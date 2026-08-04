@@ -19,15 +19,14 @@ import qualified Pawl.Types.TurnWindow as TurnWindow
 -- re-derived. `bindings` is the environment captured at that moment, which is how
 -- "it" and "that card" (CR 603.7c) survive the resolution that armed the ability.
 --
--- `expiry` is CR 603.7b's stated duration, as the game remembers it: "A delayed
--- triggered ability will trigger only once -- the next time its trigger event
--- occurs -- unless it has a stated duration, such as 'this turn.'" Nothing is
--- that rule's default, and an entry carrying it is removed as it fires. Just an
--- expiry keeps the entry armed through firing, and one of Pawl.Engine.Expiry's sweeps
--- is what eventually ends it -- CR 514.2's cleanup, for Full Throttle's "this
--- turn". Firing and the clock are not the only two ways an entry ends: an entry
--- whose `window` names a turn now behind us can no longer fire at all, and
--- Pawl.Engine.Event.settleOnsets retires it whatever its duration says.
+-- `expiry` is CR 603.7b's stated duration, as the game remembers it. Nothing is
+-- that rule's default -- fire once, the next time the trigger event occurs -- and
+-- an entry carrying it is removed as it fires. Just an expiry keeps the entry
+-- armed through firing, and one of Pawl.Engine.Expiry's sweeps is what eventually
+-- ends it (CR 514.2's cleanup, for Full Throttle's "this turn"). Firing and the
+-- clock are not the only two ways an entry ends: an entry whose `window` names a
+-- turn now behind us can no longer fire at all, and settleOnsets retires it
+-- whatever its duration says.
 --
 -- Nothing rather than an Expiry arm meaning "once", because once-ness is not a
 -- duration: the rule words it as the ABSENCE of one, and an entry with no
@@ -43,12 +42,9 @@ data DelayedTrigger = MkDelayedTrigger
     controller :: PlayerId.PlayerId,
     bindings :: Map.Map SlotName.SlotName Binding.Binding,
     -- | Pawl.Types.Onset as the game remembers it: which turns this entry may
-    -- fire on. TurnWindow.AnyTurn is the ordinary case -- an ability watches for
-    -- its event from the moment it is created, which is CR 603.7a's floor and all
-    -- those abilities ask. The other two arms are Onset.FromYourNextTurn before
-    -- and after the turn it names has begun; see Pawl.Types.TurnWindow for why
-    -- that turn is settled at the boundary rather than at arming, and why it is
-    -- one turn rather than a floor.
+    -- fire on. TurnWindow.AnyTurn is the ordinary case, CR 603.7a's floor. The
+    -- other two arms are Onset.FromYourNextTurn before and after the turn it
+    -- names has begun; see Pawl.Types.TurnWindow.
     --
     -- Not a Maybe: "no restriction" is one of the windows rather than the absence
     -- of one, unlike `expiry` below, where CR 603.7b really does word the default

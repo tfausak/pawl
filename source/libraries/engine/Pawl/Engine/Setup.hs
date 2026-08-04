@@ -134,28 +134,25 @@ createDeck pid (Deck.MkDeck m) =
 
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
-  -- CR 103.3: build and shuffle every library BEFORE any opening hand is drawn,
-  -- so CR 103.5's declaration round (Mulligan.openingHands) sees settled libraries.
+  -- CR 103.3: build and shuffle every library before any opening hand is drawn,
+  -- so CR 103.5's declaration round sees settled libraries.
   Monad.forM_ (NonEmpty.toList matchup) $ \(pid, deck) -> do
     createDeck pid deck
     Mulligan.shuffleLibrary pid
   Mulligan.openingHands perform (fmap fst (NonEmpty.toList matchup))
 
--- CR 727.2 / 729.2: build every player's library from an EXISTING object pool --
--- each player's owned CARDS, wherever they currently sit -- then shuffle and draw
--- opening hands (CR 103.5). This is deliberately NOT newGame: it reuses the real
--- objects (ownership preserved, CR 727.2) instead of minting fresh ones from Deck
--- definitions. Only Magic cards survive: an ability on the stack, a token, an
--- emblem, or a trigger is not a card (CR 727.2 / 111.7) and ceases to exist.
--- Shared by restart (CR 727) and, later, subgames (CR 729).
+-- CR 727.2 / 729.2: build every player's library from the EXISTING object pool
+-- -- each player's owned cards, wherever they currently sit -- then shuffle and
+-- draw opening hands (CR 103.5). Deliberately not newGame: it reuses the real
+-- objects (ownership preserved) instead of minting fresh ones from Deck
+-- definitions. Only Magic cards survive; an ability on the stack, a token, an
+-- emblem or a trigger is not a card (CR 727.2 / 111.7). Shared by restart (CR
+-- 727) and subgames (CR 729).
 --
--- CR 727.1 / CR 729.2 rebuild the game for the players who are IN it, so a player
--- who has left gets no library, no shuffle and no opening hand (fixed by #147); `owners` is
--- the still-playing seats, in seating order, because CR 103.5's declaration round
--- goes around the table in turn order. Their cards are not here to skip: CR 800.4a
--- takes every object a departing player owns out of the game with them
--- (Departure.objectsLeaveWith), so a rebuild has nothing of theirs left in the
--- object pool to orphan.
+-- `owners` is the still-playing seats in seating order: CR 727.1 / 729.2
+-- rebuild the game for the players who are in it, and CR 103.5's declaration
+-- round goes around the table in turn order. A departed player's cards are not
+-- here to skip -- CR 800.4a took them out of the game with them.
 startGameFromCards :: HandActionPerformer -> Game ()
 startGameFromCards perform = do
   gs <- State.get
@@ -189,32 +186,24 @@ startGameFromCards perform = do
   Mulligan.openingHands perform owners
 
 -- CR 103 / 727.1a: put `starter` at the head of the turn order, preserving the
--- cyclic order ("the game's default turn order begins with the starting player
--- and proceeds clockwise"). Total: a `starter` not in the order leaves it as-is.
+-- cyclic order. Total: a `starter` not in the order leaves it as-is.
 rotateTo :: PlayerId -> [PlayerId] -> [PlayerId]
 rotateTo starter order = case break (== starter) order of
   (before, after) -> after <> before
 
--- CR 103.4 / CR 727.1 / CR 729.2: put every player back to a new game's starting
--- state -- the starting life total, no counters -- for the two paths that rebuild
--- a game in place (restart and subgames). One helper, because the two rules want
--- the same filter for different reasons.
+-- CR 103.4 / CR 727.1 / CR 729.2: put every player back to a new game's
+-- starting state for the two paths that rebuild a game in place (restart and
+-- subgames).
 --
--- A player who has already LEFT is not reset. CR 727.1: "All players in that game
--- when it ended then start a new game following the procedures set forth in rule
--- 103" -- a player who left before it ended is not one of them. CR 729.4: "All
--- players not currently in the subgame are considered outside the subgame." So
--- their Status.Departed survives the rebuild, and nothing else about them is
--- touched either: they are not starting a game (fixed by #147).
---
--- They keep their entry in the map rather than being deleted, so every Map.lookup
--- on a PlayerId that still names them stays total. Which players are IN the
--- rebuilt game is the rebuilt GameState.turnOrder.
+-- A player who has already left is not reset: CR 727.1 restarts for the players
+-- in the game when it ended, and CR 729.4 puts everyone else outside the
+-- subgame. Their Status.Departed survives the rebuild, and they keep their
+-- entry in the map rather than being deleted, so every Map.lookup naming them
+-- stays total. Which players are in the rebuilt game is the rebuilt
+-- GameState.turnOrder.
 resetPlayers :: Map.Map PlayerId Player.Player -> Map.Map PlayerId Player.Player
 resetPlayers players =
   let reset player = case Player.status player of
-        -- Already Playing, so the status is not rewritten -- only the fields a
-        -- new game resets.
         Status.Playing ->
           player
             { Player.life = startingLife,
@@ -223,22 +212,19 @@ resetPlayers players =
         Status.Departed _ -> player
    in fmap reset players
 
--- CR 727: restart the game in place. CR 727.1: the current game immediately ends
--- and a new game begins per CR 103, with the CR 727.1a exception -- the starting
--- player is `starter` (the controller of the restarting ability), so the turn
--- order is rotated to begin with them. CR 727.2: every card returns to its
--- owner's new library via startGameFromCards, built from the ACTUAL object pool
--- (never emptyGame+newGame, which would lose the real cards and pick the wrong
--- starting player). CR 727.4: the effect finishes resolving just before the first
--- turn's untap step, with no player holding priority -- phase = firstPhase,
--- priority = Nothing, turn 1. The object and timestamp id supplies are preserved
--- so reused cards keep unique ids; startGameFromCards rebuilds objects and zones.
+-- CR 727: restart the game in place. CR 727.1a's starting player is `starter`
+-- (the controller of the restarting ability), so the turn order is rotated to
+-- begin with them. CR 727.2: every card returns to its owner's new library via
+-- startGameFromCards, built from the actual object pool -- never emptyGame plus
+-- newGame, which would lose the real cards and pick the wrong starting player.
+-- CR 727.4: the effect finishes resolving just before the first turn's untap
+-- step with no player holding priority. The object and timestamp id supplies
+-- are preserved so reused cards keep unique ids.
 restartGame :: HandActionPerformer -> PlayerId -> Game ()
 restartGame perform starter = do
   State.modify' $ \gs ->
-    -- CR 727.1: "All players in that game when it ended then start a new game
-    -- ..." -- so the rebuilt seating order is the players who were still in the
-    -- game, in their seats (fixed by #147), rotated to begin with `starter` (CR 727.1a).
+    -- CR 727.1: the rebuilt seating order is the players who were still in the
+    -- game, in their seats, rotated to begin with `starter` (CR 727.1a).
     let order = rotateTo starter (Game.stillPlayingInOrder gs)
      in gs
           { GameState.players = resetPlayers (GameState.players gs),
@@ -254,12 +240,11 @@ restartGame perform starter = do
             GameState.replacements = [],
             GameState.playerEffects = [],
             GameState.turnOrder = order,
-            -- CR 727.1a: "The starting player in the new game is the player who
-            -- controlled the spell or ability that restarted the game." Read back
-            -- off the rebuilt order, exactly as subgameStateFrom does, so the two
-            -- can never disagree and this always names a seat: rotateTo leaves an
-            -- order alone when `starter` is not in it, and the head is then the
-            -- first still-playing seat.
+            -- CR 727.1a. Read back off the rebuilt order, exactly as
+            -- subgameStateFrom does, so the two can never disagree and this
+            -- always names a seat: rotateTo leaves an order alone when
+            -- `starter` is not in it, and the head is then the first
+            -- still-playing seat.
             GameState.activePlayer = Maybe.fromMaybe starter (Maybe.listToMaybe order),
             GameState.phase = Turn.firstPhase,
             GameState.remaining = Turn.laterPhases,
@@ -268,8 +253,8 @@ restartGame perform starter = do
             GameState.turnNumber = 1,
             GameState.result = Nothing,
             -- CR 727.4: the game the caller was running has been replaced.
-            -- Engine.priorityLoop and Engine.runStep read this and unwind to the
-            -- rebuilt turn 1 rather than granting priority or advancing past it.
+            -- Engine.priorityLoop and Engine.runStep read this and unwind to
+            -- the rebuilt turn 1 rather than granting priority.
             GameState.restartSignal = RestartSignal.Restarted,
             GameState.drewFromEmpty = mempty,
             GameState.landPlayed = mempty,
@@ -277,80 +262,46 @@ restartGame perform starter = do
             GameState.activeControl = Nothing,
             GameState.monarch = Nothing,
             GameState.exiledUntilMonarch = Map.empty,
-            -- CR 727.1: the game that scheduled them has ended, so no extra turn
-            -- survives into the new one -- cleared exactly as every other
-            -- transient field is.
+            -- CR 727.1: the game that scheduled them has ended, so no extra
+            -- turn survives into the new one.
             GameState.extraTurns = [],
             GameState.turnAnchor = Nothing
           }
   startGameFromCards perform
 
--- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards ONLY --
--- each player takes all the cards in their main-game library into the subgame
--- library; no other main-game zone enters (rule 729.2). The object pool is
--- restricted to those library objects; startGameFromCards (called by playSubgame)
--- then rebuilds each subgame library from that pool, shuffles, and draws opening
--- hands (CR 103). Players reset to a new game (CR 103); every transient field is
--- cleared, exactly as restartGame does, EXCEPT the object/timestamp id supplies,
--- which are INHERITED from the parent so every object the subgame mints (CR 400.7)
--- gets an id above every parent id -- funnelBack relies on that for non-collision.
--- CR 729.2's "randomly determine which player goes first" happens in the caller
--- (Engine.playSubgame asks Prompt.RandomFirstPlayer); `starter` is what it rolled.
--- CR 103.1: the turn order is rotated to begin with them, exactly as CR 727.1a's
--- restart does -- rotating rather than only setting activePlayer is load-bearing,
--- because Engine.skipsDraw (CR 103.8a) tests the HEAD of the turn order. Total: a
--- `starter` outside the order leaves it alone (rotateTo), and activePlayer is read
--- back off the rotated order, so the two can never disagree.
+-- CR 729.2: build a fresh subgame state from the parent's LIBRARY cards only;
+-- no other main-game zone enters. The object pool is restricted to those
+-- library objects; startGameFromCards (called by playSubgame) then rebuilds
+-- each subgame library from that pool, shuffles, and draws opening hands (CR
+-- 103). Every transient field is cleared as restartGame does, EXCEPT the
+-- object/timestamp id supplies, which are inherited from the parent so every
+-- object the subgame mints (CR 400.7) gets an id above every parent id --
+-- funnelBack relies on that for non-collision. `starter` is what the caller's
+-- CR 729.2 random roll produced. Rotating the turn order to begin with them (CR
+-- 103.1), rather than only setting activePlayer, is load-bearing:
+-- Engine.skipsDraw (CR 103.8a) tests the HEAD of the turn order. Total: a
+-- `starter` outside the order leaves it alone, and activePlayer is read back
+-- off the rotated order, so the two cannot disagree.
 subgameStateFrom :: PlayerId -> GameState -> GameState
 subgameStateFrom starter parent =
   let libIds =
         Set.fromList
           (concatMap (\pid -> Foldable.toList (Map.findWithDefault Seq.empty pid (GameState.library parent))) (GameState.turnOrder parent))
       libObjects = Map.restrictKeys (GameState.objects parent) libIds
-      -- The pool is drawn from EVERY seat in the parent's FULL roster
-      -- (GameState.turnOrder), never narrowed to Game.stillPlayingInOrder
-      -- -- `order` below DOES narrow to the seated players (CR 729.4, fixed by #147), but
-      -- this pool must not, because funnelBack's oldLibIds is built the SAME way
-      -- over the SAME full roster, and the two have to agree: funnelBack drops
-      -- every id in that set from the parent's kept objects (Map.withoutKeys)
-      -- and rebuilds the returned set only from what actually survived the
-      -- subgame (`returned`, plus `recovered` for CR 800.4a departures -- see
-      -- funnelBack). Narrowing THIS pool to the seated players while funnelBack
-      -- keeps the full roster would let funnelBack drop a STILL-PLAYING player's
-      -- real library object that this pool never captured to fund a return for
-      -- -- destroying it, silently.
+      -- Invariant: `libIds` here and funnelBack's `oldLibIds` MUST compute the
+      -- identical id set. Both draw from the parent's FULL roster
+      -- (GameState.turnOrder), never narrowed to Game.stillPlayingInOrder --
+      -- `order` below does narrow to the seated players (CR 729.4), but this
+      -- pool must not. funnelBack drops every id in that set from the parent's
+      -- kept objects and refunds it only from what survived the subgame, so
+      -- narrowing one side and not the other would silently destroy a
+      -- still-playing player's library object that this pool never captured.
       --
-      -- A departed seat's own share of this pool is, in practice, always empty
-      -- now, which is a change from before CR 800.4a landed (this same
-      -- milestone): Departure.objectsLeaveWith deletes a departing player's
-      -- library outright the instant they leave a CR 800.1 multiplayer game,
-      -- and a departure in a two-player game ends the whole game (CR 104.2a)
-      -- before any subgame could be built from it in the first place -- see
-      -- Pawl.Engine.Departure. (A restart INSIDE a subgame, Setup.restartGame, can
-      -- later shrink turnOrder below what it was at departure time, but it
-      -- never resurrects objects Departure.objectsLeaveWith already deleted, so
-      -- this stays true even then; funnelBack's own recovery guard relies on
-      -- the same fact.) So this is no longer about ferrying a departed player's
-      -- cards through the subgame inert so funnelBack can return them later --
-      -- there is nothing left of theirs to ferry -- it is purely the
-      -- bookkeeping symmetry with funnelBack described above, which has to hold
-      -- regardless of who is or isn't currently seated.
-      --
-      -- Named plainly: `libIds` here and funnelBack's `oldLibIds` MUST compute
-      -- the identical id set, and today they do, by construction -- both are the
-      -- same expression (`concatMap` over each `GameState.library parent` entry,
-      -- keyed by `GameState.turnOrder parent`) applied to the same `parent`
-      -- value, because playSubgame's outer state is untouched while the subgame
-      -- runs (CR 729.1a), so the `parent` funnelBack later reads back is this
-      -- `parent` argument, unchanged. The match is a maintenance invariant, not a
-      -- live gap: nothing today lets the two expressions drift apart, but an edit
-      -- that changed one side's roster (e.g. narrowing it to seated players)
-      -- without the other would reintroduce exactly the silent-destruction risk
-      -- described above. This is a SEPARATE concern from a player who departs
-      -- INSIDE the subgame, after this pool is already fixed -- that is
-      -- funnelBack's `recovered` pass, which is driven by the owner's absence
-      -- from the FINISHED subgame's own objects, not by anything this pool
-      -- captured for them at the start; see funnelBack's haddock.
+      -- They agree today by construction: the same expression applied to the
+      -- same `parent`, which is unchanged while the subgame runs (CR 729.1a).
+      -- That is a maintenance invariant, not a live gap. A player who departs
+      -- INSIDE the subgame is a separate concern, handled by funnelBack's
+      -- `recovered` pass.
       order = rotateTo starter (Game.stillPlayingInOrder parent)
       firstPlayer = Maybe.fromMaybe (GameState.activePlayer parent) (Maybe.listToMaybe order)
    in parent
@@ -390,80 +341,51 @@ subgameStateFrom starter parent =
           GameState.monarch = Nothing,
           GameState.exiledUntilMonarch = Map.empty,
           -- CR 729.1a: the subgame is its own game and starts from turn 1, so
-          -- the main game's pending extra turns are not in it. The main game's
-          -- own copy is untouched -- the parent state sits in the outer frame --
-          -- so they are still waiting when the subgame ends.
+          -- the main game's pending extra turns are not in it. Its own copy
+          -- sits untouched in the outer frame, still waiting when the subgame
+          -- ends.
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
         }
 
 -- CR 729.5: at the end of a subgame, each player takes all traditional cards
--- (Source.OfCard) they own ANYWHERE in the subgame into their main-game library
--- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step). All other
--- subgame objects and the subgame's zones cease to exist -- they are simply not
--- carried over. The parent's non-library objects (hand, battlefield, graveyard,
--- ...) are untouched: the main game continues from where it was discontinued. The
--- old parent library objects are dropped (they moved into the subgame).
--- `oldLibIds` spans the parent's FULL seating roster, matching
--- subgameStateFrom's `libIds` -- see the comment there for why the two
--- expressions must stay identical. Returned cards keep their subgame ids, which
--- are all above the parent supply (subgameStateFrom inherited it), so Map.union
--- cannot collide; the id/timestamp supplies advance to the subgame high-water
--- mark.
+-- (Source.OfCard) they own anywhere in the subgame into their main-game library
+-- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step). All
+-- other subgame objects and zones simply are not carried over. The parent's
+-- non-library objects are untouched -- the main game continues from where it
+-- was discontinued -- and the old parent library objects are dropped, having
+-- moved into the subgame. `oldLibIds` spans the parent's full seating roster,
+-- matching subgameStateFrom's `libIds`; see there for why the two must stay
+-- identical. Returned cards keep their subgame ids, all above the parent
+-- supply, so Map.union cannot collide; the supplies advance to the subgame
+-- high-water mark.
 --
--- CR 729.4's second sentence keeps the subgame and the main game as separate
--- populations: a player who leaves the SUBGAME has not left the main game, and
--- nothing in the CR removes a card from a player's deck for losing a subgame --
--- CR 729.5 says the opposite. But a subgame that itself began with more than two
--- players is CR 800.1 multiplayer (a subgame can be multiplayer even when its
--- departing player has only two OPPONENTS in the PARENT), so a departure inside
--- it really does reach Departure.objectsLeaveWith (CR 800.4a) and delete every
--- object that player owned in the subgame outright -- and `returned`, built only
--- from `finalSub`'s surviving objects, has nothing left to funnel back for them.
--- `recovered` restores exactly that set from the PARENT's pre-subgame copies.
+-- A subgame that began with more than two players is CR 800.1 multiplayer even
+-- when its departing player has only two opponents in the PARENT, so a
+-- departure inside it reaches CR 800.4a's Departure.objectsLeaveWith and
+-- deletes every object that player owned in the subgame -- leaving `returned`
+-- nothing to funnel back for them. `recovered` restores exactly that set from
+-- the parent's pre-subgame copies.
 --
--- The guard is on the CARD'S OWNER, not on whether its id merely fails to
--- appear in `finalSub`'s objects: CR 400.7 mints a fresh id on every zone
--- change (a draw, a cast, a death), including the opening-hand draws every
--- subgame runs through startGameFromCards, so an id from `oldLibIds` going
--- missing is the ORDINARY case for a card that is alive and well under a NEW
--- id -- one `returned` already has. A real card's object is never deleted
--- outright by anything other than Departure.objectsLeaveWith (CR 704.5d's
--- `ceaseToExist` in Pawl.Engine.Sba guards on Source.OfToken and never fires for
--- Source.OfCard), so the only players whose oldLibIds objects can legitimately
--- need recovering are ones for whom objectsLeaveWith actually fired.
+-- The guard is on the card's OWNER, not on the id merely being missing from
+-- `finalSub`: CR 400.7 mints a fresh id on every zone change, including the
+-- opening-hand draws, so a missing `oldLibIds` id is the ordinary case for a
+-- card that is alive under a new id. Nothing but objectsLeaveWith deletes a
+-- real card's object outright (Sba's `ceaseToExist` guards on Source.OfToken),
+-- so its firing is the only thing that can need recovering.
 --
--- The test for THAT is "this owner has no object of any kind left anywhere in
--- `finalSub`" -- not "Departure.continuesAfterDeparture finalSub", which was
--- tried and rejected: that reads `finalSub`'s turnOrder at the END of the
--- subgame, but objectsLeaveWith's own gate was decided at DEPARTURE time
--- (Departure.hs), and the two can disagree. Setup.restartGame rewrites
--- turnOrder to `Game.stillPlayingInOrder`, DROPPING departed seats, and a
--- restart can resolve inside a subgame (Effect.RestartGame, Resolve.hs;
--- playSubgame's playGame honours restartSignal) -- so a three-seat subgame
--- where bob departs (wiping him) followed by an in-subgame restart leaves
--- `finalSub`'s own turnOrder at length 2, and continuesAfterDeparture on
--- `finalSub` reads False even though bob's objects are gone. The owner-absence
--- test doesn't have this problem: restartGame's startGameFromCards rebuilds
--- `objects` from the pool that ALREADY EXISTS (Map.filter isCard, no owner
--- restriction) -- it can carry a survivor's objects forward, but it can never
--- resurrect a departed player's, because objectsLeaveWith already deleted
--- every one of them before the restart ran. A departed owner therefore stays
--- absent from `finalSub`'s objects through any number of intervening
--- restarts, which is exactly the robustness this predicate needs.
---
--- It is also still correctly False for a player who merely decks out in a
--- subgame that never reaches multiplayer (CR 800.1): there, objectsLeaveWith
--- never fires at all (Departure.depart's own gate), so their drawn cards are
--- untouched and still sit in `finalSub`'s objects under their post-draw ids --
--- `returned` already has them, and the owner is not absent.
---
--- The explicit "id itself is still missing from finalSub" check used to be a
--- separate third conjunct; it is now REDUNDANT and has been dropped: owner is
--- invariant across a card's whole life (Event.changeZoneReturning carries it
--- forward on every zone change), so if the owner has no object anywhere in
--- `finalSub`, this specific `oid` -- which belongs to that same owner -- cannot
--- be one of finalSub's objects either.
+-- Owner-absence rather than `Departure.continuesAfterDeparture finalSub`, which
+-- was tried and rejected: that reads turnOrder at the END of the subgame while
+-- objectsLeaveWith's gate was decided at departure time, and an in-subgame
+-- restart rewrites turnOrder to the still-playing seats, so the two disagree. A
+-- departed owner stays absent from `finalSub`'s objects through any number of
+-- restarts, since a restart rebuilds from the pool that already exists and can
+-- never resurrect what objectsLeaveWith deleted. It stays correctly False for a
+-- player who merely decks out in a subgame that never reaches multiplayer:
+-- objectsLeaveWith never fires there, so their cards are still in `finalSub`
+-- and `returned` has them. Owner is invariant across a card's life, so an
+-- absent owner also implies this `oid` is missing -- no separate id check is
+-- needed.
 funnelBack :: GameState -> GameState -> GameState
 funnelBack finalSub parent =
   let isCard obj = case Object.source obj of

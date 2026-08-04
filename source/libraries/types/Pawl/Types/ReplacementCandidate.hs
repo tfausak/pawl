@@ -14,9 +14,8 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 -- applicability test and the ChooseReplacement payload read it directly.
 --
 -- `origin` rides here rather than on ReplacementEffect because CR 614.15 is about
--- which ability CREATED an effect, not about what the effect does; see
--- Pawl.Types.ReplacementOrigin. It is what lets bucketOf answer CR 616.1a without
--- the rules core ever asking what an effect IS.
+-- which ability CREATED an effect, not about what it does. It is what lets
+-- bucketOf answer CR 616.1a without the rules core asking what an effect IS.
 data ReplacementCandidate = MkReplacementCandidate
   { identity :: CandidateId.CandidateId,
     effect :: ReplacementEffect.ReplacementEffect,

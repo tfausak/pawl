@@ -1,8 +1,7 @@
 module Pawl.Types.Payment where
 
--- | Whether a cost was paid. CR 601.2h: "Partial payments are not allowed.
--- Unpayable costs can't be paid." -- so the answer is genuinely two-valued, and
--- a sum type rather than a Bool per the house rule against boolean blindness.
+-- | Whether a cost was paid. CR 601.2h allows no partial payments, so the answer
+-- is genuinely two-valued, and a sum type rather than a Bool.
 --
 -- Runtime-only: a Payment is never card data and never serialized.
 --

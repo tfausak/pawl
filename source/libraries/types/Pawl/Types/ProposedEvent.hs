@@ -17,27 +17,24 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- and the one that survives the CR 616.1 loop is the one that actually happens.
 --
 -- WouldEnter is raised only for BATTLEFIELD entries (CR 614.1c-d apply nowhere
--- else) and is NESTED inside whatever caused the entry -- CR 616.1g's containment
--- ("one effect may apply to an event, and another to an event contained within
--- the first"), expressed as call nesting rather than as a field.
+-- else) and is NESTED inside whatever caused the entry -- CR 616.1g's
+-- containment, expressed as call nesting rather than as a field.
 --
 -- It carries an ObjectId and NOTHING ELSE, including no would-be controller for
 -- CR 616.1b to rewrite, because the engine materializes the entering permanent
--- before the loop runs (CR 614.12's "as it would exist on the battlefield", see
--- Pawl.Engine.Replacement.runEntry). Every property of the entry that a
--- replacement can modify therefore lives on the OBJECT -- the copy snapshot, the
--- entry choice, the counters, and CR 110.2's default controller -- and each
--- rewrite writes there, which is also what makes CR 616.2 fall out: the loop's
--- next iteration re-collects against a board that already shows the change.
+-- before the loop runs (CR 614.12). Every property of the entry a replacement can
+-- modify therefore lives on the OBJECT -- the copy snapshot, the entry choice,
+-- the counters, and CR 110.2's default controller -- and each rewrite writes
+-- there, which is also what makes CR 616.2 fall out: the loop's next iteration
+-- re-collects against a board that already shows the change.
 --
 -- WouldBeginPhase is the one arm that is not about an OBJECT: CR 614.1b's skips
 -- replace a step, a phase or a turn, none of which any object owns. Its PlayerId
--- is the active player -- the player whose step it is, and so CR 616.1's
--- "affected player" for the choice among applicable skips.
+-- is the active player, and so CR 616.1's "affected player" for the choice among
+-- applicable skips.
 --
--- Seven arms, not the ~40 replaceable event classes the rules define: each of the
--- rest is one more arm plus the funnel that raises it -- vocabulary on a finished
--- axis, which is what "the closed half can genuinely be finished" means here.
+-- Seven arms, not every replaceable event class the rules define: each of the
+-- rest is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
   | WouldEnter ObjectId.ObjectId
@@ -51,15 +48,13 @@ data ProposedEvent
   | WouldCreateTokens PlayerId.PlayerId Card.Card Natural.Natural
   | -- | CR 500.11 / 614.10: a step or phase would begin, on this player's turn.
     -- Raised by Engine.runStep before anything about the step is observable, so
-    -- a skip that takes it leaves no trace -- CR 614.10's "once a step, phase, or
-    -- turn has started, it can no longer be skipped" read as the moment this
-    -- event exists.
+    -- a skip that takes it leaves no trace -- CR 614.10 stops a step, phase or
+    -- turn being skipped once it has started, read as the moment this event
+    -- exists.
     --
     -- A PhaseSelector, not a Phase, because CR 500.11 lets a skip name a whole
     -- PHASE and CR 500.1's beginning, combat and ending phases are more than one
     -- schedule entry each. Engine.runStep therefore raises this TWICE at the
-    -- first step of such a phase -- once for the phase, once for the step -- and
-    -- CR 614.10's "once a step, phase, or turn has started" is what keeps the
-    -- phase question to that one moment.
+    -- first step of such a phase -- once for the phase, once for the step.
     WouldBeginPhase PhaseSelector.PhaseSelector PlayerId.PlayerId
   deriving (Eq, Show)

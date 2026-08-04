@@ -21,9 +21,8 @@ import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
-  -- CR 508.1c: Pacifism's first half, "Enchanted creature can't attack" -- the
-  -- FIRST clause of the parenthetical, so the "unless" key is absent rather than
-  -- null.
+  -- CR 508.1c's first clause: unconditional, so the "unless" key is absent
+  -- rather than null.
   Spec.it s "CantAttack carries its Affected" $
     Common.assertJsonCodec
       s
@@ -31,7 +30,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.fromJson
       (CombatRestriction.CantAttack Affected.Attached Nothing)
       """ {"type":"CantAttack","value":{"affected":{"type":"Attached"}}} """
-  -- CR 509.1b: Pacifism's second half, "... or block".
+  -- CR 509.1b, the blocking counterpart.
   Spec.it s "CantBlock carries its Affected" $
     Common.assertJsonCodec
       s
@@ -39,8 +38,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.fromJson
       (CombatRestriction.CantBlock Affected.Attached Nothing)
       """ {"type":"CantBlock","value":{"affected":{"type":"Attached"}}} """
-  -- CR 508.1c's SECOND clause, "or that it can't attack unless some condition is
-  -- met" -- Blind-Spot Giant's "unless you control another Giant", in miniature.
+  -- CR 508.1c's second clause: the gated form.
   Spec.it s "CantAttack carries its condition" $
     Common.assertJsonCodec
       s
@@ -62,10 +60,9 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       (CombatRestriction.fromJson (CombatRestriction.toJson (CombatRestriction.CantBlock Affected.Attached (Just anotherGiant))))
       (Right (CombatRestriction.CantBlock Affected.Attached (Just anotherGiant)))
 
--- "you control a Giant" -- Blind-Spot Giant's gate minus the `Not IsSource`
--- conjunct that makes it "ANOTHER Giant", which is dropped only to keep the
--- expected string readable: the codec writes one Filter like any other, and
--- Pawl.Codec.FilterSpec is where that conjunct is covered.
+-- "you control a Giant", without the `Not IsSource` conjunct that would make it
+-- "another Giant" -- dropped only to keep the expected string readable, since
+-- Pawl.Codec.FilterSpec covers that conjunct.
 anotherGiant :: Condition.Condition
 anotherGiant =
   Condition.MkCondition

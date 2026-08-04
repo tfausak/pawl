@@ -26,11 +26,9 @@ data View = MkView
     subtypes :: Set.Set Subtype.Subtype,
     -- CR 702: the keyword abilities the candidate has. A SET and not the
     -- projection's Map Keyword Natural, because HasKeyword asks membership and
-    -- nothing else: CR 702 lets an object have the same keyword ability twice
-    -- (ProjectedCharacteristics.keywords counts it), and no card text asks how
-    -- many. Read from the PROJECTION on the battlefield and from the printed card
-    -- off it, exactly as cardTypes and colors are -- so a creature that gains
-    -- flying at layer 6 matches, and a Humility'd one (CR 613.1f) does not.
+    -- nothing else. Read from the PROJECTION on the battlefield and from the
+    -- printed card off it, so a creature that gains flying at layer 6 matches and
+    -- a Humility'd one (CR 613.1f) does not.
     keywords :: Set.Set Keyword.Keyword,
     power :: Maybe Integer,
     controller :: Maybe PlayerId.PlayerId,
@@ -47,25 +45,18 @@ data View = MkView
     playerIdentity :: Maybe PlayerId.PlayerId,
     -- CR 508.1k: is this candidate an attacking creature right now? Not a
     -- characteristic (CR 109.3 says so in as many words), so it is read from
-    -- GameState.combat rather than from a projection -- see
-    -- Pawl.Engine.Projection.viewOfCharacteristics. False for every candidate with no
-    -- combat status to read: a printed card off the battlefield, a player, and an
-    -- event snapshot -- the same vacuous posture power and controller take.
+    -- GameState.combat rather than from a projection. False for every candidate
+    -- with no combat status to read: a printed card off the battlefield, a
+    -- player, an event snapshot -- the vacuous posture power and controller take.
     attacking :: Bool,
-    -- CR 509.1g: is this candidate a blocking creature right now? Not a
-    -- characteristic either (CR 109.3), so it is read from GameState.combat
-    -- alongside `attacking` -- but from the OTHER map: Combat.blockers is keyed
-    -- by attacker, and a blocking creature is a MEMBER of some attacker's set.
-    -- False for every candidate with no combat status to read, the vacuous
-    -- posture `attacking` takes.
+    -- CR 509.1g: is this candidate a blocking creature right now? Read from
+    -- GameState.combat alongside `attacking` -- but from the OTHER map:
+    -- Combat.blockers is keyed by attacker, and a blocking creature is a MEMBER
+    -- of some attacker's set.
     blocking :: Bool,
     -- CR 608.2i: was this candidate declared as an attacker earlier this turn?
-    -- Not a characteristic either, and unlike `attacking` not even a present
-    -- state: it is a look-back read of the turn-scoped GameEvent log, which
-    -- CR 608.2i is the rule for -- see Pawl.Engine.Projection.viewOfCharacteristics.
-    -- False for every candidate with no history to read: a printed card off the
-    -- battlefield, a player, and an event snapshot -- the vacuous posture
-    -- `attacking` takes.
+    -- Unlike `attacking` not even a present state: it is a look-back read of the
+    -- turn-scoped GameEvent log.
     --
     -- LAZY, like `attachedToCreature` below but for a plainer reason: filling it
     -- folds the whole turn's event log, and nothing forces it unless a Filter
@@ -73,12 +64,9 @@ data View = MkView
     -- the recursion hazard the next field records.
     attackedThisTurn :: Bool,
     -- CR 701.3a: is this candidate attached to a CREATURE right now? Not a
-    -- characteristic either (CR 109.3 names "what an Aura enchants" among the
-    -- things that are not one), so it is read from Object.attachedTo plus the
-    -- HOST's projected card types rather than from the candidate's own
-    -- projection -- see Pawl.Engine.Projection.viewOfCharacteristics. False for every
-    -- candidate with no attachment to read: a printed card off the battlefield,
-    -- a player, and an event snapshot -- the vacuous posture `attacking` takes.
+    -- characteristic either (CR 109.3), so it is read from Object.attachedTo plus
+    -- the HOST's projected card types rather than from the candidate's own
+    -- projection.
     --
     -- LAZY, and load-bearingly so. Filling it costs a projection OF ANOTHER
     -- OBJECT, and viewOfCharacteristics is itself called from inside
@@ -91,18 +79,13 @@ data View = MkView
     attachedToCreature :: Bool,
     -- CR 303.4: is this candidate attached to a PERMANENT right now? Read from
     -- Object.attachedTo alone -- whether the attachment names an object rather
-    -- than a player (CR 303.4 attaches an Aura to "an object or player"), and
-    -- Recipient.objectOf is that question. False for every candidate with no
-    -- attachment to read, the vacuous posture `attacking` takes.
-    --
-    -- Unlike `attachedToCreature` this reads no second projection, so it needs no
-    -- laziness argument: an object's attachment is a stored field, and whether it
-    -- names an object or a player is settled without asking the host anything.
+    -- than a player, which is what Recipient.objectOf asks. Unlike
+    -- `attachedToCreature` this reads no second projection, so it needs no
+    -- laziness argument.
     attachedToPermanent :: Bool,
     -- CR 701.3a: could the SUBJECT of the attach now being performed -- the
     -- permanent an Effect.AttachTarget is moving -- legally be attached to this
-    -- candidate? "An Aura, Equipment, or Fortification can't be attached to an
-    -- object or player it couldn't enchant, equip, or fortify, respectively."
+    -- candidate?
     --
     -- The one field whose answer depends on something OTHER than the candidate,
     -- which is why it lives here rather than in Context: Context carries no game
@@ -112,20 +95,17 @@ data View = MkView
     -- that performs the move, so the offer and the move cannot disagree.
     --
     -- False everywhere else, and that is not a lost distinction: outside an attach
-    -- there is no subject for the question to be about. The vacuous posture
-    -- `playerIdentity` and `attacking` take. A Filter that named the atom from any
-    -- other position would read that vacuous False, so no card is allowed to:
-    -- Pawl.CardSpec's "CR 701.3a no card asks CanHostSubject outside an attach's
-    -- destination" rejects it in every Filter position a card has but this one's.
-    -- Widening the subject to somewhere every evaluation can see it is #572.
+    -- there is no subject for the question to be about. A Filter that named the
+    -- atom from any other position would read that vacuous False, so no card is
+    -- allowed to -- Pawl.CardSpec rejects it in every Filter position a card has
+    -- but this one's. Widening the subject to somewhere every evaluation can see
+    -- it is #572.
     canHostSubject :: Bool,
     -- CR 111.1 / 111.6: is this candidate a token rather than a card? Read from
     -- Object.source (Pawl.Engine.Game.isToken), never from a projection -- CR 111.3 makes
     -- a token's effect-defined characteristics equivalent to printed ones, so no
     -- characteristic axis distinguishes the two and no CR 613 layer can change the
-    -- answer. False for every candidate with no object behind it: a printed card
-    -- off the battlefield, a player, and an event snapshot -- the same vacuous
-    -- posture `attacking` and `attachedToCreature` take.
+    -- answer. False for every candidate with no object behind it.
     token :: Bool
   }
   deriving (Eq, Show)
@@ -141,8 +121,7 @@ playerView pid =
       colors = Set.empty,
       subtypes = Set.empty,
       -- CR 702.1: a keyword ability is an ability OF AN OBJECT, and CR 109.1's
-      -- list of what an object is has no player in it -- so a player candidate
-      -- has none, the vacuous posture cardTypes and colors already take here.
+      -- list of what an object is has no player in it.
       keywords = Set.empty,
       power = Nothing,
       controller = Nothing,
@@ -155,17 +134,14 @@ playerView pid =
       -- CR 506.3 again: a player was never declared as an attacker either.
       attackedThisTurn = False,
       -- CR 303.4b: a player an Aura is attached to is ENCHANTED by it; the
-      -- player is not itself attached to anything, because Object.attachedTo
-      -- runs the other way -- it is a field of the ATTACHED permanent, and a
-      -- player is not one.
+      -- player is not itself attached to anything, because Object.attachedTo is
+      -- a field of the ATTACHED permanent, and a player is not one.
       attachedToCreature = False,
-      -- CR 303.4 again, for the same reason: Object.attachedTo is a field of the
-      -- ATTACHED permanent, and a player is not one.
+      -- CR 303.4 again, for the same reason.
       attachedToPermanent = False,
-      -- CR 701.3a's question can be asked about a player -- CR 702.5d lets an
-      -- enchant-player Aura be attached to one -- but not here: the only site that
-      -- fills this field is Pawl.Engine.Resolve's AttachTarget arm, whose candidates are
-      -- battlefield permanents, so no player candidate ever carries an answer.
+      -- CR 701.3a's question can be asked about a player (CR 702.5d), but not
+      -- here: the only site that fills this field is Pawl.Engine.Resolve's
+      -- AttachTarget arm, whose candidates are battlefield permanents.
       canHostSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False
@@ -199,16 +175,11 @@ matches context view predicate = case predicate of
     Just p -> p >= n
   -- Every other player is an Opponent by construction: CR 806.1 has a
   -- free-for-all's players compete as individuals against each other, and CR
-  -- 102.2 says the same for two players -- one predicate, `c /= p`, serves
-  -- both. CR 102.3's teams are the ONE reading it is wrong for, and pawl has
-  -- none to express (#175). Unlike Pawl.Engine.Count.playersFor, which folds a player
-  -- SET, this arm tests one candidate `View` at a time, so there is no set
-  -- here to get the size of wrong. `controller view == Nothing` off the
-  -- battlefield is already covered by View's own haddock (vacuously False,
-  -- the same posture PowerAtLeast takes).
-  --
-  -- Pinned at three seats by ResolveSpec's "CR 806.1 at three seats a
-  -- ControlledBy Opponent pool spans BOTH opponents' creatures".
+  -- 102.2 says the same for two players -- one predicate, `c /= p`, serves both.
+  -- CR 102.3's teams are the ONE reading it is wrong for, and pawl has none to
+  -- express (#175). Unlike Pawl.Engine.Count.playersFor, which folds a player
+  -- SET, this arm tests one candidate `View` at a time, so there is no set here
+  -- to get the size of wrong.
   Filter.ControlledBy relation -> case (controller view, perspective context) of
     (Just c, Just p) -> case relation of
       PlayerRelation.You -> c == p
@@ -226,14 +197,12 @@ matches context view predicate = case predicate of
       PlayerRelation.You -> candidate == you
       PlayerRelation.Opponent -> candidate /= you
     _ -> False
-  -- CR 508.1k: "it remains an attacking creature until it's removed from combat
-  -- or the combat phase ends, whichever comes first" -- so this is a live read of
-  -- the combat record, never a stamp on the object.
+  -- CR 508.1k: a creature stays attacking until it is removed from combat or the
+  -- combat phase ends, so this is a live read of the combat record, never a stamp
+  -- on the object.
   Filter.IsAttacking -> attacking view
-  -- CR 509.1g: "it remains a blocking creature until it's removed from combat or
-  -- the combat phase ends, whichever comes first" -- the same live read of the
-  -- combat record IsAttacking is, off the other map. Never the question
-  -- Pawl.Engine.Combat.isBlocked asks: CR 509.1h's last sentence keeps an attacker
+  -- CR 509.1g: the same live read IsAttacking is, off the other map. Never the
+  -- question Pawl.Engine.Combat.isBlocked asks: CR 509.1h keeps an attacker
   -- blocked after every creature blocking it has gone, so this can be False for
   -- everything while that is still True.
   Filter.IsBlocking -> blocking view
@@ -254,22 +223,21 @@ matches context view predicate = case predicate of
   -- CR 701.3a: a live read of the legality of the attach this match is framing,
   -- computed by the caller that knows what is moving. Vacuously False outside one.
   Filter.CanHostSubject -> canHostSubject view
-  -- CR 111.6: "A token isn't a card." A live read of what the object is
+  -- CR 111.6: a token isn't a card. A live read of what the object is
   -- represented by (Object.source), never a stamp on the candidate -- and unlike
   -- the two arms above it cannot change while the game runs, because CR 111.3
-  -- makes a token's characteristics equivalent to a card's rather than a
-  -- different kind of thing that some effect could convert.
+  -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
 
--- CR 612.1: swap subtype words wherever they appear in a Filter. A
--- text-changing effect "can apply to any words or symbols printed on that
--- object", and a Filter carried by an effect is part of that text -- so this is
--- the shape Pawl.Engine.Projection.rewriteModification already has, for the type THIS
--- module owns. Pawl.Engine.Resolve threads one call per Filter-carrying effect arm
--- rather than learning what is inside each one.
+-- CR 612.1: swap subtype words wherever they appear in a Filter. A text-changing
+-- effect reaches any word printed on the object, and a Filter carried by an
+-- effect is part of that text -- so this is the shape
+-- Pawl.Engine.Projection.rewriteModification already has, for the type THIS
+-- module owns. Pawl.Engine.Resolve threads one call per Filter-carrying effect
+-- arm rather than learning what is inside each one.
 --
 -- HasSubtype is the only atom REWRITTEN here. Most of the rest name a card type,
 -- a supertype, a colour, a number, a relation or a status, none of which CR 612's
@@ -278,12 +246,10 @@ matches context view predicate = case predicate of
 -- catch-all, so a later atom that can carry a subtype fails to compile here
 -- instead of silently going unrewritten.
 --
--- CR 612.2's family gate ("only those words that are used in the correct way")
--- is not restated on the HasSubtype arm, for the reason
+-- CR 612.2's family gate is not restated on the HasSubtype arm, for the reason
 -- Pawl.Engine.Projection's type-line half gives: a HasSubtype atom may name a
--- word of any family -- Kormus Bell's Swamp is a land type, a Sliver lord's
--- Sliver is a creature type -- so the family the word is used as IS the family
--- the word belongs to, and the exact `lookup` already asks CR 612.2's question.
+-- word of any family, so the family the word is used as IS the family the word
+-- belongs to, and the exact `lookup` already asks CR 612.2's question.
 rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter Keyword.Keyword -> Filter.Filter Keyword.Keyword
 rewrite pairs predicate = case predicate of
   Filter.HasSubtype s -> Filter.HasSubtype (Maybe.fromMaybe s (lookup s pairs))
@@ -296,17 +262,15 @@ rewrite pairs predicate = case predicate of
   -- Not rewritten, and CR 702.14a is why it is a live question rather than an
   -- obvious no: landwalk carries a criterion naming a land type
   -- (Keyword.Landwalk (HasSubtype Swamp)), so a text-changing effect could in
-  -- principle reach the word inside this atom. Since #499 made that payload a
-  -- Filter, the fix is no longer a new traversal -- it is this very function,
-  -- called on the keyword's own criterion.
+  -- principle reach the word inside this atom, and since that payload is a
+  -- Filter (#499) this very function would be the fix.
   --
-  -- Still nothing to rewrite, but the reason is narrower than it was. Vectis
-  -- Gloves now GRANTS a landwalk, so "no card grants one" is no longer why; its
-  -- criterion is HasCardType Artifact, which names no subtype word at all for
-  -- CR 612.1's swap to reach. Nothing in the pool filters by a landwalk
-  -- either. Note the separate half: Projection.project's ChangeSubtypeWord arm
-  -- rewrites PC.subtypes and never PC.keywords, so a Magical Hack on Bog Wraith
-  -- would not make islandwalk even if this arm recursed. Matches
+  -- Still nothing to rewrite: the pool's one granted landwalk (Vectis Gloves)
+  -- has a HasCardType Artifact criterion, which names no subtype word for CR
+  -- 612.1's swap to reach, and nothing in the pool filters by a landwalk either.
+  -- Note the separate half: Projection.project's ChangeSubtypeWord arm rewrites
+  -- PC.subtypes and never PC.keywords, so a Magical Hack on Bog Wraith would not
+  -- make islandwalk even if this arm recursed. Matches
   -- Pawl.Engine.Projection.rewriteModification's identical silence on
   -- Modification.GainKeyword (#523).
   Filter.HasKeyword _ -> predicate

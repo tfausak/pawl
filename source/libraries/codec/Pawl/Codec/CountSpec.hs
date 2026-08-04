@@ -18,10 +18,9 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
--- Instantiated at Integer via Common.integer/Common.asInteger, the simplest
--- element codec available -- MkCount is parametric in the per-object quantity
--- its Aggregation reads (see Pawl.Types.Count's haddock), and none of the three
--- cases below exercises Aggregation.Greatest, the one arm that would need it.
+-- Instantiated at Integer, the simplest element codec available: MkCount is
+-- parametric in the per-object quantity its Aggregation reads, and no case
+-- below exercises Aggregation.Greatest, the one arm that would need it.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Count" $ do
   Spec.it s "MkCount, in a zone" $

@@ -11,20 +11,18 @@ import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Filter as Filter
 
--- | CR 702.29e's typecycling filter, absent for plain cycling: null rather than an
--- omitted key, because this rides inside a positional pair.
+-- | CR 702.29e's typecycling filter, absent for plain cycling: null rather than
+-- an omitted key, because this rides inside a positional pair.
 optional :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (Maybe (Filter.Filter keyword))
 optional decode = Common.decodeMaybe (fromJson decode)
 
--- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their operands
--- as a JSON Array, Not as a single nested object, and each atom delegates to the
--- leaf-enum codec for the characteristic it cases on.
+-- | Recursive, mirroring Quantity's toJson/fromJson: And/Or carry their
+-- operands as a JSON Array, Not as a single nested object, and each atom
+-- delegates to the leaf-enum codec for the characteristic it cases on.
 --
--- The keyword codec is a PARAMETER, mirroring Effect's card codec and for the
--- same kind of reason: Pawl.Codec.Keyword imports this module for 702.29e's
--- typecycling filter, so a direct call to Keyword.toJson here would close a
--- module cycle exactly as the two data types do. Every caller passes
--- Pawl.Codec.Keyword.toJson.
+-- The keyword codec is a PARAMETER: Pawl.Codec.Keyword imports this module for
+-- CR 702.29e's typecycling filter, so a direct call to Keyword.toJson here
+-- would close a module cycle. Every caller passes Pawl.Codec.Keyword.toJson.
 toJson :: (keyword -> Value.Value) -> Filter.Filter keyword -> Value.Value
 toJson encode filter_ = case filter_ of
   Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ CardType.toJson t

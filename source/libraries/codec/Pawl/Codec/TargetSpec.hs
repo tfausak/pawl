@@ -11,10 +11,9 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
 
--- The product shape: {"pool": <pool>, "filter": <filter | omitted>}. The filter
--- key is omitted when Nothing (a bare "target creature" narrows nothing),
--- mirroring how optional fields are encoded elsewhere. CR 601.2c's "another" is
--- a Not IsSource conjunct inside that filter, not a key of its own (#163).
+-- The filter key is omitted when Nothing, mirroring how optional fields are
+-- encoded elsewhere. CR 601.2c's "another" is a Not IsSource conjunct inside
+-- that filter, not a key of its own (#163).
 toJson :: TargetSpec.TargetSpec -> Value.Value
 toJson spec =
   Common.object $
@@ -32,8 +31,8 @@ fromJson value = do
         TargetSpec.filter = f
       }
 
--- A name-keyed map as a sorted array of entries, so the render is deterministic
--- and the file byte-stable.
+-- A name-keyed map as a sorted array of entries, so the render is
+-- deterministic.
 toJsonMap :: Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Value.Value
 toJsonMap m =
   Common.encodeList

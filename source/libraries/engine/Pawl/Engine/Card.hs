@@ -1,7 +1,7 @@
 -- Card-agnostic classifications only (CR 110.1 / 305.6, the closed half). The
--- ~30 hand-written card values moved out to the test suite's Pawl.Cards at M3.5:
--- the engine library can no longer name a card, so §1's invariant (the closed
--- half never depends on a card's identity) is enforced by the module graph.
+-- engine library cannot name a card -- the hand-written card values live in the
+-- test suite's Pawl.Cards -- so design.md §1's invariant is enforced by the
+-- module graph.
 module Pawl.Engine.Card where
 
 import Data.Map.Strict (Map)
@@ -22,9 +22,9 @@ import Pawl.Types.TargetSpec (TargetSpec)
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- Every effect across all of a card's modes, in printed (mode, then written)
--- order. CR 608.2c/700.2: the card's whole text spans its modes; the D4 lint
--- and the text-change scan (M3d) range over all of them regardless of what is
--- chosen.
+-- order. CR 608.2c/700.2: the card's whole text spans its modes, and both the
+-- dataflow lint and the text-change scan range over all of them regardless of
+-- what is chosen.
 --
 -- Card.mulliganAction is deliberately NOT included: it is not part of the
 -- spell, and CR 103.5b's action is performed from the hand rather than cast
@@ -32,17 +32,13 @@ import qualified Pawl.Types.TypeLine as TypeLine
 allEffects :: Card.Card -> [Effect Card.Card]
 allEffects card = Modal.allEffects (Card.spell card)
 
--- CR 303.4a: an Aura spell's target is defined by its enchant ability, not by a
--- mode -- an Aura's spell payload is a single empty mode. Merging here is what
--- puts the enchant slot in front of Cast's prompt (Cast.hs) and Resolve's CR
--- 608.2b re-validation (Resolve.hs) without either learning what an Aura is.
+-- The union of every mode's target specs, plus the enchant slot. CR 303.4a: an
+-- Aura spell's target is defined by its enchant ability rather than by a mode,
+-- and merging here is what puts that slot in front of Cast's prompt and
+-- Resolve's CR 608.2b re-validation without either learning what an Aura is.
 --
 -- Union is left-biased, and the CardSpec lint holds that no mode declares this
 -- slot name, so the bias is never exercised.
---
--- The union of every mode's target specs (slot names are unique across a
--- card's modes by authoring discipline; the D4 lint enforces per-mode
--- resolution).
 allTargetSpecs :: Card.Card -> Map SlotName TargetSpec
 allTargetSpecs card = Map.union (enchantSpecs card) (Modal.allTargetSpecs (Card.spell card))
 
@@ -85,15 +81,13 @@ isSorcery :: Card.Card -> Bool
 isSorcery c = Set.member CardType.Sorcery (TypeLine.types (Card.typeLine c))
 
 -- CR 205.4a: does the printed type line carry the "legendary" supertype? The
--- supertype half of the same closed-half classification isInstant is -- rule 205
--- is part of the rulebook, so reading it is no more a case on card identity than
--- isPermanentType's case on a card type. Two rules turn on it: CR 205.4d's
--- legend rule (CR 704.5j, Pawl.Engine.Sba) and CR 205.4e's casting restriction
--- (Pawl.Engine.Cast).
+-- supertype half of the same closed-half classification isInstant is. Two rules
+-- turn on it: CR 205.4d's legend rule (CR 704.5j, Pawl.Engine.Sba) and CR
+-- 205.4e's casting restriction (Pawl.Engine.Cast).
 --
--- PRINTED, and only ever asked of a card rather than of a permanent: CR 704.5j's
--- reading has to see a Clone's COPIED supertype, so Pawl.Engine.Sba goes through the
--- projection instead of calling this.
+-- PRINTED, and only ever asked of a card rather than of a permanent: CR
+-- 704.5j's reading has to see a Clone's COPIED supertype, so Sba goes through
+-- the projection instead of calling this.
 isLegendary :: Card.Card -> Bool
 isLegendary c = Set.member Supertype.Legendary (TypeLine.supertypes (Card.typeLine c))
 
@@ -122,24 +116,23 @@ isPermanent :: Card.Card -> Bool
 isPermanent c = any isPermanentType (Set.toList (TypeLine.types (Card.typeLine c)))
 
 -- CR 205.3h / 303.4: is this card an Aura? A SUBTYPE read off the printed type
--- line, exactly the kind of closed-half classification isPermanent is -- NOT a
--- case on the card's identity. Pawl.Engine.Stack dispatches on it (CR 303.4's "an Aura
--- enters the battlefield attached"), which is the one place the difference
--- between an Aura and any other enchantment is a rules difference.
+-- line, the same kind of closed-half classification isPermanent is -- NOT a
+-- case on the card's identity. Pawl.Engine.Stack dispatches on it, which is the
+-- one place an Aura differs from any other enchantment by a rule.
 isAura :: Card.Card -> Bool
 isAura c = Set.member Subtype.Aura (TypeLine.subtypes (Card.typeLine c))
 
 -- CR 303.4a: the slot an Aura spell's required target is bound under. A genuine
--- target, so it lives in the ordinary target namespace and is NOT one of
--- Pawl.Engine.Binding's reserved names -- those exist precisely because they are not
--- targets. The CardSpec lint holds that no mode declares this name, which is
--- what makes the merge below collision-free.
+-- target, so it lives in the ordinary target namespace rather than among
+-- Pawl.Engine.Binding's reserved names. The CardSpec lint holds that no mode
+-- declares this name, which is what makes the merge above collision-free.
 enchantSlot :: SlotName
 enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 
--- CR 303.4a / 702.5a: the enchant ability's target spec as a one-entry slot map,
--- empty for every non-Aura. Merged into the two functions above, and passed to
--- Target.fillableModes by Pawl.Engine.Cast so castability accounts for it.
+-- CR 303.4a / 702.5a: the enchant ability's target spec as a one-entry slot
+-- map, empty for every non-Aura. Merged into the two functions above, and
+-- passed to Target.fillableModes by Pawl.Engine.Cast so castability accounts
+-- for it.
 enchantSpecs :: Card.Card -> Map SlotName TargetSpec
 enchantSpecs card = case Card.enchant card of
   Nothing -> Map.empty

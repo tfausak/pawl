@@ -33,13 +33,10 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
       )
       """ {"affected":{"type":"Attached"},"modifications":[{"type":"LoseAllAbilities"},{"type":"SetBasePowerToughness","value":[{"type":"Literal","value":1},{"type":"Literal","value":1}]}]} """
-  -- CR 613.6 made a static ability "one affected set, one or more parts", so the
-  -- wire format has an array where it used to have a single modification -- and
-  -- an array can be empty where a single value could not. An ability with no
-  -- parts is one that does nothing, which no card means, so it is a decode
-  -- FAILURE rather than a permanent that quietly under-performs its own text.
-  -- NonEmpty is what makes that structural; this pins that the boundary really
-  -- says no.
+  -- CR 613.6: a static ability is one affected set and one or more parts, so
+  -- the wire format is an array -- and an array can be empty. An ability with
+  -- no parts does nothing, which no card means, so it is a decode FAILURE
+  -- rather than a permanent that quietly under-performs its own text.
   Spec.it s "an empty modifications array is rejected" $
     Spec.assertBool
       s

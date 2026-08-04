@@ -17,10 +17,9 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.fromJson
       DamageRewrite.PreventAll
       """ {"type":"PreventAll"} """
-  -- CR 615.7: Mending Hands' shield, whose Natural is what REMAINS of it. Baked
-  -- by Resolve's PreventNextDamage arm and never authored on a card (see
-  -- Pawl.Types.DamageRewrite), so this codec is the only place the wire form is
-  -- pinned.
+  -- CR 615.7's shield, whose Natural is what REMAINS of it. Baked by Resolve's
+  -- PreventNextDamage arm and never authored on a card, so this codec is the
+  -- only place the wire form is pinned.
   Spec.it s "PreventNext" $
     Common.assertJsonCodec
       s
@@ -28,7 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.fromJson
       (DamageRewrite.PreventNext 4)
       """ {"type":"PreventNext","value":4} """
-  -- CR 614.1a: Galvanic Blast's "deals 4 damage instead".
+  -- CR 614.1a: a flat instead-amount.
   Spec.it s "SetAmount" $
     Common.assertJsonCodec
       s
@@ -36,8 +35,7 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.fromJson
       (DamageRewrite.SetAmount 4)
       """ {"type":"SetAmount","value":4} """
-  -- Furnace of Rath's "double that damage", which is Scaling's Multiply 2 -- the
-  -- same value Corpsejack Menace doubles counters with.
+  -- A doubling, which is Scaling's Multiply 2.
   Spec.it s "Scale" $
     Common.assertJsonCodec
       s

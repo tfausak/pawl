@@ -19,16 +19,14 @@ data Source
     OfToken Card.Card
   | -- | CR 602: an activated ability on the stack -- the source permanent's id plus
     -- the ability. The ability travels with the object so it resolves even if the
-    -- source leaves (CR 113.7a, "once activated … an ability exists on the stack
-    -- independently of its source").
+    -- source leaves (CR 113.7a).
     --
-    -- The id alone is enough, and stays enough once the source is gone: CR 400.7
-    -- mints a fresh id on every zone change, so this one names nothing after the
-    -- source leaves -- which is exactly the trigger for CR 608.2h's last known
-    -- information, filed under this same id in GameState.lastKnown and read back
-    -- by Projection.viewWithLastKnown. Nothing about the source is copied in
-    -- here; a snapshot on the ability object would have to be kept in step with
-    -- a source that can still change while the ability waits on the stack.
+    -- The id alone is enough once the source is gone: CR 400.7 mints a fresh id
+    -- on every zone change, so this one then names nothing, which is exactly the
+    -- trigger for CR 608.2h's last known information, filed under the same id in
+    -- GameState.lastKnown. Nothing about the source is copied in here; a snapshot
+    -- would have to be kept in step with a source that can still change while the
+    -- ability waits on the stack.
     OfAbility ObjectId.ObjectId (ActivatedAbility.ActivatedAbility Card.Card)
   | -- | CR 603.3: a triggered ability on the stack -- the source permanent's id
     -- plus the ability. Travels with the object so it resolves even if the source

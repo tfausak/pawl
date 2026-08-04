@@ -10,253 +10,173 @@ import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | CR 603.2: the pattern that fires a triggered ability. Only Pawl.Engine.Event may case
 -- on it for RULES purposes; Pawl.Codec also cases on every constructor, but only
--- as the JSON data boundary (encode/decode), not to decide game behaviour.
+-- as the JSON data boundary, not to decide game behaviour.
 data TriggerCondition
-  = -- | CR 603.6a: "when this ... enters [the battlefield]" -- fires when the object
-    -- BEARING the ability enters. Self-scoped: the scan checks every permanent
-    -- (CR 603.6a), so the bearer's identity is part of the match, not an accident
-    -- of which object the scan happened to visit. PermanentEnters below is the
-    -- other half of that same rule's sentence, and is kept SEPARATE rather than
-    -- rewritten as `PermanentEnters IsSource`: this arm is a bare comparison of
-    -- ids, while that one has to READ the entrant's characteristics, and reading
-    -- them can come up empty for an entrant that ceased without a zone change
-    -- ever filing last known information (see Pawl.Engine.Event.matchesTrigger).
+  = -- | CR 603.6a: "when this ... enters" -- fires when the object BEARING the
+    -- ability enters. Self-scoped: the scan checks every permanent, so the
+    -- bearer's identity is part of the match. PermanentEnters below is the other
+    -- half of that same sentence, kept SEPARATE rather than written as
+    -- `PermanentEnters IsSource`: this arm is a bare comparison of ids, while that
+    -- one has to READ the entrant's characteristics, and reading them can come up
+    -- empty for an entrant that ceased without a zone change ever filing last
+    -- known information (see Pawl.Engine.Event.matchesTrigger).
     SelfEnters
-  | -- | CR 603.6a's SECOND written form, in the same breath as the first:
-    -- "Whenever a [type] enters, . . ." -- fires when ANY permanent the Filter
-    -- admits enters the battlefield, whoever bears the ability. The "[type]" is
-    -- a Filter, matched against the entering permanent with the bearer as the
-    -- Filter.Context's source and the bearer's controller as its perspective.
+  | -- | CR 603.6a's SECOND written form -- "whenever a [type] enters" -- fires when
+    -- ANY permanent the Filter admits enters, whoever bears the ability. The
+    -- bearer is the Filter.Context's source and its controller the perspective.
     --
-    -- Named for the rule ("a permanent enters the battlefield"), NOT
-    -- "OtherEnters": the bearer is not excluded by this constructor. CR 603.6a
-    -- says "all permanents on the battlefield (INCLUDING THE NEWCOMERS) are
-    -- checked", so a permanent must be able to see its own entry through this
-    -- condition whenever the Filter admits it. Soul Warden's "whenever ANOTHER
-    -- creature enters" writes that exclusion into the Filter as
-    -- `Not IsSource` -- the one spelling Filter.IsSource's own haddock already
-    -- fixes for "another" (#163) -- rather than into a parallel exclusion flag
-    -- here.
+    -- Named for the rule, NOT "OtherEnters": the bearer is not excluded here,
+    -- since CR 603.6a checks the newcomers too. Soul Warden's "whenever ANOTHER
+    -- creature enters" writes that exclusion into the Filter as `Not IsSource`
+    -- (#163) rather than into a parallel exclusion flag.
     PermanentEnters (Filter.Filter Keyword.Keyword)
   | -- | CR 603.2b: "at the beginning of [each|your] <step>". Matched against a
     -- GameEvent.StepBegan; the TurnScope decides whose turn qualifies.
     StepBegins Phase.Phase TurnScope.TurnScope
   | -- | CR 603.8: a STATE trigger -- it fires whenever its condition is true, not
-    -- when an event occurs. "It doesn't trigger again until the ability has
-    -- resolved, has been countered, or has otherwise left the stack", which is why
-    -- Pawl.Engine.Event derives armedness from the stack rather than storing it.
+    -- when an event occurs, and not again until the ability has left the stack.
+    -- That is why Pawl.Engine.Event derives armedness from the stack rather than
+    -- storing it.
     StateIs Condition.Condition
-  | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player. Rides P4's
-    -- event history -- combat damage already records a DamageDealt event.
+  | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player, read off
+    -- the DamageDealt event history.
     SelfDealsCombatDamageToPlayer
   | -- | CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
     -- (any creature); matched only via Pawl.Engine.Monarch.inherentMatch, never through a
-    -- card's bearer. Rides P4's DamageDealt history.
+    -- card's bearer.
     CreatureDealtCombatDamageToMonarch
-  | -- | CR 702.29c: "'When you cycle this card' means 'When you discard this card
-    -- to pay an activation cost of a cycling ability.'" Self-scoped like
-    -- SelfEnters: the scan visits every candidate source, so the bearer being the
-    -- cycled card is part of the match.
-    --
-    -- The bearer is the card in the zone it landed in, because that same rule
-    -- continues "these abilities trigger from whatever zone the card winds up in
-    -- after it's cycled" -- the graveyard, for every printing today.
+  | -- | CR 702.29c: "when you cycle this card". Self-scoped like SelfEnters. The
+    -- bearer is the card in the zone it landed in, which is that rule's second
+    -- sentence -- the graveyard, for every printing today.
     SelfCycled
-  | -- | CR 701.9a: "whenever [a player] discards a card" -- Megrim's "whenever an
-    -- OPPONENT discards a card". Matched against GameEvent.Discarded, whose
-    -- PlayerId is the discarding player; the PlayerRelation reads that player
-    -- against CR 109.5's "you", the ability's controller (CR 603.3a).
-    --
-    -- NOT self-scoped, unlike SelfCycled just above: the bearer is a bystander
-    -- watching someone else's hand, so nothing about the bearer is part of the
-    -- match. Bartered Cow's "when you discard this card" is the self-scoped
-    -- sibling, and is a different condition that does not exist yet (#319).
+  | -- | CR 701.9a: "whenever [a player] discards a card" -- Megrim's. Matched
+    -- against GameEvent.Discarded, whose PlayerId is the discarding player; the
+    -- PlayerRelation reads that player against CR 109.5's "you", the ability's
+    -- controller (CR 603.3a). NOT self-scoped, unlike SelfCycled above: the bearer
+    -- is a bystander watching someone else's hand. Bartered Cow's "when you
+    -- discard this card" is the self-scoped sibling, and does not exist yet
+    -- (#319).
     --
     -- The DiscardCause is deliberately not part of this condition. CR 702.29a
-    -- makes cycling a discard, so a cycled card must fire this; CR 702.29d
-    -- bounds it to once, which the single Discarded event supplies by
-    -- construction (see Pawl.Types.GameEvent).
+    -- makes cycling a discard, so a cycled card must fire this; CR 702.29d bounds
+    -- it to once, which the single Discarded event supplies by construction.
     PlayerDiscards PlayerRelation.PlayerRelation
-  | -- | CR 508.3a: "An ability that reads 'Whenever [a creature] attacks, . . .'
-    -- triggers if that creature is declared as an attacker." Hanweir Garrison's.
-    -- Self-scoped like SelfEnters and SelfCycled: the scan visits every
-    -- permanent, so the bearer being the declared attacker is part of the match.
+  | -- | CR 508.3a: "whenever [a creature] attacks" -- Hanweir Garrison's.
+    -- Self-scoped like SelfEnters.
     --
     -- DECLARED is the whole content of the condition, not a synonym for
-    -- "attacking": the same rule's last sentence is "such abilities won't trigger
-    -- if a creature is put onto the battlefield attacking", and CR 508.4 says such
-    -- a creature is attacking but "for the purposes of trigger events and effects
-    -- ... never attacked". So this matches GameEvent.AttackerDeclared, which only
-    -- the declaration appends, and never the combat record.
-    --
-    -- No attack TARGET is carried. CR 508.3a's second sentence ("Whenever [a
-    -- creature] attacks [a player, planeswalker, or battle]") is a different
-    -- condition, and no card in the pool has it.
+    -- "attacking": CR 508.3a exempts a creature put onto the battlefield
+    -- attacking, and CR 508.4 says such a creature never attacked. So this matches
+    -- GameEvent.AttackerDeclared, which only the declaration appends, and never
+    -- the combat record. No attack TARGET is carried; CR 508.3a's second sentence
+    -- is a different condition no card in the pool has.
     --
     -- The TriggerFrequency is Aurelia, the Warleader's "for the first time each
     -- turn" -- a payload rather than a sibling condition, because it narrows this
-    -- same trigger event rather than naming a different one. Hanweir Garrison is
-    -- EveryTime. See Pawl.Types.TriggerFrequency for why no rule number is cited
-    -- for the phrase.
+    -- same trigger event rather than naming a different one.
     SelfAttacks TriggerFrequency.TriggerFrequency
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
-    -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters
-    -- and SelfCycled: the scan visits every candidate source, so the bearer
-    -- being the card that arrived is part of the match.
+    -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.
     --
     -- The bearer is the card AS IT NOW IS IN THE GRAVEYARD -- CR 400.7's new
-    -- incarnation, which CR 400.7e says such an ability may find ("can find the
-    -- new object that it became in the zone it moved to when the ability
-    -- triggered, if that zone is a public zone"; a graveyard is public, CR
-    -- 400.2) -- because CR 113.6k puts the ability there: "A trigger
-    -- condition that can't trigger from the battlefield functions in all zones
-    -- it can trigger from." A card cannot be put into a graveyard from a library
-    -- while it is on the battlefield, so this condition can never trigger from
-    -- the battlefield, and the one zone it can trigger from is the graveyard it
-    -- lands in.
+    -- incarnation, which CR 400.7e lets the ability find since a graveyard is
+    -- public (CR 400.2) -- because CR 113.6k puts the ability wherever it can
+    -- trigger from, and a card cannot be put into a graveyard from a library while
+    -- it is on the battlefield.
     --
-    -- No zone pair is carried, so this is not a general "moved from A to B".
-    -- Narcomoeba is the only card in the pool with the shape, and the two zones
-    -- are exactly what makes CR 113.6k apply to it; a second card wanting a
-    -- different pair is the one that must generalise this.
+    -- No zone pair is carried, so this is not a general "moved from A to B": the
+    -- two zones are exactly what makes CR 113.6k apply, and a second card wanting
+    -- a different pair is the one that must generalise this.
     --
-    -- The printed "your ... your" needs no controller check. A card is always
-    -- put into its OWNER's graveyard from its OWNER's library, and a card in a
+    -- The printed "your ... your" needs no controller check. A card is always put
+    -- into its OWNER's graveyard from its OWNER's library, and a card in a
     -- graveyard has no controller (CR 108.4), so CR 113.8 makes the ability's
-    -- controller that same owner: the two "your"s can only ever name the player
-    -- the scan already picks.
+    -- controller that same owner.
     SelfPutIntoGraveyardFromLibrary
-  | -- | CR 603.6c: a LEAVES-THE-BATTLEFIELD ability, narrowed to the one written
-    -- form Doomed Traveler prints. That rule's second written form is "Whenever
-    -- [something] is put into a graveyard from the battlefield", and CR 700.4
-    -- abbreviates it: "The term dies means 'is put into a graveyard from the
-    -- battlefield.'" So the match is a zone PAIR -- battlefield to graveyard --
-    -- and NOT the whole of CR 603.6c, whose first clause is "a permanent moves
-    -- from the battlefield to another zone", any zone at all. A card that says
-    -- "leaves the battlefield" must not be conflated with one that says "dies",
-    -- so the wider condition is SelfLeavesTheBattlefield below rather than
-    -- a widening of this one.
-    --
-    -- Self-scoped like SelfEnters and SelfCycled: the scan visits every
-    -- candidate source, so the bearer being the permanent that died is part of
-    -- the match, not an accident of which object the scan visited.
+  | -- | CR 603.6c, narrowed to the one written form Doomed Traveler prints -- CR
+    -- 700.4's "dies", the battlefield-to-graveyard pair. NOT the whole of CR
+    -- 603.6c, whose first clause reaches any zone at all; that is
+    -- SelfLeavesTheBattlefield below, since a card saying "leaves the
+    -- battlefield" must not be conflated with one saying "dies". Self-scoped like
+    -- SelfEnters.
     --
     -- The bearer is the incarnation that was ON THE BATTLEFIELD -- the id
-    -- ZoneChange.departed carries and GameState.lastKnown files under -- and
-    -- NOT the CR 400.7 incarnation that arrived in the graveyard. That is CR
-    -- 603.10a ("some zone-change triggers look back in time. These are
-    -- leaves-the-battlefield abilities ...") read through CR 603.10's own
-    -- definition of looking back: "using the existence of those abilities and
-    -- the appearance of objects immediately prior to the event". Both halves
-    -- live in that one last-known record -- the ability exists because the
-    -- characteristics taken from the pre-move projection say so, and CR 603.3a's
-    -- controller is the player who controlled the permanent as it left.
+    -- ZoneChange.departed carries and GameState.lastKnown files under -- and NOT
+    -- the CR 400.7 incarnation that arrived. That is CR 603.10a read through CR
+    -- 603.10's own definition of looking back, and both halves live in that one
+    -- last-known record: the ability exists because the pre-move projection says
+    -- so, and CR 603.3a's controller is whoever controlled the permanent as it
+    -- left. The arriving incarnation is not lost -- CR 400.7e lets the ability
+    -- find it, and Pawl.Engine.Event.eventBindings binds that id under
+    -- Pawl.Engine.Binding.became -- so the bearer and the object the payload acts
+    -- on are deliberately two different ids.
     --
-    -- The arriving incarnation is not lost, though: CR 400.7e lets the ability
-    -- "find the new object that it became in the zone it moved to", and
-    -- Pawl.Engine.Event.eventBindings binds that id under Pawl.Engine.Binding.became. So the
-    -- bearer and the object the payload acts on are deliberately two different
-    -- ids, and the one printed word "it" means whichever of them the sentence
-    -- is about.
-    --
-    -- The contrast with SelfPutIntoGraveyardFromLibrary above is exact, and the
-    -- two must not be conflated: that one is library to graveyard, functions IN
-    -- the graveyard (CR 113.6k, since it can never trigger from the
-    -- battlefield), and reads the ARRIVING incarnation; this one is battlefield
-    -- to graveyard, functions on the battlefield, and reads the DEPARTING one.
+    -- The contrast with SelfPutIntoGraveyardFromLibrary above is exact: that one
+    -- is library to graveyard, functions IN the graveyard (CR 113.6k), and reads
+    -- the ARRIVING incarnation; this one is battlefield to graveyard, functions on
+    -- the battlefield, and reads the DEPARTING one.
     SelfDies
-  | -- | The SAME written form as SelfDies above -- CR 603.6c's "Whenever
-    -- [something] is put into a graveyard from the battlefield", narrowed by CR
-    -- 700.4's "dies" to the battlefield-to-graveyard pair -- read by a BYSTANDER
-    -- rather than by the permanent that died. Meren of Clan Nel Toth's "whenever
-    -- another creature you control dies".
+  | -- | The SAME written form as SelfDies above, read by a BYSTANDER rather than by
+    -- the permanent that died. Meren of Clan Nel Toth's "whenever another creature
+    -- you control dies".
     --
-    -- The relation to SelfDies is exactly PermanentEnters' to SelfEnters, and
-    -- for the same reason that pair is two constructors: that one is a bare
-    -- comparison of ids, while this one has to READ the dead permanent's
-    -- characteristics, and reading them can come up empty for a permanent that
-    -- ceased without a zone change ever filing last known information (see
-    -- Pawl.Engine.Event.matchesTrigger). Nothing about the bearer is part of the
-    -- match; the bearer is the Filter.Context's source, and its controller is
-    -- the perspective CR 109.5 gives "you" in "a creature YOU control".
+    -- Two constructors for exactly PermanentEnters' and SelfEnters' reason: that
+    -- one is a bare comparison of ids, while this one has to READ the dead
+    -- permanent's characteristics, and reading them can come up empty for a
+    -- permanent that ceased without last known information ever being filed.
+    -- Nothing about the bearer is part of the match; the bearer is the
+    -- Filter.Context's source, and its controller is CR 109.5's "you". Named for
+    -- the rule, NOT "AnotherPermanentDies": "another" is
+    -- Filter.Not Filter.IsSource inside the Filter (#163), and a card watching
+    -- EVERY creature die is the same constructor with a wider Filter.
     --
-    -- Named for the rule, NOT "AnotherPermanentDies": "another" is
-    -- Filter.Not Filter.IsSource inside the Filter, the one spelling
-    -- Filter.IsSource's own haddock fixes for that word (#163), never a second
-    -- exclusion mechanism here. A card that watches EVERY creature die, its own
-    -- included, is the same constructor with a wider Filter.
+    -- The candidate is ZoneChange.departed and NOT ZoneChange.object -- the
+    -- permanent as it was on the battlefield, read from CR 608.2h last known
+    -- information (CR 603.10a again). That is what makes "you control" answerable
+    -- CORRECTLY: by the CR 117.5 boundary the candidate is a card in a graveyard,
+    -- CR 108.4 gives it no controller, and CR 108.4a would hand back its OWNER --
+    -- a different player for anything its controller had stolen.
     --
-    -- The candidate the Filter is matched against is ZoneChange.departed and
-    -- NOT ZoneChange.object -- the permanent as it was on the battlefield,
-    -- read from CR 608.2h last known information. That is CR 603.10a again
-    -- ("some zone-change triggers look back in time. These are
-    -- leaves-the-battlefield abilities"), and it is what makes "you control"
-    -- answerable CORRECTLY: by the CR 117.5 boundary the candidate is a card in
-    -- a graveyard, CR 108.4 says "a card doesn't have a controller unless that
-    -- card represents a permanent or spell", and CR 108.4a would hand back its
-    -- OWNER instead -- a different player for anything its controller had
-    -- stolen.
-    --
-    -- Nothing about the DEAD permanent is bound for the payload to name, so a
-    -- card that says "return that creature card to your hand" is not
-    -- expressible through this condition (#616). Meren's payload names only
-    -- its own controller.
+    -- Nothing about the DEAD permanent is bound for the payload to name, so a card
+    -- saying "return that creature card to your hand" is not expressible through
+    -- this condition (#616).
     PermanentDies (Filter.Filter Keyword.Keyword)
-  | -- | CR 603.6c's FIRST written form -- "When [this object] leaves the
-    -- battlefield, . . ." -- which is the rule's own first clause taken whole:
-    -- "Leaves-the-battlefield abilities trigger when a permanent moves from the
-    -- battlefield to another zone". ANY other zone, so an exile, a bounce to a
-    -- hand and a shuffle into a library all fire it. Thragtusk's.
+  | -- | CR 603.6c's FIRST written form -- "when [this object] leaves the
+    -- battlefield" -- taken whole: ANY other zone, so an exile, a bounce and a
+    -- shuffle into a library all fire it. Thragtusk's.
     --
-    -- SIBLING of SelfDies above, never its superset in code even though it is
-    -- one in the rules. The two written forms are different printed sentences,
-    -- and CR 700.4 narrows the second to a graveyard, so a Doomed Traveler must
-    -- stay silent for exactly the bounce that fires a Thragtusk. Expressing
-    -- SelfDies as "this condition, plus a destination test" would put the two
-    -- cards' fates in one arm, which is the conflation the separation exists to
-    -- prevent.
+    -- SIBLING of SelfDies above, never its superset in code even though it is one
+    -- in the rules. The two written forms are different printed sentences, and CR
+    -- 700.4 narrows the second to a graveyard, so a Doomed Traveler must stay
+    -- silent for exactly the bounce that fires a Thragtusk. Self-scoped and a
+    -- LOOK-BACK for SelfDies' reasons (CR 603.10a): the bearer is
+    -- ZoneChange.departed, and CR 603.3a's controller is whoever controlled it
+    -- then.
     --
-    -- Self-scoped, and a LOOK-BACK, for the same reasons as SelfDies: CR 603.10a
-    -- names leaves-the-battlefield abilities as the exception in the first
-    -- place, so the bearer is ZoneChange.departed -- the permanent as it was
-    -- immediately before it left -- and CR 603.3a's controller is whoever
-    -- controlled it then.
+    -- Where it DIVERGES from SelfDies is CR 400.7e, whose rescue of the arriving
+    -- object holds only for a public destination -- satisfied by construction for
+    -- a graveyard (CR 400.2), but a real test here, since a hand or a library is
+    -- hidden. Pawl.Engine.Event.eventBindings binds Pawl.Engine.Binding.became only
+    -- for a public destination, and nothing at all for a hidden one.
     --
-    -- Where it DIVERGES from SelfDies is CR 400.7e. That rule's rescue of the
-    -- arriving object -- "can find the new object that it became in the zone it
-    -- moved to when the ability triggered, if that zone is a public zone" --
-    -- carries a proviso SelfDies satisfies by construction, since CR 400.2 makes
-    -- a graveyard public. This condition's destination may be a hand or a
-    -- library, which that same rule makes hidden, so the proviso is a real test
-    -- here: Pawl.Engine.Event.eventBindings binds Pawl.Engine.Binding.became only
-    -- for a public destination, and binds nothing at all for a hidden one.
-    --
-    -- CR 603.6c's SECOND trigger event -- "or when a phased-in permanent leaves
-    -- the game because its owner leaves the game" -- is not matched (#385).
+    -- CR 603.6c's SECOND trigger event, a phased-in permanent leaving the game
+    -- with its owner, is not matched (#385).
     SelfLeavesTheBattlefield
   | -- | CR 701.6a: "whenever a spell or ability you control counters a spell" --
     -- Baral, Chief of Compliance's. Matched against GameEvent.SpellCountered,
-    -- whose Countering carries the controller of the spell or ability that DID
-    -- the countering; the PlayerRelation reads that player against CR 109.5's
-    -- "you", the ability's controller (CR 603.3a).
+    -- whose Countering carries the controller of whatever DID the countering; the
+    -- PlayerRelation reads that player against CR 109.5's "you", the ability's
+    -- controller (CR 603.3a). NOT self-scoped -- PlayerDiscards' shape, not a
+    -- Self- condition's -- since Baral is a creature watching an instant resolve.
     --
-    -- NOT self-scoped, and the shape is PlayerDiscards' rather than any Self-
-    -- condition's: the bearer is a bystander watching a counterspell it controls
-    -- resolve somewhere else, so nothing about the bearer is part of the match.
-    -- Baral is a creature and the countering is done by an instant.
+    -- The relation is on the COUNTERING side, never on the countered spell's: the
+    -- printed sentence has one "you" and it modifies "a spell or ability", so
+    -- Baral triggers on countering its own controller's spell just as readily.
     --
-    -- The relation is on the COUNTERING side, never on the countered spell's.
-    -- The printed sentence has one "you" in it and it modifies "a spell or
-    -- ability", so whose spell was countered is not asked -- Baral triggers on
-    -- countering its own controller's spell just as readily.
-    --
-    -- Only a countered SPELL fires this, which is the printed word rather than
-    -- an omission: rule 701.6a's subject is "a spell or ability", and Baral's
-    -- own object is "counters a spell". Stifle counters an ABILITY, and Baral
-    -- stays silent for it -- CR 113.9 says an ability on the stack is not a
-    -- spell, so Pawl.Engine.Event.counter ceases it (CR 608.2n) and records no
-    -- event for this condition to match. The countered-ability sibling of that
-    -- record does not exist, and no card in the pool wants one (#541); it would
-    -- be a new event and a new condition, never a widening of these two.
+    -- Only a countered SPELL fires this, which is the printed word rather than an
+    -- omission. Stifle counters an ABILITY and Baral stays silent -- CR 113.9 says
+    -- an ability on the stack is not a spell, so Pawl.Engine.Event.counter ceases
+    -- it (CR 608.2n) and records no event to match. The countered-ability sibling
+    -- of that record does not exist, and no card in the pool wants one (#541).
     SpellOrAbilityCounters PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

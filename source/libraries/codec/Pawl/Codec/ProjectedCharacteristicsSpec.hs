@@ -17,30 +17,19 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
--- | R7's one case for MkProjectedCharacteristics's single constructor. `name`
--- and `cardTypes` are the only required keys; every other field is omitted
--- from the JSON when it is at its default (Common.optionalPair/defaultedField).
--- One populated fixture, with every collection given at least one element and
--- 'power'/'toughness' set but 'loyalty'/'characteristicPT' left at their
--- Nothing (a creature has no loyalty and no printed star), exercises the whole
--- shape at once, including the omission of the still-defaulted keys.
--- `triggeredAbilities` reuses 'CardSpec.minimalTriggeredAbility' rather than
--- building a second one by hand; `activatedAbilities` and `replacementEffects`
--- stay empty (and so omitted) because ActivatedAbility's and
--- ReplacementEffect's own per-constructor coverage lives in their own XSpecs. A
--- second fixture, `minimalCharacteristics`, is the counterpart at every field
--- but the two required ones left at its default, proving the omission side
--- directly.
+-- | `name` and `cardTypes` are the only required keys; every other field is
+-- omitted when it is at its default. One populated fixture, with every
+-- collection given at least one element and 'loyalty'/'characteristicPT' left
+-- at Nothing, exercises the whole shape at once including those omissions;
+-- `minimalCharacteristics` below is its counterpart with everything but the two
+-- required keys defaulted.
 --
 -- No registry here: like Pawl.Codec.CardSpec, this sublibrary sits above
--- Pawl.Registry and cannot reach a real snapshot. The GameEvent.Moved/Revealed
--- round trips over a REAL Typhoid Rats snapshot (multiple keywords, colors,
--- power, toughness, cardTypes and subtypes all populated by the engine) stay in
--- Pawl.CodecIntegrationSpec.
+-- Pawl.Registry and cannot reach a real snapshot. Round trips over an
+-- engine-built snapshot stay in Pawl.CodecIntegrationSpec.
 
--- | A synthetic snapshot, not any real card's projection (its Legendary
--- supertype and Human subtype are an arbitrary combination chosen to exercise
--- every collection field, not a claim about a printed creature).
+-- | A synthetic snapshot, not any real card's projection: its supertype and
+-- subtype are chosen to exercise every collection field.
 testCharacteristics :: PC.ProjectedCharacteristics
 testCharacteristics =
   PC.MkProjectedCharacteristics
@@ -67,9 +56,7 @@ testCharacteristicsJson =
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}]}"
 
--- | Every field but the two required ones ('name', 'cardTypes') at its
--- default -- the counterpart to 'testCharacteristics' above, which populates
--- every collection at least once.
+-- | Every field but the two required ones at its default.
 minimalCharacteristics :: PC.ProjectedCharacteristics
 minimalCharacteristics =
   PC.MkProjectedCharacteristics

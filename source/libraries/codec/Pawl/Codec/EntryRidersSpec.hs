@@ -33,10 +33,9 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       Common.assertFromJson s EntryRiders.fromJson "{\"attacking\":false}" EntryRiders.defaultValue
     Spec.it s "a missing attacking key decodes as False" $
       Common.assertFromJson s EntryRiders.fromJson "{\"tapped\":{\"type\":\"Untapped\"}}" EntryRiders.defaultValue
-    -- R7 of the omit-defaults design: an explicit null is null-tolerant only
-    -- for a Maybe field, composed with Common.decodeMaybe. `tapped` isn't one,
-    -- so an explicit null is now a decode error rather than a second spelling
-    -- of the default.
+    -- An explicit null is tolerated only for a Maybe field, composed with
+    -- Common.decodeMaybe. `tapped` isn't one, so a null is a decode error
+    -- rather than a second spelling of the default.
     Spec.it s "an explicit null tapped is now a decode error" $
       Spec.assertBool
         s

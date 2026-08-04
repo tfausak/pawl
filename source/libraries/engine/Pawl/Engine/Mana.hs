@@ -60,14 +60,14 @@ subtypeMana subtype = case subtype of
   Subtype.Plains -> Just (ManaType.Colored Color.White)
   _ -> Nothing
 
--- CR 105.4: "If a player is asked to choose a color, they must choose one of the
--- five colors. 'Multicolored' is not a color. Neither is 'colorless.'" So an
--- any-colour producer offers exactly five options and never {C} -- which is also
--- why AnyColor cannot be spelled as "every ManaType".
+-- CR 105.4: a player asked to choose a color must choose one of the five;
+-- multicolored and colorless are not colors. So an any-colour producer offers
+-- exactly five options and never {C} -- which is also why AnyColor cannot be
+-- spelled as "every ManaType".
 --
 -- Written out rather than derived from a Bounded Color: the five are CR 105.1's
 -- closed enumeration, and spelling them here keeps the rule citation next to the
--- list a reader has to check.
+-- list.
 producedTypes :: ManaProduction -> [ManaType]
 producedTypes production = case production of
   ManaProduction.OfType manaType -> [manaType]
@@ -82,20 +82,18 @@ producedTypes production = case production of
 -- activated ability that is a mana ability (CR 605.1a), resolved inline at
 -- payment and never on the stack (CR 605.3b).
 --
--- CR 106.12 narrows the phrase "tap for mana" to a mana ability "that includes
--- the {T} symbol in its activation cost", and NOTHING here reads a cost -- not
--- this function and not isManaAbility. Every mana ability in the pool costs
--- exactly {T} (manaSourcesGiven leans on the same fact for CR 302.6), so the
--- filter would change no answer; one that did not would be enumerated here as
--- though it tapped, which is the cost half of the same shortcut tapForMana takes
--- (#238).
+-- CR 106.12 narrows "tap for mana" to a mana ability that includes {T} in its
+-- activation cost, and NOTHING here reads a cost -- not this function and not
+-- isManaAbility. Every mana ability in the pool costs exactly {T}
+-- (manaSourcesGiven leans on the same fact for CR 302.6), so the filter would
+-- change no answer; one that did not would be enumerated here as though it
+-- tapped (#238).
 --
 -- The nesting is the whole point. The OUTER list is the options -- which ability
 -- of this permanent, and which of its modes. The INNER list is that one
 -- activation's YIELD, its AddMana effects in printed order (CR 608.2c). Sol
--- Ring's "{T}: Add {C}{C}" is one option adding two mana; Birds of Paradise is
--- one option adding one mana of a colour still to be chosen; an Urborg'd
--- Mountain is two options of one mana each.
+-- Ring's "{T}: Add {C}{C}" is one option adding two mana; an Urborg'd Mountain
+-- is two options of one mana each.
 --
 -- Read through the projection (abilitiesOf), so Humility (layer 6) strips a
 -- creature's mana ability too -- and so does CR 305.7 at layer 4, which is what
@@ -105,16 +103,12 @@ producedTypes production = case production of
 -- One route per mode, rather than one per combination of modes, because CR
 -- 700.2's selection is "choose exactly one" for every mana ability in the pool.
 -- An ability that chose two modes at once would make a route the CONCATENATION
--- of the chosen modes' yields, and the options the size-n subsets of its modes
--- (#449). A mode adding no mana contributes an empty route, which is a legal but
--- pointless activation and costs the reader nothing below: it is one more option
--- offering no mana, and the supply model ignores it.
+-- of the chosen modes' yields (#449). A mode adding no mana contributes an empty
+-- route, which the supply model ignores.
 --
 -- Takes a PRE-PROJECTED board, because every caller asks this of every source a
--- player controls -- manaSources below and payableResolutions both do, and each
--- of the two projection reads here was a fresh gather per source (#200). See
--- Projection.projectGiven for what the board is and why passing Map.empty (which
--- manaYieldsOf does) is the same answer.
+-- player controls, and each of the two projection reads here was a fresh gather
+-- per source (#200).
 manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [[ManaProduction]]
 manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =
@@ -127,10 +121,10 @@ manaRoutesOfGiven pcs oid gs =
    in fromSubtypes <> fromAbilities
 
 -- What tapping this object for mana could actually put in a pool: every route
--- above with each of its ManaProduction choices resolved to a concrete type, so
--- one entry per (route, colour choice) pair. `traverse` over the list
--- applicative is that product -- Birds of Paradise's one route becomes CR
--- 105.4's five one-mana yields.
+-- above with each ManaProduction resolved to a concrete type, so one entry per
+-- (route, colour choice) pair. `traverse` over the list applicative is that
+-- product -- Birds of Paradise's one route becomes CR 105.4's five one-mana
+-- yields.
 --
 -- A Mana rather than a list of types because that is what a yield IS: some mana,
 -- headed for a pool (CR 106.4). tapForMana adds the chosen one whole.
@@ -139,9 +133,8 @@ manaRoutesOfGiven pcs oid gs =
 -- Urborg'd Swamp is a Swamp twice over) are indistinguishable options -- no cost
 -- and no rider tells two of this permanent's mana abilities apart yet (#238) --
 -- so collapsing them elides a prompt with no content. Deliberately order-
--- sensitive: {R} then {B} and {B} then {R} are left as two options rather than
--- merged, which can only ever ASK where a set-valued dedup would not, and no
--- card in the pool produces either.
+-- sensitive: {R} then {B} and {B} then {R} stay two options, which can only ever
+-- ASK where a set-valued dedup would not.
 manaYieldsOf :: ObjectId -> GameState -> [Mana]
 manaYieldsOf = manaYieldsOfGiven Map.empty
 
@@ -155,33 +148,27 @@ manaYieldsOfGiven pcs oid gs =
    in List.nub (fmap asMana (concatMap (traverse producedTypes) (manaRoutesOfGiven pcs oid gs)))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
--- adds will carry. THE one place they are decided -- manaYieldsOfGiven just
--- above is the one place they are stamped onto a unit -- and the reason they are
--- captured rather than looked up later is in that module and in
--- Pawl.Types.ManaUnit's header: the mana outlives the source.
+-- adds will carry. THE one place they are decided; manaYieldsOfGiven just above
+-- is the one place they are stamped onto a unit. They are captured rather than
+-- looked up later because the mana outlives the source (Pawl.Types.ManaUnit).
 --
--- CR 106.3 is what makes reading the SOURCE the right question: "If mana is
--- produced by an ability, the source of that mana is the source of that ability
--- (see rule 113.7)" -- for everything here, the permanent being tapped. CR
--- 107.4h then asks whether that source is a snow one, and the rules define no
--- separate term for it: the glossary's "Snow Mana Symbol" points back at CR
--- 107.4h, so a snow source is a source that is snow, which for a permanent is CR
--- 205.4g's supertype and nothing else ("regardless of its name").
+-- CR 106.3 is what makes reading the SOURCE the right question: mana produced by
+-- an ability has that ability's source (CR 113.7) -- for everything here, the
+-- permanent being tapped. CR 107.4h then asks whether that source is a snow one,
+-- and the rules define no separate term for it: a snow source is a source that
+-- is snow, which for a permanent is CR 205.4g's supertype and nothing else.
 --
--- CR 205.4g is PERMANENT-scoped, and CR 106.3's first clause is wider than that
--- -- "if mana is produced by a spell, the source of that mana is that spell" --
--- so this read would be too narrow for a source that is not a permanent. Nothing
--- reaches it with one: the two engine paths in are tapForMana and
--- payableResolutions, and both take their oid from manaSourcesGiven, which
--- filters the battlefield.
+-- CR 205.4g is PERMANENT-scoped and CR 106.3's first clause is wider, so this
+-- read would be too narrow for a source that is not a permanent. Nothing reaches
+-- it with one: the two engine paths in are tapForMana and payableResolutions,
+-- and both take their oid from manaSourcesGiven, which filters the battlefield.
 productionTagsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Set.Set ProductionTag.ProductionTag
 productionTagsGiven pcs oid gs =
   if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs)
     then Set.singleton ProductionTag.Snow
     else Set.empty
 
--- The units of one yield, in printed order. Reading a Mana rather than spending
--- or adding one, which is what every other unwrap in this module does.
+-- The units of one yield, in printed order.
 unitsOf :: Mana -> [ManaUnit]
 unitsOf (Mana.MkMana units) = units
 
@@ -192,18 +179,17 @@ typesOf = fmap ManaUnit.manaType . unitsOf
 -- CR 106.7's shape: every mana type this object COULD produce, flattened across
 -- its yields and deduplicated. A strictly weaker question than manaYieldsOf --
 -- it says nothing about how MUCH a single activation adds, so a Sol Ring answers
--- [{C}] here and yields {C}{C} there. Kept apart deliberately: the two were one
--- function while every source added exactly one mana, and conflating them is
--- what made Sol Ring read as a choice between two singles (#238).
+-- [{C}] here and yields {C}{C} there. Kept apart deliberately: conflating them
+-- is what made Sol Ring read as a choice between two singles (#238).
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 
 -- CR 605.1a: an activated ability is a mana ability if it could add mana AND
 -- doesn't target and is not itself a loyalty ability (CR 606.2, which
 -- Pawl.Engine.Cost.isLoyaltyCost answers; no loyalty ability in the pool adds
--- mana, so the clause is inert rather than checked here). The ABI
--- predicate read at two sites: manaRoutesOfGiven includes a mana ability as a
--- source (Task 6); Action.legalActions excludes it from the stack (Task 5).
+-- mana, so the clause is inert rather than checked here). Read at two sites:
+-- manaRoutesOfGiven includes a mana ability as a source, and
+-- Action.legalActions excludes it from the stack.
 --
 -- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
 -- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even
@@ -223,8 +209,8 @@ addMana pid units gs =
 
 -- CR 500.5: as a step or phase ends, any unspent mana left in a player's mana
 -- pool empties -- a turn-based action that does not use the stack (CR 703.4q).
--- CR 106.4 supplies the wording for what that does to the player: they are said
--- to LOSE this mana, which is how every card that stops it is templated.
+-- CR 106.4 supplies the wording every card that stops it is templated on: the
+-- player is said to LOSE this mana.
 --
 -- Being a turn-based action does not put it in Engine.runTurnBasedActions, which
 -- handles a step's OPENING: CR 703.4q's own moment is the step's end, so
@@ -232,27 +218,20 @@ addMana pid units gs =
 --
 -- The RETENTION check lives here rather than at that call site, because it is
 -- part of the turn-based action and not part of the moment: CR 500.5 names one
--- action, "any unspent mana left in a player's mana pool empties", and which
--- mana that is belongs to the action. Engine.runStepThatBegan stays a line that
--- says only WHEN.
---
--- Asked PER PLAYER and then PER UNIT, off the CR 613.11 player-axis carrier,
--- through a typed question (PlayerEffect.keepsUnspentMana) that never reveals
--- which effect answered it. Per unit rather than per pool because a card may name
--- only some of the mana: Upwelling keeps every type, Omnath, Locus of Mana keeps
--- only green out of the same pool.
---
--- The per-player question is asked ONCE and its predicate applied to that
--- player's units, rather than re-resolving the applicable effects for each unit
--- -- the shape keepsUnspentMana's argument order is built for.
+-- action, and which mana it takes belongs to the action. Asked PER PLAYER and
+-- then PER UNIT, off the CR 613.11 player-axis carrier, through a typed question
+-- (PlayerEffect.keepsUnspentMana) that never reveals which effect answered it.
+-- Per unit because a card may name only some of the mana: Upwelling keeps every
+-- type, Omnath, Locus of Mana only green. The per-player question is asked ONCE
+-- and its predicate applied to that player's units -- the shape
+-- keepsUnspentMana's argument order is built for.
 --
 -- A player left with nothing is DROPPED from the map rather than left holding an
 -- empty pool: absent already means an empty pool (Game.poolOf), so keeping the
 -- key would give the same state two spellings.
 --
--- `gs` is the state as the step ends, so the effect is read at that moment and
--- never captured earlier -- an Upwelling that left the battlefield during the
--- step is simply not there to find.
+-- `gs` is the state as the step ends, so the effect is read at that moment -- an
+-- Upwelling that left the battlefield during the step is simply not there.
 emptyManaPools :: GameState -> GameState
 emptyManaPools gs =
   let retain pid pool = case filter (PlayerEffect.keepsUnspentMana pid gs) (Mana.unwrap pool) of
@@ -267,29 +246,25 @@ emptyManaPools gs =
 -- ONE control-grant walk and ONE whole-board projection for the whole sweep,
 -- threaded into every question asked of every permanent -- the hoist
 -- Sba.performStateBasedActions takes for the CR 704.3 sweep and
--- Projection.controls takes for the grant list. Unhoisted, each candidate cost as
--- many as four fresh Projection.gathers -- two for its mana routes alone
--- (manaRoutesOfGiven reads subtypes and abilities separately), one for the
--- card-type test and one for the haste read behind it -- plus a fresh grant
--- walk, which made a function the priority loop reaches at every boundary
--- quadratic in the battlefield (#200).
+-- Projection.controls takes for the grant list. Unhoisted,
+-- each candidate cost several fresh Projection.gathers plus a fresh grant walk,
+-- which made a function the priority loop reaches at every boundary quadratic in
+-- the battlefield (#200).
 --
 -- Projection.projectGiven carries the snapshot argument. It holds here because
 -- this is a pure function of one GameState: nothing can move between the
 -- projection and its uses, and payCost's loop -- the one caller that DOES change
--- the state, by tapping -- takes a fresh State.get and so a fresh board on every
--- pass.
+-- the state, by tapping -- takes a fresh State.get on every pass.
 manaSources :: PlayerId -> GameState -> [ObjectId]
 manaSources pid gs = manaSourcesGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
 manaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 manaSourcesGiven grants pcs pid gs =
-  let -- CR 302.6: a sick creature can't use a {T} mana ability. A land is never
-      -- sick-gated. (M3e mana abilities all cost {T}.) Keyed to `pid`: the
-      -- creature must have settled under the player reaching for the mana, not
-      -- under whoever held it before (#198) -- and CR 702.10c's haste exemption
-      -- applies here exactly as it does to any other {T} ability, which is what
-      -- makes Act of Treason's rider pay off.
+  let -- CR 302.6: a sick creature can't use a {T} mana ability, and every mana
+      -- ability in the pool costs {T}; a land is never sick-gated. Keyed to
+      -- `pid`: the creature must have settled under the player reaching for the
+      -- mana, not under whoever held it before (#198) -- and CR 702.10c's haste
+      -- exemption applies as it does to any other {T} ability.
       notSickCreature oid =
         not (Set.member CardType.Creature (Projection.cardTypesGiven pcs oid gs))
           || Summoning.settledOrHastyGiven pcs pid oid gs
@@ -303,10 +278,10 @@ manaSourcesGiven grants pcs pid gs =
 -- use the stack, so this is immediate -- which is also why the colour choice is
 -- made HERE and not by Resolve.
 --
--- Monadic because of that choice. A Mountain offers exactly one yield and is
--- never asked; a Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR
--- 305.6/305.7) both offer several, and the engine never picks for the player.
--- Which SOURCE to tap is a separate question, and payCost asks it.
+-- Monadic because of that choice. A Mountain offers one yield and is never
+-- asked; Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR 305.6/305.7)
+-- offer several, and the engine never picks for the player. Which SOURCE to tap
+-- is a separate question, and payCost asks it.
 --
 -- The whole yield lands, so Sol Ring's "{T}: Add {C}{C}" adds two units from one
 -- activation. What this still does NOT do is run the ability's own activation
@@ -340,10 +315,9 @@ tapForMana oid = do
 -- manaYieldsOf has already collapsed routes producing identical mana, so a
 -- remaining list of two is two genuinely different yields.
 --
--- FILTERED, NOT TRUSTED, the posture chooseSource and Cost.payComponents take:
--- an answer outside the offered set is rejected and the head used instead. Here
--- that is not merely hygiene -- honouring a yield the source cannot make would
--- mint mana out of nothing.
+-- FILTERED, NOT TRUSTED, the posture chooseSource and Cost.payComponents take.
+-- Here that is not merely hygiene -- honouring a yield the source cannot make
+-- would mint mana out of nothing.
 chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty Mana -> GameState -> Game Mana
 chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
@@ -357,15 +331,13 @@ chooseManaYield pid oid candidates gs = case candidates of
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
 -- types, carrying at least these production-time tags.
 --
--- A SET of types rather than a single one, because CR 107.4e's hybrid symbol "can
--- be paid in one of two ways". A plain `{R}` is the singleton case, so every
+-- A SET of types rather than a single one, because CR 107.4e's hybrid symbol can
+-- be paid in one of two ways. A plain `{R}` is the singleton case, so every
 -- payment path below reads one shape and none cases on hybrid-ness.
 --
--- The TAGS are CR 107.4h's {S}, and they are a second axis rather than more
--- types: "a cost that can be paid with one mana of any type produced by a snow
--- source", so the symbol constrains how the mana was PRODUCED and not what it is.
--- Empty for every other symbol, which is what keeps them all indifferent to how
--- their mana was made.
+-- The TAGS are CR 107.4h's {S}, a second axis rather than more types: the symbol
+-- constrains how the mana was PRODUCED and not what it is. Empty for every other
+-- symbol, which is what keeps them all indifferent to how their mana was made.
 data Demand = MkDemand
   { demandTypes :: Set.Set ManaType,
     demandTags :: Set.Set ProductionTag.ProductionTag
@@ -410,14 +382,11 @@ supplyOf unit =
 ofTypes :: Set.Set ManaType -> Demand
 ofTypes types = MkDemand {demandTypes = types, demandTags = Set.empty}
 
--- CR 106.1b: "There are six types of mana: white, blue, black, red, green, and
--- colorless." Written out rather than derived, for the reason producedTypes
--- writes out CR 105.1's five: the enumeration IS the rule, and spelling it keeps
--- the citation next to the list.
+-- CR 106.1b: the six types of mana. Written out rather than derived, for the
+-- reason producedTypes writes out CR 105.1's five: the enumeration IS the rule.
 --
--- This is the whole type side of CR 107.4h's {S}: "one mana of ANY type", so the
--- symbol narrows nothing about what the mana is and everything about where it
--- came from.
+-- This is the whole type side of CR 107.4h's {S}, which narrows nothing about
+-- what the mana is and everything about where it came from.
 everyManaType :: Set.Set ManaType
 everyManaType =
   Set.fromList
@@ -430,12 +399,10 @@ everyManaType =
 -- and the LIFE it costs.
 --
 -- A LIST of ways, because CR 107.4e's other half is not a wider set but a
--- different SHAPE: "a monocolored hybrid symbol such as {2/B} can be paid with
--- either one black mana or two mana of any type", and one mana and two mana
--- cannot be the same demand. CR 107.4f's Phyrexian symbol is the other
--- two-way symbol, for the different reason the LIFE field below gives; every
--- other symbol, {S} included, offers exactly one way and the list is a singleton
--- for it.
+-- different SHAPE: a monocolored hybrid {2/B} is one black mana or two mana of
+-- any type, and one mana and two mana cannot be the same demand. CR 107.4f's
+-- Phyrexian symbol is the other two-way symbol, for the different reason the
+-- LIFE field below gives; every other symbol, {S} included, offers exactly one.
 --
 -- The LIFE field is CR 107.4f's Phyrexian symbol, and it is the one way that is
 -- not a mana payment at all, so it could not be folded into either of the other
@@ -455,24 +422,22 @@ waysOf symbol = case symbol of
   ManaSymbol.Hybrid a b -> [(Just (ofTypes (Set.fromList [a, b])), 0, 0)]
   -- CR 107.4e's two ways, and the one-mana way is FIRST -- see resolutions.
   ManaSymbol.MonocoloredHybrid t -> [(Just (ofTypes (Set.singleton t)), 0, 0), (Nothing, 2, 0)]
-  -- CR 107.4f's two ways: "a cost that can be paid either with one mana of its
-  -- color or by paying 2 life." The colour is a ManaType here because that is
-  -- what a demand is made of; CR 107.4f admits no colourless Phyrexian symbol,
-  -- so ManaType.Colored is total rather than a case.
+  -- CR 107.4f's two ways: one mana of its colour, or 2 life. The colour is a
+  -- ManaType here because that is what a demand is made of; CR 107.4f admits no
+  -- colourless Phyrexian symbol, so ManaType.Colored is total rather than a case.
   --
   -- The mana way is FIRST, which resolutions' sort then keeps -- see there.
   ManaSymbol.Phyrexian c -> [(Just (ofTypes (Set.singleton (ManaType.Colored c))), 0, 0), (Nothing, 0, 2)]
   ManaSymbol.Generic n -> [(Nothing, n, 0)]
-  -- CR 107.4h: "a cost that can be paid with one mana of any type produced by a
-  -- snow source." ONE way, and it is a typed demand rather than a generic count
-  -- -- which is the same rule's next sentence made structural: "Effects that
-  -- reduce the amount of generic mana you pay don't affect {S} costs." Every
+  -- CR 107.4h: one mana of any type produced by a snow source. ONE way, and a
+  -- typed demand rather than a generic count -- the same rule's next sentence
+  -- made structural, since generic-mana reductions don't affect {S} costs. Every
   -- type (CR 106.1b) and one tag, so nothing about the mana's identity is asked
   -- and everything about its provenance is.
   ManaSymbol.Snow -> [(Just (MkDemand everyManaType (Set.singleton ProductionTag.Snow)), 0, 0)]
-  -- Unreachable in payment: substituteX removes every Variable before canPay
-  -- (Task 4). The match must be total, so a bare {X} demands nothing and counts
-  -- as 0 generic.
+  -- Unreachable in payment: substituteX removes every Variable before canPay.
+  -- The match must be total, so a bare {X} demands nothing and counts as 0
+  -- generic.
   ManaSymbol.Variable -> [(Nothing, 0, 0)]
 
 -- CR 601.2b's "nonhybrid equivalent cost", enumerated: every way the whole cost
@@ -484,33 +449,25 @@ waysOf symbol = case symbol of
 -- spendDemands and canPay's Hall condition both rest on. CR 107.4e's {2/B} is the
 -- only symbol two mana can pay, and rather than teach those two about a demand
 -- that consumes two units -- which would break the counting each of them does --
--- the choice is made here, above them. Each of them still sees a cost in which
--- every typed demand is exactly one mana. CR 107.4f's {G/P} is absorbed the same
--- way and for the same reason: a symbol payable with no mana at all would be a
--- demand nothing serves, so the life is lifted out here and neither of them ever
--- sees it.
+-- the choice is made here, above them. CR 107.4f's {G/P} is absorbed the same
+-- way: a symbol payable with no mana at all would be a demand nothing serves.
 --
 -- Finite and small, which is what keeps the search terminating: the product over
 -- symbols of their ways, so 2^(number of monocolored hybrid and Phyrexian
--- symbols), and exactly one entry for every cost without one. Flame Javelin
--- ({2/R}{2/R}{2/R}) is 8; Reaper King ({2/W}{2/U}{2/B}{2/R}{2/G}) is 32;
--- Mutagenic Growth ({G/P}) is 2.
+-- symbols), and exactly one entry for every cost without one.
 --
 -- ORDERED, and the order is a choice pawl makes for the player, because unlike a
 -- colour/colour hybrid these ways are DISTINGUISHABLE -- they spend different
--- amounts of mana, or mana against life, and so leave a different board behind.
--- Two rules, in this priority:
+-- amounts of mana, or mana against life. Two rules, in this priority:
 --
 --   1. LEAST LIFE first, by the sort. CR 107.4f's life is the resource that does
 --      not come back: an unspent pool empties every step (CR 500.5) and a land
---      untaps, so preferring mana can never cost the player something they keep.
---      Conservative, and still pawl choosing -- which is why a cast or an
+--      untaps. Conservative, and still pawl choosing -- which is why a cast or an
 --      activation announces first (announcePhyrexian, CR 118.13a) and reaches
 --      this sort with no Phyrexian symbol left to order. A cost paid during a
 --      resolution or for a special action has no such announcement (#373).
 --   2. Among equal life, FEWEST UNITS, which waysOf's per-symbol order already
---      gives and a STABLE sort preserves -- so a monocolored hybrid's behaviour
---      is exactly what it was (#261).
+--      gives and a STABLE sort preserves (#261).
 --
 -- The sort is what makes rule 1 hold across symbols rather than within one: for
 -- {2/R}{G/P} the product alone would offer a 2-life way before a 0-life one.
@@ -547,18 +504,14 @@ removals wanted units = Maybe.mapMaybe without (zip [0 :: Int ..] units)
 
 -- Spend one unit per demand, or Nothing if no assignment covers them all.
 --
--- EXACT, by search, and not the fold this replaced. A greedy left-to-right match
--- is correct only while every demand has exactly one option, because then the
--- order it consumes units in cannot matter. CR 107.4e's hybrid breaks that:
---
---   pool {R}{G}, cost {R/G}{R} -- greedy hands the {R} unit to the hybrid, then
---   the {R} demand fails with a {G} still in the pool. The assignment that works
---   gives the hybrid the {G}.
---
--- So this backtracks: try each unit that could serve the first demand, recurse,
--- and keep the first assignment that covers the rest. A mana cost is a handful of
--- symbols, so the search is trivially small, and being exact means canPay's Hall
--- condition and this never disagree about whether a cost is payable.
+-- EXACT, by search. A greedy left-to-right match is correct only while every
+-- demand has exactly one option; CR 107.4e's hybrid breaks that -- with pool
+-- {R}{G} and cost {R/G}{R}, greedy hands the {R} unit to the hybrid and the {R}
+-- demand then fails with a {G} still in the pool. So this backtracks: try each
+-- unit that could serve the first demand, recurse, and keep the first assignment
+-- that covers the rest. A mana cost is a handful of symbols, so the search is
+-- trivially small, and being exact means canPay's Hall condition and this never
+-- disagree about whether a cost is payable.
 spendDemands :: [ManaUnit] -> [Demand] -> Maybe [ManaUnit]
 spendDemands units demands = case demands of
   [] -> Just units
@@ -578,9 +531,8 @@ takeAny units _ = case units of
 -- {R} that nothing else can satisfy.
 --
 -- The FIRST resolution that fits wins. For every cost without a monocolored
--- hybrid or a Phyrexian symbol there is only one, so this is the plain spend it
--- always was; where there are several, `resolutions` has already put the
--- least-life, fewest-units one first.
+-- hybrid or a Phyrexian symbol there is only one; where there are several,
+-- `resolutions` has already put the least-life, fewest-units one first.
 --
 -- The BUDGET is a cap and not a target, and it is what keeps that ordering
 -- meaningful during payCost's loop. Left uncapped, a {G/P} would take the 2-life
@@ -598,43 +550,36 @@ spend budget cost (Mana.MkMana units) =
         pure (Mana.MkMana left, life)
    in Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions cost))
 
--- CR 601.2g: "If the total cost includes a mana payment, the player then has a
--- chance to activate mana abilities." Reached from an ability too, by CR 602.2b
--- ("the remainder of the process ... is identical to ... 601.2b-i").
+-- CR 601.2g: if the total cost includes a mana payment, the player then has a
+-- chance to activate mana abilities. Reached from an ability too, by CR 602.2b.
 --
 -- Returns whether it was paid; on failure nothing is spent, which is CR 601.2h's
--- "Partial payments are not allowed" rather than mere tidiness. The prompts
--- themselves are NOT rolled back -- they live in the Program, outside the state --
--- so a failed payment still asked its questions.
+-- bar on partial payments rather than mere tidiness. The prompts themselves are
+-- NOT rolled back -- they live in the Program, outside the state -- so a failed
+-- payment still asked its questions.
 --
 -- Failure is REACHABLE, and a source offering a colour choice is what makes it
 -- so. canPay asks whether SOME sequence of choices pays the cost; this asks the
 -- player to make them. A player who taps their only Birds of Paradise for green
 -- cannot then pay {B}, and the engine must let them: choosing badly is a choice,
--- and second-guessing it here would be the engine playing the game. While every
--- source produced one fixed type the two questions coincided, and this comment
--- claimed the failure was unreachable. Proved reachable by ManaSpec's "a Birds
--- tapped for green does not pay {B}".
+-- and second-guessing it here would be the engine playing the game.
 --
 -- One prompt per source tapped, against a shrinking candidate list, rather than
 -- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
 -- second is made knowing the first.
 --
--- The life budget only ever binds a cost NOTHING ANNOUNCED for. A cast (CR
+-- The life budget only ever binds a cost NOTHING ANNOUNCED for: a cast (CR
 -- 601.2b) and an activation (CR 602.2b) both run announcePhyrexian first, so the
--- cost arriving here holds no Phyrexian symbol, every resolution of it costs 0
--- life, and the budget is 0 -- CR 107.4f's life is a Pawl.Engine.Cost component by then.
--- What is left under the budget is CR 118.13b/c, a cost paid during a resolution
--- or for a special action, where pawl still chooses (#373).
+-- cost arriving here holds no Phyrexian symbol and the budget is 0. What is left
+-- under it is CR 118.13b/c, a cost paid during a resolution or for a special
+-- action, where pawl still chooses (#373).
 --
 -- It is recomputed on EVERY pass rather than fixed at entry, because a tap can
 -- change it: a Birds of Paradise tapped for blue takes the mana way to an
 -- unannounced {G/P} off the board, and the cost is then payable only by CR
 -- 107.4f's 2 life. Recomputing means pawl pays it, rather than failing the
 -- payment the way the paragraph above lets a mis-tapped {B} fail -- the same MORE
--- PERMISSIVE posture #261 records. Zero when the cost is unpayable outright,
--- which leaves the loop exactly as it was -- spend fails, sources are exhausted
--- one prompt at a time, and the answer is False.
+-- PERMISSIVE posture #261 records. Zero when the cost is unpayable outright.
 payCost :: PlayerId -> ManaCost -> Game Bool
 payCost pid cost = do
   before <- State.get
@@ -659,26 +604,22 @@ payCost pid cost = do
 -- Which source to tap next.
 --
 -- Asked whenever there is more than one candidate, and elided ONLY when there is
--- exactly one -- where no choice exists to make. That is a deliberately blunt
--- reading of CLAUDE.md's "eliding a prompt is legitimate only for
--- indistinguishable options": it never has to be right about what
--- indistinguishable MEANS.
+-- exactly one -- where no choice exists to make. A deliberately blunt reading of
+-- "eliding a prompt is legitimate only for indistinguishable options": it never
+-- has to be right about what indistinguishable MEANS.
 --
 -- The obvious cheaper rule -- elide when every candidate is a copy of the same
 -- card -- is unsound in this pool, and the counterexamples are ordinary. Two
--- Llanowar Elves are one card, but one may be equipped with Bonesplitter or
--- enchanted, one may carry +1/+1 counters (Battlegrowth, Longtusk Cub), one may
--- be borrowed until end of turn by Act of Treason, and one may be blocking (CR
--- 506.4 does not remove a creature from combat for tapping). Each of those makes
--- the choice real. `Game.cardOf` compares PRINTED identity and cannot see any of
--- it, so that rule would suppress exactly the prompts the invariant exists to
--- force. An extra question is cheap; a missing one is the engine deciding (#217).
+-- Llanowar Elves are one card, but one may be equipped or enchanted, one may
+-- carry +1/+1 counters, one may be borrowed until end of turn, and one may be
+-- blocking (CR 506.4 does not remove a creature from combat for tapping).
+-- `Game.cardOf` compares PRINTED identity and cannot see any of it, so that rule
+-- would suppress exactly the prompts the invariant exists to force (#217).
 --
 -- FILTERED, NOT TRUSTED, the posture Combat.declareAttackers and
--- Cost.payComponents already take: an answer outside the offered set is rejected
--- and the head is used instead. That is not only hygiene -- tapForMana is a no-op
--- on an unknown or mana-less id, so honouring a bogus answer would leave the
--- state unchanged and loop forever.
+-- Cost.payComponents already take. That is not only hygiene -- tapForMana is a
+-- no-op on an unknown or mana-less id, so honouring a bogus answer would leave
+-- the state unchanged and loop forever.
 chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game ObjectId
 chooseSource pid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
@@ -689,44 +630,36 @@ chooseSource pid candidates gs = case candidates of
         then answer
         else NonEmpty.head candidates
 
--- CR 107.4f: "...or by paying 2 life." The one place that number is written.
+-- CR 107.4f's 2 life. The one place that number is written.
 phyrexianLife :: Natural
 phyrexianLife = 2
 
--- CR 601.2b: "If a cost that will be paid as the spell is being cast includes
--- Phyrexian mana symbols, the player announces whether they intend to pay 2 life
--- or a corresponding colored mana cost for each of those symbols." CR 118.13a is
--- what places that announcement: it "is made as its controller proposes that
--- spell or ability", NOT when the cost is paid. CR 602.2b sends an activated
--- ability's cost through the same rule.
+-- CR 601.2b: if a cost that will be paid as the spell is cast includes Phyrexian
+-- mana symbols, the player announces for each whether they intend to pay 2 life
+-- or the corresponding coloured mana. CR 118.13a places that announcement as the
+-- controller PROPOSES the spell or ability, NOT when the cost is paid; CR 602.2b
+-- sends an activated ability's cost through the same rule.
 --
 -- Returns CR 601.2b's own phrase -- the "nonhybrid equivalent cost", a mana cost
 -- with no Phyrexian symbol left in it -- and the life the announcement committed.
--- Pawl.Engine.Cost.announce is what turns that life into CR 119.4's payment, so nothing
+-- Pawl.Engine.Cost.announce turns that life into CR 119.4's payment, so nothing
 -- below this function ever sees a mana symbol that spends no mana.
 --
 -- ONE SYMBOL AT A TIME, in printed order, each question asked knowing the answers
--- before it -- the shape payCost's source prompts already take. What makes that
--- sound is the OFFER: a route is offered only if the whole cost is still payable
--- after taking it, so an earlier answer may narrow a later one's options but can
--- never strand the payment. That is also CR 601.2b's last sentence, arriving as a
--- board rather than as a rule: "previously made choices ... may restrict the
--- player's options when making these choices."
+-- before it. What makes that sound is the OFFER: a route is offered only if the
+-- whole cost is still payable after taking it, so an earlier answer may narrow a
+-- later one's options but can never strand the payment -- CR 601.2b's last
+-- sentence, arriving as a board rather than as a rule.
 --
--- Measured through `total`, which is CR 601.2f's totalling supplied by the caller
--- -- because the cost that decides whether a route is payable is the one that will
--- actually be paid, not the printed one. CR 601.2b comes first and 601.2f second,
--- so the ANNOUNCEMENT stays here; only the payability probe reaches forward. Get
--- that wrong and a cost reduction hides a route the player was entitled to and
--- this function elides the prompt, which is the engine choosing -- proved by
--- ManaSpec's "CR 601.2f a reduction opens the coloured-mana route, so the
--- announcement is asked".
---
--- Every remaining announcement is COMPLETED before totalling (`completions`),
--- because CR 601.2f is defined over a nonhybrid equivalent cost: a reduction that
--- names a mana type can only cancel a symbol some announcement has committed to
--- mana, so leaving the tail's symbols Phyrexian would silently withhold reductions
--- a later answer is entitled to.
+-- Measured through `total`, the caller's CR 601.2f totalling, because the cost
+-- that decides whether a route is payable is the one that will actually be paid,
+-- not the printed one. CR 601.2b comes first and 601.2f second, so the
+-- ANNOUNCEMENT stays here; only the payability probe reaches forward. Get that
+-- wrong and a cost reduction hides a route the player was entitled to and this
+-- function elides the prompt, which is the engine choosing. Every remaining
+-- announcement is COMPLETED before totalling (`completions`), because CR 601.2f
+-- is defined over a nonhybrid equivalent cost: leaving the tail's symbols
+-- Phyrexian would silently withhold reductions a later answer is entitled to.
 --
 -- Measured against the BOARD and not the pool: canPayCommitting counts an
 -- untapped source as the mana it could make (payableResolutions), so a Forest
@@ -734,8 +667,7 @@ phyrexianLife = 2
 -- then taps it for something else fails the payment, which is CR 601.2h's
 -- business and not this function's -- announcing is not producing.
 --
--- FILTERED, NOT TRUSTED, the chooseSource posture: an answer outside the offered
--- set is rejected and the head used instead.
+-- FILTERED, NOT TRUSTED, the chooseSource posture.
 announcePhyrexian :: PlayerId -> ObjectId -> (ManaCost -> ManaCost) -> ManaCost -> Game (ManaCost, Natural)
 announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
@@ -744,8 +676,8 @@ announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
       ManaSymbol.Phyrexian color : rest -> do
         gs <- State.get
         let asMana = ManaSymbol.OfType (ManaType.Colored color)
-            -- "Payable" here means "SOME completion of the remaining
-            -- announcements pays it", which is what CR 601.2b's last sentence
+            -- "Payable" here means SOME completion of the remaining
+            -- announcements pays it, which is what CR 601.2b's last sentence
             -- makes the question. Enumerated here rather than left to canPay's own
             -- `resolutions` so that each completion is a Phyrexian-free cost by
             -- the time `total` sees it.
@@ -768,12 +700,11 @@ announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
           -- gate and this offer measure payability through the same totalling, so
           -- no completion payable here can be one the gate refused, and none it
           -- admitted can be missing here. {X} used to be the one wedge in that --
-          -- a gate at X=0 while this runs on the value the player named, so a
-          -- large X on a {X}{G/P} (Corrosive Gale) could empty the offers -- and
+          -- a gate at X=0 while this runs on the value the player named -- and
           -- BOTH callers now close it the same way, by re-asking their own
           -- payability predicate at the announced value before calling
-          -- Cost.announce at all: Cast.castSpell (#417) and Activate.activateAbility
-          -- (#544, Cinder Elemental's "{X}{R}, {T}, Sacrifice this creature").
+          -- Cost.announce at all: Cast.castSpell (#417) and
+          -- Activate.activateAbility (#544).
           [] -> pure PhyrexianPayment.PaysMana
           [only] -> pure only
           first : others -> do
@@ -794,9 +725,8 @@ announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
 --
 -- One entry for a Phyrexian-free tail, so this is the identity case for every cost
 -- announcePhyrexian leaves untouched, and 2^(number of Phyrexian symbols)
--- otherwise -- the same small bound resolutions already carries. Non-Phyrexian
--- symbols ride through in place, which is what keeps a completion a cost and not
--- merely a set of choices.
+-- otherwise. Non-Phyrexian symbols ride through in place, which is what keeps a
+-- completion a cost and not merely a set of choices.
 completions :: [ManaSymbol] -> [([ManaSymbol], Natural)]
 completions symbols = case symbols of
   [] -> [([], 0)]
@@ -830,34 +760,28 @@ canPayCommitting pid committed cost gs = not (null (payableResolutions pid commi
 -- per mana it adds. payableResolutions picks exactly ONE option per source.
 --
 -- One and not several, because CR 106.12 makes "tap for mana" an activation of a
--- mana ability "that includes the {T} symbol in its activation cost", and CR
--- 107.5 says "a permanent that's already tapped can't be tapped again to pay the
--- cost". Every mana ability in this pool costs exactly {T} (manaSourcesGiven
--- leans on the same fact for CR 302.6), so an untapped source is tapped for mana
--- at most once and adds what exactly one activation adds. Mixing its yields --
--- the first mana from one, the second from another -- describes a board no
--- sequence of activations reaches.
+-- mana ability including {T} in its activation cost, and CR 107.5 bars tapping an
+-- already-tapped permanent to pay that cost. Every mana ability in this pool
+-- costs exactly {T} (manaSourcesGiven leans on the same fact for CR 302.6), so an
+-- untapped source is tapped for mana at most once and adds what exactly one
+-- activation adds. Mixing its yields -- the first mana from one, the second from
+-- another -- describes a board no sequence of activations reaches.
 --
 -- The COLLAPSE is the one place several yields become one option, and it is
 -- exact rather than a shortcut. Where every yield adds at most one mana, each
 -- option is at most one supply, and one supply is already "one mana that could be
 -- any of these types": the union over the yields is precisely what an Urborg'd
 -- Mountain or a Birds of Paradise puts on the table. A yield adding NO mana is
--- dropped by the same union, and dropping it changes no answer -- both of
--- payableResolutions' board clauses only ever grow as supplies are added, so an
--- option offering fewer supplies than another can never be the one that pays.
--- Outside the collapse such a yield is offered as an empty option and never
--- taken, for that same reason.
+-- dropped by the same union, which changes no answer, since both of
+-- payableResolutions' board clauses only ever grow as supplies are added.
 --
--- It is also what keeps the search below small. Birds of Paradise offers CR
--- 105.4's five yields; collapsed it is one option, so five Birds are one board
--- rather than 5^5. A source with ONE yield needs no collapse to be one option,
--- so Sol Ring's "{T}: Add {C}{C}" takes the other branch and is one option there.
+-- It is also what keeps the search below small: Birds of Paradise's five yields
+-- collapse to one option, so five Birds are one board rather than 5^5. A source
+-- with ONE yield needs no collapse, so Sol Ring takes the other branch.
 --
 -- The TAGS mix by union, and there too the union is exact: manaYieldsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
--- makes them all facts about that one source. So the union is the value each of
--- them already had.
+-- makes them all facts about that one source.
 sourceOptions :: [Mana] -> [[Supply]]
 sourceOptions yields =
   let unitLists = fmap unitsOf yields
@@ -882,20 +806,17 @@ sourceOptions yields =
 -- strength of an untapped source may not yet fit. What the two agree on is the
 -- life, because the budget is what carries between them.
 --
--- The mana part must not be simulated greedily. Once a source can produce more
--- than one type, WHICH type each source makes decides whether the cost is
--- affordable: a Forest and a Birds of Paradise pay {G}{B}, but only if the Birds
--- makes black, and a greedy walk that tapped the Forest for green and took the
--- Birds' first colour would call it unaffordable.
+-- The mana part must not be simulated greedily: once a source can produce more
+-- than one type, WHICH type each makes decides affordability -- a Forest and a
+-- Birds of Paradise pay {G}{B}, but only if the Birds makes black.
 --
 -- So it is an assignment question, and it is answered exactly. Model each
 -- available mana as a SUPPLY carrying the set of types it could be and the
--- production-time tags it would carry (CR 106.3) -- a pool unit is its own type
--- and its own tags. An untapped source is a CHOICE among such supplies, one
--- option per yield it could add (sourceOptions above), because CR 107.5 lets it
--- be tapped for mana once. Each typed symbol of the cost is a DEMAND, which
--- `serves` matches against a supply; generic symbols demand a count and nothing
--- more.
+-- production-time tags it would carry (CR 106.3). An untapped source is a CHOICE
+-- among such supplies, one option per yield it could add (sourceOptions above),
+-- because CR 107.5 lets it be tapped for mana once. Each typed symbol of the cost
+-- is a DEMAND, which `serves` matches against a supply; generic symbols demand a
+-- count and nothing more.
 --
 -- A BOARD is the pool plus one option taken from every source -- the mana the
 -- player would actually have in front of them after tapping everything. A
@@ -910,61 +831,44 @@ sourceOptions yields =
 --      and
 --   3. CR 119.4's floor admits the life -- this resolution's own, PLUS whatever
 --      an announcement in progress has already committed (`committed`, zero for
---      every caller but announcePhyrexian). This is the clause that reads the
---      PLAYER rather than the board, and the only one a Phyrexian-free cost can
---      never fail: every resolution of such a cost costs 0 life, and CR 119.4b
---      lets anyone pay that -- see canPayLife, which answers 0 without a lookup
---      precisely so that this holds for a player the map does not hold either.
+--      every caller but announcePhyrexian). The clause that reads the PLAYER
+--      rather than the board, and the only one a Phyrexian-free cost can never
+--      fail: every resolution of such a cost costs 0 life, and CR 119.4b lets
+--      anyone pay that -- see canPayLife.
 --
 -- Clauses 1 and 2 are asked of ONE board at a time, and that is the whole of
--- #450's fix. Asking them of a per-source union instead -- the Nth supply being
--- every type the Nth mana of ANY of a source's yields could be -- lets one
--- source's first mana come from one yield and its second from another, which is
--- not a board any sequence of activations reaches. Ashaya, Soul of the Wild makes
--- a Palladium Myr ({T}: Add {C}{C}) a Forest as well, so it adds {G} or {C}{C};
--- the union read it as {G}-or-{C} plus {C}, and so as able to make two mana one
--- of which is green.
+-- #450's fix. Asking them of a per-source union instead lets one source's first
+-- mana come from one yield and its second from another, which is not a board any
+-- sequence of activations reaches: Ashaya, Soul of the Wild makes a Palladium Myr
+-- ({T}: Add {C}{C}) a Forest as well, so the union read it as able to make two
+-- mana one of which is green.
 --
--- The SEARCH over boards is the product of the sources' options, and it is
--- exponential in the number of sources offering more than one -- a real change
--- from the single supply list this used to build, and the reason sourceOptions'
+-- The SEARCH over boards is the product of the sources' options, exponential in
+-- the number of sources offering more than one -- the reason sourceOptions'
 -- collapse matters. After it, a source offers more than one option only if it has
--- several yields AND one of them adds more than one mana. Nothing in this pool is
--- that on its own: it takes a permanent with a multi-mana ability that some
--- effect has ALSO given a basic land type, which is Palladium Myr under Ashaya
--- (or under Urborg, once Ashaya has made it a land). Every land, every mana
--- creature and every Sol Ring is one option, so the ordinary board is one board
--- and the product costs nothing. `any` short-circuits, so a payable cost stops at
--- the first board that pays it; an unpayable one walks every board, and neither a
--- domination prune over a source's options nor a cheap necessary-condition
--- prefilter is implemented (#595).
+-- several yields AND one of them adds more than one mana, which in this pool
+-- takes a multi-mana ability on a permanent some effect has ALSO given a basic
+-- land type (Palladium Myr under Ashaya), so the ordinary board is one board.
+-- `any` short-circuits, so a payable cost stops at the first board that pays it;
+-- an unpayable one walks every board, and neither a domination prune nor a cheap
+-- necessary-condition prefilter is implemented (#595).
 --
 -- Clause 1 is Hall's condition: a saturating matching exists iff no set of
 -- demands outruns the supplies that could serve it. Checked directly rather than
--- by running a matching algorithm: the condition IS the specification, so there
--- is no gap between what this says and what it does.
---
--- Enumerated over subsets of the DISTINCT demands, and that is enough for every
--- subset. Equal demands have the same supplies, so for any violating set take
--- every demand equal to one of its members: that set is no smaller and its
--- supplies are exactly the same ones, so it violates the condition too. At most
--- 2^(distinct typed symbols in the resolution) subsets, a handful for every cost
--- in the pool.
---
--- Over DEMANDS rather than over TYPES, which is what this enumerated while a
--- demand was nothing but a set of types. CR 107.4h's {S} is what ends that: its
--- demand is every type (CR 106.1b) narrowed by a production tag, so two demands
--- can name the same types and still be served by different supplies, and a
--- subset of the types demanded no longer names the demand set it stands for.
+-- by running a matching algorithm, so there is no gap between what this says and
+-- what it does. Enumerated over subsets of the DISTINCT demands, which is enough
+-- for every subset: equal demands have the same supplies, so for any violating
+-- set take every demand equal to one of its members -- no smaller, same
+-- supplies, still violating. At most 2^(distinct typed symbols) subsets. Over
+-- DEMANDS rather than over TYPES because CR 107.4h's {S} demands every type (CR
+-- 106.1b) narrowed by a production tag, so two demands can name the same types
+-- and still be served by different supplies.
 --
 -- Clauses 1 and 2 count one supply per typed demand, which is exactly why CR
--- 107.4e's {2/B} is resolved AWAY before either is asked: `resolutions` turns the
--- cost into the nonhybrid equivalents, and the cost is payable when ANY of them
--- is. Neither clause has to learn about a demand two supplies satisfy, and
--- neither can be fooled into charging {2/B} a single mana. CR 107.4f's {G/P}
--- rides on the same enumeration: its life way is a resolution with one fewer
--- demand, so neither clause has to learn about a symbol that consumes no supply
--- at all.
+-- 107.4e's {2/B} is resolved AWAY before either is asked: neither can be fooled
+-- into charging {2/B} a single mana. CR 107.4f's {G/P} rides on the same
+-- enumeration: its life way is a resolution with one fewer demand, so neither
+-- has to learn about a symbol that consumes no supply at all.
 payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
 payableResolutions pid committed cost gs =
   let Mana.MkMana units = Game.poolOf pid gs
@@ -1005,31 +909,30 @@ lifeNeeded pid cost gs = case payableResolutions pid 0 cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing
 
--- CR 119.4: "If a cost or effect allows a player to pay an amount of life greater
--- than 0, the player may do so only if their life total is greater than or equal
--- to the amount of the payment."
+-- CR 119.4: a player may pay an amount of life greater than 0 only if their life
+-- total is at least that amount.
 --
--- Lives here rather than in Pawl.Engine.Cost so that CR 107.4f's Phyrexian symbol and
--- CR 119.4's own PayLife component share one reading of the rule; Pawl.Engine.Cost
--- imports this module, so the dependency only goes one way.
+-- Lives here rather than in Pawl.Engine.Cost so that CR 107.4f's Phyrexian symbol
+-- and CR 119.4's own PayLife component share one reading of the rule;
+-- Pawl.Engine.Cost imports this module, so the dependency only goes one way.
 --
 -- CR 119.4b is answered BEFORE the lookup, not by the `>=` that would usually
--- absorb it: "Players can always pay 0 life, no matter what their (or their
--- team's) life total is, and even if an effect says players can't pay life."
--- ALWAYS, so a player the map does not hold must not turn a zero payment into an
--- unpayable one -- and every resolution of a cost with no Phyrexian symbol is a
--- zero payment, so this is also what keeps payableResolutions' life clause
--- unable to change any answer such a cost used to give.
+-- absorb it: players can ALWAYS pay 0 life, whatever their total and even where
+-- an effect says they can't pay life. So a player the map does not hold must not
+-- turn a zero payment into an unpayable one -- and every resolution of a cost
+-- with no Phyrexian symbol is a zero payment, so this is also what keeps
+-- payableResolutions' life clause unable to change any answer such a cost used
+-- to give.
 canPayLife :: PlayerId -> Natural -> GameState -> Bool
 canPayLife pid n gs =
   n == 0 || case Map.lookup pid (GameState.players gs) of
     Nothing -> False
     Just player -> Player.life player >= toInteger n
 
--- CR 119.4: "the payment is subtracted from their life total; in other words, the
--- player loses that much life." A direct subtraction, and the CR 704.5a
--- state-based action that may follow is the existing one in Pawl.Engine.Sba -- paying to
--- exactly 0 is a legal payment, not a barred one.
+-- CR 119.4: the payment is subtracted from the player's life total. A direct
+-- subtraction, and the CR 704.5a state-based action that may follow is the
+-- existing one in Pawl.Engine.Sba -- paying to exactly 0 is a legal payment, not
+-- a barred one.
 payLife :: PlayerId -> Natural -> GameState -> GameState
 payLife pid n gs =
   gs

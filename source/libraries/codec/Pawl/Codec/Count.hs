@@ -10,14 +10,9 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Count as Count
 
 -- | A BARE OBJECT keyed by the record's field names, the shape every
--- single-constructor record in this codec writes (Pawl.Codec.Condition,
--- Pawl.Codec.Countering, ...).
---
--- The "Count" TAG MOVED UP to Pawl.Codec.Quantity's Count arm, which is this
--- codec's only caller. It sat here before only because Quantity dispatched on
--- it, which made the two types share one tag across two levels and forced
--- Quantity's arm to skip the wrapper every other arm writes. Quantity now tags
--- its own arm like the rest, and a Count is just the payload.
+-- single-constructor record in this codec writes. The "Count" tag belongs to
+-- Pawl.Codec.Quantity's Count arm -- this codec's only caller -- so the two
+-- types never share one tag across two levels.
 toJson :: (q -> Value.Value) -> Count.Count q -> Value.Value
 toJson codec count =
   Common.object . concat $

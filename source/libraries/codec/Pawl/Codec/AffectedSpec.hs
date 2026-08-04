@@ -35,9 +35,8 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       Affected.fromJson
       (Affected.MatchingAnywhere (Filter.HasCardType CardType.Creature))
       """ {"type":"MatchingAnywhere","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
-  -- Opalescence's shape: its own "each other" card text (not a rule) as Not
-  -- IsSource, nested inside Matching -- the composed form a bare atom case
-  -- above would not exercise.
+  -- An "each other" card text as Not IsSource nested inside Matching -- the
+  -- composed form the bare atom cases above do not exercise.
   Spec.it s "Matching, Opalescence's \"each other\" shape" $
     Common.assertJsonCodec
       s
@@ -59,7 +58,7 @@ spec s = Spec.describe s "Pawl.Codec.Affected" $ do
       Affected.fromJson
       Affected.Attached
       """ {"type":"Attached"} """
-  -- CR 303.4m through a player: Curse of Death's Hold's shape.
+  -- CR 303.4m through a player.
   Spec.it s "AttachedPlayerControls" $
     Common.assertJsonCodec
       s

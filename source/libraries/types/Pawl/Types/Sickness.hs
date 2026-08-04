@@ -8,33 +8,24 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- component expresses the untap symbol (#204).
 --
 -- `Settled` names WHO the continuity claim is about, because CR 302.6's subject
--- is a player, not the creature: "under ITS CONTROLLER'S control since THEIR most
--- recent turn began". A bare not-sick flag cannot answer that question, and got
--- it wrong for Control Magic (#198) -- the thief inherited the victim's settle.
--- A reader asks `sickness obj == Settled pid` for the specific player whose turn
--- and control are at issue, so the claim can never be read by the wrong player.
+-- is a player rather than the creature. A bare not-sick flag cannot answer that
+-- and got it wrong for Control Magic (#198) -- the thief inherited the victim's
+-- settle. A reader asks `sickness obj == Settled pid` for the specific player
+-- whose turn and control are at issue.
 --
--- Two writers put the claim there, and both are moments CR 302.6 names:
---   * Engine.settleAll writes `Settled pid` at pid's untap step, for everything
---     pid controls then. That is literally "since their most recent turn began".
---   * Engine.checkControlContinuity DROPS a `Settled p` whose object p no longer
---     controls. Control is DERIVED (a control-granting static ability is re-read
---     live by the projection), so a change has no event to hook; it samples
---     instead, wherever the board can change. It only ever clears, never grants,
---     so a stolen creature stays sick even after the Aura leaves and control
---     returns.
+-- Two writers, both moments CR 302.6 names: Engine.settleAll writes
+-- `Settled pid` at pid's untap step for everything pid controls; and
+-- Engine.checkControlContinuity DROPS a `Settled p` whose object p no longer
+-- controls. Control is DERIVED, so a change has no event to hook and the check
+-- samples wherever the board can change. It only ever clears, never grants, so a
+-- stolen creature stays sick after the Aura leaves and control returns.
 --
--- Everything else writes `Sick`: Event.changeZone and Event.createToken, because
--- CR 400.7 makes each a new object no player has controlled for any time at all;
--- Pawl.Engine.Setup, for the cards a game starts with; and Resolve's GainControl arm,
--- because control just moved.
---
--- The exception is an object built directly onto the stack or into the command
--- zone -- an activated or triggered ability, an emblem -- which is stamped
--- `Settled` under its own controller. Summoning sickness is meaningless off the
--- battlefield, and every reader is battlefield-gated, so the value is inert
--- either way; it is not an assertion about anything. A spell is not in this
--- group: it reaches the stack through Event.changeZone, so it carries `Sick`.
+-- Everything else writes `Sick`, CR 400.7 making a zone change or a new token a
+-- new object no player has controlled for any time. The exception is an object
+-- built directly onto the stack or into the command zone -- an ability, an emblem
+-- -- stamped `Settled` under its own controller: every reader is
+-- battlefield-gated, so the value is inert rather than an assertion. A spell is
+-- not in that group; it reaches the stack through Event.changeZone.
 data Sickness
   = Sick
   | Settled PlayerId.PlayerId

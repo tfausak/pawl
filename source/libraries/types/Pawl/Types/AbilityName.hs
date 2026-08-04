@@ -6,10 +6,9 @@ import qualified Data.Text as Text
 -- joining Effect.ArmDelayedTrigger to Card.delayedAbilities. SlotName's exact
 -- shape, and for the same reason: named, never positional.
 --
--- A card's text therefore lives in two fields joined by a name -- and the join
--- is policed the way SlotName's is. The dataflow lint (test suite) checks that
--- every armed name is declared and every declared name is armed, so a dangling
--- name is a FAILING TEST, never a trigger that silently never fires.
+-- The join is policed the way SlotName's is: the dataflow lint checks that every
+-- armed name is declared and every declared name is armed, so a dangling name is
+-- a failing test rather than a trigger that silently never fires.
 newtype AbilityName = MkAbilityName
   { unwrap :: Text.Text
   }

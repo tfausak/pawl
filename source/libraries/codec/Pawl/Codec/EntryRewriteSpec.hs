@@ -22,8 +22,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       EntryRewrite.AsCopy
       """ {"type":"AsCopy"} """
-  -- CR 208.2b: Primal Plasma's three P/T-and-keyword choices, here narrowed to
-  -- the two that show the keyword union isn't lost on the wire.
+  -- CR 208.2b: two P/T-and-keyword choices, enough to show the keyword union
+  -- isn't lost on the wire.
   Spec.it s "ChoiceOf (Primal Plasma)" $
     Common.assertJsonCodec
       s
@@ -35,8 +35,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
           ]
       )
       """ {"type":"ChoiceOf","value":[{"power":3,"toughness":3},{"power":1,"toughness":6,"keywords":[{"type":"Defender"}]}]} """
-  -- CR 614.1c / 105.1: Painter's Servant's as-enters colour choice, payload-free
-  -- because the five colours are always the whole offer.
+  -- CR 614.1c / 105.1: an as-enters colour choice, payload-free because the
+  -- five colours are always the whole offer.
   Spec.it s "ChooseColor (Painter's Servant)" $
     Common.assertJsonCodec
       s
@@ -59,8 +59,8 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       (EntryRewrite.WithCounters CounterKind.Loyalty 3)
       """ {"type":"WithCounters","value":[{"type":"Loyalty"},3]} """
-  -- CR 616.1b: Gather Specimens' control rewrite, payload-free for the reason
-  -- Pawl.Types.EntryRewrite gives -- CR 109.5 derives the player.
+  -- CR 616.1b: a control rewrite, payload-free because CR 109.5 derives the
+  -- player.
   Spec.it s "UnderSourceControl (Gather Specimens)" $
     Common.assertJsonCodec
       s

@@ -24,9 +24,8 @@ import qualified Pawl.Types.ManaCount as ManaCount
 -- Read STRAIGHT OFF GameState.manaPool at the moment of the call, never off a
 -- stored or sampled copy: CR 605.3a lets a player activate a mana ability
 -- whenever they have priority and CR 605.3b has it resolve immediately without
--- using the stack, so the pool moves with no state-based action (CR 704.3) and
--- no priority pass in between. Pinned by Pawl.PowerToughnessSpec's "CR 106.4 the
--- count is live".
+-- the stack, so the pool moves with no state-based action (CR 704.3) and no
+-- priority pass in between.
 evaluate :: Filter.Context -> GameState -> ManaCount.ManaCount -> Maybe Integer
 evaluate context gs count = do
   -- CR 106.4 attaches a pool to a player, so the same PlayerRef reading a

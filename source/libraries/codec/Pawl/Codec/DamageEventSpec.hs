@@ -32,10 +32,8 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.kind = DamageKind.Combat
         }
       """ {"source":1,"target":{"type":"ToPlayer","value":2},"amount":3,"dealtByDeathtouch":true,"dealtByToxic":2,"kind":{"type":"Combat"}} """
-  -- CR 120.3c's recipient tag is a different arm of Recipient from the one
-  -- above, and noncombat damage (CR 608) is a different arm of DamageKind.
-  -- CR 702.15b: lifelink pays the source's controller, carried here as the
-  -- concrete PlayerId.
+  -- CR 120.3c's recipient tag and CR 608's noncombat damage are each the other
+  -- arm of their type. CR 702.15b's lifelink payee is a concrete PlayerId.
   Spec.it s "MkDamageEvent, dealt to a planeswalker, with lifelink" $
     Common.assertJsonCodec
       s
@@ -52,9 +50,8 @@ spec s = Spec.describe s "Pawl.Codec.DamageEvent" $ do
           DamageEvent.kind = DamageKind.Noncombat
         }
       """ {"source":1,"target":{"type":"ToPlaneswalker","value":5},"amount":4,"dealtByInfect":true,"dealtByLifelink":2,"kind":{"type":"Noncombat"}} """
-  -- Every dealtBy* rider at its default (CR 702.164b's zero, CR 702.15b's no
-  -- lifelink payer, and both booleans false), which is what an event carrying
-  -- none of them means.
+  -- Every dealtBy* rider at its default, which is what an event carrying none
+  -- of them means.
   Spec.it s "an all-default value omits every optional key" $
     Common.assertJsonCodec
       s

@@ -21,10 +21,8 @@ import qualified Numeric.Natural as Natural
 -- moment they can happen.
 data TurnWindow
   = -- | Onset.Immediately: no turn restriction at all, which is CR 603.7a's floor
-    -- ("a delayed triggered ability won't trigger until it has actually been
-    -- created, even if its trigger event occurred just beforehand") and every
-    -- delayed ability in the pool but Meandering Towershell's. The floor itself
-    -- is the event scan's watermark, not this type's business.
+    -- and every delayed ability in the pool but Meandering Towershell's. The
+    -- floor itself is the event scan's watermark, not this type's business.
     AnyTurn
   | -- | Onset.FromYourNextTurn, before that turn has arrived: the entry watches
     -- for nothing yet, whatever its condition matches.
@@ -36,10 +34,9 @@ data TurnWindow
     --
     -- No turn number of its own either, and that is the point: the number of the
     -- controller's next turn is not knowable when the ability is armed. An
-    -- intervening opponent's turn and an extra turn (CR 500.7, "adding the turns
-    -- directly after the specified turn") each move it, and a seat whose turn
-    -- never begins at all (CR 800.4k) does not supply it -- so the only honest
-    -- thing to store is the boundary itself, and to store the number when the
+    -- intervening opponent's turn and an extra turn (CR 500.7) each move it, and
+    -- a seat whose turn never begins at all (CR 800.4k) does not supply it -- so
+    -- the only honest thing to store is the boundary, and the number when the
     -- turn arrives.
     ControllersNextTurn
   | -- | The same onset once that turn has begun: the number
@@ -48,26 +45,17 @@ data TurnWindow
     --
     -- Closed at both ends, which a lower bound cannot be. The printed phrase
     -- names ONE turn, so if that turn's trigger event never happens -- Stonehorn
-    -- Dignitary taking the combat phase away from the turn Meandering Towershell's
-    -- return was waiting for -- CR 614.10a's first sentence settles it: "Anything
-    -- scheduled for a skipped step, phase, or turn won't happen", which CR 603.7a
-    -- says again from the ability's side ("other events that happen earlier may
-    -- make the trigger event impossible"). Firing it on the controller's NEXT turn
-    -- instead would be firing it on a turn the card does not name.
+    -- Dignitary taking the combat phase away -- CR 614.10a's first sentence
+    -- settles it, and CR 603.7a says the same from the ability's side. Firing it
+    -- on the controller's NEXT turn instead would be firing it on a turn the card
+    -- does not name.
     --
-    -- CR 614.10a's SECOND sentence -- "anything scheduled for the 'next'
-    -- occurrence of something waits for the first occurrence that isn't skipped"
-    -- -- is the reason the two halves are settled at different moments rather
-    -- than both here. The only "next" the Towershell prints is the TURN ("at the
-    -- beginning of the declare attackers step on your next turn", oracle text
-    -- checked on Scryfall), so it is the turn that waits for the first occurrence
-    -- that happens, which is what settleOnsets running per turn BEGUN delivers.
-    -- The step inside that turn is not a "next" occurrence of anything, so
-    -- sentence one governs it.
-    --
-    -- Pawl.TriggerSpec's "CR 603.7a a skipped combat phase on the named turn makes
-    -- the return impossible, not late" is what proves it, against its own paired
-    -- control.
+    -- CR 614.10a's SECOND sentence, on waiting for the first occurrence that is
+    -- not skipped, is why the two halves are settled at different moments. The
+    -- only "next" Meandering Towershell prints is the TURN, so it is the turn
+    -- that waits, which is what settleOnsets running per turn BEGUN delivers. The
+    -- step inside that turn is not a "next" occurrence of anything, so sentence
+    -- one governs it.
     --
     -- An entry whose turn has passed is dropped rather than left to fail the
     -- comparison forever: it can no longer fire, and CR 603.7b's one shot is not

@@ -61,8 +61,7 @@ losesNow gs pid = case Map.lookup pid (GameState.players gs) of
 -- since the last SBA check is destroyed. "Deathtouch source" is read from the
 -- event's deal-time bit (CR 702.2e last-known information), NOT re-derived now --
 -- so a source that lost deathtouch (Humility) or left after dealing damage is
--- still judged by what it was. See the M3b spec, section 4. Now read from the
--- WATERMARKED slice of the turn log, not a drained queue.
+-- still judged by what it was.
 woundedByDeathtouch :: GameState -> ObjectId -> Bool
 woundedByDeathtouch gs oid =
   let hits ev =
@@ -76,13 +75,11 @@ woundedByDeathtouch gs oid =
 --
 -- The isCreature guard is not redundant. Only creatures have printed toughness
 -- today, so toughnessOf already implies it -- but CR 301.7a is why the two are
--- not the same question: "Each Vehicle has a printed power and toughness, but it
--- has these characteristics only if it's also a creature." A noncreature Vehicle
--- has the printed numbers and not the characteristic, and 704.5f/g must not
--- touch it. Ask the classification, never the identity.
+-- not the same question: a noncreature Vehicle has the printed numbers and not
+-- the characteristic, and 704.5f/g must not touch it.
+--
 -- Takes the object's already-projected characteristics (checkStateBasedActions
--- projects the whole board once, per CR 704.3 simultaneity, rather than
--- re-projecting per object).
+-- projects the whole board once, per CR 704.3 simultaneity).
 zeroToughness :: PC.ProjectedCharacteristics -> Bool
 zeroToughness pc =
   Set.member CardType.Creature (PC.cardTypes pc)
@@ -90,28 +87,25 @@ zeroToughness pc =
       Nothing -> False
       Just t -> t <= 0
 
--- CR 704.5i: "If a planeswalker has loyalty 0, it's put into its owner's
--- graveyard." CR 306.9 states the same rule from the card type's side.
+-- CR 704.5i: a planeswalker with loyalty 0 is put into its owner's graveyard. CR
+-- 306.9 states the same rule from the card type's side.
 --
 -- A put-into-graveyard and NOT a destruction, the CR 704.5f shape rather than the
--- CR 704.5g one: it is ungated by indestructible and offers regeneration no
+-- CR 704.5g one: ungated by indestructible and offering regeneration no
 -- opportunity (CR 701.19a), which is why the classification below maps it to the
 -- bury batch.
 --
 -- Takes the GameState as well as the projection, unlike zeroToughness above,
--- because CR 306.5c puts a permanent's loyalty in its COUNTERS -- "the loyalty of
--- a planeswalker on the battlefield is equal to the number of loyalty counters on
--- it" -- and no layer projects it. A planeswalker that never received counters
--- reads 0 here and is buried, which is the rule and not an accident: a
--- planeswalker on the battlefield always has CR 306.5b's counters unless
--- something removed them.
+-- because CR 306.5c puts a permanent's loyalty in its COUNTERS and no layer
+-- projects it. A planeswalker that never received counters reads 0 here and is
+-- buried, which is the rule and not an accident: CR 306.5b gives one counters as
+-- it enters unless something removed them.
 --
 -- The card-type guard is load-bearing rather than defensive, and in the opposite
 -- direction to zeroToughness's: Object.counters is keyed by kind for EVERY
 -- permanent, so absent this guard every creature on the battlefield would read as
--- having loyalty 0 and be buried. CR 122.1e is what confines the reading -- "the
--- number of loyalty counters on a PLANESWALKER on the battlefield indicates how
--- much loyalty it has".
+-- having loyalty 0 and be buried. CR 122.1e confines the reading to
+-- planeswalkers.
 zeroLoyalty :: GameState -> PC.ProjectedCharacteristics -> ObjectId -> Bool
 zeroLoyalty gs pc oid =
   Set.member CardType.Planeswalker (PC.cardTypes pc)
@@ -138,32 +132,24 @@ destroyedBySba gs pc oid =
                    || woundedByDeathtouch gs oid
                )
 
--- CR 704.5n: "If an Equipment or Fortification is attached to an illegal
--- permanent or to a player, it becomes unattached from that permanent or player.
--- It remains on the battlefield."
+-- CR 704.5n: an Equipment or Fortification attached to an illegal permanent or to
+-- a player becomes unattached and remains on the battlefield.
 --
 -- The shape difference from CR 704.5m, which is why this is a separate
 -- classification rather than another clause of fallsOff: an Aura DIES, an
--- Equipment merely DETACHES and stays. CR 301.5c says the same from the card
--- type's side -- "An Equipment that equips an illegal or nonexistent permanent
--- becomes unattached from that permanent but remains on the battlefield."
+-- Equipment merely DETACHES and stays (CR 301.5c says the same from the card
+-- type's side).
 --
--- "Illegal" is CR 301.5: "An Equipment can be attached to a creature. It can't
--- legally be attached to anything that isn't a creature." So a host that is gone,
--- or that is not a creature, is illegal -- and `pcs` answers both at once, since
--- an object no longer on the battlefield has no entry in it.
+-- "Illegal" is CR 301.5: an Equipment can be attached only to a creature. So a
+-- host that is gone, or that is not a creature, is illegal -- and `pcs` answers
+-- both at once, since an object no longer on the battlefield has no entry in it.
+-- Reading the shared pre-pass projection (a per-object project here would
+-- reintroduce the cubic sweep) means an Equipment whose creature dies THIS pass
+-- detaches on the NEXT one, exactly as an Aura falls off on the next one.
 --
--- Reads the shared pre-pass projection for the same reason fallsOff does (see its
--- haddock): a per-object project here would reintroduce the cubic sweep. An
--- Equipment whose creature dies THIS pass therefore detaches on the NEXT one,
--- exactly as an Aura falls off on the next one.
---
--- CR 704.5n's "or to a player" clause is expressible but has no producer: no
--- effect in this pool attaches an Equipment to a player (CR 301.5 lets an
--- Equipment be attached only to a creature, and Pawl.Engine.Resolve.attachmentFor
--- refuses anything else). Written anyway, as the `Nothing` a player host yields from
--- Recipient.objectOf -- there is no host object to be a creature, so the rule
--- detaches it.
+-- CR 704.5n's "or to a player" clause is expressible but has no producer. Written
+-- anyway, as the `Nothing` a player host yields from Recipient.objectOf -- there
+-- is no host object to be a creature, so the rule detaches it.
 --
 -- Guarded on the PROJECTED subtype, so a permanent that stops being an Equipment
 -- while attached stops matching here; cannotBeAttached below is the CR 704.5p
@@ -182,50 +168,38 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
             Just pc -> Set.member CardType.Creature (PC.cardTypes pc)
        in isEquipment && not hostIsCreature
 
--- CR 704.5p: "If a battle or creature is attached to an object or player, it
--- becomes unattached and remains on the battlefield. Similarly, if any
--- nonbattle, noncreature permanent that's neither an Aura, an Equipment, nor a
--- Fortification is attached to an object or player, it becomes unattached and
--- remains on the battlefield."
+-- CR 704.5p: a battle or creature attached to an object or player becomes
+-- unattached and remains on the battlefield, and so does any nonbattle,
+-- noncreature permanent that is neither an Aura, an Equipment, nor a
+-- Fortification.
 --
 -- The complement of becomesUnattached, and the reason the two are separate
 -- classifications rather than clauses of one: CR 704.5n asks whether the HOST is
 -- still legal, and this asks whether the attached permanent may be attached to
 -- anything at all. An Equipment animated while equipping a perfectly legal
--- creature is the case only this one catches -- CR 301.5c, "An Equipment that's
--- also a creature can't equip a creature unless that Equipment has reconfigure".
--- That exception costs nothing here: CR 702.151b makes a reconfigure Equipment
--- "stop being a creature until it becomes unattached", so it never reaches this
--- branch in the first place (and no card in the pool has reconfigure). They share
--- an ACTION (detach, stay on the battlefield), so performStateBasedActions ORs
--- them into one list.
+-- creature is the case only this one catches (CR 301.5c). That rule's reconfigure
+-- exception costs nothing here: CR 702.151b makes a reconfigure Equipment stop
+-- being a creature until it becomes unattached, so it never reaches this branch
+-- (and no card in the pool has reconfigure). The two share an ACTION -- detach,
+-- stay on the battlefield -- so performStateBasedActions ORs them into one list.
 --
 -- Read off the PROJECTED characteristics, which is the whole point: the card
--- types this cases on are exactly what CR 613's layer 4 changes, and a permanent
--- that was neither a creature nor an Aura when it became attached is what this
--- rule exists for. "Aura" and "Equipment" are subtypes (CR 205.3h, CR 301.5), so
--- they are read from PC.subtypes -- unlike CR 704.5m's fallsOff, which asks the
--- printed card for an enchant ability because it needs that ability's spec.
+-- types this cases on are exactly what CR 613's layer 4 changes. "Aura" and
+-- "Equipment" are subtypes (CR 205.3h, CR 301.5), so they come from PC.subtypes
+-- -- unlike CR 704.5m's fallsOff, which asks the printed card for an enchant
+-- ability because it needs that ability's spec.
 --
 -- Two clauses of the rule have no constructor to case on and are therefore
--- unreachable rather than elided: there is no CardType.Battle (both "battle"
--- halves) and no Subtype.Fortification. "Or to a player" needs no clause at all
--- here: this rule asks only whether the attached permanent may be attached to
--- ANYTHING, so the `Just _` below covers an object and a player alike.
+-- unreachable rather than elided: there is no CardType.Battle and no
+-- Subtype.Fortification. "Or to a player" needs no clause at all: this rule asks
+-- only whether the attached permanent may be attached to ANYTHING, so the
+-- `Just _` below covers an object and a player alike.
 --
--- This is also where CR 303.4d's second clause -- "An Aura that's also a creature
--- can't enchant anything. If this occurs somehow, the Aura becomes unattached,
--- then is put into its owner's graveyard" -- is enforced, without naming it: such
--- an Aura is a creature that is attached, so it detaches HERE (first sentence)
--- and CR 704.5m's fallsOff buries it on the next pass. The rule's "then" IS that
--- pass boundary. Proven by Liquimetal Coating plus Skilled Animator in
--- Pawl.AuraSpec, which is the only route to it: every printed enchantment
--- animator excludes Auras, so the Aura has to be made an ARTIFACT first.
---
--- CR 303.4d's clause is a RESTRICTION as well as a state-based action ("can't
--- enchant anything"), and only the state-based half lives here. The restriction
--- half is Pawl.Engine.Resolve.attachmentFor's first Aura conjunct, which refuses to attach
--- an Aura that is also a creature to anything.
+-- This is also where CR 303.4d's second clause is enforced without being named:
+-- an Aura that is also a creature is attached, so it detaches HERE and CR 704.5m's
+-- fallsOff buries it on the next pass. The rule's "then" IS that pass boundary.
+-- Only the state-based half lives here; the RESTRICTION half ("can't enchant
+-- anything") is Pawl.Engine.Resolve.attachmentFor's first Aura conjunct.
 cannotBeAttached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
   Nothing -> False
@@ -243,48 +217,35 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
             -- conjunct is the second sentence's own "noncreature" qualifier.
             isCreature || (not isCreature && not isAura && not isEquipment)
 
--- CR 704.5m: "If an Aura is attached to an illegal object or player, or is not
--- attached to an object or player, that Aura is put into its owner's graveyard."
--- Three clauses: unattached, attached to an id that is no longer a permanent, and
--- attached to one its own enchant ability no longer admits (CR 303.4c's "as
--- defined by its enchant ability and other applicable effects").
+-- CR 704.5m: an Aura attached to an illegal object or player, or attached to
+-- nothing, is put into its owner's graveyard. Three clauses: unattached, attached
+-- to an id that is no longer a permanent, and attached to one its own enchant
+-- ability no longer admits (CR 303.4c).
 --
--- CR 303.4c's own wording splits that last clause differently -- "the object it
--- was attached to no longer exists, or the player it was attached to has left the
--- game" -- and both halves land in the SAME place here, because a pool's
--- candidate list already excludes them: Target.creatureRecipients scans the
--- battlefield of players still in the game, and Target.playerRecipients IS
--- Game.stillPlaying. So an enchant-player Aura (CR 702.5d) whose player has left
--- is illegal by the same test that judges every other Aura, with no player-only
--- branch. Pawl.AuraSpec's "the player it was attached to has left the game" case
--- is the proof.
+-- CR 303.4c's own wording splits that last clause differently, and both halves
+-- land in the SAME place here because a pool's candidate list already excludes
+-- them: Target.creatureRecipients scans the battlefield of players still in the
+-- game, and Target.playerRecipients IS Game.stillPlaying. So an enchant-player
+-- Aura (CR 702.5d) whose player has left is illegal by the same test that judges
+-- every other Aura, with no player-only branch.
 --
 -- The third clause goes through stillLegalEnchant below rather than calling
 -- Target.stillAdmitted directly, so that the common enchant spec is answered off
 -- `pcs` -- the SAME pre-pass Projection.projectAll performStateBasedActions
--- computed once for every other CR 704.3 classification. (A spec carrying a
--- Filter still reaches stillAdmitted, by that function's own fallthrough; see
--- its haddock.)
--- stillAdmitted reaches Target.admittedRecipients -> basePoolGiven Pool.Creatures
--- -> creatureRecipients -> Projection.isCreatureOf, and THAT is `project oid gs`
--- -- a fresh `gather` PER Aura. Every other classify here shares one `gather`
--- precisely because gather's neighbouring lesson (Projection.hs's `liveGiven`
--- comment) is that recomputing it inside a per-object loop makes project
--- O(permanents^3) per SBA sweep; calling stillLegal here reintroduced that same
--- shape one level down (20 permanents with 2 attached Auras costing ~40 extra
--- `gather`s and ~400 extra `project`s per pass).
+-- computed once for every other CR 704.3 classification. Calling stillAdmitted
+-- here instead means a fresh `gather` PER Aura, which is the O(permanents^3)
+-- shape Projection.hs's `liveGiven` comment warns about, one level down. (A spec
+-- carrying a Filter still reaches stillAdmitted by that function's fallthrough.)
 --
 -- CR 303.4d's first clause -- an Aura can't enchant itself -- is the `oid == self`
--- arm. Unreachable in this pool (a Creatures enchant spec cannot name the Aura
--- spell on the stack), written anyway because it costs one comparison. CR
--- 303.4d's SECOND clause -- an Aura that's also a creature can't enchant anything
--- -- is the "unattached" arm here plus cannotBeAttached above: that rule detaches
--- the animated Aura on one pass, and this buries it on the next, which is the
--- order CR 303.4d states. See cannotBeAttached's haddock.
+-- arm. Unreachable in this pool, written anyway because it costs one comparison.
+-- Its SECOND clause is the "unattached" arm here plus cannotBeAttached above:
+-- that rule detaches the animated Aura on one pass, and this buries it on the
+-- next, which is the order CR 303.4d states.
 --
--- A put-into-graveyard, NOT a destruction: CR 704.5m says "put into its owner's
--- graveyard", so this goes through Event.changeZone and consults neither
--- indestructible (CR 702.12b) nor a regeneration shield (CR 701.19a).
+-- A put-into-graveyard, NOT a destruction, so this goes through Event.changeZone
+-- and consults neither indestructible (CR 702.12b) nor a regeneration shield (CR
+-- 701.19a).
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 fallsOff pcs gs oid = case Game.cardOf oid gs of
   Nothing -> False
@@ -298,65 +259,45 @@ fallsOff pcs gs oid = case Game.cardOf oid gs of
           Recipient.objectOf recipient == Just oid
             || not (stillLegalEnchant pcs gs oid spec recipient)
 
--- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s spec
--- ADMITS? Answered off `pcs` -- the pre-pass projection every other
--- classification in performStateBasedActions shares (CR 704.3 simultaneity) --
--- for the one spec shape that reduces to a lookup, and by the general
--- Target.stillAdmitted for every other.
+-- CR 303.4c: is `recipient` still one the enchanting Aura `source`'s spec ADMITS?
+-- Answered off `pcs` -- the pre-pass projection every other classification in
+-- performStateBasedActions shares (CR 704.3 simultaneity) -- for the one spec
+-- shape that reduces to a lookup, and by the general Target.stillAdmitted for
+-- every other.
 --
--- Admission, NOT target legality: CR 303.4c asks whether the Aura enchants "an
--- illegal object or player as defined by its enchant ability and other
--- applicable effects", which rule 702's TARGETING restrictions do not speak to.
--- Protection would bury this Aura, but by its own separate clause (CR 702.16c),
--- while shroud (CR 702.18) and hexproof (CR 702.11) restrict targeting and
--- nothing else -- so an Aura stays attached to a host that gains either. See
--- Target.admittedRecipients.
+-- Admission, NOT target legality: CR 303.4c asks about an illegal object or
+-- player as defined by the enchant ability, which rule 702's TARGETING
+-- restrictions do not speak to. Protection would bury this Aura, but by its own
+-- separate clause (CR 702.16c), while shroud (CR 702.18) and hexproof (CR 702.11)
+-- restrict targeting and nothing else -- so an Aura stays attached to a host that
+-- gains either. See Target.admittedRecipients.
 --
 -- Pool.Creatures with no Filter is the shape MOST Card.enchant specs in this pool
--- carry (Unholy Strength's "enchant creature"). Target.creatureRecipients
--- (Target.hs) tags every candidate it produces ToCreature, drawn from the
--- battlefield objects owned by a still-playing player (Game.stillPlaying);
--- with no Filter left to narrow that set, "still legal" reduces EXACTLY to
--- "still a creature, on the battlefield, owned by a player still in the game" --
--- which is what the Pool.Creatures arm below reads off `pcs` (a Map.lookup) plus
--- one owner check. This is not an approximation: `pcs Map.! target`, when it
--- exists, IS `Projection.project target gs` (projectAll folds the SAME gathered
--- candidate list stillAdmitted would rebuild from scratch), and a missing key
--- means exactly what Target.creatureRecipients' own battlefield scan would have
--- missed it for -- target is not on the battlefield at all.
+-- carry (Unholy Strength). Target.creatureRecipients tags every candidate
+-- ToCreature, drawn from the battlefield objects owned by a still-playing player,
+-- so with no Filter to narrow that set "still legal" reduces EXACTLY to "still a
+-- creature, on the battlefield, owned by a player still in the game" -- a
+-- Map.lookup on `pcs` plus one owner check. Not an approximation: `pcs Map.!
+-- target`, when it exists, IS `Projection.project target gs`, and a missing key
+-- means what creatureRecipients' own battlefield scan would have missed it for.
 --
 -- Any OTHER shape falls through to the general, slower Target.stillAdmitted,
--- which reuses the SAME pool and Filter Cast/Resolve already judge -- rather
--- than assuming the
--- Creatures-with-no-Filter shape holds regardless, a shortcut that would go
--- silently wrong the day it stops holding. That day has come: Setessan Training's
--- "Enchant creature you control" is a Creatures spec that DOES carry a Filter, and
--- its ControlledBy You conjunct is unanswerable from `pcs` -- CR 109.5 makes that
--- "you" the AURA's controller (enchant is a static ability, CR 702.5a), so the
--- answer changes when an opponent steals the enchanted creature even though the
--- reduction's three facts all still hold. Pawl.AuraSpec's Control Magic case is
--- the proof. CR 702.5d's enchant-player Auras are the second producer: Curse of
--- Death's Hold's Pool.Players spec falls through, and Target.playerRecipients IS
--- Game.stillPlaying, so CR 303.4c's "the player it was attached to has left the
--- game" is answered by the general path with no clause of its own.
---
--- So the fallthrough pays the per-Aura re-projection the reduction above exists to
--- avoid -- but only for the Auras whose spec the reduction cannot serve, and `pcs`
--- remains the source of truth for every other CR 704.3 classification on the pass,
--- so the simultaneity the pre-pass buys is untouched. Serving a filtered spec off
+-- which reuses the SAME pool and Filter Cast/Resolve already judge, rather than
+-- assuming the Creatures-with-no-Filter shape holds regardless. Two producers
+-- need it: Setessan Training's "Enchant creature you control" carries a Filter
+-- whose ControlledBy You conjunct is unanswerable from `pcs` -- CR 109.5 makes
+-- that "you" the AURA's controller (CR 702.5a), so the answer changes when an
+-- opponent steals the enchanted creature -- and CR 702.5d's enchant-player Auras
+-- carry a Pool.Players spec. The fallthrough pays the per-Aura re-projection the
+-- reduction exists to avoid, but only for those. Serving a filtered spec off
 -- `pcs` would mean answering Filter.matches against the pre-pass projection
 -- instead of a fresh one, which is #430.
 --
 -- That fallback is general in its recipient TAG as well as in its pool and
--- filter, and that is the whole reason Object.attachedTo stores a Recipient: the
--- tag is the one the Aura's own pool produced when it attached, so a Pool.Players
--- spec is judged against ToPlayer candidates and a Pool.Permanents one against
--- ToObject candidates, with nothing here to keep in step. Re-deriving the tag
--- from the Pool would have been the alternative, and it would have had to be
--- taught every pool separately.
---
--- The fast arm is therefore matched on the PAIR, not on the spec alone: it is a
--- reduction of Pool.Creatures' candidate list specifically, so a recipient of any
+-- filter, which is the whole reason Object.attachedTo stores a Recipient: the tag
+-- is the one the Aura's own pool produced when it attached, with nothing here to
+-- keep in step. So the fast arm is matched on the PAIR, not on the spec alone --
+-- it reduces Pool.Creatures' candidate list specifically, and a recipient of any
 -- other shape falls through rather than being read as an object id it is not.
 stillLegalEnchant :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> TargetSpec.TargetSpec -> Recipient.Recipient -> Bool
 stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
@@ -375,12 +316,10 @@ stillLegalEnchant pcs gs source spec recipient = case (spec, recipient) of
 -- CR 704.5j: the same-named legendary groups one player controls, as a list of
 -- groups, each with two or more members. Both halves are read from the
 -- PROJECTION, not the printed card, which is the whole reason a Clone is caught:
--- CR 707.2 copies name and supertype alike, so a Clone of Thalia is legendary and
--- named Thalia even though its own card is neither.
+-- CR 707.2 copies name and supertype alike.
 --
--- Grouped by name per controller. Two players each with a Thalia is not the
--- legend rule's business (it says "controlled by the same player"), and one
--- player's Thalia and Urborg are two different names.
+-- Grouped by name per controller, since the rule says "controlled by the same
+-- player": two players each with a Thalia is not its business.
 legendGroups :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> [(PlayerId, NonEmpty.NonEmpty ObjectId)]
 legendGroups pcs gs =
   let legendary oid = case Map.lookup oid pcs of
@@ -400,20 +339,17 @@ legendGroups pcs gs =
    in Maybe.mapMaybe toGroup (Map.toList byKey)
 
 -- CR 704.5j: ask one same-named group's controller which to keep, and return the
--- rest -- the permanents this pass must put into their OWNERS' graveyards
--- (Event.changeZone is owner-relative, so that falls out).
+-- rest -- the permanents this pass must put into their OWNERS' graveyards.
 --
 -- Asks but does not move, and that separation is the rule rather than tidiness.
--- CR 704.3 performs every applicable state-based action "simultaneously as a
--- single event", so the choice has to be made against the state as the pass
--- began -- including a group member that another action is ALSO about to bury.
--- Keeping that one is a legal choice, and it puts every other same-named legend
--- into the graveyard beside it; dropping it from the candidates would decide for
--- the player and could leave a copy alive that they chose to lose.
+-- CR 704.3 performs every applicable state-based action simultaneously, so the
+-- choice has to be made against the state as the pass began -- including a group
+-- member that another action is ALSO about to bury. Keeping that one is a legal
+-- choice; dropping it from the candidates would decide for the player and could
+-- leave a copy alive that they chose to lose.
 --
--- A plain put-into-graveyard, not a destruction: CR 704.5j says "put into", so
--- the caller consults neither indestructible (CR 702.12b) nor a regeneration
--- shield, exactly as CR 704.5f's zero-toughness bury does.
+-- A plain put-into-graveyard, not a destruction, so the caller consults neither
+-- indestructible (CR 702.12b) nor a regeneration shield.
 --
 -- FILTERED, NOT TRUSTED: an answer naming a permanent outside the group would
 -- otherwise bury the whole group, so it falls back to the head.
@@ -424,51 +360,38 @@ chooseLegendVictims (controller, candidates) = do
   let kept = if List.elem answer (NonEmpty.toList candidates) then answer else NonEmpty.head candidates
   pure (filter (/= kept) (NonEmpty.toList candidates))
 
--- CR 704.5k: "If two or more permanents have the supertype world, all except the
--- one that has had the world supertype for the shortest amount of time are put
--- into their owners' graveyards. In the event of a tie for the shortest amount of
--- time, all are put into their owners' graveyards." The permanents this pass must
--- bury, which is every world permanent but the newest arrival.
+-- CR 704.5k: with two or more world permanents, all but the one that has been
+-- world for the shortest time are put into their owners' graveyards, and on a tie
+-- for shortest all of them are. So: every world permanent but the newest arrival.
 --
--- The neighbouring legend rule (CR 704.5j) is a different shape in three ways,
--- and each one is a place this could have been wrongly copied from it:
+-- The neighbouring legend rule (CR 704.5j) differs in three ways, each a place
+-- this could have been wrongly copied from it:
 --
--- 1. It ASKS; this does not. CR 704.5j has the controller choose a survivor, so
---    chooseLegendVictims raises a prompt. CR 704.5k decides by the clock, and
---    that answer is a fact about the board rather than a choice, so prompting
---    here would be the engine inventing a decision the rules never offer. Not an
---    elision -- there is nothing to ask.
--- 2. It is scoped to one controller and one name; this is scoped to neither.
---    "If two or more permanents" is the whole condition, so two players each with
---    a world permanent (a board the legend rule leaves alone) is exactly the case
---    this rule fires on.
+-- 1. It ASKS; this does not. CR 704.5k decides by the clock, and that answer is a
+--    fact about the board rather than a choice, so prompting here would be the
+--    engine inventing a decision the rules never offer. Not an elision.
+-- 2. It is scoped to one controller and one name; this is scoped to neither, so
+--    two players each with a world permanent -- a board the legend rule leaves
+--    alone -- is exactly the case this rule fires on.
 -- 3. It has no tie clause; this one does. Game.freshTimestamp hands out a
---    distinct stamp per object, so no two permanents can be equally new and the
---    tie arm below is unreachable today. Written regardless, because it costs
---    one `case` and it is what the rule says: the day two permanents can share
---    an arrival time, "all are put into their owners' graveyards" is the answer,
---    not "the lower id survives".
+--    distinct stamp per object, so the tie arm below is unreachable today.
+--    Written regardless, because it costs one `case` and it is what the rule
+--    says.
 --
--- The CLOCK is Object.timestamp -- when the permanent entered the battlefield
--- (CR 613.7d) -- and NOT a separate record of when it became world. The two are
--- the same instant for every board pawl can reach TODAY, and that is a fact
--- about what pawl cannot yet express rather than a fact about Magic. All three
--- of the ways they could come apart are missing capabilities, each with an issue:
+-- The CLOCK is Object.timestamp -- when the permanent entered the battlefield (CR
+-- 613.7d) -- and NOT a separate record of when it became world. The two are the
+-- same instant for every board pawl can reach TODAY, which is a fact about what
+-- pawl cannot yet express rather than a fact about Magic. All three ways they
+-- could come apart are missing capabilities:
 --
--- 1. A supertype gained or lost on the battlefield. No Modification arm changes
---    a supertype (#311), so nothing projects one -- the projection seeds
---    supertypes from the card and no layer touches them afterwards.
+-- 1. A supertype gained or lost on the battlefield: no Modification arm changes a
+--    supertype (#311).
 -- 2. A permanent that BECOMES a copy of a world permanent, which needs no
---    supertype-changing effect at all: CR 707.2 lists supertype among the
---    copiable values. pawl copies only as an object ENTERS (Binding.copyOf,
---    written by the CR 614 as-enters replacement), the same moment it is
---    stamped; CR 707.3's on-the-battlefield half is #313, and Crystalline
---    Resonance is the card that would break this reading -- it can be older than
---    the world permanent it copies, so the timestamp says "bury it" where the
---    rule says "keep it".
--- 3. A restamp with no zone change. CR 701.3c's is the only one, and it needs
---    the world permanent to be attachable, which no printing that carries the
---    world supertype is.
+--    supertype-changing effect at all (CR 707.2). pawl copies only as an object
+--    ENTERS, the same moment it is stamped; CR 707.3's on-the-battlefield half is
+--    #313, and Crystalline Resonance is the card that would break this reading.
+-- 3. A restamp with no zone change. CR 701.3c's is the only one, and it needs the
+--    world permanent to be attachable, which no world printing is.
 --
 -- Whichever of #311 or #313 lands first has to give this rule a clock of its own:
 -- a per-object "world since", sampled where the supertype set is established.
@@ -476,14 +399,12 @@ chooseLegendVictims (controller, candidates) = do
 -- Read off the PROJECTION rather than the printed type line, for the reason
 -- legendGroups is: CR 707.2 makes a copy of a world permanent world too.
 --
--- CR 801.12 narrows this rule to permanents "within its controller's range of
--- influence". CR 801.1 makes limited range of influence an OPTION, and pawl has
--- no representation for a multiplayer option at all (#175), so every world
--- permanent is always in range and the narrowing is inert.
+-- CR 801.12 narrows this rule to a controller's range of influence. CR 801.1
+-- makes limited range of influence an OPTION, and pawl has no representation for
+-- a multiplayer option at all (#175), so the narrowing is inert.
 --
--- A put-into-graveyard, NOT a destruction: CR 704.5k says "put into", so the
--- caller consults neither indestructible (CR 702.12b) nor a regeneration shield,
--- exactly as CR 704.5f's zero-toughness bury and CR 704.5j's legend rule do.
+-- A put-into-graveyard, NOT a destruction, so the caller consults neither
+-- indestructible (CR 702.12b) nor a regeneration shield.
 worldVictims :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> [ObjectId]
 worldVictims pcs gs =
   let stamped oid = case Map.lookup oid pcs of
@@ -509,8 +430,7 @@ worldVictims pcs gs =
 -- single pass is NOT sufficient IN GENERAL -- CR 704.5m's Aura falls off, and CR
 -- 704.5n's Equipment detaches, only on the pass AFTER the creature dies -- so
 -- settleForPriority is the entry point a caller wanting a settled board should
--- use. Engine.runStep's own two direct, unlooped calls are the exception, each
--- safe for reasons local to that call site, not repeated here.
+-- use.
 checkStateBasedActions :: Game ()
 checkStateBasedActions = Monad.void performStateBasedActions
 
@@ -519,11 +439,9 @@ checkStateBasedActions = Monad.void performStateBasedActions
 -- while that flag is True. The flag lets the CR 117.5 settle loop (Engine) decide
 -- whether to repeat WITHOUT a deep GameState comparison.
 --
--- Monadic since P5: CR 704.5f's put-into-graveyard and CR 704.5g's destruction
--- both go through funnels that can now raise a CR 616 replacement prompt (a
--- creature dying with two applicable death-replacements genuinely must ask its
--- controller which to apply). M3g's decider re-entrancy already permits prompting
--- from inside the settle loop.
+-- Monadic because CR 704.5f's put-into-graveyard and CR 704.5g's destruction both
+-- go through funnels that can raise a CR 616 replacement prompt: a creature dying
+-- with two applicable death-replacements must ask its controller which to apply.
 performStateBasedActions :: Game Bool
 performStateBasedActions = do
   gs <- State.get
@@ -572,20 +490,17 @@ performStateBasedActions = do
       -- no damage. The record is never removed.
       watermark :: Natural
       watermark = Natural.length (GameState.events gs)
-      -- CR 704.5j, computed from the SAME pre-pass state as every classification
-      -- above, because CR 704.3 performs all applicable state-based actions
-      -- simultaneously. Deliberately NOT filtered against the buries below: see
+      -- CR 704.5j, from the SAME pre-pass state as every classification above.
+      -- Deliberately NOT filtered against the buries below: see
       -- chooseLegendVictims for why a member that is dying anyway must stay on
       -- the ballot.
       legendsToResolve = legendGroups pcs gs
-      -- CR 704.5k, from the SAME pre-pass state as everything above, for the
-      -- same CR 704.3 reason. Unlike the legend rule this one asks nobody, so
-      -- it is a pure list rather than a prompt.
+      -- CR 704.5k, from the SAME pre-pass state, for the same CR 704.3 reason.
+      -- Unlike the legend rule this one asks nobody.
       worldLosers = worldVictims pcs gs
   -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
-  -- asks BEFORE anything below moves -- so every choice is made against the state
-  -- this pass began in, which is what CR 704.3's "simultaneously as a single
-  -- event" requires.
+  -- asks BEFORE anything below moves, so every choice is made against the state
+  -- this pass began in -- CR 704.3's simultaneity.
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
@@ -596,9 +511,8 @@ performStateBasedActions = do
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
   -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
   -- moving it twice would emit a second zone-change event and fire its
-  -- dies-triggers again. 704.5f and 704.5k overlap the same way, and reachably:
-  -- Opalescence animates a world enchantment, Night of Souls' Betrayal makes it
-  -- a 0/0, and the older of two world permanents is then named by both.
+  -- dies-triggers again. 704.5f and 704.5k overlap reachably too, via Opalescence
+  -- plus Night of Souls' Betrayal on a world enchantment.
   --
   -- Moved as a BATCH on the pre-pass state, not one move at a time on the live
   -- board, for the same CR 704.3 reason every classification above was computed
@@ -611,31 +525,27 @@ performStateBasedActions = do
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m oid -> Map.adjust (\o -> o {Object.attachedTo = Nothing}) oid m) (GameState.objects g) detaching})
-  -- CR 704.5g/h: destruction through the funnel, Regenerable -- and that is not a
-  -- default so much as the point, since CR 701.19a's shield exists to replace
-  -- exactly this destruction.
+  -- CR 704.5g/h: destruction through the funnel, Regenerable -- the point rather
+  -- than a default, since CR 701.19a's shield exists to replace exactly this
+  -- destruction.
   --
   -- A permanent the legend rule or the world rule already buried is excluded
-  -- rather than left to no-op on a dead id, and the two halves of this line say
-  -- the same thing from opposite ends: CR 704.5j and CR 704.5k are
+  -- rather than left to no-op on a dead id: CR 704.5j and CR 704.5k are
   -- put-into-graveyards, not destructions, so neither offers the shield an
   -- opportunity nor may consume one here.
   --
   -- ONE batch, not one call per victim, and on the SAME pre-pass board as the
   -- put-into-graveyard batch above, because CR 704.3 makes the two halves one
-  -- event: "performs all applicable state-based actions simultaneously as a
-  -- single event". Splitting them is an implementation order, not a rules one, so
-  -- a replacement effect belonging to a permanent buried above is still in force
-  -- for a destruction here -- an animated Rest in Peace this pass buries exiles
-  -- the card of the creature this pass destroys.
+  -- event. Splitting them is an implementation order, not a rules one, so a
+  -- replacement effect belonging to a permanent buried above is still in force
+  -- for a destruction here.
   --
   -- The funnel's own CR 702.12b gate is judged against that same board too, so it
   -- asks what `destroyedBySba` asked above rather than second-guessing it from a
   -- board the buries have already changed. Only the funnel's existence filter is
   -- live, which is what keeps a permanent the buries already moved -- CR 704.5m's
-  -- Aura is the one this line does not exclude by name -- from being offered a
-  -- destruction that never happens (CR 614.7). Event.destroyIn sets all three
-  -- readers out.
+  -- Aura, the one this line does not exclude by name -- from being offered a
+  -- destruction that never happens (CR 614.7).
   Event.destroyInBatch gs Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
@@ -665,14 +575,10 @@ performStateBasedActions = do
       outcome = Departure.outcomeAfterLeaving leaving departed
       drained = vanished {GameState.damageScannedThrough = watermark}
       balanced = List.foldl' balance drained annihilations
-      -- A state-based action was performed iff a permanent was buried (a creature
-      -- at 0 toughness, CR 704.5f, or a planeswalker at 0 loyalty, CR 704.5i) or
-      -- destroyed (a regenerated creature still counts, which the CR 704.3 settle
-      -- loop re-checks and -- because the regen healed the damage -- terminates), a
-      -- player left, a token ceased to exist, an Aura fell off (CR 704.5m), a
-      -- permanent detached (CR 704.5n / 704.5p), the legend rule buried a
-      -- duplicate legend (CR 704.5j), or the world rule buried an older world
-      -- permanent (CR 704.5k).
+      -- A state-based action was performed iff any of the classifications above
+      -- named something. A regenerated creature still counts as destroyed, which
+      -- the CR 704.3 settle loop re-checks and -- because the regen healed the
+      -- damage -- terminates.
       acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles

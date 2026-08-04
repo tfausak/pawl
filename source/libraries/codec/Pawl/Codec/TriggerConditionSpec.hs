@@ -19,7 +19,7 @@ import qualified Pawl.Types.TurnScope as TurnScope
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
-  -- CR 603.6a: "when this ... enters [the battlefield]".
+  -- CR 603.6a.
   Spec.it s "SelfEnters" $
     Common.assertJsonCodec
       s
@@ -27,8 +27,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfEnters
       """ {"type":"SelfEnters"} """
-  -- CR 603.6a's "[type]" is a whole Filter, so the nested And/Not that spells
-  -- Soul Warden's "another creature" has to survive the trip.
+  -- CR 603.6a's "[type]" is a whole Filter, so a nested And/Not has to survive
+  -- the trip.
   Spec.it s "PermanentEnters round-trips with its Filter" $
     Common.assertJsonCodec
       s
@@ -36,7 +36,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PermanentEnters (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not Filter.IsSource]))
       """ {"type":"PermanentEnters","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Not","value":{"type":"IsSource"}}]}} """
-  -- CR 603.2b: "at the beginning of [each|your] <step>".
+  -- CR 603.2b.
   Spec.it s "StepBegins round-trips" $
     Common.assertJsonCodec
       s
@@ -68,8 +68,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.CreatureDealtCombatDamageToMonarch
       """ {"type":"CreatureDealtCombatDamageToMonarch"} """
-  -- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
-  -- pay an activation cost of a cycling ability.'"
+  -- CR 702.29c.
   Spec.it s "SelfCycled" $
     Common.assertJsonCodec
       s
@@ -77,8 +76,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfCycled
       """ {"type":"SelfCycled"} """
-  -- CR 701.9a's discard, Megrim's "whenever an OPPONENT discards a card". Both
-  -- relations, since the PlayerRelation is the whole content of that phrasing.
+  -- CR 701.9a's discard. Both relations, since the PlayerRelation is the whole
+  -- content of the "whenever an opponent discards" phrasing.
   Spec.it s "PlayerDiscards round-trips both relations" $ do
     Common.assertJsonCodec
       s
@@ -92,10 +91,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PlayerDiscards PlayerRelation.You)
       """ {"type":"PlayerDiscards","value":{"type":"You"}} """
-  -- CR 508.3a: "An ability that reads 'Whenever [a creature] attacks, . . .'
-  -- triggers if that creature is declared as an attacker." Both frequencies,
-  -- since Aurelia, the Warleader's "for the first time each turn" is a payload
-  -- on this condition rather than a sibling one.
+  -- CR 508.3a. Both frequencies, since "for the first time each turn" is a
+  -- payload on this condition rather than a sibling one.
   Spec.it s "SelfAttacks round-trips both frequencies" $ do
     Common.assertJsonCodec
       s
@@ -109,8 +106,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn)
       """ {"type":"SelfAttacks","value":{"type":"FirstTimeEachTurn"}} """
-  -- CR 113.6k's condition (Narcomoeba's), the first that names a zone pair
-  -- rather than the battlefield.
+  -- CR 113.6k's condition, which names a zone pair rather than the battlefield.
   Spec.it s "SelfPutIntoGraveyardFromLibrary" $
     Common.assertJsonCodec
       s
@@ -118,8 +114,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfPutIntoGraveyardFromLibrary
       """ {"type":"SelfPutIntoGraveyardFromLibrary"} """
-  -- CR 603.6c's second written form (Doomed Traveler's), abbreviated by CR 700.4
-  -- to "dies".
+  -- CR 603.6c's second written form, abbreviated by CR 700.4 to "dies".
   Spec.it s "SelfDies" $
     Common.assertJsonCodec
       s
@@ -127,9 +122,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfDies
       """ {"type":"SelfDies"} """
-  -- The same written form read by a bystander (Meren of Clan Nel Toth's
-  -- "whenever another creature you control dies"), which carries a Filter where
-  -- SelfDies above carries nothing -- so it is a separate tag, and the "another"
+  -- The same written form read by a bystander, which carries a Filter where
+  -- SelfDies above carries nothing -- so it is a separate tag, and "another"
   -- lives inside that Filter.
   Spec.it s "PermanentDies round-trips with its Filter" $
     Common.assertJsonCodec
@@ -138,8 +132,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PermanentDies (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You, Filter.Not Filter.IsSource]))
       """ {"type":"PermanentDies","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"ControlledBy","value":{"type":"You"}},{"type":"Not","value":{"type":"IsSource"}}]}} """
-  -- CR 603.6c's first written form (Thragtusk's), a separate tag from SelfDies
-  -- above: the two must never decode to each other.
+  -- CR 603.6c's first written form, a separate tag from SelfDies above: the two
+  -- must never decode to each other.
   Spec.it s "SelfLeavesTheBattlefield" $
     Common.assertJsonCodec
       s
@@ -147,9 +141,8 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfLeavesTheBattlefield
       """ {"type":"SelfLeavesTheBattlefield"} """
-  -- CR 701.6a's countering, Baral, Chief of Compliance's "a spell or ability you
-  -- control counters a spell". Both relations, for the same reason
-  -- PlayerDiscards' does.
+  -- CR 701.6a's countering. Both relations, for the same reason
+  -- PlayerDiscards has both.
   Spec.it s "SpellOrAbilityCounters round-trips both relations" $ do
     Common.assertJsonCodec
       s

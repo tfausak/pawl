@@ -205,68 +205,54 @@ decode p response = case p of
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
 -- degrades into a deterministic default rather than crashing.
 --
--- Every arm below is a legal answer, and most are the LEAST EVENTFUL one --
--- but "least eventful" is a statement about the choice, never a promise that
--- the game plays out the same. 'replay' therefore reports the first prompt that
--- reached this function (Pawl.Types.Desync); a caller that ignores the report is
--- reading a different game's final state.
+-- Every arm below is a legal answer, and most are the LEAST EVENTFUL one -- but
+-- "least eventful" is a statement about the choice, never a promise that the
+-- game plays out the same. 'replay' therefore reports the first prompt that
+-- reached this function (Pawl.Types.Desync); a caller that ignores the report
+-- is reading a different game's final state. Each arm below notes only why its
+-- answer is legal.
 defaultAnswer :: Prompt r -> r
 defaultAnswer p = case p of
   Prompt.Shuffle ids -> ids
-  -- CR 729.2: the head of the turn order is always a legal starting player, and
-  -- is the least eventful fallback when a transcript runs short -- it is what a
-  -- subgame did before randomness had a channel at all.
+  -- CR 729.2: the head of the turn order is always a legal starting player.
   Prompt.RandomFirstPlayer order -> NonEmpty.head order
   Prompt.ChooseAction _ _ actions -> case actions of
     h : _ -> h
     [] -> Action.Pass
-  -- CR 104.3a: not conceding is always legal, and continuing is the fallback
-  -- that leaves the game running when a transcript runs short.
-  --
-  -- NOT "least eventful", unlike the arms around it. Every other fallback
-  -- under- or over-fills a choice inside a game that carries on; this one drops
-  -- a departure, and CR 104.2a then hands the win to the other player. A
-  -- transcript whose Concede answer is lost replays to the OTHER winner, in
-  -- silence -- which is why 'replay' reports the desync rather than leaving this
-  -- arm to be trusted.
+  -- CR 104.3a: not conceding is always legal. NOT "least eventful", unlike the
+  -- arms around it: this one drops a departure, and CR 104.2a then hands the
+  -- win to the other player, so a transcript whose Concede answer is lost
+  -- replays to the OTHER winner. That is why 'replay' reports the desync.
   Prompt.Concede _ -> Concession.Continues
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
-  -- CR 507.1: the first candidate is always a legal answer (the prompt is only
-  -- asked with candidates) and is the least eventful fallback when a transcript
-  -- runs short. NonEmpty.head is total.
+  -- CR 507.1: the prompt is only asked with candidates, so the head is legal.
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  -- Any candidate pays; the head is the least eventful fallback. NonEmpty.head is total.
+  -- Any candidate pays.
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  -- Every offered yield is producible (tapForMana only offers what the source can
-  -- make), so the head is a legal answer and the least eventful fallback.
+  -- Every offered yield is producible: tapForMana only offers what the source
+  -- can make.
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  -- CR 701.34a: "any number" includes none, and declining is always legal -- the
-  -- least eventful thing a fallback can do, the same posture as declining to
-  -- attack or block.
+  -- CR 701.34a: any number includes none, so declining is always legal.
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  -- CR 704.5j: every candidate is a legal thing to keep, so the head is a legal
-  -- answer and the least eventful fallback.
+  -- CR 704.5j: every candidate is a legal thing to keep.
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  -- Declining to ATTACK is not always legal -- a CR 508.1d requirement (Curse of
-  -- the Nightly Hunt) can make the empty declaration the one illegal answer,
-  -- unless CR 508.1d's cost clause excuses it (Ghostly Prison). Still the least
-  -- eventful fallback, and still total, on DeclareBlockers' terms below:
-  -- Combat.declareAttackers repairs an illegal declaration to
+  -- Declining to ATTACK is not always legal -- a CR 508.1d requirement (Curse
+  -- of the Nightly Hunt) can make the empty declaration the one illegal answer.
+  -- Still total: Combat.declareAttackers repairs an illegal declaration to
   -- Combat.forcedAttackDeclaration rather than dropping it.
   Prompt.DeclareAttackers {} -> []
   -- CR 508.1b: the head is the defending player (Combat.attackTargets orders it
-  -- first), which is always a legal thing to attack and is what every attack in a
-  -- planeswalker-less pool announces anyway. The same value
-  -- Combat.announceAttackTarget degrades an out-of-list answer to, which the two
-  -- must agree on: neither path can observe the other.
+  -- first), always a legal thing to attack. The same value
+  -- Combat.announceAttackTarget degrades an out-of-list answer to, which the
+  -- two must agree on: neither path can observe the other.
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
-  -- Declining to BLOCK is not always legal -- a CR 509.1c requirement (Lure) can
-  -- make the empty declaration the one illegal answer. Still the least eventful
-  -- fallback, and still total: Combat.declareBlockers repairs an illegal
-  -- declaration to Combat.forcedBlockDeclaration rather than dropping it.
+  -- Declining to BLOCK is not always legal either -- a CR 509.1c requirement
+  -- (Lure) can make the empty declaration illegal -- and stays total the same
+  -- way, through Combat.forcedBlockDeclaration.
   Prompt.DeclareBlockers {} -> Map.empty
   -- Must be a LEGAL division (Damage.legalAssignment), or the attacker deals
-  -- nothing. All power onto the first blocker totals power with the defender at 0.
+  -- nothing. All power onto the first blocker totals power with the defender at
+  -- 0.
   Prompt.AssignCombatDamage _ _ _ thresholds n ->
     let blockers = filter isCreatureRecipient (Map.keys thresholds)
         isCreatureRecipient r = case r of
@@ -280,95 +266,67 @@ defaultAnswer p = case p of
   -- One legal recipient per slot, chosen deterministically (the minimum). A
   -- slot with no legal recipient stays unfilled -- casting rejects that answer.
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  -- A canonical identity hack (Mountain -> Mountain changes nothing): the fallback
-  -- when a transcript runs short on a text-changer's word swap.
+  -- A canonical identity swap: Mountain -> Mountain changes nothing.
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  -- The same canonical identity for CR 612.2's creature-type half. Frog is a
-  -- creature type (CR 205.3m) and is forbidden by nothing the pool prints, so
-  -- this is as legal an answer as the land-type fallback above.
+  -- The same identity for CR 612.2's creature-type half. Frog is a creature
+  -- type (CR 205.3m) and nothing in the pool forbids it.
   --
   -- Not implemented: neither swap prompt's stated restrictions are checked
   -- against the answer that comes back (#641).
   Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  -- CR 701.23b: failing to find is always legal, and is the least eventful
-  -- fallback when a transcript runs short on a search.
+  -- CR 701.23b: failing to find is always legal.
   Prompt.SearchLibrary {} -> Nothing
-  -- Declining the re-entrant cast is always legal -- the least eventful fallback
-  -- when a transcript runs short.
+  -- Declining the re-entrant cast is always legal.
   Prompt.CastWhileSearching {} -> Nothing
-  -- CR 601.2b: X=0 is always payable and the least eventful fallback when a
-  -- transcript runs short on a variable-cost cast.
+  -- CR 601.2b: X=0 is always payable.
   Prompt.ChooseX {} -> 0
-  -- The first `count` legal modes, deterministically -- the least eventful
-  -- fallback when a transcript runs short on a modal cast.
+  -- The first `count` legal modes, deterministically.
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  -- CR 707.5: declining to copy is always legal, and is the least eventful
-  -- fallback -- Clone is a deterministic fixture, never in a random deck, so
-  -- this is never exercised in play.
+  -- CR 707.5: declining to copy is always legal.
   Prompt.ChooseCopyTarget {} -> Nothing
-  -- CR 208.2b: the first offered shape is always a legal answer (this is asked
-  -- only when the list has two or more), and is the least eventful fallback.
+  -- CR 208.2b: asked only when the list has two or more shapes.
   Prompt.ChooseEntryOption {} -> 0
-  -- CR 105.1: any of the five colours is a legal answer, and white is the least
-  -- eventful fallback when a transcript runs short.
+  -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
-  -- CR 305.6: any of the five basic land types is a legal answer. Mountain is
-  -- what the ChooseLandTypeSwap arm above already falls back to, so the two
-  -- agree on which type a short transcript conjures.
+  -- CR 305.6: any of the five basic land types is legal. Mountain is what the
+  -- ChooseLandTypeSwap arm above falls back to, so the two agree on which type
+  -- a short transcript conjures.
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  -- CR 603.3b: the canonical order is always a legal answer, and is the least
-  -- eventful fallback when a transcript runs short.
+  -- CR 603.3b: the canonical order is always a legal answer.
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  -- CR 615.7: likewise -- the canonical order is a legal permutation, and is
-  -- what the batch was gathered in.
+  -- CR 615.7: likewise, and it is the order the batch was gathered in.
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  -- CR 616.1: index 0 is always a legal answer (the bucket is non-empty when this
-  -- is asked), and is the least eventful fallback when a transcript runs short.
+  -- CR 616.1: the bucket is non-empty when this is asked, so index 0 is legal.
   Prompt.ChooseReplacement {} -> 0
-  -- CR 603.7c: every minted token is a legal thing for "it" to name, so the head
-  -- is a legal answer and the least eventful fallback when a transcript runs
-  -- short -- it is exactly what the engine bound before the choice had a channel.
+  -- CR 603.7c: every minted token is a legal thing for "it" to name.
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  -- The first `count` candidates, which the engine offers in ascending order --
-  -- a legal answer whenever the prompt was legal to ask, and the least eventful
-  -- fallback when a transcript runs short.
+  -- The first `count` candidates, which the engine offers in ascending order.
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- CR 701.3a: every candidate is a legal destination the card's own text
-  -- offered, so the head is a legal answer and the least eventful fallback when a
-  -- transcript runs short -- it is the destination offered first, in the
-  -- ascending order the engine builds the list in.
+  -- CR 701.3a: every candidate is a destination the card's own text offered.
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   -- The first offered candidate is the PRINTED cost for a cast from hand
-  -- (Pawl.Engine.Cost.costsFor puts it first) -- the least eventful fallback when a
-  -- transcript runs short, since it sacrifices nothing. A cast from the graveyard
-  -- offers only rule 702.34a's flashback cost, so the head is the sole candidate
-  -- and this prompt is not raised at all. Cost.firstOffered keeps this total for
-  -- the empty list the engine never produces.
+  -- (Cost.costsFor puts it first), so it sacrifices nothing. A cast from the
+  -- graveyard offers only CR 702.34a's flashback cost, so the head is the sole
+  -- candidate and this prompt is not raised at all. Cost.firstOffered keeps
+  -- this total for the empty list the engine never produces.
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  -- CR 103.5: keeping is always legal and the least-eventful fallback when a
-  -- transcript runs short.
+  -- CR 103.5: keeping is always legal.
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  -- A legal ordered subset of the redrawn hand, deterministically the first
-  -- `count` -- the least-eventful fallback when a transcript runs short.
+  -- A legal ordered subset of the redrawn hand: deterministically the first
+  -- `count`.
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  -- CR 103.5b: declining is always legal and the least-eventful fallback when a
-  -- transcript runs short (mirrors DeclareMulligan -> Keep).
+  -- CR 103.5b: declining is always legal.
   Prompt.MulliganAction {} -> Nothing
-  -- CR 103.6: declining is always legal and the least-eventful fallback when a
-  -- transcript runs short (mirrors MulliganAction -> Nothing).
+  -- CR 103.6: declining is always legal.
   Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a "may" is always legal and changes nothing, the
-  -- least-eventful fallback when a transcript runs short (mirrors MulliganAction
-  -- -> Nothing).
+  -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.13a: every offered route is payable (the prompt is raised only where
-  -- two are), so the head is a legal answer and the least eventful fallback when
-  -- a transcript runs short. NonEmpty.head is total.
+  -- CR 118.13a: every offered route is payable, and the prompt is raised only
+  -- where two are.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: entwine is a "may", so declining is always legal and is the
-  -- least-eventful fallback when a transcript runs short (mirrors ChooseOptional
-  -- -> Declines). It also costs no mana, which keeps a short transcript from
-  -- diverging into an unpayable cast.
+  -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
+  -- no mana, which keeps a short transcript from diverging into an unpayable
+  -- cast.
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Run a game under a base interpreter, keeping every answer in order.
@@ -385,21 +343,19 @@ record answer gs game =
 
 -- Re-run a game against a recorded transcript. Because the engine is pure and
 -- every decision is a suspension, feeding back the same answers reproduces the
--- same final state — the M0 determinism criterion.
+-- same final state.
 --
--- Mirrors 'record', which yields a game's outcome alongside the transcript it
--- produced: this yields the outcome alongside the first point at which that
--- transcript stopped answering (Nothing when it answered every prompt exactly).
--- The report is a RETURN VALUE rather than nothing at all because
--- 'defaultAnswer' is total: a transcript that has drifted out of step still
--- produces a final state, just not the recorded game's, and for Prompt.Concede
--- that silently decides who wins. See Pawl.Types.Desync for why only the first is
--- reported.
+-- Mirrors 'record', but yields the outcome alongside the first point at which
+-- the transcript stopped answering (Nothing when it answered every prompt
+-- exactly). The report is a RETURN VALUE because 'defaultAnswer' is total: a
+-- transcript that has drifted out of step still produces a final state, just
+-- not the recorded game's, and for Prompt.Concede that silently decides who
+-- wins.
 --
 -- The desync is not itself an error and does not stop the run. Positional
 -- replay cannot tell a prompt the engine gained from one it lost, so there is
 -- no resync that is right in both directions; consuming nothing on a mismatch
--- is the conservative half of that, and saying so is this function's job.
+-- is the conservative half of that.
 replay :: [Response] -> GameState -> Game a -> ((a, GameState), Maybe Desync)
 replay responses gs game =
   let step :: Prompt r -> State.State (Natural, [Response], Maybe Desync) r

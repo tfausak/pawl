@@ -11,23 +11,15 @@ import qualified Pawl.Types.Modification as Modification
 -- the same timestamp as the object it is on).
 --
 -- One affected set, MANY modifications, because CR 613.6 makes that the unit the
--- layer system reasons about: "If an effect should be applied in different layers
--- and/or sublayers, the parts of the effect each apply in their appropriate ones.
--- If an effect starts to apply in one layer ... it will continue to be applied to
--- the same set of objects in each other applicable layer." Humility's "All
--- creatures lose all abilities and have base power and toughness 1/1" is ONE
--- ability whose parts land in layers 6 and 7b, and the set it applies to is
--- chosen once. Declaring it as two abilities -- which this type used to force --
--- let the projection ask the filter once per layer and get two different answers
--- (#233).
+-- layer system reasons about: an effect applying in several layers keeps applying
+-- to the same set of objects in each. Humility is ONE ability whose parts land in
+-- layers 6 and 7b, and its set is chosen once; declaring it as two abilities let
+-- the projection ask the filter once per layer and get two answers (#233).
 --
--- NonEmpty, and not merely a list validated at the boundary: an ability with no
--- parts is an ability that does nothing, which the one-modification field this
--- replaced could not express and which no card means. Making it unrepresentable
--- keeps the codec honest (a malformed `"modifications": []` fails to decode
--- rather than quietly producing a permanent that under-performs its own text) and
--- costs the rest of the module nothing, since every consumer only folds over it.
--- Same reasoning as Setup.emptyGame's NonEmpty player order.
+-- NonEmpty rather than a list validated at the boundary: an ability with no parts
+-- does nothing, which no card means, and a malformed `"modifications": []` then
+-- fails to decode rather than quietly producing a permanent that under-performs
+-- its own text.
 --
 -- Its order is the card's PRINTED order, not the application order --
 -- Projection.layer decides that, per CR 613.1.

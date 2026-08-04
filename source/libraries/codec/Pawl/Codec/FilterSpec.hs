@@ -16,10 +16,9 @@ import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
--- | Every case below instantiates the `keyword` parameter at 'Keyword.Keyword',
--- the only concrete instantiation anywhere in the pool (see Pawl.Types.Filter's
--- header) -- so HasKeyword's own case can pin a real keyword's wire shape rather
--- than a stand-in's.
+-- | The `keyword` parameter is instantiated at 'Keyword.Keyword', the only
+-- concrete instantiation anywhere in the pool, so HasKeyword's case pins a real
+-- keyword's wire shape rather than a stand-in's.
 toJson :: Filter.Filter Keyword.Keyword -> Value.Value
 toJson = Filter.toJson Keyword.toJson
 
@@ -161,9 +160,8 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       (Filter.Not (Filter.HasColor Color.Black))
       """ {"type":"Not","value":{"type":"HasColor","value":{"type":"Black"}}} """
-  -- Moved from Pawl.CodecSpec's "filter (P9)" group: nested And/Or/Not, one
-  -- fixture per named card, exercising the recursion the per-constructor cases
-  -- above do not.
+  -- Nested And/Or/Not, exercising the recursion the per-constructor cases above
+  -- do not.
   Spec.it s "nested And/Or/Not round-trips (P9)" $
     let doomBlade = Filter.Not (Filter.HasColor Color.Black)
         terror = Filter.And [Filter.Not (Filter.HasColor Color.Black), Filter.Not (Filter.HasCardType CardType.Artifact)]

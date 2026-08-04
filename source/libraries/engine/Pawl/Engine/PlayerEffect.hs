@@ -1,20 +1,18 @@
 -- CR 613.10 / 613.11: the continuous effects that affect PLAYERS and the RULES
 -- OF THE GAME rather than the characteristics of objects. A sibling TIER to the
--- CR 613 layer system, not a layer in it: CR 613.1 opens "the values of an
--- object's characteristics are determined by starting with the actual object",
--- so the seven layers are a machine for computing object characteristics and
--- nothing else, and 613.10/613.11 both apply AFTER that machine has run.
+-- CR 613 layer system, not a layer in it: CR 613.1 makes the seven layers a
+-- machine for computing object characteristics and nothing else, and
+-- 613.10/613.11 both apply AFTER that machine has run.
 --
 -- The dependency is therefore ONE-WAY, and that is what keeps it well founded:
--- this module reads the layer machine's finished answers (a projected view, a
--- controller, CR 604.2's "has the ability"), while Pawl.Engine.Projection is untouched
--- by this module and never sees these types.
+-- this module reads the layer machine's finished answers, while
+-- Pawl.Engine.Projection is untouched by this module and never sees these types.
 --
 -- This module is the ONLY module that may case on Pawl.Types.PlayerEffect and
--- Pawl.Types.PlayerScope -- the standing Pawl.Engine.Resolve
--- has over Effect, Pawl.Engine.Projection over Modification, Pawl.Engine.Event over
--- TriggerCondition and Pawl.Engine.Expiry over Expiry. Every consumer asks a TYPED
--- QUESTION and never sees a constructor.
+-- Pawl.Types.PlayerScope -- the standing Pawl.Engine.Resolve has over Effect,
+-- Pawl.Engine.Projection over Modification, Pawl.Engine.Event over
+-- TriggerCondition and Pawl.Engine.Expiry over Expiry. Every consumer asks a
+-- TYPED QUESTION and never sees a constructor.
 module Pawl.Engine.PlayerEffect where
 
 import qualified Data.Foldable as Foldable
@@ -42,46 +40,37 @@ import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 
--- CR 109.5: "the words 'you' and 'your' on an object refer to the object's
--- controller ... for a static ability, this is the current controller of the
--- object it's on". `pid` is the player being asked about; `controller` is the
+-- CR 109.5: "you" on an object is its controller, and for a static ability the
+-- CURRENT controller. `pid` is the player being asked about; `controller` is the
 -- player the scope is anchored to. The argument order is (asked-about, anchor)
 -- and the two are never interchangeable.
 --
 -- The anchor is CR 109.5's "you" for every caller but one: protectedFromTargeting
 -- below passes the PROTECTED player, because CR 702.11c's "your opponents" are
 -- the opponents of whoever has hexproof rather than of the effect's controller.
--- The parameter is named for the common case; see that function and
--- Pawl.Types.PlayerScope's carrier list for why the two come apart.
+-- The parameter is named for the common case.
 inScope :: PlayerId -> PlayerId -> PlayerScope -> Bool
 inScope pid controller scope = case scope of
   PlayerScope.You -> pid == controller
   -- Every other player. Not a two-player shortcut: CR 806.1 has a free-for-all's
   -- players compete as individuals against each other, so every other player is
-  -- an opponent by construction and `pid /= controller` is exactly that. CR 102.2
-  -- says the same thing for two players; the predicate serves both.
+  -- an opponent by construction, and CR 102.2 says the same for two players.
   --
   -- CR 102.3 is the ONE reading this is wrong for -- in a game between teams a
   -- teammate is not an opponent -- and pawl has no teams to express (#175).
-  --
-  -- Pinned at three seats by PlayerEffectSpec's "CR 806.1 at three seats
-  -- Silence stops BOTH opponents, and still spares the caster".
   PlayerScope.Opponents -> pid /= controller
   -- Thalia's ruling: "including your own".
   PlayerScope.EachPlayer -> True
 
--- The same scope as a SET rather than as a membership test -- CR 400.1's "each
--- player has their own library, hand, and graveyard" asked in the direction a
--- zone fold needs it (Pawl.Engine.Target.graveyardRecipients). Built ON inScope
--- rather than beside it, so there is exactly one reading of what a PlayerScope
--- names; Pawl.Engine.Count.playersFor's own haddock is where the cost of two
--- readings disagreeing is written down.
+-- The same scope as a SET rather than as a membership test -- CR 400.1's
+-- per-player zones asked in the direction a zone fold needs it
+-- (Pawl.Engine.Target.graveyardRecipients). Built ON inScope rather than beside
+-- it, so there is exactly one reading of what a PlayerScope names.
 --
--- CR 102.1: "A player is one of the people in the game." A player who has left
--- keeps their row in GameState.players -- Player.status turns Departed, the key
--- stays -- so the fold is over Game.stillPlaying rather than the map's keys, and
--- no scope names a departed seat. That is playersFor's rule, honoured here for
--- the same reason.
+-- CR 102.1: a player who has left keeps their row in GameState.players
+-- (Player.status turns Departed, the key stays), so the fold is over
+-- Game.stillPlaying rather than the map's keys, and no scope names a departed
+-- seat.
 --
 -- Nothing is an ABSENT perspective, which is CR 109.5's "you" with nobody to be
 -- -- the vacuous posture every player-referencing Filter atom takes. EachPlayer
@@ -102,9 +91,8 @@ playersInScope perspective gs scope =
 -- leaving the battlefield lifts its restriction with nothing to unwind.
 --
 -- The scope is resolved DYNAMICALLY (see Pawl.Types.PlayerScope): CR 611.2c
--- classifies a rules-modifying effect as one that "can affect objects that
--- weren't affected when that continuous effect began", so no set is ever frozen
--- on this axis.
+-- lets a rules-modifying effect reach objects that were not affected when it
+-- began, so no set is ever frozen on this axis.
 --
 -- The (controller, scope, effect) triples are local: nothing outside this
 -- function ever sees one.
@@ -135,15 +123,12 @@ applying pid gs =
               -- Reliquary Tower).
               --
               -- CR 604.2: a static ability's continuous effect is active only
-              -- while the permanent "remains on the battlefield and has the
-              -- ability", so a CR 613.1f layer-6 removal takes this one with it
-              -- (Humility on Thalia). CR 613.6's rescue -- an effect that has
-              -- STARTED to apply continues "even if the ability generating the
-              -- effect is removed during this process" -- cannot reach it: CR
-              -- 613.10/613.11 apply a player effect AFTER the seven layers have
-              -- run, so it never started to apply before layer 6 and the cut is
-              -- unconditional. That is the same shape as a static ability all of
-              -- whose parts land after layer 6 (Projection.gatherStatic).
+              -- while the permanent remains on the battlefield and has the
+              -- ability, so a CR 613.1f layer-6 removal takes this one with it
+              -- (Humility on Thalia). CR 613.6's rescue for an effect that has
+              -- already STARTED to apply cannot reach it: CR 613.10/613.11 apply
+              -- a player effect AFTER the seven layers have run, so it never
+              -- started to apply before layer 6 and the cut is unconditional.
               if (null setEffs || Projection.liveGiven setEffs Set.empty oid gs)
                 && not (removed oid)
                 then fmap (\ability -> (controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
@@ -155,9 +140,7 @@ applying pid gs =
       --
       -- Neither gate above touches it, because it is not an ability for CR 613.1f
       -- to remove: CR 611.2a gives a resolved spell's continuous effect a duration
-      -- of its own ("lasts as long as stated by the spell or ability creating it
-      -- ... If no duration is stated, it lasts until the end of the game").
-      -- Humility cannot take back a Silence that has already resolved.
+      -- of its own. Humility cannot take back a Silence that has already resolved.
       storedOne active =
         ( ActivePlayerEffect.controller active,
           ActivePlayerEffect.scope active,
@@ -168,33 +151,30 @@ applying pid gs =
       effectOf (_, _, effect) = effect
    in fmap effectOf (filter keep (printed <> stored))
 
--- CR 601.2i: how many spells this player has cast this turn. A fold over P4's
--- whole log, which is exactly "this turn" because Engine.handoffTurn clears it at
--- the handoff and no reader ever drains it (scannedThrough is a watermark, not a
--- consumption). Rule of Law's ruling demands precisely this: "looks at the entire
--- turn ... even if Rule of Law wasn't on the battlefield when that spell was
--- cast."
+-- CR 601.2i: how many spells this player has cast this turn. A fold over the
+-- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
+-- it at the handoff and no reader ever drains it (scannedThrough is a watermark,
+-- not a consumption). Rule of Law's ruling demands precisely this: the whole
+-- turn, including spells cast before it was on the battlefield.
 castsThisTurn :: PlayerId -> GameState -> Integer
 castsThisTurn pid gs =
   let mine caster = caster == pid
    in toInteger (length (filter mine (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs)))))
 
--- CR 601.3: "a player can begin to cast a spell only if ... no rule or effect
--- prohibits that player from casting it". The prohibit half. Cast
--- .permitsCastWhileSearching is not the general allow half of CR 601.3 (the
--- ordinary casting permission) -- it is only the Panglacial Wurm timing
+-- CR 601.3: a player can begin to cast a spell only if no rule or effect
+-- prohibits it. The prohibit half. Cast.permitsCastWhileSearching is not the
+-- general allow half of CR 601.3 -- it is only the Panglacial Wurm timing
 -- exception, one specific instance of "allows".
 --
--- CR 101.2 is why this folds as a DISJUNCTION: "When a rule or effect allows or
--- directs something to happen, and another effect states that it can't happen,
--- the 'can't' effect takes precedence." One applicable prohibition is enough and
+-- CR 101.2 is why this folds as a DISJUNCTION: a "can't" effect takes precedence
+-- over anything allowing or directing. One applicable prohibition is enough and
 -- nothing outvotes it.
 --
--- Deliberately does NOT take the spell. Both of P7's prohibitions are
--- quality-free -- "can't cast spells", "can't cast more than one spell" -- so the
--- answer does not depend on WHICH spell, and a parameter nothing reads would
--- assert a generality this phase has not built. It grows an ObjectId when CR
--- 601.3a's quality-bearing prohibitions do (#95).
+-- Deliberately does NOT take the spell. Both prohibitions here are quality-free
+-- -- "can't cast spells", "can't cast more than one spell" -- so the answer does
+-- not depend on WHICH spell, and a parameter nothing reads would assert a
+-- generality this engine has not built. It grows an ObjectId when CR 601.3a's
+-- quality-bearing prohibitions do (#95).
 prohibitsCasting :: PlayerId -> GameState -> Bool
 prohibitsCasting pid gs =
   let cast = castsThisTurn pid gs
@@ -206,18 +186,17 @@ prohibitsCasting pid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
-        -- shroud may cast anything, and Pawl.Engine.Target.targetable is where the
-        -- restriction lands (CR 115.4's "any target" and CR 601.2c's choosing).
+        -- shroud may cast anything, and Pawl.Engine.Target.targetable is where
+        -- the restriction lands (CR 115.4, CR 601.2c).
         PlayerEffect.CantBeTargetedBy _ -> False
    in any prohibits (applying pid gs)
 
 -- Does this spell match the cost-adjustment Filter? Evaluated against the
 -- PROJECTED view (Projection.viewOfObject) -- a card type is CR 613.1d layer 4
--- and a colour is CR 613.1e layer 5 -- never a printed characteristic, per the
--- standing house rule. The perspective is the spell's own controller (CR 109.5),
--- harmless to today's card-type/colour filters and well-defined for a future
--- ControlledBy filter. Runs through the identity-blind Filter.matches: this
--- module never learns which spell produced the Filter.
+-- and a colour is CR 613.1e layer 5 -- never a printed characteristic. The
+-- perspective is the spell's own controller (CR 109.5). Runs through the
+-- identity-blind Filter.matches: this module never learns which spell produced
+-- the Filter.
 matchesSpell :: Filter Keyword -> ObjectId -> GameState -> Bool
 matchesSpell filter_ oid gs =
   -- No source in scope at this site: `oid` is the AFFECTED object, not a source.
@@ -229,9 +208,9 @@ matchesSpell filter_ oid gs =
 -- Kept APART, never summed into one signed delta: CR 601.2f applies every
 -- increase before any reduction, and CR 118.7a gives a reduction a restriction
 -- an increase does not have. The two halves do not even have the same shape --
--- an increase is an amount of generic mana (a Natural) and a reduction is an
--- amount of mana that may name a type (a ManaCost). Pawl.Engine.Cost.applyAdjustments is
--- what consumes the pair; this function only decides membership.
+-- an increase is an amount of generic mana and a reduction is a ManaCost.
+-- Pawl.Engine.Cost.applyAdjustments consumes the pair; this only decides
+-- membership.
 --
 -- matchesSpell is called only from inside an arm that already matched a
 -- cost-modifying constructor, so a board with no Thalia and no Medallion runs no
@@ -272,19 +251,16 @@ costAdjustments pid oid gs =
 -- DIFFERENT anchor from the one PlayerStaticAbility.scope uses (the effect's
 -- controller), which is why the argument order here is (caster, protected) and
 -- inScope's is (asked-about, controller). See
--- Pawl.Types.PlayerEffect.CantBeTargetedBy for why the two coincide on both
--- cards in the pool and where they would come apart.
+-- Pawl.Types.PlayerEffect.CantBeTargetedBy for where the two would come apart.
 --
 -- A Nothing caster is a question with no CR 109.5 "you" in it. Hexproof does not
--- stop it -- nobody's opponent, the vacuous posture Target.opponentOfController
--- and every player-referencing Filter atom take -- while shroud stops it anyway,
--- because EachPlayer never asks the caster a question. That is exactly the
--- carve-out playersInScope above already makes for the same constructor, and it
--- is the rules answer too: CR 702.18a names no player at all.
+-- stop it -- nobody's opponent -- while shroud stops it anyway, because
+-- EachPlayer never asks the caster a question. That is exactly the carve-out
+-- playersInScope above already makes for the same constructor, and it is the
+-- rules answer too: CR 702.18a names no player at all.
 --
--- MEMBERSHIP, never a tally: CR 702.18b ("multiple instances of shroud on the
--- same permanent or player are redundant") and CR 702.11h say so for the player
--- half in the same breath as the permanent half.
+-- MEMBERSHIP, never a tally: CR 702.18b and CR 702.11h make multiple instances
+-- redundant for the player half as well as the permanent half.
 protectedFromTargeting :: Maybe PlayerId -> PlayerId -> GameState -> Bool
 protectedFromTargeting caster pid gs =
   let stops effect = case effect of
@@ -302,10 +278,10 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.DontLoseUnspentMana _ -> False
    in any stops (applying pid gs)
 
--- CR 402.2: "each player has a maximum hand size, which is normally seven
--- cards." This is NOT CR 103.5's starting hand size, which is a different seven
--- (Mulligan.openingHand) that this constant deliberately does not share -- the
--- rules keep them apart, and Reliquary Tower changes only one of them.
+-- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
+-- starting hand size, which is a different seven (Mulligan.openingHand) that
+-- this constant deliberately does not share -- the rules keep them apart, and
+-- Reliquary Tower changes only one of them.
 defaultMaximumHandSize :: Natural
 defaultMaximumHandSize = 7
 
@@ -332,20 +308,19 @@ maximumHandSize pid gs =
 -- 703.4q never learns which effect answered it.
 --
 -- A PER-UNIT predicate rather than a Bool about the whole pool, because CR 106.4
--- says the player loses "this mana" and a card may name only some of it: Omnath,
--- Locus of Mana keeps green and drops the rest of the same pool. The pid and the
--- state are taken FIRST so a caller sweeping a pool resolves the applicable
--- effects once and asks the units afterwards.
+-- loses "this mana" and a card may name only some of it: Omnath, Locus of Mana
+-- keeps green and drops the rest of the same pool. The pid and the state are
+-- taken FIRST so a caller sweeping a pool resolves the applicable effects once
+-- and asks the units afterwards.
 --
 -- A DISJUNCTION over the applicable effects: two retention effects that name
 -- different mana are not in conflict, so a unit either effect keeps is kept, and
 -- an empty list keeps nothing. CR 613.11's timestamp order has nothing to order
--- here -- unlike a cost adjustment, no answer here depends on which ran first.
+-- here -- unlike a cost adjustment, no answer depends on which ran first.
 --
 -- Read LIVE through `applying`, like every other question here, so an Upwelling
 -- destroyed earlier in the step is simply not found and the pools empty with
--- nothing to unwind (CR 604.2). Pinned by ManaSpec's "CR 604.2 destroying
--- Upwelling restores the emptying in the same step".
+-- nothing to unwind (CR 604.2).
 --
 -- Not the finest granularity the pool asks for. A card that keeps only the mana
 -- it just added (Shizuko, Karn) needs the retention to leave this player-axis

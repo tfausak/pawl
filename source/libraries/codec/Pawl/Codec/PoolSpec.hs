@@ -45,8 +45,8 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       Pool.fromJson
       Pool.Spells
       """ {"type":"Spells"} """
-  -- CR 113.9: activated and triggered abilities on the stack -- Stifle's pool,
-  -- disjoint from Spells (Pawl.Types.Pool's header).
+  -- CR 113.9: activated and triggered abilities on the stack, disjoint from
+  -- Spells.
   Spec.it s "Abilities" $
     Common.assertJsonCodec
       s
@@ -61,8 +61,7 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       Pool.fromJson
       Pool.SpellsAndPermanents
       """ {"type":"SpellsAndPermanents"} """
-  -- CR 404.1: the cards in a graveyard, tagged with WHOSE -- Raise Dead's "target
-  -- creature card in your graveyard".
+  -- CR 404.1: the cards in a graveyard, tagged with WHOSE.
   Spec.it s "CardsInGraveyard" $
     Common.assertJsonCodec
       s
@@ -70,9 +69,8 @@ spec s = Spec.describe s "Pawl.Codec.Pool" $ do
       Pool.fromJson
       (Pool.CardsInGraveyard PlayerScope.You)
       """ {"type":"CardsInGraveyard","value":{"type":"You"}} """
-  -- CR 406.1: the cards in the exile zone -- Riftsweeper's "choose target
-  -- face-up exiled card". Nullary: exile has no per-player copy (Pawl.Types.Pool's
-  -- header).
+  -- CR 406.1: the cards in the exile zone. Nullary, since exile has no
+  -- per-player copy.
   Spec.it s "CardsInExile" $
     Common.assertJsonCodec
       s

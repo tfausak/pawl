@@ -20,13 +20,11 @@ toJson d =
       Common.requiredPair "source" ObjectId.toJson (DelayedTrigger.source d),
       Common.requiredPair "controller" PlayerId.toJson (DelayedTrigger.controller d),
       Common.optionalPair "bindings" Map.empty Binding.toJsonMap (DelayedTrigger.bindings d),
-      -- CR 603.7a: TurnWindow.AnyTurn for an ability armed with no onset gate,
-      -- which is the rule's default and every entry in the pool but Meandering
-      -- Towershell's. Always present, unlike the expiry below: "no restriction"
-      -- is one of the windows rather than the absence of one.
+      -- CR 603.7a: TurnWindow.AnyTurn for an ability armed with no onset gate.
+      -- Always present, unlike the expiry below, because "no restriction" is
+      -- one of the windows rather than the absence of one.
       Common.requiredPair "window" TurnWindow.toJson (DelayedTrigger.window d),
-      -- CR 603.7b: absent for an ability with no stated duration, which is the
-      -- rule's default and every entry in the pool but Full Throttle's.
+      -- CR 603.7b: absent for an ability with no stated duration.
       Common.optionalPair "expiry" Nothing (Common.encodeMaybe Expiry.toJson) (DelayedTrigger.expiry d)
     ]
 

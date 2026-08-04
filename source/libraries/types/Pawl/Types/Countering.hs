@@ -3,23 +3,19 @@ module Pawl.Types.Countering where
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
--- | CR 701.6a: one act of COUNTERING a spell -- "to counter a spell or ability
--- means to cancel it, removing it from the stack. It doesn't resolve and none of
--- its effects occur." Recorded by Pawl.Engine.Event.counter, the one funnel every
--- countering in the engine goes through.
+-- | CR 701.6a: one act of COUNTERING a spell. Recorded by
+-- Pawl.Engine.Event.counter, the one funnel every countering in the engine goes
+-- through.
 --
--- A record rather than three positional fields on GameEvent.SpellCountered, the
--- Pawl.Types.DamageEvent and Pawl.Types.ZoneChange posture: two of the three are
--- ObjectIds, and `spell` and `source` are the two ends of the same act, so a
--- caller that swapped them would still typecheck.
+-- A record rather than three positional fields on GameEvent.SpellCountered: two
+-- of the three are ObjectIds, and `spell` and `source` are the two ends of the
+-- same act, so a caller that swapped them would still typecheck.
 --
 -- Only the SPELL half of rule 701.6a is here, and that is the printed word
 -- rather than an omission: the one reader is Baral, Chief of Compliance's
 -- "whenever a spell or ability you control counters A SPELL". Stifle counters an
--- ABILITY, which CR 113.9 keeps a separate object -- "activated and triggered
--- abilities on the stack aren't spells, and therefore can't be countered by
--- anything that counters only spells" -- and Pawl.Engine.Event.counter ceases it
--- (CR 608.2n) without recording anything at all, so Baral cannot see it. A
+-- ABILITY, which CR 113.9 keeps a separate object, and Pawl.Engine.Event.counter
+-- ceases it (CR 608.2n) without recording anything, so Baral cannot see it. A
 -- countered ability therefore has no look-back record (#541); the sibling that
 -- would carry one is not this type widened, since widening it is exactly what
 -- would make Baral fire.
@@ -42,32 +38,28 @@ data Countering = MkCountering
     -- THIS creature counters a spell") is the one thing `controller` below could
     -- not answer.
     source :: ObjectId.ObjectId,
-    -- | CR 405.4: who controlled `source` AT THE MOMENT IT COUNTERED -- "the
-    -- controller of a spell is the player who cast it", and for an ability the
-    -- player who activated it or who controlled its source when it triggered.
-    -- The player a "a spell or ability YOU CONTROL" condition compares against
-    -- CR 109.5's "you".
+    -- | CR 405.4: who controlled `source` AT THE MOMENT IT COUNTERED. The player
+    -- a "a spell or ability YOU CONTROL" condition compares against CR 109.5's
+    -- "you".
     --
     -- Captured here rather than re-derived from `source` at match time, the
-    -- deal-time rider posture Pawl.Types.DamageEvent's dealtByDeathtouch takes,
-    -- and for that comment's reason: it may be unaskable later. Both halves of
-    -- rule 701.6a's "a spell or ability" have a case where it is:
+    -- deal-time rider posture DamageEvent.dealtByDeathtouch takes, and for that
+    -- comment's reason: it may be unaskable later. Both halves of rule 701.6a's
+    -- "a spell or ability" have a case where it is:
     --
     --   * a countering SPELL, always. `source` is the spell object itself, and
     --     CR 608.2n puts it into its owner's graveyard as the final part of its
     --     own resolution -- before the CR 117.5 scan reads this log, and under a
     --     new id (CR 400.7). Nothing live answers for the old one.
     --   * a countering ABILITY, when its source has left. `source` is then CR
-    --     113.7's source permanent, which is usually still on the battlefield --
-    --     but need not be, and Pawl.Engine.Resolve's own note says why ("for an
-    --     ability, the source permanent may already be sacrificed as a cost").
-    --     CR 608.2h last known information would then answer with the controller
-    --     as of the DEPARTURE rather than as of the countering.
+    --     113.7's source permanent, which may already have been sacrificed as a
+    --     cost. CR 608.2h last known information would then answer with the
+    --     controller as of the DEPARTURE rather than as of the countering.
     --
     -- Even for a source that is still there, re-deriving would read control at
     -- the scan boundary rather than at the event -- the divergence
     -- GameState.controlWhenTriggered exists to close for the objects the scan
-    -- walks, and which this field simply does not have.
+    -- walks, and which this field does not have.
     controller :: PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

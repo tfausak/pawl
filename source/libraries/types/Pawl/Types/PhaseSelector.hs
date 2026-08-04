@@ -7,26 +7,19 @@ import qualified Pawl.Types.Phase as Phase
 -- compared by EQUALITY on this type, so a pattern that names a phase can never
 -- be confused with one that names a step of it.
 --
--- Pawl.Types.Phase is one type over CR 500.1's five phases and their steps, and
--- GameState.remaining is a Seq of exactly those, so a Phase value is always a
--- SCHEDULE ENTRY: one step, or a phase that has none. That is what makes `Step`
--- the arm carrying it, and it is enough for Eon Hub's upkeep step, Fatigue's
--- draw step and for either main phase -- CR 505.2, "the main phase has no
--- steps", makes naming that phase and naming its one entry the same act.
+-- A Pawl.Types.Phase value is always a SCHEDULE ENTRY -- one step, or a phase
+-- that has none -- since GameState.remaining is a Seq of exactly those. That is
+-- what `Step` carries, and CR 505.2 makes it enough for either main phase, naming
+-- the phase and naming its one entry being the same act.
 --
--- The other three arms are CR 500.1's stepped phases: "the beginning, combat, and
--- ending phases are further broken down into steps, which proceed in order".
--- Stonehorn Dignitary's "skips their next combat phase" names ALL of CR 506.1's
--- five steps and none of them individually, which no Phase value can say.
+-- The other three arms are CR 500.1's stepped phases. Stonehorn Dignitary's
+-- "skips their next combat phase" names ALL of CR 506.1's five steps and none of
+-- them individually, which no Phase value can say. Three arms rather than one
+-- `WholePhase PhaseKind`, and none for either main phase, so that every namable
+-- window has exactly ONE spelling and no reader owes two cases for it.
 --
--- Three arms rather than one `WholePhase PhaseKind`, and no arm for either main
--- phase: this way every namable window has exactly ONE spelling. A separate kind
--- type would let `WholePhase PrecombatMainPhase` and `Step PrecombatMain` mean
--- the same thing, and every reader would owe both a case.
---
--- Vocabulary on a finished axis, which is why all three stepped phases are here
--- while only the combat one has a producer in the pool: CR 500.1 fixes the set at
--- three, and Pawl.Engine.Turn.phaseBeginningAt has to answer for every Phase regardless.
+-- Vocabulary on a finished axis: CR 500.1 fixes the set at three, so all three
+-- are here though only the combat one has a producer in the pool.
 data PhaseSelector
   = Step Phase.Phase
   | BeginningPhase

@@ -1,8 +1,7 @@
 -- Mode-scoped structural reads over a Modal payload (CR 700.2), shared by the
--- spell (Card.spell) and both ability types. Card-free/parametric in `card` (M4c):
--- imports only Type modules and Pawl.Extra (a leaf of the module graph: it
--- imports nothing from Pawl outside itself), so no cycle -- Pawl.Engine.Card imports
--- THIS.
+-- spell (Card.spell) and both ability types. Parametric in `card` and importing
+-- only Type modules and Pawl.Extra, so there is no cycle -- Pawl.Engine.Card
+-- imports THIS.
 module Pawl.Engine.Modal where
 
 import qualified Data.Foldable as Foldable
@@ -23,22 +22,22 @@ import Pawl.Types.SlotName (SlotName)
 import Pawl.Types.TargetSpec (TargetSpec)
 
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
--- inner list per mode, kept apart. The shape a caller wants when the MODE is the
--- unit of choice but resolution is not in play: Pawl.Engine.Mana reads it to enumerate
--- the ways one mana ability could be activated (CR 700.2), where flattening
--- would fuse two alternatives into one yield.
+-- inner list per mode, kept apart. The shape a caller wants when the MODE is
+-- the unit of choice but resolution is not in play: Pawl.Engine.Mana reads it
+-- to enumerate the ways one mana ability could be activated (CR 700.2), where
+-- flattening would fuse two alternatives into one yield.
 modeEffects :: Modal.Modal card -> [[Effect card]]
 modeEffects m = fmap (Foldable.toList . Mode.effects) (Foldable.toList (Modal.modes m))
 
--- Every effect across all modes, printed (mode, then written) order (CR 608.2c).
+-- Every effect across all modes, printed (mode, then written) order (CR
+-- 608.2c).
 allEffects :: Modal.Modal card -> [Effect card]
 allEffects m = concat (modeEffects m)
 
 -- The union of every mode's target specs. Slot names are unique across a card's
--- modes, and that is CHECKED rather than merely intended: Pawl.CardSpec's "no
--- card's modes share a target slot name" rejects the card whose two modes
--- declare one name, which this union would otherwise collapse into a single
--- entry. The D4 lint enforces per-mode resolution.
+-- modes, and that is CHECKED rather than merely intended: a CardSpec lint
+-- rejects the card whose two modes declare one name, which this union would
+-- otherwise collapse into a single entry.
 allTargetSpecs :: Modal.Modal card -> Map SlotName TargetSpec
 allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.modes m)))
 
@@ -46,16 +45,15 @@ allTargetSpecs m = Map.unions (fmap Mode.targetSpecs (Foldable.toList (Modal.mod
 -- ModeIndex order (the Set is already sorted). Out-of-range indices contribute
 -- nothing (total via Seq.lookup).
 --
--- The ORDER is what CR 702.42b demands of an entwined spell -- "follow the text
--- of each of the modes in the order written on the card when the spell resolves"
--- -- and it costs nothing extra: ModeIndex order IS printed order, and
--- Set.toAscList is already sorted. Pawl.Engine.Resolve.resolveModes walks this list.
+-- The ORDER is what CR 702.42b demands of an entwined spell, and it costs
+-- nothing extra: ModeIndex order IS printed order, and Set.toAscList is already
+-- sorted.
 --
 -- Modes rather than a flat effect list because a mode is the unit CR 603.5's
--- "may" covers (Mode.optionality) and the unit CR 700.2c scopes targets to, so a
--- resolver that flattened first could not ask the one question per mode that
--- Pawl.Engine.Resolve.resolveModes asks. The index rides along so the prompt can name
--- which mode is asking.
+-- "may" covers (Mode.optionality) and the unit CR 700.2c scopes targets to, so
+-- a resolver that flattened first could not ask the one question per mode that
+-- Resolve.resolveModes asks. The index rides along so the prompt can name which
+-- mode is asking.
 chosenModes :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [(ModeIndex.ModeIndex, Mode.Mode card)]
 chosenModes chosen m =
   let modeAt idx@(ModeIndex.MkModeIndex n) =
@@ -70,10 +68,9 @@ modesEffects :: Set ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
 modesEffects chosen m = concatMap (Foldable.toList . Mode.effects . snd) (chosenModes chosen m)
 
 -- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union). Two modes may
--- be chosen at once (CR 702.42a's entwine), which is what makes the collapse
--- this union would perform an observable wrong answer rather than a latent one
--- -- so Pawl.CardSpec's "no card's modes share a target slot name" keeps a card
--- whose modes declare one name out of the pool.
+-- be chosen at once (CR 702.42a's entwine), which is what makes this union's
+-- collapse an observable wrong answer rather than a latent one -- so the
+-- CardSpec lint keeps a card whose modes share a slot name out of the pool.
 modesTargetSpecs :: Set ModeIndex.ModeIndex -> Modal.Modal card -> Map SlotName TargetSpec
 modesTargetSpecs chosen m =
   let specsAt (ModeIndex.MkModeIndex n) =
@@ -92,8 +89,8 @@ selectionCount m = case Modal.selection m of
   ModeSelection.ChooseExactly n -> n
 
 -- How many modes are PRINTED, which is not the same question as how many the
--- selection demands. CR 702.42a's entwine is what asks it: "you may choose all
--- modes of this spell instead of just the number specified", so this is the
--- count Pawl.Engine.Cast substitutes for selectionCount when the entwine cost is paid.
+-- selection demands. CR 702.42a's entwine is what asks it: this is the count
+-- Pawl.Engine.Cast substitutes for selectionCount when the entwine cost is
+-- paid.
 modeCount :: Modal.Modal card -> Natural
 modeCount = Natural.length . Modal.modes

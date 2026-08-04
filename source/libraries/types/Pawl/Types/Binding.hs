@@ -15,11 +15,10 @@ import qualified Pawl.Types.Recipient as Recipient
 -- Recipient -- so the merge is total and order-independent by construction
 -- rather than by luck. Grows a field per future binding (a for-each count).
 --
--- A CHOICE AN EFFECT OFFERS is not one of these, and does not belong here: CR
--- 608.2d has the player announce it "while applying the effect", so it is asked
--- and consumed inside Pawl.Engine.Resolve without ever being stored. Magical
--- Hack's two basic land types are that shape; Pawl.ResolveSpec's
--- MagicalHackTiming group is what proves the two moments differ.
+-- A CHOICE AN EFFECT OFFERS does not belong here: CR 608.2d has the player
+-- announce it while applying the effect, so it is asked and consumed inside
+-- Pawl.Engine.Resolve without ever being stored. Magical Hack's two basic land
+-- types are that shape.
 data Binding = MkBinding
   { -- | CR 601.2c: the chosen target for this slot; re-validated at CR 608.2b.
     target :: Maybe Recipient.Recipient,
@@ -32,8 +31,8 @@ data Binding = MkBinding
     -- Stored only under the reserved Binding.chosenModes slot. Nothing elsewhere.
     modes :: Maybe (Set.Set ModeIndex.ModeIndex),
     -- | CR 707.2 / 707.5: the copiable-value snapshot a permanent copies AS IT
-    -- ENTERS (P2). Stored only under Pawl.Engine.Binding.copySource; the layer fold reads
-    -- it as the layer-1 seed. Nothing for a non-copy object.
+    -- ENTERS. Stored only under Pawl.Engine.Binding.copySource; the layer fold
+    -- reads it as the layer-1 seed. Nothing for a non-copy object.
     copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics
   }
   deriving (Eq, Ord, Show)

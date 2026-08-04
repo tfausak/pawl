@@ -20,167 +20,113 @@ import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 
 -- CR 601.2b: the reserved slot under which a spell's single chosen X is stored.
--- No card's targetSpecs may name it (the D4 lint enforces this): X is not a
--- target, so it needs a key the target namespace cannot collide with.
+-- No card's targetSpecs may name it (lint-enforced): X is not a target, so it
+-- needs a key the target namespace cannot collide with.
 variableX :: SlotName
 variableX = SlotName.MkSlotName (Text.pack "X")
 
 -- CR 700.2: the reserved slot under which a modal spell's chosen modes are
--- stored. No card's targetSpecs may name it (the D4 lint enforces this): a mode
--- is not a target. Distinct from variableX.
+-- stored. No card's targetSpecs may name it (lint-enforced): a mode is not a
+-- target. Distinct from variableX.
 chosenModes :: SlotName
 chosenModes = SlotName.MkSlotName (Text.pack "modes")
 
--- CR 707.5: the reserved slot under which an object's copy snapshot is stored
--- (P2). No card's targetSpecs may name it: a copy source is not a target.
+-- CR 707.5: the reserved slot under which an object's copy snapshot is stored.
+-- No card's targetSpecs may name it: a copy source is not a target.
 copySource :: SlotName
 copySource = SlotName.MkSlotName (Text.pack "copySource")
 
 -- CR 113.7: the reserved slot under which a triggered ability's SOURCE object
 -- (the object whose ability triggered) is bound as the ability is placed, so
 -- "this creature" / "this enchantment" is a slot read rather than a
--- self-referential opcode. No card's targetSpecs may name it (the D4 lint
--- enforces this): a source is not a target.
+-- self-referential opcode. No card's targetSpecs may name it (lint-enforced): a
+-- source is not a target.
 --
--- The D4 lint and this reserved slot do not collide, but only because of
--- where the lint currently looks: Resolve.slotsOf DOES return
--- Binding.triggerSource for an effect that reads it (e.g. Sacrifice
--- Binding.triggerSource), so a "declared slots == read slots" equality check
--- run over that effect's OWN mode would demand a matching targetSpecs entry
--- -- which the "never a declared target slot" rule above then forbids,
--- making the two lints mutually unsatisfiable. CardSpec.hs's EQUALITY lint
--- ("every mode's slot reads equal its declared slots") avoids this today because
--- `cardOffends` walks only `Modal.modes (Card.Type.spell card)` -- a card's
--- SPELL modes -- and every `Sacrifice Binding.triggerSource` in this phase lives
--- in a TRIGGERED ability, whose modes that lint never visits.
---
--- Three lints that now exist cover an ability's OWN reads of this slot -- the
--- delayed one (CardSpec.hs, "every slot a delayed ability reads is bound by its
--- card"), the triggered one ("every slot a triggered ability reads is bound
--- for its condition") and the activated one ("every slot an activated ability
--- reads is bound for its activation") -- and none runs into the equality trap
--- above: each adds Binding.triggerSource to the AVAILABLE side (the slots a
--- Create or a MoveToZone binds, plus this one, plus the condition's own event
--- slots for the triggered lint and CR 601.2b's announced X for the activated
--- one) and
--- checks the read slots are a SUBSET of that, never an equality. A subset check
--- has no "declared but never read" half to retire, so reserved-slot subtraction
--- is not needed in any of them. This warning is about a DIFFERENT, still-hypothetical
--- extension: an EQUALITY-style D4 lint (declared == read, the spell-mode lint's
--- own shape) widened to run over a triggered/activated/delayed ability's modes.
--- That extension MUST subtract the reserved slot names (this one, variableX,
--- chosenModes, copySource, you, thatPlayer, became) from the read-slots side
--- before comparing -- loosening the equality to a subset would silently retire
--- its "declared but never read" half instead.
+-- Hazard for a future lint. CardSpec.hs's "declared slots == read slots"
+-- equality lint walks only a card's SPELL modes, and the ability lints are all
+-- SUBSET checks that put this slot on the available side -- so neither collides
+-- with the rule above today. But an equality-style lint widened to an ability's
+-- modes WOULD be unsatisfiable, because Resolve.slotsOf returns this slot for
+-- an effect that reads it while the rule forbids the matching targetSpecs
+-- entry. Such a lint must subtract the reserved names (this one, variableX,
+-- chosenModes, copySource, you, thatPlayer, became) from the read side;
+-- loosening it to a subset check instead would silently retire its "declared
+-- but never read" half.
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
 -- CR 109.5: the reserved slot under which a triggered ability's CONTROLLER is
--- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
--- damage to you" -- is a slot read rather than a new opcode.
+-- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals
+-- 1 damage to you" -- is a slot read rather than a new opcode.
 --
--- "No card's targetSpecs may name it" is lint-enforced here as it is for the
--- reserved names above, by a sweep (CardSpec.hs) that collects the target specs
--- of every carrier: a card's spell modes and enchant slot, AND its activated,
--- triggered and delayed abilities' modes. It has to reach the abilities to mean
--- anything for this slot, because "you" is stamped exclusively on TRIGGERED
--- abilities (setYou below is called only when a triggered ability is placed --
--- Pawl.Engine.Engine for a borne one, Pawl.Engine.Monarch for CR 725's sourceless
--- inherent ones): a card declaring a "you" target spec there would otherwise be
--- prompted for a target and have the answer silently clobbered by setYou's
--- insert.
+-- "No card's targetSpecs may name it" is lint-enforced as for the names above,
+-- by a sweep that has to reach the ABILITIES to mean anything here: "you" is
+-- stamped exclusively on triggered abilities, so a card declaring a "you"
+-- target spec on one would be prompted for a target and have the answer
+-- clobbered by setYou.
 --
--- The two ability READ lints are different checks, and they disagree about this
--- slot on purpose. Both are subset checks: "you" sits on the TRIGGERED lint's
--- available side precisely because every triggered ability has it bound, and is
--- deliberately absent from the ACTIVATED lint's, because no activation binds it
--- -- so an activated ability reading "you" is a failing test rather than a
--- silent no-op (#569).
+-- The two ability read lints disagree about this slot on purpose. Both are
+-- subset checks: "you" sits on the triggered lint's available side because
+-- every triggered ability has it bound, and is deliberately absent from the
+-- activated lint's, because no activation binds it -- so an activated ability
+-- reading "you" is a failing test rather than a silent no-op (#569).
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
 -- CR 603.2: the reserved slot under which the PLAYER an event trigger's event
--- names is bound -- "that player" in CR 702.70a's "whenever this creature deals
--- combat damage to a player, that player gets N poison counters". Stamped by
--- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the ability's payload
--- reads an ordinary slot rather than needing a "the damaged player" opcode.
+-- names is bound -- "that player" in CR 702.70a's poisonous. Stamped by
+-- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the ability's
+-- payload reads an ordinary slot rather than a "the damaged player" opcode.
 --
 -- Distinct from `you` (CR 109.5, the ability's CONTROLLER): the player the
 -- event names is generally an opponent, and in a multiplayer game which
 -- opponent is not derivable from the controller at all.
 --
 -- Not a target (nothing was chosen), so CR 608.2b has nothing to re-validate --
--- Resolve.resolveEffects' legalSlot answers True for any slot with no target
--- spec, which is how this slot stays readable at resolution. The same "no
--- card's targetSpecs may name it" rule `you` carries applies here, enforced by
--- the same declaration sweep.
---
--- That an effect READING this slot sits under a condition that binds it IS
--- enforced, by Pawl.Engine.Event.eventBindingSlots and CardSpec's "every slot a
--- triggered ability reads is bound for its condition": only CR 510.1b's
--- combat-damage-to-a-player condition stamps it -- which poisonous is one
--- printing of, not the owner of -- so reading it under any other is a failing
--- test rather than a silent no-op.
+-- Resolve's legalSlot answers True for any slot with no target spec, which is
+-- how this stays readable at resolution. `you`'s "no card's targetSpecs may
+-- name it" rule applies here too, under the same sweep. That an effect reading
+-- this slot sits under a condition that binds it is enforced by
+-- Pawl.Engine.Event.eventBindingSlots: only CR 510.1b's
+-- combat-damage-to-a-player condition stamps it, so reading it under any other
+-- is a failing test.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
--- CR 400.7e: the reserved slot under which a zone-change trigger's ARRIVING
--- incarnation is bound -- "the new object that it became in the zone it moved
--- to when the ability triggered, if that zone is a public zone". CR 603.6c says
--- the same thing from the other side: "An ability that attempts to do something
--- to the card that left the battlefield checks for it only in the first zone
--- that it went to."
+-- CR 400.7e / CR 603.6c: the reserved slot under which a zone-change trigger's
+-- ARRIVING incarnation is bound.
 --
 -- ONE slot for both directions of a zone change, because CR 400.7e is one rule
 -- about whatever moved, not a rule about the ability's bearer:
 --
---   * a DEPARTURE, where the mover is the bearer -- Endless Cockroaches' "when
---     this creature dies, return it to its owner's hand". The paragraphs below
---     are about this case, which is the hard one.
---   * an ENTRY, where the mover is generally NOT the bearer -- Aether Flash's
---     "whenever a creature enters, this enchantment deals 2 damage to it".
---     Here `triggerSource` is the enchantment and this slot is the entrant, so
---     the two name unrelated objects and nothing has to be told apart. The
---     entrant may still be gone by the time the ability resolves (CR 608.2h),
---     which is what makes an effect reading this slot have to tolerate an id
---     that no longer resolves either way.
+--   * a DEPARTURE, where the mover is the bearer -- Endless Cockroaches.
+--   * an ENTRY, where the mover is generally NOT the bearer -- Aether Flash.
+--     Here `triggerSource` is the enchantment and this slot is the entrant, two
+--     unrelated objects. The entrant may be gone by resolution (CR 608.2h),
+--     which is why an effect reading this slot must tolerate a dead id.
 --
 -- For the departure direction it is a SECOND name for what one printed word
--- calls "it", and the two are not interchangeable. CR 400.7 mints a fresh id on
--- every zone change, so a leaves-the-battlefield trigger has two objects to
--- talk about at once:
+-- calls "it", and the two are not interchangeable, because CR 400.7 mints a
+-- fresh id on every zone change:
 --
---   * `triggerSource` above is CR 113.7a's SOURCE -- the permanent as it was on
---     the battlefield, which CR 603.10a's look-back is about and which
---     Projection.viewWithLastKnown reads from CR 608.2h last known information.
---     Everything the ability says ABOUT itself ("its power", "if it had a
---     counter on it") is that object.
+--   * `triggerSource` is CR 113.7a's SOURCE, the permanent as it was on the
+--     battlefield, read from CR 608.2h last known information by
+--     Projection.viewWithLastKnown. Everything the ability says ABOUT itself.
 --   * this slot is the CARD, wherever the move put it. Everything the ability
---     DOES to itself ("return it to its owner's hand", "exile it") is this one,
---     because the other no longer exists to be moved.
+--     DOES to itself, because the other no longer exists to be moved.
 --
--- Collapsing them either way is a silent wrong answer rather than a type error:
+-- Collapsing them either way is a silent wrong answer, not a type error:
 -- binding only the source makes every such effect a no-op on a dead id, and
--- rebinding the source to the arrival would redirect viewWithLastKnown at all
--- of Pawl.Engine.Resolve's quantity reads onto the graveyard card's printed
--- characteristics.
+-- rebinding the source to the arrival redirects every viewWithLastKnown
+-- quantity read onto the graveyard card's printed characteristics.
 --
--- Stamped by Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
--- `triggerPlayer`, and not a target -- the same CR 608.2b posture that slot's
--- comment spells out: Resolve's legalSlot answers True for any slot with no
--- target spec, which is how this one stays readable at resolution, and CR
--- 608.2b's fizzle asks only about the targeted slots so it cannot rescue a
--- spell either. "No card's targetSpecs may name it" is checked by CardSpec.hs
--- over every carrier of target specs, exactly as it is for `you` -- see that
--- comment for why the abilities have to be in scope. Reading it under a
--- condition that never binds it is the direction that IS enforced, by
--- Pawl.Engine.Event.eventBindingSlots (see `triggerPlayer` above).
---
--- A condition that binds it only SOMETIMES is rejected by that same lint, which
--- answers the guaranteed floor: CR 400.7e's proviso withholds this slot when the
--- destination is hidden (CR 400.2), so the wider leaves-the-battlefield
--- condition binds it for a death and not for a bounce, and no card may read it
--- under that condition yet (#505).
+-- Stamped by Pawl.Engine.Event.eventBindings alongside `triggerPlayer`, and not
+-- a target -- same CR 608.2b posture as that slot, including the "no card's
+-- targetSpecs may name it" sweep and the eventBindingSlots check on reads. A
+-- condition that binds it only SOMETIMES is rejected by that same lint: CR
+-- 400.7e withholds this slot when the destination is hidden (CR 400.2), so the
+-- wider leaves-the-battlefield condition binds it for a death and not for a
+-- bounce, and no card may read it under that condition yet (#505).
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
@@ -190,38 +136,33 @@ toObject :: ObjectId -> Binding
 toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
 
 -- A binding that names one player and nothing else -- CR 729.1b's subgame
--- loser, bound by Pawl.Engine.Resolve's bindLoserSlot. Mirrors toObject, but the
--- recipient is a player (ToPlayer), not an object.
+-- loser, bound by Pawl.Engine.Resolve's bindLoserSlot. Mirrors toObject, but
+-- the recipient is a player (ToPlayer), not an object.
 toPlayer :: PlayerId -> Binding
 toPlayer pid = Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)}
 
--- A binding that names one NUMBER and nothing else -- what a Destroy that counts
--- what it destroyed binds for a later "for each ... destroyed this way" to read
--- (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an amount
--- rather than a recipient, so it rides the same field CR 601.2b's chosen X does.
+-- A binding that names one NUMBER and nothing else -- what a Destroy that
+-- counts what it destroyed binds for a later "for each ... destroyed this way"
+-- to read (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an
+-- amount rather than a recipient, so it rides the same field CR 601.2b's chosen
+-- X does.
 toAmount :: Natural -> Binding
 toAmount n = Binding.empty {Binding.amount = Just n}
 
--- Bind an object under the reserved triggerSource slot. A dedicated
--- single-purpose slot, so this insert never clobbers another binding (setCopy's
--- posture).
+-- Bind an object under the reserved triggerSource slot. Dedicated and
+-- single-purpose, so the insert cannot clobber another binding -- as below.
 setTriggerSource :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setTriggerSource oid = Map.insert triggerSource (toObject oid)
 
--- Bind a player under the reserved you slot. A dedicated single-purpose slot,
--- so this insert never clobbers another binding (setCopy's posture).
+-- Bind a player under the reserved you slot.
 setYou :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
 setYou pid = Map.insert you (toPlayer pid)
 
--- Bind a player under the reserved triggerPlayer slot. A dedicated
--- single-purpose slot, so this insert never clobbers another binding (setCopy's
--- posture).
+-- Bind a player under the reserved triggerPlayer slot.
 setTriggerPlayer :: PlayerId -> Map SlotName Binding -> Map SlotName Binding
 setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 
--- Bind an object under the reserved became slot (CR 400.7e). A dedicated
--- single-purpose slot, so this insert never clobbers another binding (setCopy's
--- posture).
+-- Bind an object under the reserved became slot (CR 400.7e).
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
 
@@ -231,7 +172,7 @@ modesOf :: Map SlotName Binding -> Set ModeIndex
 modesOf m = Maybe.fromMaybe Set.empty (Binding.modes =<< Map.lookup chosenModes m)
 
 -- Project the chosen targets (CR 601.2c) out of a binding environment, dropping
--- slots with no target. Restores the pre-M4a Object.targets view for readers.
+-- slots with no target.
 targetsOf :: Map SlotName Binding -> Map SlotName Recipient
 targetsOf = Map.mapMaybe Binding.target
 
@@ -243,19 +184,17 @@ amountOf slot m = Binding.amount =<< Map.lookup slot m
 copyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics
 copyOf m = Binding.copy =<< Map.lookup copySource m
 
--- Store a copy snapshot under the reserved copySource slot (P2). copySource is a
--- dedicated single-purpose slot (no target/subtype/amount/mode binding is ever
--- stored there), so overwriting it wholesale is lossless.
+-- Store a copy snapshot under the reserved copySource slot. Nothing else is
+-- ever stored there, so overwriting it wholesale is lossless.
 setCopy :: ProjectedCharacteristics -> Map SlotName Binding -> Map SlotName Binding
 setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
 
 -- Build the binding environment stamped on a stack object at cast: the chosen
--- targets, (Just x) the chosen X under variableX, and (when non-empty) the
--- chosen modes under chosenModes. The two reserved names cannot collide with a
--- target slot (the D4 lint forbids a card declaring them), so the merges below
--- never actually merge; they are insertWith rather than insert so that a future
--- binding kind sharing a slot keeps both choices instead of silently clobbering
--- one.
+-- targets, the chosen X under variableX, and any chosen modes under
+-- chosenModes. The reserved names cannot collide with a target slot
+-- (lint-enforced), so the merges below never actually merge; they are
+-- insertWith rather than insert so a future binding kind sharing a slot keeps
+-- both choices instead of clobbering one.
 fromChoices ::
   Map SlotName Recipient ->
   Maybe Natural ->
@@ -271,9 +210,9 @@ fromChoices targets mAmount mModes =
         then withX
         else Map.insertWith mergeBinding chosenModes (Binding.empty {Binding.modes = Just mModes}) withX
 
--- Combine two bindings for the same slot, preferring the left's present choice in
--- each field. Inputs are disjoint per field by construction, so this is a total,
--- order-independent merge.
+-- Combine two bindings for the same slot, preferring the left's present choice
+-- in each field. Inputs are disjoint per field by construction, so this is a
+-- total, order-independent merge.
 mergeBinding :: Binding -> Binding -> Binding
 mergeBinding a b =
   Binding.MkBinding

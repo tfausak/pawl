@@ -9,10 +9,10 @@ import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Expiry as Expiry
 
--- | CR 611.2: the STORED duration, which unlike every other type in this module
--- never appears in card JSON -- a card carries a Duration and Pawl.Engine.Expiry.arm
--- turns it into this. The one thing that serialises an Expiry is a
--- DelayedTrigger, below, because CR 603.7b lets a delayed ability state one.
+-- | CR 611.2: the STORED duration, which never appears in card JSON -- a card
+-- carries a Duration and Pawl.Engine.Expiry.arm turns it into this. The one
+-- thing that serialises an Expiry is a DelayedTrigger, since CR 603.7b lets a
+-- delayed ability state one.
 toJson :: Expiry.Expiry -> Value.Value
 toJson e = case e of
   Expiry.AtCleanup -> Common.nullary "AtCleanup"

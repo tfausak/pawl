@@ -25,10 +25,9 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
 
--- | Every case below instantiates the `card` parameter at 'Text.Text', a
--- stand-in that is never a real card -- 'ActivatedAbility.toJson'/
--- 'ActivatedAbility.fromJson' reach it only through the supplied Modal codec,
--- exactly like 'Pawl.Codec.EffectSpec's own cardToJson/cardFromJson.
+-- | The `card` parameter is instantiated at 'Text.Text' throughout.
+-- 'ActivatedAbility.toJson'/'ActivatedAbility.fromJson' reach it only through
+-- the supplied Modal codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
 cardToJson = Common.text
 
@@ -41,11 +40,8 @@ toJson = ActivatedAbility.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility Text.Text)
 fromJson = ActivatedAbility.fromJson cardFromJson
 
--- One constructor (MkActivatedAbility), so two cases: Bonesplitter's Equip
--- ability (CR 702.6a: "[Cost]: Attach this permanent to target creature you
--- control. Activate only as a sorcery.") -- a {1} cost, an Attach mode
--- restricted to creatures you control, and CR 307.5's printed SorcerySpeed
--- rider (data/cards/bonesplitter.json) -- and CR 117.1b's own default, AnyTime,
+-- One constructor, so two cases: an equip ability (CR 702.6a) carrying
+-- CR 307.5's printed SorcerySpeed rider, and CR 117.1b's default AnyTime,
 -- whose key is elided.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
@@ -70,8 +66,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       )
       """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"timing":{"type":"SorcerySpeed"}} """
   -- CR 117.1b: AnyTime is the default for every ability but equip, so its key
-  -- stays out of the JSON -- the same posture Mode's Optionality.Mandatory
-  -- takes.
+  -- stays out of the JSON.
   Spec.it s "an AnyTime ability omits the timing key, and an absent key decodes to AnyTime" $
     Common.assertJsonCodec
       s

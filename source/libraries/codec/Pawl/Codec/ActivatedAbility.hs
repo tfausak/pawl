@@ -10,9 +10,8 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 
--- | CR 117.1b: "A player may activate an activated ability any time they have
--- priority" -- the unrestricted case, and every ability without a timing rider
--- means exactly that (CR 307.5's restricted case is a narrower carve-out).
+-- | CR 117.1b's unrestricted case, which is what every ability without a timing
+-- rider means; CR 307.5 is the narrower carve-out.
 defaultTiming :: ActivationTiming.ActivationTiming
 defaultTiming = ActivationTiming.AnyTime
 
@@ -21,9 +20,8 @@ toJson codec aa =
   Common.object
     ( Common.requiredPair "cost" (Cost.toJson Keyword.toJson) (ActivatedAbility.cost aa)
         <> Common.requiredPair "modal" (Modal.toJson codec) (ActivatedAbility.modal aa)
-        -- CR 307.5: emitted only for a restricted ability, so the absence of the
-        -- key means "no timing rider" -- the same optional-field shape Card.enchant
-        -- takes, and it leaves every card without one byte-identical.
+        -- CR 307.5: emitted only for a restricted ability, so the absence of
+        -- the key means "no timing rider".
         <> Common.optionalPair "timing" defaultTiming ActivationTiming.toJson (ActivatedAbility.timing aa)
     )
 

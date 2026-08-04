@@ -19,7 +19,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.fromJson
       Duration.UntilEndOfTurn
       """ {"type":"UntilEndOfTurn"} """
-  -- CR 611.2a: "lasts until the end of the game" (Magical Hack).
+  -- CR 611.2a: for the rest of the game.
   Spec.it s "Indefinite" $
     Common.assertJsonCodec
       s
@@ -27,7 +27,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.fromJson
       Duration.Indefinite
       """ {"type":"Indefinite"} """
-  -- CR 611.2a: "until your next turn" (Hag of Inner Weakness).
+  -- CR 611.2a: until your next turn.
   Spec.it s "UntilYourNextTurn" $
     Common.assertJsonCodec
       s
@@ -35,7 +35,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.fromJson
       Duration.UntilYourNextTurn
       """ {"type":"UntilYourNextTurn"} """
-  -- CR 611.2b: "for as long as ...", carrying its Condition.
+  -- CR 611.2b, carrying its Condition.
   Spec.it s "ForAsLongAs carries its condition" $
     Common.assertJsonCodec
       s
@@ -43,7 +43,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       Duration.fromJson
       (Duration.ForAsLongAs (Condition.MkCondition (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
       """ {"type":"ForAsLongAs","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}} """
-  -- CR 500.5a: "until end of combat" (Jade Statue).
+  -- CR 500.5a: until end of combat.
   Spec.it s "UntilEndOfCombat" $
     Common.assertJsonCodec
       s

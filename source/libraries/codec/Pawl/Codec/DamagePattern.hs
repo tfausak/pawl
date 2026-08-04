@@ -17,9 +17,8 @@ defaultWhichSource = SourceRelation.AnySource
 -- | `whichRecipient` is runtime-only -- CR 615.7's shielded permanent or player
 -- is baked by Resolve's PreventNextDamage arm, never authored on a card -- but
 -- this codec is structural over the record and so accepts one from card JSON.
--- The same treatment, and the same reason, as PhasePattern's `whosePhase`;
--- Pawl.CardSpec's "no card authors a recipient-scoped damage pattern" is what
--- keeps the pool honest.
+-- A corpus lint keeps the pool honest instead, as for PhasePattern's
+-- `whosePhase`.
 toJson :: DamagePattern.DamagePattern -> Value.Value
 toJson p =
   Common.object

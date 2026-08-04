@@ -7,8 +7,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.TapState as TapState
 
--- | CR 110.5b: "permanents enter the battlefield untapped ... unless a spell or
--- ability says otherwise", so this is what a Create or a MoveToZone that says
+-- | CR 110.5b's default, which is what a Create or a MoveToZone that says
 -- nothing about tapped-ness means.
 defaultTapped :: TapState.TapState
 defaultTapped = TapState.Untapped
@@ -33,8 +32,7 @@ fromJson value = do
 
 -- | The value 'toJson' elides entirely: a card file carries riders only when
 -- the effect really does say otherwise (CR 110.5b for tapped, CR 508.4 for a
--- creature put onto the battlefield attacking), which is what keeps every card
--- file written before them byte-identical.
+-- creature put onto the battlefield attacking).
 defaultValue :: EntryRiders.EntryRiders
 defaultValue =
   EntryRiders.MkEntryRiders

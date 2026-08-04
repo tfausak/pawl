@@ -54,10 +54,9 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
--- | Every case below instantiates the `card` parameter at 'Text.Text' (the
--- parametricity case at the bottom also uses 'Int'), a stand-in that is never
--- a real card -- 'Effect.toJson'/'Effect.fromJson' reach it only through the
--- supplied codec (below), so any type proves the shape.
+-- | The `card` parameter is instantiated at 'Text.Text' throughout (and at
+-- 'Int' in the parametricity case). 'Effect.toJson'/'Effect.fromJson' reach it
+-- only through the supplied codec, so any type proves the shape.
 cardToJson :: Text.Text -> Value.Value
 cardToJson = Common.text
 
@@ -72,8 +71,7 @@ fromJson = Effect.fromJson cardFromJson
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Effect" $ do
-  -- ObjectRef is untagged, so both arms have to survive: Lightning Bolt's
-  -- chosen slot and Corrosive Gale's swept "each creature with flying".
+  -- ObjectRef is untagged, so both arms have to survive.
   Spec.it s "DealDamage round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
@@ -87,8 +85,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.DealDamage (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)) (Quantity.Literal 1))
       """ {"type":"DealDamage","value":[{"type":"HasKeyword","value":{"type":"Flying"}},{"type":"Literal","value":1}]} """
-  -- ModifyTarget's ObjectRef is untagged, so both arms have to survive: Giant
-  -- Growth's chosen slot and Trumpet Blast's swept "attacking creatures".
+  -- ModifyTarget's ObjectRef is untagged, so both arms have to survive.
   Spec.it s "ModifyTarget round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
@@ -157,10 +154,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.ControlPlayerNextTurn (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"ControlPlayerNextTurn","value":"target"} """
-  -- Both ObjectRef arms Destroy's own comment gives (Murder's slot, Day of
-  -- Judgment's swept set), plus the two shapes CR 701.19c's regeneration rider
-  -- takes. The two-element literal here is what pins the elided (Nothing) arm of
-  -- the bound-count slot below.
+  -- Both ObjectRef arms, plus the two shapes CR 701.19c's regeneration rider
+  -- takes. The two-element literal pins the elided (Nothing) arm of the
+  -- bound-count slot below.
   Spec.it s "Destroy carries its CR 701.19c rider both ways" $ do
     Common.assertJsonCodec
       s
@@ -180,11 +176,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Destroy (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Regenerability.Regenerable Nothing)
       """ {"type":"Destroy","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Regenerable"}]} """
-  -- Bane of Progress' "destroyed this way": the third element is the slot the
-  -- sweep binds its count into, and it is ELIDED when absent -- so every Destroy
-  -- already on disk keeps its two-element payload (pinned by the Nothing case
-  -- above). Moved from Pawl.CodecSpec (formerly built on `payloadLength`),
-  -- rewritten against the literal the encoder actually produces.
+  -- The third element is the slot the sweep binds its count into, ELIDED when
+  -- absent, so a Destroy already on disk keeps its two-element payload.
   Spec.it s "Destroy's bound-count slot round-trips and is written only when present" $
     Common.assertJsonCodec
       s
@@ -206,8 +199,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Attach (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"Attach","value":"target"} """
-  -- CR 701.3: the destination Filter travels in the payload, distinguishing this
-  -- arm's wire format from Attach's bare slot above.
+  -- CR 701.3: the destination Filter travels in the payload, distinguishing
+  -- this arm's wire format from Attach's bare slot above.
   Spec.it s "AttachTarget" $
     Common.assertJsonCodec
       s
@@ -216,10 +209,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       (Effect.AttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature))
       """ {"type":"AttachTarget","value":["target",{"type":"HasCardType","value":{"type":"Creature"}}]} """
   -- MoveToZone's payload takes Create's shape below: four emitted forms, told
-  -- apart by LENGTH first and then, at three elements, by JSON TYPE (an Object is
-  -- the EntryRiders, anything else is the bound slot). Moved from
-  -- Pawl.CodecSpec, rewritten against the literals the encoder actually
-  -- produces.
+  -- apart by LENGTH first and then, at three elements, by JSON TYPE (an Object
+  -- is the EntryRiders, anything else is the bound slot).
   Spec.it s "MoveToZone round-trips all four shapes, and elides the defaults" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         bound = SlotName.MkSlotName (Text.pack "exiled")
@@ -248,8 +239,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.MoveToZone bound Zone.Battlefield attacking (Just bound))
       """ {"type":"MoveToZone","value":["exiled",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled"]} """
-  -- Both of Draw's proven PlayerRef shapes: Divination's controller draw and
-  -- Ancestral Recall's targeted one.
+  -- Both of Draw's PlayerRef shapes: a controller draw and a targeted one.
   Spec.it s "Draw" $ do
     Common.assertJsonCodec
       s
@@ -293,8 +283,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       """ {"type":"GainLife","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":1}]} """
   -- Create's EntryRiders and bound slot are each ELIDED when they are the
   -- default, exactly like MoveToZone above: four emitted forms, the middle two
-  -- told apart at decode by JSON TYPE. Moved from Pawl.CodecSpec, rewritten
-  -- against the literals the encoder actually produces.
+  -- told apart at decode by JSON TYPE.
   Spec.it s "Create round-trips all four shapes, and elides the defaults" $ do
     let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}
         plain = EntryRiders.defaultValue
@@ -331,10 +320,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Replace Duration.UntilEndOfTurn Uses.Once ReplacementOrigin.Other Nothing (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))
       """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"Other"},null,{"type":"DestructionR","value":{"type":"Regenerate"}}]} """
-  -- CR 614.15 / 616.1a: Galvanic Blast's metalcraft clause -- a self-replacement
-  -- gated on a nonzero threshold (CR 702's ability words have no rules meaning,
-  -- so "Metalcraft" itself encodes nothing). Both new fields carry payloads here,
-  -- so a codec that dropped either is caught.
+  -- CR 614.15 / 616.1a: a self-replacement gated on a nonzero threshold.
+  -- CR 702's ability words have no rules meaning, so "Metalcraft" itself
+  -- encodes nothing.
   Spec.it s "Replace (a conditional self-replacement)" $
     Common.assertJsonCodec
       s
@@ -348,9 +336,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           (ReplacementEffect.DamageR (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing) (DamageRewrite.SetAmount 4))
       )
       """ {"type":"Replace","value":[{"type":"UntilEndOfTurn"},{"type":"Once"},{"type":"SelfReplacement"},{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Artifact"}},{"type":"ControlledBy","value":{"type":"You"}}]},"aggregation":{"type":"Objects"}}},"comparison":{"type":"AtLeast"},"threshold":{"type":"Literal","value":3}},{"type":"DamageR","value":[{"whichSource":{"type":"TheSource"}},{"type":"SetAmount","value":4}]}]} """
-  -- CR 614.10a: Fatigue's slot read, plus Stonehorn Dignitary's whole-phase
-  -- selector -- the arm a Phase alone cannot spell (CR 500.1, "a turn consists
-  -- of five phases").
+  -- CR 614.10a: a slot read, plus the whole-phase selector -- the arm a Phase
+  -- alone cannot spell (CR 500.1).
   Spec.it s "SkipNextPhase" $ do
     Common.assertJsonCodec
       s
@@ -364,8 +351,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.SkipNextPhase (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PhaseSelector.CombatPhase)
       """ {"type":"SkipNextPhase","value":[{"type":"InSlot","value":"target"},{"type":"CombatPhase"}]} """
-  -- CR 615.7: Mending Hands' whole text -- "Prevent the next 4 damage that would
-  -- be dealt to any target this turn."
+  -- CR 615.7.
   Spec.it s "PreventNextDamage" $
     Common.assertJsonCodec
       s
@@ -373,8 +359,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4))
       """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":4}]} """
-  -- CR 113.9: this same opcode now also counters an ABILITY (Stifle), not only
-  -- a spell (Cancel) -- the type is unchanged, so the wire shape is too.
+  -- CR 113.9: this opcode counters an ability as well as a spell, with the type
+  -- unchanged, so the wire shape is too.
   Spec.it s "Counter" $
     Common.assertJsonCodec
       s
@@ -382,9 +368,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Counter (SlotName.MkSlotName (Text.pack "spell")))
       """ {"type":"Counter","value":"spell"} """
-  -- CR 701.24: a bare slot name, not an array -- whose library is DERIVED from
-  -- the object the slot names (CR 400.3's "its owner"), so there is no second
-  -- field for a card file to write.
+  -- CR 701.24: a bare slot name, not an array -- the library is derived from
+  -- the object the slot names (CR 400.3), so there is no second field to write.
   Spec.it s "ShuffleIntoLibrary" $
     Common.assertJsonCodec
       s
@@ -399,8 +384,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "creature")))
       """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},"creature"]} """
-  -- Every PlayerRef shape the opcode accepts: the self-scoped one every card in
-  -- the pool uses, and the slot read CR 702.70a's "that player" needs.
+  -- Every PlayerRef shape the opcode accepts: the self-scoped one, and the slot
+  -- read CR 702.70a needs.
   Spec.it s "GainPlayerCounters" $ do
     Common.assertJsonCodec
       s
@@ -449,8 +434,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.RemoveFromCombat (SlotName.MkSlotName (Text.pack "target")))
       """ {"type":"RemoveFromCombat","value":"target"} """
-  -- Both shapes in the pool: Aggravated Assault's pair and Full Throttle's two
-  -- combat phases with no main phase between them.
+  -- Both shapes in the pool: a pair, and a repeated phase.
   Spec.it s "AddPhases round-trips the pair and a repeated phase" $ do
     Common.assertJsonCodec
       s
@@ -464,8 +448,6 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AddPhases [ExtraPhase.ExtraCombat, ExtraPhase.ExtraCombat])
       """ {"type":"AddPhases","value":[{"type":"ExtraCombat"},{"type":"ExtraCombat"}]} """
-  -- GainControl's own two arms: Act of Treason's slot and Aura Thief's "all
-  -- enchantments".
   Spec.it s "GainControl round-trips both ObjectRef arms" $ do
     Common.assertJsonCodec
       s
@@ -479,11 +461,10 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment)))
       """ {"type":"GainControl","value":[{"type":"Indefinite"},{"type":"HasCardType","value":{"type":"Enchantment"}}]} """
-  -- The three shapes the encoder can emit, told apart by LENGTH: a bare ability
-  -- name (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
+  -- The shapes the encoder can emit, told apart by LENGTH: a bare ability name
+  -- (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
   -- still the default), and a three-element form (a stated onset, whose last
-  -- element is the duration or null). Moved from Pawl.CodecSpec, rewritten
-  -- against the literals the encoder actually produces.
+  -- element is the duration or null).
   Spec.it s "ArmDelayedTrigger round-trips all three shapes, and elides the default onset" $ do
     let sacrificeIt = AbilityName.MkAbilityName (Text.pack "sacrifice it")
         eachCombat = AbilityName.MkAbilityName (Text.pack "each combat")
@@ -526,11 +507,9 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.CreateEmblem (Text.pack "Goblin Piker"))
       """ {"type":"CreateEmblem","value":"Goblin Piker"} """
-  -- The `card` payload comes only from the caller-supplied codec, exactly like
-  -- Create's above -- proven at two different `card` values through the SAME
-  -- constant codec, so a leak straight to the constructor (bypassing the codec
-  -- argument) would fail this rather than merely coincide. Moved from
-  -- Pawl.CodecSpec's "parametricity" group.
+  -- Two different `card` values through the SAME constant codec, so a leak
+  -- straight to the constructor (bypassing the codec argument) fails this
+  -- rather than merely coincides.
   Spec.it s "CreateEmblem reaches its card only through the supplied codec" $
     Spec.assertEqWith
       s
@@ -579,10 +558,8 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PlayerSacrifices (SlotName.MkSlotName (Text.pack "t")) (Filter.HasCardType CardType.Creature) (Quantity.Literal 1))
       """ {"type":"PlayerSacrifices","value":["t",{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Literal","value":1}]} """
-  -- CR 500.7: Time Warp's slot read, whose skip set is empty, plus Savor the
-  -- Moment's self-scoped arm carrying CR 500.11's skip of one step of the turn
-  -- it creates, and a two-member set (a Set, so the wire format has to survive
-  -- more than one).
+  -- CR 500.7: a slot read with an empty skip set, a self-scoped arm carrying
+  -- CR 500.11's skip of one step, and a two-member set.
   Spec.it s "TakeExtraTurn" $ do
     Common.assertJsonCodec
       s
@@ -608,8 +585,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
 sentinel :: Value.Value
 sentinel = Common.text (Text.pack "SENTINEL")
 
--- CR 614.15 / 616.1a: "three or more artifacts" -- the pool's first nonzero
--- Comparison threshold, and the count Galvanic Blast's metalcraft clause reads.
+-- CR 614.15 / 616.1a.
 threeArtifacts :: Count.Count Quantity.Quantity
 threeArtifacts =
   Count.MkCount

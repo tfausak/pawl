@@ -11,9 +11,7 @@ import qualified Pawl.Types.Quantity as Quantity
 
 -- | Quantity.Count's arm is tagged HERE, like every other arm. Pawl.Codec.Count
 -- writes a bare object, so the tag that picks this arm has to come from the
--- dispatching type -- which is this one. It used to live inside Count itself,
--- leaving the two types sharing one tag name across two levels and this arm the
--- only one that skipped its own wrapper to avoid double-tagging.
+-- dispatching type, which is this one.
 toJson :: Quantity.Quantity -> Value.Value
 toJson q = case q of
   Quantity.Literal n -> Common.tagged "Literal" . Just $ Common.integer n

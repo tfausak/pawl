@@ -11,9 +11,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 -- payload-carrying constructors (PayLife, Sacrifice), so the decoder is written
 -- against Common.asTagged and only gains arms.
 --
--- The keyword codec is a PARAMETER, mirroring Filter's own -- see
--- Pawl.Codec.Filter's header: the Filter this carries needs one, and every
--- caller passes Pawl.Codec.Keyword.toJson.
+-- The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
 toJson :: (keyword -> Value.Value) -> CostComponent.CostComponent keyword -> Value.Value
 toJson encode c = case c of
   CostComponent.TapThis -> Common.nullary "TapThis"

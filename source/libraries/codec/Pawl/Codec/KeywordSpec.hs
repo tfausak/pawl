@@ -79,9 +79,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Indestructible
       """ {"type":"Indestructible"} """
-  -- CR 702.14a's "[type]" rides the constructor, so swampwalk and islandwalk are
-  -- DIFFERENT keywords and must encode differently -- a Bog Wraith that decoded
-  -- as an islandwalker would be blockable exactly when it should not be.
+  -- CR 702.14a's "[type]" rides the constructor, so swampwalk and islandwalk
+  -- are DIFFERENT keywords and must encode differently.
   Spec.it s "Landwalk carries a land-type criterion" $ do
     Common.assertJsonCodec
       s
@@ -99,10 +98,9 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Swamp)) /= Keyword.toJson (Keyword.Landwalk (Filter.HasSubtype Subtype.Island)))
       "swampwalk and islandwalk encode differently"
-  -- The other three shapes CR 702.14c names, which a bare Subtype could not say.
-  -- Each has a printing in the pool, and each has to survive the trip intact --
-  -- a codec that flattened the criterion back to a subtype would round-trip the
-  -- swampwalk above and lose all three.
+  -- The other three shapes CR 702.14c names, which a bare Subtype could not
+  -- say: a codec that flattened the criterion back to a subtype would
+  -- round-trip the swampwalk above and lose all three.
   Spec.it s "Landwalk carries CR 702.14c's other three shapes" $ do
     -- Dryad Sophisticate: "without the specified type or supertype".
     Common.assertJsonCodec
@@ -111,17 +109,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       (Keyword.Landwalk (Filter.Not (Filter.HasSupertype Supertype.Basic)))
       """ {"type":"Landwalk","value":{"type":"Not","value":{"type":"HasSupertype","value":{"type":"Basic"}}}} """
-    -- Legions of Lim-Dûl: "with both the specified type or supertype and the
-    -- specified subtype".
+    -- With both the specified type or supertype and the specified subtype.
     Common.assertJsonCodec
       s
       Keyword.toJson
       Keyword.fromJson
       (Keyword.Landwalk (Filter.And [Filter.HasSupertype Supertype.Snow, Filter.HasSubtype Subtype.Swamp]))
       """ {"type":"Landwalk","value":{"type":"And","value":[{"type":"HasSupertype","value":{"type":"Snow"}},{"type":"HasSubtype","value":{"type":"Swamp"}}]}} """
-    -- "With the specified type or supertype" -- artifact landwalk, whose one
-    -- paper source is Vectis Gloves (an Equipment that GRANTS it; no creature
-    -- prints it).
+    -- With the specified type or supertype: artifact landwalk, which no
+    -- creature prints -- it is only ever granted.
     Common.assertJsonCodec
       s
       Keyword.toJson
@@ -142,8 +138,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Reach
       """ {"type":"Reach"} """
-  -- CR 702.18a's shroud is nullary, so what this pins is the TAG: a Blurred
-  -- Mongoose that decoded as anything else would be a legal Doom Blade target.
+  -- CR 702.18a's shroud is nullary, so what this pins is the TAG.
   Spec.it s "Shroud" $ do
     Common.assertJsonCodec
       s
@@ -166,9 +161,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Vigilance
       """ {"type":"Vigilance"} """
-  -- CR 702.29c's event, carrying the incarnation the cycled card became. CR
-  -- 702.29e: the typecycling filter rides the same keyword arm, absent for
-  -- plain cycling -- so both spellings have to survive the trip.
+  -- CR 702.29c/702.29e: the typecycling filter rides the same keyword arm and
+  -- is absent for plain cycling, so both spellings have to survive the trip.
   Spec.it s "Cycling round-trips with and without a typecycling filter" $ do
     let cost = Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) []
     Common.assertJsonCodec
@@ -202,7 +196,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Fear
       """ {"type":"Fear"} """
   -- CR 702.42a's payload is a whole Cost too, and it must not share Flashback's
-  -- tag: Dream's Grip may not decode as a card castable from a graveyard.
+  -- tag.
   Spec.it s "Entwine carries its cost, and is not Flashback" $ do
     let entwine n = Keyword.Entwine (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
@@ -213,9 +207,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (entwine 1)
       """ {"type":"Entwine","value":{"mana":[{"type":"Generic","value":1}]}} """
     Spec.assertBool s (Keyword.toJson (entwine 1) /= Keyword.toJson (flashbackOf 1)) "entwine {1} is not flashback {1}"
-  -- CR 702.70a's N rides the constructor the same way. The two payloaded
-  -- keywords must not share a tag, or Snake Cult Initiation would decode as
-  -- toxic 3.
+  -- CR 702.70a's N rides the constructor the same way, and the two payloaded
+  -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do
     Common.assertJsonCodec
       s
@@ -234,9 +227,9 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Infect
       """ {"type":"Infect"} """
-  -- CR 702.91a's battle cry is a triggered ability, but it takes no parameter,
-  -- so it encodes as a bare tag like every other nullary keyword -- what CR
-  -- 702.91b makes multiple is the COUNT the projection keeps, never the value.
+  -- CR 702.91a's battle cry takes no parameter, so it encodes as a bare tag.
+  -- What CR 702.91b makes multiple is the COUNT the projection keeps, never the
+  -- value.
   Spec.it s "BattleCry" $
     Common.assertJsonCodec
       s

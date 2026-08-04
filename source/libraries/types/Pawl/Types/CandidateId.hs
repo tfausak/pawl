@@ -4,19 +4,16 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Timestamp as Timestamp
 
--- | CR 614.5's identity: "A replacement effect doesn't invoke itself repeatedly; it
--- gets only one opportunity to affect an event or any modified events that may
--- replace that event." This is what counts as ONE effect for that rule. Without
--- it Hardened Scales and Corpsejack Menace re-fire on each other's output
--- forever -- it is a termination condition, not an optimization.
+-- | CR 614.5's identity: what counts as ONE replacement effect for the rule that
+-- an effect gets only one opportunity to affect an event. Without it Hardened
+-- Scales and Corpsejack Menace re-fire on each other's output forever -- a
+-- termination condition, not an optimization.
 --
 -- A permanent's static replacement ability is identified by (source, effect
--- VALUE), NOT (source, list index). Index identity would break CR 616.2, the rule
--- this phase exists to get right: a Clone applies its own `EntryR AsCopy` (index
--- 0 of its one-element list), which replaces its copiable snapshot with a Primal
--- Plasma's -- whose `EntryR (ChoiceOf ...)` is then ALSO index 0. The
--- newly-acquired ability would be mistaken for the one already used, and the
--- Gatherer ruling's board state would be unreachable.
+-- VALUE), NOT (source, list index). Index identity would break CR 616.2: a Clone
+-- applies its own `EntryR AsCopy` at index 0, replacing its copiable snapshot
+-- with a Primal Plasma's, whose `EntryR (ChoiceOf ...)` is then also index 0, so
+-- the newly-acquired ability would be mistaken for the one already used.
 --
 -- Two Doubling Seasons are still two opportunities: different SOURCES. The cost
 -- of value identity is that a single source carrying two TEXTUALLY IDENTICAL
