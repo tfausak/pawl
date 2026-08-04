@@ -986,10 +986,10 @@ direnv exec . git commit -m "Default the unmarked-constructor fields"
 
 ### Task 9: ProjectedCharacteristics
 
-On its own because it is the widest record in the codec — twelve fields, of which
-ten are omissible — and because it is the one whose JSON appears inside other
-modules' spec literals (`ProjectedCharacteristicsSpec.testCharacteristicsJson` is
-concatenated into `BindingSpec`, `GameEventSpec` and `DelayedTriggerSpec`).
+On its own because it is the widest record in the codec — thirteen fields, of
+which eleven are omissible — and because it is the one whose JSON appears inside
+other modules' spec literals (`ProjectedCharacteristicsSpec.testCharacteristicsJson`
+is concatenated into `BindingSpec` and `GameEventSpec`).
 
 **Files:**
 - Modify: `source/libraries/codec/Pawl/Codec/ProjectedCharacteristics.hs`
@@ -1006,7 +1006,7 @@ concatenated into `BindingSpec`, `GameEventSpec` and `DelayedTriggerSpec`).
 | `supertypes`, `subtypes`, `colors` | `Set.empty` |
 | `keywords` | `Map.empty` (a multiset) |
 | `power`, `toughness`, `loyalty`, `characteristicPT` | `Nothing` |
-| `activatedAbilities`, `replacementEffects` | `[]` |
+| `activatedAbilities`, `replacementEffects`, `triggeredAbilities` | `[]` |
 
 - [ ] **Step 1: Convert both halves**
 
@@ -1043,13 +1043,29 @@ direnv exec . cabal test
 Expected: PASS. `ProjectedCharacteristics` is not reachable from a card file, so
 the corpus should not move — but run it, because a shared codec it calls might.
 
-- [ ] **Step 4: Verify no hand-rolled omission blocks survive anywhere**
+- [ ] **Step 4: Verify every record encoder was converted**
 
-Run: `direnv exec . grep -rn 'then \[\] else \[' source/libraries/codec/`
-Expected: no matches.
+```bash
+for f in $(direnv exec . grep -rl 'Common\.object' source/libraries/codec/Pawl/Codec/*.hs | grep -v Spec | grep -v Common.hs); do
+  grep -q 'requiredPair\|optionalPair' "$f" || echo "UNCONVERTED: $f"
+done
+```
 
-Run: `direnv exec . grep -rn 'Common.object$' source/libraries/codec/ | grep -v Spec`
-Expected: no matches — every record encoder now goes through `Common.object . concat`.
+Expected: nothing printed.
+
+Do **not** grep for a bare `Common.object$` or for `then [] else [` as a
+completeness check — both produce false positives and neither means what it
+looks like. `Common.object` legitimately sits alone on its line whenever hlint's
+preferred `Common.object (x <> y)` form is used, which is most modules with one
+or two fields. `then [] else [` legitimately appears in `optionalPair`'s own
+definition, and in `Effect.hs`, where it elides a trailing element of a
+*positional array* rather than a keyed object field — a different construct that
+this migration does not touch.
+
+Two `Common.pair "…"` uses also survive on purpose, in `Binding.hs` and
+`TriggeredAbility.hs`: they build the two-key `{slot, binding}` and
+`{name, ability}` objects that render a map entry. Both keys are structurally
+required, and neither is a record field, so they are outside the rule.
 
 - [ ] **Step 5: Commit**
 
