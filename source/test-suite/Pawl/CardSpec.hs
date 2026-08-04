@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Quantity as Quantity
 -- Aliased Condition.Type, matching Pawl.Types.Count below and the project-wide
 -- convention (FilterSpec/CardSpec's Filter.Type note): Pawl.Engine.Condition may
 -- later be imported and must not collide.
@@ -164,6 +165,19 @@ instantLine =
       TypeLine.subtypes = Set.empty
     }
 
+-- CR 709.4's fixture: two Instant halves, Wax costing {G} and Wane costing
+-- {W}, so the combined view's colours, mana value and type line are each a
+-- genuine union rather than a copy of one half. Built by hand, the faceNamed
+-- fixture's reason: no printing in the pool has a second face yet.
+splitCard :: Card.Type.Card
+splitCard =
+  Card.Type.MkCard
+    { Card.Type.layout = Layout.Split,
+      Card.Type.faces =
+        (vanillaFace "Wax" instantLine) {Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.Green)]}
+          NonEmpty.:| [(vanillaFace "Wane" instantLine) {Face.manaCost = costOf [ManaSymbol.OfType (ManaType.Colored Color.White)]}]
+    }
+
 cardSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 cardSpec s = Spec.describe s "Card" $ do
   Spec.it s "CR 110.1 an instant is not a permanent type" $
@@ -192,6 +206,20 @@ cardSpec s = Spec.describe s "Card" $ do
           -- CR 709.4a again: a split card has two names and no combined one, so
           -- the joined name is not a face name and must not resolve to a face.
           Spec.assertEqWith s "a name no face carries" (Card.faceNamed (named "Wax // Wane") card) Nothing
+  Spec.it s "CR 709.4 a split card's characteristics are its two halves combined" $ do
+    let card = splitCard
+        c = Card.combined card
+    -- CR 709.4b: "The mana cost of a split card is the combined mana costs of
+    -- its two halves. A split card's colors and mana value are determined from
+    -- its combined mana cost."
+    Spec.assertEqWith s "both colours" (Projection.printedColorsOf c) (Set.fromList [Color.Green, Color.White])
+    Spec.assertEqWith s "mana value 2" (Quantity.manaValueOf c) 2
+    -- CR 709.4a, as far as a single CardName can carry it (#650): the CR writes
+    -- a split card's name joined, in all four of its own examples.
+    Spec.assertEqWith s "the joined name" (Face.name c) (CardName.MkCardName (Text.pack "Wax//Wane"))
+    -- CR 709.4c: "A split card has each card type specified on either of its
+    -- halves and each ability in the text box of each half."
+    Spec.assertEqWith s "each card type" (TypeLine.types (Face.typeLine c)) (Set.singleton CardType.Instant)
 
 -- Every Count reachable from a Quantity: a leaf Count directly, or one nested
 -- through Plus's two children (CR 208.2 composition -- a printed 1+*).
@@ -1389,6 +1417,16 @@ anyFace p = any p . Card.Type.faces
 overFaces :: (Face.Face Card.Type.Card -> [a]) -> Card.Type.Card -> [a]
 overFaces f = concatMap f . NonEmpty.toList . Card.Type.faces
 
+-- CR 709.4a: a card's faces are referred to BY NAME (Card.faceNamed), so two
+-- faces sharing a name make that reference ambiguous -- faceNamed would return
+-- the FIRST of them and silently hide the second. Over the whole card rather
+-- than through anyFace: this is a claim about the SET of names a card prints,
+-- which no per-face predicate can state.
+distinctFaceNamesOffends :: Card.Type.Card -> Bool
+distinctFaceNamesOffends card =
+  let names = fmap Face.name (NonEmpty.toList (Card.Type.faces card))
+   in length (List.nub names) /= length names
+
 -- Every claim pawl makes about how its own card files are authored, swept over
 -- the whole corpus. A sweep alone proves nothing about the lint it runs -- a
 -- correctly authored pool passes a lint that never fires -- so most cases here
@@ -2008,6 +2046,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends c = isPlaneswalker c /= Maybe.isJust (Face.loyalty c)
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "planeswalker iff loyalty" (fmap (S.nameOf . Printing.card) offenders) []
+  -- What makes Pawl.Engine.Card.faceNamed's answer unique, and so what makes
+  -- referring to a face BY NAME well-defined (CR 709.4a). Held over the whole
+  -- pool rather than by construction, because a card file is data.
+  --
+  -- No anti-vacuity guard yet: the pool has no multi-face card until Task 5
+  -- adds Wax // Wane, so this sweep cannot yet prove it is looking at
+  -- anything. Task 5 owes that guard.
+  Spec.it s "a card's face names are pairwise distinct" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (distinctFaceNamesOffends . Printing.card) ps
+    Spec.assertEqWith s "no card repeats a face name" (fmap (Face.name . Card.combined . Printing.card) offenders) []
+  -- The rejecting direction, proven against a hand-built offender rather than a
+  -- card file: a card that repeats a face name must not be loadable.
+  Spec.it s "the lint itself catches a card that repeats a face name" $ do
+    let wax = vanillaFace "Wax" instantLine
+        offender = Card.Type.MkCard {Card.Type.layout = Layout.Split, Card.Type.faces = wax NonEmpty.:| [wax]}
+    Spec.assertBool s (distinctFaceNamesOffends offender) "two faces sharing one name are rejected"
   Spec.it s "no mode declares a slot named enchant" $ do
     ps <- S.allPrintings s
     let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Face.spell c))

@@ -8,9 +8,10 @@ import qualified Pawl.Types.Layout as Layout
 toJson :: Layout.Layout -> Value.Value
 toJson l = Common.nullary $ case l of
   Layout.Normal -> "Normal"
+  Layout.Split -> "Split"
 
 fromJson :: Value.Value -> Either Text.Text Layout.Layout
 fromJson =
   Common.decodeNullary
     "Layout"
-    [("Normal", Layout.Normal)]
+    [("Normal", Layout.Normal), ("Split", Layout.Split)]

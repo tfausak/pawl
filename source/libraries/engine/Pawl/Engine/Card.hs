@@ -8,6 +8,7 @@
 -- and never about which card it is.
 module Pawl.Engine.Card where
 
+import Control.Applicative ((<|>))
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
@@ -21,6 +22,8 @@ import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import Pawl.Types.SlotName (SlotName)
@@ -42,6 +45,98 @@ import qualified Pawl.Types.TypeLine as TypeLine
 combined :: Card.Card -> Face.Face Card.Card
 combined card = case Card.layout card of
   Layout.Normal -> NonEmpty.head (Card.faces card)
+  -- CR 709.4: "In every zone except the stack, the characteristics of a split
+  -- card are those of its two halves combined." Written over the whole
+  -- NonEmpty rather than over a pair, because CR 709 names no arity and a
+  -- five-part split card exists (Who // What // When // Where // Why).
+  Layout.Split -> foldSplit (Card.faces card)
+
+-- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
+-- order decides the joined name and the concatenated mana cost.
+foldSplit :: NonEmpty.NonEmpty (Face.Face Card.Card) -> Face.Face Card.Card
+foldSplit faces = List.foldl' merge2 (NonEmpty.head faces) (NonEmpty.tail faces)
+
+merge2 :: Face.Face Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
+merge2 l r =
+  l
+    { -- CR 709.4a gives the card BOTH names and no joined one; a single
+      -- CardName cannot carry that, so this is the form the CR uses in its own
+      -- four examples ("Fire//Ice", "Assault//Battery") and #650 carries the
+      -- plural axis.
+      Face.name = CardName.join (Face.name l NonEmpty.:| [Face.name r]),
+      -- CR 709.4b: "the combined mana costs of its two halves", from which
+      -- colours and mana value fall out with no further arm.
+      Face.manaCost = concatCosts (Face.manaCost l) (Face.manaCost r),
+      -- CR 709.4c: "each card type specified on either of its halves".
+      Face.typeLine = unionTypeLines (Face.typeLine l) (Face.typeLine r),
+      Face.keywords = Set.union (Face.keywords l) (Face.keywords r),
+      Face.colorIndicator = Set.union (Face.colorIndicator l) (Face.colorIndicator r),
+      -- CR 709.4c: "each ability in the text box of each half".
+      Face.staticAbilities = Face.staticAbilities l <> Face.staticAbilities r,
+      Face.activatedAbilities = Face.activatedAbilities l <> Face.activatedAbilities r,
+      Face.replacementEffects = Face.replacementEffects l <> Face.replacementEffects r,
+      Face.triggeredAbilities = Face.triggeredAbilities l <> Face.triggeredAbilities r,
+      Face.delayedAbilities = Map.union (Face.delayedAbilities l) (Face.delayedAbilities r),
+      Face.castingPermissions = Face.castingPermissions l <> Face.castingPermissions r,
+      Face.castingRestrictions = Face.castingRestrictions l <> Face.castingRestrictions r,
+      Face.additionalCosts = Face.additionalCosts l <> Face.additionalCosts r,
+      Face.alternativeCosts = Face.alternativeCosts l <> Face.alternativeCosts r,
+      Face.playerAbilities = Face.playerAbilities l <> Face.playerAbilities r,
+      Face.blockRequirements = Face.blockRequirements l <> Face.blockRequirements r,
+      Face.attackRequirements = Face.attackRequirements l <> Face.attackRequirements r,
+      Face.combatRestrictions = Face.combatRestrictions l <> Face.combatRestrictions r,
+      Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
+      Face.mulliganAction = Face.mulliganAction l <> Face.mulliganAction r,
+      Face.openingHandAction = Face.openingHandAction l <> Face.openingHandAction r,
+      -- The first half that has one. No split card in the pool prints a
+      -- permanent half, so these are unexercised (#648's deferral list); CR
+      -- 709.5's shared-type-line cards are what will need a real answer.
+      Face.power = firstJust (Face.power l) (Face.power r),
+      Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
+      Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
+      Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
+      Face.enchant = firstJust (Face.enchant l) (Face.enchant r)
+      -- Face.counterability is NOT listed: record update keeps the left half's,
+      -- and writing `Face.counterability l` here would be a no-op. CR 113.6g is
+      -- a per-half ability, so the combined view taking the left half's is a
+      -- placeholder no split card exercises.
+      --
+      -- Face.spell is deliberately NOT merged either: it stays the left half's, and
+      -- nothing ever casts it. CR 709.3b means the thing on the stack is always
+      -- ONE half, so the combined view is never the payload that resolves --
+      -- Task 4's castableFaces is what a cast reads. Merging the modes here
+      -- would invent a spell that has no printing.
+    }
+
+-- CR 202.1: a land's Nothing is no mana cost at all, not a zero one, so two
+-- Nothings stay Nothing and either half present makes the combined cost Just
+-- -- concatenated left to right, which is CR 709.4b's "combined mana costs".
+concatCosts :: Maybe ManaCost.ManaCost -> Maybe ManaCost.ManaCost -> Maybe ManaCost.ManaCost
+concatCosts l r = case (l, r) of
+  (Nothing, Nothing) -> Nothing
+  _ -> Just (ManaCost.MkManaCost (costSymbols l <> costSymbols r))
+
+-- concatCosts' shared halves: the symbol list of a printed cost, or none for a
+-- face with no mana cost at all.
+costSymbols :: Maybe ManaCost.ManaCost -> [ManaSymbol.ManaSymbol]
+costSymbols = foldMap ManaCost.unwrap
+
+-- CR 709.4c: "each card type specified on either of its halves" reaches every
+-- set a TypeLine carries, not card types alone -- a supertype or subtype
+-- printed on either half is on the combined view too.
+unionTypeLines :: TypeLine.TypeLine -> TypeLine.TypeLine -> TypeLine.TypeLine
+unionTypeLines l r =
+  TypeLine.MkTypeLine
+    { TypeLine.supertypes = Set.union (TypeLine.supertypes l) (TypeLine.supertypes r),
+      TypeLine.types = Set.union (TypeLine.types l) (TypeLine.types r),
+      TypeLine.subtypes = Set.union (TypeLine.subtypes l) (TypeLine.subtypes r)
+    }
+
+-- flip Maybe.fromMaybe, lifted to answer a Maybe rather than unwrap one: the
+-- left half's value if it has one, the right half's (Just or Nothing)
+-- otherwise -- Maybe's Alternative instance, read left to right.
+firstJust :: Maybe a -> Maybe a -> Maybe a
+firstJust l r = l <|> r
 
 -- The face of this card with the given name, if it has one. CR 709.4a: a card's
 -- faces are referred to BY NAME, which is what a player names in paper and what
