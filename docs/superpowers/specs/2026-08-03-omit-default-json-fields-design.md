@@ -3,9 +3,9 @@
 ## The problem
 
 The codec writes every field of every record, whether or not the field says
-anything. `data/cards/goblin-piker.json` is 51 lines, of which nine keys hold `[]` and one
+anything. `data/cards/goblin-piker.json` is 60 lines, of which nine keys hold `[]` and one
 holds the `ModeSelection` that means "not modal". Dropping those, and the `spell`
-stanza left empty behind them, takes the file to 35 lines:
+stanza left empty behind them, takes the file to 41 lines:
 
 ```json
 {
@@ -27,7 +27,8 @@ Across the 226 committed cards: **2,364 keys hold `null`, `[]`, or `{}`**, out o
 13,451 JSON paths, and **`"selection": {"type":"ChooseExactly","value":1}` appears
 325 times**. Simulating the rule below over the corpus takes it from **20,804
 lines to 16,228** — and that simulation is conservative, since it does not know
-the enum defaults in R2 below.
+the enum defaults in R2 below. (Realized: **16,194**, 34 lines better than the
+simulation, for exactly that reason.)
 
 The same noise fills the specs. 512 `Common.assertJsonCodec` sites carry a JSON
 literal, and most of them spell out fields that say nothing.
