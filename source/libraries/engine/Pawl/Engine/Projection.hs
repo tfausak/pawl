@@ -579,7 +579,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.replacementEffects = [],
         PC.triggeredAbilities = []
       }
-  Just card ->
+  Just face ->
     -- The seed predates every layer, so a Count reached from here gets a viewOf
     -- that determines nothing rather than one recursing back into
     -- copiableCharacteristics. The tradeoff is that such a Count folds an empty
@@ -590,12 +590,12 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     let seedViewOf = const Nothing
         seedContext = Filter.MkContext (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
-          { PC.name = Face.name card,
-            PC.supertypes = TypeLine.supertypes (Face.typeLine card),
+          { PC.name = Face.name face,
+            PC.supertypes = TypeLine.supertypes (Face.typeLine face),
             -- CR 702: a printed keyword appears once, so the seed's count is 1
             -- apiece; layer-6 grants add multiplicity on top (CR 702.164b).
-            PC.keywords = Map.fromSet (const 1) (Face.keywords card),
-            PC.colors = printedColorsOf card,
+            PC.keywords = Map.fromSet (const 1) (Face.keywords face),
+            PC.colors = printedColorsOf face,
             -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
             -- instead" belongs to a CDA, and a printed star with none behind it
             -- evaluates to Nothing. A star given its value by an as-enters
@@ -603,21 +603,21 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- battlefield where that rule says 0 (#76). A star that does have a
             -- CDA is Nothing only until layer 7a, where applyCharacteristicPT
             -- determines the pair seedCharacteristicPT left in characteristicPT.
-            PC.power = case Face.power card of
+            PC.power = case Face.power face of
               Nothing -> Nothing
               Just (Power.MkPower q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
-            PC.toughness = case Face.toughness card of
+            PC.toughness = case Face.toughness face of
               Nothing -> Nothing
               Just (Toughness.MkToughness q) -> Quantity.evaluate seedViewOf seedContext gs oid q,
             -- CR 306.5a: a literal number, so copied through rather than
             -- evaluated like the two fields above.
-            PC.loyalty = Face.loyalty card,
-            PC.characteristicPT = seedCharacteristicPT card,
-            PC.cardTypes = TypeLine.types (Face.typeLine card),
-            PC.subtypes = TypeLine.subtypes (Face.typeLine card),
-            PC.activatedAbilities = Face.activatedAbilities card,
-            PC.replacementEffects = Face.replacementEffects card,
-            PC.triggeredAbilities = Face.triggeredAbilities card
+            PC.loyalty = Face.loyalty face,
+            PC.characteristicPT = seedCharacteristicPT face,
+            PC.cardTypes = TypeLine.types (Face.typeLine face),
+            PC.subtypes = TypeLine.subtypes (Face.typeLine face),
+            PC.activatedAbilities = Face.activatedAbilities face,
+            PC.replacementEffects = Face.replacementEffects face,
+            PC.triggeredAbilities = Face.triggeredAbilities face
           }
 
 -- CR 202.2 / 204.2 / 202.2b: an object's printed colours, from its mana cost's
