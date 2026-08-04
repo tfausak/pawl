@@ -52,6 +52,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
@@ -1400,7 +1401,7 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Nineteen of Pawl.Types.Face's twenty-eight fields can hold one, and
+-- frames it. Twenty of Pawl.Types.Face's twenty-eight fields can hold one, and
 -- here is where each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
@@ -1413,7 +1414,8 @@ activatedAbilityFilters ability =
 --   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
 --   * `playerAbilities` -- CR 613.11's cost modifiers.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `attackRequirements` (CR
---     508.1d) and `blockRequirements` (CR 509.1c) -- three more affected sets.
+--     508.1d), `blockRequirements` (CR 509.1c) and `attackCosts` (CR 508.1h) --
+--     four more affected sets.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target specs and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -1422,13 +1424,13 @@ activatedAbilityFilters ability =
 --
 -- The other eight fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
 -- `colorIndicator`, `counterability`, `castingPermissions` and
--- `castingRestrictions`. That is checkable rather than asserted: exactly ten
+-- `castingRestrictions`. That is checkable rather than asserted: exactly thirteen
 -- modules under Pawl.Types import Pawl.Types.Filter -- Affected, CostComponent,
--- Count, CounterPattern, Effect, Keyword, ObjectRef, PlayerEffect, TargetSpec and
--- TriggerCondition -- and nothing those eight fields reach is one of them.
+-- Count, CounterPattern, Effect, EntryRewrite, Keyword, ObjectRef, PlayerEffect,
+-- Prompt, ReplacementEffect, TargetSpec and TriggerCondition -- and nothing those
+-- eight fields reach is one of them.
 --
--- Nineteen and eight is twenty-seven, and the twenty-eighth is `attackCosts`,
--- which can hold one and which this fold does not walk (#651).
+-- Twenty and eight is twenty-eight, the whole record.
 --
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
@@ -1450,6 +1452,7 @@ cardFilters card =
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
+        <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
     )
     <> modalFilters (Face.spell card)
@@ -2306,6 +2309,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ),
             ( "CR 508.1c's combat restriction",
               base {Face.combatRestrictions = [CombatRestriction.CantAttack (Affected.Matching buried) Nothing]}
+            ),
+            ( "CR 508.1h's cost to attack",
+              base {Face.attackCosts = [AttackCost.MkAttackCost (Affected.Matching buried) (ManaCost.MkManaCost [ManaSymbol.Generic 2])]}
             ),
             ( "CR 614.1's counter-placement pattern",
               base
