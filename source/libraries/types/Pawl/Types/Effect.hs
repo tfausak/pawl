@@ -245,14 +245,23 @@ data Effect card
     -- embedded card for the reason that type's comment gives (CR 109.3: neither is
     -- a characteristic). Resolve reads it; it never cases on it.
     --
-    -- The Maybe SlotName BINDS the minted token into the resolving object's LIVE
-    -- bindings, so a delayed ability armed by this same resolution (CR 603.7c's
-    -- "it") can name the token. It does NOT make the token visible to a LATER
-    -- EFFECT in the same resolution: applyEffect's `chosen` map is computed once
-    -- before the fold begins, so a later Sacrifice or Destroy still reads the
-    -- pre-Create snapshot. A DEFINITION, not a read: never a target, never in
-    -- targetSpecs. Defined only for a single-token create; one that binds a slot
-    -- while making several is rejected by the Pawl.CardSpec lint family (#53).
+    -- The Maybe SlotName BINDS what this Create minted into the resolving
+    -- object's LIVE bindings, so a delayed ability armed by this same resolution
+    -- can name it. A DEFINITION, not a read: never a target, never in
+    -- targetSpecs.
+    --
+    -- WHAT it binds is decided by the PRINTED Quantity, which is the only thing
+    -- that can tell CR 603.7c's singular "it" from a card's plural "those
+    -- tokens": Literal 1 binds the one token (and, if CR 614.16 multiplied the
+    -- count, asks which of them "it" names), and any other quantity binds every
+    -- token minted. Tidal Wave is the first; Thatcher Revolt is the second. See
+    -- Pawl.Engine.Resolve.namesEveryToken.
+    --
+    -- A GROUP slot is visible to a later effect of the same resolution on either
+    -- path, since its reader goes to live bindings. A single-object slot is not
+    -- on the ABILITY path: resolveModes' `chosen` map is computed once before
+    -- the fold begins, so a later Sacrifice or Destroy there still reads the
+    -- pre-Create snapshot (the spell path re-reads, and does see it).
     Create Quantity.Quantity card EntryRiders.EntryRiders (Maybe SlotName.SlotName)
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition. Fog and Drudge

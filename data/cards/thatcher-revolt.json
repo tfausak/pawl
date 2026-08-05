@@ -1,0 +1,121 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "StepBegins",
+              "value": [
+                {
+                  "type": "Ending",
+                  "value": {
+                    "type": "EndStep"
+                  }
+                },
+                {
+                  "type": "EachTurn"
+                }
+              ]
+            },
+            "modal": {
+              "modes": [
+                {
+                  "effects": [
+                    {
+                      "type": "Sacrifice",
+                      "value": "tokens"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "name": "sacrifice those tokens"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Thatcher Revolt",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Create",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 3
+                  },
+                  {
+                    "faces": [
+                      {
+                        "colorIndicator": [
+                          {
+                            "type": "Red"
+                          }
+                        ],
+                        "keywords": [
+                          {
+                            "type": "Haste"
+                          }
+                        ],
+                        "name": "Human Token",
+                        "power": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "toughness": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "typeLine": {
+                          "subtypes": [
+                            {
+                              "type": "Human"
+                            }
+                          ],
+                          "types": [
+                            {
+                              "type": "Creature"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "tokens"
+                ]
+              },
+              {
+                "type": "ArmDelayedTrigger",
+                "value": "sacrifice those tokens"
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

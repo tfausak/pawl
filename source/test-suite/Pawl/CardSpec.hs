@@ -1864,10 +1864,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- TRIGGERED ability, so the narrower view saw a declared entry that nothing
   -- appeared to arm and failed the equality outright.
   --
-  -- The multi-token-binding lint below takes the same wide view, for the same
-  -- reason: nothing about CR 603.7c's one-of-several question is peculiar to a
-  -- spell mode. It sweeps nothing new today -- no ability in this pool creates
-  -- tokens and binds one -- so the widening is a hole closed, not a claim.
+  -- The "every slot a delayed ability reads is one its card defines" lint below
+  -- takes the same wide view, for the same reason: nothing about where a Create
+  -- binds its minted tokens is peculiar to a spell mode.
   Spec.it s "every armed delayed ability is declared, and every declared one is armed" $ do
     ps <- S.allPrintings s
     let cardOffends card =
@@ -2112,15 +2111,6 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (triggeredAbilityOffends (secondModeReads TriggerCondition.SelfEnters))
       "and a later mode is still rejected when the condition binds nothing"
-  -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
-  -- of them. Rejected rather than guessed (#53).
-  Spec.it s "no Create binds a slot while making more than one token" $ do
-    ps <- S.allPrintings s
-    let offenders =
-          filter
-            (anyFace (Resolve.bindsSeveralTokens . cardResolutionEffects) . Printing.card)
-            ps
-    Spec.assertEqWith s "no multi-token binding" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
   -- exile, command) must pair with PlayerRef.EachPlayer -- the type
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a

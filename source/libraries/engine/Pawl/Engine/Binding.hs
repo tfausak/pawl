@@ -4,6 +4,7 @@ import Control.Applicative ((<|>))
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import Data.Sequence (Seq)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -166,6 +167,14 @@ preventedAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 toObject :: ObjectId -> Binding
 toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
 
+-- A binding that names SEVERAL objects and nothing else -- what a Create binds
+-- for a card that refers back to every token it made at once, Thatcher Revolt's
+-- "those tokens". toObject's plural, and a distinct field rather than a list of
+-- Recipients: this is a definition and never a target (CR 115.10a), so it is not
+-- subject to CR 608.2b.
+toObjects :: Seq ObjectId -> Binding
+toObjects oids = Binding.empty {Binding.objects = Just oids}
+
 -- A binding that names one player and nothing else -- CR 729.1b's subgame
 -- loser, bound by Pawl.Engine.Resolve's bindLoserSlot. Mirrors toObject, but
 -- the recipient is a player (ToPlayer), not an object.
@@ -216,6 +225,12 @@ targetsOf = Map.mapMaybe Binding.target
 amountOf :: SlotName -> Map SlotName Binding -> Maybe Natural
 amountOf slot m = Binding.amount =<< Map.lookup slot m
 
+-- The objects bound as a GROUP at a slot, if any. Nothing when the slot holds a
+-- single target instead, or nothing at all -- so a reader that offers both shapes
+-- can tell "them" from "it" without a tag.
+objectsOf :: SlotName -> Map SlotName Binding -> Maybe (Seq ObjectId)
+objectsOf slot m = Binding.objects =<< Map.lookup slot m
+
 -- The copy snapshot stored on an object, if any (CR 707.2).
 copyOf :: Map SlotName Binding -> Maybe ProjectedCharacteristics
 copyOf m = Binding.copy =<< Map.lookup copySource m
@@ -255,5 +270,6 @@ mergeBinding a b =
     { Binding.target = Binding.target a <|> Binding.target b,
       Binding.amount = Binding.amount a <|> Binding.amount b,
       Binding.modes = Binding.modes a <|> Binding.modes b,
-      Binding.copy = Binding.copy a <|> Binding.copy b
+      Binding.copy = Binding.copy a <|> Binding.copy b,
+      Binding.objects = Binding.objects a <|> Binding.objects b
     }

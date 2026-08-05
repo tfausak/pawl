@@ -13,9 +13,12 @@ import qualified Pawl.Types.SlotName as SlotName
 -- EachMatching never does.
 data ObjectRef
   = -- | The one object bound in a slot (CR 601.2c filled it by targeting, or the
-    -- engine reserved it -- Binding.triggerSource). At most one: a slot holds a
-    -- single Recipient. Subject to CR 608.2b's illegal-target check when the
-    -- slot was a target.
+    -- engine reserved it -- Binding.triggerSource). At most one: this reads the
+    -- slot's single Recipient. Subject to CR 608.2b's illegal-target check when
+    -- the slot was a target.
+    --
+    -- A slot a Create bound to a whole minted GROUP is not read here at all, so
+    -- naming one this way affects nothing (#755).
     InSlot SlotName.SlotName
   | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a
