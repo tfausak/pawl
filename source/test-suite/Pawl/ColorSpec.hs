@@ -7,7 +7,9 @@
 -- pools read straight off the card), the P3a colour gates (Doom Blade, Crimson
 -- Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder) and this phase's own CR 613.3
 -- gates (Indigo Faerie, Painter's Servant, Red Elemental Blast), plus the CR
--- 608.2b colour-change fizzle.
+-- 608.2b colour-change fizzle and CR 105.3's "become colorless" half (Moonlace,
+-- Ersatz Gnomes -- the only cards here that recolour a SPELL by targeting it,
+-- and the pair that pins Duration.Indefinite against Duration.UntilEndOfTurn).
 -- Mostly gameplay-level: a card is cast or resolved through the stack and the
 -- resulting game state is asserted on. The rest assert on a projection over a
 -- hand-built board, either because no card in the pool produces the effect
@@ -39,6 +41,7 @@ import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -53,6 +56,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -93,6 +97,26 @@ theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.C
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
   [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+
+-- Ersatz Gnomes' two activated abilities, in the order the card prints them
+-- (data/cards/ersatz-gnomes.json). Two separate abilities, NOT two modes -- no
+-- CR 700.2 choice is made, so the index below is a fact about the JSON:
+--   0. "{T}: Target spell becomes colorless."                       -- Pool.Spells, Indefinite
+--   1. "{T}: Target permanent becomes colorless until end of turn." -- Pool.Permanents, UntilEndOfTurn
+spellAbility :: Int
+spellAbility = 0
+
+permanentAbility :: Int
+permanentAbility = 1
+
+-- One activated ability of a printing, BY INDEX -- `theAbility` above reads "the
+-- single one", which Ersatz Gnomes' two do not fit. Nothing when the index is
+-- out of range; the callers assert on that rather than falling back to an
+-- ability that would make their assertions vacuous.
+abilityAt :: Int -> Printing.Printing -> Maybe (ActivatedAbility.ActivatedAbility Card.Type.Card)
+abilityAt i p = case drop i (Face.activatedAbilities (S.combinedFace p)) of
+  ab : _ -> Just ab
+  [] -> Nothing
 
 -- Answers CR 614.1c's as-enters colour choice with blue, deferring everything
 -- else to S.identityAnswer -- whose own default for that prompt is WHITE, so a
@@ -186,13 +210,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         (ratsId, board) = S.addCreature typhoidRats S.alice gs0
         gs = S.withEffect ratsId (Modification.SetColor (Set.singleton Color.Red)) board
     Spec.assertEq s (Projection.colorsOf ratsId gs) $ Set.singleton Color.Red
-
-  Spec.it s "CR 105.3 an effect may make a coloured object colourless" $ do
-    typhoidRats <- S.printingOf s registry "Typhoid Rats"
-    let gs0 = Setup.emptyGame S.bothPlayers
-        (ratsId, board) = S.addCreature typhoidRats S.alice gs0
-        gs = S.withEffect ratsId (Modification.SetColor Set.empty) board
-    Spec.assertEq s (Projection.colorsOf ratsId gs) Set.empty
 
   Spec.it s "CR 613.3 within layer 5 the CR 702.114a devoid CDA applies first, then the timestamped colour change" $ do
     -- Both live in layer 5 (CR 613.1e). CR 613.3 orders them: devoid, the
@@ -583,3 +600,119 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     Spec.assertEqWith s "the blast really was cast" (length (Game.zoneMembers Zone.Hand S.alice blasted)) 0
     Spec.assertBool s (notElem spellId (GameState.stack after)) "the DRONE is what got countered"
     Spec.assertEqWith s "both spells are in the graveyard: neither countered itself" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
+
+  Spec.it s "CR 105.3 Moonlace makes a blue SPELL colourless, so Red Elemental Blast can no longer counter it" $ do
+    -- CR 105.3's last sentence -- "Effects may also make a colored object become
+    -- colorless" -- aimed at a SPELL rather than a permanent. Painter's Servant
+    -- already recolours a spell, but through a static ability's untargeted
+    -- Affected.MatchingAnywhere; this is the first card that TARGETS one for a
+    -- colour change, through CR 115's Pool.SpellsAndPermanents.
+    --
+    -- This is the test that PROVES the layer-5 fold reaches a stack object:
+    -- gating Affected.TheseObjects to the battlefield fails it.
+    --
+    -- Red Elemental Blast is the READER: "counter target blue spell" names the
+    -- Recall before Moonlace resolves and not after, which no assertion on
+    -- Projection.colorsOf alone would prove is visible to the rules.
+    island <- S.printingOf s registry "Island"
+    ancestralRecall <- S.printingOf s registry "Ancestral Recall"
+    moonlace <- S.printingOf s registry "Moonlace"
+    redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
+    let base = S.landsInPlay island 1
+        (recallId, withRecall) = S.spellOnStack ancestralRecall S.alice base
+        (gs, moonlaceId) = S.handOne moonlace withRecall
+        answer :: Prompt.Prompt r -> r
+        answer = aimAtObject recallId
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice moonlaceId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "before: the Recall on the stack is blue" (Projection.colorsOf recallId gs) $ Set.singleton Color.Blue
+    Spec.assertEqWith s "after: colourless (CR 105.2c), not merely 'not blue'" (Projection.colorsOf recallId after) Set.empty
+    Spec.assertBool s (elem recallId (GameState.stack after)) "and it is still a spell on the stack, not countered"
+    case modeSpec redElementalBlast counterMode of
+      Nothing -> Spec.assertFailure s "Red Elemental Blast's counter mode declares exactly one target slot"
+      Just counterSpec -> do
+        Spec.assertBool
+          s
+          (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSpec gs))
+          "before: a legal 'target blue spell'"
+        Spec.assertBool
+          s
+          (not (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSpec after)))
+          "after: no longer a legal 'target blue spell'"
+
+  Spec.it s "CR 611.2a Moonlace states no duration, so a permanent it made colourless stays colourless past cleanup" $ do
+    -- THE DURATION FALSIFIER, and the contrast with Ersatz Gnomes below: an
+    -- implementation that reads Moonlace as "until end of turn" passes every
+    -- assertion here except the last two. Bad Moon is the reader -- the Rats
+    -- leave its "black creatures" set in layer 5 and come back only if the
+    -- colour change wears off.
+    island <- S.printingOf s registry "Island"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    moonlace <- S.printingOf s registry "Moonlace"
+    let base = S.landsInPlay island 1
+        (_, withMoon) = S.addCreature badMoon S.alice base
+        (ratsId, board) = S.addCreature typhoidRats S.alice withMoon
+        (gs, moonlaceId) = S.handOne moonlace board
+        answer :: Prompt.Prompt r -> r
+        answer = aimAtObject ratsId
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice moonlaceId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+        afterCleanup = snd (Engine.runGamePure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
+    Spec.assertEqWith s "before: black, and 2/2 under Bad Moon" (Projection.colorsOf ratsId gs, Projection.powerOf ratsId gs) (Set.singleton Color.Black, Just 2)
+    Spec.assertEqWith s "after: colourless" (Projection.colorsOf ratsId after) Set.empty
+    Spec.assertEqWith s "after: out of Bad Moon's set, back to 1 power" (Projection.powerOf ratsId after) $ Just 1
+    Spec.assertEqWith s "CR 514.2 does not reach an Expiry.Never effect" (length (GameState.continuousEffects afterCleanup)) 1
+    Spec.assertEqWith s "still colourless next turn" (Projection.colorsOf ratsId afterCleanup) Set.empty
+
+  Spec.it s "Ersatz Gnomes' second ability makes a permanent colourless only until end of turn" $ do
+    -- The same colour change as Moonlace's, with the OTHER duration, so the two
+    -- tests together pin Duration.Indefinite and Duration.UntilEndOfTurn to the
+    -- right cards. CR 514.2's cleanup sweep is what ends this one, and Bad Moon
+    -- reads the revert: the Rats are 2/2, then 1/1, then 2/2 again.
+    badMoon <- S.printingOf s registry "Bad Moon"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    ersatzGnomes <- S.printingOf s registry "Ersatz Gnomes"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, withMoon) = S.addCreature badMoon S.alice gs0
+        (ratsId, withRats) = S.addCreature typhoidRats S.alice withMoon
+        (gnomesId, gs) = S.addCreature ersatzGnomes S.alice withRats
+    case abilityAt permanentAbility ersatzGnomes of
+      Nothing -> Spec.assertFailure s "Ersatz Gnomes prints two activated abilities"
+      Just ability -> do
+        let answer :: Prompt.Prompt r -> r
+            answer = aimAtObject ratsId
+            activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice gnomesId ability))
+            after = snd (Engine.runGamePure answer activated Stack.resolveTop)
+            afterCleanup = snd (Engine.runGamePure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup)))
+        Spec.assertEqWith s "before: black, 2/2 under Bad Moon" (Projection.colorsOf ratsId gs, Projection.powerOf ratsId gs) (Set.singleton Color.Black, Just 2)
+        Spec.assertEqWith s "after: colourless, 1/1" (Projection.colorsOf ratsId after, Projection.powerOf ratsId after) (Set.empty, Just 1)
+        Spec.assertEqWith s "CR 514.2 drops the effect at cleanup" (GameState.continuousEffects afterCleanup) []
+        Spec.assertEqWith s "black and 2/2 again" (Projection.colorsOf ratsId afterCleanup, Projection.powerOf ratsId afterCleanup) (Set.singleton Color.Black, Just 2)
+
+  Spec.it s "Ersatz Gnomes' first ability makes a SPELL colourless, from an activated ability rather than a spell" $ do
+    -- Moonlace's stack half again, reached through Pool.Spells and an activated
+    -- ability: the ability goes on the stack ABOVE the Recall (CR 405.2) and
+    -- resolves first, so the Recall is still there to be recoloured.
+    ancestralRecall <- S.printingOf s registry "Ancestral Recall"
+    ersatzGnomes <- S.printingOf s registry "Ersatz Gnomes"
+    redElementalBlast <- S.printingOf s registry "Red Elemental Blast"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (gnomesId, board) = S.addCreature ersatzGnomes S.alice gs0
+        (recallId, gs) = S.spellOnStack ancestralRecall S.alice board
+    case abilityAt spellAbility ersatzGnomes of
+      Nothing -> Spec.assertFailure s "Ersatz Gnomes prints two activated abilities"
+      Just ability -> do
+        let answer :: Prompt.Prompt r -> r
+            answer = aimAtObject recallId
+            activated = snd (Engine.runGamePure answer gs (Activate.activateAbility S.alice gnomesId ability))
+            after = snd (Engine.runGamePure answer activated Stack.resolveTop)
+        Spec.assertEqWith s "before: blue" (Projection.colorsOf recallId gs) $ Set.singleton Color.Blue
+        Spec.assertEqWith s "after: colourless" (Projection.colorsOf recallId after) Set.empty
+        case modeSpec redElementalBlast counterMode of
+          Nothing -> Spec.assertFailure s "Red Elemental Blast's counter mode declares exactly one target slot"
+          Just counterSpec ->
+            Spec.assertBool
+              s
+              (not (Set.member (Recipient.ToObject recallId) (Target.legalRecipients Nothing S.noSource counterSpec after)))
+              "and no longer a legal 'target blue spell'"
