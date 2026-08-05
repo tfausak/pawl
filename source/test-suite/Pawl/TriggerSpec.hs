@@ -912,7 +912,7 @@ delayedSpec s registry =
         -- direction (`Map.union captured placementTime`) the captured {7} would
         -- win instead, and this assertion would fail.
         Spec.it s "CR 603.7c placement-time's own chosen mode wins a collision with the captured environment" $ do
-          let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty, Mode.optionality = Optionality.Mandatory}
+          let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty, Mode.optionality = Optionality.Mandatory, Mode.unlessPaid = Nothing}
               ability =
                 TriggeredAbility.MkTriggeredAbility
                   { TriggeredAbility.condition = TriggerCondition.SelfEnters,

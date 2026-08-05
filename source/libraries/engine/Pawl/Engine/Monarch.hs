@@ -62,7 +62,7 @@ oneEffect cond eff =
     { TriggeredAbility.condition = cond,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton eff) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton eff) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }

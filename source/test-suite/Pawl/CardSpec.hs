@@ -576,7 +576,9 @@ modalReadOffends abilityBound modal =
                   Resolve.definedSlots effects,
                   Map.keysSet (Mode.targetSpecs mode)
                 ]
-            wanted = Set.unions (fmap Resolve.slotsOf effects)
+            -- The whole MODE's reads, not just its effect list's: CR 118.12a's
+            -- "unless [a player] pays" names its payer by slot too.
+            wanted = Resolve.modeSlots mode
          in not (Set.isSubsetOf wanted available)
    in any modeOffends (Modal.modes modal)
 
@@ -913,7 +915,7 @@ oneEffectTrigger condition effect =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -936,7 +938,7 @@ oneEffectActivated mana effect =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.timing = ActivationTiming.AnyTime
     }
@@ -949,6 +951,7 @@ lintMode effects slots =
     (Seq.fromList effects)
     (Map.fromList (fmap (\slot -> (slot, TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) slots))
     Optionality.Mandatory
+    Nothing
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -1561,7 +1564,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let modeOffends m =
           let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
-              reads_ = Set.unions (fmap Resolve.slotsOf (Foldable.toList (Mode.effects m)))
+              -- Resolve.modeSlots and not a fold over the effects alone: CR
+              -- 118.12a's "unless [a player] pays" reads a slot for its payer,
+              -- which must be declared like any other.
+              reads_ = Resolve.modeSlots m
            in -- A slot DEFINED in this mode (a Create's minted token, or a
               -- PlaySubgame's bound subgame outcome) and then read by a later
               -- effect is legitimate dataflow, not an undeclared target -- the
@@ -1743,7 +1749,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory))
+            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory Nothing))
             (ModeSelection.ChooseExactly 1)
         withTriggered slot card =
           card
@@ -2260,7 +2266,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Mode.targetSpecs at once.
         spellOf effects specs =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory))
+            (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory Nothing))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility

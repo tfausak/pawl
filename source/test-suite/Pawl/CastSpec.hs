@@ -59,6 +59,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -503,6 +504,11 @@ discardLastAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
@@ -1779,6 +1785,11 @@ castFirstOption p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
@@ -1848,6 +1859,11 @@ castPanglacial p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
