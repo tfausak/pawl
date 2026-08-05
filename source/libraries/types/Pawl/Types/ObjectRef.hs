@@ -12,13 +12,17 @@ import qualified Pawl.Types.SlotName as SlotName
 -- runs. That is the distinction CR 115.10a draws: only InSlot can name a target;
 -- EachMatching never does.
 data ObjectRef
-  = -- | The one object bound in a slot (CR 601.2c filled it by targeting, or the
-    -- engine reserved it -- Binding.triggerSource). At most one: this reads the
-    -- slot's single Recipient. Subject to CR 608.2b's illegal-target check when
-    -- the slot was a target.
+  = -- | The objects bound in a slot (CR 601.2c filled it by targeting, or the
+    -- engine reserved it -- Binding.triggerSource). Usually ONE, the slot's
+    -- single Recipient, subject to CR 608.2b's illegal-target check when the slot
+    -- was a target.
     --
-    -- A slot a Create bound to a whole minted GROUP is not read here at all, so
-    -- naming one this way affects nothing (#755).
+    -- But a slot a Create bound to a whole minted GROUP names every one of them
+    -- -- Salt Road Skirmish's "they gain haste until end of turn" over the two
+    -- tokens the sentence before it made. A group is a definition and never a
+    -- target (CR 115.10a), so it owes CR 608.2b nothing; the arm still reads at
+    -- most one object per slot for every OTHER kind of binding, which is why
+    -- "target creature" cannot become two.
     InSlot SlotName.SlotName
   | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of
     -- Judgment's "all creatures". The battlefield is where CR 109.2 puts it; a

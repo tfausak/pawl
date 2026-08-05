@@ -1,0 +1,150 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "StepBegins",
+              "value": [
+                {
+                  "type": "Ending",
+                  "value": {
+                    "type": "EndStep"
+                  }
+                },
+                {
+                  "type": "EachTurn"
+                }
+              ]
+            },
+            "modal": {
+              "modes": [
+                {
+                  "effects": [
+                    {
+                      "type": "Sacrifice",
+                      "value": "tokens"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "name": "sacrifice them"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Salt Road Skirmish",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Destroy",
+                "value": [
+                  "target",
+                  {
+                    "type": "Regenerable"
+                  }
+                ]
+              },
+              {
+                "type": "Create",
+                "value": [
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  },
+                  {
+                    "faces": [
+                      {
+                        "colorIndicator": [
+                          {
+                            "type": "Red"
+                          }
+                        ],
+                        "name": "Warrior Token",
+                        "power": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "toughness": {
+                          "type": "Literal",
+                          "value": 1
+                        },
+                        "typeLine": {
+                          "subtypes": [
+                            {
+                              "type": "Warrior"
+                            }
+                          ],
+                          "types": [
+                            {
+                              "type": "Creature"
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  },
+                  "tokens"
+                ]
+              },
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "Haste"
+                    }
+                  },
+                  "tokens"
+                ]
+              },
+              {
+                "type": "ArmDelayedTrigger",
+                "value": "sacrifice them"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
