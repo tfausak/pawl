@@ -57,9 +57,9 @@ grantsPriority phase = case phase of
 -- the same conjuncts and a drifting second copy is what the CR-citation
 -- discipline exists to prevent: CR 307.1 gates casting a sorcery
 -- (Cast.castableSpells), CR 307.5 gates "Activate only as a sorcery"
--- (Activate.timingOk), and CR 305.1 / 116.2a gate playing a land
--- (Action.legalActions) -- a main phase of the player's own turn with the stack
--- empty, stated three times in the rulebook and once here.
+-- (Activate.timingOk), and CR 305.1 / 116.2a / 505.6b gate playing a land
+-- (Action.legalActions). Every one of them names the same moment: a main phase
+-- of the player's own turn with the stack empty.
 --
 -- Priority is NOT among the conjuncts. Every caller is reached only from
 -- Action.legalActions, which the priority loop asks solely of the player who

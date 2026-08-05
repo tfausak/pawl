@@ -65,8 +65,11 @@ legalActions pid gs =
           -- turn with the number they HAVE already played; the play is legal
           -- only if the first is greater. A comparison of two counts and never
           -- a yes/no, because CR 305.2 lets a continuous effect raise the first
-          -- one (Exploration, Azusa Lost but Seeking). The complement of this
-          -- is CR 305.2b, which forbids the play when they are equal.
+          -- one (Exploration, Azusa Lost but Seeking). Strictly greater is CR
+          -- 305.2b read from the other side: it forbids the play once the
+          -- allowance is EQUAL TO OR LESS THAN the tally, and less than is
+          -- reachable -- Exploration destroyed after the second land leaves an
+          -- allowance of one against a tally of two.
           && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
       lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
       -- CR 709.3: one action per castable HALF, so choosing a half is choosing
