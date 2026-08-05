@@ -281,18 +281,18 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
         Nothing -> pure Nothing
         Just settled -> do
           let dest = ZoneChange.to settled
-              -- CR 110.5b: untapped unless the moving effect said otherwise, and
-              -- meaningful only for a battlefield destination (CR 110.5a).
+              -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
+              -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),
+              -- damage, counters, bindings and the rest all go back to their
+              -- no-memory values there, and Setup's two hand-written moves into
+              -- a library call the same function. What is set back here is only
+              -- what this MOVE decides: the destination, CR 613.7d's moment of
+              -- entry, CR 110.5b's "enters tapped" (meaningful only for a
+              -- battlefield destination, CR 110.5a), and CR 701.3's
+              -- attach-on-entry seed.
               --
-              -- CR 110.2 / 400.7: `enteredUnder` is reset like every other
-              -- per-incarnation field, so the new object enters under its owner's
-              -- control until a CR 616.1b replacement says otherwise --
-              -- Replacement.runEntry is the only writer. `chosenColor`,
-              -- `chosenSubtype` and `chosenNames` are reset for the same reason
-              -- (CR 614.1c).
-              --
-              -- `face` is cleared under CR 400.7 as well, which is right for the
-              -- one layout that ships: whichever half CR 709.3b singled out
+              -- `face` is among what newIncarnation clears, which is right for
+              -- the one layout that ships: whichever half CR 709.3b singled out
               -- belonged only to the incarnation that left, and CR 709.4 gives
               -- the split card its two halves combined everywhere but the stack.
               -- It is NOT right in general -- CR 712.13: "a resolving
@@ -301,7 +301,13 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- stack", so a stack-to-battlefield move must CARRY the face
               -- rather than drop it. Not implemented; no double-faced card is in
               -- the pool to reach it (#657).
-              mkObj ts = obj {Object.zone = dest, Object.tapped = tapped, Object.damage = 0, Object.sickness = Sickness.Sick, Object.bindings = Map.empty, Object.counters = Map.empty, Object.attachedTo = seed, Object.enteredUnder = Nothing, Object.chosenColor = Nothing, Object.chosenSubtype = Nothing, Object.chosenNames = Set.empty, Object.timestamp = ts, Object.face = Nothing, Object.playableFromExileBy = Nothing}
+              mkObj ts =
+                (Object.newIncarnation obj)
+                  { Object.zone = dest,
+                    Object.timestamp = ts,
+                    Object.tapped = tapped,
+                    Object.attachedTo = seed
+                  }
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
