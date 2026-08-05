@@ -13,6 +13,10 @@
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
 --
+-- Exploration and Azusa, Lost but Seeking are the CR 305.2 pair, and they are a
+-- PAIR on purpose: they grant different numbers of extra land plays, which is
+-- what tells a real count apart from a boolean-plus-one.
+--
 -- Null Chamber also brings CR 201.4's card-name choice and CR 614.1c's entry
 -- replacement in with it, so the group covers Pawl.Engine.Replacement's
 -- EntryRewrite.ChooseCardNames arm and Pawl.Engine.Action.playableLands as well.
@@ -20,6 +24,7 @@ module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -41,6 +46,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -1649,6 +1655,47 @@ nullChamberSpec s registry =
             (Object.chosenNames chamber)
             (Set.fromList [S.printingName piker, S.printingName lightningBolt])
 
+-- `active` is the active player in their own precombat main phase with an empty
+-- stack (CR 305.1's window) holding FIVE Mountains, while `grantors` are already
+-- on the battlefield under ALICE's control.
+--
+-- Five is deliberately more than any case below plays. Every "and no more"
+-- assertion is otherwise satisfiable by an empty hand, which is the trap this
+-- whole group is built to avoid: each case checks the leftover hand as well as
+-- the lands that landed.
+--
+-- The grantors go under alice while the HAND is the argument's, so the one case
+-- that makes bob active reads alice's Exploration against bob's land plays --
+-- CR 109.5's You scope with the two players actually pulled apart.
+landDropBoard :: Printing.Printing -> [Printing.Printing] -> PlayerId.PlayerId -> GameState.GameState
+landDropBoard mountain grantors active =
+  let put g printing = snd (S.addCreature printing S.alice g)
+      withGrantors = List.foldl' put (Setup.emptyGame S.bothPlayers) grantors
+      add g _ = snd (S.addHandCard mountain active g)
+      withHand = List.foldl' add withGrantors [1 .. 5 :: Int]
+   in withHand
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = active,
+          GameState.priority = Just active
+        }
+
+-- Take every land play the board allows and stop. S.playLandAnswer plays a land
+-- whenever one is offered and passes otherwise, so the loop halts exactly when
+-- CR 305.2a's comparison refuses -- the whole gate, through the real priority
+-- loop, rather than a direct call to Action.legalActions.
+playEveryLand :: GameState.GameState -> GameState.GameState
+playEveryLand gs = S.runPure S.playLandAnswer gs Engine.priorityLoop
+
+-- alice's next turn, as far as CR 305.2 can see it: her untap step, which is
+-- where Engine.runTurnBasedActions resets the per-turn tally -- "during their
+-- turn" in CR 305.2 has to start over somewhere, and that is the first moment of
+-- the new one.
+nextTurnFor :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+nextTurnFor pid gs =
+  let untap = Phase.Beginning BeginningStep.Untap
+      untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = pid, GameState.phase = untap}) (Engine.runTurnBasedActions untap)
+   in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passes = 0}
+
 -- CR 601.3b / Vedalken Orrery {4} Artifact: "You may cast spells as though they
 -- had flash."
 --
@@ -1731,6 +1778,114 @@ isPlay action = case action of
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
   Action.Type.Pass -> False
+
+-- Exploration {G} Enchantment: "You may play an additional land on each of your
+-- turns." Azusa, Lost but Seeking {2}{G} Legendary Creature -- Human Monk: "You
+-- may play two additional lands on each of your turns."
+--
+-- TWO producers with DIFFERENT numbers, and that is the point of the group
+-- rather than redundancy: one card cannot tell a real count from a
+-- boolean-plus-one, because both readings answer "two". Azusa's three is what
+-- separates them, and the two of them together answer four, which separates a
+-- SUM from a maximum.
+extraLandDropsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+extraLandDropsSpec s registry =
+  Spec.describe s "ExtraLandDrops" $ do
+    -- The control. CR 305.2's "normally one", played through the same loop, so
+    -- every raised number below is measured against a baseline this group
+    -- established rather than an assumed one.
+    Spec.it s "CR 305.2 with no effect a player plays one land and no more" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      let board = landDropBoard mountain [] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is one" (PlayerEffect.landPlaysAllowed S.alice board) 1
+      Spec.assertEqWith s "one Mountain landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 1
+      Spec.assertEqWith s "and FOUR are still in hand -- the gate refused, an empty hand did not" (S.handSize S.alice after) 4
+      Spec.assertEqWith s "no further land play is offered" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- Exploration's one extra. A gate that ignored the effect answers one here.
+    Spec.it s "CR 305.2 Exploration raises the allowance to two" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let board = landDropBoard mountain [exploration] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is two" (PlayerEffect.landPlaysAllowed S.alice board) 2
+      Spec.assertEqWith s "two Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 2
+      Spec.assertEqWith s "three are still in hand" (S.handSize S.alice after) 3
+      Spec.assertEqWith s "and the third is refused" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- THE DISCRIMINATOR between a count and a boolean. A gate written as "one,
+    -- or two if any effect grants extra lands" passes the Exploration case above
+    -- and stops at two here; only a gate that reads Azusa's NUMBER reaches
+    -- three.
+    Spec.it s "CR 305.2 Azusa's two additional lands make three, not two" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
+      let board = landDropBoard mountain [azusa] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is three" (PlayerEffect.landPlaysAllowed S.alice board) 3
+      Spec.assertEqWith s "three Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 3
+      Spec.assertEqWith s "two are still in hand" (S.handSize S.alice after) 2
+      Spec.assertEqWith s "and the fourth is refused" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- CR 305.2 says continuous effects INCREASE the number, so two of them
+    -- compose: one plus one plus two. Nothing here is redundant -- CR 702.18b
+    -- and CR 702.11h make multiple instances redundant for a KEYWORD, and CR
+    -- 305.2 states no such rule. A maximum rather than a sum answers three.
+    Spec.it s "CR 305.2 Exploration and Azusa together add up to four" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
+      let board = landDropBoard mountain [exploration, azusa] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is four" (PlayerEffect.landPlaysAllowed S.alice board) 4
+      Spec.assertEqWith s "four Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 4
+      Spec.assertEqWith s "one is still in hand" (S.handSize S.alice after) 1
+      Spec.assertEqWith s "and the fifth is refused" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- CR 109.5: the You scope. alice's Exploration is alice's, and bob playing
+    -- lands on his own turn is still held to CR 305.2's one.
+    Spec.it s "CR 109.5 one player's Exploration does not raise another's allowance" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let board = landDropBoard mountain [exploration] S.bob
+          after = playEveryLand board
+      Spec.assertEqWith s "alice's allowance is two" (PlayerEffect.landPlaysAllowed S.alice board) 2
+      Spec.assertEqWith s "bob's is still one" (PlayerEffect.landPlaysAllowed S.bob board) 1
+      Spec.assertEqWith s "one Mountain landed for bob" (S.countOnBattlefieldByName (S.printingName mountain) S.bob after) 1
+      Spec.assertEqWith s "four are still in his hand" (S.handSize S.bob after) 4
+      Spec.assertEqWith s "and his second is refused" (filter isPlay (Action.legalActions S.bob after)) []
+
+    -- CR 305.2's allowance is PER TURN, and the raised one refills like the
+    -- normal one: CR 703.4c's untap step clears the tally, and the next turn
+    -- gets two again rather than nothing or a running total.
+    Spec.it s "CR 305.2 the raised allowance refills each turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let firstTurn = playEveryLand (landDropBoard mountain [exploration] S.alice)
+          untapped = nextTurnFor S.alice firstTurn
+          secondTurn = playEveryLand untapped
+      Spec.assertEqWith s "two played on the first turn" (GameState.landsPlayed firstTurn) (Map.singleton S.alice 2)
+      Spec.assertEqWith s "the untap step clears the tally" (GameState.landsPlayed untapped) Map.empty
+      Spec.assertEqWith s "two more on the second turn" (GameState.landsPlayed secondTurn) (Map.singleton S.alice 2)
+      Spec.assertEqWith s "four Mountains in play" (S.countOnBattlefieldByName (S.printingName mountain) S.alice secondTurn) 4
+      Spec.assertEqWith s "and the fifth is still in hand, refused" (S.handSize S.alice secondTurn) 1
+
+    -- CR 604.2: the grant is re-read from the battlefield on every look, so
+    -- destroying Exploration between the second land and the third takes the
+    -- extra play back. The already-played tally is untouched by that, which is
+    -- CR 305.2b's comparison landing on "equal" and refusing.
+    Spec.it s "CR 604.2 destroying Exploration mid-turn drops the allowance back to one" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let (explorationId, board) = S.addCreature exploration S.alice (Setup.emptyGame S.bothPlayers)
+          add g _ = snd (S.addHandCard mountain S.alice g)
+          withHand = List.foldl' add board [1 .. 5 :: Int]
+          ready = withHand {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+          gone = S.runPure S.identityAnswer (playEveryLand ready) (Event.destroy Regenerability.Regenerable [explorationId])
+      Spec.assertEqWith s "two lands were played while it stood" (GameState.landsPlayed gone) (Map.singleton S.alice 2)
+      Spec.assertEqWith s "the allowance is back to one" (PlayerEffect.landPlaysAllowed S.alice gone) 1
+      Spec.assertEqWith s "and CR 305.2b refuses a third" (filter isPlay (Action.legalActions S.alice gone)) []
 
 vedalkenOrrerySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vedalkenOrrerySpec s registry =
@@ -1872,5 +2027,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   reliquaryTowerSpec s registry
   storedSpec s registry
   silenceSpec s registry
+  extraLandDropsSpec s registry
   matchesSpellSpec s registry
   vedalkenOrrerySpec s registry

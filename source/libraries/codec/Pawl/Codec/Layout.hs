@@ -10,9 +10,14 @@ toJson l = Common.nullary $ case l of
   Layout.Normal -> "Normal"
   Layout.Split -> "Split"
   Layout.Adventure -> "Adventure"
+  Layout.Transforming -> "Transforming"
 
 fromJson :: Value.Value -> Either Text.Text Layout.Layout
 fromJson =
   Common.decodeNullary
     "Layout"
-    [("Normal", Layout.Normal), ("Split", Layout.Split), ("Adventure", Layout.Adventure)]
+    [ ("Normal", Layout.Normal),
+      ("Split", Layout.Split),
+      ("Adventure", Layout.Adventure),
+      ("Transforming", Layout.Transforming)
+    ]

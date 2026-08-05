@@ -165,3 +165,17 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SpellOrAbilityCounters PlayerRelation.Opponent)
       """ {"type":"SpellOrAbilityCounters","value":{"type":"Opponent"}} """
+  -- CR 615.13's prevention trigger. Both relations, for the same reason.
+  Spec.it s "DamageToPlayerPrevented round-trips both relations" $ do
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.DamageToPlayerPrevented PlayerRelation.You)
+      """ {"type":"DamageToPlayerPrevented","value":{"type":"You"}} """
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.DamageToPlayerPrevented PlayerRelation.Opponent)
+      """ {"type":"DamageToPlayerPrevented","value":{"type":"Opponent"}} """

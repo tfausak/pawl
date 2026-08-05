@@ -23,6 +23,24 @@ data Layout
     -- fixed positions (CR 715.2's inset frame on the left, the card's own on the
     -- right) rather than names, so the order Pawl.Types.Card.faces already
     -- carries is what says which is which -- the same positional reading CR
-    -- 712.8a's front face will take.
+    -- 712.8a's front face takes below.
     Adventure
+  | -- | CR 712.2: a NONMODAL double-faced card -- one Magic card face on each
+    -- side, with an ability on one or both faces that turns the card over. The
+    -- constructor keeps the name CR 712.1 records as the older one for the same
+    -- kind of card ("previously called 'transforming double-faced cards'"),
+    -- since turning over is exactly what separates it from CR 712.3's modal kind
+    -- here: CR 712.11b lets a player choose which face of a MODAL card they cast,
+    -- where CR 712.11 casts this one with its front face up and nothing else.
+    --
+    -- FIRST face front, the rest back -- the positional reading Adventure above
+    -- already takes. CR 712.2a/712.2b give the two faces printed SYMBOLS rather
+    -- than an order, so Pawl.Types.Card.faces' printed order is what stands in
+    -- for them, and CR 712.8a/712.8d is what makes the front face the one
+    -- Pawl.Engine.Card.combined answers with.
+    --
+    -- The other two kinds of double-faced card CR 712.1 lists have no constructor
+    -- here: modal double-faced cards (CR 712.3, #697) and meld cards (CR 712.4,
+    -- #369).
+    Transforming
   deriving (Eq, Ord, Show)

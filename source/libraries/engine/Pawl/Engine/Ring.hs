@@ -178,7 +178,7 @@ tempt pid = do
           -- FILTERED, NOT TRUSTED, the ChooseAttachment posture: an answer naming
           -- something never offered falls back to the first candidate, since the
           -- action is mandatory and must designate someone.
-          answer <- Game.ask (Prompt.ChooseRingBearer (Decide.deciderFor pid gs1) pid offered)
+          answer <- Game.choose (Prompt.ChooseRingBearer (Decide.deciderFor pid gs1) pid offered)
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
       designate pid chosen
   -- CR 701.54d: the temptation itself, which is what a count of temptations

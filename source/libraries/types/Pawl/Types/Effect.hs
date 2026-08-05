@@ -322,6 +322,23 @@ data Effect card
     -- CR 615.7's shield is spent in damage, not in applications, so Resolve
     -- installs it Unlimited.
     PreventNextDamage Duration.Duration ObjectRef.ObjectRef Quantity.Quantity
+  | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the recipients
+    -- an ObjectRef names, for a duration -- Selfless Squire's "prevent all damage
+    -- that would be dealt to you this turn".
+    --
+    -- PreventNextDamage above with the Quantity removed, and the missing field is
+    -- the whole difference: CR 615.7's shield is spent in damage and ends when it
+    -- reaches 0, while this one has no amount to spend and ends only when its
+    -- duration does (CR 615.3's other terminator). That is why it installs a
+    -- DamageRewrite.PreventAll rather than a PreventNext of some large number:
+    -- there is no number, and a shield that counted down would be a different
+    -- card.
+    --
+    -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason: the
+    -- pattern must name the shielded permanent or player, which card data cannot
+    -- write. Fog IS such a Replace precisely because it shields nobody in
+    -- particular.
+    PreventAllDamage Duration.Duration ObjectRef.ObjectRef
   | -- | CR 701.6/701.6a: counter the slot's target via the Event.counter funnel.
     -- ONE opcode for both of that rule's subjects -- Cancel's slot is a
     -- Pool.Spells one and Stifle's a Pool.Abilities one -- because which ending
@@ -363,6 +380,26 @@ data Effect card
     -- Assault's sweeps are `EachMatching`. ObjectRef for Destroy's reason -- one
     -- opcode rather than a sibling UntapAll to keep in step with it.
     Untap ObjectRef.ObjectRef
+  | -- | CR 701.27a: turn the permanents the ObjectRef names over, so that each
+    -- shows its other face. Thraben Gargoyle's "{6}: Transform this creature" is
+    -- `InSlot` the ability's own source; Moonmist's "transform all Humans" is
+    -- `EachMatching`, which is why this takes Destroy's ObjectRef rather than a
+    -- bare slot.
+    --
+    -- A one-shot under CR 608.2c: what it writes is which face the permanent
+    -- shows (Object.face), and every characteristic read already goes through
+    -- that (Pawl.Engine.Game.faceOf), so nothing is stored and no duration is
+    -- owed. The gates on whether anything happens at all -- CR 701.27c's card
+    -- that is not double-faced, CR 701.27d's instant or sorcery face -- are read
+    -- off the card's LAYOUT by Pawl.Engine.Card.turnedOver, never off which card
+    -- it is.
+    --
+    -- CR 701.28's convert is a SEPARATE keyword action that turns a permanent
+    -- over by the same subrules -- CR 701.28a: "This follows rules 701.27a-f,
+    -- 712.9-10, and 712.18. Those rules apply to converting a permanent just as
+    -- they apply to transforming a permanent." So this opcode is the transform
+    -- WORDING only, and a card printing "convert" needs its own (#698).
+    Transform ObjectRef.ObjectRef
   | -- | CR 506.4: an effect that specifically removes a permanent from combat --
     -- the rule's one clause a card ASKS for rather than a condition the engine has
     -- to notice, which is why it is an opcode and not a sampler like

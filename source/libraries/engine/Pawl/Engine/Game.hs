@@ -35,7 +35,8 @@ import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
 
 -- Ask a player a question and wait for the answer. The ONE way the engine
--- suspends: every prompt in the codebase goes through here.
+-- suspends: every prompt in the codebase goes through here, including the ones
+-- that come by way of 'choose' below.
 --
 -- What it adds over lifting Program.prompt directly is the game the question
 -- came from (#153). StateT sits outside the Program, so the interpreter cannot
@@ -74,6 +75,33 @@ freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
 freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
+
+-- Ask a player something they could have answered more than one way, and record
+-- that they were asked (GameState.lastChoice). CR 104.4b's second sentence --
+-- "loops that contain an optional action don't result in a draw" -- is why this
+-- is a funnel rather than a note at each prompt site: being asked this is the
+-- engine's whole definition of an optional action, and a new prompt site that
+-- forgot to say so would make a loop containing it look mandatory.
+--
+-- FOUR prompts deliberately do not come through here, and are asked with a bare
+-- 'ask' instead:
+--
+--   * Prompt.Concede, because CR 104.3a lets a player concede at any time, in a
+--     loop or out of one. If conceding counted, no loop would ever be mandatory
+--     and Pawl.Engine.Engine.checkMandatoryLoop could never fire.
+--   * Prompt.ChooseAction when Pass is the only legal action -- passing is not a
+--     decision. Engine.priorityLoop makes that call, being the only caller that
+--     knows the menu.
+--   * Prompt.Shuffle and Prompt.RandomFirstPlayer, which ask for RANDOMNESS
+--     rather than for a choice (CR 701.24, CR 729.2). A loop that reshuffles a
+--     library every cycle is still a loop of mandatory actions.
+--
+-- Every other prompt site already elides its prompt when the answer is forced,
+-- so only the branch that genuinely asks reaches this.
+choose :: Prompt.Prompt a -> Game a
+choose p = do
+  State.modify' (\gs -> gs {GameState.lastChoice = GameState.nextTimestamp gs})
+  ask p
 
 -- CR 400.2: a property of the ZONE and never of the card -- a hand every one of
 -- whose cards is currently revealed is still a hidden zone.
@@ -231,10 +259,10 @@ resolveFace mName card = case mName of
   -- A name that does not resolve falls back to the combined view rather than
   -- failing. Pawl.CardSpec's "a card's face names are pairwise distinct" corpus
   -- lint holds that of every loadable card, which is what makes faceNamed's
-  -- answer unique whenever the name IS one of the card's own faces, and the
-  -- only writer of this field (Cast.asProposed) stores a name its callers read
-  -- from that same card's faces -- so this arm has no case that reaches it,
-  -- short of a bug in that writer.
+  -- answer unique whenever the name IS one of the card's own faces, and both
+  -- writers of this field (Cast.asProposed and Resolve's CR 701.27a Transform
+  -- arm) store a name they read from that same card's faces -- so this arm has
+  -- no case that reaches it, short of a bug in one of them.
   Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
 
 -- The face of the card an object is showing. Nothing when the id is unknown or
@@ -245,6 +273,21 @@ faceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceOf oid gs = do
   card <- cardOf oid gs
   Just (resolveFace (lookupObject oid gs >>= Object.face) card)
+
+-- `faceOf`, narrowed to the one characteristic that is not always read off the
+-- live face: CR 712.8e calculates a nonmodal double-faced permanent's mana value
+-- from its FRONT face's mana cost even while its back face is up. Every mana
+-- value read goes through here rather than through faceOf, and
+-- Pawl.Engine.Card.manaCostFace is where the layout decides.
+--
+-- Its own function rather than a flag on faceOf, because the two answers differ
+-- for exactly one object -- a transformed permanent -- and every OTHER
+-- characteristic of that permanent is its back face's (CR 712.8e's first
+-- sentence). Collapsing them either way is a silent wrong answer.
+manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
+manaCostFaceOf oid gs = do
+  card <- cardOf oid gs
+  Just (Card.manaCostFace card (resolveFace (lookupObject oid gs >>= Object.face) card))
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
 -- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the

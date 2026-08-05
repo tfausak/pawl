@@ -579,7 +579,7 @@ castWhileSearching pid = do
     [] -> pure ()
     options -> do
       let decider = Decide.deciderFor pid gs
-      choice <- Game.ask (Prompt.CastWhileSearching decider pid options)
+      choice <- Game.choose (Prompt.CastWhileSearching decider pid options)
       case choice of
         Nothing -> pure ()
         Just oid ->
@@ -696,7 +696,7 @@ castProposed pid sid face castFrom candidates before = do
   entwined <- case entwineOffer pid sid candidates gs of
     Nothing -> pure Nothing
     Just extra -> do
-      decision <- Game.ask (Prompt.ChooseEntwine decider pid sid extra)
+      decision <- Game.choose (Prompt.ChooseEntwine decider pid sid extra)
       pure $ case decision of
         EntwineDecision.Entwines -> Just extra
         EntwineDecision.Declines -> Nothing
@@ -723,7 +723,7 @@ castProposed pid sid face castFrom candidates before = do
   chosenModes <-
     if Natural.length legal <= count
       then pure legal
-      else Game.ask (Prompt.ChooseModes decider pid sid legal count)
+      else Game.choose (Prompt.ChooseModes decider pid sid legal count)
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes rewinds the whole cast, guarding every step below.
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
@@ -746,7 +746,7 @@ castProposed pid sid face castFrom candidates before = do
         else do
           chosenCost <- case payable of
             [only] -> pure only
-            _ -> Game.ask (Prompt.ChooseCost decider pid sid payable)
+            _ -> Game.choose (Prompt.ChooseCost decider pid sid payable)
           if notElem chosenCost payable
             then reject
             else do
@@ -757,7 +757,7 @@ castProposed pid sid face castFrom candidates before = do
               -- unaffordable announcement still reverses the whole cast (#417).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Game.ask (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost)))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost)))
                   else pure Nothing
               -- CR 601.2: a step the player cannot comply with makes the casting
               -- illegal and returns the game to before it was proposed. The X just
@@ -803,7 +803,7 @@ castProposed pid sid face castFrom candidates before = do
                   chosen <-
                     if Map.null sets
                       then pure Map.empty
-                      else Game.ask (Prompt.ChooseTargets decider pid sid sets)
+                      else Game.choose (Prompt.ChooseTargets decider pid sid sets)
                   let keysAgree = Map.keysSet chosen == Map.keysSet sets
                       eachLegal = and (Map.intersectionWith Set.member chosen sets)
                   if not (keysAgree && eachLegal)

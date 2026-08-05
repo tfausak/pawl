@@ -495,7 +495,7 @@ payComponent pid oid component = case component of
     chosen <-
       if Natural.length candidates <= n
         then pure (Set.fromList candidates)
-        else Game.ask (Prompt.ChooseSacrifices decider pid oid candidates n)
+        else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
@@ -527,7 +527,7 @@ payComponent pid oid component = case component of
     chosen <-
       if Natural.length held <= n
         then pure held
-        else Game.ask (Prompt.ChooseDiscard decider pid held n)
+        else Game.choose (Prompt.ChooseDiscard decider pid held n)
     let distinct = List.nub chosen
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do

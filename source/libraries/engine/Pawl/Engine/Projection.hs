@@ -521,8 +521,10 @@ viewOfCharacteristics oid pc controller gs =
       -- face (its effect-defined card) with no mana cost, so CR 202.3a gives it
       -- 0 through the same path a card takes. Nothing only for an object with no
       -- card at all -- an ability on the stack, whose CR 202.3a zero this does
-      -- not claim (#674).
-      Filter.manaValue = fmap Quantity.manaValueOf (Game.faceOf oid gs),
+      -- not claim (#674). CR 712.8e is why the face comes from
+      -- Game.manaCostFaceOf rather than Game.faceOf: a transformed permanent's
+      -- mana value is its FRONT face's, where everything else here is its back's.
+      Filter.manaValue = fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs),
       Filter.controller = controller,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
@@ -1018,11 +1020,13 @@ rewriteEffect pairs effect = case effect of
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   Effect.PreventNextDamage {} -> effect
+  Effect.PreventAllDamage {} -> effect
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
   Effect.GainPlayerCounters {} -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
+  Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
   Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger {} -> effect
@@ -1159,6 +1163,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfDies -> condition
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
+  TriggerCondition.DamageToPlayerPrevented _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the two customers a
 -- printed triggered ability has: a CR 603.8 state trigger and a CR 603.4
@@ -2323,12 +2328,12 @@ controlOverrides gs =
 -- entered under (CR 110.2), and a card that has no controller at all uses its
 -- owner (CR 108.4a).
 --
--- Object.enteredUnder is written only by Replacement's CR 616.1b rewrite and is
--- Nothing on every other object, so for the whole pool bar Gather Specimens'
--- victims this is the owner it always was.
+-- Object.enteredUnder is written only for a BATTLEFIELD entry, and only by the
+-- two writers CR 110.2a names (see Pawl.Types.Object), so it is Nothing on every
+-- card outside the battlefield and this is the owner CR 108.4a asks for.
 --
--- On the hot path (#582): controllerOfGiven runs once per battlefield object
--- inside `controls`, which the SBA sweep calls at every priority boundary. The one
+-- On the hot path: controllerOfGiven runs once per battlefield object inside
+-- `controls`, which the SBA sweep calls at every priority boundary. The one
 -- Maybe match measured inside the benchmark suite's run-to-run stddev.
 defaultControllerOf :: Object.Object -> PlayerId.PlayerId
 defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)

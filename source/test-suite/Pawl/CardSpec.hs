@@ -413,6 +413,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
   -- exactly as the discard condition above.
   TriggerCondition.SpellOrAbilityCounters _ -> []
+  -- CR 615.13's prevention condition is a PlayerRelation too.
+  TriggerCondition.DamageToPlayerPrevented _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -446,12 +448,14 @@ effectCounts effect = case effect of
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration _ quantity -> durationCounts duration <> quantityCounts quantity
+  Effect.PreventAllDamage duration _ -> durationCounts duration
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Transform _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
@@ -640,12 +644,14 @@ effectReplacements effect = case effect of
   Effect.GainLife _ _ -> []
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage {} -> []
+  Effect.PreventAllDamage {} -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Transform _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl _ _ -> []
   Effect.ArmDelayedTrigger {} -> []
@@ -703,10 +709,10 @@ phasePatternOffends replacement = case replacement of
 
 -- The third baked field the codec accepts and no card may author, and the third
 -- for the same reason phasePatternOffends gives: a card cannot name an ObjectId
--- or a PlayerId, so CR 615.7's shielded recipient is Resolve's
--- PreventNextDamage arm to write. CR 615.7's remaining amount rides the same
--- carrier and is equally engine-only, so both halves of a shield are checked
--- here at once.
+-- or a PlayerId, so the recipient a shield covers -- CR 615.7's, and CR 615.3's
+-- unbounded one -- is for Resolve's prevention arms to write. CR 615.7's
+-- remaining amount rides the same carrier and is equally engine-only, so both
+-- halves of a shield are checked here at once.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
 damagePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
@@ -1003,7 +1009,8 @@ reservedSlots =
       Binding.triggerSource,
       Binding.you,
       Binding.triggerPlayer,
-      Binding.became
+      Binding.became,
+      Binding.preventedAmount
     ]
 
 -- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
@@ -1268,6 +1275,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
+  TriggerCondition.DamageToPlayerPrevented _ -> []
 
 -- CR 613.11: which spells a player effect names -- a cost modifier's (CR
 -- 601.2f) or a timing permission's (CR 601.3b).
@@ -1281,6 +1289,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- the source entered, which is not a Filter and is not written by the card.
   PlayerEffect.CantCastChosenName -> []
   PlayerEffect.CantPlayLandChosenName -> []
+  -- CR 305.2 carries a bare count of extra land plays, not a Filter: it names
+  -- how many lands, never which spells.
+  PlayerEffect.PlayAdditionalLands _ -> []
   PlayerEffect.NoMaximumHandSize -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.
@@ -1384,12 +1395,14 @@ effectFilters effect = case effect of
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
+  Effect.PreventAllDamage duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.Tap ref -> unframed (objectRefFilters ref)
   Effect.Untap ref -> unframed (objectRefFilters ref)
+  Effect.Transform ref -> unframed (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.GainControl duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))

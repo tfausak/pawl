@@ -53,16 +53,20 @@ grantsPriority phase = case phase of
   Phase.Ending EndingStep.Cleanup -> False
   _ -> True
 
--- CR 307.5: the "as a sorcery" window. ONE predicate, because two rules need
+-- CR 307.5: the "as a sorcery" window. ONE predicate, because three rules need
 -- the same conjuncts and a drifting second copy is what the CR-citation
 -- discipline exists to prevent: CR 307.1 gates casting a sorcery
--- (Cast.castableSpells) and CR 307.5 gates "Activate only as a sorcery"
--- (Activate.timingOk).
+-- (Cast.castableSpells), CR 307.5 gates "Activate only as a sorcery"
+-- (Activate.timingOk), and CR 305.1 / 116.2a / 505.6b gate playing a land
+-- (Action.legalActions). Every one of them names the same moment: a main phase
+-- of the player's own turn with the stack empty.
 --
--- Priority is NOT among the conjuncts. Both callers are reached only from
+-- Priority is NOT among the conjuncts. Every caller is reached only from
 -- Action.legalActions, which the priority loop asks solely of the player who
 -- holds it. Nothing else belongs either: CR 307.5's last sentence means no
--- prohibition (Rule of Law, Silence) may be consulted here.
+-- prohibition (Rule of Law, Silence) may be consulted here, and CR 305.2's land
+-- allowance is the land caller's business rather than this window's -- a tally
+-- of what has already happened this turn, not a description of the moment.
 sorcerySpeedWindow :: PlayerId -> GameState -> Bool
 sorcerySpeedWindow pid gs =
   isMainPhase (GameState.phase gs)

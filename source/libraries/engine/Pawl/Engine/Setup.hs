@@ -90,8 +90,9 @@ emptyGame order =
           GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 0,
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
+          GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
-          GameState.landPlayed = mempty,
+          GameState.landsPlayed = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
@@ -122,6 +123,7 @@ createCard pid printing = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing
           }
@@ -263,8 +265,13 @@ restartGame perform starter = do
             -- Engine.priorityLoop and Engine.runStep read this and unwind to
             -- the rebuilt turn 1 rather than granting priority.
             GameState.restartSignal = RestartSignal.Restarted,
+            -- CR 104.4b: CR 727.1 ends the game that was being played, so the
+            -- rebuilt one starts owing nobody a choice. The timestamp supply is
+            -- preserved across the restart, so this is the supply's current
+            -- value and not zero.
+            GameState.lastChoice = GameState.nextTimestamp gs,
             GameState.drewFromEmpty = mempty,
-            GameState.landPlayed = mempty,
+            GameState.landsPlayed = mempty,
             GameState.pendingControl = Map.empty,
             GameState.activeControl = Nothing,
             GameState.monarch = Nothing,
@@ -341,8 +348,13 @@ subgameStateFrom starter parent =
           GameState.turnNumber = 1,
           GameState.result = Nothing,
           GameState.restartSignal = RestartSignal.Playing,
+          -- CR 104.4b: the subgame is its own game, so it starts owing nobody a
+          -- choice. Set to the INHERITED nextTimestamp rather than to zero,
+          -- which the timestamp supply is not: a copied parent marker would
+          -- have the subgame draw itself on entry for events at another level.
+          GameState.lastChoice = GameState.nextTimestamp parent,
           GameState.drewFromEmpty = mempty,
-          GameState.landPlayed = mempty,
+          GameState.landsPlayed = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
@@ -418,5 +430,10 @@ funnelBack finalSub parent =
         { GameState.objects = Map.union allReturned keptParentObjects,
           GameState.library = Map.fromList (fmap (\pid -> (pid, libraryOf pid)) (GameState.turnOrder parent)),
           GameState.nextObjectId = max (GameState.nextObjectId parent) (GameState.nextObjectId finalSub),
-          GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub)
+          GameState.nextTimestamp = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub),
+          -- CR 104.4b: the subgame's events are not a stretch during which the
+          -- parent's players could not act -- they were playing the subgame.
+          -- Cleared to the merged supply so the main game resumes owing nobody a
+          -- choice, rather than inheriting a gap the subgame ran up.
+          GameState.lastChoice = max (GameState.nextTimestamp parent) (GameState.nextTimestamp finalSub)
         }

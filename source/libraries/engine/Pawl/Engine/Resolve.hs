@@ -89,10 +89,12 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotName (SlotName)
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -164,11 +166,14 @@ slotsOf effect = case effect of
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
   Effect.PreventNextDamage duration ref quantity ->
     Set.unions [durationSlots duration, objectRefSlots ref, Quantity.slots quantity]
+  -- The same two reads, minus the shield size this opcode does not carry.
+  Effect.PreventAllDamage duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
+  Effect.Transform ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ ref -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Set.empty
@@ -252,11 +257,13 @@ readsX = any effectReadsX
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PreventAllDamage {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
       Effect.Tap _ -> False
       Effect.Untap _ -> False
+      Effect.Transform _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger {} -> False
@@ -300,11 +307,13 @@ searchesLibrary effect = case effect of
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   Effect.PreventNextDamage {} -> False
+  Effect.PreventAllDamage {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
+  Effect.Transform _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger {} -> False
@@ -580,7 +589,7 @@ exercises resolving controller idx mode = case Mode.optionality mode of
   Optionality.Optional -> do
     gs <- State.get
     let decider = Decide.deciderFor controller gs
-    decision <- Game.ask (Prompt.ChooseOptional decider controller resolving idx)
+    decision <- Game.choose (Prompt.ChooseOptional decider controller resolving idx)
     pure $ case decision of
       OptionalDecision.Exercises -> True
       OptionalDecision.Declines -> False
@@ -642,7 +651,7 @@ paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
         if not (Cost.canPay payer source cost gs)
           then pure False
           else do
-            decision <- Game.ask (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cost)
+            decision <- Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cost)
             case decision of
               PaymentDecision.Declines -> pure False
               PaymentDecision.Pays -> do
@@ -679,6 +688,88 @@ resolveAbility abilId srcId ability = do
     Just obj ->
       let chosen = Binding.modesOf (Object.bindings obj)
        in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
+
+-- CR 701.27a over ONE object: turn it over, or leave the map exactly as it was.
+-- The Transform arm of applyEffectWith folds this over its victims.
+--
+-- Two ways nothing happens, and neither is an error:
+--
+--   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
+--     PERMANENT, which is what CR 110.1 makes an object on the battlefield, so a
+--     slot naming a card in another zone turns nothing over. Belt and braces
+--     against the common case, where CR 400.7 has already minted a fresh id for
+--     the card that left and this id names nothing at all.
+--   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
+--     CR 701.27d's instant or sorcery face.
+--   * CR 701.27f's already-turned gate, alreadyTurnedFor below.
+--
+-- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
+-- "When a double-faced permanent transforms or converts, it doesn't become a new
+-- object. Any effects that applied to that permanent will continue to apply to
+-- it." So no id is minted, no timestamp is reissued, and damage, counters and
+-- attachments ride through untouched -- the rule's own Example is a +2/+2 that
+-- survives the turn. CR 400.7 is the negative half of the same claim: this is not
+-- a zone change, so nothing mints an incarnation.
+--
+-- Reads the object's OWN card (Game.cardOf), never a projected one, which is the
+-- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
+-- being a one-faced card whatever it copied, and that is the same read.
+--
+-- `now` is minted ONCE for the whole instruction by the caller rather than per
+-- victim, because CR 608.2f processes a swept set simultaneously: two Humans
+-- transformed by one Moonmist turned over at the same moment, and a later CR
+-- 701.27f comparison must not be able to tell them apart.
+turnOver :: ObjectId -> Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+turnOver resolving now gs oid objects
+  | not (Set.member oid (GameState.battlefield gs)) = objects
+  | alreadyTurnedFor resolving oid gs = objects
+  | otherwise = case (Map.lookup oid objects, Game.cardOf oid gs) of
+      (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
+        Nothing -> objects
+        Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
+      _ -> objects
+
+-- CR 701.27f, first sentence: "If an activated or triggered ability of a
+-- permanent that isn't a delayed triggered ability of that permanent tries to
+-- transform it, the permanent does so only if it hasn't transformed or converted
+-- since the ability was put onto the stack. ... if the permanent has already
+-- transformed or converted, an instruction to do either is ignored."
+--
+-- True when this resolution must be ignored. Two conditions, and BOTH narrow:
+--
+--   * the resolving object is an ability whose SOURCE is the very permanent
+--     being turned over (CR 113.7a). A spell is not one -- Moonmist transforms a
+--     permanent that already transformed this turn, because the rule names only
+--     abilities -- and neither is an ability of some OTHER permanent, because the
+--     rule says such an ability "tries to transform IT".
+--   * the permanent's last turn is later than the moment the ability was put
+--     onto the stack, which is that ability object's own CR 613.7d timestamp.
+--     Both come from GameState.nextTimestamp, so one `>` decides it and equality
+--     cannot arise -- a fresh stamp is never reissued.
+--
+-- The rule's SECOND sentence measures a delayed triggered ability from when it
+-- was CREATED rather than from when it reached the stack, and that half is not
+-- implemented: a fired delayed ability arrives as the same Source.OfTrigger an
+-- ordinary one does (Engine.placeBorne), and Pawl.Types.DelayedTrigger records
+-- no creation moment to compare against, so this measures it from the stack like
+-- any other trigger (#694).
+alreadyTurnedFor :: ObjectId -> ObjectId -> GameState -> Bool
+alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
+  Nothing -> False
+  Just ability ->
+    abilityOf (Object.source ability)
+      && maybe False (> Object.timestamp ability) (Game.lookupObject victim gs >>= Object.turnedOverAt)
+  where
+    -- A CLASSIFICATION of the resolving object -- which kind of object it is,
+    -- never which card it is. CR 725.2's sourceless inherent trigger has no
+    -- permanent to be an ability OF, so it falls out with the spells.
+    abilityOf source = case source of
+      Source.OfAbility srcId _ -> srcId == victim
+      Source.OfTrigger srcId _ -> srcId == victim
+      Source.OfCard _ -> False
+      Source.OfToken _ -> False
+      Source.OfEmblem _ -> False
+      Source.OfInherentTrigger _ _ -> False
 
 -- CR 701.3a/701.3b: may `src` legally be attached to `destination` right now?
 --
@@ -851,6 +942,66 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
     _ -> []
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen controller source gs ref)
 
+-- CR 615.3: install one floating prevention shield over `recipient`, for a
+-- duration. The shared body of Effect.PreventNextDamage's and
+-- Effect.PreventAllDamage's arms, which differ only in the DamageRewrite they
+-- hand it -- CR 615.7's countdown or CR 615.1's unbounded one.
+--
+-- The row's other fields are Replace's: CR 113.7's source, CR 109.5's controller
+-- baked at installation, and a fresh timestamp for its CR 614.5 identity.
+--
+-- One shield PER RECIPIENT, which is why both arms fold this over the set their
+-- ObjectRef names rather than installing a single row: CR 615.11 says an effect
+-- covering several recipients "creates a prevention shield for each applicable
+-- creature when the spell or ability that generates that effect resolves". Every
+-- producer in the pool names exactly one, so the fold is over a singleton today.
+--
+-- Not implemented: CR 615.5's additional effect. The row carries a
+-- ReplacementEffect and no payload, so a prevention that also does something --
+-- Test of Faith's "for each 1 damage prevented this way, put a +1/+1 counter on
+-- that creature" -- cannot be written (#689).
+installShield :: PlayerId -> ObjectId -> Duration.Duration -> DamageRewrite.DamageRewrite -> GameState -> Recipient -> GameState
+installShield controller source duration rewrite g recipient = case Expiry.arm controller source duration g of
+  -- CR 611.2b: the duration never started, so no shield is installed.
+  Nothing -> g
+  Just expiry ->
+    let (ts, g1) = Game.freshTimestamp g
+        active =
+          ActiveReplacement.MkActiveReplacement
+            { ActiveReplacement.effect =
+                ReplacementEffect.DamageR
+                  DamagePattern.MkDamagePattern
+                    { -- Both producers say "damage that would be dealt", naming
+                      -- no kind, so the shield takes combat and noncombat alike.
+                      DamagePattern.whichKind = Nothing,
+                      -- Nor does either name a source, which is CR 615.7's own
+                      -- "the number of events or sources dealing it doesn't
+                      -- matter". CR 615.9's shields against a source of a chosen
+                      -- quality are a different rule, and have no producer
+                      -- (#588).
+                      DamagePattern.whichSource = SourceRelation.AnySource,
+                      DamagePattern.whichRecipient = Just recipient
+                    }
+                  rewrite,
+              ActiveReplacement.source = source,
+              -- CR 109.5, baked as Replace's is: nothing reads it on a shield
+              -- today (the pattern names its recipient outright and has no
+              -- ControllerRelation to resolve), but the row cannot be built
+              -- without one.
+              ActiveReplacement.controller = controller,
+              ActiveReplacement.timestamp = ts,
+              ActiveReplacement.expiry = expiry,
+              -- CR 615.7's shield is spent in DAMAGE, not in applications, so
+              -- the use count is not what ends it (see Pawl.Types.Uses); a
+              -- PreventAll shield has nothing to spend at all.
+              ActiveReplacement.uses = Uses.Unlimited,
+              -- CR 614.15: a prevention shield replaces damage from any source,
+              -- including one this resolution is not itself dealing, so it is
+              -- not a self-replacement.
+              ActiveReplacement.origin = ReplacementOrigin.Other
+            }
+     in g1 {GameState.replacements = active : GameState.replacements g1}
+
 -- One effect, applied. The case on the constructor is this module's charter.
 -- `runSubgame` is the injected nested-game runner; only the PlaySubgame arm
 -- consults it, and the bare applyEffect below passes noSubgame.
@@ -991,7 +1142,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             question = case family of
               SubtypeFamily.BasicLandType -> Prompt.ChooseLandTypeSwap decider controller resolving slot forbidden
               SubtypeFamily.CreatureType -> Prompt.ChooseCreatureTypeSwap decider controller resolving slot forbidden
-        (from, to) <- Game.ask question
+        (from, to) <- Game.choose question
         State.modify' $ \gs ->
           -- CR 611.2a: the opcode states no duration, so the effect "lasts
           -- until the end of the game" -- Duration.Indefinite, armed through
@@ -1041,7 +1192,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
               decider = Decide.deciderFor controller gs
-          answer <- Game.ask (Prompt.SearchLibrary decider controller matches)
+          answer <- Game.choose (Prompt.SearchLibrary decider controller matches)
           -- CR 701.23a: the card found is one the search's own filter admits.
           -- Filtered, not trusted (#222): naming a card the filter excluded, or one
           -- that is not in the library at all, finds nothing rather than fetching
@@ -1208,8 +1359,32 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- (CR 400.3 for a library, graveyard or hand destination).
         -- CR 110.5b: the funnel is handed the riders' tap state, so a permanent
         -- an effect says enters tapped is never untapped for an instant.
+        --
+        -- CR 110.2a: "If an effect instructs a player to put an object onto the
+        -- battlefield, that object enters the battlefield under THAT PLAYER's
+        -- control unless the effect states otherwise." This effect is exactly
+        -- such an instruction, so its controller (CR 109.5) is who the permanent
+        -- enters under -- Meandering Towershell's "return it to the battlefield
+        -- under your control" is that rule restated on the card rather than an
+        -- exception to it. Handed to the FUNNEL, not applied after it returns,
+        -- for the reason the tap state is: control is settled on the entering
+        -- incarnation before CR 614.1c's entry loop and the Moved snapshot can
+        -- read it, so a CR 616.1b entry replacement that filters on control
+        -- (Gather Specimens' "under an opponent's control") sees the controller
+        -- the permanent actually enters under. No card in the pool observes that
+        -- ordering -- Gather Specimens' row is Uses.Unlimited, so applying it to
+        -- a creature already entering under its own controller changes nothing
+        -- and consumes nothing -- so it buys the ordering rather than a passing
+        -- test. The funnel ignores the player entirely for a non-battlefield
+        -- destination, which is CR 110.2's own scope.
+        --
+        -- No CR 800.4b guard, unlike Effect.GainControl's arm: `controller` here
+        -- is whoever controls the resolving spell or ability, and a departed
+        -- player controls neither -- CR 800.4d keeps their triggered ability off
+        -- the stack and Departure.nonCardStackObjectsCease removes one already
+        -- on it, while clause 1 of CR 800.4a took their spells out of the game.
         Just target -> do
-          mNew <- Event.changeZoneEntering target zone (EntryRiders.tapped entry)
+          mNew <- Event.changeZoneEntering target zone (EntryRiders.tapped entry) (Just controller)
           case mNew of
             -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
             -- already gone (CR 603.7c's "no longer in the zone it's expected to
@@ -1217,21 +1392,6 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- is nothing to join to combat and nothing to bind.
             Nothing -> pure ()
             Just newId -> do
-              -- CR 110.2a: "If an effect instructs a player to put an object
-              -- onto the battlefield, that object enters the battlefield under
-              -- THAT PLAYER's control unless the effect states otherwise." This
-              -- effect is exactly such an instruction, so its controller is who
-              -- the permanent enters under -- Meandering Towershell's "return it
-              -- to the battlefield under your control" is that rule restated on
-              -- the card rather than an exception to it.
-              --
-              -- BEFORE the combat join below, and that order is load-bearing:
-              -- Combat.putOntoBattlefieldAttacking reads the new permanent's
-              -- controller and CR 506.3b refuses one who is not the active
-              -- player. Installed the other way round, a Towershell its
-              -- attacker does not own would return to its owner and then fail to
-              -- be attacking at all.
-              applyEntryControl controller source zone newId
               -- CR 508.4: "if a creature is put onto the battlefield attacking,
               -- its controller chooses which defending player ... it's
               -- attacking". The rules for that live in Pawl.Engine.Combat, which
@@ -1240,6 +1400,12 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               -- creature's own (Meandering Towershell's ruling says so in as
               -- many words). The Create arm calls the same function for the same
               -- rule.
+              --
+              -- It reads the new permanent's controller, and CR 506.3b refuses
+              -- one who is not the active player -- which the funnel above has
+              -- already settled. A Towershell its attacker does not own would
+              -- otherwise return to its owner and then fail to be attacking at
+              -- all (Pawl.CombatSpec pins both halves).
               Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
               -- CR 603.7c: bind the arriving incarnation into the resolving
               -- object's live bindings, so a delayed ability THIS SAME
@@ -1357,7 +1523,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   else do
                     -- CR 701.9b: the discarding player chooses which cards.
                     let decider = Decide.deciderFor target gs
-                    choices <- Game.ask (Prompt.ChooseDiscard decider target held count)
+                    choices <- Game.choose (Prompt.ChooseDiscard decider target held count)
                     -- FILTERED AND COMPLETED, the posture PlayerSacrifices takes
                     -- below. Dropping the invalid picks is not enough: this branch
                     -- is reached only when the hand is LARGER than the count, so CR
@@ -1470,7 +1636,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 picked <-
                   if Natural.length candidates <= count
                     then pure (Set.fromList candidates)
-                    else Game.ask (Prompt.ChooseSacrifices decider victim source candidates count)
+                    else Game.choose (Prompt.ChooseSacrifices decider victim source candidates count)
                 -- FILTERED AND COMPLETED, not merely filtered. Dropping the
                 -- invalid picks is not enough: Diabolic Edict is not "may", so an
                 -- interpreter answering with too few -- or with nothing -- would
@@ -1541,7 +1707,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 gs1 <- State.get
                 let candidates = first NonEmpty.:| (second : rest)
                     decider = Decide.deciderFor controller gs1
-                answer <- Game.ask (Prompt.ChooseBoundToken decider controller source candidates)
+                answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot resolving slot named)
       _ -> pure ()
@@ -1591,7 +1757,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- CR 614.3 / 615.3: install the floating replacement; Pawl.Engine.Replacement
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
-    -- source, which is what CR 615.13's "prevented" triggers will read (#612).
+    -- source, which together with the timestamp is the row's CR 614.5 identity --
+    -- what a "prevented this way" trigger would have to be keyed on (#687).
     --
     -- CR 614.15: the ORIGIN travels with the row rather than being re-derived,
     -- because it is a fact about the ability that wrote it and nothing on the
@@ -1659,49 +1826,19 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- the same state `setShield` leaves a spent one in.
         Monad.when (n > 0) . State.modify' $ \g0 ->
           let amount = Integer.toNaturalSaturating n
-              install g recipient = case Expiry.arm controller source duration g of
-                -- CR 611.2b: the duration never started, so no shield is installed.
-                Nothing -> g
-                Just expiry ->
-                  let (ts, g1) = Game.freshTimestamp g
-                      active =
-                        ActiveReplacement.MkActiveReplacement
-                          { ActiveReplacement.effect =
-                              ReplacementEffect.DamageR
-                                DamagePattern.MkDamagePattern
-                                  { -- Mending Hands says "damage that would be
-                                    -- dealt", naming no kind, so the shield
-                                    -- takes combat and noncombat alike.
-                                    DamagePattern.whichKind = Nothing,
-                                    -- Nor does it name a source, which is CR
-                                    -- 615.7's own "the number of events or
-                                    -- sources dealing it doesn't matter". CR
-                                    -- 615.9's shields against a source of a
-                                    -- chosen quality are a different rule, and
-                                    -- have no producer (#588).
-                                    DamagePattern.whichSource = SourceRelation.AnySource,
-                                    DamagePattern.whichRecipient = Just recipient
-                                  }
-                                (DamageRewrite.PreventNext amount),
-                            ActiveReplacement.source = source,
-                            -- CR 109.5, baked as Replace's is: nothing reads it
-                            -- on a shield today (the pattern names its recipient
-                            -- outright and has no ControllerRelation to resolve),
-                            -- but the row cannot be built without one.
-                            ActiveReplacement.controller = controller,
-                            ActiveReplacement.timestamp = ts,
-                            ActiveReplacement.expiry = expiry,
-                            -- CR 615.7's shield is spent in DAMAGE, not in
-                            -- applications, so the use count is not what ends it
-                            -- (see Pawl.Types.Uses).
-                            ActiveReplacement.uses = Uses.Unlimited,
-                            -- CR 614.15: a prevention shield replaces damage from
-                            -- any source, including one this resolution is not
-                            -- itself dealing, so it is not a self-replacement.
-                            ActiveReplacement.origin = ReplacementOrigin.Other
-                          }
-                   in g1 {GameState.replacements = active : GameState.replacements g1}
-           in List.foldl' install g0 recipients
+           in List.foldl' (installShield controller source duration (DamageRewrite.PreventNext amount)) g0 recipients
+  Effect.PreventAllDamage duration ref -> do
+    -- CR 615.1 / 615.3: install one floating prevention shield per recipient the
+    -- ref names, with no amount to count down -- "prevent all damage that would
+    -- be dealt to you this turn" (Selfless Squire). The row is
+    -- PreventNextDamage's above in every respect but its rewrite, which is why
+    -- both go through `installShield`; what differs is that CR 615.7's "reduced
+    -- to 0" terminator does not exist here, so only the duration ends it.
+    --
+    -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
+    gs <- State.get
+    let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+    State.modify' $ \g0 -> List.foldl' (installShield controller source duration DamageRewrite.PreventAll) g0 recipients
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the
@@ -1889,7 +2026,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   -- answer naming something that was never offered falls back to
                   -- the first candidate, since the effect is mandatory and must
                   -- pick something.
-                  answer <- Game.ask (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
+                  answer <- Game.choose (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
                   pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
               gs1 <- State.get
               -- CR 303.4j, for an Aura -- "the Aura doesn't move" -- and CR
@@ -2005,7 +2142,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         players = filter (not . null . kindsFor) everyone
     Monad.unless (null permanents && null players) $ do
       (pickedPermanents, pickedPlayers) <-
-        Game.ask (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players)
+        Game.choose (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players)
       -- FILTERED, NOT TRUSTED, the posture every other prompt reader takes: an
       -- answer naming something that was not offered is dropped rather than
       -- honoured, so a bogus id cannot mint a counter on a permanent that had
@@ -2087,6 +2224,38 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
        in gs
             { GameState.objects =
                 foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
+            }
+  Effect.Transform ref ->
+    State.modify' $ \gs ->
+      -- CR 701.27a: "To transform a permanent, turn it over so that its other
+      -- face is up." One assignment to Object.face per victim, which is all a
+      -- turn IS here -- every characteristic read already resolves through it
+      -- (Game.faceOf), so the permanent's power, type line, keywords and
+      -- abilities all change together and none of them has to be told.
+      --
+      -- The victims are enumerated ONCE, the sweep Tap and Untap above share, so
+      -- an illegal slot (CR 608.2b), a player recipient and a set that matched
+      -- nothing all arrive as the empty list and turn nothing over.
+      --
+      -- WHICH face is Pawl.Engine.Card.turnedOver's answer, off the card's
+      -- layout: it is what withholds a turn from a permanent that is not
+      -- double-faced (CR 701.27c) and from one whose other face is an instant or
+      -- sorcery (CR 701.27d), so this arm never learns which card it is holding.
+      --
+      -- CR 701.27b is why nothing else fires: turning over is its own game
+      -- action, distinct from turning a permanent face up or face down, and a
+      -- card that triggers ON it needs a trigger condition pawl does not have
+      -- (#695).
+      --
+      -- ONE fresh timestamp for the whole instruction, threaded through so CR
+      -- 701.27f can later ask when this happened. Minted even when the sweep
+      -- turns nothing over, which costs a number nobody reads rather than a
+      -- branch: GameState.nextTimestamp is a counter with no meaning beyond its
+      -- order (CR 613.7).
+      let (now, g1) = Game.freshTimestamp gs
+       in g1
+            { GameState.objects =
+                foldr (turnOver resolving now g1) (GameState.objects g1) (objectRefObjects legality chosen controller source g1 ref)
             }
   -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
@@ -2192,60 +2361,6 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- rather than being a "next occurrence" replacement installed here).
     let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
-
--- CR 110.2a: "If an effect instructs a player to put an object onto the
--- battlefield, that object enters the battlefield under that player's control
--- unless the effect states otherwise." `controller` is that player -- the
--- resolving effect's controller (CR 109.5) -- and this is what makes it so.
---
--- A stored CR 613.1b layer-2 effect over the ONE incarnation CR 400.7 just
--- minted: controllerOf derives control from layer-2 effects over a base, so
--- storing one IS "entered under that player's control". Effect.GainControl's arm
--- builds the same shape, naming a chosen target rather than a fresh id.
---
--- Indefinite (CR 611.2a): entering under someone's control is not a duration a
--- card states an end for.
---
--- BATTLEFIELD ONLY, the rule's own scope (CR 110.2, CR 110.5d). Control is the one
--- of the three sibling riders that would NOT have been inert elsewhere --
--- controllerOf answers for an object in any zone, so an ungated store would give a
--- graveyard card a controller.
---
--- NOTHING STORED when the effect's controller already owns the object, which is
--- every producer in the pool: the base already answers, and a stored effect would
--- be a no-op the controllerOf fold pays for on every projection thereafter.
---
--- NOT re-Sicked, where Effect.GainControl's arm is: CR 302.6 asks whether control
--- has been continuous since the controller's most recent turn began, and a
--- permanent that has just entered has no earlier span to interrupt.
---
--- No CR 800.4b guard, unlike Effect.GainControl's arm -- CR 800.4d keeps a
--- departed player's triggered ability off the stack and
--- Departure.nonCardStackObjectsCease removes one already on it.
---
--- Two known divergences, both unobservable because no card in the pool reaches the
--- store (#582): modelling this as a stored effect reverts the permanent to its
--- owner if this controller later leaves, where CR 800.4a would leave it controlled
--- by the departing player and exile it; and the store lands after
--- changeZoneEntering returns, so CR 614.1c's entry loop and the Moved snapshot
--- read the owner rather than this controller. Fixing the ordering means settling
--- control before the entry loop runs.
-applyEntryControl :: PlayerId -> ObjectId -> Zone.Zone -> ObjectId -> Game ()
-applyEntryControl controller source zone newId =
-  Monad.when (zone == Zone.Battlefield) . State.modify' $ \gs ->
-    if fmap Object.owner (Game.lookupObject newId gs) == Just controller
-      then gs
-      else
-        let (ts, gs1) = Game.freshTimestamp gs
-            eff =
-              ContinuousEffect.MkContinuousEffect
-                { ContinuousEffect.source = source,
-                  ContinuousEffect.timestamp = ts,
-                  ContinuousEffect.expiry = Expiry.Type.Never,
-                  ContinuousEffect.modification = Modification.SetController controller,
-                  ContinuousEffect.affected = Affected.TheseObjects (Set.singleton newId)
-                }
-         in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).

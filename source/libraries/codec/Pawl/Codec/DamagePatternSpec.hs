@@ -39,8 +39,8 @@ spec s = Spec.describe s "Pawl.Codec.DamagePattern" $ do
       DamagePattern.fromJson
       (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing)
       """ {"whichSource":{"type":"TheSource"}} """
-  -- CR 615.7's shielded permanent, baked by Resolve's PreventNextDamage arm and
-  -- never authored on a card.
+  -- The permanent a shield covers (CR 615.7's, and CR 615.3's unbounded one),
+  -- baked by Resolve's prevention arms and never authored on a card.
   Spec.it s "a shielded recipient (CR 615.7)" $
     Common.assertJsonCodec
       s

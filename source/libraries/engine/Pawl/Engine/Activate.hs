@@ -317,6 +317,7 @@ activateAbility pid srcId ability = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing
           }
@@ -336,7 +337,7 @@ activateAbility pid srcId ability = do
   chosenModes <-
     if Natural.length legal <= count
       then pure legal
-      else Game.ask (Prompt.ChooseModes decider pid abilId legal count)
+      else Game.choose (Prompt.ChooseModes decider pid abilId legal count)
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes makes the whole activation a no-op, guarding every step below.
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
@@ -359,7 +360,7 @@ activateAbility pid srcId ability = do
       let printedCost = ActivatedAbility.cost ability
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Game.ask (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost)))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
@@ -403,7 +404,7 @@ activateAbility pid srcId ability = do
           chosen <-
             if Map.null sets
               then pure Map.empty
-              else Game.ask (Prompt.ChooseTargets decider pid abilId sets)
+              else Game.choose (Prompt.ChooseTargets decider pid abilId sets)
           let keysAgree = Map.keysSet chosen == Map.keysSet sets
               eachLegal = and (Map.intersectionWith Set.member chosen sets)
           if not (keysAgree && eachLegal)

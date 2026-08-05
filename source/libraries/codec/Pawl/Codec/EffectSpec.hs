@@ -359,6 +359,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4))
       """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":4}]} """
+  -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
+  Spec.it s "PreventAllDamage" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PreventAllDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))))
+      """ {"type":"PreventAllDamage","value":[{"type":"UntilEndOfTurn"},"you"]} """
   -- CR 113.9: this opcode counters an ability as well as a spell, with the type
   -- unchanged, so the wire shape is too.
   Spec.it s "Counter" $
@@ -427,6 +435,22 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Untap (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       """ {"type":"Untap","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  -- CR 701.27a. Both ObjectRef arms, since the pool prints one of each shape's
+  -- twin: Thraben Gargoyle's "transform this creature" is the slot, and a
+  -- "transform all X" sweep is the filter.
+  Spec.it s "Transform round-trips both ObjectRef arms" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      """ {"type":"Transform","value":"self"} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Transform (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"Transform","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   Spec.it s "RemoveFromCombat" $
     Common.assertJsonCodec
       s

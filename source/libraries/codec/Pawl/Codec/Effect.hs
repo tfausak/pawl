@@ -89,10 +89,12 @@ toJson codec e = case e of
       [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
   Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Common.array [PlayerRef.toJson r, PhaseSelector.toJson sel]))
   Effect.PreventNextDamage d r q -> Common.tagged "PreventNextDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r, Quantity.toJson q]))
+  Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
   Effect.Untap r -> Common.tagged "Untap" (Just (ObjectRef.toJson r))
+  Effect.Transform r -> Common.tagged "Transform" (Just (ObjectRef.toJson r))
   Effect.AddPhases ps -> Common.tagged "AddPhases" (Just (Common.array (fmap ExtraPhase.toJson ps)))
   Effect.GainControl d r -> Common.tagged "GainControl" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   -- The duration is ELIDED when absent (CR 603.7b's default) and the onset when
@@ -205,6 +207,9 @@ fromJson decode value = do
     "PreventNextDamage" -> case mv of
       Just (Value.Array (Array.MkArray [d, r, q])) -> Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "PreventNextDamage expects [Duration, ObjectRef, Quantity]"
+    "PreventAllDamage" -> case mv of
+      Just (Value.Array (Array.MkArray [d, r])) -> Effect.PreventAllDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r
+      _ -> Left . Text.pack $ "PreventAllDamage expects [Duration, ObjectRef]"
     "PutCounters" -> case mv of
       Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.PutCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
       _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, slot]"
@@ -213,6 +218,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]"
     "Tap" -> Common.withValue mv (fmap Effect.Tap . ObjectRef.fromJson)
     "Untap" -> Common.withValue mv (fmap Effect.Untap . ObjectRef.fromJson)
+    "Transform" -> Common.withValue mv (fmap Effect.Transform . ObjectRef.fromJson)
     "AddPhases" -> case mv of
       Just (Value.Array (Array.MkArray ps)) -> Effect.AddPhases <$> traverse ExtraPhase.fromJson ps
       _ -> Left . Text.pack $ "AddPhases expects [ExtraPhase]"

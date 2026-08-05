@@ -176,6 +176,16 @@ objectsLeaveWith pid gs =
 -- the effect that gave them the source is a stored carrier this clause just
 -- ended.
 --
+-- Object.enteredUnder is a FIFTH place a player's name is recorded against an
+-- object, and it is not a carrier at all -- it must never be swept here, however
+-- much it looks like one. CR 110.2a's entry controller is the player who
+-- controls the permanent BY DEFAULT (CR 110.2), which is the other side of the
+-- line CR 800.4c draws, and no effect is giving it to them: the one-shot that
+-- put the permanent there finished resolving. Clearing it would put the
+-- permanent back under its owner and leave the fourth clause with nothing to
+-- exile, which is the bug this engine had; Pawl.DepartureSpec's Meandering
+-- Towershell case is what catches it coming back.
+--
 -- Card JSON could author a stored SetControllerToSource through
 -- Effect.ModifyTarget, and this function does not end one -- but such an effect
 -- is inert: Projection.controllerOfGiven's storedSetter matches only
@@ -215,14 +225,16 @@ controlEffectsEnd pid gs =
 -- 1 and 2 none of them can answer `pid` for a surviving object ON THE STACK:
 --
 --   1. CR 110.2's DEFAULT controller (Projection.defaultControllerOf):
---      Object.enteredUnder where a CR 616.1b replacement recorded one, otherwise
---      CR 108.4a's Object.owner. Object.owner is baked at creation and never
---      mutated, and the first clause deleted every object `pid` owned.
---      Object.enteredUnder is written only by Pawl.Engine.Replacement's entry
---      loop and only for a BATTLEFIELD entry, and Event.changeZone clears it on
---      every move, so no STACK object can carry one. A battlefield permanent can
---      (Gather Specimens, whose taker then leaves), which is what clause 4 is
---      for.
+--      Object.enteredUnder where CR 110.2a recorded one, otherwise CR 108.4a's
+--      Object.owner. Object.owner is baked at creation and never mutated, and
+--      the first clause deleted every object `pid` owned. Object.enteredUnder is
+--      written only for a BATTLEFIELD entry -- by Event.changeZoneAttaching for
+--      the effect that put the permanent there, and by
+--      Pawl.Engine.Replacement's entry loop for a CR 616.1b rewrite of it -- and
+--      Event.changeZone clears it on every move, so no STACK object can carry
+--      one. A battlefield permanent can (Meandering Towershell returned under a
+--      thief who then leaves; Gather Specimens' victim), which is what clause 4
+--      is for.
 --   2. a stored layer-2 SetController, whose PlayerId is BAKED at resolution
 --      (CR 611.2c). The second clause deleted every stored effect whose payload
 --      is `pid`, whichever object it affects.
@@ -276,9 +288,11 @@ nonCardStackObjectsCease pid gs =
 -- The BATTLEFIELD is a different matter, and this clause has real work to do
 -- there: source 1 is CR 110.2's default controller, and Object.enteredUnder can
 -- carry `pid` for a permanent `pid` neither owns nor holds by any stored effect
--- -- Gather Specimens' victim, once its taker leaves. Clause 1 does not delete
--- it (the owner is someone else) and clause 2 ends no effect (there is none), so
--- it arrives here still controlled by the departing player.
+-- -- a Meandering Towershell a thief returned to the battlefield under their own
+-- control (CR 110.2a), or Gather Specimens' victim (CR 616.1b), once that player
+-- leaves. Clause 1 does not delete it (the owner is someone else) and clause 2
+-- ends no effect (there is none), so it arrives here still controlled by the
+-- departing player.
 --
 -- Two premises of that induction live here, at the sites that would break them:
 --
@@ -296,11 +310,13 @@ nonCardStackObjectsCease pid gs =
 --     reach through Effect.ModifyTarget; no card does, and Pawl.CardSpec lints
 --     the pool to keep it that way (#199).
 --
--- NOT empty by construction, unlike nonCardStackObjectsCease. No card reaches it
--- yet: the only board that produces one needs three or more seats (at two, CR
--- 104.2a ends the game the moment a player leaves and continuesAfterDeparture
--- skips all of CR 800.4a) and a Gather Specimens whose controller then leaves
--- (#582). The exile is a direct move rather than an Event.changeZone -- this
+-- NOT empty by construction, unlike nonCardStackObjectsCease, and no longer
+-- unreached: Pawl.DepartureSpec drives a Meandering Towershell stolen with
+-- Control Magic through its own exile-and-return and then has its thief concede,
+-- which is a permanent this clause exiles. Three or more seats are needed for
+-- any of it -- at two, CR 104.2a ends the game the moment a player leaves and
+-- continuesAfterDeparture skips all of CR 800.4a, which that spec's paired case
+-- pins. The exile is a direct move rather than an Event.changeZone -- this
 -- function is pure, so it cannot funnel, and a leaves-the-battlefield trigger on
 -- this move is therefore not emitted (#179). It is still a move, so CR 400.7's
 -- forgetting applies and Object.newIncarnation runs -- the part of the funnel

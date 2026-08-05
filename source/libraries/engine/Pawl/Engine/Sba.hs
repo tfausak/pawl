@@ -361,7 +361,7 @@ legendGroups pcs gs =
 chooseLegendVictims :: (PlayerId, NonEmpty.NonEmpty ObjectId) -> Game [ObjectId]
 chooseLegendVictims (controller, candidates) = do
   gs <- State.get
-  answer <- Game.ask (Prompt.ChooseLegend (Decide.deciderFor controller gs) controller candidates)
+  answer <- Game.choose (Prompt.ChooseLegend (Decide.deciderFor controller gs) controller candidates)
   let kept = if List.elem answer (NonEmpty.toList candidates) then answer else NonEmpty.head candidates
   pure (filter (/= kept) (NonEmpty.toList candidates))
 
