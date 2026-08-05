@@ -36,7 +36,7 @@ jobs:
       - run: mkdir artifact
       - run: ghc-pkg list
       - run: cabal sdist --output-dir artifact
-      - run: cabal configure ${{ matrix.bench && '--enable-benchmarks' || '' }} ${{ matrix.test && '--enable-tests' || '' }} --flags=pedantic --jobs
+      - run: cabal configure ${{ matrix.bench && '--enable-benchmarks' || '' }} ${{ matrix.test && '--enable-tests' || '' }} --flags=pedantic --jobs --semaphore
       - run: cat cabal.project.local
       - run: cp cabal.project.local artifact
       - run: cabal freeze
