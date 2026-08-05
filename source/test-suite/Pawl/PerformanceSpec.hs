@@ -120,10 +120,12 @@ growthBound = 8
 -- 4x, and only an absolute figure catches it.
 --
 -- Measured at 5,448 bytes per permanent on GHC 9.14.1, so this carries ~2.2x
--- headroom: enough to absorb a compiler bump or a feature landing in the
--- enumeration, tight enough to fail on a doubling. To REGENERATE it, run this
--- test and read the observed figure out of the failure message; if the increase
--- is understood and wanted, raise this constant in the commit that causes it.
+-- headroom: enough to absorb a compiler bump, a change of architecture (this
+-- was measured on aarch64 and CI runs the suite on x86_64), or a feature
+-- landing in the enumeration -- and still tight enough to fail on a doubling.
+-- To REGENERATE it, run this test and read the observed figure out of the
+-- failure message; if the increase is understood and wanted, raise this
+-- constant in the commit that causes it.
 ceilingBytesPerPermanent :: Integer
 ceilingBytesPerPermanent = 12000
 
@@ -138,10 +140,10 @@ spec s registry = Spec.describe s "performance" $ do
         oids = Set.toList (GameState.battlefield board)
     Spec.assertEqWith s "the board holds one permanent per requested size" (length oids) smallBoard
     Spec.assertEqWith s "each one offers exactly one activated ability to enumerate" (fmap (\oid -> length (Activate.abilitiesFor oid board)) oids) (replicate smallBoard 1)
-    -- CR 605.3b: a mana ability never uses the stack, so it is not an offered
-    -- action and alice may only pass. That the ANSWER does not grow with the
-    -- board is what makes the readings below a measure of the walk rather than
-    -- of the list it builds.
+    -- CR 605.3b: an activated mana ability doesn't go on the stack, so it is
+    -- not an offered action and alice may only pass. That the ANSWER does not
+    -- grow with the board is what makes the readings below a measure of the
+    -- walk rather than of the list it builds.
     Spec.assertEqWith s "and the enumeration answers Pass alone at both sizes" (fmap (enumerationOver elves) [smallBoard, largeBoard]) [1, 1]
 
   Spec.it s "enumerating legal actions costs one board projection, not one per object" $ do
