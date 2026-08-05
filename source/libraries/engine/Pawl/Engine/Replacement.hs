@@ -6,8 +6,9 @@
 -- The other half -- CR 616.1's loop itself and `apply`, which carries out the
 -- chosen rewrite -- lives in Pawl.Engine.Event, next to the CR 400.7 zone-change
 -- funnel. That is not a preference: the two are mutually recursive by the rules.
--- A zone change raises its event through the loop (CR 614.4), and a chosen
--- rewrite can itself change zones -- CR 614.1c's "as this permanent enters,
+-- A zone change raises its event through the loop, because CR 614.1's replacement
+-- effects "watch for a particular event that would happen" and a zone change is
+-- one of those, and a chosen rewrite can itself change zones -- CR 614.1c's "as this permanent enters,
 -- sacrifice any number of permanents" is a replacement whose application is a CR
 -- 701.21a sacrifice. One module has to hold both ends of that cycle, and it is
 -- the performing one.
@@ -104,7 +105,7 @@ asZoneChange event = case event of
 --   1. PERMANENT abilities (Projection.replacementsAffecting): battlefield
 --      permanents ascending by id, each permanent's own effects in printed
 --      order. Read from `sources`, which for a CR 608.2f batch is the board the
---      batch began in rather than the live one (see applyReplacementsIn).
+--      batch began in rather than the live one (see Event.applyReplacementsIn).
 --   2. The FLOATING store (GameState.replacements): newest first, since every
 --      installer prepends as it creates the row. Always the LIVE store, never a
 --      frozen one: CR 614.3 spends a one-shot as it is applied, and `consume`
@@ -148,7 +149,7 @@ collect sources floating =
         <> fmap fromFloating floating
 
 -- The candidates that apply to this event. `asOf` is Nothing for a lone event
--- and Just the pre-batch board for a CR 608.2f batch (see applyReplacementsIn);
+-- and Just the pre-batch board for a CR 608.2f batch (see Event.applyReplacementsIn);
 -- `gs` is always the live state.
 --
 -- `applies` reads the pre-batch board too, not just `collect`: both ask about
@@ -630,7 +631,7 @@ applyEntryOption oid option gs =
 
 -- CR 707.5 / 614.12a: the permanents an entering copy may choose. Battlefield
 -- creatures other than itself, minus anything entering in the same batch (see
--- the CR 614.12a note on applyReplacementsIn for why the batch set, not
+-- the CR 614.12a note on Event.applyReplacementsIn for why the batch set, not
 -- 614.13a, is what excludes them).
 legalCopyTargets :: Set ObjectId -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch self gs =
@@ -916,7 +917,7 @@ asTokens event = case event of
 -- Here rather than in Pawl.Engine.Resolve, which installs Effect.SkipNextPhase's
 -- rows: the two differ only on WHEN the row exists, and this module is the one
 -- that reads GameState.replacements. The row is the same shape Resolve builds --
--- PhaseR, scoped to the taker, Uses.Once -- so `beginsPhase` answers a
+-- PhaseR, scoped to the taker, Uses.Once -- so Event.beginsPhase answers a
 -- turn-scoped skip and a next-occurrence skip through one mechanism, and CR
 -- 616.1's loop orders them against each other for free.
 --
@@ -925,7 +926,7 @@ asTokens event = case event of
 -- whatever step came first in the meantime, and CR 500.7 lets that be a different
 -- turn entirely. CR 614.10 bars skipping a step, phase or turn that has already
 -- started; nothing of this turn has started yet, since Engine.beginTurnOf has
--- only scheduled it and Engine.runStep asks `beginsPhase` before the untap step's
+-- only scheduled it and Engine.runStep asks Event.beginsPhase before the untap step's
 -- first observable moment.
 --
 -- Expiry.AtCleanup, not Never, and not because of CR 514.2 -- the card states no

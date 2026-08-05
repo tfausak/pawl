@@ -4,7 +4,9 @@
 --
 -- The loop and the funnel share a module because the rules make them mutually
 -- recursive, not because either is convenient here: a zone change raises its
--- event through the loop (CR 614.4), and applying a chosen rewrite can itself
+-- event through the loop, because CR 614.1's replacement effects "watch for a
+-- particular event that would happen" and a zone change is one of those events,
+-- and applying a chosen rewrite can itself
 -- change zones -- CR 614.1c's "as this permanent enters, sacrifice any number of
 -- permanents" is a replacement whose application is a CR 701.21a sacrifice. The
 -- SELECTION half -- which effects exist, which apply, how they bucket, who
@@ -267,9 +269,9 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 
 -- CR 608.2f / 704.3: `asOf` is the board a BATCH's candidates are read from --
 -- `Just` the state the batch began in, or `Nothing` for the live board. Only the
--- destroy funnel passes `Just` (Event.destroy, Event.destroyInBatch), along with
+-- destroy funnel passes `Just` (`destroy`, `destroyInBatch` below), along with
 -- the graveyard moves it and Pawl.Engine.Sba's put-into-graveyard batch make
--- through Event.changeZoneInBatch. Everything else is a lone event and wants the
+-- through `changeZoneInBatch`. Everything else is a lone event and wants the
 -- live board. CR 608.2f and CR 704.3 make a batch ONE event, so CR 614.4 asks
 -- which effects existed before the BATCH, not before the member being processed
 -- -- otherwise Rest in Peace animated by Opalescence and swept by Day of
@@ -282,11 +284,12 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- entering beside the loop's subject. Deliberately not one parameter: different
 -- batches, different readers, and no call site ever supplies both.
 --
--- What `asOf` does NOT freeze: the FLOATING store stays live (see `collect`),
--- because CR 614.3 has `consume` spend a one-shot as it applies and a frozen
+-- What `asOf` does NOT freeze: the FLOATING store stays live (see
+-- Replacement.collect), because CR 614.3 has Replacement.consume spend a one-shot
+-- as it applies and a frozen
 -- store would hand a spent regeneration shield to the next member of the batch;
 -- the loop still RE-COLLECTS every iteration, so CR 616.1f and CR 616.2 are
--- untouched; and `apply`'s writes and `choose`'s chooser lookup read the LIVE
+-- untouched; and `apply`'s writes and Replacement.choose's chooser lookup read the LIVE
 -- state. A permanent that ENTERED after the batch began therefore contributes
 -- nothing, which is CR 614.4 read the other way. No producer today, so that half
 -- is unexercised.
@@ -311,7 +314,7 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- `self`, and the sacrifice arm's `entering` -- never through this set.
 --
 -- `changeZone` handles one entering object at a time and passes `Set.empty`. The
--- non-empty case is Event.createTokens, which materializes every token of a
+-- non-empty case is `createTokens` below, which materializes every token of a
 -- Create BEFORE running any of their entry loops (CR 614.16's doubled count is
 -- settled once, up front), so a later token's entry loop would otherwise find
 -- its siblings already sitting on the battlefield.
@@ -368,7 +371,7 @@ loop asOf batch applied prevented event = do
           outcome <- apply batch candidate event
           -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
           -- no arm of that fold has to report anything and none can forget to.
-          -- What makes it exact rather than a guess is `prevents` below: only a
+          -- What makes it exact rather than a guess is Replacement.prevents: only a
           -- PREVENTION rewrite's shrinkage is prevention, where CR 614.1a's
           -- SetAmount and Scale shrink an event without preventing a point of it.
           let prevented1 = prevented <> Maybe.maybeToList (Replacement.preventionBy candidate event outcome)
@@ -765,7 +768,7 @@ apply batch candidate event =
     -- one per instance -- falls out of the floating store's SHAPE rather than
     -- out of care taken here. Two Fatigues prepend two ActiveReplacements, and a
     -- list of instances with distinct timestamps cannot coalesce the way a Set of
-    -- patterns or a Boolean flag would; `consume` below deletes by (source,
+    -- patterns or a Boolean flag would; Replacement.consume deletes by (source,
     -- timestamp), so it spends exactly the one that applied; and returning
     -- Nothing ENDS the CR 616.1 loop, so no second skip can be spent on the same
     -- step.
@@ -1265,9 +1268,9 @@ counter source controller oid = do
 --
 -- CR 701.21a also forbids sacrificing a permanent you do not control, which is why
 -- this takes the sacrificing player. Enforced here at the one funnel rather than
--- trusted from each caller: a cost payment and a triggered ability's own source
--- are controlled by the paying player by construction, but an edict's victim is a
--- permanent a PLAYER named.
+-- trusted from each caller: a cost payment, a triggered ability's own source and
+-- `apply`'s CR 614.1c as-enters sacrifice are controlled by the paying player by
+-- construction, but an edict's victim is a permanent a PLAYER named.
 sacrifice :: PlayerId -> ObjectId -> Game ()
 sacrifice pid oid = do
   gs <- State.get
@@ -1278,8 +1281,9 @@ sacrifice pid oid = do
       -- something that's a permanent they don't control." The zone case below is
       -- the first clause; this is the second. Enforced HERE, at the one funnel,
       -- rather than trusted from each caller -- the callers are a cost payment, a
-      -- trigger's own source, and an edict whose victim a player NAMED, and only
-      -- the last of those could ever be wrong.
+      -- trigger's own source, `apply`'s CR 614.1c as-enters sacrifice, and an
+      -- edict whose victim a player NAMED, and only the last of those could ever
+      -- be wrong.
       Zone.Battlefield
         | Projection.controllerOf oid gs /= Just pid -> pure ()
         | otherwise -> changeZone oid Zone.Graveyard
