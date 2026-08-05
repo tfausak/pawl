@@ -41,7 +41,7 @@ data Object = MkObject
     -- default, and writing a CR 616.1b rewrite as a layer-2 effect would put it
     -- on the wrong side of that line.
     --
-    -- Per-incarnation state, like damage and counters: reset by changeZone,
+    -- Per-incarnation state, like damage and counters: reset by newIncarnation,
     -- because CR 400.7 makes the moved object a new one and CR 110.2's entry is
     -- the one this incarnation made.
     enteredUnder :: Maybe PlayerId.PlayerId,
@@ -53,20 +53,20 @@ data Object = MkObject
     -- lifelink, toxic) is consumed at deal time and never re-read, and CR 704.5g
     -- reads only the total marked on it.
     --
-    -- Removed at cleanup (CR 514.2). Per-incarnation state: reset by changeZone.
+    -- Removed at cleanup (CR 514.2). Per-incarnation state: reset by newIncarnation.
     damage :: Natural.Natural,
     -- | CR 302.6, carrying WHICH player the permanent settled under -- the rule's
     -- subject is a player, not the object. Per-incarnation state: reset by
-    -- changeZone. Not purely stored: Engine.checkControlContinuity drops the
+    -- newIncarnation. Not purely stored: Engine.checkControlContinuity drops the
     -- claim when the derived controller stops matching it.
     sickness :: Sickness.Sickness,
     -- | CR 601.2: the choices bound while casting, by slot name. Empty for
     -- everything but a spell or ability on the stack. Per-incarnation state:
-    -- reset by changeZone, so CR 400.7 forgets them when the object moves.
+    -- reset by newIncarnation, so CR 400.7 forgets them when the object moves.
     bindings :: Map.Map SlotName.SlotName Binding.Binding,
     -- | CR 122.1: counters placed on this permanent, counted per kind. Persistent
     -- permanent state -- unlike `damage`, cleanup does NOT clear it (a counter is
-    -- not an "until end of turn" effect). Per-incarnation: reset by changeZone,
+    -- not an "until end of turn" effect). Per-incarnation: reset by newIncarnation,
     -- because CR 122.2 makes counters cease to exist when an object changes
     -- zones. A +1/+1 or -1/-1 count feeds P/T via the projection (CR 122.1a /
     -- 613.4c); both kinds present trigger the CR 704.5q annihilation SBA.
@@ -86,7 +86,7 @@ data Object = MkObject
     --
     -- BASE state, not projected: attachment is a fact about the object, and no CR
     -- 613 layer reads or writes it. Per-incarnation, like damage and counters:
-    -- changeZone resets it, because CR 400.7 makes the moved object a new one.
+    -- newIncarnation resets it, because CR 400.7 makes the moved object a new one.
     --
     -- One direction only. "What is attached to me" is derived by scanning the
     -- battlefield, so there is no reverse index to keep consistent across zone
@@ -101,7 +101,7 @@ data Object = MkObject
     -- CR 707.6 is why the OLD choice does not carry over -- a copy of Painter's
     -- Servant runs the copied ability and makes its own NEW choice.
     --
-    -- Per-incarnation state, like damage and counters: reset by changeZone,
+    -- Per-incarnation state, like damage and counters: reset by newIncarnation,
     -- because CR 400.7 makes the moved object a new one.
     --
     -- One of THREE as-enters choice fields; chosenSubtype and chosenNames below
@@ -119,7 +119,7 @@ data Object = MkObject
     --
     -- NOT a copiable value, for chosenColor's reason (CR 707.5, CR 707.6).
     --
-    -- Per-incarnation state: reset by changeZone, because CR 400.7 makes the
+    -- Per-incarnation state: reset by newIncarnation, because CR 400.7 makes the
     -- moved object a new one.
     chosenSubtype :: Maybe Subtype.Subtype,
     -- | CR 614.1c / CR 201.4: the card names chosen as this object entered
@@ -143,7 +143,7 @@ data Object = MkObject
     --
     -- NOT a copiable value, for chosenColor's reason (CR 707.5, CR 707.6).
     --
-    -- Per-incarnation state: reset by changeZone, because CR 400.7 makes the
+    -- Per-incarnation state: reset by newIncarnation, because CR 400.7 makes the
     -- moved object a new one.
     chosenNames :: Set.Set CardName.CardName,
     -- | CR 613.7d: when this object entered its current zone. A static ability's
@@ -166,7 +166,7 @@ data Object = MkObject
     -- holds that of every loadable card, and the only writer of this field draws
     -- the name from that same card's faces.
     --
-    -- Per-incarnation state, like damage and counters: cleared by changeZone,
+    -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
     -- because CR 400.7 makes the moved object a new one.
     face :: Maybe CardName.CardName,
     -- | CR 715.3d: the player who may play this card while it remains exiled --
@@ -182,7 +182,7 @@ data Object = MkObject
     -- one incarnation and names one player, so a CastingPermission arm could not
     -- carry it.
     --
-    -- Per-incarnation, like damage and counters: cleared by changeZone, because
+    -- Per-incarnation, like damage and counters: cleared by newIncarnation, because
     -- CR 400.7 makes the moved object a new one. That IS CR 715.3d's "for as
     -- long as that card remains exiled" -- the permission ends when the card
     -- leaves, with no sweep to run and nothing to unwind.
@@ -198,3 +198,40 @@ data Object = MkObject
     playableFromExileBy :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)
+
+-- | CR 400.7: "an object that moves from one zone to another becomes a new
+-- object with no memory of, or relation to, its previous existence" -- the
+-- forgetting, as one function. Every field above documented as per-incarnation
+-- goes back to its no-memory value here, and nothing else is touched.
+--
+-- The single place that knows the whole set, because there is more than one
+-- path into a zone: Event.changeZoneAttaching is the funnel every in-game move
+-- uses, while Setup.startGameFromCards (CR 727.2), Setup.funnelBack (CR 729.5)
+-- and Departure.remainingControlledExiled (CR 800.4a) move objects by hand.
+-- Spelling the reset out at each of them is what let the four drift apart, so a
+-- field added to Object is reset everywhere exactly when it is added HERE.
+--
+-- Leaves `zone` and `timestamp` alone, plus `owner` and `source`. The last two
+-- are not per-incarnation at all (CR 108.3: ownership follows the card, not the
+-- object). The first two ARE, but they are what the caller is DECIDING rather
+-- than forgetting: the move names its destination, and CR 613.7d wants the
+-- moment of entry, which only a caller in the Game monad can mint. A caller
+-- overrides the rest the same way -- CR 110.5b's "enters tapped" and CR 701.3's
+-- attach-on-entry are choices the move makes about the new object, not memories
+-- of the old one, so they are reset here and set again by the funnel.
+newIncarnation :: Object -> Object
+newIncarnation object =
+  object
+    { tapped = TapState.Untapped,
+      damage = 0,
+      sickness = Sickness.Sick,
+      bindings = Map.empty,
+      counters = Map.empty,
+      attachedTo = Nothing,
+      enteredUnder = Nothing,
+      chosenColor = Nothing,
+      chosenSubtype = Nothing,
+      chosenNames = Set.empty,
+      face = Nothing,
+      playableFromExileBy = Nothing
+    }
