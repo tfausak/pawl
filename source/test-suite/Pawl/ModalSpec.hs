@@ -545,9 +545,12 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "bob's Piker was not bounced (mode 1 unchosen)"
     Spec.assertEqWith s "bob's Piker is untapped (mode 2 unchosen)" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Untapped)
 
-  -- CR 608.2c's printed order is observable here: the bounce (mode 1) happens
-  -- before the sweep (mode 2), so the bounced creature is gone by the time "tap
-  -- all creatures your opponents control" enumerates its victims.
+  -- Two chosen modes whose effects touch the same board: the bounce (mode 1)
+  -- runs first (CR 608.2c), so "tap all creatures your opponents control" sweeps
+  -- what is left. Not a test OF that order -- tapping the Piker and then bouncing
+  -- it would leave the same board, since CR 400.7 mints a new object in hand
+  -- either way -- but of the sweep itself, which is what "all creatures your
+  -- OPPONENTS control" makes discriminating: alice's own creature stays untapped.
   Spec.it s "CR 608.2c bounce then tap: only the opponent's remaining creatures are tapped" $ do
     island <- S.printingOf s registry "Island"
     crypticCommand <- S.printingOf s registry "Cryptic Command"
