@@ -11,6 +11,10 @@
 -- case, GHC stopped sharing the repeated `project srcId gs`, and the suite went
 -- from 29s to 56s with nothing failing.
 --
+-- Only the action enumeration is measured. The other paths the priority loop
+-- reaches every pass -- Combat.legalAttackers, Combat.legalBlockers,
+-- Mana.manaSources, Cast.castableSpells -- have no bound here (#717).
+--
 -- Measured in BYTES ALLOCATED rather than in seconds. Allocation is a
 -- deterministic function of the code and its input: the same build measuring
 -- the same board allocates the same amount every run, on a loaded shared runner
