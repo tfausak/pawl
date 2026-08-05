@@ -1879,10 +1879,6 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- counter on a player. Their poison is still there for kindsFor to find,
       -- so the map's keys would offer someone who is not in the game as a
       -- choice, and honouring that answer puts a fresh counter on a non-player.
-      -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
-      -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
-      -- this arm knows only that some effect asked for it.
-  Effect.TemptWithTheRing -> Ring.tempt controller
   Effect.Proliferate -> do
     gs <- State.get
     let everyone = Game.stillPlaying gs
@@ -1922,6 +1918,11 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                         (GameState.players g)
                   }
             )
+  -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
+  -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
+  -- this arm knows only that some effect asked for it, exactly as the arms around
+  -- it know only that some effect asked for a counter or a card.
+  Effect.TemptWithTheRing -> Ring.tempt controller
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
