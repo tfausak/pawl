@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Mana: mana payment and castability. CR 118.13a's announcement lives
--- here too (Mana.announcePhyrexian), so the cases that reach it through
+-- here too (Mana.announce), so the cases that reach it through
 -- Cast.castSpell and Activate.activateAbility are in this spec rather than in
 -- CastSpec or ActivateSpec -- the module under test is this one, and the two entry
 -- points are how the rule is reached.

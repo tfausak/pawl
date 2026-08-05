@@ -506,6 +506,7 @@ discardLastAnswer p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -744,7 +745,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   --
   -- That is the posture castability itself takes -- pawl refuses to propose a
   -- cast it cannot pay rather than proposing and reversing at CR 601.2h -- and
-  -- carrying it through to the announced X is what leaves Mana.announcePhyrexian
+  -- carrying it through to the announced X is what leaves Mana.announce
   -- with no cost it has no offer for (#417).
   Spec.it s "CR 601.2 an unaffordable X ends the cast before CR 601.2c's targets are asked for" $ do
     blaze <- S.printingOf s registry "Blaze"
@@ -1782,6 +1783,7 @@ castFirstOption p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -1851,6 +1853,7 @@ castPanglacial p = case p of
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines

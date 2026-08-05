@@ -76,6 +76,7 @@ encode p answer = case p of
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
+  Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -206,6 +207,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.AnnouncePhyrexianPayment {} -> case response of
     Response.AnnouncedPhyrexianPayment way -> Just way
+    _ -> Nothing
+  Prompt.AnnounceHybridPayment {} -> case response of
+    Response.AnnouncedHybridPayment way -> Just way
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -345,6 +349,9 @@ defaultAnswer p = case p of
   -- CR 118.13a: every offered route is payable, and the prompt is raised only
   -- where two are.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.13a again, for CR 107.4e's monocolored hybrid: every offered route is
+  -- payable, and the prompt is raised only where two are.
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.

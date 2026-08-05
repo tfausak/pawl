@@ -10,6 +10,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -126,6 +127,10 @@ data Response
     -- Phyrexian mana symbol, so a Mutagenic Growth paid out of life replays
     -- exactly as it was cast.
     AnnouncedPhyrexianPayment PhyrexianPayment.PhyrexianPayment
+  | -- | CR 118.13a / 601.2b: which way a caster announced they would pay a
+    -- monocolored hybrid mana symbol, so a Flame Javelin cast for {6} replays as
+    -- that and not as {R}{R}{R}.
+    AnnouncedHybridPayment HybridPayment.HybridPayment
   | -- | CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
     -- ability.
     AnnouncedEntwine EntwineDecision.EntwineDecision

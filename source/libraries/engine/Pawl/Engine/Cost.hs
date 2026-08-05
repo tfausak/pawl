@@ -200,9 +200,10 @@ greatestPayableX payableAt cost =
 -- Pawl.Engine.Cast and Pawl.Engine.Activate call at exactly that moment, one step
 -- before CR 601.2f's total.
 --
--- Only CR 107.4f's Phyrexian symbol is announced. CR 107.4e's hybrids are the
--- other "paid in multiple ways" symbols and they are NOT announced here (#261):
--- Pawl.Engine.Mana still resolves them at payment.
+-- CR 107.4f's Phyrexian symbol and CR 107.4e's MONOCOLORED hybrid ({2/R}) are
+-- announced. CR 107.4e's colour/colour hybrid ({W/U}) is the one "paid in
+-- multiple ways" symbol still not announced here (#729): Pawl.Engine.Mana
+-- resolves it at payment.
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, which is
 -- the rule's own words rather than a re-encoding: CR 107.4f pays 2 life for the
@@ -229,7 +230,7 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announcePhyrexian pid oid total_ manaCost
+    (announced, life) <- Mana.announce pid oid total_ manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -618,11 +619,15 @@ applyAdjustments adjustments cost =
         -- come off.
         ManaSymbol.Hybrid _ _ -> 0
         -- A monocolored hybrid's {2} half IS generic mana once CR 601.2b's
-        -- nonhybrid equivalent names it, so this arm is decided by the elision
-        -- and not by the rule: pawl makes no such announcement (#261), and Flame
-        -- Javelin's ruling applies a generic reduction only where the chosen
-        -- payment includes generic mana. With no choice recorded there is nothing
-        -- for CR 118.7a to come off, so the symbol is left whole.
+        -- nonhybrid equivalent names it -- but a symbol still spelled {2/R} is one
+        -- CR 601.2b has NOT named, so there is nothing yet for CR 118.7a to come
+        -- off and the symbol is left whole. That is Flame Javelin's own ruling: a
+        -- generic cost reduction applies to it only where the announced payment
+        -- includes generic mana. Pawl.Engine.Mana.announce makes that
+        -- announcement, so the cost actually paid reaches here as a Generic and is
+        -- reduced; what still arrives unannounced is the CASTABILITY GATE's cost,
+        -- which measures the printed symbols, and CR 118.13b/c's costs, which have
+        -- no announcement at all (#730, #373).
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 107.4f makes this a COLOURED mana symbol, and its other half is 2
         -- life rather than any amount of mana, so there is no generic component
