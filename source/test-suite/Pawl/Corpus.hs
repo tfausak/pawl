@@ -52,17 +52,18 @@ loadAll root = do
   found <- slugsIn root
   mapM (\slug -> fmap ((,) slug) (loadOne root slug)) found
 
--- The lint's half of the read/parse split described on Pawl.Registry.parseCard.
--- No tryIOError, unlike Pawl.Registry.loadFile: every slug here came from
--- slugsIn listing the directory a moment ago, so a file that is not there is a
--- broken invariant rather than a card the corpus declines to contain -- and an
+-- No tryIOError, unlike a registry lookup: every slug here came from slugsIn
+-- listing the directory a moment ago, so a file that is not there is a broken
+-- invariant rather than a card the corpus declines to contain -- and an
 -- exception is the right way for that to surface.
 --
 -- The name is derived from the slug because a sweep has no name to have been
--- asked for. It only ever reaches the error message.
+-- asked for. It only ever reaches the error message. Filename agreement is not
+-- checked here -- Pawl.CardSpec's "every file in data/cards is filed under its
+-- card's joined face names" is that lint now (#649).
 loadOne :: FilePath -> Slug.Slug -> IO (Either CardError.CardError Card.Card)
 loadOne root slug = do
   let path = Registry.cardPath root slug
       name = CardName.MkCardName (Slug.unwrap slug)
   bytes <- ByteString.readFile path
-  pure (either (Left . CardError.Invalid name . (<>) (path <> ": ") . Text.unpack) Right (Registry.parseFiledCard slug bytes))
+  pure (either (Left . CardError.Invalid name . (<>) (path <> ": ") . Text.unpack) Right (Registry.parseCard bytes))

@@ -1,7 +1,7 @@
 -- Covers Pawl.Registry. Every test builds its own corpus in a temporary
 -- directory: the committed data/cards is read-only here, and the failure modes
--- (a missing file, a malformed file, a file whose name disagrees with its file
--- name) have no representative in it by construction.
+-- (a missing file, a malformed file, two cards claiming one name) have no
+-- representative in it by construction.
 module Pawl.RegistrySpec where
 
 import qualified Control.Exception as Exception
@@ -10,7 +10,7 @@ import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
-import qualified Data.Text.IO as TextIO
+import qualified Pawl.Exceptions.InvalidCorpus as InvalidCorpus
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -32,7 +32,7 @@ withCorpus label files action =
 -- withCorpus cannot express a file containing invalid UTF-8, since Text.Text
 -- cannot hold one. This exercises Registry.parseCard's decodeUtf8' failure
 -- branch, otherwise unreached by any case here.
-withInvalidUtf8Corpus :: String -> (FilePath -> Registry.Registry IO -> IO a) -> IO a
+withInvalidUtf8Corpus :: String -> (FilePath -> IO (Registry.Registry IO) -> IO a) -> IO a
 withInvalidUtf8Corpus label action = do
   tmp <- Directory.getTemporaryDirectory
   let dir = tmp <> "/pawl-registry-spec-" <> label
@@ -50,7 +50,7 @@ withInvalidUtf8Corpus label action = do
         ByteString.writeFile (dir <> "/goblin-piker.json") badBytes
     )
     (Directory.removeDirectoryRecursive dir)
-    (Registry.fileRegistry dir >>= action dir)
+    (action dir (Registry.fileRegistry dir))
 
 -- An IO action that must fail with a specific exception VALUE. The `expected`
 -- argument fixes Exception.try's type, so no ScopedTypeVariables is needed.
@@ -62,6 +62,16 @@ expectException s label expected action = do
   case result of
     Left err -> Spec.assertEqWith s label err expected
     Right _ -> Spec.assertFailure s (label <> ": expected " <> show expected <> ", got a value")
+
+-- The problems an InvalidCorpus carries, for the cases that assert on their
+-- content. Pattern-matching the field fixes Exception.try's type, so no
+-- ScopedTypeVariables is needed -- the `expectException` precedent.
+problemsOf :: Spec.Spec IO n -> String -> IO a -> IO [String]
+problemsOf s label action = do
+  result <- Exception.try action
+  case result of
+    Left err -> pure (InvalidCorpus.problems err)
+    Right _ -> Spec.assertFailure s (label <> ": expected an InvalidCorpus")
 
 -- The message an Invalid carries, for cases that assert on its content rather
 -- than on the constructor alone.
@@ -103,22 +113,11 @@ spec s = Spec.describe s "Pawl.Registry" $ do
         "both faces"
         (fmap (fmap Face.name . NonEmpty.toList . Card.faces) byLeft)
         (Right (fmap (CardName.MkCardName . Text.pack) ["Wax", "Wane"]))
-      -- The joined name still resolves by the direct path, since "Wax // Wane"
-      -- slugifies to the filename: the fallback is an addition, not a
-      -- replacement.
+      -- CR 709.4a gives a split card two names and no combined one, so the
+      -- joined string is not a name a lookup may ask for -- it survived until
+      -- now only because it happened to be the file name (#649).
       byJoined <- Registry.named registry "Wax // Wane"
-      Spec.assertEqWith s "and by the joined name" byJoined byLeft
-
-  -- The rejecting direction of that scan. "goblin-piker.json" is a candidate
-  -- for "Goblin" by filename -- the slug is a whole hyphen-separated run of it
-  -- -- and is read and parsed, and then refused, because no FACE of it is named
-  -- "Goblin". Without this the scan would answer by filename, which is how a
-  -- lookup starts serving a card it was not asked for.
-  Spec.it s "a filename that merely contains the name asked for does not answer for it" $ do
-    piker <- S.pikerJson
-    withCorpus "not-a-face-name" [("goblin-piker.json", piker)] $ \_ registry -> do
-      result <- Registry.named registry "Goblin"
-      Spec.assertEqWith s "still missing" result . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Goblin"
+      Spec.assertEqWith s "and not by the two joined" byJoined . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Wax // Wane"
 
   Spec.it s "a card is parsed at most once: the file may vanish after the first load" $ do
     piker <- S.pikerJson
@@ -140,49 +139,50 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       result <- Registry.named registry "Goblin Piker"
       Spec.assertEqWith s "missing, by name" result . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Goblin Piker"
 
-  Spec.it s "a malformed file is Invalid, not Missing"
-    . withCorpus "malformed" [("goblin-piker.json", Text.pack "{oh no")]
-    $ \root registry -> do
-      result <- Registry.named registry "Goblin Piker"
-      case result of
-        Right _ -> Spec.assertFailure s "expected a malformed file to fail"
-        Left err -> do
-          Spec.assertBool s (List.isInfixOf (root <> "/goblin-piker.json") (reasonOf err)) ("names the path: " <> show err)
-          Spec.assertBool s (not (null (reasonOf err))) "says why"
-
-  Spec.it s "a file whose card is named something else is Invalid, naming both names" $ do
+  -- A file that will not parse has no face names, so there is no key it could
+  -- be filed under and no lookup that could report it. Construction is the only
+  -- place it can surface -- and it names every offender at once, not the first
+  -- (#167).
+  Spec.it s "a corpus with a malformed file is rejected when the registry is built" $ do
     piker <- S.pikerJson
-    withCorpus "misfiled" [("bird-maiden.json", piker)] $ \root registry -> do
-      result <- Registry.named registry "Bird Maiden"
-      case result of
-        Right _ -> Spec.assertFailure s "expected a misfiled card to fail"
-        Left err -> do
-          Spec.assertBool s (List.isInfixOf (root <> "/bird-maiden.json") (reasonOf err)) ("names the path: " <> show err)
-          Spec.assertBool s (List.isInfixOf "Goblin Piker" (reasonOf err)) ("names the card: " <> show err)
-          Spec.assertBool s (List.isInfixOf "goblin-piker" (reasonOf err)) ("names where it belongs: " <> show err)
+    S.withCorpusDir "malformed" [("goblin-piker.json", piker), ("bird-maiden.json", Text.pack "{oh no")] $ \root -> do
+      problems <- problemsOf s "malformed" (Registry.fileRegistry root)
+      Spec.assertEqWith s "one problem, for the one bad file" (length problems) 1
+      Spec.assertBool s (any (List.isInfixOf (root <> "/bird-maiden.json")) problems) ("names the path: " <> show problems)
+      Spec.assertBool s (not (any (List.isInfixOf "goblin-piker") problems)) ("and not the good file: " <> show problems)
 
-  Spec.it s "a file with invalid UTF-8 bytes is Invalid, naming the path and the decode failure"
+  -- CR 709.4a: a name belongs to a card, so one name answering for two cards is
+  -- a broken pool rather than a lookup with a preference. Impossible while
+  -- filenames were the key, since those are unique; keying by face name makes it
+  -- representable, and a silent last-one-wins would be a lookup quietly serving
+  -- a card it was not asked for.
+  Spec.it s "a corpus where two cards claim one name is rejected when the registry is built" $ do
+    waxWane <- S.waxWaneJson
+    S.withCorpusDir "ambiguous" [("wax-wane.json", waxWane), ("wane-wax.json", waxWane)] $ \root -> do
+      problems <- problemsOf s "ambiguous" (Registry.fileRegistry root)
+      Spec.assertBool s (any (List.isInfixOf "wax") problems) ("names the ambiguous name: " <> show problems)
+      Spec.assertBool s (any (List.isInfixOf (root <> "/wax-wane.json")) problems) ("names the first claimant: " <> show problems)
+      Spec.assertBool s (any (List.isInfixOf (root <> "/wane-wax.json")) problems) ("names the second claimant: " <> show problems)
+
+  -- The filename is a filing convention with no standing in the rules (#649),
+  -- so it decides where a file LIVES and never what a lookup may ask for.
+  Spec.it s "a card is found by its own name, and never by its file name" $ do
+    piker <- S.pikerJson
+    withCorpus "misfiled" [("bird-maiden.json", piker)] $ \_ registry -> do
+      byOwnName <- Registry.named registry "Goblin Piker"
+      Spec.assertBool s (either (const False) (const True) byOwnName) "found by the name the card has"
+      byFileName <- Registry.named registry "Bird Maiden"
+      Spec.assertEqWith s "and not by the name its file has" byFileName . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Bird Maiden"
+
+  Spec.it s "a corpus with an undecodable file is rejected, naming the decode failure"
     . withInvalidUtf8Corpus "invalid-utf8"
-    $ \root registry -> do
-      result <- Registry.named registry "Goblin Piker"
-      case result of
-        Right _ -> Spec.assertFailure s "expected invalid UTF-8 to fail"
-        Left err -> do
-          Spec.assertBool s (List.isInfixOf (root <> "/goblin-piker.json") (reasonOf err)) ("names the path: " <> show err)
-          -- Specifically the decodeUtf8' failure, not merely any Invalid: an
-          -- incomplete JSON payload (this file's contents) would fail for an
-          -- unrelated reason (missing fields) once decoded, so this pins the
-          -- decode branch rather than any downstream one.
-          Spec.assertBool s (List.isInfixOf "not valid UTF-8" (reasonOf err)) ("names the decode failure: " <> show err)
-
-  Spec.it s "a failed load is not memoized: fixing the file fixes the lookup" $ do
-    piker <- S.pikerJson
-    withCorpus "retry" [("goblin-piker.json", Text.pack "{oh no")] $ \root registry -> do
-      broken <- Registry.named registry "Goblin Piker"
-      Spec.assertBool s (either (const True) (const False) broken) "the malformed file fails first"
-      TextIO.writeFile (root <> "/goblin-piker.json") piker
-      c <- S.cardOf s registry "Goblin Piker"
-      Spec.assertEq s (S.nameOf c) . CardName.MkCardName $ Text.pack "Goblin Piker"
+    $ \root build -> do
+      problems <- problemsOf s "invalid-utf8" build
+      Spec.assertBool s (any (List.isInfixOf (root <> "/goblin-piker.json")) problems) ("names the path: " <> show problems)
+      -- Specifically the decodeUtf8' failure, not merely any problem: an
+      -- incomplete JSON payload (this file's contents) would fail for an
+      -- unrelated reason once decoded, so this pins the decode branch.
+      Spec.assertBool s (any (List.isInfixOf "not valid UTF-8") problems) ("names the decode failure: " <> show problems)
 
   -- (b) A mistyped --cards-dir should fail once, at startup, rather than
   -- once per card looked up (#167). This is the one failure that is still an

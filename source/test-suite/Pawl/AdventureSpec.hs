@@ -49,7 +49,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- "Embereth Shieldbreaker//Battle Display", give it both card types, and
   -- price it at the concatenated {1}{R}{R} for mana value 3.
   Spec.it s "CR 715.4 in a hand the card is only its normal half" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     let (gs, oid) = S.handOne shieldbreaker (Setup.emptyGame S.bothPlayers)
     case Game.faceOf oid gs of
       Nothing -> Spec.assertFailure s "expected a card in hand"
@@ -62,7 +62,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- they play the card normally or as an Adventure." Both halves offered, and
   -- the choice left to the player.
   Spec.it s "CR 715.3 both halves are offered from a hand" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
@@ -80,7 +80,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- CR 715.3d: "Instead of putting a spell that was cast as an Adventure into
   -- its owner's graveyard as it resolves, its controller exiles it."
   Spec.it s "CR 715.3d the resolved Adventure destroys the artifact and is exiled" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 1)
@@ -109,7 +109,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- The contrast with the hand case above is the whole point: the same card
   -- offers TWO halves from a hand and exactly ONE from exile.
   Spec.it s "CR 715.3d from exile the creature is castable and the Adventure is not" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     -- TWO artifacts, and the Adventure destroys only one. Without the survivor
@@ -141,7 +141,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- The whole loop, which is what the mechanic IS: the Adventure resolves, and
   -- the creature it left in exile is cast from there onto the battlefield.
   Spec.it s "CR 715.3d the creature is cast from exile onto the battlefield" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (_, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
@@ -173,7 +173,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- Without this the permission would be indistinguishable from "an adventurer
   -- card in exile is castable", which is a different and wrong rule.
   Spec.it s "an adventurer card exiled any other way permits nothing" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     -- Through handOne, which is what puts alice in a main phase holding
@@ -191,7 +191,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- exiled. CR 608.2b's fizzle is the path, and CR 715.3d's "as it resolves"
   -- never reaches it.
   Spec.it s "CR 608.2b a fizzled Adventure goes to the graveyard, not exile" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)

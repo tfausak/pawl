@@ -40,7 +40,6 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -1635,15 +1634,6 @@ stubView table oid =
                 Filter.token = False
               }
         [] -> Nothing
-
--- Every card file in the bundled corpus, by slug. The corpus-wide checks need
--- the directory listing rather than a hand-kept list: a file nobody loads is
--- exactly the file a hand-kept list forgets. Kept as a String list because that
--- is what the sweeps feed back to a lookup.
-corpusSlugs :: IO [String]
-corpusSlugs = do
-  root <- Registry.defaultRoot
-  fmap (fmap (Text.unpack . Slug.unwrap)) (Corpus.slugsIn root)
 
 -- Every card pawl ships, or a failure naming every file that would not load.
 --

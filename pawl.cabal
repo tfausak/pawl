@@ -360,6 +360,7 @@ library exceptions
   hs-source-dirs: source/libraries/exceptions
   -- cabal-gild: discover source/libraries/exceptions
   exposed-modules:
+    Pawl.Exceptions.InvalidCorpus
     Pawl.Exceptions.MissingRoot
 
 -- Quality of life improvements for packages Pawl doesn't own, in the spirit of
