@@ -24,17 +24,16 @@ data Object = MkObject
     -- permanent rather than a continuous effect, and this field is where it is
     -- recorded -- the base a CR 613.1b layer-2 effect then overrides.
     --
-    -- Nothing means "no recorded entry controller, so use the owner". That
-    -- covers two things at once: CR 108.4a's fallback for a card that is not a
-    -- permanent at all, and, for a permanent, the fact that every effect in this
-    -- pool that puts one onto the battlefield is controlled by that permanent's
-    -- own owner. The one write is a CR 616.1b replacement redirecting the entry,
-    -- which is CR 110.2a's "unless the effect states otherwise".
+    -- Nothing means "no recorded entry controller, so use the owner". That is CR
+    -- 108.4a's fallback, and it covers every entry no effect spoke about: a
+    -- permanent spell resolving (CR 110.2b), a token, a land played from hand.
     --
-    -- CR 110.2a's OTHER shape -- an effect naming a controller who is not the
-    -- owner -- does not come through this field: Resolve.applyEntryControl still
-    -- expresses it as a stored layer-2 effect, and no card reaches that store
-    -- (#582).
+    -- Two writers, both of them CR 110.2a. Event.changeZoneAttaching records the
+    -- player an effect instructed to put the object onto the battlefield, which
+    -- is the rule's main clause; Pawl.Engine.Replacement's entry loop overwrites
+    -- that with a CR 616.1b rewrite's taker (Gather Specimens), which is its
+    -- "unless the effect states otherwise". Both write only for a BATTLEFIELD
+    -- entry, the rule's own scope (CR 110.2, CR 110.5d).
     --
     -- NOT a control-changing EFFECT: CR 800.4c distinguishes an effect that gives
     -- a player control of an object from the player who controlled it by

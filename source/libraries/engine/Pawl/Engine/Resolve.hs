@@ -1092,8 +1092,28 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- (CR 400.3 for a library, graveyard or hand destination).
         -- CR 110.5b: the funnel is handed the riders' tap state, so a permanent
         -- an effect says enters tapped is never untapped for an instant.
+        --
+        -- CR 110.2a: "If an effect instructs a player to put an object onto the
+        -- battlefield, that object enters the battlefield under THAT PLAYER's
+        -- control unless the effect states otherwise." This effect is exactly
+        -- such an instruction, so its controller (CR 109.5) is who the permanent
+        -- enters under -- Meandering Towershell's "return it to the battlefield
+        -- under your control" is that rule restated on the card rather than an
+        -- exception to it. Handed to the FUNNEL, not applied after it returns,
+        -- for the reason the tap state is: control is settled on the entering
+        -- incarnation before CR 614.1c's entry loop and the Moved snapshot can
+        -- read it, so a CR 616.1b entry replacement that filters on control
+        -- (Gather Specimens' "under an opponent's control") sees the controller
+        -- the permanent actually enters under. The funnel ignores it for a
+        -- non-battlefield destination, which is CR 110.2's own scope.
+        --
+        -- No CR 800.4b guard, unlike Effect.GainControl's arm: `controller` here
+        -- is whoever controls the resolving spell or ability, and a departed
+        -- player controls neither -- CR 800.4d keeps their triggered ability off
+        -- the stack and Departure.nonCardStackObjectsCease removes one already
+        -- on it, while clause 1 of CR 800.4a took their spells out of the game.
         Just target -> do
-          mNew <- Event.changeZoneEntering target zone (EntryRiders.tapped entry)
+          mNew <- Event.changeZoneEntering target zone (EntryRiders.tapped entry) (Just controller)
           case mNew of
             -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
             -- already gone (CR 603.7c's "no longer in the zone it's expected to
@@ -1101,21 +1121,6 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- is nothing to join to combat and nothing to bind.
             Nothing -> pure ()
             Just newId -> do
-              -- CR 110.2a: "If an effect instructs a player to put an object
-              -- onto the battlefield, that object enters the battlefield under
-              -- THAT PLAYER's control unless the effect states otherwise." This
-              -- effect is exactly such an instruction, so its controller is who
-              -- the permanent enters under -- Meandering Towershell's "return it
-              -- to the battlefield under your control" is that rule restated on
-              -- the card rather than an exception to it.
-              --
-              -- BEFORE the combat join below, and that order is load-bearing:
-              -- Combat.putOntoBattlefieldAttacking reads the new permanent's
-              -- controller and CR 506.3b refuses one who is not the active
-              -- player. Installed the other way round, a Towershell its
-              -- attacker does not own would return to its owner and then fail to
-              -- be attacking at all.
-              applyEntryControl controller source zone newId
               -- CR 508.4: "if a creature is put onto the battlefield attacking,
               -- its controller chooses which defending player ... it's
               -- attacking". The rules for that live in Pawl.Engine.Combat, which
@@ -2092,60 +2097,6 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- rather than being a "next occurrence" replacement installed here).
     let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
-
--- CR 110.2a: "If an effect instructs a player to put an object onto the
--- battlefield, that object enters the battlefield under that player's control
--- unless the effect states otherwise." `controller` is that player -- the
--- resolving effect's controller (CR 109.5) -- and this is what makes it so.
---
--- A stored CR 613.1b layer-2 effect over the ONE incarnation CR 400.7 just
--- minted: controllerOf derives control from layer-2 effects over a base, so
--- storing one IS "entered under that player's control". Effect.GainControl's arm
--- builds the same shape, naming a chosen target rather than a fresh id.
---
--- Indefinite (CR 611.2a): entering under someone's control is not a duration a
--- card states an end for.
---
--- BATTLEFIELD ONLY, the rule's own scope (CR 110.2, CR 110.5d). Control is the one
--- of the three sibling riders that would NOT have been inert elsewhere --
--- controllerOf answers for an object in any zone, so an ungated store would give a
--- graveyard card a controller.
---
--- NOTHING STORED when the effect's controller already owns the object, which is
--- every producer in the pool: the base already answers, and a stored effect would
--- be a no-op the controllerOf fold pays for on every projection thereafter.
---
--- NOT re-Sicked, where Effect.GainControl's arm is: CR 302.6 asks whether control
--- has been continuous since the controller's most recent turn began, and a
--- permanent that has just entered has no earlier span to interrupt.
---
--- No CR 800.4b guard, unlike Effect.GainControl's arm -- CR 800.4d keeps a
--- departed player's triggered ability off the stack and
--- Departure.nonCardStackObjectsCease removes one already on it.
---
--- Two known divergences, both unobservable because no card in the pool reaches the
--- store (#582): modelling this as a stored effect reverts the permanent to its
--- owner if this controller later leaves, where CR 800.4a would leave it controlled
--- by the departing player and exile it; and the store lands after
--- changeZoneEntering returns, so CR 614.1c's entry loop and the Moved snapshot
--- read the owner rather than this controller. Fixing the ordering means settling
--- control before the entry loop runs.
-applyEntryControl :: PlayerId -> ObjectId -> Zone.Zone -> ObjectId -> Game ()
-applyEntryControl controller source zone newId =
-  Monad.when (zone == Zone.Battlefield) . State.modify' $ \gs ->
-    if fmap Object.owner (Game.lookupObject newId gs) == Just controller
-      then gs
-      else
-        let (ts, gs1) = Game.freshTimestamp gs
-            eff =
-              ContinuousEffect.MkContinuousEffect
-                { ContinuousEffect.source = source,
-                  ContinuousEffect.timestamp = ts,
-                  ContinuousEffect.expiry = Expiry.Type.Never,
-                  ContinuousEffect.modification = Modification.SetController controller,
-                  ContinuousEffect.affected = Affected.TheseObjects (Set.singleton newId)
-                }
-         in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
