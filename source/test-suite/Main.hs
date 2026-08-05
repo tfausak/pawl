@@ -153,6 +153,7 @@ import qualified Pawl.Json.ValueSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
+import qualified Pawl.PerformanceSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
@@ -364,6 +365,7 @@ spec s registry = do
   Pawl.ManaSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
+  Pawl.PerformanceSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
