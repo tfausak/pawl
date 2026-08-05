@@ -1767,7 +1767,7 @@ project oid gs = projectFrom (gather gs) oid gs
 -- nothing.
 --
 -- Not implemented: CR 208.5, which is about the READ POINTS -- powerOf and
--- toughnessOf return Nothing for a creature with no value rather than 0 (#65).
+-- toughnessOf return Nothing for a creature with no value rather than 0 (#759).
 --
 -- CR 604.3a(3): a CDA does not affect any other object, so the Filter.Context is
 -- the object's OWN controller -- contrast applyModification's, which is the

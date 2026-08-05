@@ -156,8 +156,8 @@ playersFor context gs ref =
 -- subtypes, keywords (CR 109.3 counts abilities among an object's
 -- characteristics) and power. Everything that is not a characteristic is
 -- vacuously empty over a past event -- controller, identity and playerIdentity
--- are Nothing, and combat status, attachment, tokenhood and what the object did
--- this turn are all False.
+-- are Nothing, and combat status, attachment, tokenhood, tap status and what the
+-- object did this turn are all False.
 --
 -- `supertypes` is the odd one out: it IS a characteristic and
 -- ProjectedCharacteristics records it, but this view leaves it empty, so a

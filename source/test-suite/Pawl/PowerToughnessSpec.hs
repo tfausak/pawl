@@ -554,14 +554,15 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
 -- Elemental's power and toughness are each equal to the number of Forests
 -- sacrificed as it entered." Oracle text verified against Scryfall.
 --
--- The card #65 was waiting for. Its CDA reads a Quantity.InSlot, the one
--- quantity in the pool that can fail to evaluate: the entry replacement
+-- The first CDA in the pool whose quantity is a Quantity.InSlot. That is the arm
+-- whose Nothing means "unanswered" outright: the entry replacement
 -- (EntryRewrite.SacrificeAnyNumber) stamps the count on the permanent it made,
 -- so an incarnation that never entered has nothing to read and CR 208.2a's last
 -- sentence -- "if the ability needs to use a number that can't be determined,
 -- including inside a calculation, use 0 instead of that number" -- supplies the
 -- 0. Pawl.Engine.Quantity.determine is where that happens; the first test below
--- is what proves it, since every other CDA quantity in the pool is total.
+-- is what proves it for this arm, as Monstrous War-Leech's empty graveyard above
+-- does for an Aggregation.Greatest over no candidates.
 --
 -- It is also the first card whose Filter reads CR 110.5's tap status
 -- (Filter.IsTapped, spelled `Not IsTapped` for "untapped").
@@ -573,7 +574,7 @@ woodElementalSpec s registry = Spec.describe s "Wood Elemental" $ do
   -- CR 604.3: a characteristic-defining ability functions in all zones, so the
   -- card in hand has a power and a toughness to report -- and no number of
   -- Forests sacrificed as it entered, because it has not entered. CR 208.2a
-  -- makes that 0 rather than leaving the box blank, which is the whole of #65.
+  -- makes that 0 rather than leaving the box blank.
   Spec.it s "CR 208.2a a Wood Elemental that has not entered has an undeterminable count, so it is 0/0" $ do
     forest <- S.printingOf s registry "Forest"
     woodElemental <- S.printingOf s registry "Wood Elemental"
@@ -600,7 +601,7 @@ woodElementalSpec s registry = Spec.describe s "Wood Elemental" $ do
   -- The pair's second half, and CR 704.5f's own test. S.identityAnswer answers
   -- the empty set, which "any number" admits: the count is 0, so the CDA makes a
   -- 0/0 and the state-based action buries it. A Wood Elemental that kept a blank
-  -- P/T -- #65's failure mode -- would still be standing here.
+  -- P/T instead would still be standing here.
   Spec.it s "CR 704.5f sacrificing nothing makes a 0/0 that dies" $ do
     forest <- S.printingOf s registry "Forest"
     woodElemental <- S.printingOf s registry "Wood Elemental"
