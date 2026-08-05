@@ -55,10 +55,10 @@ reads it, so the convention is enforced there.
 
 Startup becomes O(pool) rather than O(cards actually used): a caller who wants
 one card pays to parse all of them. At 232 files and 372 KB that is a cost the
-test suite already reads whole many times over per run — `Pawl.Support.allPrintings`
-alone is unmemoized and is called repeatedly from `CardSpec`, `CardsSpec` and
-`CodecIntegrationSpec`. The pool is hand-authored and card-driven, so it grows by
-single cards rather than by sets.
+test suite already pays many times over per run — `Pawl.Support.allPrintings`
+alone is unmemoized and reads the pool whole, called repeatedly from `CardSpec`,
+`CardsSpec` and `CodecIntegrationSpec`. The pool is hand-authored and
+card-driven, so it grows by single cards rather than by sets.
 
 ## 4. Why not a registry of faces
 
@@ -93,13 +93,6 @@ single-face card would need a pointer file beside its face file.
 - `parseCard`'s filename identity check and its `name`/`slug` parameters; it
   becomes `ByteString -> Either Text Card`, since `loadRoot` pairs each result
   with the path it came from.
-
-The filing convention itself survives as `Registry.filedAs :: Card -> Slug` —
-the face names joined, slugified — because the corpus lint still needs to say
-where a file belongs. What ends is its role in a *lookup*. So `CardName.join`
-keeps two consumers rather than one, and the point of its comment changes rather
-than disappearing: `Engine.Card.combined` and `Registry.filedAs` ask for the same
-string for unrelated reasons and no longer have to agree.
 - **`Pawl.Types.CardError`.** `fetchCard` becomes `CardName -> m (Maybe Card)`.
   `Invalid` becomes unreachable (§6), which leaves one constructor carrying one
   bit plus the name the caller already passed in — and both consumers,
@@ -113,6 +106,13 @@ string for unrelated reasons and no longer have to agree.
   moves into `Pawl.Registry` and `Pawl.Support` calls it directly. Deleting a
   module needs `cabal-gild pawl.cabal` run directly; `hooky fix` acts on staged
   files and skips it.
+
+The filing convention itself survives as `Registry.filedAs :: Card -> Slug` —
+the face names joined, slugified — because the corpus lint still needs to say
+where a file belongs. What ends is its role in a *lookup*. So `CardName.join`
+keeps two consumers rather than one, and the point of its comment changes rather
+than disappearing: `Engine.Card.combined` and `Registry.filedAs` ask for the same
+string for unrelated reasons and no longer have to agree.
 
 `named`, `defaultRoot`, `cardPath` and the `Registry` record are unchanged.
 Enumeration still is not part of the *interface*: a caller holding a `Registry`
