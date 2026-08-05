@@ -122,7 +122,9 @@ attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayin
 -- every attack in a battle-less, planeswalker-less pool used to get, and
 -- Replay.defaultAnswer's fallback is the same one for the same reason.
 --
--- Battles are absent because there is no battle card type (#302). CR 802's
+-- Battles are absent because no battle can be attacked: AttackTarget has no
+-- OfBattle arm and nothing designates the CR 310.8 protector an attack on one
+-- would go through (#302). CR 802's
 -- attack-multiple-players option would put a SECOND player on this list, and
 -- pawl has no options concept to read it from (#175) -- the defending player is
 -- the argument, so this function needs no change when it arrives.

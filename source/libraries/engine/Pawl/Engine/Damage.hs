@@ -315,8 +315,8 @@ gatherCombatDamage assigns = do
 -- built; re-asking here would be a second, later reading of the same question,
 -- which is what CR 608.2b's target re-validation is for and this is not.
 --
--- Only battles are missing from the classification, and only because no card type
--- for one exists yet (#302); CR 120.3h is what it would need.
+-- Only battles are missing from the classification, and only because Recipient
+-- has no ToBattle tag to classify one as (#302); CR 120.3h is what it would need.
 --
 -- The creature test comes first, and for a permanent that is both a creature and
 -- a planeswalker that is the wrong answer -- CR 120.3c and CR 120.3e both apply

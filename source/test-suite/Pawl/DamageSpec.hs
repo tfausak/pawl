@@ -1733,7 +1733,7 @@ m2cPropertySpec s registry =
 --
 -- All three clauses of that rule are now live: the creature one has been since
 -- M3a, and CR 306.8's loyalty removal made the planeswalker one so (#494). Only
--- "battle" is still aspirational, for want of the card type (#302).
+-- "battle" is still aspirational, for want of a Recipient.ToBattle tag (#302).
 --
 -- So the function has three answers for a generically named permanent --
 -- ToCreature, ToPlaneswalker, or Nothing -- plus the pass-through for a
