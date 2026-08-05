@@ -1092,13 +1092,18 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
   -- gatherStatic is called with the SOURCE's own changes, so a Hack on the
   -- Warrior never reaches the Lord's GainKeyword at all. The layer order (the
   -- swap at 3, the grant at 6) is the second and weaker one.
-  let lordBoard hacked land = do
+  let -- combatBoardOf returns the ids in printing order, so the Warrior is the
+      -- head and the Lord is the second. Which of the two the Hack names is the
+      -- parameter, since that is the whole difference between CR 612.1's case
+      -- and CR 612.3's.
+      theWarrior = Maybe.listToMaybe
+      theLord = Maybe.listToMaybe . drop 1
+      lordBoardAt hackTarget hacked land = do
         lord <- S.printingOf s registry "Lord of Atlantis"
         tidalWarrior <- S.printingOf s registry "Tidal Warrior"
         landP <- S.printingOf s registry land
-        -- combatBoardOf returns the ids in printing order, so the Warrior is
-        -- the head and the Lord is the Hack's target.
-        hackedLandwalkBoard s registry [tidalWarrior, lord] (Maybe.listToMaybe . drop 1) hacked Subtype.Island Subtype.Swamp landP
+        hackedLandwalkBoard s registry [tidalWarrior, lord] hackTarget hacked Subtype.Island Subtype.Swamp landP
+      lordBoard = lordBoardAt theLord
   Spec.it s "CR 702.14c an unhacked Lord of Atlantis grants ISLANDwalk" $ do
     -- The premise, and the control the two hacked cases are read against: with
     -- the Lord's text as printed, bob's Island stops the block and his Swamp
@@ -1122,6 +1127,29 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     Spec.assertEqWith s "the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
     (onSwamp, warrior', blocker') <- lordBoard True "Swamp"
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp)) "a Swamp stops it now"
+  Spec.it s "CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing" $ do
+    -- CR 612.3 itself, and the case the two above are read against a THIRD
+    -- time: the same Island -> Swamp swap, aimed at the WARRIOR. Its islandwalk
+    -- is the Lord's text and not its own, so the swap cannot reach it and the
+    -- board answers exactly as the unhacked one does.
+    --
+    -- The Warrior is a legal and non-vacuous target: its own printed text says
+    -- "target land becomes an Island until end of turn", so the Hack really does
+    -- have an Island of its own to rewrite there. What it must not rewrite is
+    -- the keyword, which arrived from somewhere else.
+    (onIsland, warrior, blocker) <- lordBoardAt theWarrior True "Island"
+    -- THE ANTI-VACUITY CHECK, and it has to come first: every assertion below
+    -- also holds of a Hack that was never cast at all. This one says the swap
+    -- really did land, and on the Warrior.
+    Spec.assertEqWith s "the Hack resolved onto the Warrior" (Projection.textChangesAffecting warrior onIsland) [(Subtype.Island, Subtype.Swamp)]
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland)) "an Island still stops the block"
+    Spec.assertEqWith s "and the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
+    -- The half that keeps this from passing by the landwalk simply vanishing: a
+    -- Warrior that had wrongly picked up swampwalk would make this one illegal.
+    (onSwamp, warrior', blocker') <- lordBoardAt theWarrior True "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp) "and a Swamp still does not"
+    let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
+    Spec.assertEqWith s "the block sticks" (Combat.blockersOf warrior' after) (Set.singleton blocker')
   -- The PRINTED half, one carrier over: Bog Wraith ("Creature -- Wraith 3/3,
   -- Swampwalk" and nothing else) has the keyword on its own type line rather
   -- than from a grant, so the swap has to reach the projection's keyword map at
