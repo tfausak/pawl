@@ -163,15 +163,6 @@ objectsLeaveWith pid gs =
 --     (CR 723.1b). CR 800.4b says the same thing one step later, at
 --     Engine.beginTurnOf's promotion; neither is the other's spare.
 --
--- Object.enteredUnder is NOT a carrier and must never be swept here, however
--- much it looks like one: CR 110.2a's entry controller is the player who
--- controls the permanent BY DEFAULT (CR 110.2), which is the other side of the
--- line CR 800.4c draws, and no effect is giving it to them -- the one-shot that
--- put the permanent there finished resolving. Clearing it would put the
--- permanent back under its owner and leave the fourth clause with nothing to
--- exile, which is the bug this engine had; Pawl.DepartureSpec's Meandering
--- Towershell case is what catches it coming back.
---
 -- Control has a FOURTH source that is deliberately absent from that list: a
 -- layer-2 control-granting STATIC ability (Control Magic's
 -- Modification.SetControllerToSource, CR 613.1b), which
@@ -184,6 +175,16 @@ objectsLeaveWith pid gs =
 -- the source it left with the first clause, and if they merely CONTROLLED it,
 -- the effect that gave them the source is a stored carrier this clause just
 -- ended.
+--
+-- Object.enteredUnder is a FIFTH place a player's name is recorded against an
+-- object, and it is not a carrier at all -- it must never be swept here, however
+-- much it looks like one. CR 110.2a's entry controller is the player who
+-- controls the permanent BY DEFAULT (CR 110.2), which is the other side of the
+-- line CR 800.4c draws, and no effect is giving it to them: the one-shot that
+-- put the permanent there finished resolving. Clearing it would put the
+-- permanent back under its owner and leave the fourth clause with nothing to
+-- exile, which is the bug this engine had; Pawl.DepartureSpec's Meandering
+-- Towershell case is what catches it coming back.
 --
 -- Card JSON could author a stored SetControllerToSource through
 -- Effect.ModifyTarget, and this function does not end one -- but such an effect
