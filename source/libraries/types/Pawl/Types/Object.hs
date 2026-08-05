@@ -218,7 +218,7 @@ data Object = MkObject
     -- NOT a copiable value (CR 701.54b's second sentence), and that falls out
     -- with nothing to enforce: CR 707.2's copy path snapshots
     -- ProjectedCharacteristics into a Binding, and an Object field is not among
-    -- them. Pawl.RingSpec's "CR 701.54b a copy of the Ring-bearer is not a
+    -- them. Pawl.RingSpec's "CR 701.54b a Clone of the Ring-bearer is not a
     -- Ring-bearer" is the test that keeps it so.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
