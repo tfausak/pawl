@@ -704,6 +704,7 @@ test-suite pawl-test-suite
     Pawl.ReplacementSpec
     Pawl.ReplaySpec
     Pawl.ResolveSpec
+    Pawl.RingSpec
     Pawl.SetupSpec
     Pawl.Support
     Pawl.TargetSpec
