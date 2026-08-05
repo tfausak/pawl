@@ -581,11 +581,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- for the wrong reason.
   --
   -- SYNTHETIC GRANT, and the one crutch here: no card in data/cards prints or
-  -- grants the variant yet (#555 stays open for the card, blocked on #725), so
-  -- the ability arrives as a stored layer-6 continuous effect, exactly as the CR
-  -- 608.2b case below grants plain hexproof. The granted shape is real Magic --
-  -- Skrelv, Defector Mite and Sungold Sentinel both grant one -- and both of them
-  -- choose a colour first, which pawl cannot prompt for.
+  -- grants the variant (#555), so the ability arrives as a stored layer-6
+  -- continuous effect, exactly as the CR 608.2b case below grants plain hexproof.
+  -- The granted shape is real Magic -- Skrelv, Defector Mite and Sungold Sentinel
+  -- both grant one -- and both of them choose a colour first, which pawl cannot
+  -- prompt for.
   Spec.it s "CR 702.11d hexproof from black stops an opponent's black spell and admits their white one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"

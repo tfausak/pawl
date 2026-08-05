@@ -22,9 +22,8 @@ import qualified Pawl.Types.Filter as Filter
 -- Set -- see Pawl.Types.Face.keywords.
 --
 -- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
--- Filter has a HasKeyword arm and this type carries a Filter (702.11d, 702.29e,
--- 702.14c)
--- and a Cost (702.29a/702.34a/702.42a) whose components carry one too, so the
+-- Filter has a HasKeyword arm and this type carries a Filter (702.11d, 702.14c,
+-- 702.29e) and a Cost (702.29a/702.34a/702.42a) whose components carry one too, so the
 -- three would be a module cycle if any were concrete. They are parametric and
 -- this one is not, which makes `Filter Keyword` and `Cost Keyword` the only
 -- instantiations anywhere.
@@ -55,13 +54,14 @@ data Keyword
     -- sources.
     --
     -- Shroud's sibling (702.18a) and deliberately NOT the same constructor: the
-    -- CONTROLLER AXIS is the whole difference. Shroud names no player, so it stops
-    -- the permanent's own controller as readily as anyone else; hexproof's "your
-    -- opponents control" makes the answer depend on WHO is aiming the spell, which
-    -- is why Pawl.Engine.Target.targetable reads CR 109.5's "you" and not only the
-    -- candidate. The quality below narrows that same rule further, by the SOURCE's
-    -- characteristics -- the question protection (702.16b) asks and the one shroud
-    -- never does.
+    -- CONTROLLER AXIS is what separates them, and both arms of this one carry it.
+    -- Shroud names no player, so it stops the permanent's own controller as
+    -- readily as anyone else; hexproof's "your opponents control" makes the answer
+    -- depend on WHO is aiming the spell, which is why
+    -- Pawl.Engine.Target.targetable reads CR 109.5's "you" and not only the
+    -- candidate. The quality below narrows the same rule a second time, by WHAT is
+    -- aiming -- the question protection (702.16b) asks and the one shroud never
+    -- does.
     --
     -- The quality RIDES this constructor rather than taking one of its own,
     -- because rule 702.11d's last sentence says "a 'hexproof from [quality]'

@@ -78,8 +78,9 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       """ {"type":"Hexproof"} """
   -- CR 702.11d's "[quality]" rides the same constructor, so "hexproof from
   -- black" and plain hexproof must encode differently -- a codec that dropped the
-  -- quality would round-trip Slippery Bogle and silently turn Knight of Grace
-  -- into it, which is the far-too-strong reading #555 opened with.
+  -- quality would round-trip Slippery Bogle unharmed and silently turn Knight of
+  -- Grace into it, which is exactly the far-too-strong reading the variant exists
+  -- to avoid.
   Spec.it s "Hexproof carries CR 702.11d's quality" $ do
     Common.assertJsonCodec
       s
