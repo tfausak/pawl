@@ -1066,8 +1066,8 @@ hackedLandwalkBoard s registry mine hackTarget hacked from to defendersLand = do
 -- CR 612.1 reaching a keyword's own land type, end to end through the real
 -- engine, in both of the two ways a creature can have one.
 --
--- CR 702.14a (`docs/rules.txt:4015`): landwalk "appears within an object's rules
--- text as '[type]walk'". CR 612.1 (`docs/rules.txt:2934`): a text change reaches
+-- CR 702.14a: landwalk "appears within an object's rules
+-- text as '[type]walk'". CR 612.1: a text change reaches
 -- "any words or symbols printed on that object". So the land type in swampwalk
 -- is a word a Magical Hack swaps -- which is the example Magical Hack's own
 -- reminder text gives, "you may change 'swampwalk' to 'plainswalk'".
@@ -1083,12 +1083,15 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
   -- 2026-08-05) and Tidal Warrior, the pool's other Merfolk, are the whole
   -- board.
   --
-  -- The Hack names the LORD and never the Warrior, and that is CR 612.3
-  -- (`docs/rules.txt:2940`) rather than convenience: "any abilities that are
-  -- granted to an object can't be modified by text-changing effects that affect
-  -- that object", so hacking the creature that RECEIVED islandwalk would prove
-  -- nothing. The engine gets that from the layer order for free -- the swap is
-  -- layer 3 and the grant is layer 6.
+  -- Which creature the Hack NAMES is the whole of CR 612.3: "any abilities that
+  -- are granted to an object can't be modified by text-changing effects that
+  -- affect that object". Naming the Lord rewrites the grant; naming the Warrior
+  -- that RECEIVED islandwalk must not, and the case below asserts exactly that.
+  --
+  -- Two mechanisms give it, and the first is the one that scopes the rewrite:
+  -- gatherStatic is called with the SOURCE's own changes, so a Hack on the
+  -- Warrior never reaches the Lord's GainKeyword at all. The layer order (the
+  -- swap at 3, the grant at 6) is the second and weaker one.
   let lordBoard hacked land = do
         lord <- S.printingOf s registry "Lord of Atlantis"
         tidalWarrior <- S.printingOf s registry "Tidal Warrior"

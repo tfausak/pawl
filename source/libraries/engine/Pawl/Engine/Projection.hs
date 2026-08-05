@@ -920,8 +920,11 @@ rewriteModification pairs m =
         -- creature that RECEIVED the keyword may not touch it, and the layer
         -- order keeps that true (this is layer 6, the swap is layer 3).
         --
-        -- Filter.rewriteKeyword rather than a swap here, since the word is
-        -- inside a Filter (#499) and CR 612.2's gate comes with it.
+        -- Filter.rewriteKeyword rather than a swap here, since the word is inside
+        -- a Filter. No family gate is restated at that descent, for the reason
+        -- Filter.rewrite's own comment gives: a HasSubtype atom may name a word of
+        -- any family, so the family the word is used AS is the family it belongs
+        -- to, and the exact lookup already asks CR 612.2's question.
         Modification.GainKeyword k -> Modification.GainKeyword (Filter.rewriteKeyword [(from, to)] k)
         -- Carries no word: the type is read off the source at projection time,
         -- not printed on the card, so CR 612.1 has nothing here to reach.
@@ -1554,10 +1557,12 @@ filterReads f = case f of
 
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
--- Four arms write Keywords, each writing PC.keywords in applyModification:
--- GainKeyword and LoseAllAbilities per CR 613.1f, and both subtype-setting arms
--- per CR 305.7. Filter.HasKeyword reads that map, so all four can move an affected
--- set. Keyword counters need no arm, arriving here as synthetic GainKeywords.
+-- Five arms write Keywords, each writing PC.keywords in applyModification:
+-- GainKeyword and LoseAllAbilities per CR 613.1f, both subtype-setting arms per
+-- CR 305.7, and ChangeSubtypeWord per CR 612.1 -- a text change reaches the land
+-- type inside a landwalk keyword, so it rewrites the map's KEYS.
+-- Filter.HasKeyword reads that map, so all five can move an affected set. Keyword
+-- counters need no arm, arriving here as synthetic GainKeywords.
 --
 -- An ability change can also matter to CR 613.8 by changing an effect's EXISTENCE,
 -- a different clause that lives in staticAbilitiesLive.
@@ -1572,7 +1577,7 @@ modificationWrites m = case m of
   Modification.SetLandSubtypeToChosen -> Set.fromList [Subtypes, Keywords]
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
-  Modification.ChangeSubtypeWord _ _ -> Set.singleton Subtypes
+  Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors
   Modification.AddColor _ -> Set.singleton Colors
