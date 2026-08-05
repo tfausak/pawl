@@ -1105,6 +1105,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfDies -> condition
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
+  TriggerCondition.DamageToPlayerPrevented _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the two customers a
 -- printed triggered ability has: a CR 603.8 state trigger and a CR 603.4

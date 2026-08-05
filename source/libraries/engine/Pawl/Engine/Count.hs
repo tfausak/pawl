@@ -195,6 +195,9 @@ snapshotView shape event = case event of
               }
         else Nothing
   GameEvent.DamageDealt _ -> Nothing
+  -- CR 615.13's record names a recipient and an amount and snapshots no
+  -- characteristics, so there is nothing for a Filter to look at.
+  GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing

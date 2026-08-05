@@ -1,5 +1,6 @@
 module Pawl.Engine.Quantity where
 
+import Control.Applicative ((<|>))
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -70,12 +71,26 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.X -> case Game.lookupObject announcedOn gs of
     Nothing -> Nothing
     Just obj -> fmap toInteger (Binding.amountOf Binding.variableX (Object.bindings obj))
-  -- A value an earlier effect of this resolution bound into the slot, read off
-  -- the effect's SOURCE. Nothing when the slot holds no amount: the producing
-  -- effect has not run, or bound nothing.
-  Quantity.InSlot slot -> case Game.lookupObject oid gs of
-    Nothing -> Nothing
-    Just obj -> fmap toInteger (Binding.amountOf slot (Object.bindings obj))
+  -- A value bound into the slot, read off the effect's SOURCE and then off the
+  -- object on the stack. Nothing when neither holds an amount there: the
+  -- producing effect has not run, or bound nothing.
+  --
+  -- TWO places because there are two writers, each of which binds where its value
+  -- belongs:
+  --
+  --   * Resolve.bindAmountSlot writes to the SOURCE, mid-resolution -- Bane of
+  --     Progress' "for each permanent destroyed this way".
+  --   * Event.eventBindings writes to the object CR 603.3 put ON THE STACK, as
+  --     the trigger was gathered -- Selfless Squire's "that many", the amount CR
+  --     615.13's prevention supplied.
+  --
+  -- The source is asked first so the existing reading is untouched, and the two
+  -- cannot collide over one name: a mid-resolution bind names a slot the CARD
+  -- declared, and an event-supplied one names a reserved slot no card may declare
+  -- (see Pawl.Engine.Binding.preventedAmount).
+  Quantity.InSlot slot ->
+    let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
+     in fmap toInteger (boundOn oid <|> boundOn announcedOn)
   -- CR 208.2: a bare star has no value of its own. The projection substitutes
   -- the object's characteristic-defining quantity for it at the seed
   -- (Projection.baseCharacteristics), so reaching this arm means the star was

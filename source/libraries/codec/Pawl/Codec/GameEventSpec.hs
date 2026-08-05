@@ -46,6 +46,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       ( "{\"type\":\"DamageDealt\",\"value\":{\"source\":1,\"target\":{\"type\":\"ToPlayer\",\"value\":1},\"amount\":2,"
           <> "\"dealtByDeathtouch\":true,\"dealtByToxic\":3,\"dealtByLifelink\":2,\"kind\":{\"type\":\"Combat\"}}}"
       )
+  -- CR 615.13's record. The recipient is a PLAYER, which is the only shape the
+  -- pool's one reader matches.
+  Spec.it s "DamagePrevented" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.DamagePrevented (Recipient.ToPlayer (PlayerId.MkPlayerId 1)) 3)
+      """ {"type":"DamagePrevented","value":[{"type":"ToPlayer","value":1},3]} """
   Spec.it s "StepBegan" $
     Common.assertJsonCodec
       s

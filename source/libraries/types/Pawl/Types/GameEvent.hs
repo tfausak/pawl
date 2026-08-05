@@ -1,5 +1,6 @@
 module Pawl.Types.GameEvent where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -7,6 +8,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | CR 608.2i: one entry of the turn-scoped record of what happened. Effects
@@ -31,6 +33,27 @@ data GameEvent
   | -- | CR 120 / 510: damage was dealt. The record the CR 704.5h deathtouch
     -- state-based action reads, watermarked rather than drained.
     DamageDealt DamageEvent.DamageEvent
+  | -- | CR 615.13: a prevention effect was applied to one or more SIMULTANEOUS
+    -- damage events and prevented some or all of that damage. The Recipient is
+    -- whom the prevented damage would have been dealt to, and the Natural is how
+    -- much of it was prevented -- always greater than 0, since a prevention that
+    -- prevented nothing fires nothing.
+    --
+    -- ONE entry per prevention effect per batch, not per damage event: the rule
+    -- says "one or more simultaneous damage events", so a shield spent across
+    -- two attackers is a single prevention of the total.
+    -- Pawl.Engine.Replacement.groupPreventions does that grouping; this record is
+    -- what it turned into.
+    --
+    -- Not derivable from DamageDealt below, which is the whole reason this is its
+    -- own constructor: CR 615.6 makes a fully prevented event never happen, so
+    -- there is no DamageDealt to subtract from -- and even a partly prevented one
+    -- records only what got through.
+    --
+    -- Carries no identity for the prevention EFFECT. The pool's one reader
+    -- (Selfless Squire) triggers on any prevention at all, by its own ruling, and
+    -- a card saying "prevented this way" is what must add one (#687).
+    DamagePrevented Recipient.Recipient Natural.Natural
   | -- | CR 603.2b: a phase or step began, on whose turn (the active player). What
     -- both an "at the beginning of each end step" step trigger and a CR 603.7
     -- delayed ability match against.

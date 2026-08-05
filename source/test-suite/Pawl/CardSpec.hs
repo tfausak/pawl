@@ -400,6 +400,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
   -- exactly as the discard condition above.
   TriggerCondition.SpellOrAbilityCounters _ -> []
+  -- CR 615.13's prevention condition is a PlayerRelation too.
+  TriggerCondition.DamageToPlayerPrevented _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -1246,6 +1248,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
+  TriggerCondition.DamageToPlayerPrevented _ -> []
 
 -- CR 613.11: which spells a cost-modifying player effect applies to.
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]

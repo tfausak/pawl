@@ -130,6 +130,25 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
+-- CR 615.13: the reserved slot under which a prevention trigger's AMOUNT is
+-- bound -- "put that many +1/+1 counters" on Selfless Squire, "you gain that much
+-- life" on the cards that will follow it. Stamped by
+-- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the payload
+-- reads an ordinary Quantity.InSlot rather than a "how much was prevented"
+-- opcode.
+--
+-- A NUMBER, where triggerPlayer and became are references, so this is the first
+-- reserved slot read through Quantity rather than through a Ref. That is why
+-- Pawl.Engine.Quantity.evaluateFor's InSlot arm looks on the stack object as well
+-- as on the effect's source: an amount an EFFECT bound mid-resolution lives on
+-- the source, and one the EVENT supplied lives where every other trigger binding
+-- does.
+--
+-- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
+-- "no card's targetSpecs may name it" sweep as `you`, `thatPlayer` and `became`.
+preventedAmount :: SlotName
+preventedAmount = SlotName.MkSlotName (Text.pack "thatMuch")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -165,6 +184,10 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 -- Bind an object under the reserved became slot (CR 400.7e).
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
+
+-- Bind a number under the reserved preventedAmount slot (CR 615.13).
+setPreventedAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding
+setPreventedAmount n = Map.insert preventedAmount (toAmount n)
 
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).
