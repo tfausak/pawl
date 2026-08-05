@@ -177,13 +177,25 @@ applyModification lyr src cands gs oid m pc =
         -- same Set.member guard: a word swapped in the text box has nothing to
         -- do with whether the type line carries it.
         --
+        -- The KEYWORD half is CR 702.14a's: swampwalk holds a land-type word, and
+        -- Magical Hack's own reminder text is that example. It reaches only the
+        -- keywords the object PRINTS, which is CR 612.3 falling out of the layer
+        -- order again -- a granted keyword arrives at layer 6, after this.
+        --
+        -- Map.mapKeysWith (+) rather than Map.mapKeys, because the swap can
+        -- collide two keys: a creature with both islandwalk and swampwalk hacked
+        -- Island -> Swamp has one kind of landwalk twice. Summing is CR 702.14e's
+        -- redundancy counted rather than discarded, matching what two GainKeywords
+        -- of the same keyword already do.
+        --
         -- Not implemented: the swap does not reach PC.replacementEffects, a
         -- mode's targetSpecs, or an activated ability's cost (#635).
         Modification.ChangeSubtypeWord from to ->
           let pairs = [(from, to)]
               pc' =
                 pc
-                  { PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
+                  { PC.keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc),
+                    PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
                     PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc)
                   }
            in if Set.member from (PC.subtypes pc')
@@ -886,6 +898,10 @@ textChangesAffecting oid gs =
 -- the gate changes no answer. What it removes is the dependence on that: the rule
 -- is stated rather than inferred from the payload, so malformed data cannot
 -- smuggle a cross-family rewrite through.
+--
+-- Exhaustive rather than a catch-all, which is what let GainKeyword go
+-- unrewritten while carrying CR 702.14a's land-type word (#523): a later arm that
+-- can hold a word must break this build instead of falling through.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
 rewriteModification pairs m =
   let -- `inFamily from` is CR 612.2's gate.
@@ -896,12 +912,45 @@ rewriteModification pairs m =
         -- CR 612.2's other named example: the swap rewrites a Turn to Frog's Frog
         -- on the stack, so the spell resolves making its target the new type.
         Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
+        -- CR 702.14a: "[type]walk" holds a land-type word, so a hacked Lord of
+        -- Atlantis grants swampwalk rather than the printed islandwalk. The
+        -- GRANTER's text is what this reads -- gatherStatic calls it with the
+        -- source's own changes -- which is CR 612.3: a text change on the
+        -- creature that RECEIVED the keyword may not touch it, and the layer
+        -- order keeps that true (this is layer 6, the swap is layer 3).
+        --
+        -- Filter.rewriteKeyword rather than a swap here, since the word is
+        -- inside a Filter (#499) and CR 612.2's gate comes with it.
+        Modification.GainKeyword k -> Modification.GainKeyword (Filter.rewriteKeyword [(from, to)] k)
         -- Carries no word: the type is read off the source at projection time,
         -- not printed on the card, so CR 612.1 has nothing here to reach.
         Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word either.
         Modification.SetController _ -> acc
-        _ -> acc
+        Modification.SetControllerToSource -> acc
+        -- An ability wipe names nothing at all, and neither does a P/T switch.
+        Modification.LoseAllAbilities -> acc
+        Modification.SwitchPowerToughness -> acc
+        -- Not implemented: a Quantity.Count carries a Filter, and it is left
+        -- unrewritten, so a "+1/+1 for each Swamp you control" would keep
+        -- counting Swamps after a swap (#711).
+        Modification.SetBasePowerToughness _ _ -> acc
+        Modification.ModifyPowerToughness _ _ -> acc
+        -- A card type is not a subtype (CR 205.2a vs 205.3), so CR 612.2's gate
+        -- would reject the pair even if the words could collide.
+        Modification.AddCardType _ -> acc
+        -- The swapped-in words of a STORED text change are the choice its own
+        -- resolution made (CR 612.1's ChooseLandTypeSwap), not words printed on
+        -- the object this rewrite is walking. Artificial Evolution aimed at a
+        -- Magical Hack still on the stack reaches the PRINTED restriction
+        -- instead, which is rewriteEffect's ChangeText arm.
+        Modification.ChangeSubtypeWord _ _ -> acc
+        -- CR 612.2 names colour words as a family a text change can swap, but
+        -- pawl's only text changer swaps subtypes (Modification.ChangeSubtypeWord),
+        -- so no pair reaching here holds a colour word to write.
+        Modification.SetColor _ -> acc
+        Modification.AddColor _ -> acc
+        Modification.AddChosenColor -> acc
    in List.foldl' apply1 m pairs
 
 -- rewriteModification's sibling for the other half of a static ability. Under CR
