@@ -1254,7 +1254,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
 
--- CR 613.11: which spells a cost-modifying player effect applies to.
+-- CR 613.11: which spells a player effect names -- a cost modifier's (CR
+-- 601.2f) or a timing permission's (CR 601.3b).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost f _ -> [f]
@@ -1267,11 +1268,14 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.CantPlayLandChosenName -> []
   PlayerEffect.NoMaximumHandSize -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
-  -- this traversal is about the spells a cost modifier matches.
+  -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
   -- CR 702.18a / 702.11c carry a PlayerScope, not a Filter: the set they name is
-  -- players, and this traversal is about the spells a cost modifier matches.
+  -- players, and this traversal is about the spells a player effect names.
   PlayerEffect.CantBeTargetedBy _ -> []
+  -- CR 601.3b's "a spell with certain qualities", which is a Filter over the
+  -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
+  PlayerEffect.CastAsThoughItHadFlash f -> [f]
 
 -- CR 201.4a: the restriction on which cards' names an as-enters name choice may
 -- name (Null Chamber's "other than a basic land card name"). The one Filter an
@@ -1424,7 +1428,8 @@ activatedAbilityFilters ability =
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
 --   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
---   * `playerAbilities` -- CR 613.11's cost modifiers.
+--   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
+--     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `attackRequirements` (CR
 --     508.1d), `blockRequirements` (CR 509.1c) and `attackCosts` (CR 508.1h) --
 --     four more affected sets.

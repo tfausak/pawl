@@ -68,13 +68,23 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 -- Flash is that second sentence being OVERRIDDEN rather than restated, so
 -- instantSpeed's disjunction is CR 101.1 resolved, not CR 117.1a read generously.
 --
+-- THREE disjuncts, not two, because the widening arrives on two different axes.
+-- instantSpeed is what the CARD is (CR 304.1) or what it says about itself (CR
+-- 702.8a); PlayerEffect.mayCastAsThoughItHadFlash is what an effect says about
+-- the PLAYER (CR 601.3b, Vedalken Orrery). They are read BESIDE each other and
+-- neither is folded into the other -- see instantSpeed below for what folding
+-- would cost.
+--
 -- The window the RULES give a spell, and not the whole of when it may be cast: a
 -- card may narrow this further with a printed restriction (CR 601.3), which
 -- `castable` conjoins separately through printedRestrictionsOk.
 timingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 timingOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
-  Just face -> instantSpeed face || sorcerySpeed pid gs
+  Just face ->
+    instantSpeed face
+      || PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
+      || sorcerySpeed pid gs
 
 -- The half whose cast is being proposed (CR 709.3a: "Only the chosen half is
 -- evaluated to see if it can be cast"). Nothing when the id is unknown or no
@@ -120,9 +130,12 @@ soleCastableFace oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
 -- wherever the cast is being proposed from -- CR 702.8a's "functions in any zone
 -- from which you could play the card it's on".
 --
--- The PLAYER-scoped sibling is not this and is not built: an effect that lets a
--- player cast OTHER spells as though they had flash (CR 601.3b, Vedalken Orrery)
--- would be read here beside this predicate, never folded into it (#565).
+-- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
+-- effect that lets a player cast OTHER spells as though they had flash (CR
+-- 601.3b, Vedalken Orrery) is read in timingOk above, beside this predicate,
+-- through PlayerEffect.mayCastAsThoughItHadFlash. Widening this one instead would
+-- say the Orrery gave every card in every zone the flash keyword, which is not
+-- what CR 702.8a's "the card it's on" means.
 instantSpeed :: Face.Face Card.Type.Card -> Bool
 instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 
