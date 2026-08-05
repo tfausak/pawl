@@ -58,6 +58,8 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerId (PlayerId)
+import Pawl.Types.Prevention (Prevention)
+import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
@@ -169,10 +171,20 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 --      relative to it. NOT IMPLEMENTED AT ALL, and unreached today only because
 --      every token card in the pool has empty `staticAbilities` (#78).
 applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
-applyReplacementsIn asOf batch = loop asOf batch Set.empty
+applyReplacementsIn asOf batch = fmap fst . applyReplacementsReporting asOf batch
 
-loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> ProposedEvent -> Game (Maybe ProposedEvent)
-loop asOf batch applied event = do
+-- The same loop, answering CR 615.13's second question as well: WHICH prevention
+-- effects applied on the way, and how much each of them prevented.
+--
+-- A separate entry rather than a wider applyReplacementsIn because only the
+-- damage class can answer anything but the empty list -- CR 615.1 makes a
+-- prevention effect a thing that watches a DAMAGE event -- so every other caller
+-- would be threading a value it knows is empty.
+applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
+applyReplacementsReporting asOf batch = loop asOf batch Set.empty []
+
+loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
+loop asOf batch applied prevented event = do
   gs <- State.get
   -- From scratch each iteration: collect against the CURRENT state (or, for a
   -- CR 608.2f batch, the state the batch began in), minus CR 614.5's
@@ -181,18 +193,24 @@ loop asOf batch applied event = do
       fresh = filter unused (applicable asOf gs event)
   case highestBucket fresh of
     -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
-    [] -> pure (Just event)
+    [] -> pure (Just event, prevented)
     bucket -> do
       picked <- choose gs event bucket
       case picked of
         -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
         -- is non-empty and `choose` always picks. Total rather than partial.
-        Nothing -> pure (Just event)
+        Nothing -> pure (Just event, prevented)
         Just candidate -> do
           outcome <- apply batch candidate event
+          -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
+          -- no arm of that fold has to report anything and none can forget to.
+          -- What makes it exact rather than a guess is `prevents` below: only a
+          -- PREVENTION rewrite's shrinkage is prevention, where CR 614.1a's
+          -- SetAmount and Scale shrink an event without preventing a point of it.
+          let prevented1 = prevented <> Maybe.maybeToList (preventionBy candidate event outcome)
           case outcome of
-            Nothing -> pure Nothing
-            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) rewritten
+            Nothing -> pure (Nothing, prevented1)
+            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 rewritten
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -1134,25 +1152,106 @@ setShield identity_ pat left = case identity_ of
             | otherwise = Just active {ActiveReplacement.effect = ReplacementEffect.DamageR pat (DamageRewrite.PreventNext left)}
        in gs {GameState.replacements = Maybe.mapMaybe rewrite (GameState.replacements gs)}
 
--- CR 615: settle one proposed damage event. Nothing means it does not happen.
-resolveDamage :: DamageEvent.DamageEvent -> Game (Maybe DamageEvent.DamageEvent)
+-- CR 615.1a: is this damage rewrite a PREVENTION effect, rather than one of CR
+-- 614.1a's replacements? "Effects that use the word 'prevent' are prevention
+-- effects", and that word is what CR 615.13's trigger watches for -- so a
+-- SetAmount that cuts an event from 3 to 1 has prevented nothing, though it
+-- shrank the event exactly as a shield would.
+--
+-- A CLASSIFICATION of effects -- what SHAPE a rewrite has, never which effect it
+-- is -- in the same genre as bucketOf, readsApplier and shieldRemaining above.
+-- One arm per constructor, no wildcard, so a new rewrite that prevents damage
+-- breaks the build here rather than silently going unreported.
+--
+-- Not implemented: CR 615.12's damage that "can't be prevented", which asks a
+-- second question this predicate cannot -- a prevention still APPLIES to such an
+-- event, prevents none of it, and leaves its shield unspent (#690).
+prevents :: DamageRewrite.DamageRewrite -> Bool
+prevents rewrite = case rewrite of
+  DamageRewrite.PreventNext _ -> True
+  DamageRewrite.PreventAll -> True
+  DamageRewrite.SetAmount _ -> False
+  DamageRewrite.Scale _ -> False
+
+-- CR 615.13: how much of this event the candidate just applied PREVENTED, or
+-- Nothing when it prevented nothing.
+--
+-- `before` is the event as it was offered to `apply` and `after` what came back,
+-- so this is the CR 615.6 arithmetic read off the pair: Nothing means the event
+-- does not happen at all, which is the whole of it prevented.
+--
+-- The wildcard is over (effect, event) PAIRS, where it is the only way to say
+-- "this pair is not a prevention of damage"; the per-constructor obligation this
+-- module carries is discharged by `prevents` above, which the guard delegates to.
+preventionBy :: ReplacementCandidate -> ProposedEvent -> Maybe ProposedEvent -> Maybe Prevention
+preventionBy candidate before after = case (ReplacementCandidate.effect candidate, before) of
+  (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de)
+    | prevents rewrite ->
+        let was = DamageEvent.amount de
+            -- The event that did not happen prevented all of it (CR 615.6).
+            now = maybe 0 DamageEvent.amount (after >>= asDamageEvent)
+         in if was > now
+              then
+                Just
+                  Prevention.MkPrevention
+                    { Prevention.by = ReplacementCandidate.identity candidate,
+                      -- The recipient of the event as PROPOSED. Nothing in the
+                      -- pool redirects damage, and if anything did, CR 615.13's
+                      -- ability watches the damage that WOULD have been dealt.
+                      Prevention.recipient = DamageEvent.target de,
+                      Prevention.amount = was - now
+                    }
+              else Nothing
+  _ -> Nothing
+
+-- CR 615: settle one proposed damage event. Nothing means it does not happen;
+-- the second answer is CR 615.13's, one entry per prevention effect that applied
+-- to THIS event and prevented some of it.
+resolveDamage :: DamageEvent.DamageEvent -> Game (Maybe DamageEvent.DamageEvent, [Prevention])
 resolveDamage de = do
-  outcome <- applyReplacements (ProposedEvent.WouldDealDamage de)
-  pure (outcome >>= asDamageEvent)
+  (outcome, prevented) <- applyReplacementsReporting Nothing Set.empty (ProposedEvent.WouldDealDamage de)
+  pure (outcome >>= asDamageEvent, prevented)
 
 -- CR 608.2f / 510.2: settle a whole batch of SIMULTANEOUS damage events, and
 -- answer the survivors. The typed door Pawl.Engine.Damage uses, so Damage never
 -- cases on a ProposedEvent or on a ReplacementEffect.
 --
 -- Each event still runs its OWN CR 616.1 loop and the loop's unit is still one
--- event, which is what CR 614.5 and CR 615.10 both describe. The one thing this
--- adds over calling resolveDamage per event is the ORDER those loops run in,
--- because CR 615.7's shield is a single resource allocated across the whole
--- batch and the rule gives that choice to the shielded side, not to the engine.
-resolveDamageBatch :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+-- event, which is what CR 614.5 and CR 615.10 both describe. Two things this
+-- adds over calling resolveDamage per event, and both are rules the BATCH is the
+-- only place to state:
+--
+--   * CR 615.7's ORDER, because the shield is a single resource allocated across
+--     the whole batch and the rule gives that choice to the shielded side.
+--   * CR 615.13's GROUPING, because that rule fires an ability "each time a
+--     prevention effect is applied to one or more simultaneous damage events",
+--     so one instance reaching three of this batch's events is ONE prevention of
+--     the total rather than three.
+resolveDamageBatch :: [DamageEvent.DamageEvent] -> Game ([DamageEvent.DamageEvent], [Prevention])
 resolveDamageBatch events = do
   ordered <- orderForShields events
-  fmap Maybe.catMaybes (Monad.mapM resolveDamage ordered)
+  settled <- Monad.mapM resolveDamage ordered
+  pure (Maybe.mapMaybe fst settled, groupPreventions (concatMap snd settled))
+
+-- CR 615.13: collapse a batch's per-event preventions to one entry per applying
+-- instance per recipient, carrying the total that instance prevented.
+--
+-- Keyed on the RECIPIENT as well as the instance, which is narrower than the
+-- rule's own unit -- 615.13 counts one application of one prevention effect,
+-- whoever the simultaneous events were addressed to. Every prevention the ENGINE
+-- bakes names exactly one recipient (Resolve's two prevention arms), and the one
+-- card-authored prevention that names none -- Fog's -- has no CR 615.13 trigger
+-- paired with it, so the two readings coincide today. Not implemented: a
+-- prevention effect naming NO recipient that reaches two recipients in one batch
+-- reports two preventions where the rule describes one (#688).
+--
+-- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
+-- these triggers are offered in -- is canonical rather than gather-dependent.
+groupPreventions :: [Prevention] -> [Prevention]
+groupPreventions ps =
+  let keyed = Map.fromListWith (+) [((Prevention.by p, Prevention.recipient p), Prevention.amount p) | p <- ps]
+      rebuild ((by, recipient), amount) = Prevention.MkPrevention {Prevention.by = by, Prevention.recipient = recipient, Prevention.amount = amount}
+   in fmap rebuild (Map.toAscList keyed)
 
 -- CR 615.7: when two or more applicable sources would deal damage to a shielded
 -- recipient at the same time, that recipient chooses which damage the shield

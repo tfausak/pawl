@@ -597,6 +597,7 @@ library types
     Pawl.Types.PlayerStaticAbility
     Pawl.Types.Pool
     Pawl.Types.Power
+    Pawl.Types.Prevention
     Pawl.Types.Printing
     Pawl.Types.ProductionTag
     Pawl.Types.Program
