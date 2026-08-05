@@ -1028,16 +1028,16 @@ withMenace oid gs =
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- CR 702.111b, proved by Boggart Brute ("Creature -- Goblin Warrior 3/2,
--- Menace") -- the first restriction of the SET shape #533 named, and the first
--- evasion ability that is not a question about a (blocker, attacker) pair. Only
--- the blocking side of that issue; its attacking side has no card and no gate
--- (see attackCeiling).
+-- Menace") -- the blocking side's SET-SHAPED combat restriction, and the first
+-- evasion ability that is not a question about a (blocker, attacker) pair. Its
+-- attacking counterpart is Bonded Construct's "can't attack alone"
+-- (attacksAloneSpec below).
 --
 -- The whole group turns on the difference between "two or more creatures block
 -- it" and "each creature blocking it passes some test". Flying, reach, fear and
 -- landwalk are all the second kind, so they are checked in
 -- Pawl.Engine.Combat.pairAllowed; menace is the first of the first kind, and is
--- checked in declarationAllowed, which sees the whole map at once. The
+-- checked in blockDeclarationAllowed, which sees the whole map at once. The
 -- zero-blockers case below is what separates 702.111b's "can't be blocked EXCEPT
 -- BY two or more" from the naive "at least two creatures must block it".
 menaceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1844,6 +1844,123 @@ conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional Comba
         Spec.assertEqWith s "without it, bob takes nothing" (S.lifeOf S.bob control) (Just 20)
         Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
       _ -> Spec.assertFailure s "fixture should have two creatures"
+
+-- CR 508.1c read through CR 506.5, proved by Bonded Construct ("{1} Artifact
+-- Creature -- Construct 2/1, This creature can't attack alone") -- the attacking
+-- side's SET-SHAPED restriction, and menaceSpec's twin across the combat phase.
+--
+-- What makes it a different KIND of restriction from Pacifism's, and not merely a
+-- narrower one: there is no answer to "may this creature attack?" at all. The
+-- Construct may attack in some declarations and not in others, so it stays on CR
+-- 508.1a's candidate list and the illegality is a property of the declaration.
+-- The first assertion of every case below is that it is still offered, because
+-- "the attack was refused" is also what a bug that drops it from the candidate
+-- list produces -- and that bug would pass every negative assertion here.
+--
+-- The requirement cases are the subtle half. CR 508.1d's maximum is "the maximum
+-- possible number of requirements that could be obeyed WITHOUT DISOBEYING ANY
+-- RESTRICTIONS", and before this card no attacking restriction could take a
+-- required creature's declaration away, so the maximum was always every
+-- requirement at once. Under a Curse of the Nightly Hunt a lone Construct is
+-- required to attack and forbidden to attack alone, and the maximum is zero.
+attacksAloneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
+  Spec.it s "CR 506.5 a lone Bonded Construct is a legal CANDIDATE that may not be the whole declaration" $ do
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    let (gs, mine, _) = S.combatBoardOf [bondedConstruct] []
+    case mine of
+      [construct] -> do
+        Spec.assertBool s (Combat.canAttack S.alice construct gs) "the Construct can attack"
+        Spec.assertEqWith s "and is offered" (Combat.legalAttackers S.alice gs) [construct]
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "but attacking alone is illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "and declining stays legal"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 506.5 a Goblin Piker beside it makes the same Construct's attack legal" $ do
+    -- The permitted case on the SAME board as the refused one, which is what
+    -- separates this restriction from summoning sickness, a tap, or a defender:
+    -- none of those changes its answer when a second creature is declared.
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [bondedConstruct, piker] []
+    case mine of
+      [construct, other] -> do
+        Spec.assertEqWith s "both are offered" (Combat.legalAttackers S.alice gs) [construct, other]
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone is still illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] gs) "the two together are legal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [other] gs) "and the Piker alone is legal, so nothing blanket-refused"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1c two Bonded Constructs may attack together, which is that rule's own Example" $ do
+    -- Verbatim: "A player controls two creatures, each with a restriction that
+    -- states 'This creature can't attack alone.' It's legal to declare both as
+    -- attackers." The reading it falsifies is "each restricted creature needs an
+    -- UNRESTRICTED companion", which passes every other case in this group.
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    let (gs, mine, _) = S.combatBoardOf [bondedConstruct, bondedConstruct] []
+    case mine of
+      [first, second] -> do
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] gs) "declaring both is legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first] gs)) "either one alone is illegal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [second] gs)) "in both directions"
+      _ -> Spec.assertFailure s "fixture should have two Constructs"
+  Spec.it s "CR 508.1d a required creature that can't attack alone makes the maximum ZERO" $ do
+    -- The board CR 508.1d's closed form got wrong: the Curse requires the
+    -- Construct to attack if able, the Construct may not attack alone, and there
+    -- is nobody to attack with -- so no legal declaration obeys the requirement
+    -- and declining attains the maximum. A ceiling that assumed "every required
+    -- creature at once is legal" answers this by forcing an illegal attack.
+    --
+    -- The lone Piker under the same Curse is the control, and it is the case that
+    -- makes this one non-vacuous: there declining IS illegal, so the Curse is
+    -- live and it is the Construct's restriction that moved the maximum.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [bondedConstruct] []
+        (control, _, _) = cursing curse S.alice [piker] []
+    case mine of
+      [construct] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] control)) "a required Piker may not decline"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "but a required Construct with no company may"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "and attacking alone stays illegal, requirement or no requirement"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 508.1d with company the maximum is BOTH, and the Piker alone no longer attains it" $ do
+    -- The other side of the same interaction. One Curse over two able creatures
+    -- is two requirements, both obeyable at once because attacking together is
+    -- legal -- so the restriction bounds the maximum here without zeroing it, and
+    -- the declaration that obeys only the Piker's is now illegal.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [bondedConstruct, piker] []
+    case mine of
+      [construct, other] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "declining is illegal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [other] gs)) "the Piker alone obeys one of two"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone disobeys the restriction"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] gs) "only both together is legal"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 506.5 whole cards: a lone Construct sits out a real declare attackers step" $ do
+    -- The gameplay-level case, through the priority loop and CR 703.4i's
+    -- turn-based action rather than a direct call, with the interpreter that
+    -- attacks with everything it is offered.
+    --
+    -- THREE boards, because two would not be enough. The Construct with a Piker
+    -- connects for 4; the Construct alone is refused and bob takes nothing; the
+    -- PIKER alone connects for 2, which is what rules out "a lone attacker never
+    -- gets through" as the explanation of the middle board.
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pair, mine, _) = S.combatBoardOf [bondedConstruct, piker] []
+        (lone, _, _) = S.combatBoardOf [bondedConstruct] []
+        (lonePiker, _, _) = S.combatBoardOf [piker] []
+        after = S.runCombat S.aggressiveAnswer pair
+        refused = S.runCombat S.aggressiveAnswer lone
+        control = S.runCombat S.aggressiveAnswer lonePiker
+    Spec.assertEqWith s "with company, bob takes four" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf after) mine
+    Spec.assertEqWith s "alone, bob takes nothing" (S.lifeOf S.bob refused) (Just 20)
+    Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf refused) []
+    Spec.assertEqWith s "while a lone PIKER connects for two" (S.lifeOf S.bob control) (Just 18)
 
 vigilanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
@@ -3371,6 +3488,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
   conditionalCombatRestrictionSpec s registry
+  attacksAloneSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry

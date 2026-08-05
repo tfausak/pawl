@@ -33,18 +33,37 @@ cantAttack = restricted attacking
 cantBlock :: [ObjectId] -> GameState -> Set ObjectId
 cantBlock = restricted blocking
 
--- The two selectors, written out rather than a wildcard: this type has exactly
--- two arms, so an exhaustive case is what makes a third arm a compile error at
--- all three of the sites that would have to decide about it.
+-- CR 508.1c together with CR 506.5: which of `candidates` an effect in force
+-- right now says can't be the ONLY creature declared as an attacker. Bonded
+-- Construct.
+--
+-- The two above are answered ABOUT A CANDIDATE and this one is not, even though
+-- all three come back as a set of ids: this set is the input to a whole
+-- declaration's check (Pawl.Engine.Combat.attackDeclarationAllowed) rather than a
+-- filter on the candidate list. See `restricted` below.
+cantAttackAlone :: [ObjectId] -> GameState -> Set ObjectId
+cantAttackAlone = restricted attackingAlone
+
+-- The selectors, written out rather than a wildcard: an exhaustive case is what
+-- makes a new arm a compile error at every site that would have to decide about
+-- it.
 attacking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 attacking cr = case cr of
   CombatRestriction.CantAttack a _ -> Just a
   CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantAttackAlone _ _ -> Nothing
 
 blocking :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
 blocking cr = case cr of
   CombatRestriction.CantAttack _ _ -> Nothing
   CombatRestriction.CantBlock a _ -> Just a
+  CombatRestriction.CantAttackAlone _ _ -> Nothing
+
+attackingAlone :: CombatRestriction.CombatRestriction -> Maybe Affected.Affected
+attackingAlone cr = case cr of
+  CombatRestriction.CantAttack _ _ -> Nothing
+  CombatRestriction.CantBlock _ _ -> Nothing
+  CombatRestriction.CantAttackAlone a _ -> Just a
 
 -- CR 508.1c / CR 509.1b's second clause: the condition the creature can't
 -- attack (or block) UNLESS. Read off either arm, because the clause is the same
@@ -57,6 +76,7 @@ gate :: CombatRestriction.CombatRestriction -> Maybe Condition.Type.Condition
 gate cr = case cr of
   CombatRestriction.CantAttack _ c -> c
   CombatRestriction.CantBlock _ c -> c
+  CombatRestriction.CantAttackAlone _ c -> c
 
 -- The shared walk behind both questions above, over the restrictions `select`
 -- keeps.
@@ -67,12 +87,15 @@ gate cr = case cr of
 -- quadratic (#200). `candidates` is the caller's chosen-from set (CR 508.1a for
 -- attacking, CR 509.1a for blocking).
 --
--- The answer is applied to the CANDIDATE LIST rather than to the finished
--- declaration. Sound only because every restriction this type can state is per
--- creature: such a creature is in no legal declaration at all, so dropping it
--- changes no answer -- and it keeps CR 508.1d's and CR 509.1c's maximizations
--- honest, since a creature that cannot act can obey no requirement. A
--- restriction on a SET of creatures would need the whole declaration (#533).
+-- WHAT THE CALLER DOES WITH THE ANSWER is the caller's, and the two things done
+-- with it are not interchangeable. `cantAttack` and `cantBlock` name creatures
+-- that are in no legal declaration at all, so their sets are subtracted from the
+-- candidate list before anything else runs; that also keeps CR 508.1d's and CR
+-- 509.1c's maximizations honest, since a creature that cannot act can obey no
+-- requirement. `cantAttackAlone` names creatures that are in SOME legal
+-- declaration, so its set must stay on the candidate list and be asked of the
+-- finished declaration instead -- subtracting it would forbid the very
+-- declaration CR 508.1c's Example calls legal.
 restricted :: (CombatRestriction.CombatRestriction -> Maybe Affected.Affected) -> [ObjectId] -> GameState -> Set ObjectId
 restricted select candidates gs =
   let -- Hoisted out of the walk as AttackRequirement.instances hoists them, and

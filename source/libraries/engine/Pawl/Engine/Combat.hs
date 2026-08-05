@@ -181,12 +181,20 @@ isCreatureObjectGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId ->
 isCreatureObjectGiven = Projection.isCreatureGiven
 
 -- CR 508.1a: an attacking creature must be untapped, controlled by the active
--- player, and not summoning sick (CR 302.6). Together with CR 508.1c's
--- restrictions, which are the last two conjuncts: the rules ask them as separate
--- steps, and pawl answers both here because every restriction it can state is per
--- creature, so failing one is indistinguishable from never having been a
--- candidate. A restriction on a SET of creatures could not be answered here
--- (#533).
+-- player, and not summoning sick (CR 302.6). Together with the PER-CREATURE half
+-- of CR 508.1c's restrictions, which are the last two conjuncts: the rules ask
+-- them as separate steps, and pawl answers both here because a creature failing
+-- one of these is in no legal declaration at all, so failing it is
+-- indistinguishable from never having been a candidate.
+--
+-- Only that half. CR 508.1c's other shape is SET-SHAPED -- Bonded Construct's
+-- "can't attack alone" is a fact about the whole declaration -- and a creature
+-- carrying one is still a candidate, since some declaration containing it is
+-- legal. That shape is asked in attackDeclarationAllowed and never here; taking
+-- it off the candidate list would forbid the declaration CR 508.1c's own Example
+-- calls legal. So CR 508.1c is answered in two places, one per shape -- the
+-- split canBlockGiven describes for CR 509.1b, without its middle PAIRWISE case,
+-- which on the attacking side is the missing object axis (#620).
 --
 -- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
 -- each one battlefield-wide walk, taken once per declaration pass by
@@ -233,37 +241,94 @@ legalAttackers pid gs =
       restricted = CombatRestriction.cantAttack controlled gs
    in filter (\oid -> canAttackGiven grants pcs restricted pid oid gs) controlled
 
+-- CR 506.5: a creature attacks alone if it is the only creature DECLARED as an
+-- attacker during the declare attackers step. `alone` is the set of candidates a
+-- CR 508.1c restriction forbids that of (Bonded Construct), so a declaration is
+-- disallowed exactly when it is the singleton of such a creature.
+--
+-- Read off the DECLARATION and not off Combat.attackers, which is CR 506.5's own
+-- word "declared": a creature put onto the battlefield attacking earlier in the
+-- combat phase never was declared, so it is not company, and CR 508.4c says such
+-- a creature is not affected by this declaration's restrictions either.
+--
+-- The pool's one printing restricts ITSELF, and nothing here assumes that: the
+-- test is on the lone creature's membership in `alone`, so an Aura printing
+-- "enchanted creature can't attack alone" would work unchanged.
+--
+-- Two restricted creatures attacking TOGETHER is legal, which is CR 508.1c's own
+-- Example, and is why this asks the declaration's size rather than asking each
+-- creature for an unrestricted companion.
+aloneAllows :: Set ObjectId -> Set ObjectId -> Bool
+aloneAllows alone declaration = case Set.toList declaration of
+  [only] -> not (Set.member only alone)
+  _ -> True
+
+-- CR 508.1c: the active player checks each creature for RESTRICTIONS, and if any
+-- are disobeyed the DECLARATION is illegal. blockDeclarationAllowed's attacking twin,
+-- and the seam a set-shaped attacking restriction is added at.
+--
+-- Only the SET-SHAPED restrictions are asked here. The per-creature ones are
+-- canAttackGiven's, and a creature failing one is not on `candidates` at all, so
+-- the caller's own membership test is already CR 508.1c for that shape --
+-- exactly the collapse legalAttackDeclarationGiven describes. The blocking side
+-- keeps both conjuncts in one function because its per-pair shape has no
+-- candidate list to hide in.
+attackDeclarationAllowed :: Set ObjectId -> Set ObjectId -> Bool
+attackDeclarationAllowed = aloneAllows
+
+-- Every declaration CR 508.1a lets the active player write down: each candidate
+-- independently attacks or does not. candidateBlockDeclarations' attacking twin, and
+-- EXPONENTIAL for its reason -- O(2 ^ candidates) here, since an attacker chooses
+-- no attacker to pair with.
+--
+-- Set.empty comes FIRST and every declaration precedes its own supersets, which
+-- attackCeiling's tie-breaking fold relies on: with ties going to the earlier
+-- entry, the maximum is attained by a declaration no smaller one attains.
+candidateAttackDeclarations :: [ObjectId] -> [Set ObjectId]
+candidateAttackDeclarations candidates =
+  let extend acc oid = concatMap (\declaration -> [declaration, Set.insert oid declaration]) acc
+   in List.foldl' extend [Set.empty] candidates
+
 -- CR 508.1d's two halves, computed together because neither is usable alone: the
 -- requirement instances in force, and a declaration obeying the maximum number of
 -- them that could be obeyed without disobeying any restriction. blockCeiling's
 -- twin, deliberately the same shape so the two rules read the same way at their
 -- call sites.
 --
--- The maximum is answered in CLOSED FORM -- the instance set, minus whichever
--- instances CR 508.1d's cost clause excuses -- where blockCeiling enumerates every
--- candidate declaration and folds. That is a different search rather than an
--- optimization of that one, and it is exact only because of what pawl cannot yet
--- print: every attacking RESTRICTION it models is per creature (CR 508.1a's own
+-- TWO SEARCHES, and which one runs is decided by `alone` -- the set-shaped
+-- restrictions in force over the candidates (CR 508.1c). Both answer the same
+-- question; the closed form is a shortcut that only some boards admit.
+--
+-- The CLOSED FORM is the instance set, minus whichever instances CR 508.1d's cost
+-- clause excuses. It is exact when no set-shaped restriction reaches a candidate,
+-- because then every restriction pawl models is per creature (CR 508.1a's own
 -- clauses, CR 702.3b's defender, CR 508.1c's printed
 -- CombatRestriction.CantAttack), and canAttack has already applied all of them to
--- `candidates`, so declaring every required creature at once disobeys nothing and
--- is maximal by construction. A cost to attack does not break that: CR 508.1h
+-- `candidates` -- so declaring every required creature at once disobeys nothing
+-- and is maximal by construction. A cost to attack does not break that: CR 508.1h
 -- totals the whole declaration at once, so no creature's presence can make
 -- another's attack ILLEGAL, only dearer.
 --
--- That argument fails the moment a set-shaped ATTACKING restriction lands (Silent
--- Arbiter, Bonded Construct), and the replacement is blockCeiling's enumeration at
--- blockCeiling's exponential cost (#533). The closed form therefore rests on a
--- missing capability rather than on a claim about Magic. The BLOCKING side's
--- set-shaped restriction has landed -- CR 702.111b's menace, in
--- declarationAllowed -- and reaches nothing here: no restriction on who may block
--- bounds who may attack.
+-- That argument is what a Bonded Construct falsifies: it makes a declaration
+-- illegal for its SIZE, so "all of the required creatures at once" can be a
+-- declaration no player may make, and the maximum stops being the instance set.
+-- The ENUMERATION is then blockCeiling's search, at blockCeiling's exponential
+-- cost (#342's shape on the attacking side, #718).
 --
--- So nothing here is exponential: one battlefield walk plus, per requirement, one
--- Projection.affects per candidate. That last read is QUADRATIC in the
--- battlefield rather than linear, which is #435's shape and is documented at
--- Projection.affects's AttachedPlayerControls arm; measured, it stays cheap on
--- the boards this pool can build.
+-- Keeping the closed form on the boards that admit it is an optimization and NOT
+-- a second rules reading: `alone` empty means no declaration is disallowed by
+-- anything the enumeration would filter on, so the enumeration's maximum would be
+-- the largest free requirement-obeying declaration, which is the closed form's
+-- answer. It matters because the guard is what keeps every board without such a
+-- card off the exponential path, including every board in the pool that has a
+-- Curse of the Nightly Hunt on it.
+--
+-- The enumeration is over the creatures that attack FREELY, never over all the
+-- candidates, and that is CR 508.1d's cost clause rather than a cheat: a player
+-- is not required to pay a cost to attack, so a declaration that costs something
+-- cannot be the bar another declaration is judged against. Excluding those
+-- creatures from the search is the same act the closed form performs with
+-- Set.filter.
 --
 -- CR 508.1d's COST CLAUSE is a modifier on the maximization rather than a check
 -- of its own: a player is never required to pay a cost to attack, even where
@@ -272,25 +337,50 @@ legalAttackers pid gs =
 -- reaches for, and declining to attack with it stays legal -- which is why the
 -- two components come apart. `required` stays every instance in force, because
 -- that is what a declaration's obedience is counted against, and paying is
--- mandatory once a taxed creature does attack (CR 508.1j); `best` is the untaxed
--- subset, and it is what makes "no attacks" legal under a Curse of the Nightly
--- Hunt while a Ghostly Prison is out. AttackCost.attacksFreely is asked against
--- CR 508.1b's whole target list, so a creature that could attack a planeswalker
--- for nothing keeps its requirement.
+-- mandatory once a taxed creature does attack (CR 508.1j); `best` is drawn from
+-- the untaxed creatures alone, and it is what makes "no attacks" legal under a
+-- Curse of the Nightly Hunt while a Ghostly Prison is out.
+-- AttackCost.attacksFreely is asked against CR 508.1b's whole target list, so a
+-- creature that could attack a planeswalker for nothing keeps its requirement.
 --
 -- No defending player means no target at all, so nothing attacks freely and
 -- `best` is empty. Not a fallback: with no defender there is no attack to make,
 -- so a requirement that cannot be obeyed is one CR 508.1d's "if able" never
 -- reaches. (empty, empty) when no requirement is in force -- the maximum is zero,
--- every declaration obeys zero, and Set.filter never calls the predicate, so no
--- cost walk is taken.
+-- every declaration obeys zero -- and that case takes the closed form whatever
+-- `alone` says, so a board carrying a set-shaped restriction and no requirement
+-- enumerates nothing and no cost walk is taken.
 attackCeiling :: [ObjectId] -> GameState -> (Set ObjectId, Set ObjectId)
-attackCeiling candidates gs =
+attackCeiling candidates gs = attackCeilingGiven (CombatRestriction.cantAttackAlone candidates gs) candidates gs
+
+-- attackCeiling against a restriction set the caller already gathered, which is
+-- what both callers below want: each has to ask attackDeclarationAllowed of the
+-- player's own declaration as well, and the two must be judging the same board.
+attackCeilingGiven :: Set ObjectId -> [ObjectId] -> GameState -> (Set ObjectId, Set ObjectId)
+attackCeilingGiven alone candidates gs =
   let required = AttackRequirement.instances candidates gs
       targets = case Combat.defender (GameState.combat gs) of
         Nothing -> []
         Just defender -> NonEmpty.toList (attackTargets defender gs)
-   in (required, Set.filter (\oid -> AttackCost.attacksFreely oid targets gs) required)
+      freely oid = AttackCost.attacksFreely oid targets gs
+      better best declaration =
+        if attackRequirementsMet required declaration > attackRequirementsMet required best
+          then declaration
+          else best
+      -- The fold's seed is the EMPTY declaration, always legal under restrictions
+      -- alone: CR 508.1c's restrictions only ever forbid attacking, so declining
+      -- disobeys none of them. blockCeiling's seed, for blockCeiling's reason --
+      -- it is what makes the answer total without a partial function.
+      enumerated =
+        List.foldl'
+          better
+          Set.empty
+          (filter (attackDeclarationAllowed alone) (candidateAttackDeclarations (filter freely candidates)))
+   in ( required,
+        if Set.null alone || Set.null required
+          then Set.filter freely required
+          else enumerated
+      )
 
 -- How many of `required` this declaration obeys (CR 508.1d): a requirement
 -- instance is obeyed exactly when the declaration attacks with its creature.
@@ -307,16 +397,16 @@ obeysAttackRequirements :: (Set ObjectId, Set ObjectId) -> [ObjectId] -> Bool
 obeysAttackRequirements (required, best) chosen =
   attackRequirementsMet required (Set.fromList chosen) >= attackRequirementsMet required best
 
--- CR 508.1: is this declaration one the active player may make? Both checks the
--- rules ask for, in the order they ask them: CR 508.1a's chosen-from set together
--- with CR 508.1c's restrictions, then CR 508.1d's requirements.
+-- CR 508.1: is this declaration one the active player may make? All three checks
+-- the rules ask for, in the order they ask them: CR 508.1a's chosen-from set, CR
+-- 508.1c's restrictions, then CR 508.1d's requirements.
 --
--- CR 508.1c's restrictions are not a separate conjunct because they are not a
--- separate set: canAttack is the whole of what pawl can say a creature can't
--- attack for -- CR 508.1a's own clauses, CR 702.3b's defender, and every printed
--- CombatRestriction.CantAttack -- so being a candidate IS obeying every
--- restriction it knows. That collapse holds only while every restriction is per
--- creature (#533).
+-- CR 508.1c's PER-CREATURE restrictions are not a separate conjunct because they
+-- are not a separate set: canAttack is the whole of what pawl can say a creature
+-- can't attack for on its own -- CR 508.1a's own clauses, CR 702.3b's defender,
+-- and every printed CombatRestriction.CantAttack -- so being a candidate IS
+-- obeying every restriction of that shape. Its SET-SHAPED restrictions are the
+-- conjunct, because no candidate list can carry them (see aloneAllows).
 --
 -- CR 508.1d is not a check but a MAXIMIZATION, so it cannot be asked of the
 -- declaration alone. It is what makes declaring no attackers at all illegal while
@@ -326,14 +416,23 @@ legalAttackDeclaration pid chosen gs = legalAttackDeclarationGiven (legalAttacke
 
 legalAttackDeclarationGiven :: [ObjectId] -> [ObjectId] -> GameState -> Bool
 legalAttackDeclarationGiven candidates chosen gs =
-  all (\oid -> List.elem oid candidates) chosen
-    && obeysAttackRequirements (attackCeiling candidates gs) chosen
+  -- Gathered ONCE and shared with the ceiling, on blockCeilingGiven's terms: the
+  -- restriction check and the maximization have to be judging one board, and a
+  -- second walk would be paid for nothing.
+  let alone = CombatRestriction.cantAttackAlone candidates gs
+   in all (\oid -> List.elem oid candidates) chosen
+        && attackDeclarationAllowed alone (Set.fromList chosen)
+        && obeysAttackRequirements (attackCeilingGiven alone candidates gs) chosen
 
 -- A declaration that is always legal: one attaining CR 508.1d's maximum, which
 -- with no requirement in force is the empty one (declining to attack). Not an
 -- answer the engine ever prefers to the active player's own -- declareAttackers
 -- reaches for it only when an interpreter hands back a declaration the rules
 -- forbid.
+--
+-- It obeys CR 508.1c as well as CR 508.1d, on both of attackCeiling's paths: the
+-- enumeration draws `best` from declarations attackDeclarationAllowed kept, and
+-- the closed form runs only where nothing set-shaped reaches a candidate.
 --
 -- Taken as a filter over `candidates` rather than as Set.toList, so the forced
 -- declaration comes back in the order the player was offered its creatures.
@@ -347,7 +446,7 @@ forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 -- Only the per-creature ones. CR 509.1b's restrictions are mostly PAIRWISE
 -- (flying, fear) and cannot be decided about a blocker alone -- those live in
 -- pairAllowed -- and CR 702.111b's menace is SET-SHAPED, which lives in
--- declarationAllowed. So the rule is answered in three places, one per shape of
+-- blockDeclarationAllowed. So the rule is answered in three places, one per shape of
 -- restriction, and this is the narrowest.
 --
 -- Summoning sickness is NOT a blocking restriction: CR 302.6 restricts attacking
@@ -504,11 +603,10 @@ landwalkAllowsGiven grants pcs attacker gs =
 -- CR 702.111b: a creature with menace can't be blocked except by two or more
 -- creatures.
 --
--- The first restriction of the SET shape #533 named -- its blocking half; the
--- attacking half is still open, at attackCeiling -- and the reason this takes the
--- whole declaration where its three siblings above take a pair: how many blockers
--- were assigned to one attacker is not something a predicate on a single
--- (blocker, attacker) pair can state.
+-- The blocking side's SET-SHAPED restriction, aloneAllows' twin, and the reason
+-- this takes the whole declaration where its three siblings above take a pair:
+-- how many blockers were assigned to one attacker is not something a predicate on
+-- a single (blocker, attacker) pair can state.
 --
 -- "EXCEPT BY two or more", not "must be blocked by two or more". An attacker
 -- nobody blocked is not blocked at all, so 702.111b has nothing to say about it
@@ -533,7 +631,7 @@ menaceAllowsGiven pcs declaration gs =
       blockerCounts = Map.fromListWith (+) (fmap (\attacker -> (attacker, 1 :: Int)) (Map.elems declaration))
       -- The count first, so an attacker that is comfortably blocked never pays
       -- for a keyword read (#200's posture, in the one place a declaration check
-      -- sits inside candidateDeclarations' exponential filter).
+      -- sits inside candidateBlockDeclarations' exponential filter).
       allowed (attacker, count) = count >= 2 || not (Projection.hasKeywordGiven pcs Keyword.Menace attacker gs)
    in all allowed (Map.toList blockerCounts)
 
@@ -549,7 +647,7 @@ menaceAllowsGiven pcs declaration gs =
 -- Every restriction ASKED HERE is at most pairwise, and CR 702.14c's landwalk is
 -- less than that: it does not read the blocker at all. Menace (CR 702.111b)
 -- constrains the SET blocking one attacker, so it is asked in
--- declarationAllowed and never here. The two are cumulative rather than
+-- blockDeclarationAllowed and never here. The two are cumulative rather than
 -- alternative: a menace attacker that also has fear needs two blockers AND needs
 -- each of them to pass 702.36b.
 pairAllowed :: [ObjectId] -> [ObjectId] -> ObjectId -> ObjectId -> GameState -> Bool
@@ -586,11 +684,11 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- is taken over declarations menace already allows.
 --
 -- Takes the projected board rather than projecting per read, because the
--- set-shaped conjunct reads a keyword and this sits inside candidateDeclarations'
+-- set-shaped conjunct reads a keyword and this sits inside candidateBlockDeclarations'
 -- exponential filter (#342). There is no per-read twin the way pairAllowed has
 -- one: both callers are already inside a hoisted pass.
-declarationAllowed :: Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId ObjectId -> GameState -> Bool
-declarationAllowed pcs able declaration gs =
+blockDeclarationAllowed :: Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId ObjectId -> GameState -> Bool
+blockDeclarationAllowed pcs able declaration gs =
   all (uncurry able) (Map.toList declaration)
     && menaceAllowsGiven pcs declaration gs
 
@@ -611,8 +709,8 @@ requirementsMet requirements declaration =
 -- What keeps it off the hot path is blockCeiling's guard: this is never called
 -- unless some requirement is actually in force, which needs a card like Lure on
 -- the battlefield (#342).
-candidateDeclarations :: (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId ObjectId]
-candidateDeclarations able candidates attackers =
+candidateBlockDeclarations :: (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId ObjectId]
+candidateBlockDeclarations able candidates attackers =
   let extend acc blocker =
         let options = Nothing : fmap Just (filter (\attacker -> able blocker attacker) attackers)
             apply declaration option = case option of
@@ -654,7 +752,7 @@ blockCeilingGiven grants pcs pid gs =
         if requirementsMet requirements declaration > requirementsMet requirements best
           then declaration
           else best
-      legal = filter (\declaration -> declarationAllowed pcs able declaration gs) (candidateDeclarations able candidates attackers)
+      legal = filter (\declaration -> blockDeclarationAllowed pcs able declaration gs) (candidateBlockDeclarations able candidates attackers)
    in ( requirements,
         if Set.null requirements
           then Map.empty
@@ -680,7 +778,7 @@ legalBlockDeclaration pid declaration gs =
       candidates = legalBlockersGiven grants pcs pid gs
       able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
       (requirements, best) = blockCeilingGiven grants pcs pid gs
-   in declarationAllowed pcs able declaration gs
+   in blockDeclarationAllowed pcs able declaration gs
         && requirementsMet requirements declaration >= requirementsMet requirements best
 
 -- A declaration that is always legal: one attaining CR 509.1c's maximum, which
@@ -906,10 +1004,13 @@ declareAttackers pid = do
         -- that is not legally an attacker.
         let isCandidate oid = List.elem oid candidates
             offered = filter isCandidate chosen
-            -- CR 508.1d's maximization, taken ONCE for both questions below --
-            -- one battlefield walk, against the same candidate list the prompt
-            -- was built from.
-            bound = attackCeiling candidates gs
+            -- CR 508.1c's set-shaped restrictions and CR 508.1d's maximization,
+            -- taken ONCE for all three questions below -- one battlefield walk
+            -- each, against the same candidate list the prompt was built from.
+            -- The restriction set feeds the ceiling as well as the check beside
+            -- it, so the two cannot judge different boards.
+            alone = CombatRestriction.cantAttackAlone candidates gs
+            bound = attackCeilingGiven alone candidates gs
             -- Declining to attack is NOT always legal: with a CR 508.1d
             -- requirement on the board (Curse of the Nightly Hunt), "no attacks"
             -- can itself be the illegal answer, so the filtered answer is not a
@@ -919,23 +1020,26 @@ declareAttackers pid = do
             --
             -- The whole answer is replaced rather than repaired, which is
             -- declareBlockers' posture: a declaration is illegal AS A WHOLE, and
-            -- unioning the missing creatures into the player's answer would be
-            -- sound only while every restriction stays per-creature (#533). Nor is
-            -- it re-prompted -- a pure `Prompt r -> r` returns the identical wrong
+            -- unioning the missing creatures into the player's answer is unsound
+            -- now that a restriction can forbid a declaration for its SIZE -- a
+            -- Bonded Construct added to an empty answer would manufacture the
+            -- attacks-alone illegality it was meant to remove, which is exactly
+            -- the trap declareBlockers describes for menace. Nor is it
+            -- re-prompted -- a pure `Prompt r -> r` returns the identical wrong
             -- answer -- and this is NOT CR 733's rewind, which is about human
             -- error at a table rather than an engine check.
             --
             -- It is not the engine choosing for the player: an enforcing
             -- interpreter never arrives here, and the player's answer was taken
             -- and rejected before this ran. Where a requirement leaves several
-            -- legal declarations -- any SUPERSET of the required creatures also
-            -- attains the maximum -- this takes the smallest, which is the least
-            -- the rules can be said to have forced. That is a real choice among
-            -- distinguishable declarations, and it is why nothing but a broken
-            -- interpreter may reach it; the same is true of
-            -- forcedBlockDeclaration.
+            -- legal declarations -- any SUPERSET of the required creatures that
+            -- CR 508.1c allows also attains the maximum -- this takes the first
+            -- in candidateAttackDeclarations' order, which no smaller declaration
+            -- attains. That is a real choice among distinguishable declarations,
+            -- and it is why nothing but a broken interpreter may reach it; the
+            -- same is true of forcedBlockDeclaration.
             attacking =
-              if obeysAttackRequirements bound offered
+              if attackDeclarationAllowed alone (Set.fromList offered) && obeysAttackRequirements bound offered
                 then offered
                 else forcedAttackDeclaration bound candidates
             -- CR 508.1f: declaring an attacker taps it -- unless it has vigilance

@@ -180,7 +180,8 @@ data Keyword
     -- creatures. Nullary like fear (702.36) and unlike landwalk -- the number two
     -- is written into the rule.
     --
-    -- The first restriction of the SET shape #533 named, and its blocking half.
+    -- The blocking side's SET-SHAPED combat restriction, whose attacking
+    -- counterpart is Bonded Construct's "can't attack alone".
     -- Every other evasion ability here asks about one (blocker, attacker) pair or
     -- less; menace asks how MANY creatures are blocking, which no pairwise
     -- predicate can answer, so it is read by

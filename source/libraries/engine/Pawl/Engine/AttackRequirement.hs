@@ -33,14 +33,20 @@ import Pawl.Types.ObjectId (ObjectId)
 -- "attacks each combat if able". Passed IN rather than computed here, as
 -- BlockRequirement takes its `able` predicate, so this module never learns the
 -- restrictions. Pruning by it changes no answer -- a creature that cannot
--- attack attacks in no legal declaration -- but it makes the instance set CR
--- 508.1d's maximum rather than an upper bound on it.
+-- attack attacks in no legal declaration.
+--
+-- What the instance set is NOT is CR 508.1d's maximum. It is an upper bound on
+-- it, and Combat.attackCeiling is what turns the bound into the number: a
+-- creature restricted by its declaration's SIZE (Bonded Construct) is a
+-- candidate and mints an instance, yet the declaration obeying every instance at
+-- once can be one no player may make. The bound and the maximum coincide on a
+-- board with no such card, which is what attackCeiling's closed form exploits.
 --
 -- No `able` predicate BESIDE the candidate list, where the blocking twin has
 -- one: there, CR 509.1b's restrictions are pairwise (flying, fear) and cannot
--- be decided per blocker. Every attacking restriction pawl models today is per
--- creature and already inside Combat.canAttack. A set-shaped restriction would
--- break that (#533).
+-- be decided per blocker. Every attacking restriction pawl models is either per
+-- creature -- already inside Combat.canAttack -- or about the whole declaration,
+-- which no per-creature predicate could carry either.
 instances :: [ObjectId] -> GameState -> Set ObjectId
 instances candidates gs =
   let -- Hoisted out of the walk as BlockRequirement.instances hoists them, and
