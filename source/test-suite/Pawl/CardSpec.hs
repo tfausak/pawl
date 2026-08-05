@@ -1287,6 +1287,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- the source entered, which is not a Filter and is not written by the card.
   PlayerEffect.CantCastChosenName -> []
   PlayerEffect.CantPlayLandChosenName -> []
+  -- CR 305.2 carries a bare count of extra land plays, not a Filter: it names
+  -- how many lands, never which spells.
+  PlayerEffect.PlayAdditionalLands _ -> []
   PlayerEffect.NoMaximumHandSize -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
   -- this traversal is about the spells a player effect names.

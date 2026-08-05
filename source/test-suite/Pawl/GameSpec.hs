@@ -236,9 +236,25 @@ actionSpec s registry = Spec.describe s "Action" $ do
     mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice (S.oneMountainState mountain (Phase.Beginning BeginningStep.Upkeep))) [A.Pass]
 
-  Spec.it s "no second land after one is played" $ do
+  -- CR 305.1 / 116.2a: a land play needs an EMPTY STACK as well as a main phase
+  -- of the player's own turn -- the same three conjuncts CR 307.5's window has,
+  -- which is why the gate asks Turn.sorcerySpeedWindow rather than keeping its
+  -- own near-copy. The empty-stack board is the falsifier: a gate that offered
+  -- nothing at all would satisfy the second assertion for the wrong reason.
+  Spec.it s "CR 305.1 no land play while a spell is on the stack" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let gs = (S.oneMountainState mountain Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.oneMountainState mountain Phase.PrecombatMain
+        (_, withSpell) = S.spellOnStack piker S.alice base
+    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice base) "playable while the stack is empty"
+    Spec.assertEqWith s "only pass while a spell is on it" (Action.legalActions S.alice withSpell) [A.Pass]
+
+  -- CR 305.2b: with the normal allowance of one already spent, no further play
+  -- is legal. The raised-allowance half of CR 305.2 is Pawl.PlayerEffectSpec's
+  -- Exploration and Azusa group.
+  Spec.it s "CR 305.2b no second land after one is played" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let gs = (S.oneMountainState mountain Phase.PrecombatMain) {GameState.landsPlayed = Map.singleton S.alice 1}
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice gs) [A.Pass]
 
 goldfishResult :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Result.Result, GameState.GameState)
@@ -251,8 +267,12 @@ landState s registry = do
   matchup <- S.redRed (S.printingOf s registry)
   pure (snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom matchup)))
 
--- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
--- turn (CR 305.2) a player can never have more lands out than turns taken.
+-- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With CR 305.2's normal
+-- one land play per turn a player can never have more lands out than turns
+-- taken. NORMAL is load-bearing now that a continuous effect can raise the
+-- number (CR 305.2): this bound holds for the red-red matchup because no card in
+-- it grants an extra land play, and Pawl.PlayerEffectSpec is where the raised
+-- number is measured.
 turnsTaken :: PlayerId.PlayerId -> GameState.GameState -> Natural
 turnsTaken pid gs =
   let total = GameState.turnNumber gs
@@ -1224,18 +1244,18 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty control)) "but a playing one does -- the guard is what did it"
 
   Spec.it s "CR 800.4j/703.4c a departed active player's untap step does nothing" $ do
-    -- landPlayed is the observable part of the untap step that needs no
+    -- landsPlayed is the observable part of the untap step that needs no
     -- permanents: it is cleared for the active player each untap.
     let base =
           S.threePlayerGame
             { GameState.phase = Phase.Beginning BeginningStep.Untap,
-              GameState.landPlayed = Set.singleton S.alice
+              GameState.landsPlayed = Map.singleton S.alice 1
             }
         gone = Departure.depart Departure.Type.Conceded S.alice base
         after = S.runPure S.identityAnswer gone (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
         control = S.runPure S.identityAnswer base (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
-    Spec.assertEqWith s "no untap-step action happened" (GameState.landPlayed after) (Set.singleton S.alice)
-    Spec.assertEqWith s "a playing active player's land play IS cleared" (GameState.landPlayed control) Set.empty
+    Spec.assertEqWith s "no untap-step action happened" (GameState.landsPlayed after) (Map.singleton S.alice 1)
+    Spec.assertEqWith s "a playing active player's land play IS cleared" (GameState.landsPlayed control) Map.empty
 
   Spec.it s "CR 800.4j/703.4i a departed active player is not asked to declare attackers" $ do
     piker <- S.printingOf s registry "Goblin Piker"

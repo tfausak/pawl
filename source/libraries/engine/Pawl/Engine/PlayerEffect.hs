@@ -230,6 +230,9 @@ prohibitsCasting pid name gs =
         PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        -- CR 305.2 raises how many LANDS may be played, and a land is never
+        -- cast (CR 305.1), so this grant reaches nothing here.
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
@@ -260,13 +263,20 @@ prohibitsPlayingLand pid name gs =
         PlayerEffect.CantPlayLandChosenName -> Set.member name (chosenNamesOf source gs)
         -- CR 305.1 again, in the other direction: a prohibition on CASTING says
         -- nothing about a special action, so Silence and Rule of Law leave a
-        -- land play alone. CR 305.2/305.3's own limits are the closed half's and
-        -- are asked by Action.legalActions, not here.
+        -- land play alone. CR 305.2's and CR 305.3's limits are the closed
+        -- half's and are asked by Action.legalActions -- the first as a count
+        -- (landPlaysAllowed below is only its left-hand side), the second as
+        -- part of Turn.sorcerySpeedWindow. Neither is a question about WHICH
+        -- land, which is all this one asks.
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        -- CR 305.2 raises HOW MANY lands may be played, never WHICH: a grant is
+        -- no permission for a land this rule stops. landPlaysAllowed below is
+        -- the gate that reads it.
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
@@ -323,6 +333,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -334,6 +345,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
@@ -377,6 +389,7 @@ mayCastAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
 mayCastAsThoughItHadFlash pid oid gs =
   let allows effect = case effect of
         PlayerEffect.CastAsThoughItHadFlash criterion -> matchesSpell criterion oid gs
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.CantCastChosenName -> False
@@ -426,10 +439,56 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
    in any (stops . snd) (applying pid gs)
+
+-- CR 305.2: the number of lands a player may normally play during their turn.
+-- The base of landPlaysAllowed below, named for the same reason
+-- defaultMaximumHandSize is: the rule states a number, and a bare literal in the
+-- gate would not say which rule it came from.
+defaultLandPlays :: Natural
+defaultLandPlays = 1
+
+-- CR 305.2 / 305.2a: how many lands `pid` may play this turn -- the LEFT-hand
+-- side of CR 305.2a's comparison, whose right-hand side is
+-- GameState.landsPlayed. Pawl.Engine.Action.legalActions compares them, so that
+-- module never learns which effect raised the number.
+--
+-- A SUM over every applicable grant, added to CR 305.2's normal one. CR 305.2
+-- says continuous effects "may increase this number", and an increase composes:
+-- Exploration beside Azusa is one plus one plus two. Nothing makes them
+-- redundant -- CR 702.18b and CR 702.11h say so for a KEYWORD, and CR 305.2
+-- states no such rule -- so this is a tally and not a membership test, which is
+-- the opposite posture from protectedFromTargeting above.
+--
+-- Saturating addition is not a concern here and the type says why: a Natural
+-- cannot overflow, and every summand is one.
+--
+-- Read LIVE through `applying`, like every other question in this module, so an
+-- Exploration destroyed after the extra land was played simply stops being found
+-- (CR 604.2) -- and the already-played count outliving the grant is exactly CR
+-- 305.2b, which then permits no further play.
+landPlaysAllowed :: PlayerId -> GameState -> Natural
+landPlaysAllowed pid gs =
+  let grantOf effect = case effect of
+        PlayerEffect.PlayAdditionalLands extra -> Just extra
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        -- CR 305.1's name-based prohibition stops ONE land rather than changing
+        -- the turn's allowance, which is why Action.playableLands asks it per
+        -- card and this per player.
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost _ _ -> Nothing
+        PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+   in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
 -- starting hand size, which is a different seven (Mulligan.openingHand) that
@@ -451,6 +510,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
@@ -492,6 +552,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
         PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing

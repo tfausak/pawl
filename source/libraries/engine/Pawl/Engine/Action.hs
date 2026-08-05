@@ -1,6 +1,6 @@
 module Pawl.Engine.Action where
 
-import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -51,13 +51,26 @@ playableLands pid gs =
 
 legalActions :: PlayerId -> GameState -> [Action]
 legalActions pid gs =
-  let -- CR 702.8a's window says "play this card", which reaches a land as well
+  let -- CR 305.1 / 116.2a: the window is a main phase of this player's own turn
+      -- with the stack empty, which is CR 307.5's "as a sorcery" window
+      -- conjunct for conjunct -- so it is asked through the one predicate rather
+      -- than a near-copy that can drift (see Turn.sorcerySpeedWindow).
+      --
+      -- CR 702.8a's window says "play this card", which reaches a land as well
       -- as a spell; this gate does not consult the keyword, so a land card with
       -- flash would still be playable only at sorcery speed (#566).
       canPlayLand =
-        Turn.isMainPhase (GameState.phase gs)
-          && GameState.activePlayer gs == pid
-          && not (Set.member pid (GameState.landPlayed gs))
+        Turn.sorcerySpeedWindow pid gs
+          -- CR 305.2a: compare the number of lands this player CAN play this
+          -- turn with the number they HAVE already played; the play is legal
+          -- only if the first is greater. A comparison of two counts and never
+          -- a yes/no, because CR 305.2 lets a continuous effect raise the first
+          -- one (Exploration, Azusa Lost but Seeking). Strictly greater is CR
+          -- 305.2b read from the other side: it forbids the play once the
+          -- allowance is EQUAL TO OR LESS THAN the tally, and less than is
+          -- reachable -- Exploration destroyed after the second land leaves an
+          -- allowance of one against a tally of two.
+          && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
       lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
       -- CR 709.3: one action per castable HALF, so choosing a half is choosing
       -- an action and the engine never asks which one.

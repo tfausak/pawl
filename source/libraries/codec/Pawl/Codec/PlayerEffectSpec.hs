@@ -79,6 +79,23 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
           (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.White), ManaSymbol.OfType (ManaType.Colored Color.Black)])
       )
       """ {"type":"ReduceSpellCost","value":[{"type":"HasSubtype","value":{"type":"Cleric"}},[{"type":"OfType","value":{"type":"Colored","value":{"type":"White"}}},{"type":"OfType","value":{"type":"Colored","value":{"type":"Black"}}}]]} """
+  -- CR 305.2 / Exploration.
+  Spec.it s "PlayAdditionalLands, Exploration's one" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.PlayAdditionalLands 1)
+      """ {"type":"PlayAdditionalLands","value":1} """
+  -- CR 305.2 / Azusa, Lost but Seeking: the OTHER amount, so a codec that
+  -- dropped the payload would round-trip one of these and not both.
+  Spec.it s "PlayAdditionalLands, Azusa's two" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.PlayAdditionalLands 2)
+      """ {"type":"PlayAdditionalLands","value":2} """
   -- CR 402.2 / Reliquary Tower.
   Spec.it s "NoMaximumHandSize" $
     Common.assertJsonCodec

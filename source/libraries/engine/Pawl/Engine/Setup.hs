@@ -92,7 +92,7 @@ emptyGame order =
           GameState.nextTimestamp = Timestamp.MkTimestamp 0,
           GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
-          GameState.landPlayed = mempty,
+          GameState.landsPlayed = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
@@ -270,7 +270,7 @@ restartGame perform starter = do
             -- value and not zero.
             GameState.lastChoice = GameState.nextTimestamp gs,
             GameState.drewFromEmpty = mempty,
-            GameState.landPlayed = mempty,
+            GameState.landsPlayed = mempty,
             GameState.pendingControl = Map.empty,
             GameState.activeControl = Nothing,
             GameState.monarch = Nothing,
@@ -353,7 +353,7 @@ subgameStateFrom starter parent =
           -- have the subgame draw itself on entry for events at another level.
           GameState.lastChoice = GameState.nextTimestamp parent,
           GameState.drewFromEmpty = mempty,
-          GameState.landPlayed = mempty,
+          GameState.landsPlayed = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,

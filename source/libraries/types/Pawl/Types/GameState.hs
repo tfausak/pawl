@@ -161,7 +161,18 @@ data GameState = MkGameState
     -- neither a fresh game nor a resumed one inherits a gap run up elsewhere.
     lastChoice :: Timestamp.Timestamp,
     drewFromEmpty :: Set.Set PlayerId.PlayerId,
-    landPlayed :: Set.Set PlayerId.PlayerId,
+    -- | CR 305.2a: how many lands each player has already played this turn --
+    -- the right-hand side of that rule's comparison, whose left-hand side is
+    -- Pawl.Engine.PlayerEffect.landPlaysAllowed. A player with no row here has
+    -- played none.
+    --
+    -- A COUNT and not a yes/no, because CR 305.2 lets a continuous effect raise
+    -- the number a player may play, so one is not the only interesting
+    -- threshold (Exploration, Azusa Lost but Seeking).
+    --
+    -- Cleared PER PLAYER at that player's untap step (Engine.runTurnBasedActions),
+    -- which is what makes it "this turn".
+    landsPlayed :: Map.Map PlayerId.PlayerId Natural.Natural,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
     -- controlled. Map.insert overwrites (CR 723.1a, last created wins). Promoted
     -- to activeControl at the actual start of that player's turn (CR 723.1b).
