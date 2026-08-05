@@ -46,12 +46,18 @@ data Modification
     -- 205.1b keeps the object's other card types and subtypes and replaces only
     -- its creature types. CR 205.3m is the list of what that reaches.
     --
-    -- No AddCreatureSubtype beside it, though AddColor sits beside SetColor
-    -- below: adding a creature type is a real thing an effect can do, and it is
-    -- absent only because no card in the pool does it. CR 205.1b allows several
-    -- creature types and this carries exactly one, the same narrowing
-    -- SetLandSubtype takes.
+    -- AddCreatureSubtype sits beside it, the way AddColor sits beside SetColor
+    -- below. CR 205.1b allows several creature types and this carries exactly
+    -- one, the same narrowing SetLandSubtype takes.
     SetCreatureSubtype Subtype.Subtype
+  | -- | layer 4, CR 205.1b add (Life and Limb -> Saproling). The ADD beside the
+    -- SET above, standing to it as AddLandSubtype stands to SetLandSubtype: the
+    -- object keeps every creature type it had and gains this one.
+    --
+    -- No ability clause on this arm or on the set above. CR 305.7's strip is the
+    -- land arms' alone, which is why neither creature-type arm routes through
+    -- setLandSubtypeTo.
+    AddCreatureSubtype Subtype.Subtype
   | AddCardType CardType.CardType -- layer 4 (Opalescence -> Creature)
   | ChangeSubtypeWord Subtype.Subtype Subtype.Subtype -- layer 3, CR 612 (Magical Hack, Artificial Evolution: from -> to)
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at

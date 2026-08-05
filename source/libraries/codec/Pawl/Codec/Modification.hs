@@ -22,6 +22,7 @@ toJson m = case m of
   Modification.SetLandSubtypeToChosen -> Common.nullary "SetLandSubtypeToChosen"
   Modification.AddLandSubtype s -> Common.tagged "AddLandSubtype" . Just $ Subtype.toJson s
   Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Subtype.toJson s
+  Modification.AddCreatureSubtype s -> Common.tagged "AddCreatureSubtype" . Just $ Subtype.toJson s
   Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
   Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Common.array $ [Subtype.toJson a, Subtype.toJson b]
   Modification.SetController p -> Common.tagged "SetController" . Just $ PlayerId.toJson p
@@ -46,6 +47,7 @@ fromJson value = do
     "SetLandSubtypeToChosen" -> Right Modification.SetLandSubtypeToChosen
     "AddLandSubtype" -> Common.withValue mv (fmap Modification.AddLandSubtype . Subtype.fromJson)
     "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Subtype.fromJson)
+    "AddCreatureSubtype" -> Common.withValue mv (fmap Modification.AddCreatureSubtype . Subtype.fromJson)
     "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Subtype.fromJson x <*> Subtype.fromJson y
     "SetController" -> Common.withValue mv (fmap Modification.SetController . PlayerId.fromJson)

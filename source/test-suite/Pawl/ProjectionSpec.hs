@@ -6,8 +6,8 @@
 -- overrides it. Mostly directly-constructed continuous effects, so the engine is
 -- proven independently of any card wiring; the card-level proofs live alongside.
 -- Also Pawl.Engine.Subtype, the CR 205.3i land-type and CR 205.3m creature-type
--- classifications the layer-4 SetLandSubtype and SetCreatureSubtype arms fold
--- with.
+-- classifications the layer-4 SetLandSubtype, SetCreatureSubtype and
+-- AddCreatureSubtype arms fold with.
 module Pawl.ProjectionSpec where
 
 import qualified Data.Foldable as Foldable
@@ -1078,6 +1078,21 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf ashayaId gs)) "Ashaya is a land"
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf ashayaId gs)) "Ashaya is a Mountain"
+
+  -- The card-level proof of the layer-4 AddCreatureSubtype arm: Life and Limb
+  -- makes a basic Forest a 1/1 green Saproling creature land, and the Saproling
+  -- is the type this arm adds. CR 205.1b's add keeps the types already there,
+  -- which the Forest land type surviving alongside it shows.
+  Spec.it s "CR 205.1b Life and Limb adds a creature type without replacing the land's own" $ do
+    forest <- S.printingOf s registry "Forest"
+    limb <- S.printingOf s registry "Life and Limb"
+    let base = Setup.emptyGame S.bothPlayers
+        (forestId, g1) = S.addCreature forest S.alice base
+        (_, gs) = S.addCreature limb S.alice g1
+    Spec.assertBool s (Set.member Subtype.Type.Saproling (Projection.subtypesOf forestId gs)) "the Forest is a Saproling"
+    Spec.assertBool s (Set.member Subtype.Type.Forest (Projection.subtypesOf forestId gs)) "and still a Forest (CR 205.1b: the add keeps the rest)"
+    Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
+    Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf forestId gs)) "and still a land"
 
   -- CR 111.3: a token is not a card, and nothing in CR 613 changes that -- so
   -- Not IsToken reads no projected aspect and no ordering turns on it.

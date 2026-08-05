@@ -83,6 +83,7 @@ layer m = case m of
   Modification.SetLandSubtypeToChosen -> Layer.Type
   Modification.AddLandSubtype _ -> Layer.Type
   Modification.SetCreatureSubtype _ -> Layer.Type
+  Modification.AddCreatureSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
@@ -148,6 +149,10 @@ applyModification lyr src cands gs oid m pc =
         -- (#530).
         Modification.SetCreatureSubtype s ->
           pc {PC.subtypes = Set.insert s (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))}
+        -- CR 205.1b's add: every creature type already present is kept, which is
+        -- the one line separating this arm from the set above.
+        Modification.AddCreatureSubtype s ->
+          pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 305.7's set, with the type written into card data.
@@ -769,6 +774,7 @@ freezeQuantities gs oid you m =
         Modification.SetLandSubtypeToChosen -> Just m
         Modification.AddLandSubtype _ -> Just m
         Modification.SetCreatureSubtype _ -> Just m
+        Modification.AddCreatureSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.ChangeSubtypeWord _ _ -> Just m
         Modification.SetController _ -> Just m
@@ -791,6 +797,7 @@ quantitiesOf m = case m of
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
+  Modification.AddCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
@@ -823,6 +830,7 @@ setLandSubtypeEffects gs =
         -- one: CR 305.7's ability strip is about a LAND whose subtype is set, and
         -- CR 205.1a/205.1b's creature-type set carries no such clause.
         Modification.SetCreatureSubtype _ -> False
+        Modification.AddCreatureSubtype _ -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
@@ -916,6 +924,7 @@ rewriteModification pairs m =
         -- CR 612.2's other named example: the swap rewrites a Turn to Frog's Frog
         -- on the stack, so the spell resolves making its target the new type.
         Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
+        Modification.AddCreatureSubtype s -> Modification.AddCreatureSubtype (swap Subtype.isCreatureType from to s)
         -- CR 702.14a: "[type]walk" holds a land-type word, so a hacked Lord of
         -- Atlantis grants swampwalk rather than the printed islandwalk. The
         -- GRANTER's text is what this reads -- gatherStatic calls it with the
@@ -1385,6 +1394,7 @@ removesAbilities m = case m of
   -- CR 205.1a/205.1b's creature-type set has no ability clause at all; CR 305.7's
   -- strip belongs to the land arm above.
   Modification.SetCreatureSubtype _ -> False
+  Modification.AddCreatureSubtype _ -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
   Modification.SwitchPowerToughness -> False
@@ -1650,6 +1660,7 @@ modificationWrites m = case m of
   Modification.SetLandSubtypeToChosen -> Set.fromList [Subtypes, Keywords]
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
+  Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors
