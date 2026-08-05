@@ -275,7 +275,7 @@ data Prompt r where
   -- ADVISORY, not a limit and not a clamp: the answer is filtered against it
   -- nowhere. CR 601.2b lets the player announce the value freely, and an
   -- announcement the cost cannot pay is answered by CR 601.2 / 602.2's reversal,
-  -- which is pawl's no-op minus the prompts (#56). Both callers take that reversal
+  -- which is pawl's no-op minus the prompts (#741). Both callers take that reversal
   -- at THIS step rather than carrying an already lost spell to CR 601.2h. What the
   -- bound adds is the INFORMATION a player at a table has and an answerer, seeing
   -- only this payload, did not (#417).

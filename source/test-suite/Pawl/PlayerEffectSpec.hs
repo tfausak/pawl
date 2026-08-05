@@ -408,8 +408,8 @@ thaliaSpec s registry =
 
     -- BOTH sites, one scenario. Taxing castability but not payment lets
     -- the player underpay; taxing payment but not castability offers a
-    -- cast that cannot be afforded, and there is no mid-announcement
-    -- rewind (#56) -- that is a wedged game, not a rejected action.
+    -- cast that cannot be afforded, and nothing REPAIRS a cast partway --
+    -- that is a wedged game, not a rejected action.
     Spec.it s "CR 601.2f castability is measured against the total cost" $ do
       mountain <- S.printingOf s registry "Mountain"
       thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"

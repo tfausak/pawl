@@ -178,8 +178,9 @@ targetable pid oid name gs = case proposedFace oid name gs of
 -- affordable when it is payable with X=0 (the caster may always choose 0)
 -- against the TOTAL cost, not the printed one. Taxing castability without taxing
 -- payment lets the player underpay; taxing payment without taxing castability
--- offers a cast that cannot be afforded, and there is no mid-announcement
--- rewind (#56).
+-- offers a cast that cannot be afforded, and nothing REPAIRS a cast partway:
+-- the announcement unwinds whole or not at all (castSpell's haddock, proven by
+-- Pawl.CastSpec's mis-coloured-mana pair).
 --
 -- CR 118.13a's announcement is measured against the same total, and castSpell
 -- hands Cost.totalMana in for exactly that reason: a gate and an offer that
@@ -206,7 +207,7 @@ payableCostAt x pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.
 -- the same predicate castability was gated on.
 --
 -- Advisory, and nothing here clamps: see Prompt.ChooseX for why announcing past
--- this is legal (CR 601.2b) and what it costs the player (#56).
+-- this is legal (CR 601.2b) and what it costs the player (#741).
 --
 -- The SEARCH is Cost.greatestPayableX, shared with Activate.affordableX; the
 -- PREDICATE is not, since an activation cost skips CR 601.2f's totalling (#90).
@@ -611,8 +612,11 @@ castWhileSearching pid = do
 --
 -- REJECT-NOT-REPAIR, as a genuine rewind: an illegal answer at any step restores
 -- `before`, which is what undoes the CR 601.2a move -- CR 601.2's own remedy, and
--- the posture Activate.activateAbility already takes. What the restore does NOT
--- undo is a prompt already issued (#56).
+-- the posture Activate.activateAbility already takes. Pawl.CastSpec's pair "CR
+-- 601.2 a mis-coloured mana answer unwinds the whole cast" and "the same cast
+-- with the right colour succeeds" prove it end to end: one colour apart, and the
+-- rejected one leaves the card in hand with its payer untapped. What the restore
+-- does NOT undo is a prompt already issued (#741).
 --
 -- Every prompt below is answerable: legalActions only offers affordable,
 -- fully-fillable casts. A legal answer CAN still fail after the prompt, and one
