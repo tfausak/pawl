@@ -220,6 +220,17 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
         copied = castAndResolve (copyThe bearer) S.alice cloneId designated
         -- The Clone is the newest object on the battlefield.
         newest = Maybe.listToMaybe (List.sortOn Ord.Down (Set.toList (GameState.battlefield copied)))
+    -- Anti-vacuity: "only the original is marked" is trivially true of a board
+    -- where the Clone never entered, or entered as a 0/0 and died to CR 704.5f. It
+    -- entered AND copied exactly when a permanent that is not the bearer projects
+    -- the bearer's name (CR 707.2 makes the name copiable; a Clone that copied
+    -- nothing projects "Clone"). Both assertions fail if the copy answer is
+    -- replaced by S.identityAnswer, which declines.
     Spec.assertBool s (newest /= Just bearer) "the Clone really is a different object"
+    Spec.assertEqWith
+      s
+      "and it really copied the Ring-bearer"
+      (fmap (\oid -> Projection.nameOf oid copied) newest)
+      (Just (Projection.nameOf bearer copied))
     Spec.assertEqWith s "the original is still the Ring-bearer" (markedFor S.alice copied) [bearer]
     Spec.assertEqWith s "and nothing else carries the designation" (length (markedFor S.alice copied)) 1
