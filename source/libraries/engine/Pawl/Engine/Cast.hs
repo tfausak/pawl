@@ -428,12 +428,13 @@ asProposed oid name gs =
 -- Asked of ONE HALF, named: CR 709.3a and CR 715.3a evaluate only the chosen half
 -- to see if it can be cast, so a multi-face card is asked this question once per
 -- half. That name reaches the conjuncts TWICE over, and both are needed: as an
--- argument, which is how the ones that read the card resolve their face, and as
--- `asProposed`'s stamp, which is how the ones that read the OBJECT -- CR 601.2f's
--- adjustments through Cost.total, and the target specs -- resolve theirs.
--- Thalia's "noncreature spells cost {1} more to cast" is the observable: it taxes
--- the Sorcery half of an adventurer card and not the Creature half, off one card
--- in one hand.
+-- ARGUMENT, which is how the ones that read the CARD -- the timing window, the
+-- printed restrictions, the candidate costs, the target specs -- resolve their
+-- face, and as `asProposed`'s STAMP, which is how the ones that go on to read the
+-- OBJECT resolve theirs: CR 601.2f's adjustments through Cost.total, and any
+-- filter measuring the spell's own characteristics. Thalia's "noncreature spells
+-- cost {1} more to cast" is the observable: it taxes the Sorcery half of an
+-- adventurer card and not the Creature half, off one card in one hand.
 castable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 castable pid oid name gs =
   let proposed = asProposed oid name gs
