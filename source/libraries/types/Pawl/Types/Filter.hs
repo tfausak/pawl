@@ -47,6 +47,22 @@ data Filter keyword
     -- Projection.viewOfCard is the printed-card fallback off the battlefield.
     HasKeyword keyword
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
+  | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
+    -- Command's "creature card with mana value 2 or less".
+    --
+    -- AT MOST where power's atom is at least, because that is the direction the
+    -- cards ask in: a mana value bounds what a cheap-thing effect may reach, and
+    -- a power threshold bounds what a big-thing effect may. Neither is the
+    -- other's negation -- `Not (PowerAtLeast 3)` is power <= 2 only for an
+    -- object that HAS a power, and every object has a mana value -- so a single
+    -- comparison atom with a direction flag would buy nothing.
+    --
+    -- Unlike PowerAtLeast, this is answerable OFF the battlefield, which is the
+    -- point: rule 202.3 reads the printed mana cost, which exists in every zone,
+    -- and the graveyard is where the card asking is looking (CR 115.2's other
+    -- zone half, via Pool.CardsInGraveyard). No Modification writes a mana cost,
+    -- so there is nothing projected to read instead.
+    ManaValueAtMost Integer
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | The candidate IS the evaluation's source object. Context-relative like
     -- ControlledBy: the Filter carries no object id, and the answer comes from the

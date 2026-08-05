@@ -5,6 +5,7 @@
 module Pawl.ModalSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -40,6 +41,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -52,6 +54,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
@@ -425,6 +428,338 @@ triggerModalSpec s registry = Spec.describe s "M4h trigger modal (CR 700.2b/603.
     Spec.assertEqWith s "alice's hand is still empty (nothing bounced)" (length (Game.zoneMembers Zone.Hand S.alice placed)) 0
     Spec.assertEqWith s "nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice placed)) 0
 
+-- Cryptic Command's four modes, in printed order (CR 700.2 /
+-- data/cards/cryptic-command.json), under "Choose two --":
+--   0. counter target spell                        -- slot "spell"
+--   1. return target permanent to its owner's hand -- slot "permanent"
+--   2. tap all creatures your opponents control    -- no slot (EachMatching)
+--   3. draw a card                                 -- no slot
+crypticModes :: Set.Set ModeIndex.ModeIndex
+crypticModes = Set.fromList (fmap ModeIndex.MkModeIndex [0, 1, 2, 3])
+
+spellSlot, permanentSlot :: SlotName.SlotName
+spellSlot = SlotName.MkSlotName (Text.pack "spell")
+permanentSlot = SlotName.MkSlotName (Text.pack "permanent")
+
+-- Chooses the two modes `idxs` and aims each named slot at the recipient `picks`
+-- gives it -- chooseModeAt's shape, except that a "choose two" cast can have TWO
+-- slots to fill at once (modes 0 and 1 together), which one fixed recipient
+-- cannot answer. A slot `picks` does not name falls back to the least member of
+-- its own legal set, so the answer stays total.
+chooseTwo :: [ModeIndex.ModeIndex] -> [(SlotName.SlotName, Recipient.Recipient)] -> Prompt.Prompt r -> r
+chooseTwo idxs picks p = case p of
+  Prompt.ChooseModes {} -> Set.fromList idxs
+  Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey pickFor sets
+  _ -> S.identityAnswer p
+  where
+    pickFor slot legal = case lookup slot picks of
+      Just recipient -> recipient
+      Nothing -> Maybe.fromMaybe (Recipient.ToPlayer S.alice) (Set.lookupMin legal)
+
+-- alice has four Islands and Cryptic Command in hand ({1}{U}{U}{U}); bob has one
+-- Goblin Piker on the battlefield.
+crypticBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+crypticBoard island crypticCommand piker =
+  let (pikerId, gs1) = S.addCreature piker S.bob (S.landsInPlay island 4)
+      (gs, spellId) = S.handOne crypticCommand gs1
+   in (gs, spellId, pikerId)
+
+-- CR 601.2b/700.2: "Choose two" of four -- the case the forced-mode shortcut in
+-- Cast.castProposed must stay out of the way of. Cryptic Command is the pool's
+-- first ChooseExactly n with n > 1, and its last two modes take no targets at
+-- all, so the fillable count can never fall below two -- and at cast time it is
+-- always more than two, so the prompt is always asked.
+chooseTwoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
+  Spec.it s "CR 700.2 Cryptic Command demands two of four fillable modes" $ do
+    island <- S.printingOf s registry "Island"
+    crypticCommand <- S.printingOf s registry "Cryptic Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let (board, spellId, _) = crypticBoard island crypticCommand piker
+        (_, gs) = S.spellOnStack slaughterDrone S.bob board
+        modal = Face.spell (S.combinedFace crypticCommand)
+    Spec.assertEqWith s "the selection demands two" (Modal.selectionCount modal) 2
+    Spec.assertEqWith
+      s
+      "with a spell on the stack and permanents in play, all four modes are fillable"
+      (Target.fillableModes (Just S.alice) spellId (Card.enchantSpecs (S.combinedFace crypticCommand)) modal gs)
+      crypticModes
+    -- The forced case's own boundary, and why casting does not reach it: modes 2
+    -- and 3 take no targets, so they are fillable even on an empty board --
+    -- exactly the two the selection demands. No cast in this pool arrives here,
+    -- since every mana source in it is a permanent, and a permanent on the
+    -- battlefield is a legal target for mode 1.
+    Spec.assertEqWith
+      s
+      "on an empty board only the two targetless modes are fillable"
+      (Target.fillableModes (Just S.alice) S.noSource Map.empty modal (Setup.emptyGame S.bothPlayers))
+      (Set.fromList (fmap ModeIndex.MkModeIndex [2, 3]))
+
+  -- The prompt itself, asserted rather than assumed: the answer below refuses to
+  -- name any mode unless ChooseModes really offers all four and asks for two, and
+  -- an empty answer is not a size-2 subset, so Cast.castProposed's
+  -- reject-not-repair rewinds the whole cast and every assertion here fails.
+  Spec.it s "CR 601.2b the mode prompt offers all four and asks for exactly two" $ do
+    island <- S.printingOf s registry "Island"
+    crypticCommand <- S.printingOf s registry "Cryptic Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
+        -- A spell on the stack is what makes mode 0 fillable, so the prompt this
+        -- answer insists on -- all four modes -- is the one really issued.
+        (_, withSpell) = S.spellOnStack slaughterDrone S.bob board
+        (_, gs) = S.addLibraryCard piker S.alice withSpell
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes _ _ _ legal count ->
+            if legal == crypticModes && count == 2
+              then Set.fromList (fmap ModeIndex.MkModeIndex [2, 3])
+              else Set.empty
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    -- Cryptic Command in the graveyard is what says the cast was NOT rewound:
+    -- a rejected proposal leaves it in hand, where the drawn-card count below
+    -- would pass for the wrong reason.
+    Spec.assertEqWith s "Cryptic Command resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "alice drew a card (mode 3)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+    Spec.assertEqWith s "bob's Piker is tapped (mode 2)" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Tapped)
+
+  Spec.it s "CR 608.2c both chosen modes resolve: the spell is countered and a card is drawn" $ do
+    island <- S.printingOf s registry "Island"
+    crypticCommand <- S.printingOf s registry "Cryptic Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
+        (droneId, withSpell) = S.spellOnStack slaughterDrone S.bob board
+        (_, gs) = S.addLibraryCard piker S.alice withSpell
+        answer :: Prompt.Prompt r -> r
+        answer = chooseTwo (fmap ModeIndex.MkModeIndex [0, 3]) [(spellSlot, Recipient.ToObject droneId)]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertBool s (notElem droneId (GameState.stack after)) "the Drone spell is off the stack"
+    Spec.assertEqWith s "countered into bob's graveyard, never onto the battlefield" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "alice drew a card (mode 3)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+    -- The two UNCHOSEN modes did nothing: no bounce, and nothing tapped.
+    Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "bob's Piker was not bounced (mode 1 unchosen)"
+    Spec.assertEqWith s "bob's Piker is untapped (mode 2 unchosen)" (fmap Object.tapped (Game.lookupObject pikerId after)) (Just TapState.Untapped)
+
+  -- Two chosen modes whose effects touch the same board: the bounce (mode 1)
+  -- runs first (CR 608.2c), so "tap all creatures your opponents control" sweeps
+  -- what is left. Not a test OF that order -- tapping the Piker and then bouncing
+  -- it would leave the same board, since CR 400.7 mints a new object in hand
+  -- either way -- but of the sweep itself, which is what "all creatures your
+  -- OPPONENTS control" makes discriminating: alice's own creature stays untapped.
+  Spec.it s "CR 608.2c bounce then tap: only the opponent's remaining creatures are tapped" $ do
+    island <- S.printingOf s registry "Island"
+    crypticCommand <- S.printingOf s registry "Cryptic Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
+        (wallId, withWall) = S.addCreature wallOfStone S.bob board
+        (mineId, gs) = S.addCreature piker S.alice withWall
+        answer :: Prompt.Prompt r -> r
+        answer = chooseTwo (fmap ModeIndex.MkModeIndex [1, 2]) [(permanentSlot, Recipient.ToObject pikerId)]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertBool s (not (Set.member pikerId (GameState.battlefield after))) "the targeted Piker left the battlefield"
+    Spec.assertEqWith s "and is in bob's hand" (length (Game.zoneMembers Zone.Hand S.bob after)) 1
+    Spec.assertEqWith s "bob's Wall of Stone is tapped" (fmap Object.tapped (Game.lookupObject wallId after)) (Just TapState.Tapped)
+    -- "your opponents control", not "all creatures": alice's own Piker is untouched.
+    Spec.assertEqWith s "alice's own Piker is untapped" (fmap Object.tapped (Game.lookupObject mineId after)) (Just TapState.Untapped)
+
+  -- The Gatherer ruling, verbatim: "if you choose the second and fourth modes,
+  -- and the permanent is an illegal target when Cryptic Command tries to resolve,
+  -- you won't draw a card." CR 608.2b counters the whole SPELL when all its
+  -- targets are illegal, so the targetless mode falls with the targeted one.
+  Spec.it s "CR 608.2b bounce + draw fizzles entirely when the bounce target is gone" $ do
+    island <- S.printingOf s registry "Island"
+    crypticCommand <- S.printingOf s registry "Cryptic Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
+        (_, gs) = S.addLibraryCard piker S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer = chooseTwo (fmap ModeIndex.MkModeIndex [1, 3]) [(permanentSlot, Recipient.ToObject pikerId)]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        -- CR 400.7: leaving the battlefield mints a new incarnation, so pikerId's
+        -- chosen recipient no longer names a legal target.
+        gone = S.runPure S.identityAnswer cast (Event.changeZone pikerId Zone.Graveyard)
+        after = snd (Engine.runGamePure answer gone Stack.resolveTop)
+    Spec.assertEqWith s "alice's hand is empty: no card was drawn" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+    Spec.assertEqWith s "Cryptic Command is in alice's graveyard, unresolved" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+
+  -- The other half of CR 608.2b, and the falsifier for an engine that fizzled per
+  -- MODE rather than per spell: one of the two chosen modes' targets is gone and
+  -- the other is not, so the spell resolves and only the illegal mode is skipped.
+  Spec.it s "CR 608.2b counter + bounce still counters when only the bounce target is gone" $ do
+    island <- S.printingOf s registry "Island"
+    crypticCommand <- S.printingOf s registry "Cryptic Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    let (board, spellId, pikerId) = crypticBoard island crypticCommand piker
+        (droneId, gs) = S.spellOnStack slaughterDrone S.bob board
+        answer :: Prompt.Prompt r -> r
+        answer =
+          chooseTwo
+            (fmap ModeIndex.MkModeIndex [0, 1])
+            [(spellSlot, Recipient.ToObject droneId), (permanentSlot, Recipient.ToObject pikerId)]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        gone = S.runPure S.identityAnswer cast (Event.changeZone pikerId Zone.Graveyard)
+        after = snd (Engine.runGamePure answer gone Stack.resolveTop)
+    Spec.assertBool s (notElem droneId (GameState.stack after)) "the Drone spell was still countered"
+    Spec.assertEqWith s "bob's graveyard holds the countered Drone and the Piker that left" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
+    Spec.assertEqWith s "nothing reached bob's hand: the bounce mode was skipped" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
+
+-- Ojutai's Command's four modes, in printed order (CR 700.2 /
+-- data/cards/ojutais-command.json), under "Choose two --":
+--   0. return target creature card with mana value 2 or less
+--      from your graveyard to the battlefield -- slot "creature"
+--   1. you gain 4 life                        -- no slot
+--   2. counter target creature spell          -- slot "spell"
+--   3. draw a card                            -- no slot
+ojutaiModes :: Set.Set ModeIndex.ModeIndex
+ojutaiModes = Set.fromList (fmap ModeIndex.MkModeIndex [0, 1, 2, 3])
+
+creatureSlot :: SlotName.SlotName
+creatureSlot = SlotName.MkSlotName (Text.pack "creature")
+
+-- alice has three Islands and a Plains ({2}{W}{U}) and Ojutai's Command in hand.
+-- Her graveyard and the stack are EMPTY, which is what makes modes 0 and 2
+-- unfillable: nothing to reanimate, no creature spell to counter.
+ojutaiBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+ojutaiBoard island plains ojutaisCommand =
+  let (_, gs1) = S.addCreature plains S.alice (S.landsInPlay island 3)
+   in S.handOne ojutaisCommand gs1
+
+-- CR 601.2b/700.2: the OTHER side of Cryptic Command's group above -- a "choose
+-- two" whose fillable modes really can come down to exactly two, so the forced
+-- (unprompted) branch of Cast.castProposed is reachable at cast time and the
+-- claim that nothing is hidden from the player can be checked rather than argued.
+-- Ojutai's Command's two targeting modes both look somewhere a cast can leave
+-- empty: your graveyard, and the stack.
+forcedTwoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forcedTwoSpec s registry = Spec.describe s "ForcedTwo (CR 700.2a)" $ do
+  -- CR 700.2a: "If one of the modes would be illegal … that mode can't be
+  -- chosen." Two demanded, two choosable, so there is nothing to ask -- and
+  -- neverAskModes turns the prompt into a test failure rather than a comment.
+  Spec.it s "CR 700.2a with exactly two fillable modes no mode prompt is issued" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, gs) = S.addLibraryCard piker S.alice board
+        cast = snd (Engine.runGamePure neverAskModes gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure neverAskModes cast Stack.resolveTop)
+    Spec.assertEqWith
+      s
+      "only the two targetless modes are fillable"
+      (Target.fillableModes (Just S.alice) spellId Map.empty (Face.spell (S.combinedFace ojutaisCommand)) gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 3]))
+    Spec.assertEqWith s "alice gained 4 life (mode 1)" (S.lifeOf S.alice after) (Just 24)
+    Spec.assertEqWith s "alice drew a card (mode 3)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+
+  -- The falsifier for that pair, and for CR 202.3's bound: the SAME board with a
+  -- creature card in the graveyard. Wall of Stone ({1}{R}{R}, mana value 3) is
+  -- above "2 or less" and leaves the two modes forced; Goblin Piker ({1}{R}, mana
+  -- value 2) is within it and makes a third mode fillable, so the choice is real
+  -- and the prompt must be issued.
+  Spec.it s "CR 202.3 a mana value 3 creature card in the graveyard is still not choosable" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, gs) = S.addGraveyardCard wallOfStone S.alice board
+    Spec.assertEqWith
+      s
+      "the reanimation mode stays unfillable"
+      (Target.fillableModes (Just S.alice) spellId Map.empty (Face.spell (S.combinedFace ojutaisCommand)) gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 3]))
+
+  Spec.it s "CR 202.3 a mana value 2 creature card in the graveyard makes a third mode choosable" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, gs) = S.addGraveyardCard piker S.alice board
+    Spec.assertEqWith
+      s
+      "the reanimation mode joins the two targetless ones"
+      (Target.fillableModes (Just S.alice) spellId Map.empty (Face.spell (S.combinedFace ojutaisCommand)) gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [0, 1, 3]))
+
+  -- CR 115.2's other-zone pool doing real work: the chosen mode reads a card in
+  -- alice's graveyard and puts it onto the battlefield (CR 400.7 mints the new
+  -- object there).
+  Spec.it s "CR 601.2b reanimating and gaining life: both chosen modes resolve" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (pikerId, gs) = S.addGraveyardCard piker S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer = chooseTwo (fmap ModeIndex.MkModeIndex [0, 1]) [(creatureSlot, Recipient.ToObject pikerId)]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "a Goblin Piker is on the battlefield under alice" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "alice gained 4 life (mode 1)" (S.lifeOf S.alice after) (Just 24)
+    Spec.assertEqWith s "alice's hand is empty: mode 3 was not chosen" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+
+  -- Mode 2's own filter: "target CREATURE spell", so a noncreature spell on the
+  -- stack leaves the two modes forced -- the counter mode is not choosable just
+  -- because something is on the stack.
+  Spec.it s "CR 700.2a a noncreature spell on the stack does not make the counter mode choosable" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, withBolt) = S.spellOnStack lightningBolt S.bob board
+        (_, gs) = S.spellOnStack piker S.bob board
+        modal = Face.spell (S.combinedFace ojutaisCommand)
+    Spec.assertEqWith
+      s
+      "an instant on the stack leaves only the targetless modes"
+      (Target.fillableModes (Just S.alice) spellId Map.empty modal withBolt)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 3]))
+    Spec.assertEqWith
+      s
+      "a creature spell on the stack makes the counter mode choosable"
+      (Target.fillableModes (Just S.alice) spellId Map.empty modal gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 2, 3]))
+
+  -- All four at once, so the prompt has the widest choice this card can offer.
+  Spec.it s "CR 601.2b all four modes fillable: the prompt is issued and the chosen two resolve" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (deadPiker, withGrave) = S.addGraveyardCard piker S.alice board
+        (castPiker, gs) = S.spellOnStack piker S.bob withGrave
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes _ _ _ legal count ->
+            if legal == ojutaiModes && count == 2
+              then Set.fromList (fmap ModeIndex.MkModeIndex [0, 2])
+              else Set.empty
+          Prompt.ChooseTargets _ _ _ sets ->
+            Map.mapWithKey
+              (\slot _ -> if slot == creatureSlot then Recipient.ToObject deadPiker else Recipient.ToObject castPiker)
+              sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertBool s (notElem castPiker (GameState.stack after)) "bob's creature spell was countered"
+    Spec.assertEqWith s "the graveyard Piker is on the battlefield under alice" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "alice is still at 20: mode 1 was not chosen" (S.lifeOf S.alice after) (Just 20)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   gateSpec s registry
@@ -436,3 +771,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   modalReaderSpec s
   activationModalSpec s registry
   triggerModalSpec s registry
+  chooseTwoSpec s registry
+  forcedTwoSpec s registry

@@ -176,6 +176,12 @@ snapshotView shape event = case event of
                 Filter.subtypes = PC.subtypes snapshot,
                 Filter.keywords = Map.keysSet (PC.keywords snapshot),
                 Filter.power = PC.power snapshot,
+                -- CR 202.3 needs a mana cost, and the snapshot is a
+                -- ProjectedCharacteristics, which records none -- so unlike
+                -- supertypes above there is no answer here being thrown away.
+                -- A ManaValueAtMost over a past event is False for every value
+                -- (#674).
+                Filter.manaValue = Nothing,
                 Filter.controller = Nothing,
                 Filter.identity = Nothing,
                 Filter.playerIdentity = Nothing,

@@ -425,9 +425,11 @@ placeOne pending = case PendingTrigger.source pending of
 -- Put one object-borne triggered ability on the stack as a fresh OfTrigger
 -- object, choosing its mode(s) and their targets as it is placed (CR 603.3d).
 -- This mirrors Cast.castSpell's cast-time flow: CR 700.2b's mode choice as the
--- ability triggers (elided, forced and unprompted, exactly when the fillable
--- modes are no more than the selection demands, #50), then CR 603.3d's targets
--- for the CHOSEN mode(s), chosen now at placement.
+-- ability triggers (forced and unprompted exactly when the fillable modes are no
+-- more than the selection demands -- a choice between indistinguishable options,
+-- since every fillable mode must be taken), then CR 603.3d's targets for the
+-- CHOSEN mode(s), chosen now at placement. Aether Channeler's ETB is the pool's
+-- proof that a real choice is really asked (ModalSpec, "M4h trigger modal").
 --
 -- CR 603.3c/700.2b: if no mode is chosen, the ability is removed from the stack.
 -- This is the trigger-only half of the rule -- a SPELL that can't choose a mode

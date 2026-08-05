@@ -31,6 +31,7 @@ toJson encode filter_ = case filter_ of
   Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Subtype.toJson sub
   Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ encode k
   Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Common.integer n
+  Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Common.integer n
   Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ PlayerRelation.toJson r
   Filter.IsPlayer r -> Common.tagged "IsPlayer" . Just $ PlayerRelation.toJson r
   Filter.IsSource -> Common.nullary "IsSource"
@@ -55,6 +56,7 @@ fromJson decode value = do
     ("HasSubtype", Just v) -> Filter.HasSubtype <$> Subtype.fromJson v
     ("HasKeyword", Just v) -> Filter.HasKeyword <$> decode v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Common.asInteger v
+    ("ManaValueAtMost", Just v) -> Filter.ManaValueAtMost <$> Common.asInteger v
     ("ControlledBy", Just v) -> Filter.ControlledBy <$> PlayerRelation.fromJson v
     ("IsPlayer", Just v) -> Filter.IsPlayer <$> PlayerRelation.fromJson v
     ("IsSource", _) -> Right Filter.IsSource

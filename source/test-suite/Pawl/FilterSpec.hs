@@ -26,6 +26,7 @@ blackCreature =
       Filter.subtypes = Set.singleton Subtype.Zombie,
       Filter.keywords = Set.singleton Keyword.Flying,
       Filter.power = Just 2,
+      Filter.manaValue = Just 3,
       Filter.controller = Just (PlayerId.MkPlayerId 0),
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
@@ -48,6 +49,7 @@ devoidBigCreature =
       Filter.subtypes = Set.empty,
       Filter.keywords = Set.empty,
       Filter.power = Just 5,
+      Filter.manaValue = Just 5,
       Filter.controller = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
@@ -106,6 +108,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
   Spec.it s "PowerAtLeast is False when power is Nothing" $ do
     let noPower = blackCreature {Filter.power = Nothing}
     Spec.assertBool s (not (Filter.matches self noPower (Filter.Type.PowerAtLeast 1))) "no power"
+
+  -- CR 202.3, the other direction from PowerAtLeast above: Ojutai's Command's
+  -- "mana value 2 or less".
+  Spec.it s "ManaValueAtMost compares the mana value" $ do
+    Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ManaValueAtMost 3)) "mana value 3 <= 3"
+    Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.ManaValueAtMost 2))) "mana value 3 > 2"
+
+  -- CR 202.3a: a mana value of 0 is a real answer, not a missing one, so the
+  -- bound holds at zero rather than falling through to the Nothing arm below.
+  Spec.it s "ManaValueAtMost holds for a mana value of 0" $ do
+    let free = blackCreature {Filter.manaValue = Just 0}
+    Spec.assertBool s (Filter.matches self free (Filter.Type.ManaValueAtMost 0)) "0 <= 0"
+
+  Spec.it s "ManaValueAtMost is False when the mana value is Nothing" $ do
+    let noCost = blackCreature {Filter.manaValue = Nothing}
+    Spec.assertBool s (not (Filter.matches self noCost (Filter.Type.ManaValueAtMost 99))) "no mana value"
+
+  Spec.it s "ManaValueAtMost is False for a player" $ do
+    Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.ManaValueAtMost 99))) "player"
 
   Spec.it s "ControlledBy You holds for own object" $ do
     Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ControlledBy PlayerRelation.You)) "you"

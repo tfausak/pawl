@@ -1,0 +1,149 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Ojutai's Command",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "MoveToZone",
+                "value": [
+                  "creature",
+                  {
+                    "type": "Battlefield"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "creature",
+                "spec": {
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "ManaValueAtMost",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  "pool": {
+                    "type": "CardsInGraveyard",
+                    "value": {
+                      "type": "You"
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "GainLife",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 4
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "Counter",
+                "value": "spell"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "spell",
+                "spec": {
+                  "filter": {
+                    "type": "HasCardType",
+                    "value": {
+                      "type": "Creature"
+                    }
+                  },
+                  "pool": {
+                    "type": "Spells"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 2
+        }
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

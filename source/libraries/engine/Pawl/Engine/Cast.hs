@@ -636,12 +636,20 @@ castProposed pid sid face castFrom candidates before = do
   let count = case entwined of
         Just _ -> Modal.modeCount modal
         Nothing -> Modal.selectionCount modal
-  -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
-  -- unprompted) exactly when there is nothing to choose -- as many legal modes
-  -- as the selection demands or fewer (#50). An entwined cast is always in that
-  -- case: entwineOffer has already established that every mode is legal, so
-  -- `legal` has exactly `count` members and CR 702.42a's "all modes" is the only
-  -- answer.
+  -- CR 601.2b: modes are chosen BEFORE X and targets. Forced and unprompted
+  -- exactly when there is nothing to choose -- as many legal modes as the
+  -- selection demands or fewer, so every legal mode must be taken and the
+  -- options are indistinguishable. An entwined cast is always in that case:
+  -- entwineOffer has already established that every mode is legal, so `legal`
+  -- has exactly `count` members and CR 702.42a's "all modes" is the only answer.
+  --
+  -- Two cards hold this branch and its complement in place, both "Choose two --"
+  -- of four (ModalSpec): Cryptic Command, whose last two modes take no targets
+  -- and whose "target permanent" mode is fillable in every state that can pay for
+  -- it, so the prompt is always asked and is answered only when it really offers
+  -- all four; and Ojutai's Command, whose two targeting modes look at a graveyard
+  -- and the stack, which a cast can leave empty -- exactly two choosable modes,
+  -- and a spec that fails if a prompt is issued.
   chosenModes <-
     if Natural.length legal <= count
       then pure legal

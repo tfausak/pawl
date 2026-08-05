@@ -474,7 +474,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- Red Elemental Blast's cast below has only ONE fillable mode -- nothing is
     -- on the stack for "counter target blue spell" to name, so
     -- Target.fillableModes reports only the destroy mode and Cast.castSpell
-    -- elides Prompt.ChooseModes (#50). This test does not exercise the mode
+    -- forces the mode without prompting. This test does not exercise the mode
     -- choice; the ChooseModes prompt itself is exercised by the stack test
     -- below ("CR 604.3 Red Elemental Blast counters a devoid SPELL...").
     --
