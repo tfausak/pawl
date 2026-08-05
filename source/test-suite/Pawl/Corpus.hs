@@ -63,5 +63,6 @@ loadAll root = do
 loadOne :: FilePath -> Slug.Slug -> IO (Either CardError.CardError Card.Card)
 loadOne root slug = do
   let path = Registry.cardPath root slug
+      name = CardName.MkCardName (Slug.unwrap slug)
   bytes <- ByteString.readFile path
-  pure (Registry.parseCard (CardName.MkCardName (Slug.unwrap slug)) slug path bytes)
+  pure (either (Left . CardError.Invalid name . (<>) (path <> ": ") . Text.unpack) Right (Registry.parseFiledCard slug bytes))

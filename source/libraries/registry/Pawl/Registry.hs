@@ -166,40 +166,61 @@ cardPath :: FilePath -> Slug.Slug -> FilePath
 cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 
 -- What a card file's bytes mean. Pure, and separate from reading them, because
--- that is exactly what this module and the test suite's Pawl.Corpus agree
--- about; they disagree about how to obtain the bytes and about what a failure
--- to obtain them means. `path` is carried only to name the file in the error.
+-- that is exactly what a lookup and the corpus-wide lints agree about; they
+-- disagree about how to obtain the bytes and about what a failure to obtain
+-- them means. The caller pairs the reason with the path.
 --
 -- Decoded as UTF-8 explicitly rather than via Data.Text.IO.readFile, which
 -- decodes using the locale encoding -- ASCII under LC_ALL=C -- so a card with a
 -- non-ASCII character would fail with "invalid byte sequence" instead of naming
--- the offending file.
+-- the offending file. The caller pairs the reason with the path.
 --
--- The name check: the file's face names, joined, must slugify back to the name
--- it is filed under, or a lookup would quietly serve a different card than it
--- was asked for. Both callers inherit it.
+-- Says NOTHING about where the file was found: that is `filedAs` below, and
+-- keeping the two apart is what lets a root be read without a filename deciding
+-- what any of it answers for.
+parseCard :: ByteString.ByteString -> Either Text.Text Card.Card
+parseCard bytes = do
+  contents <- either (\err -> Left (Text.pack ("not valid UTF-8: " <> show err))) Right (Encoding.decodeUtf8' bytes)
+  Common.parse contents >>= Card.fromJson
+
+-- The slug a card's file is named for: its face names joined, slugified.
 --
--- Pawl.Types.CardName.join rather than a second "//" intercalation written
--- here: Pawl.Engine.Card.combined joins the same way, and the registry
--- sublibrary sits ABOVE engine and cannot call into it, so `types` is where the
--- two agree by construction. For a one-face card the join is that face's own
--- name, which is why 227 files were filed under it before any card printed a
--- second face.
+-- A FILING convention and not a name the card has -- CR 709.4a gives a split
+-- card two names and no combined one (#649) -- so this decides where a file
+-- LIVES and never what a lookup may ask for. Also not Pawl.Engine.Card.combined's
+-- name, which is a different question and only coincidentally the same string:
+-- CR 715.4 gives an adventurer card its normal face's name alone, so the
+-- combined view would name embereth-shieldbreaker while the file is
+-- embereth-shieldbreaker-battle-display.
+filedAs :: Card.Card -> Slug.Slug
+filedAs = Slug.fromText . CardName.unwrap . CardName.join . fmap Face.name . Card.faces
+
+-- Every card file in a root, ascending by path, each paired with what its bytes
+-- mean. One IO pass over the whole directory: this is what a registry is built
+-- from and what the corpus-wide lints sweep, so neither has to restate how a
+-- pool is enumerated.
 --
--- The joined string is a filing convention and not a name the card has -- CR
--- 709.4a gives a split card two names and no combined one -- so it decides
--- where a file LIVES and never what a lookup may ask for; see #649.
-parseCard :: CardName.CardName -> Slug.Slug -> FilePath -> ByteString.ByteString -> Either CardError.CardError Card.Card
-parseCard name slug path bytes = do
-  contents <- either (\err -> invalid ("not valid UTF-8: " <> show err)) Right (Encoding.decodeUtf8' bytes)
-  card <- either (invalid . Text.unpack) Right (Common.parse contents >>= Card.fromJson)
-  let joined = CardName.join (fmap Face.name (Card.faces card))
-      actual = Slug.fromText . CardName.unwrap $ joined
-  if actual == slug
+-- Per-file Either rather than an exception, so one pass can name every bad file
+-- instead of dying on the first.
+--
+-- Sorted so that what a caller reports first is a fact about the pool rather
+-- than about the order a directory happens to enumerate in. Non-.json entries
+-- are ignored outright -- a README is not a broken card.
+loadRoot :: FilePath -> IO [(FilePath, Either Text.Text Card.Card)]
+loadRoot root = do
+  entries <- fmap List.sort (Directory.listDirectory root)
+  let paths = fmap (\entry -> root <> "/" <> entry) (filter (List.isSuffixOf ".json") entries)
+  mapM (\path -> fmap (\bytes -> (path, parseCard bytes)) (ByteString.readFile path)) paths
+
+-- What a card file's bytes mean, confirmed against the slug it was filed under.
+-- A lookup builds a path from a slug, so a file whose card is named otherwise
+-- would quietly serve a different card than the one asked for.
+parseFiledCard :: Slug.Slug -> ByteString.ByteString -> Either Text.Text Card.Card
+parseFiledCard slug bytes = do
+  card <- parseCard bytes
+  if filedAs card == slug
     then Right card
-    else invalid ("is named " <> show joined <> ", which files under " <> show actual)
-  where
-    invalid reason = Left (CardError.Invalid name (path <> ": " <> reason))
+    else Left (Text.pack ("is named " <> show (CardName.join (fmap Face.name (Card.faces card))) <> ", which files under " <> show (filedAs card)))
 
 -- Read one file, and say what a failure to read it means. The registry asks for
 -- one named card, so a file that is not there is an answer (CardError.Missing)
@@ -214,6 +235,6 @@ loadFile root name slug = do
     Left err
       | IOError.isDoesNotExistError err -> pure (Left (CardError.Missing name))
       | otherwise -> Exception.throwIO err
-    Right bytes -> pure (parseCard name slug path bytes)
+    Right bytes -> pure (either (Left . CardError.Invalid name . (<>) (path <> ": ") . Text.unpack) Right (parseFiledCard slug bytes))
   where
     path = cardPath root slug
