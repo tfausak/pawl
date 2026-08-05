@@ -18,6 +18,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -33,12 +34,14 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -110,15 +113,25 @@ spec s registry = Spec.describe s "Transform" $ do
   -- CR 709.3's split card offers two -- the whole difference between the layouts
   -- at the point of casting.
   --
-  -- The falsifier is Pawl.Engine.Card.castableFaces answering with the whole
-  -- NonEmpty, as it does for Split and Adventure: Stonewing Antagonizer has no
-  -- mana cost at all, so a back face on the offer list would be castable for {0}.
+  -- Asserted TWICE, because the offer list alone cannot tell CR 712.11 from an
+  -- accident: Stonewing Antagonizer prints no mana cost, and CR 202.1's "some
+  -- objects have no mana cost" is unpayable rather than free
+  -- (Pawl.Engine.Cost.canPay's Nothing arm), so a back face proposed all the way
+  -- to the cost gate would be dropped there and the list would read the same.
+  -- The falsifier -- Pawl.Engine.Card.castableFaces answering with the whole
+  -- NonEmpty, as it does for Split and Adventure -- is caught only by asking
+  -- that function directly, so both are here and neither stands alone.
   Spec.it s "CR 712.11 only the front face is offered from a hand" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
     let (gs, _) = S.handOne gargoyle (S.landsInPlay island 1)
         namesOffered = [n | A.Cast _ n <- Action.legalActions S.alice gs]
-    Spec.assertEqWith s "the front face, alone" namesOffered [gargoyleName]
+    Spec.assertEqWith
+      s
+      "CR 712.11: the card proposes its front face and no other"
+      (fmap Face.name (Card.castableFaces (Printing.card gargoyle)))
+      [gargoyleName]
+    Spec.assertEqWith s "and the action list offers that one cast" namesOffered [gargoyleName]
   -- THE proving case. CR 701.27a: "To transform a permanent, turn it over so
   -- that its other face is up."
   --
