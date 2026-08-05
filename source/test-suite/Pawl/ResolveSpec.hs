@@ -1455,12 +1455,12 @@ counterSpec s registry = Spec.describe s "Counter" $ do
 -- The board every Mana Leak case starts from, with only `bobLands` varying.
 -- alice has two Islands (Mana Leak's {1}{U}) and a Mana Leak in hand; bob has
 -- `bobLands` untapped Islands of his own and a Goblin Piker already on the
--- stack. Returns the Piker's id and the state after alice casts Mana Leak at it
--- -- identityAnswer's ChooseTargets takes the lowest-id legal recipient, and the
--- Piker is the only spell on the stack it may name.
+-- stack. Returns the Piker's id and the state after alice casts Mana Leak at it.
 --
--- bob's lands go on FIRST so that they and the Piker exist before anything
--- alice owns, which keeps the board identical across the cases below.
+-- The Piker is on the stack BEFORE Mana Leak is cast, so it holds the lower
+-- object id and identityAnswer's ChooseTargets -- Set.lookupMin over the legal
+-- recipients -- aims the Leak at it. The cancelVictim route above, and the same
+-- reason.
 manaLeakBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 manaLeakBoard island manaLeak piker bobLands =
   let base = S.landsInPlay island 2
@@ -1470,13 +1470,22 @@ manaLeakBoard island manaLeak piker bobLands =
       cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId))
    in (victimId, cast)
 
--- Pays whatever a resolving spell offers, and takes the identity fallback
+-- Pays what a resolving spell offers BOB, and takes the identity fallback
 -- elsewhere (the hackToIsland liar pattern). Deliberately unlike
 -- identityAnswer's Declines, so a test can tell an honoured answer from the
 -- fallback -- and so the two branches below differ in NOTHING but this.
-paysAnswer :: Prompt.Prompt r -> r
-paysAnswer p = case p of
-  Prompt.ChooseToPay {} -> PaymentDecision.Pays
+--
+-- Guarded on bob rather than paying whoever is asked, which is what makes the
+-- cases below prove CR 118.12's "who": the payer is the TARGETED spell's
+-- controller, so an engine that asked alice -- the resolving spell's controller,
+-- and the answer every other resolution-time prompt has -- would fall through to
+-- Declines and fail. The Decider is checked alongside the player for CR 723.1:
+-- nobody is controlling anybody here, so the two must agree.
+bobPaysAnswer :: Prompt.Prompt r -> r
+bobPaysAnswer p = case p of
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _
+    | d == S.bob && player == S.bob ->
+        PaymentDecision.Pays
   _ -> S.identityAnswer p
 
 -- The pay-or-not answers in a transcript, in order.
@@ -1492,11 +1501,11 @@ isPayResponse response = case response of
 -- pays {3}" -- a cost paid when the spell RESOLVES, by a player who is not the
 -- resolving spell's controller, with the counter on the refusal branch.
 --
--- The three cases run the SAME cast at the SAME board and differ only in bob's
--- answer and in how many Islands he has, so a difference in outcome is the gate
--- and nothing else. CR 608.2n's "Mana Leak in alice's graveyard" is asserted in
--- all three: the resolution continues either way, a refusal being the other
--- branch rather than a failure.
+-- The first two cases run the SAME board and the SAME cast and differ in NOTHING
+-- but bob's answer, so the difference in outcome is the gate and nothing else;
+-- the third changes only how many Islands he holds. CR 608.2n's "Mana Leak in
+-- alice's graveyard" is asserted in all three: the resolution continues either
+-- way, a refusal being the other branch rather than a failure.
 manaLeakSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
   Spec.it s "CR 118.12a the targeted spell's controller declines, so it is countered" $ do
@@ -1518,7 +1527,7 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     manaLeak <- S.printingOf s registry "Mana Leak"
     piker <- S.printingOf s registry "Goblin Piker"
     let (victimId, cast) = manaLeakBoard island manaLeak piker 3
-        ((_, after), transcript) = Replay.record paysAnswer cast Stack.resolveTop
+        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
     Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
     -- The payment really happened: CR 605.3a lets the payer activate mana
     -- abilities "whenever a rule or effect asks for a mana payment, even if
@@ -1532,7 +1541,7 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     -- CR 400.7 mints a fresh incarnation on the battlefield, so the permanent
     -- is counted rather than looked up by the spell's id.
-    let played = snd (Engine.runGamePure paysAnswer after Stack.resolveTop)
+    let played = snd (Engine.runGamePure bobPaysAnswer after Stack.resolveTop)
     Spec.assertEqWith s "and the Piker then resolves onto the battlefield" (S.creaturesInPlay S.bob played) 1
   -- CR 118.3 / 118.12: "can't" is the rule's own third case, and its Standstill
   -- example is exactly an unpayable cost. Two Islands cannot pay {3}, so there
@@ -1543,7 +1552,7 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     manaLeak <- S.printingOf s registry "Mana Leak"
     piker <- S.printingOf s registry "Goblin Piker"
     let (_victimId, cast) = manaLeakBoard island manaLeak piker 2
-        ((_, after), transcript) = Replay.record paysAnswer cast Stack.resolveTop
+        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
     Spec.assertEqWith s "bob was never asked" (payResponses transcript) []
     Spec.assertEqWith s "nothing of bob's was tapped" (S.tappedCount S.bob after) 0
     Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1

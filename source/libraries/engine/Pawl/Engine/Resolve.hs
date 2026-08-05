@@ -197,10 +197,11 @@ durationSlots duration = case duration of
   Duration.UntilEndOfCombat -> Set.empty
 
 -- Every slot a whole MODE reads: its effect list's, plus the one CR 118.12a's
--- "unless [a player] pays" names its payer by. What the D4 dataflow lint must
--- ask, since a payer slot no effect also reads would otherwise dangle unnoticed
--- -- Mana Leak's Counter happens to read the same slot, so the lint's answer is
--- unchanged there and would not be for the next card of the family.
+-- "unless [a player] pays" names its payer by. What the D4 dataflow lint asks,
+-- since a payer slot no effect ALSO reads would otherwise dangle unnoticed. Mana
+-- Leak's Counter happens to read the very slot its "unless" names, so the lint's
+-- answer is the same either way for the one card in the pool; a card whose payer
+-- and target differ is what this exists for.
 modeSlots :: Mode.Mode Card.Type.Card -> Set SlotName
 modeSlots mode =
   Set.union
@@ -596,10 +597,11 @@ exercises resolving controller idx mode = case Mode.optionality mode of
 -- the branch still ran. Nothing here looks at the target, at the payer's board or
 -- at the mana that moved; it reads Prompt.ChooseToPay's answer.
 --
--- THREE ways the instructions run, and only one way they do not:
+-- FOUR outcomes. Exactly one skips the instructions -- the payer chose to pay
+-- and the payment went through -- and the other three run them:
 --
 --   * no payer. The slot is unfilled, has become an illegal target (CR 608.2b),
---     or names an object that is gone -- so there is nobody to offer the cost to
+--     or names an object that is gone, so there is nobody to offer the cost to
 --     and nobody has paid. Unreachable for Mana Leak, whose single target slot
 --     sends the whole spell through CR 608.2b's fizzle before this is asked.
 --   * the payer CANNOT pay (CR 118.3), which CR 118.12's clause names outright
@@ -607,11 +609,12 @@ exercises resolving controller idx mode = case Mode.optionality mode of
 --     being one possible answer; see Prompt.ChooseToPay.
 --   * the payer declines.
 --
--- and the fourth: they chose to pay AND the payment went through, which skips
--- the instructions. A payment that does not go through is a complete no-op (see
--- Pawl.Engine.Cost.pay) and so is read as not paid -- reachable only from an
--- answer Pawl.Engine.Mana.payCost rejects, canPay having just said the resources
--- were there.
+-- A payment that was chosen and then did not go through is read as not paid,
+-- which is the branch that leaves the game where it started: Pawl.Engine.Cost.pay
+-- restores the entry state, so an Unpaid result is a complete no-op and no cost
+-- was paid to read a choice off. Nothing in the pool is expected to reach it --
+-- canPay has just said the resources were there, and Pawl.Engine.Mana.payCost
+-- filters the answers it acts on rather than trusting them.
 --
 -- The cost is paid AGAINST `source` rather than the resolving stack object: CR
 -- 113.7a keeps the source on the permanent, which is what a component naming
