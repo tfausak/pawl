@@ -65,9 +65,11 @@ import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -233,7 +235,7 @@ discardToHandSize pid = do
           excess = length held - Natural.toIntSaturating limit
       Monad.when (excess > 0) $ do
         let decider = Decide.deciderFor pid gs
-        chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (Int.toNaturalSaturating excess)))
+        chosen <- Game.choose (Prompt.ChooseDiscard decider pid held (Int.toNaturalSaturating excess))
         let inHand oid = List.elem oid held
             toDiscard = take excess (filter inHand chosen)
         -- CR 701.9a, through the shared discard funnel: a cleanup discard is a
@@ -480,7 +482,7 @@ placeBorne srcId pending = do
       chosenModes <-
         if Natural.length legal <= count
           then pure legal
-          else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
+          else Game.choose (Prompt.ChooseModes decider controller abilId legal count)
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
       -- is placed. A mode with no target slots (Create, or a Draw that names its
       -- drawer without targeting) asks nothing.
@@ -488,7 +490,7 @@ placeBorne srcId pending = do
       chosen <-
         if Map.null sets
           then pure Map.empty
-          else Trans.lift (Program.prompt (Prompt.ChooseTargets decider controller abilId sets))
+          else Game.choose (Prompt.ChooseTargets decider controller abilId sets)
       -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
       -- placed, so "this creature" resolves as an ordinary slot read even after
       -- the source has left the battlefield.
@@ -537,7 +539,7 @@ orderFor gs pending pid = do
     then pure mine
     else do
       let decider = Decide.deciderFor pid gs
-      answer <- Trans.lift (Program.prompt (Prompt.OrderTriggers decider pid (fmap entryOf mine)))
+      answer <- Game.choose (Prompt.OrderTriggers decider pid (fmap entryOf mine))
       pure (permute mine answer)
 
 -- What one pending trigger looks like to the player being asked for CR 603.3b's
@@ -637,6 +639,44 @@ performSettle = do
   more <- if swept || returned || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
+-- CR 104.4b: how many events may happen with no player able to decide anything
+-- before the game is declared a loop of mandatory actions.
+--
+-- A HEURISTIC, and deliberately a crude one. Detecting such a loop in general is
+-- the halting problem, so the question this answers is not "is this a loop?" but
+-- "has this gone on longer than any real game would?". The MARGIN is what makes
+-- it safe. GameState.nextTimestamp advances on the events CR 104.4b names -- an
+-- object entering a zone (CR 613.7d) and a continuous effect beginning (CR
+-- 613.7a) -- and a game in which no player can act issues about one per turn, the
+-- draw. So the slowest way a real game ends, decking out from a 60-card library
+-- (CR 704.5b), spends on the order of fifty of these, roughly twenty times under
+-- the limit. A two-card recursion loop issues several per cycle and arrives in a
+-- few hundred.
+--
+-- Counting engine iterations instead was rejected for want of that margin: a game
+-- whose players pass every step until someone decks visits a loop head on the
+-- order of a thousand times, which is this same order.
+--
+-- Not configurable. There is one caller and one sensible value, and a knob
+-- threaded through GameState would be a second thing to keep right.
+mandatoryLoopLimit :: Natural
+mandatoryLoopLimit = 1000
+
+-- CR 104.4b: a game that has entered a loop of mandatory actions is a draw.
+--
+-- Never overwrites a result the game already has. A won game is not looping, and
+-- CR 104.4a's simultaneous loss is a different draw arrived at by a different
+-- path (Departure.leaveGame).
+--
+-- The subtraction cannot underflow: GameState.lastChoice is only ever written to
+-- the value GameState.nextTimestamp then had, and that supply only counts up.
+checkMandatoryLoop :: Game ()
+checkMandatoryLoop = State.modify' $ \gs ->
+  let gap = Timestamp.unwrap (GameState.nextTimestamp gs) - Timestamp.unwrap (GameState.lastChoice gs)
+   in if Maybe.isNothing (GameState.result gs) && gap >= mandatoryLoopLimit
+        then gs {GameState.result = Just Result.Drawn}
+        else gs
+
 -- Ask the priority holder for an action until every still-playing player has
 -- passed in succession (CR 117.4). A full round of passes resolves the top of the
 -- stack and hands priority back to the active player; only an EMPTY stack ends
@@ -652,6 +692,10 @@ priorityLoop = do
   -- "check SBAs only after a game event" reading of CR 117.5, observably
   -- identical to settling on every priority grant.
   let loop = do
+        -- CR 104.4b, checked HERE as well as at playGame's loop head: a
+        -- resolution cycle repeats inside one priority round and never reaches
+        -- that one.
+        checkMandatoryLoop
         finished <- State.gets (Maybe.isJust . GameState.result)
         restarted <- State.gets GameState.restartSignal
         case restarted of
@@ -704,7 +748,29 @@ priorityLoop = do
                           Concession.Continues -> do
                             let decider = Decide.deciderFor p gs
                                 actions = Action.legalActions p gs
-                            answered <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                            -- CR 104.4b: a menu that is only Pass offers no
+                            -- optional action, so it does not break a loop of
+                            -- mandatory actions. Still ASKED either way -- the
+                            -- interpreter and the Replay fold see every priority
+                            -- grant -- just not RECORDED as a choice, which is
+                            -- what Game.choose does and what
+                            -- checkMandatoryLoop reads.
+                            --
+                            -- Matched two-deep rather than `length actions > 1`:
+                            -- Action.legalActions is lazy and Pass is its head,
+                            -- so `List.elem answered actions` below stops at the
+                            -- first cons for a passing answer. Taking the length
+                            -- would force the whole spine -- castableSpells and
+                            -- the activation walk -- at every priority grant,
+                            -- which measured as a 70% slowdown on Pawl.ReplaySpec's
+                            -- played-out game.
+                            let offersAChoice = case actions of
+                                  _ : _ : _ -> True
+                                  _ -> False
+                            answered <-
+                              if offersAChoice
+                                then Game.choose (Prompt.ChooseAction decider p actions)
+                                else Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
                             -- FILTERED, NOT TRUSTED. Everything Action.legalActions
                             -- computed -- the controller check, CR 302.6's
                             -- tap-sickness gate, CR 307.5 timing, cost payability,
@@ -723,16 +789,25 @@ priorityLoop = do
                               Action.Type.Pass -> do
                                 let passes = GameState.passes gs + 1
                                     playing = Natural.length (Game.stillPlaying gs)
+                                -- modify' over `State.put gs {...}`: `gs` is the
+                                -- snapshot taken BEFORE the prompt, and putting
+                                -- it back would discard whatever the prompt
+                                -- wrote. Game.choose writes GameState.lastChoice
+                                -- there (CR 104.4b), and a clobbered marker
+                                -- would make every loop look mandatory. The
+                                -- values still read off the snapshot -- `passes`
+                                -- and the successor seat -- are fields no prompt
+                                -- touches.
                                 if passes >= playing
                                   then case GameState.stack gs of
-                                    [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                                    [] -> State.modify' (\g -> g {GameState.priority = Nothing, GameState.passes = passes})
                                     _ -> do
                                       Stack.resolveTopWith playSubgame
                                       settleForPriority
                                       State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
                                       loop
                                   else do
-                                    State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                                    State.modify' (\g -> g {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)})
                                     loop
                               Action.Type.Play oid -> do
                                 Event.changeZone oid Zone.Battlefield
@@ -1159,8 +1234,11 @@ grantsPriorityNow phase = case phase of
 -- It is NOT bounded in general, and Magic does not bound it either: an ability
 -- that triggers at the beginning of each cleanup step loops forever, and CR
 -- 104.4b's draw is the rules' answer to that rather than a bound on the loop.
--- pawl does not detect such a loop (#484), which is the same engine-liveness gap
--- #338 opened from the turn side.
+-- That draw is what `checkMandatoryLoop` applies, so a chain no card in the pool
+-- can build today would end the game rather than hang it -- heuristically, since
+-- deciding it exactly is the halting problem. The bound above is still the reason
+-- ordinary turns end in one or two cleanup steps; the guard is only the backstop
+-- for the ones it does not cover.
 cleanupException :: Game Bool
 cleanupException = do
   fired <- performSettle
@@ -1179,11 +1257,18 @@ cleanupException = do
     State.modify' (\gs -> gs {GameState.remaining = Turn.spliceExtraCleanup (GameState.remaining gs)})
   pure fired
 
--- Terminates because libraries are finite, each turn draws at most one card, and
--- drawing from an empty library is a loss (CR 704.5b). That argument rests on the
--- DRAW step being reached, and a CR 614.1b skip of it (runStep's check above)
--- suspends it, exactly as a real Stasis lock suspends a real game -- so there is
--- still no progress bound behind it (#338).
+-- Ordinarily terminates because libraries are finite, each turn draws at most one
+-- card, and drawing from an empty library is a loss (CR 704.5b). That argument
+-- rests on the DRAW step being reached, and a CR 614.1b skip of it (runStep's
+-- check above) suspends it, exactly as a real Stasis lock suspends a real game.
+--
+-- `checkMandatoryLoop` at this loop's head is the backstop for every repetition
+-- the argument does not cover, and it is a HEURISTIC rather than a bound: CR
+-- 104.4b's draw fires once events have repeated far past the point at which any
+-- player could have chosen otherwise. A game two players CAN still act in is left
+-- alone to run as long as they like, which is what that rule's second sentence
+-- asks for -- so a Stasis lock is not ended by it either. `Pawl.GameSpec`'s
+-- "a mandatory loop (CR 104.4b)" group holds both halves.
 --
 -- Fatigue is not yet a way to hang this loop: its skip is CR 614.10a's "next",
 -- spent on one occurrence, so each copy postpones the draw by one turn rather
@@ -1202,10 +1287,11 @@ cleanupException = do
 -- CR 514.3a's extra CLEANUP steps are the one repetition that does not go through
 -- a draw step at all, so the library argument says nothing about them. They carry
 -- their own termination argument, at `cleanupException`, and it is bounded for
--- the pool rather than in general (#484).
+-- the pool rather than in general -- the guard above is what covers the rest.
 playGame :: Game Result
 playGame =
   let loop = do
+        checkMandatoryLoop
         outcome <- State.gets GameState.result
         case outcome of
           Just r -> pure r

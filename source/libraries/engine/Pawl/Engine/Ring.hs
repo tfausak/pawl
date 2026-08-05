@@ -20,7 +20,6 @@
 module Pawl.Engine.Ring where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -43,7 +42,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
@@ -180,7 +178,7 @@ tempt pid = do
           -- FILTERED, NOT TRUSTED, the ChooseAttachment posture: an answer naming
           -- something never offered falls back to the first candidate, since the
           -- action is mandatory and must designate someone.
-          answer <- Trans.lift (Program.prompt (Prompt.ChooseRingBearer (Decide.deciderFor pid gs1) pid offered))
+          answer <- Game.choose (Prompt.ChooseRingBearer (Decide.deciderFor pid gs1) pid offered)
           pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
       designate pid chosen
   -- CR 701.54d: the temptation itself, which is what a count of temptations

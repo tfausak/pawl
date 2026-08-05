@@ -1534,6 +1534,7 @@ oneMountainState mountain ph =
           GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
+          GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
           GameState.landPlayed = mempty,
           GameState.pendingControl = Map.empty,
