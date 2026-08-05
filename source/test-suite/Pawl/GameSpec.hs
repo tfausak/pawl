@@ -265,8 +265,12 @@ landState s registry = do
   matchup <- S.redRed (S.printingOf s registry)
   pure (snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom matchup)))
 
--- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
--- turn (CR 305.2) a player can never have more lands out than turns taken.
+-- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With CR 305.2's normal
+-- one land play per turn a player can never have more lands out than turns
+-- taken. NORMAL is load-bearing now that a continuous effect can raise the
+-- number (CR 305.2): this bound holds for the red-red matchup because no card in
+-- it grants an extra land play, and Pawl.PlayerEffectSpec is where the raised
+-- number is measured.
 turnsTaken :: PlayerId.PlayerId -> GameState.GameState -> Natural
 turnsTaken pid gs =
   let total = GameState.turnNumber gs

@@ -259,8 +259,11 @@ prohibitsPlayingLand pid name gs =
         PlayerEffect.CantPlayLandChosenName -> Set.member name (chosenNamesOf source gs)
         -- CR 305.1 again, in the other direction: a prohibition on CASTING says
         -- nothing about a special action, so Silence and Rule of Law leave a
-        -- land play alone. CR 305.2/305.3's own limits are the closed half's and
-        -- are asked by Action.legalActions, not here.
+        -- land play alone. CR 305.2's and CR 305.3's limits are the closed
+        -- half's and are asked by Action.legalActions -- the first as a count
+        -- (landPlaysAllowed below is only its left-hand side), the second as
+        -- part of Turn.sorcerySpeedWindow. Neither is a question about WHICH
+        -- land, which is all this one asks.
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False

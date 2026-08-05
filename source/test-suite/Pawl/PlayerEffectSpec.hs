@@ -1687,8 +1687,10 @@ landDropBoard mountain grantors active =
 playEveryLand :: GameState.GameState -> GameState.GameState
 playEveryLand gs = S.runPure S.playLandAnswer gs Engine.priorityLoop
 
--- alice's next turn, as far as CR 305.2 can see it: her untap step, where CR
--- 703.4c's turn-based actions run and the per-turn count is cleared.
+-- alice's next turn, as far as CR 305.2 can see it: her untap step, which is
+-- where Engine.runTurnBasedActions resets the per-turn tally -- "during their
+-- turn" in CR 305.2 has to start over somewhere, and that is the first moment of
+-- the new one.
 nextTurnFor :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 nextTurnFor pid gs =
   let untap = Phase.Beginning BeginningStep.Untap

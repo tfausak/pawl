@@ -703,7 +703,7 @@ priorityLoop = do
                             -- FILTERED, NOT TRUSTED. Everything Action.legalActions
                             -- computed -- the controller check, CR 302.6's
                             -- tap-sickness gate, CR 307.5 timing, cost payability,
-                            -- CR 305.2's one land per turn, CR 117.1a's casting
+                            -- CR 305.2's land allowance, CR 117.1a's casting
                             -- timing and every prohibition -- is enforced here.
                             -- Acting on an unoffered answer would make all of it
                             -- advisory (#219). What only this guard can catch is
@@ -735,6 +735,11 @@ priorityLoop = do
                                 -- so this TALLIES rather than flagging: the
                                 -- second land Exploration allows has to be
                                 -- distinguishable from the first.
+                                --
+                                -- CR 305.4: this arm is the only tally, and that
+                                -- is the rule rather than an oversight -- an
+                                -- effect that PUTS a land onto the battlefield
+                                -- is not a land played and must not count.
                                 State.modify' (\g -> g {GameState.landsPlayed = Map.insertWith (+) p 1 (GameState.landsPlayed g), GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
