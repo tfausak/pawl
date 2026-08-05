@@ -1135,6 +1135,8 @@ keywordFilters keyword = case keyword of
   Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
+  -- CR 702.22: plain banding names no quality, so it filters nothing.
+  Keyword.Banding -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []

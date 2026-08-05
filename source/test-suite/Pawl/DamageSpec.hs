@@ -11,6 +11,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Combat as Combat
@@ -30,6 +31,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -1222,6 +1224,20 @@ assignmentLegalitySpec s =
               ]
        in Spec.assertBool s (not (Damage.legalAssignment thresholds 3 answer)) "rejected"
 
+-- Sends the whole assignment to the FIRST blocker when the defending player is
+-- asked, and to the SECOND when the attacker's controller is. Which creature
+-- dies then reports who the CR 702.22j chooser was, without the test having to
+-- inspect a prompt it cannot otherwise observe.
+askedOf :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+askedOf blockers p = case p of
+  Prompt.AssignCombatDamage _ asked _ _ n ->
+    let target = case (asked == S.bob, blockers) of
+          (True, first : _) -> Just first
+          (False, _ : second : _) -> Just second
+          _ -> Nothing
+     in maybe Map.empty (\oid -> Map.singleton (Recipient.ToCreature oid) n) target
+  _ -> S.aggressiveAnswer p
+
 -- Assigns each blocker exactly its threshold, and every leftover point to the
 -- defender. A legal trample division for these boards.
 tramplingAnswer :: Prompt.Prompt r -> r
@@ -1250,6 +1266,28 @@ trampleSpec s registry =
       Spec.assertEqWith s "bob took the 2 overflow" (S.lifeOf S.bob after) (Just 18)
       Spec.assertEqWith s "the Piker is dead" (S.creaturesInPlay S.bob after) 0
       Spec.assertEqWith s "the Mammoth survives" (S.creaturesInPlay S.alice after) 1
+
+    -- CR 702.22j: with a banding creature blocking, the DEFENDING player divides
+    -- the attacking creature's damage. The pair below differs only in which
+    -- blocker has banding, so it pins the chooser rather than the arithmetic --
+    -- the answerer sends the whole amount to a DIFFERENT creature depending on
+    -- who it was asked of, and the board says which happened.
+    Spec.it s "CR 702.22j a banding blocker moves the division to the defender" $ do
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      benalishHero <- S.printingOf s registry "Benalish Hero"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (gs, _, blockers) = S.combatBoardOf [warMammoth] [benalishHero, piker]
+          after = S.settleSba (S.fightWith (askedOf blockers) gs)
+      Spec.assertEqWith s "bob was asked, so the FIRST blocker took it all and died" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Benalish Hero")) S.bob after) 0
+      Spec.assertEqWith s "and the Piker, which took none, survives" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 1
+
+    Spec.it s "CR 510.1c without banding the attacker's controller still divides" $ do
+      warMammoth <- S.printingOf s registry "War Mammoth"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (gs, _, blockers) = S.combatBoardOf [warMammoth] [piker, warMammoth]
+          after = S.settleSba (S.fightWith (askedOf blockers) gs)
+      Spec.assertEqWith s "alice was asked, so the SECOND blocker took it and died" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "War Mammoth")) S.bob after) 0
+      Spec.assertEqWith s "and the Piker, the first blocker, survives" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.bob after) 1
 
     Spec.it s "CR 702.19b a non-trample control spills nothing" $ do
       -- Ogre Sentry is a 3/3 that cannot attack (defender), so use the Piker's

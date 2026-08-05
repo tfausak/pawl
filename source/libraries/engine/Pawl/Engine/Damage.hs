@@ -227,10 +227,33 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
             blockers -> case Projection.controllerOf attacker gs of
               Nothing -> pure []
               -- CR 702.19b: the attacker's controller chooses how to assign the
-              -- excess. Banding (CR 702.22j) inverts that -- the DEFENDING player
-              -- chooses -- and is not implemented (#32).
+              -- excess -- unless CR 702.22j inverts it.
               Just pid -> do
-                let decider = Decide.deciderFor pid gs
+                -- CR 702.22j: with a banding creature among the blockers, the
+                -- DEFENDING player divides the attacking creature's damage. The
+                -- rule is stated as an exception to CR 510.1c alone, so it moves
+                -- WHO is asked and nothing else -- the thresholds, the legality
+                -- check and the reject-not-repair posture below are untouched.
+                --
+                -- CR 702.22k is the mirror, moving the division of a BLOCKING
+                -- creature's damage to the active player. It has no site here:
+                -- blockerAssignment never divides, because Combat.blockers is
+                -- keyed by attacker and a blocker in the pool blocks exactly one
+                -- creature, so there is nothing to divide among. It becomes
+                -- reachable with the first effect letting one creature block
+                -- several.
+                --
+                -- The defending player falls back to the attacker's controller
+                -- rather than skipping the assignment: an attacker whose target
+                -- is gone (CR 506.4, a burned planeswalker) has already been
+                -- handled above, so this fallback is unreachable, and answering
+                -- with the CR 510.1c default is the conservative reading.
+                let banded = any (\b -> Projection.hasKeyword Keyword.Banding b gs) blockers
+                    defending = case target of
+                      AttackTarget.OfPlayer defender -> Just defender
+                      AttackTarget.OfPlaneswalker oid -> Projection.controllerOf oid gs
+                    chooser = if banded then Maybe.fromMaybe pid defending else pid
+                let decider = Decide.deciderFor chooser gs
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
                     blockerEntries = fmap (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
                     -- CR 702.19b: the trample-through recipient is whatever the
@@ -246,7 +269,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                         else []
                     thresholds = Map.fromList (blockerEntries <> defenderEntry)
                 chosen <-
-                  Game.choose (Prompt.AssignCombatDamage decider pid attacker thresholds power)
+                  Game.choose (Prompt.AssignCombatDamage decider chooser attacker thresholds power)
                 -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733
                 -- human-error rewind). An illegal answer assigns nothing.
                 let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n
