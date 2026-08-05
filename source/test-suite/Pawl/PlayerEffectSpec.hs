@@ -408,8 +408,8 @@ thaliaSpec s registry =
 
     -- BOTH sites, one scenario. Taxing castability but not payment lets
     -- the player underpay; taxing payment but not castability offers a
-    -- cast that cannot be afforded, and there is no mid-announcement
-    -- rewind (#56) -- that is a wedged game, not a rejected action.
+    -- cast that cannot be afforded, and nothing REPAIRS a cast partway --
+    -- that is a wedged game, not a rejected action.
     Spec.it s "CR 601.2f castability is measured against the total cost" $ do
       mountain <- S.printingOf s registry "Mountain"
       thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
@@ -1377,7 +1377,7 @@ nonBasicLandName = Filter.Type.Not (Filter.Type.And [Filter.Type.HasSupertype Su
 -- Cast the Chamber and let it resolve, answering both name choices.
 --
 -- CAST rather than S.addCreature, because the choice happens only on the entry
--- path (Replacement.runEntry): a Chamber placed straight onto the battlefield
+-- path (Event.runEntry): a Chamber placed straight onto the battlefield
 -- has an empty chosenNames and prohibits nothing.
 castChamber :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
 castChamber opponent pick gs oid =

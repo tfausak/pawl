@@ -3,7 +3,8 @@
     {
       "manaCost": [
         {
-          "type": "Variable"
+          "type": "Generic",
+          "value": 1
         },
         {
           "type": "OfType",
@@ -15,42 +16,35 @@
           }
         }
       ],
-      "name": "Untamed Might",
+      "name": "Rampant Growth",
       "spell": {
         "modes": [
           {
             "effects": [
               {
-                "type": "ModifyTarget",
+                "type": "Search",
                 "value": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "And",
                     "value": [
                       {
-                        "type": "InSlot",
-                        "value": "X"
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Land"
+                        }
                       },
                       {
-                        "type": "InSlot",
-                        "value": "X"
+                        "type": "HasSupertype",
+                        "value": {
+                          "type": "Basic"
+                        }
                       }
                     ]
                   },
-                  "target"
-                ]
-              }
-            ],
-            "targetSpecs": [
-              {
-                "slot": "target",
-                "spec": {
-                  "pool": {
-                    "type": "Creatures"
+                  {
+                    "type": "BattlefieldTapped"
                   }
-                }
+                ]
               }
             ]
           }
@@ -59,7 +53,7 @@
       "typeLine": {
         "types": [
           {
-            "type": "Instant"
+            "type": "Sorcery"
           }
         ]
       }

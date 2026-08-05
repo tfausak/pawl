@@ -317,7 +317,6 @@ quantityCounts quantity = case quantity of
   Quantity.Type.Literal _ -> []
   Quantity.Type.ManaValue -> []
   Quantity.Type.Power -> []
-  Quantity.Type.X -> []
   -- A slot read, not a fold over game state: the value was bound by an earlier
   -- effect of the same resolution and there is no Count inside it.
   Quantity.Type.InSlot _ -> []
@@ -372,6 +371,7 @@ modificationCounts modification = case modification of
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
+  Modification.AddCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
@@ -1135,6 +1135,8 @@ keywordFilters keyword = case keyword of
   Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
   Keyword.Flashback cost -> costFilters cost
   Keyword.Entwine cost -> costFilters cost
+  -- CR 702.22: plain banding names no quality, so it filters nothing.
+  Keyword.Banding -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -1238,6 +1240,7 @@ modificationFilters modification = case modification of
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
+  Modification.AddCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
@@ -1303,11 +1306,13 @@ playerEffectFilters playerEffect = case playerEffect of
   -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
   PlayerEffect.CastAsThoughItHadFlash f -> [f]
 
--- CR 201.4a: the restriction on which cards' names an as-enters name choice may
--- name (Null Chamber's "other than a basic land card name"). The one Filter an
--- EntryRewrite carries, and a predicate over a CARD in the Oracle card reference
--- rather than over an object on the board -- which is the same shape
--- Effect.Search's is, and why it belongs in this walk.
+-- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
+-- restriction on which cards' names an as-enters name choice may name (Null
+-- Chamber's "other than a basic land card name"), a predicate over a CARD in the
+-- Oracle card reference rather than over an object on the board -- the same shape
+-- Effect.Search's is, and why it belongs in this walk. CR 614.1c's as-enters
+-- sacrifice carries one of the ordinary kind, over permanents on the battlefield
+-- (Shimatsu the Bloodcloaked's "any number of permanents"). Neither is framed.
 entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
@@ -1317,6 +1322,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.WithCounters _ _ -> []
   EntryRewrite.UnderSourceControl -> []
+  EntryRewrite.SacrificeAnyNumber f _ -> [f]
 
 -- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
 -- is "one or more counters would be put on a creature YOU control", and EntryR's
@@ -1327,7 +1333,8 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 --
 -- EntryR's REWRITE holds one too, on a second axis: its pattern says which
 -- objects entering it applies to, and entryRewriteFilters above says which
--- cards a name choice inside it may name.
+-- cards a name choice inside it may name and which permanents an as-enters
+-- sacrifice may take.
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
@@ -1598,7 +1605,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- pool. Loosen to superset if such a card ever lands.
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
-    let modeOffends m =
+    let modeOffends announcedX m =
           let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
               -- Resolve.modeSlots and not a fold over the effects alone: CR
               -- 118.12a's "unless [a player] pays" reads a slot for its payer,
@@ -1608,9 +1615,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               -- PlaySubgame's bound subgame outcome) and then read by a later
               -- effect is legitimate dataflow, not an undeclared target -- the
               -- same definedSlots exemption the delayed-ability lint below uses.
-              Set.difference reads_ defined /= Map.keysSet (Mode.targetSpecs m)
+              Set.difference (Set.difference reads_ defined) announcedX /= Map.keysSet (Mode.targetSpecs m)
+        -- CR 601.2b's X is an ordinary slot read since #14 retired Quantity.X, so
+        -- it arrives here like any other -- but casting binds it rather than a
+        -- target spec declaring it, so it belongs on the AVAILABLE side exactly
+        -- when the cost prints an {X}. That IS the "reads X iff the cost declares
+        -- {X}" lint, now falling out of the ordinary comparison instead of
+        -- needing its own pass. activatedAbilityOffends says the same thing about
+        -- an activation cost.
         cardOffends card =
-          any modeOffends (Modal.modes (Face.spell card))
+          let announcedX =
+                if declaresVariable (Face.manaCost card)
+                  then Set.singleton Binding.variableX
+                  else Set.empty
+           in any (modeOffends announcedX) (Modal.modes (Face.spell card))
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

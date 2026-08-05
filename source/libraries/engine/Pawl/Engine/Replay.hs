@@ -71,6 +71,7 @@ encode p answer = case p of
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
+  Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
   Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
@@ -189,6 +190,9 @@ decode p response = case p of
     Response.ChoseBoundToken oid -> Just oid
     _ -> Nothing
   Prompt.ChooseSacrifices {} -> case response of
+    Response.ChoseSacrifices ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseAnyNumberToSacrifice {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
     _ -> Nothing
   Prompt.ChooseAttachment {} -> case response of
@@ -340,6 +344,9 @@ defaultAnswer p = case p of
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   -- The first `count` candidates, which the engine offers in ascending order.
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- Every candidate. The maximal subset, mirroring the arm above taking the first
+  -- `count` rather than the last: a deterministic fallback, not a recommendation.
+  Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList candidates
   -- CR 701.3a: every candidate is a destination the card's own text offered.
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   -- The first offered candidate is the PRINTED cost for a cast from hand

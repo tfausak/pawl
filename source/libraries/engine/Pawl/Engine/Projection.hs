@@ -83,6 +83,7 @@ layer m = case m of
   Modification.SetLandSubtypeToChosen -> Layer.Type
   Modification.AddLandSubtype _ -> Layer.Type
   Modification.SetCreatureSubtype _ -> Layer.Type
+  Modification.AddCreatureSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
@@ -148,6 +149,10 @@ applyModification lyr src cands gs oid m pc =
         -- (#530).
         Modification.SetCreatureSubtype s ->
           pc {PC.subtypes = Set.insert s (Set.filter (not . Subtype.isCreatureType) (PC.subtypes pc))}
+        -- CR 205.1b's add: every creature type already present is kept, which is
+        -- the one line separating this arm from the set above.
+        Modification.AddCreatureSubtype s ->
+          pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 305.7's set, with the type written into card data.
@@ -769,6 +774,7 @@ freezeQuantities gs oid you m =
         Modification.SetLandSubtypeToChosen -> Just m
         Modification.AddLandSubtype _ -> Just m
         Modification.SetCreatureSubtype _ -> Just m
+        Modification.AddCreatureSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
         Modification.ChangeSubtypeWord _ _ -> Just m
         Modification.SetController _ -> Just m
@@ -791,6 +797,7 @@ quantitiesOf m = case m of
   Modification.SetLandSubtypeToChosen -> []
   Modification.AddLandSubtype _ -> []
   Modification.SetCreatureSubtype _ -> []
+  Modification.AddCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
@@ -823,23 +830,47 @@ setLandSubtypeEffects gs =
         -- one: CR 305.7's ability strip is about a LAND whose subtype is set, and
         -- CR 205.1a/205.1b's creature-type set carries no such clause.
         Modification.SetCreatureSubtype _ -> False
+        Modification.AddCreatureSubtype _ -> False
         _ -> False
       fromStored eff =
         if isSet (ContinuousEffect.modification eff)
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
           else []
-      -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
-      -- 612's word swap to the same ability's (#624), so a text-changed source
-      -- would have this gate and the layer fold disagreeing. Unreachable: neither
-      -- subtype-setting static in the pool carries a subtype word a swap could
-      -- reach. Rewriting here is not free either, since textChangesAffecting
-      -- folds the whole effect list and this function is hoisted out of gather's
-      -- walk to avoid per-permanent cost (#584).
+      -- The affected set is REWRITTEN here, the same CR 612 word swap gatherStatic
+      -- applies to the same ability's set (#624). The two must agree: this gate
+      -- decides whose rules-text abilities CR 305.7 strips, and the layer fold
+      -- decides what the subtype becomes, so a text change reaching only one of
+      -- them would have the halves of one rule disagreeing about which permanents
+      -- an ability names.
+      --
+      -- Conversion -- "All Mountains are Plains" -- is the pool's first static
+      -- ability whose affected set names a basic land type, so it is the first
+      -- card a Magical Hack could aim at this read-point at all.
+      --
+      -- The disagreement is still NOT OBSERVABLE, and this rewrite is consistency
+      -- rather than a fix with a test behind it: no test discriminates it, checked
+      -- by mutating it away. This gate decides whose rules-text abilities CR 305.7
+      -- strips, so seeing it needs a permanent whose PRINTED type line carries a
+      -- basic land type AND which has a rules-text static ability reaching other
+      -- objects -- affectsBase reads base characteristics. Every basic land is
+      -- abilityless, and no nonbasic land in the pool carries a basic land type,
+      -- so nothing can currently be on both sides (#584).
+      --
+      -- textChangesAffecting folds the whole effect list, and this function is
+      -- hoisted out of gather's walk to keep that off the per-permanent path, so
+      -- the fold runs once per battlefield permanent here rather than once per
+      -- permanent per projection.
+      --
+      -- The MODIFICATIONS stay unrewritten, and the isSet filter is why that is
+      -- sound: a word swap rewrites which subtype a set arm names, never whether
+      -- it is a set arm, so the filter's answer cannot change. The fold does the
+      -- rewriting that decides the resulting subtype.
       fromPerm permId = case Game.faceOf permId gs of
         Nothing -> []
         Just face ->
-          fmap (\sa -> (permId, StaticAbility.affected sa)) $
-            filter (any isSet . StaticAbility.modifications) (Face.staticAbilities face)
+          let changes = textChangesAffecting permId gs
+           in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
+                filter (any isSet . StaticAbility.modifications) (Face.staticAbilities face)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
@@ -916,6 +947,7 @@ rewriteModification pairs m =
         -- CR 612.2's other named example: the swap rewrites a Turn to Frog's Frog
         -- on the stack, so the spell resolves making its target the new type.
         Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
+        Modification.AddCreatureSubtype s -> Modification.AddCreatureSubtype (swap Subtype.isCreatureType from to s)
         -- CR 702.14a: "[type]walk" holds a land-type word, so a hacked Lord of
         -- Atlantis grants swampwalk rather than the printed islandwalk. The
         -- GRANTER's text is what this reads -- gatherStatic calls it with the
@@ -1192,7 +1224,6 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Literal _ -> quantity
   Quantity.Type.ManaValue -> quantity
   Quantity.Type.Power -> quantity
-  Quantity.Type.X -> quantity
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
@@ -1385,6 +1416,7 @@ removesAbilities m = case m of
   -- CR 205.1a/205.1b's creature-type set has no ability clause at all; CR 305.7's
   -- strip belongs to the land arm above.
   Modification.SetCreatureSubtype _ -> False
+  Modification.AddCreatureSubtype _ -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False
   Modification.SwitchPowerToughness -> False
@@ -1650,6 +1682,7 @@ modificationWrites m = case m of
   Modification.SetLandSubtypeToChosen -> Set.fromList [Subtypes, Keywords]
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
+  Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors

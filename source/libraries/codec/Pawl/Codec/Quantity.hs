@@ -18,7 +18,6 @@ toJson q = case q of
   Quantity.Literal n -> Common.tagged "Literal" . Just $ Common.integer n
   Quantity.ManaValue -> Common.nullary "ManaValue"
   Quantity.Power -> Common.nullary "Power"
-  Quantity.X -> Common.nullary "X"
   Quantity.InSlot s -> Common.tagged "InSlot" . Just $ SlotName.toJson s
   Quantity.Star -> Common.nullary "Star"
   Quantity.Plus a b -> Common.tagged "Plus" . Just . Common.array $ [toJson a, toJson b]
@@ -33,7 +32,6 @@ fromJson value = do
     ("Literal", Just v) -> Quantity.Literal <$> Common.asInteger v
     ("ManaValue", _) -> Right Quantity.ManaValue
     ("Power", _) -> Right Quantity.Power
-    ("X", _) -> Right Quantity.X
     ("InSlot", Just v) -> Quantity.InSlot <$> SlotName.fromJson v
     ("Star", _) -> Right Quantity.Star
     ("Plus", Just (Value.Array (Array.MkArray [x, y]))) -> Quantity.Plus <$> fromJson x <*> fromJson y

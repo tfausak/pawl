@@ -40,10 +40,6 @@ data Quantity
     -- No Toughness sibling: nothing in the pool reads one, and an unused arm is
     -- the speculative construction the project forbids.
     Power
-  | -- | CR 601.2b: X -- a value the caster chose while casting, read from the
-    -- object's binding environment. One-shot only: a continuous effect must
-    -- FREEZE this to a Literal when stored, which no card exercises.
-    X
   | -- | A number an EARLIER effect of the same resolution bound into a slot --
     -- Bane of Progress' "for each permanent destroyed this way". Read from the
     -- binding environment of whichever object the evaluation is aimed at; for
@@ -53,13 +49,13 @@ data Quantity
     -- Named InSlot rather than Bound because PlayerRef.InSlot and
     -- ObjectRef.InSlot already spell "read the binding at this slot" that way.
     --
-    -- SEPARATE from X above rather than X being `InSlot Binding.variableX`,
-    -- though the two arms read the identical field. X is CR 601.2b's value a
-    -- PLAYER chose while casting, which is what the "reads X iff the cost
-    -- declares {X}" lint is stated over and is the one slot read Resolve.slotsOf
-    -- must NOT report; this is a value the ENGINE derived mid-resolution, which
-    -- neither lint may see. Retiring X's reserved-slot shim in favour of this
-    -- arm is #14.
+    -- CR 601.2b's X is THIS arm, at Pawl.Engine.Binding.variableX: #14 retired
+    -- the separate constructor once the two were reading the identical field.
+    -- What was special about X was never the reading but the LINTS around it --
+    -- "reads X iff the cost declares {X}", and the one slot Quantity.slots must
+    -- not report, since casting fills it and no card declares it. Those now name
+    -- the reserved slot instead of a constructor, which is where the exception
+    -- belonged: it is a fact about that slot, not about how a number is read.
     --
     -- Nothing when the slot holds no amount -- the producing effect has not run
     -- yet, or bound nothing. Not 0: "how many were destroyed" is unanswered, not

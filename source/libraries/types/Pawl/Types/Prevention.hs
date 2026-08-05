@@ -5,7 +5,7 @@ import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Recipient as Recipient
 
 -- | CR 615.13: one prevention effect, applied, having prevented `amount` damage
--- addressed to `recipient`. What Pawl.Engine.Replacement.resolveDamageBatch
+-- addressed to `recipient`. What Pawl.Engine.Event.resolveDamageBatch
 -- answers alongside the surviving damage events, and the whole of what
 -- Pawl.Engine.Damage needs to record a CR 615.13 trigger event.
 --

@@ -38,7 +38,8 @@
                     ]
                   },
                   {
-                    "type": "X"
+                    "type": "InSlot",
+                    "value": "X"
                   }
                 ]
               }

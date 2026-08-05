@@ -1,0 +1,105 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Life and Limb",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "Or",
+              "value": [
+                {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Forest"
+                  }
+                },
+                {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Saproling"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "AddCardType",
+              "value": {
+                "type": "Creature"
+              }
+            },
+            {
+              "type": "AddCardType",
+              "value": {
+                "type": "Land"
+              }
+            },
+            {
+              "type": "SetColor",
+              "value": [
+                {
+                  "type": "Green"
+                }
+              ]
+            },
+            {
+              "type": "AddCreatureSubtype",
+              "value": {
+                "type": "Saproling"
+              }
+            },
+            {
+              "type": "AddLandSubtype",
+              "value": {
+                "type": "Forest"
+              }
+            },
+            {
+              "type": "SetBasePowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 1
+                },
+                {
+                  "type": "Literal",
+                  "value": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

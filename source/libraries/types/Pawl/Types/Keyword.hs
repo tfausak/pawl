@@ -142,6 +142,23 @@ data Keyword
     Shroud
   | Trample -- 702.19
   | Vigilance -- 702.20
+  | -- | 702.22: banding. Only the two COMBAT-DAMAGE-DIVISION halves are modeled --
+    -- CR 702.22j, where a banding blocker moves the choice of how the ATTACKING
+    -- creature's damage is divided from the active player to the defending one,
+    -- and CR 702.22k, its mirror, where a banding attacker moves the choice of how
+    -- a BLOCKING creature's damage is divided the other way. Both are stated as
+    -- exceptions, to CR 510.1c and CR 510.1d respectively.
+    --
+    -- CR 702.22b's blocking half -- a band of creatures attacking as a unit, and
+    -- "bands with other" -- is NOT here and has no producer: it needs a band to be
+    -- declared as attackers, which is a shape the declare-attackers step does not
+    -- have. Benalish Hero, the pool's producer, is a plain banding creature, and
+    -- CR 702.22j/k are what its reminder text describes.
+    --
+    -- Payload-free, unlike Landwalk: plain banding names no quality. The
+    -- "[quality] creature with 'bands with other [quality]'" clause both rules
+    -- also cover would need one, and is part of the unmodeled half.
+    Banding -- 702.22
   | -- | 702.29a: pay the cost and discard this card to draw a card, functioning
     -- only while the card is in a player's hand. The cost rides the constructor,
     -- as Flashback's does, because rule 702.29a states it as part of the keyword

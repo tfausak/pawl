@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
@@ -25,7 +26,6 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
-import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
@@ -230,10 +230,10 @@ readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
-      Effect.DealDamage _ quantity -> quantity == Quantity.Type.X
+      Effect.DealDamage _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
-      Effect.ModifyTarget _ modification _ -> elem Quantity.Type.X (Projection.quantitiesOf modification)
+      Effect.ModifyTarget _ modification _ -> elem (Quantity.Type.InSlot Binding.variableX) (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
       Effect.Search _ _ -> False
@@ -241,26 +241,26 @@ readsX = any effectReadsX
       Effect.Proliferate -> False
       Effect.TemptWithTheRing -> False
       Effect.ExileHandThenDraw -> False
-      Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
-      Effect.Draw _ quantity -> quantity == Quantity.Type.X
-      Effect.Mill _ quantity -> quantity == Quantity.Type.X
-      Effect.Discard _ quantity -> quantity == Quantity.Type.X
-      Effect.LoseLife _ quantity -> quantity == Quantity.Type.X
-      Effect.GainLife _ quantity -> quantity == Quantity.Type.X
-      Effect.Create quantity _ _ _ -> quantity == Quantity.Type.X
+      Effect.Draw _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Mill _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Discard _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.LoseLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.GainLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Create quantity _ _ _ -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
-      Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.PreventAllDamage {} -> False
       Effect.Counter _ -> False
-      Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
-      Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Transform _ -> False
@@ -1198,6 +1198,19 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Nothing -> False
           Just face -> Filter.matches searchContext (Projection.viewOfCard face) filter_
      in do
+          -- CR 601.3 (Panglacial Wurm): the chance to cast a
+          -- castable-while-searching card is offered AT THE SEARCH, not when the
+          -- resolution began (#57). Two things follow, and both are the rule
+          -- rather than conveniences:
+          --
+          --   * everything this resolution sequences BEFORE the search has
+          --     already happened, so the offer is made in the game state the
+          --     player is actually searching from -- Scapeshift's sacrificed
+          --     lands are gone before the Wurm's affordability is judged;
+          --   * CR 601.3's subject is "a spell or ability", and this site is
+          --     reached by both. The old site was Stack's Source.OfAbility arm
+          --     alone, so a searching SPELL was never offered the cast at all.
+          Cast.castWhileSearching controller
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
               decider = Decide.deciderFor controller gs
@@ -2130,7 +2143,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
-          Just n -> Monad.when (n > 0) (Replacement.putCounters target kind (Integer.toNaturalSaturating n))
+          Just n -> Monad.when (n > 0) (Event.putCounters target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
       -- CR 701.34a: "choose any number of permanents and/or players that have a
       -- counter, then give each one additional counter of each kind that permanent or
@@ -2184,7 +2197,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- counter replacements (Hardened Scales, Doubling Season) apply to a
       -- proliferated counter exactly as they do to a placed one.
       Monad.forM_ keptPermanents $ \oid ->
-        Monad.forM_ (kindsOn oid) $ \kind -> Replacement.putCounters oid kind 1
+        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters oid kind 1
       -- Player counters are added directly, with no CR 614 opportunity, matching
       -- GainPlayerCounters below and gapped for the same reason (#122).
       Monad.forM_ keptPlayers $ \pid ->
