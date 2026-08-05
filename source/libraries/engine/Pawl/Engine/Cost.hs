@@ -667,13 +667,15 @@ applyAdjustments adjustments cost =
         ManaSymbol.OfType manaType -> Just manaType
         -- CR 107.4e names TWO types, so neither side of the cancellation can read
         -- one off it. In the COST that is the same elision genericOf's
-        -- MonocoloredHybrid arm makes -- pawl announces no choice of half (#261)
-        -- -- and Edgewalker's ruling is what the elision costs. In a REDUCTION it
-        -- is CR 118.7e, where the choice belongs to the player paying, and which
-        -- nothing produces (#309).
+        -- MonocoloredHybrid arm makes -- pawl announces no choice of half for a
+        -- colour/colour hybrid (#729) -- and Edgewalker's ruling is what the
+        -- elision costs. In a REDUCTION it is CR 118.7e, where the choice belongs
+        -- to the player paying, and which nothing produces (#309).
         ManaSymbol.Hybrid _ _ -> Nothing
-        -- Same two reasons: the {2} half is generic mana and the other half is
-        -- one colour, and nothing has announced which is being paid.
+        -- Same two reasons: the {2} half is generic mana and the other half is one
+        -- colour. A symbol still spelled {2/R} here is one CR 601.2b has not named
+        -- -- Pawl.Engine.Mana.announce leaves an OfType behind when it does, which
+        -- the arm above reads -- so there is nothing yet to cancel against.
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- Nothing for two different reasons, one per side. In the COST the symbol
         -- is necessarily UNANNOUNCED, or it would not be a Phyrexian symbol any

@@ -586,7 +586,8 @@ spend budget cost (Mana.MkMana units) =
 -- unannounced {G/P} off the board, and the cost is then payable only by CR
 -- 107.4f's 2 life. Recomputing means pawl pays it, rather than failing the
 -- payment the way the paragraph above lets a mis-tapped {B} fail -- the same MORE
--- PERMISSIVE posture #261 records. Zero when the cost is unpayable outright.
+-- PERMISSIVE posture, and reachable only where nothing announced (#373). Zero
+-- when the cost is unpayable outright.
 payCost :: PlayerId -> ManaCost -> Game Bool
 payCost pid cost = do
   before <- State.get

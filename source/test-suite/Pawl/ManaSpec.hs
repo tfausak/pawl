@@ -1383,6 +1383,28 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     Spec.assertEqWith s "the Javelin resolved" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "off all three Mountains" (S.tappedCount S.alice resolved) 3
 
+  -- The remaining gap, made visible rather than left implied. CR 601.2f's
+  -- reduction reaches the cost that is PAID, because the announcement
+  -- names a {2} for CR 118.7a to come off -- but castability is measured
+  -- one step earlier, on the printed cost, where the symbol is still
+  -- {2/R} and CR 118.7a has nothing to bite. So a Javelin payable only
+  -- through the reduced generic route is never offered (#730).
+  Spec.it s "CR 601.2f Baral's reduction does not reach the castability gate for a {2/R} (#730)" $ do
+    island <- S.printingOf s registry "Island"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
+    let withBaral n = S.handOne flameJavelin (snd (S.addCreature baral S.alice (S.landsInPlay island n)))
+        (five, fiveId) = withBaral 5
+        (six, sixId) = withBaral 6
+    Spec.assertBool s (not (S.castable S.alice fiveId five)) "five Islands: not offered, though CR 601.2f's total is {5}"
+    -- The control, and it is what makes the leg above about the gate
+    -- rather than about the board: one more Island and the cast happens,
+    -- and it happens for FIVE -- the reduction the gate could not see is
+    -- the one the payment takes.
+    Spec.assertBool s (S.castable S.alice sixId six) "six Islands: offered"
+    let (_, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) six sixId
+    Spec.assertEqWith s "and only five of the six are tapped" (S.tappedCount S.alice resolved) 5
+
   -- CR 107.4e's last sentence, as CR 202.2d restates it for the whole
   -- object: a monocolored hybrid's other component is generic mana, which
   -- is no colour, so only the named half counts. Flame Javelin is red
@@ -1660,8 +1682,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- life and taps it -- and when the player names blue instead, the mana way
   -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
   -- than failing the payment, which is the same MORE PERMISSIVE posture
-  -- Mana.payCost's haddock takes towards a mis-tapped colour (#261). Reached
-  -- only because this calls payCost directly, with nothing announced (#373).
+  -- Mana.payCost's haddock takes towards a mis-tapped colour. Reached only
+  -- because this calls payCost directly, with nothing announced (#373).
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)
