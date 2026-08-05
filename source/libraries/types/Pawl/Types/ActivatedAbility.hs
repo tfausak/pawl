@@ -43,7 +43,7 @@ data ActivatedAbility card = MkActivatedAbility
     -- narrows.
     --
     -- Not implemented: CR 702.178b's zone clause, which lets a max speed ability
-    -- function from whatever zones the ability it grants functions from (#768).
+    -- function from whatever zones the ability it grants functions from (#767).
     condition :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

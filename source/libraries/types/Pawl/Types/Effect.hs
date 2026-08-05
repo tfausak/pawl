@@ -242,7 +242,7 @@ data Effect card
     -- Its one producer is Pawl.Engine.Speed's inherent triggered ability (CR
     -- 702.179d), which is minted by the rules core from the rulebook rather than
     -- read off a card, the way Pawl.Engine.Monarch mints BecomeMonarch. No card in
-    -- the pool prints "your speed increases by" as text of its own (#770), so this
+    -- the pool prints "your speed increases by" as text of its own (#769), so this
     -- arm is authored by nothing in data/cards today.
     --
     -- NOT a "set speed to" opcode: CR 702.179 has both readings, and only the

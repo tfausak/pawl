@@ -42,16 +42,21 @@ import qualified Pawl.Types.Recipient as Recipient
 speedOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe (Maybe Natural.Natural)
 speedOf pid gs = fmap Player.speed (Map.lookup pid (GameState.players gs))
 
--- Alice's board: `k` Swamps and one Muraganda Raceway, with Sign in Blood in her
--- hand and enough cards in Bob's library for its draw clause. S.handOne sets the
--- precombat main phase and makes Alice the active player, which is what CR
--- 702.179d's "during your turn" needs.
+-- Alice's board: two Swamps and one Muraganda Raceway, with Sign in Blood in her
+-- hand. S.handOne sets the precombat main phase and makes Alice the active
+-- player, which is what CR 702.179d's "during your turn" needs.
+--
+-- BOTH libraries are stocked, and Alice's is not an afterthought: Sign in Blood
+-- aims its draw and its life loss at the same player, so a case that aims it at
+-- Alice decks her -- and CR 704.5b would then lose her the game before the speed
+-- trigger was ever gathered, passing that case for a reason that has nothing to
+-- do with rule 702.179.
 raceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
 raceBoard raceway swamp signInBlood filler =
   let base = S.landsInPlay swamp 2
       (racewayId, withRaceway) = S.addCreature raceway S.alice base
-      stocked = foldr (\_ g -> snd (S.addLibraryCard filler S.bob g)) withRaceway [1 .. (4 :: Int)]
-      (gs, spellId) = S.handOne signInBlood stocked
+      stock pid g = foldr (\_ g' -> snd (S.addLibraryCard filler pid g')) g [1 .. (4 :: Int)]
+      (gs, spellId) = S.handOne signInBlood (stock S.alice (stock S.bob withRaceway))
    in (gs, racewayId, spellId)
 
 -- Aim every target slot at Bob, so Sign in Blood's shared slot makes BOB the
@@ -227,6 +232,10 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
     let (gs, _, spellId) = raceBoard raceway swamp signInBlood piker
         after = castResolveSettle atAlice S.alice spellId gs
     Spec.assertEqWith s "alice lost two life" (S.lifeOf S.alice after) (fmap (subtract 2) (S.lifeOf S.alice gs))
+    -- She is still in the game, which is what makes the assertion below say
+    -- something: a decked Alice (CR 704.5b) would stop being an opponent of
+    -- herself and pass this case for the wrong reason.
+    Spec.assertEqWith s "and she is still playing" (GameState.result after) Nothing
     Spec.assertEqWith s "and her speed stayed at 1" (speedOf S.alice after) (Just (Just 1))
   -- CR 702.179d's "this ability triggers only once each turn". Two separate
   -- castings, two separate life losses, one increase.

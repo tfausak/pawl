@@ -154,7 +154,7 @@ data GameEvent
     -- a different question. CR 119.5's life-total set has no producer in the pool
     -- and so no site here.
     --
-    -- LIFE GAIN gets no sibling constructor: nothing reads one (#769). Not one
+    -- LIFE GAIN gets no sibling constructor: nothing reads one (#768). Not one
     -- "life total changed" constructor covering both, because CR 119.3 states the
     -- two directions separately and every card that cares says which.
     LifeLost PlayerId.PlayerId Natural.Natural
