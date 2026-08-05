@@ -24,6 +24,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
@@ -558,6 +559,31 @@ data Prompt r where
   -- all single-mode; a modal payload mixing a live mode with a dead optional one
   -- would reach this prompt with nothing to decide (#336).
   ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 118.12 / 118.12a: whether this player pays a cost a RESOLVING spell or
+  -- ability offers them -- Mana Leak's "unless its controller pays {3}", which CR
+  -- 118.12a rewrites as "its controller may pay {3}. If they don't, counter it."
+  -- The ObjectId is the object resolving and the ModeIndex is which of its chosen
+  -- modes is asking, both for Prompt.ChooseOptional's reasons; the Cost is what
+  -- is being offered, which is the information the answer turns on.
+  --
+  -- The PlayerId is emphatically NOT the resolving controller, which is what
+  -- separates this from every other resolution-time prompt: CR 118.12's clause
+  -- names a player, and for this card family that player is the one the effects
+  -- would be aimed AT. Routed through Decide.deciderFor like every other
+  -- player-facing prompt, so a player controlled under CR 723.1 has their
+  -- controller answer.
+  --
+  -- Asked at CR 118.12's own moment, when the spell or ability RESOLVES, so a
+  -- countered Mana Leak never asks -- observably different from an announcement
+  -- at CR 601.2f-h, where the cost of a spell being cast is paid.
+  --
+  -- NEVER elided for a payable cost: CR 118.3a makes paying optional and both
+  -- answers reach different boards. The one case not asked is where the rules
+  -- leave nothing to ask -- CR 118.3's "a player can't pay a cost without having
+  -- the necessary resources to pay it fully", which leaves declining as the only
+  -- possible answer. CR 118.12's clause covers that case in as many words ("does,
+  -- doesn't, or CAN'T"), and its Standstill example is exactly an unpayable one.
+  ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: the player announces whether they intend to pay 2 life or a
   -- coloured mana cost for each Phyrexian symbol. CR 118.13a puts the choice HERE
   -- rather than at payment. The ObjectId is the spell or the permanent whose

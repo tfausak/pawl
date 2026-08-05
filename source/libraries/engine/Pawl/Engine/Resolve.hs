@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -69,6 +70,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
@@ -92,6 +95,7 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -191,6 +195,17 @@ durationSlots duration = case duration of
   Duration.UntilYourNextTurn -> Set.empty
   Duration.ForAsLongAs condition -> conditionSlots condition
   Duration.UntilEndOfCombat -> Set.empty
+
+-- Every slot a whole MODE reads: its effect list's, plus the one CR 118.12a's
+-- "unless [a player] pays" names its payer by. What the D4 dataflow lint must
+-- ask, since a payer slot no effect also reads would otherwise dangle unnoticed
+-- -- Mana Leak's Counter happens to read the same slot, so the lint's answer is
+-- unchanged there and would not be for the next card of the family.
+modeSlots :: Mode.Mode Card.Type.Card -> Set SlotName
+modeSlots mode =
+  Set.union
+    (foldMap slotsOf (Mode.effects mode))
+    (maybe Set.empty (Set.singleton . UnlessPaid.payer) (Mode.unlessPaid mode))
 
 -- Both sides of a Condition are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Set SlotName
@@ -439,6 +454,18 @@ resolveSpellWith runSubgame oid = do
                   -- CR 603.5 / 608.2d: a printed "may" is answered here, between
                   -- the preceding mode's instructions and this one's.
                   taken <- exercises oid effectController idx mode
+                  -- CR 118.12a: and then this mode's "unless [a player] pays",
+                  -- offered only for a mode that is happening at all. The
+                  -- legality and the targets are the START-of-resolution ones,
+                  -- matching CR 608.2b's single re-validation; the per-effect
+                  -- re-read below adds only slots this resolution DEFINES, and
+                  -- an "unless" is offered before any effect has run.
+                  gatePaid <-
+                    if taken
+                      then
+                        let chosenAtStart = Binding.targetsOf (Object.bindings obj)
+                         in paid oid oid idx (Map.mapWithKey legalSlot chosenAtStart) chosenAtStart mode
+                      else pure False
                   let applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
                         -- PlaySubgame may have bound its loser slot.
@@ -446,7 +473,7 @@ resolveSpellWith runSubgame oid = do
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalityNow = Map.mapWithKey legalSlot chosenNow
                         applyEffectWith runSubgame oid oid effectController legalityNow chosenNow eff
-                  Monad.when taken (Monad.forM_ (Mode.effects mode) applyOne)
+                  Monad.when (taken && not gatePaid) (Monad.forM_ (Mode.effects mode) applyOne)
                 finishSpell oid face effectController
 
 -- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution.
@@ -525,7 +552,10 @@ resolveModes stackId srcId modes = do
             -- instructions are applied. Run only when `fizzles` is False, so the
             -- question is never asked about an ability that never resolves.
             taken <- exercises stackId effectController idx mode
-            Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController legality chosen) (Mode.effects mode))
+            -- CR 118.12a: then the "unless [a player] pays", against the same
+            -- slots -- see the spell path for why it follows the "may".
+            gatePaid <- if taken then paid stackId srcId idx legality chosen mode else pure False
+            Monad.when (taken && not gatePaid) (Monad.mapM_ (applyEffect stackId srcId effectController legality chosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
@@ -549,6 +579,75 @@ exercises resolving controller idx mode = case Mode.optionality mode of
     pure $ case decision of
       OptionalDecision.Exercises -> True
       OptionalDecision.Declines -> False
+
+-- CR 118.12a: does this mode's instruction list happen, given the "unless [a
+-- player] pays" it may state? A mode stating none always does. One that states
+-- one offers the cost to the player its `payer` slot names, and the instructions
+-- are the OTHER branch -- that rule reads "'[Do something] unless [a player does
+-- something else]' ... means the same thing as '[A player may do something
+-- else]. If [that player doesn't], [do something]'", so a refusal is not a
+-- failure and the resolution continues either way.
+--
+-- The branch is keyed on the ANSWER and never on the board afterwards, which is
+-- CR 118.12 in as many words: the clause "checks whether the player chose to pay
+-- an optional cost or started to pay a mandatory cost, regardless of what events
+-- actually occurred". That rule's Dermoplasm example is what a re-check of the
+-- world would get wrong -- the payment's intended consequence was replaced and
+-- the branch still ran. Nothing here looks at the target, at the payer's board or
+-- at the mana that moved; it reads Prompt.ChooseToPay's answer.
+--
+-- THREE ways the instructions run, and only one way they do not:
+--
+--   * no payer. The slot is unfilled, has become an illegal target (CR 608.2b),
+--     or names an object that is gone -- so there is nobody to offer the cost to
+--     and nobody has paid. Unreachable for Mana Leak, whose single target slot
+--     sends the whole spell through CR 608.2b's fizzle before this is asked.
+--   * the payer CANNOT pay (CR 118.3), which CR 118.12's clause names outright
+--     ("does, doesn't, or can't") and its Standstill example is. Not asked, there
+--     being one possible answer; see Prompt.ChooseToPay.
+--   * the payer declines.
+--
+-- and the fourth: they chose to pay AND the payment went through, which skips
+-- the instructions. A payment that does not go through is a complete no-op (see
+-- Pawl.Engine.Cost.pay) and so is read as not paid -- reachable only from an
+-- answer Pawl.Engine.Mana.payCost rejects, canPay having just said the resources
+-- were there.
+--
+-- The cost is paid AGAINST `source` rather than the resolving stack object: CR
+-- 113.7a keeps the source on the permanent, which is what a component naming
+-- "this" must reach. The two are the same object for a spell.
+paid :: ObjectId -> ObjectId -> ModeIndex -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Mode.Mode Card.Type.Card -> Game Bool
+paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
+  Nothing -> pure False
+  Just gate -> do
+    gs <- State.get
+    let cost = UnlessPaid.cost gate
+    case payerOf (UnlessPaid.payer gate) legality chosen gs of
+      Nothing -> pure False
+      Just payer ->
+        if not (Cost.canPay payer source cost gs)
+          then pure False
+          else do
+            decision <- Trans.lift (Program.prompt (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cost))
+            case decision of
+              PaymentDecision.Declines -> pure False
+              PaymentDecision.Pays -> do
+                outcome <- Cost.pay payer source cost
+                pure (outcome == Payment.Paid)
+
+-- Which player a resolution cost is offered to. ONE slot read answering in two
+-- ways, since a slot may hold either kind of recipient: a slot bound to a PLAYER
+-- names that player, and one bound to an OBJECT names whoever controls it (CR
+-- 109.5) -- Mana Leak's "its controller", read off the targeted spell.
+--
+-- Legality is asked as every other slot read asks it (CR 608.2b): a slot filled
+-- by targeting that has since become illegal names nobody, and a reserved slot
+-- has no target spec, so legalSlot already answered True.
+payerOf :: SlotName -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> GameState -> Maybe PlayerId
+payerOf slot legality chosen gs = case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+  (Just (Recipient.ToPlayer pid), True) -> Just pid
+  (Just recipient, True) -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
+  _ -> Nothing
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
 -- (CR 113.7a), not the ability object. Reads only the ability's CHOSEN modes (CR

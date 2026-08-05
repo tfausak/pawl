@@ -111,6 +111,7 @@ import qualified Pawl.Codec.TriggeredAbilitySpec
 import qualified Pawl.Codec.TurnScopeSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TypeLineSpec
+import qualified Pawl.Codec.UnlessPaidSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
@@ -323,6 +324,7 @@ spec s registry = do
   Pawl.Codec.TurnScopeSpec.spec s
   Pawl.Codec.TurnWindowSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
+  Pawl.Codec.UnlessPaidSpec.spec s
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s

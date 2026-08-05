@@ -78,7 +78,7 @@ decodeFace = Face.fromJson Card.fromJson
 minimalModal :: Modal.Modal Card.Card
 minimalModal =
   Modal.MkModal
-    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
+    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing))
     (ModeSelection.ChooseExactly 1)
 
 -- | CR 603.6a's simplest trigger. The shape does not matter here, only that it

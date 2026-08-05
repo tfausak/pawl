@@ -16,6 +16,7 @@ import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
@@ -122,6 +123,10 @@ data Response
   | -- | CR 603.5: whether the controller of a resolving spell or ability
     -- exercised a printed "may".
     ChoseOptional OptionalDecision.OptionalDecision
+  | -- | CR 118.12a: whether the player a resolving spell or ability offered a
+    -- cost to chose to pay it. Distinct from ChoseOptional, which records CR
+    -- 603.5's "may" and is always answered by the resolving controller.
+    ChoseToPay PaymentDecision.PaymentDecision
   | -- | CR 118.13a / 601.2b: which way a caster announced they would pay a
     -- Phyrexian mana symbol, so a Mutagenic Growth paid out of life replays
     -- exactly as it was cast.

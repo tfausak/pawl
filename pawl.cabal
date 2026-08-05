@@ -274,6 +274,8 @@ library codec
     Pawl.Codec.TurnWindowSpec
     Pawl.Codec.TypeLine
     Pawl.Codec.TypeLineSpec
+    Pawl.Codec.UnlessPaid
+    Pawl.Codec.UnlessPaidSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
     Pawl.Codec.Zone
@@ -575,6 +577,7 @@ library types
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
     Pawl.Types.Payment
+    Pawl.Types.PaymentDecision
     Pawl.Types.PendingTrigger
     Pawl.Types.Phase
     Pawl.Types.PhasePattern
@@ -631,6 +634,7 @@ library types
     Pawl.Types.TurnScope
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
+    Pawl.Types.UnlessPaid
     Pawl.Types.Uses
     Pawl.Types.Zone
     Pawl.Types.ZoneChange

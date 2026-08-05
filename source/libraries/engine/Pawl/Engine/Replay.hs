@@ -23,6 +23,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Program as Program
 import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
@@ -75,6 +76,7 @@ encode p answer = case p of
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
+  Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
@@ -203,6 +205,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseOptional {} -> case response of
     Response.ChoseOptional decision -> Just decision
+    _ -> Nothing
+  Prompt.ChooseToPay {} -> case response of
+    Response.ChoseToPay decision -> Just decision
     _ -> Nothing
   Prompt.AnnouncePhyrexianPayment {} -> case response of
     Response.AnnouncedPhyrexianPayment way -> Just way
@@ -342,6 +347,9 @@ defaultAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.3a: paying is optional, so declining is always legal, and it spends
+  -- nothing -- which keeps a short transcript from tapping a payer's board.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: every offered route is payable, and the prompt is raised only
   -- where two are.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
