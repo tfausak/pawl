@@ -3132,6 +3132,15 @@ leavesBattlefieldSpec s registry =
 -- rather than through its `_ -> Map.empty` fallthrough. A pair that did not
 -- match would pin nothing: both sides would read empty for every condition.
 --
+-- The INHERENT conditions are the exception, and it is the rules' rather than an
+-- oversight: CR 725.2's and CR 702.179d's abilities hang on no card, so
+-- Event.matchesTrigger answers False for them whatever the event and their real
+-- matchers live in Pawl.Engine.Monarch and Pawl.Engine.Speed. Their arms below
+-- name the event the RULE names anyway. What the pin says of those two is
+-- therefore weaker but not vacuous -- that neither claims a slot the log could
+-- never bind -- and it is what fails if either grows a binding arm here without
+-- eventBindingSlots being told.
+--
 -- A NON-EMPTY LIST rather than one event, because Event.eventBindingSlots
 -- answers the guaranteed FLOOR -- the slots bound for every event a condition
 -- admits -- and a condition that binds a slot for some of its events and not
@@ -3163,6 +3172,12 @@ representativeEvents cond =
         TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
         TriggerCondition.SelfDealsCombatDamageToPlayer -> one combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
+        -- CR 702.179d's own event. Like the monarch's condition above it, this
+        -- one is matched by Pawl.Engine.Speed.inherentPending rather than by
+        -- Event.matchesTrigger, which answers False for it whatever the event --
+        -- so the pin here is that an inherent condition binds nothing from the
+        -- log, which is what Event.eventBindingSlots claims for it.
+        TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost S.bob 2)
         TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed)
@@ -3198,6 +3213,7 @@ everyTriggerCondition =
     TriggerCondition.StateIs (Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
+    TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
