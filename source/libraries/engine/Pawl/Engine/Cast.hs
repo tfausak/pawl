@@ -136,9 +136,22 @@ instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 --
 -- MEASURED BEFORE THE MOVE, which castSpell no longer is, and that is structural
 -- rather than an oversight: this is an OFFER, computed by Action.legalActions
--- while every card is still where it was. The two agree for every card in this
--- pool, because the only object whose stack membership the move changes is the
--- spell itself and CR 115.5 takes that one back out of every stack pool
+-- while every card is still where it was. What survives of the difference is the
+-- object's ZONE, and three capabilities pawl LACKS are what keep that from being
+-- observable -- not any claim about Magic:
+--
+--   * no target pool names a hidden zone at all. Pawl.Types.Pool has Permanents,
+--     Spells, CardsInGraveyard and CardsInExile, and no hand or library arm
+--     (#559), so no target set can be measured differently either side of it.
+--   * nothing counts a hand. No Pawl.Types.Count arm reaches a hand zone, so
+--     hand size cannot enter a cost or a filter.
+--   * a cost adjustment carries a LITERAL amount. PlayerEffect.IncreaseSpellCost
+--     and ReduceSpellCost hold a Natural or a ManaCost, never a Quantity, so no
+--     adjustment can count anything -- which is the only route a zone read could
+--     take into Cost.total.
+--
+-- The one object whose stack membership the move does change is the spell itself,
+-- and CR 115.5 takes that one back out of every stack pool
 -- (Target.legalRecipients). What the CHOSEN HALF changes is no longer part of
 -- that argument: the specs come from `proposedFace`, and `castable` hands this a
 -- state with that same half stamped onto the OBJECT (asProposed), so a filter
@@ -164,7 +177,7 @@ targetable pid oid name gs = case proposedFace oid name gs of
 --
 -- The HALF being cast reaches CR 601.2f's adjustments through the state, not
 -- through an argument: `cost` comes from the chosen face and Cost.total reads
--- the object's characteristics through Game.faceOf, so both callers hand in a
+-- the object's characteristics through Game.faceOf, so every caller hands in a
 -- state with that face stamped on (asProposed) and the two cannot name different
 -- halves. AdventureSpec's "Thalia taxes the Adventure half and not the creature
 -- half" is what holds it.
@@ -404,7 +417,10 @@ attackedThisStep pid gs =
 -- say outright that castability is evaluated against the chosen half -- CR 709.3a
 -- "only the chosen half is evaluated to see if it can be cast", CR 715.3a "only
 -- the alternative characteristics are evaluated to see if it can be cast" -- and
--- CR 601.2b's last sentence puts that choice before the announcement. So no
+-- both put that choice before the move rather than inside the announcement: CR
+-- 709.3 "a player chooses which half of a split card they are casting BEFORE
+-- putting it onto the stack", CR 715.3 "as a player plays an adventurer card,
+-- the player chooses whether they play the card normally or as an Adventure". So no
 -- object is minted (CR 400.7), no CR 616.1 replacement loop runs, and nothing
 -- prompts.
 --
@@ -427,10 +443,13 @@ asProposed oid name gs =
 --
 -- Asked of ONE HALF, named: CR 709.3a and CR 715.3a evaluate only the chosen half
 -- to see if it can be cast, so a multi-face card is asked this question once per
--- half. That name reaches the conjuncts TWICE over, and both are needed: as an
--- ARGUMENT, which is how the ones that read the CARD -- the timing window, the
--- printed restrictions, the candidate costs, the target specs -- resolve their
--- face, and as `asProposed`'s STAMP, which is how the ones that go on to read the
+-- half. That name reaches the conjuncts TWICE over, belt and braces rather than
+-- necessity -- once stamped, the two resolve the same face -- and each carries a
+-- job the other cannot: as an ARGUMENT, which is how the ones that read the CARD
+-- -- the timing window, the printed restrictions, the candidate costs, the target
+-- specs -- resolve their face, and where the name is used AS A NAME (CR 601.3a's
+-- prohibitions, Null Chamber; Cost.costsFor); and as `asProposed`'s STAMP, which
+-- is how the ones that go on to read the
 -- OBJECT resolve theirs: CR 601.2f's adjustments through Cost.total, and any
 -- filter measuring the spell's own characteristics. Thalia's "noncreature spells
 -- cost {1} more to cast" is the observable: it taxes the Sorcery half of an
@@ -522,6 +541,8 @@ castableWhileSearching pid gs =
               -- The same stamped state `castable` gates on, for the same rule:
               -- CR 601.3's exception is about TIMING, so the half a library cast
               -- is evaluated against is still CR 709.3a's chosen one.
+              -- Unobservable today: soleCastableFace admits only single-face
+              -- cards, for which the stamp resolves to the face it already had.
               proposed = asProposed oid name gs
            in permitsCastWhileSearching face
                 -- CR 601.3's prohibit half, moved inside `allowed` when it grew
@@ -619,8 +640,9 @@ castSpell pid oid name = do
           -- projection included. Event.changeZone cleared the field on the way
           -- in (CR 400.7), so this is a write onto a fresh object.
           --
-          -- Through asProposed, the same write castable's gate reads through, so
-          -- the offer and the announcement cannot name different halves.
+          -- Through asProposed, the same function castable's gate builds its
+          -- state with, so the offer and the announcement cannot name different
+          -- halves.
           --
           -- JUST AFTER the move, not during it: anything that runs inside CR
           -- 601.2a -- a CR 616.1 entry replacement, or a trigger the move fires
@@ -778,8 +800,10 @@ castProposed pid sid face castFrom candidates before = do
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian
                       -- symbols announced above, then the total cost. A criterion
                       -- is read against the spell's STACK incarnation, the
-                      -- projection CR 601.2f's total is owed -- the same one
-                      -- castable's own gate read through asProposed.
+                      -- projection CR 601.2f's total is owed. Not the same
+                      -- projection castable measured -- that one read `oid` in a
+                      -- hand, this reads `sid` on the stack -- but provably the
+                      -- same HALF, since asProposed stamped both.
                       let paidCost = Cost.total pid sid announcedCost gs
                       payment <- Cost.pay pid sid paidCost
                       case payment of

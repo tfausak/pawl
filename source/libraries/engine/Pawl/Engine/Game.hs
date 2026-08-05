@@ -209,9 +209,9 @@ resolveFace mName card = case mName of
   -- failing. Pawl.CardSpec's "a card's face names are pairwise distinct" corpus
   -- lint holds that of every loadable card, which is what makes faceNamed's
   -- answer unique whenever the name IS one of the card's own faces, and the
-  -- only writer of this field (Cast.castSpell) stores a name it read from that
-  -- same card's faces -- so this arm has no case that reaches it, short of a
-  -- bug in that writer.
+  -- only writer of this field (Cast.asProposed) stores a name its callers read
+  -- from that same card's faces -- so this arm has no case that reaches it,
+  -- short of a bug in that writer.
   Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
 
 -- The face of the card an object is showing. Nothing when the id is unknown or
