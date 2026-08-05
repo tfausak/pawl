@@ -1,6 +1,8 @@
 cabal-version: 3.0
+-- cabal-gild: version
+-- Generated with cabal-gild version 1.8.4.1
 name: pawl
-version: 0.2026.8.4
+version: 0.2026.8.5
 synopsis: Magic: the Gathering rules engine
 description:
   Pawl is a Magic: the Gathering rules engine.
@@ -274,6 +276,8 @@ library codec
     Pawl.Codec.TurnWindowSpec
     Pawl.Codec.TypeLine
     Pawl.Codec.TypeLineSpec
+    Pawl.Codec.UnlessPaid
+    Pawl.Codec.UnlessPaidSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
     Pawl.Codec.Zone
@@ -346,6 +350,7 @@ library engine
     Pawl.Engine.Replacement
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
+    Pawl.Engine.Ring
     Pawl.Engine.Sba
     Pawl.Engine.Setup
     Pawl.Engine.Stack
@@ -360,6 +365,7 @@ library exceptions
   hs-source-dirs: source/libraries/exceptions
   -- cabal-gild: discover source/libraries/exceptions
   exposed-modules:
+    Pawl.Exceptions.InvalidCorpus
     Pawl.Exceptions.MissingRoot
 
 -- Quality of life improvements for packages Pawl doesn't own, in the spirit of
@@ -496,7 +502,6 @@ library types
     Pawl.Types.BlockRequirement
     Pawl.Types.CandidateId
     Pawl.Types.Card
-    Pawl.Types.CardError
     Pawl.Types.CardName
     Pawl.Types.CardType
     Pawl.Types.CastingPermission
@@ -546,6 +551,7 @@ library types
     Pawl.Types.GameEvent
     Pawl.Types.GameState
     Pawl.Types.HandActionPerformer
+    Pawl.Types.HybridPayment
     Pawl.Types.Keyword
     Pawl.Types.LastKnown
     Pawl.Types.Layer
@@ -575,6 +581,7 @@ library types
     Pawl.Types.OptionalDecision
     Pawl.Types.Optionality
     Pawl.Types.Payment
+    Pawl.Types.PaymentDecision
     Pawl.Types.PendingTrigger
     Pawl.Types.Phase
     Pawl.Types.PhasePattern
@@ -631,6 +638,7 @@ library types
     Pawl.Types.TurnScope
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
+    Pawl.Types.UnlessPaid
     Pawl.Types.Uses
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
@@ -682,8 +690,6 @@ test-suite pawl-test-suite
     Pawl.ConditionSpec
     Pawl.CopySpec
     Pawl.CoreSpec
-    Pawl.Corpus
-    Pawl.CorpusSpec
     Pawl.CostSpec
     Pawl.CountSpec
     Pawl.DamageSpec
@@ -697,6 +703,7 @@ test-suite pawl-test-suite
     Pawl.ManaSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
+    Pawl.PerformanceSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
@@ -705,6 +712,7 @@ test-suite pawl-test-suite
     Pawl.ReplacementSpec
     Pawl.ReplaySpec
     Pawl.ResolveSpec
+    Pawl.RingSpec
     Pawl.SetupSpec
     Pawl.Support
     Pawl.TargetSpec

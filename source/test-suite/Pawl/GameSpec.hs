@@ -64,6 +64,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -177,7 +178,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               -- CR 400.7: changeZone clears any singled-out face along with
               -- every other per-incarnation field.
               Object.face = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
       )
 
@@ -330,6 +332,7 @@ recordingAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseManaYield _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseProliferate {} -> pure (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseLegend _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
   Prompt.ChooseAttackTarget _ _ _ options -> pure (NonEmpty.head options)
@@ -375,9 +378,15 @@ recordingAnswer p = case p of
   Prompt.OpeningHandAction {} -> pure Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> pure OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> pure PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> pure EntwineDecision.Declines
@@ -610,6 +619,65 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "CR 727.4: settled at the first untap step" (GameState.phase after) Turn.firstPhase
     Spec.assertEqWith s "CR 727.2: the battlefield is empty (every card returned to a library)" (Set.null (GameState.battlefield after)) True
     Spec.assertEqWith s "the game did not end -- the new game is live" (GameState.result after) Nothing
+
+  Spec.it s "CR 400.7/727.2 gameplay: a restart puts Painter's Servant into a library with its chosen colour forgotten" $ do
+    -- The card-driven proof for Setup.startGameFromCards' hand-written zone
+    -- move. Painter's Servant is CAST rather than placed, because CR 614.1c's
+    -- colour choice happens only on the entry path (Replacement.runEntry) -- a
+    -- Servant put straight onto the battlefield has chosenColor = Nothing and
+    -- this test would assert nothing. S.identityAnswer answers ChooseColor with
+    -- white, which is all this needs: WHICH colour it chose does not matter,
+    -- only that it chose one.
+    --
+    -- Then bob activates the synthetic restart and CR 727.2 rebuilds every
+    -- library from the existing cards. The Servant is a new object in that
+    -- library (CR 400.7), so the colour it chose is gone.
+    syntheticRestart <- S.printingOf s registry "Synthetic Restart"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    mountain <- S.printingOf s registry "Mountain"
+    let base = S.landsInPlay mountain 2
+        (inHand, handId) = S.handOne paintersServant base
+        -- alice's bulk pool is built BEFORE the cast, and deliberately so. Both
+        -- players need >= 7 owned cards or CR 727.3's short-deck loss ends the
+        -- rebuilt game, but the Servant also has to still be IN alice's library
+        -- afterwards: a DRAWN Servant goes through Event.changeZone and comes
+        -- out clean no matter what startGameFromCards did, which is the vacuous
+        -- pass this test exists to avoid. startGameFromCards orders each
+        -- library by object id and the opening hand comes off the front, so
+        -- minting these mountains first leaves the Servant's battlefield
+        -- incarnation -- whose id the cast mints last -- at the back, behind
+        -- the seven cards drawn. The library assertion below is what keeps that
+        -- reasoning honest if it ever stops holding.
+        bulked = addManyG mountain 24 S.alice inHand
+        castServant = snd (Engine.runGamePure S.identityAnswer bulked (S.cast S.alice handId))
+        painted = snd (Engine.runGamePure S.identityAnswer castServant Stack.resolveTop)
+        (_restartId, withRestart) = S.addCreature syntheticRestart S.bob painted
+        filled = addManyG mountain 7 S.bob withRestart
+        gStart =
+          filled
+            { GameState.activePlayer = S.bob,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.bob
+            }
+        after = snd (Engine.runGamePure restartAnswer gStart Engine.priorityLoop)
+        -- The Servant's BATTLEFIELD incarnation: the cast minted new ids at
+        -- each hop (CR 400.7), so `handId` is not it. startGameFromCards keeps
+        -- the id it rebuilds, so this same id is what to look for afterwards.
+        entered = Set.toList (Set.difference (GameState.battlefield painted) (GameState.battlefield bulked))
+    case entered of
+      [servantId] -> case (Game.lookupObject servantId gStart, Game.lookupObject servantId after) of
+        -- The discriminator: the Servant really did make a CR 614.1c choice
+        -- going in, and the object that carried it is still the same object,
+        -- sitting in a library, coming out.
+        (Just before, Just rebuilt) -> do
+          Spec.assertBool s (Maybe.isJust (Object.chosenColor before)) "CR 614.1c: the cast Servant chose a colour as it entered"
+          Spec.assertEqWith s "CR 727.2: the rebuilt Servant is the same object, in a library" (Object.zone rebuilt) Zone.Library
+          Spec.assertEqWith s "CR 400.7: the Servant in the library forgot the colour it chose" (Object.chosenColor rebuilt) Nothing
+        (_, Nothing) -> Spec.assertFailure s "the opening draw took the Servant out of the library; raise alice's pool"
+        _ -> Spec.assertFailure s "the fixture lost the Servant before the restart"
+      _ -> Spec.assertFailure s "Painter's Servant did not reach the battlefield"
+    Spec.assertEqWith s "CR 727.2: the restart really ran (the battlefield is empty)" (Set.null (GameState.battlefield after)) True
+    Spec.assertEqWith s "the game did not end, so the rebuild is the live state" (GameState.result after) Nothing
 
   Spec.it s "CR 729.2/729.3/729.5: playSubgame runs a nested game, bob decks, cards funnel back" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1611,7 +1679,8 @@ handBobBolt lightningBolt gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1654,6 +1723,7 @@ slaveAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -1687,9 +1757,15 @@ slaveAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -1911,7 +1987,7 @@ restartOnStack mountain =
               Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory))
+                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.timing = ActivationTiming.AnyTime
           }
@@ -1932,7 +2008,8 @@ restartOnStack mountain =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

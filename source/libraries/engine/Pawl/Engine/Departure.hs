@@ -302,7 +302,10 @@ nonCardStackObjectsCease pid gs =
 -- skips all of CR 800.4a) and a Gather Specimens whose controller then leaves
 -- (#582). The exile is a direct move rather than an Event.changeZone -- this
 -- function is pure, so it cannot funnel, and a leaves-the-battlefield trigger on
--- this move is therefore not emitted (#179).
+-- this move is therefore not emitted (#179). It is still a move, so CR 400.7's
+-- forgetting applies and Object.newIncarnation runs -- the part of the funnel
+-- that needs no Game monad. CR 613.7d's fresh timestamp is the part that does,
+-- and is not applied here (#179).
 remainingControlledExiled :: PlayerId -> GameState -> GameState
 remainingControlledExiled pid gs =
   let -- Projection.controls already hoists the control-grant list once rather
@@ -313,7 +316,7 @@ remainingControlledExiled pid gs =
         Just obj ->
           let g1 = Game.removeFromZones (Object.owner obj) oid g
               g2 = Game.insertIntoZone Zone.Exile (Object.owner obj) oid g1
-           in g2 {GameState.objects = Map.insert oid obj {Object.zone = Zone.Exile} (GameState.objects g2)}
+           in g2 {GameState.objects = Map.insert oid (Object.newIncarnation obj) {Object.zone = Zone.Exile} (GameState.objects g2)}
    in List.foldl' exileOne gs theirs
 
 -- CR 104.2a: a player still in the game wins if their opponents have all left.

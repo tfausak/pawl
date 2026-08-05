@@ -114,6 +114,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfPutIntoGraveyardFromLibrary
       """ {"type":"SelfPutIntoGraveyardFromLibrary"} """
+  -- The same rule with no origin zone at all -- a separate tag from the one
+  -- above, which it is a superset of: the two must never decode to each other.
+  Spec.it s "SelfPutIntoGraveyardFromAnywhere" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfPutIntoGraveyardFromAnywhere
+      """ {"type":"SelfPutIntoGraveyardFromAnywhere"} """
   -- CR 603.6c's second written form, abbreviated by CR 700.4 to "dies".
   Spec.it s "SelfDies" $
     Common.assertJsonCodec

@@ -52,7 +52,10 @@ emptyGame order =
           Player.MkPlayer
             { Player.life = startingLife,
               Player.status = Status.Playing,
-              Player.counters = Map.empty
+              Player.counters = Map.empty,
+              -- CR 701.54c: the Ring has tempted nobody in a game that has not
+              -- started.
+              Player.ringTemptations = 0
             }
         )
    in GameState.MkGameState
@@ -120,7 +123,8 @@ createCard pid printing = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       gs3 =
         gs2
@@ -164,22 +168,11 @@ startGameFromCards perform = do
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
-      toLibraryCard obj =
-        obj
-          { Object.zone = Zone.Library,
-            Object.tapped = TapState.Untapped,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            -- CR 400.7: a hand-written zone move outside Event.changeZone, so
-            -- every per-incarnation reset it would have done has to be repeated
-            -- here. This list is NOT the whole of that reset: `attachedTo`,
-            -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
-            -- survive the move (#653).
-            Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
-          }
+      -- CR 400.7: a hand-written zone move outside Event.changeZone, so the
+      -- per-incarnation reset that funnel performs has to happen here too --
+      -- through the same Object.newIncarnation, so that a field added later
+      -- cannot be forgotten on one path and reset on the other.
+      toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
       cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
   State.put
@@ -218,7 +211,11 @@ resetPlayers players =
         Status.Playing ->
           player
             { Player.life = startingLife,
-              Player.counters = Map.empty
+              Player.counters = Map.empty,
+              -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
+              -- it. The command zone this line's callers empty is where the
+              -- emblem the count belongs to went.
+              Player.ringTemptations = 0
             }
         Status.Departed _ -> player
    in fmap reset players
@@ -412,22 +409,10 @@ funnelBack finalSub parent =
   let isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
-      toLibraryCard obj =
-        obj
-          { Object.zone = Zone.Library,
-            Object.tapped = TapState.Untapped,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            -- CR 400.7, exactly as startGameFromCards' own toLibraryCard: a
-            -- hand-written zone move outside Event.changeZone repeating that
-            -- reset, and repeating it INCOMPLETELY -- `attachedTo`,
-            -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
-            -- survive here too (#653).
-            Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
-          }
+      -- CR 400.7, exactly as startGameFromCards' own toLibraryCard: the second
+      -- hand-written zone move outside Event.changeZone, performing that
+      -- funnel's per-incarnation reset through the one shared function.
+      toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
       returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))
       oldLibIds =
         Set.fromList

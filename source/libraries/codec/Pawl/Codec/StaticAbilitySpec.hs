@@ -7,10 +7,19 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
@@ -20,7 +29,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       s
       StaticAbility.toJson
       StaticAbility.fromJson
-      (StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
+      (StaticAbility.MkStaticAbility Affected.Attached Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
       """ {"affected":{"type":"Attached"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
@@ -30,9 +39,31 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       StaticAbility.fromJson
       ( StaticAbility.MkStaticAbility
           Affected.Attached
+          Nothing
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
       )
       """ {"affected":{"type":"Attached"},"modifications":[{"type":"LoseAllAbilities"},{"type":"SetBasePowerToughness","value":[{"type":"Literal","value":1},{"type":"Literal","value":1}]}]} """
+  -- CR 604.2's "as long as" gate, Kird Ape's shape: the same ability plus a
+  -- condition, so the key is present exactly when the clause is. The two cases
+  -- above pin the absent half -- an encoder that always emitted the key would
+  -- rewrite every card already committed.
+  Spec.it s "an as-long-as condition" $
+    Common.assertJsonCodec
+      s
+      StaticAbility.toJson
+      StaticAbility.fromJson
+      ( StaticAbility.MkStaticAbility
+          Affected.Attached
+          ( Just
+              ( Condition.MkCondition
+                  (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Forest) Aggregation.Objects))
+                  Comparison.AtLeast
+                  (Quantity.Literal 1)
+              )
+          )
+          (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
+      )
+      """ {"affected":{"type":"Attached"},"condition":{"comparison":{"type":"AtLeast"},"measured":{"type":"Count","value":{"aggregation":{"type":"Objects"},"filter":{"type":"HasSubtype","value":{"type":"Forest"}},"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]}}},"threshold":{"type":"Literal","value":1}},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- CR 613.6 is why a static ability is one affected set and one or more parts, so
   -- the wire format is an array -- and an array can be empty. An ability with
   -- no parts does nothing, which no card means, so it is a decode FAILURE

@@ -20,7 +20,10 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameState as GameState
@@ -30,8 +33,13 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 deckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -201,6 +209,40 @@ addMany :: Printing.Printing -> Int -> PlayerId -> GameState.GameState -> GameSt
 addMany mountain n pid gs =
   List.foldl' (\g _ -> snd (S.addCreature mountain pid g)) gs (replicate n ())
 
+-- CR 400.7's per-incarnation state, all of it at once and every field set to
+-- something Object.newIncarnation would erase, so a path that forgets to erase
+-- one leaves a trace. The counterpart to `forgotten` below: dirty every card in
+-- the pool, run the path, then assert nothing survived the move.
+--
+-- Deliberately hand-written rather than derived from Object.newIncarnation --
+-- if this listed the same fields the implementation does, a field the
+-- implementation missed would be missing here too and the assertion would pass
+-- for the wrong reason.
+dirtied :: PlayerId -> Object.Object -> Object.Object
+dirtied pid object =
+  object
+    { Object.tapped = TapState.Tapped,
+      Object.damage = 1,
+      Object.sickness = Sickness.Settled pid,
+      Object.bindings = Map.singleton (SlotName.MkSlotName (Text.pack "target")) Binding.empty,
+      Object.counters = Map.singleton CounterKind.PlusOnePlusOne 1,
+      Object.attachedTo = Just (Recipient.ToPlayer pid),
+      Object.enteredUnder = Just pid,
+      Object.chosenColor = Just Color.Blue,
+      Object.chosenSubtype = Just Subtype.Forest,
+      Object.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
+      Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
+      Object.playableFromExileBy = Just pid,
+      Object.ringBearerFor = Just pid
+    }
+
+-- CR 400.7: has this object no memory of a previous existence? Applying the
+-- forgetting again changes nothing exactly when the move already applied it in
+-- full, so this stays honest as fields are added -- unlike a list of field
+-- comparisons, which would have to be extended by hand alongside Object.
+forgotten :: Object.Object -> Bool
+forgotten object = Object.newIncarnation object == object
+
 restartSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
   Spec.it s "startGameFromCards: libraries are rebuilt from the existing owned cards, hands drawn" $ do
@@ -219,6 +261,27 @@ restartSpec s registry = Spec.describe s "restart (CR 727)" $ do
     Spec.assertEqWith s "bob's library holds the remaining owned card" (libSize S.bob) 1
     Spec.assertEqWith s "the battlefield is empty after the rebuild" (Set.null (GameState.battlefield after)) True
     Spec.assertEqWith s "every rebuilt object is owned by alice or bob (ownership preserved)" (all (\o -> Object.owner o == S.alice || Object.owner o == S.bob) (Map.elems (GameState.objects after))) True
+
+  Spec.it s "CR 400.7: startGameFromCards puts each card into the library as a NEW object, with no per-incarnation state" $ do
+    -- Every one of alice's and bob's 8 owned cards carries the full set of
+    -- per-incarnation state -- a chosen colour, a chosen land type, a chosen
+    -- name, an attachment, an entry controller, damage, counters, a binding, a
+    -- face, an exile permission. startGameFromCards is a hand-written zone
+    -- move outside Event.changeZone, so it has to erase all of it (#653).
+    --
+    -- Dirtying EVERY card rather than one is what makes this deterministic:
+    -- the rebuild shuffles and draws opening hands, so which cards stay in the
+    -- library is not knowable here. The drawn ones go through changeZone and
+    -- come out clean either way; the ones that stay are the ones under test.
+    mountain <- S.printingOf s registry "Mountain"
+    let g0 = Setup.emptyGame S.bothPlayers
+        g1 = addMany mountain 8 S.bob (addMany mountain 8 S.alice g0)
+        g2 = g1 {GameState.objects = Map.map (\o -> dirtied (Object.owner o) o) (GameState.objects g1)}
+        after = snd (Engine.runGamePure S.identityAnswer g2 (Setup.startGameFromCards S.performer))
+    -- The discriminator: without this, an assertion over an already-clean pool
+    -- would pass no matter what startGameFromCards does.
+    Spec.assertEqWith s "the pool going in genuinely carried per-incarnation state" (not (all forgotten (Map.elems (GameState.objects g2)))) True
+    Spec.assertEqWith s "every rebuilt object forgot its previous existence" (all forgotten (Map.elems (GameState.objects after))) True
 
   Spec.it s "CR 727.1a: the starting player is the restart's controller, at the head of the turn order" $ do
     -- Two restarts of the same board, controlled by different players: the
@@ -445,6 +508,36 @@ subgameSpec s registry = Spec.describe s "subgames (CR 729)" $ do
     Spec.assertEqWith s "bob's 3-card library comes back whole" (length (Game.zoneMembers Zone.Library S.bob after)) 3
     Spec.assertEqWith s "alice's library is unaffected" (length (Game.zoneMembers Zone.Library S.alice after)) 3
     Spec.assertEqWith s "carol's library is unaffected" (length (Game.zoneMembers Zone.Library S.carol after)) 3
+
+  Spec.it s "CR 400.7: funnelBack returns each card to the library as a NEW object, with no per-incarnation state" $ do
+    -- The subgame teardown is the other hand-written zone move outside
+    -- Event.changeZone, and it puts cards into a library from TWO pools: the
+    -- finished subgame's objects, and -- for a player who departed inside the
+    -- subgame, so has no objects left there -- the parent's own library
+    -- objects. Both are dirtied here, so both funnels are under test (#653).
+    --
+    -- Dirtying the subgame AFTER it is played is what makes the first pool
+    -- meaningful: startGameFromCards and the opening draws would otherwise
+    -- hand funnelBack an already-clean pool and the assertion would pass
+    -- without funnelBack doing anything.
+    mountain <- S.printingOf s registry "Mountain"
+    let g0 = Setup.emptyGame S.threePlayers
+        g1 = poolToLibrary S.carol (poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain 3 S.carol (addMany mountain 3 S.bob (addMany mountain 3 S.alice g0)))))
+        dirtyPool gs = gs {GameState.objects = Map.map (\o -> dirtied (Object.owner o) o) (GameState.objects gs)}
+        parent = dirtyPool g1
+        sub0 = Setup.subgameStateFrom S.alice parent
+        (_, seated) = Engine.runGamePure S.identityAnswer sub0 (Setup.startGameFromCards S.performer)
+        departedSub = dirtyPool (Departure.depart Departure.Type.Lost S.bob seated)
+        after = Setup.funnelBack departedSub parent
+        libraryObjects pid = Maybe.mapMaybe (`Game.lookupObject` after) (Game.zoneMembers Zone.Library pid after)
+        everyone = concatMap libraryObjects [S.alice, S.bob, S.carol]
+    -- The discriminators: both pools genuinely carry state going in, and both
+    -- genuinely deliver cards to a library.
+    Spec.assertEqWith s "the subgame pool going in genuinely carried per-incarnation state" (not (all forgotten (Map.elems (GameState.objects departedSub)))) True
+    Spec.assertEqWith s "the parent pool going in genuinely carried per-incarnation state" (not (all forgotten (Map.elems (GameState.objects parent)))) True
+    Spec.assertEqWith s "alice and carol come back through the subgame pool" (length (libraryObjects S.alice) + length (libraryObjects S.carol)) 6
+    Spec.assertEqWith s "bob, who departed, comes back through the parent pool" (length (libraryObjects S.bob)) 3
+    Spec.assertEqWith s "every returned card forgot its previous existence" (all forgotten everyone) True
 
   -- The narrower door: continuesAfterDeparture reads `finalSub`'s turnOrder
   -- at the END of the subgame, but objectsLeaveWith's own gate fired at

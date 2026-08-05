@@ -187,11 +187,14 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 -- -- unlike CR 704.5m's fallsOff, which asks the printed card for an enchant
 -- ability because it needs that ability's spec.
 --
--- Two clauses of the rule have no constructor to case on and are therefore
--- unreachable rather than elided: there is no CardType.Battle and no
--- Subtype.Fortification. "Or to a player" needs no clause at all: this rule asks
--- only whether the attached permanent may be attached to ANYTHING, so the
--- `Just _` below covers an object and a player alike.
+-- Subtype.Fortification is the one clause of the rule with no constructor to case
+-- on, and is therefore unreachable rather than elided. The BATTLE clause is
+-- written out, though nothing reaches it: CardType.Battle exists, but no card in
+-- the pool carries one (#302). That is becomesUnattached's posture toward CR
+-- 704.5n's "or to a player" -- express the clause, and let the pool decide when it
+-- fires. "Or to a player" needs no clause at all here: this rule asks only whether
+-- the attached permanent may be attached to ANYTHING, so the `Just _` below covers
+-- an object and a player alike.
 --
 -- This is also where CR 303.4d's second clause is enforced without being named:
 -- an Aura that is also a creature is attached, so it detaches HERE and CR 704.5m's
@@ -206,14 +209,18 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
     Just _ -> case Map.lookup oid pcs of
       Nothing -> False
       Just pc ->
-        let isCreature = Set.member CardType.Creature (PC.cardTypes pc)
+        let isBattle = Set.member CardType.Battle (PC.cardTypes pc)
+            isCreature = Set.member CardType.Creature (PC.cardTypes pc)
             isAura = Set.member Subtype.Aura (PC.subtypes pc)
             isEquipment = Set.member Subtype.Equipment (PC.subtypes pc)
          in -- Written as the rule's two sentences rather than as the smaller
-            -- equivalent `isCreature || not (isAura || isEquipment)`, so each
-            -- half can be checked against the CR on its own. The `not isCreature`
-            -- conjunct is the second sentence's own "noncreature" qualifier.
-            isCreature || (not isCreature && not isAura && not isEquipment)
+            -- equivalent `isBattle || isCreature || not (isAura || isEquipment)`,
+            -- so each half can be checked against the CR on its own. The
+            -- `not isBattle` and `not isCreature` conjuncts are the second
+            -- sentence's own "nonbattle, noncreature" qualifiers -- and they are
+            -- what makes the two sentences differ at all, since a battle that is
+            -- also an Aura detaches by the first and not by the second.
+            isBattle || isCreature || (not isBattle && not isCreature && not isAura && not isEquipment)
 
 -- CR 704.5m: an Aura attached to an illegal object or player, or attached to
 -- nothing, is put into its owner's graveyard. Three clauses: unattached, attached

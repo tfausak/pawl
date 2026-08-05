@@ -38,6 +38,16 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.fromJson
       (CombatRestriction.CantBlock Affected.Attached Nothing)
       """ {"type":"CantBlock","value":{"affected":{"type":"Attached"}}} """
+  -- CR 508.1c together with CR 506.5, the SET-SHAPED arm: the same payload as
+  -- the two above, so the tag is the only thing that tells a reader this one is
+  -- answered against a whole declaration.
+  Spec.it s "CantAttackAlone carries its Affected" $
+    Common.assertJsonCodec
+      s
+      CombatRestriction.toJson
+      CombatRestriction.fromJson
+      (CombatRestriction.CantAttackAlone Affected.Attached Nothing)
+      """ {"type":"CantAttackAlone","value":{"affected":{"type":"Attached"}}} """
   -- CR 508.1c's second clause: the gated form.
   Spec.it s "CantAttack carries its condition" $
     Common.assertJsonCodec

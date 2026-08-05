@@ -16,9 +16,10 @@ import qualified Pawl.Types.ManaCost as ManaCost
 -- unchanged.
 --
 -- What is different is that this is a SECOND carrier for one rule.
--- Pawl.Types.CombatRestriction holds both of CR 508.1c's arms; this type is that
--- same second clause narrowed to the one condition that is not a Condition at
--- all, because it is a cost to be PAID rather than a fact to be read. The split
+-- Pawl.Types.CombatRestriction holds CR 508.1c's arms alongside CR 509.1b's;
+-- this type is that same second clause narrowed to the one condition that is not
+-- a Condition at all, because it is a cost to be PAID rather than a fact to be
+-- read. The split
 -- is pawl's and not the rules': at the CR's own level Ghostly Prison is a 508.1c
 -- restriction like Pacifism.
 --

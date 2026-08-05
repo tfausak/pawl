@@ -1,8 +1,10 @@
 -- Covers CR 715 end to end: Pawl.Types.Layout's Adventure arm, the two
 -- Pawl.Engine.Card arms that read it (CR 715.4's combined view and CR 715.3's
 -- castable halves) plus Card.isAdventure, Pawl.Engine.Resolve.finishSpell (CR
--- 715.3d's exile), and Pawl.Engine.Cast.permitsCastFromExile -- the pool's only
--- route to playing a card from exile at all.
+-- 715.3d's exile), Pawl.Engine.Cast.permitsCastFromExile -- the pool's only
+-- route to playing a card from exile at all -- and Pawl.Engine.Cast.asProposed,
+-- which is what makes CR 715.3a's "only the alternative characteristics are
+-- evaluated" reach CR 601.2f's cost adjustments and not just the mana cost.
 --
 -- Every case runs against the printed Embereth Shieldbreaker // Battle Display:
 -- a {1}{R} 2/1 Human Knight whose Adventure is a {R} sorcery, "Destroy target
@@ -49,7 +51,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- "Embereth Shieldbreaker//Battle Display", give it both card types, and
   -- price it at the concatenated {1}{R}{R} for mana value 3.
   Spec.it s "CR 715.4 in a hand the card is only its normal half" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     let (gs, oid) = S.handOne shieldbreaker (Setup.emptyGame S.bothPlayers)
     case Game.faceOf oid gs of
       Nothing -> Spec.assertFailure s "expected a card in hand"
@@ -62,7 +64,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- they play the card normally or as an Adventure." Both halves offered, and
   -- the choice left to the player.
   Spec.it s "CR 715.3 both halves are offered from a hand" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
@@ -77,10 +79,57 @@ spec s registry = Spec.describe s "Adventure" $ do
     -- creature's {1}{R}, so an engine pricing either half off the other offers
     -- the wrong one -- or, if it priced both off a combined cost, neither.
     Spec.assertEqWith s "one Mountain: only the Adventure" (namesOffered one) [battleDisplayName]
+  -- CR 715.3a's "only the alternative characteristics are evaluated to see if it
+  -- can be cast", read for the COST rather than for the mana cost alone. Thalia,
+  -- Guardian of Thraben's "noncreature spells cost {1} more to cast"
+  -- (EachPlayer-scoped, so her own controller pays it) is what makes CR 601.2f's
+  -- adjustments visible from the OFFER side: the Adventure is a Sorcery and is
+  -- taxed, the creature half is a Creature and is not, and both offers come off
+  -- ONE card sitting in ONE hand.
+  --
+  -- The falsifier is pricing the offer off the card's hand characteristics, which
+  -- CR 715.4 makes the CREATURE half: Battle Display would then dodge the tax and
+  -- be offered at {R}, a cast the player cannot actually pay for.
+  --
+  -- THE ARITHMETIC. Taxed, Battle Display's {R} totals {1}{R}; the creature's
+  -- {1}{R} is untaxed and stays {1}{R}. So two Mountains buy either half and one
+  -- Mountain buys neither.
+  Spec.it s "CR 715.3a/601.2f Thalia taxes the Adventure half and not the creature half" $ do
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    let namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+        -- The Bonesplitter is the Adventure's legal target, without which every
+        -- absent offer below would be about targeting instead of about cost.
+        artifactAnd n = snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain n))
+        taxed n = snd (S.addCreature thalia S.alice (artifactAnd n))
+        offeredFrom board = namesOffered (fst (S.handOne shieldbreaker board))
+    -- The control, and what keeps the empty list below from passing vacuously:
+    -- the same one Mountain WITH no Thalia offers the Adventure, so its absence
+    -- under Thalia is the tax and nothing else.
+    Spec.assertEqWith s "no Thalia, one Mountain: the Adventure" (offeredFrom (artifactAnd 1)) [battleDisplayName]
+    Spec.assertEqWith s "Thalia, one Mountain: neither half" (offeredFrom (taxed 1)) []
+    -- The other half of the discriminating pair: an engine that taxed the
+    -- CREATURE half too would need {2}{R} for it and offer only the Adventure.
+    Spec.assertEqWith s "Thalia, two Mountains: both halves" (offeredFrom (taxed 2)) [shieldbreakerName, battleDisplayName]
+  -- The offer above and the payment below are the same claim asked twice, which
+  -- is the point: castSpell prices the spell CR 601.2a already moved to the
+  -- stack, so a taxed Adventure that reaches CR 601.2h spends both Mountains.
+  Spec.it s "CR 601.2f the taxed Adventure actually pays the extra mana" $ do
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    let board = snd (S.addCreature thalia S.alice (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 2))))
+        (gs, oid) = S.handOne shieldbreaker board
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName))
+    Spec.assertEqWith s "the Adventure is on the stack" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "both Mountains paid {R} plus Thalia's {1}" (S.tappedCount S.alice cast) 2
   -- CR 715.3d: "Instead of putting a spell that was cast as an Adventure into
   -- its owner's graveyard as it resolves, its controller exiles it."
   Spec.it s "CR 715.3d the resolved Adventure destroys the artifact and is exiled" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 1)
@@ -109,7 +158,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- The contrast with the hand case above is the whole point: the same card
   -- offers TWO halves from a hand and exactly ONE from exile.
   Spec.it s "CR 715.3d from exile the creature is castable and the Adventure is not" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     -- TWO artifacts, and the Adventure destroys only one. Without the survivor
@@ -141,7 +190,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- The whole loop, which is what the mechanic IS: the Adventure resolves, and
   -- the creature it left in exile is cast from there onto the battlefield.
   Spec.it s "CR 715.3d the creature is cast from exile onto the battlefield" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (_, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
@@ -173,7 +222,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- Without this the permission would be indistinguishable from "an adventurer
   -- card in exile is castable", which is a different and wrong rule.
   Spec.it s "an adventurer card exiled any other way permits nothing" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     -- Through handOne, which is what puts alice in a main phase holding
@@ -191,7 +240,7 @@ spec s registry = Spec.describe s "Adventure" $ do
   -- exiled. CR 608.2b's fizzle is the path, and CR 715.3d's "as it resolves"
   -- never reaches it.
   Spec.it s "CR 608.2b a fizzled Adventure goes to the graveyard, not exile" $ do
-    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker // Battle Display"
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
