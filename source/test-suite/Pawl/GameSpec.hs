@@ -1431,6 +1431,42 @@ spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
   turnOrderSpec s registry
   trustedActionSpec s registry
   lastChoiceSpec s registry
+  mandatoryLoopSpec s
+
+-- CR 104.4b, the guard itself. The gameplay proof that a real loop reaches it is
+-- the "a mandatory loop" group below; these four pin the boundary, which a
+-- board-level test cannot do precisely.
+mandatoryLoopSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+mandatoryLoopSpec s = Spec.describe s "the mandatory-loop guard (CR 104.4b)" $ do
+  Spec.it s "one event short of the limit is not a draw" $ do
+    let after = S.runPure S.identityAnswer (atGap (Engine.mandatoryLoopLimit - 1)) Engine.checkMandatoryLoop
+    Spec.assertEqWith s "still being played" (GameState.result after) Nothing
+
+  Spec.it s "the limit is a draw" $ do
+    let after = S.runPure S.identityAnswer (atGap Engine.mandatoryLoopLimit) Engine.checkMandatoryLoop
+    Spec.assertEqWith s "CR 104.4b" (GameState.result after) (Just Result.Drawn)
+
+  Spec.it s "a game that already ended keeps the result it had" $ do
+    -- A draw must never overwrite a win: the guard fires on a state only a loop
+    -- could reach, and a won game is not looping.
+    let won = (atGap Engine.mandatoryLoopLimit) {GameState.result = Just (Result.Won S.alice)}
+        after = S.runPure S.identityAnswer won Engine.checkMandatoryLoop
+    Spec.assertEqWith s "alice still won" (GameState.result after) (Just (Result.Won S.alice))
+
+  Spec.it s "playGame draws instead of looping" $ do
+    -- Proves the guard is WIRED, not merely correct: playGame's loop head is what
+    -- reads it. The board is empty, so nothing else can end this game.
+    let (result, _) = Engine.runGamePure S.identityAnswer (atGap Engine.mandatoryLoopLimit) Engine.playGame
+    Spec.assertEqWith s "CR 104.4b" result Result.Drawn
+
+-- An otherwise-idle two-player game in which `n` events have happened since any
+-- player was last offered a choice.
+atGap :: Natural -> GameState.GameState
+atGap n =
+  (Setup.emptyGame S.bothPlayers)
+    { GameState.nextTimestamp = Timestamp.MkTimestamp n,
+      GameState.lastChoice = Timestamp.MkTimestamp 0
+    }
 
 -- CR 104.4b's "loops that contain an optional action": what makes an action
 -- optional is that the player had more than one answer to give. GameState.lastChoice

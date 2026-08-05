@@ -64,9 +64,11 @@ import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import Pawl.Types.Result (Result)
+import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -628,6 +630,43 @@ performSettle = do
   more <- if swept || returned || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
+-- CR 104.4b: how many events may happen with no player able to decide anything
+-- before the game is declared a loop of mandatory actions.
+--
+-- A HEURISTIC, and deliberately a crude one. Detecting such a loop in general is
+-- the halting problem, so the question this answers is not "is this a loop?" but
+-- "has this gone on longer than any real game would?". The MARGIN is what makes
+-- it safe. GameState.nextTimestamp advances on the events CR 104.4b names -- an
+-- object entering a zone (CR 613.7d) and a continuous effect beginning (CR
+-- 613.7a) -- and a game in which nothing happens issues about one per turn, so a
+-- game that ends slowly by decking out (CR 704.5b) sits three orders of magnitude
+-- under this. A two-card recursion loop issues several per cycle and arrives in a
+-- few hundred.
+--
+-- Counting engine iterations instead was rejected for want of that margin: a game
+-- whose players pass every step until someone decks visits a loop head on the
+-- order of a thousand times, which is this same order.
+--
+-- Not configurable. There is one caller and one sensible value, and a knob
+-- threaded through GameState would be a second thing to keep right.
+mandatoryLoopLimit :: Natural
+mandatoryLoopLimit = 1000
+
+-- CR 104.4b: a game that has entered a loop of mandatory actions is a draw.
+--
+-- Never overwrites a result the game already has. A won game is not looping, and
+-- CR 104.4a's simultaneous loss is a different draw arrived at by a different
+-- path (Departure.leaveGame).
+--
+-- The subtraction cannot underflow: GameState.lastChoice is only ever written to
+-- the value GameState.nextTimestamp then had, and that supply only counts up.
+checkMandatoryLoop :: Game ()
+checkMandatoryLoop = State.modify' $ \gs ->
+  let gap = Timestamp.unwrap (GameState.nextTimestamp gs) - Timestamp.unwrap (GameState.lastChoice gs)
+   in if Maybe.isNothing (GameState.result gs) && gap >= mandatoryLoopLimit
+        then gs {GameState.result = Just Result.Drawn}
+        else gs
+
 -- Ask the priority holder for an action until every still-playing player has
 -- passed in succession (CR 117.4). A full round of passes resolves the top of the
 -- stack and hands priority back to the active player; only an EMPTY stack ends
@@ -643,6 +682,10 @@ priorityLoop = do
   -- "check SBAs only after a game event" reading of CR 117.5, observably
   -- identical to settling on every priority grant.
   let loop = do
+        -- CR 104.4b, checked HERE as well as at playGame's loop head: a
+        -- resolution cycle repeats inside one priority round and never reaches
+        -- that one.
+        checkMandatoryLoop
         finished <- State.gets (Maybe.isJust . GameState.result)
         restarted <- State.gets GameState.restartSignal
         case restarted of
@@ -1216,6 +1259,7 @@ cleanupException = do
 playGame :: Game Result
 playGame =
   let loop = do
+        checkMandatoryLoop
         outcome <- State.gets GameState.result
         case outcome of
           Just r -> pure r
