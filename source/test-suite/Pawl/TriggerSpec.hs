@@ -13,7 +13,9 @@
 -- "died this turn") -- `historySpec`. CR 603.7 delayed triggered abilities
 -- -- `delayedSpec`, and the plural of its object binding -- a Create whose slot
 -- holds every token it minted, so a card can say "those tokens", with Thatcher
--- Revolt -- `tokenSetSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
+-- Revolt -- `tokenSetSpec`, and that group read back through ObjectRef.InSlot by
+-- a second opcode of the same resolution, with Salt Road Skirmish --
+-- `tokenGroupReadSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingSpec`. The CR 603.4 / 608.2a intervening "if" --
 -- `interveningSpec`. Also Pawl.Engine.Keyword: CR
@@ -1123,6 +1125,92 @@ tokenSetSpec s registry =
           let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
               (_, asked) = uncurry castUnderPrompts (S.handOne tidalWave base)
           Spec.assertEqWith s "one prompt, offering the two minted Walls" (fmap length asked) [2]
+
+-- Salt Road Skirmish {3}{B} Sorcery: "Destroy target creature. Create two 1/1 red
+-- Warrior creature tokens. They gain haste until end of turn. Sacrifice them at
+-- the beginning of the next end step."
+--
+-- tokenSetSpec's other half. There the group binding was WRITTEN by a Create and
+-- read by the one opcode that understood it; here a THIRD sentence reads the same
+-- group through ObjectRef.InSlot, which is what makes the binding a general
+-- reference rather than Sacrifice's private channel. "They" and "them" are the
+-- same two tokens, named by two different opcodes in one resolution.
+tokenGroupReadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tokenGroupReadSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      warriors gs = filter (\oid -> Set.member Subtype.Warrior (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+      -- alice casts the Skirmish off four Swamps with bob's creature the only
+      -- one on the battlefield, so S.identityAnswer's lowest-legal-recipient
+      -- pick is that creature and nothing else can be targeted by accident.
+      board swamp victim = S.addCreature victim S.bob (S.landsInPlay swamp 4)
+      castSkirmish skirmish base =
+        let (gs, oid) = S.handOne skirmish base
+         in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
+   in Spec.describe s "Group read through InSlot" $ do
+        -- THE PROVING CASE. Before ObjectRef.InSlot could see a group binding,
+        -- "they gain haste" resolved against an empty slot and granted haste to
+        -- nobody, while the two tokens still appeared and were still sacrificed
+        -- -- so only the keyword assertion discriminates.
+        Spec.it s "CR 613.1f \"they gain haste\" reaches BOTH minted tokens" $ do
+          skirmish <- S.printingOf s registry "Salt Road Skirmish"
+          swamp <- S.printingOf s registry "Swamp"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (_, base) = board swamp rats
+              after = castSkirmish skirmish base
+          case warriors after of
+            tokens@[_, _] ->
+              Spec.assertEqWith
+                s
+                "each of the two has haste"
+                (fmap (\oid -> Projection.hasKeyword Keyword.Type.Haste oid after) tokens)
+                [True, True]
+            other -> Spec.assertFailure s ("expected exactly two Warrior tokens, got " <> show (length other))
+        Spec.it s "CR 701.8 the same resolution still destroys its target" $ do
+          skirmish <- S.printingOf s registry "Salt Road Skirmish"
+          swamp <- S.printingOf s registry "Swamp"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (victim, base) = board swamp rats
+              after = castSkirmish skirmish base
+          Spec.assertBool s (Set.notMember victim (GameState.battlefield after)) "the targeted creature is gone"
+          Spec.assertEqWith s "and two Warriors stand" (length (warriors after)) 2
+        -- The group is read by TWO opcodes in one resolution, and the second
+        -- must still find it: ModifyTarget consuming the slot would leave the
+        -- delayed ability with nothing to sacrifice.
+        Spec.it s "CR 603.7c and the delayed ability still sacrifices both" $ do
+          skirmish <- S.printingOf s registry "Salt Road Skirmish"
+          swamp <- S.printingOf s registry "Swamp"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (_, base) = board swamp rats
+              armed = castSkirmish skirmish base
+              after = resolveAll (settle (beginEndStep armed))
+          Spec.assertEqWith s "two before the end step" (length (warriors armed)) 2
+          Spec.assertEqWith s "none after it" (warriors after) []
+        -- CR 608.2b: "if all its targets ... are now illegal, the spell doesn't
+        -- resolve". The card's own Gatherer ruling spells out what that costs
+        -- here -- "it won't resolve and none of its effects will happen" -- so
+        -- the tokens the LATER sentences would have made are never minted and
+        -- the group is never bound. Also the negative control for the group
+        -- read: no group, and the haste sentence still has to be harmless.
+        Spec.it s "CR 608.2b an illegal target takes the whole spell, tokens and all" $ do
+          skirmish <- S.printingOf s registry "Salt Road Skirmish"
+          swamp <- S.printingOf s registry "Swamp"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (victim, base) = board swamp rats
+              (gs, oid) = S.handOne skirmish base
+              onStack = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid))
+              -- The target leaves before the Skirmish resolves, which is the only
+              -- way to make it illegal without a second card.
+              gone = S.settleSba (S.runPure S.identityAnswer onStack (Event.destroy Regenerability.Regenerable [victim]))
+              after = resolveAll gone
+          Spec.assertBool s (Set.notMember victim (GameState.battlefield after)) "the target really left"
+          Spec.assertEqWith s "no Warriors were minted" (warriors after) []
+          Spec.assertEqWith s "and nothing was armed" (Seq.length (GameState.delayedTriggers after)) 0
+          -- Otherwise "no Warriors" would also be true of a spell still sitting
+          -- on the stack, which is a different bug wearing the same result.
+          Spec.assertEqWith s "the spell left the stack rather than stalling on it" (GameState.stack after) []
 
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an
@@ -3852,6 +3940,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   historySpec s registry
   delayedSpec s registry
   tokenSetSpec s registry
+  tokenGroupReadSpec s registry
   towershellOnsetSpec s registry
   towershellSkipSpec s registry
   orderingSpec s registry

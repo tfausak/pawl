@@ -2,6 +2,7 @@ module Pawl.Engine.Resolve where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -876,7 +877,10 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 --
 -- InSlot asks legality the way every other slot read does (CR 608.2b): a slot
 -- filled by targeting that has since become illegal names nobody, and a player
--- recipient names no object.
+-- recipient names no object. It asks that of a TARGET; a slot a Create bound to
+-- a group of minted tokens is answered before the question is put, since a group
+-- is a definition rather than a target (CR 115.10a) and CR 608.2b has nothing to
+-- re-validate about one.
 --
 -- EachMatching folds the battlefield (CR 109.2: a description with a card type
 -- and no zone "means a permanent of that card type ... on the battlefield")
@@ -915,11 +919,17 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 -- as CR 608.2f's secondary sentence would have it (#379). The no-controller
 -- fallback is unreachable: Projection.controllerOf answers Nothing only for an
 -- object that does not exist, and every id here came out of the battlefield.
-objectRefObjects :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
-objectRefObjects legality chosen controller source gs ref = case ref of
-  ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-    (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
-    _ -> []
+objectRefObjects :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [ObjectId]
+objectRefObjects legality chosen resolving controller source gs ref = case ref of
+  ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
+    -- The slot names every token a Create bound there ("they"), so all of them
+    -- are named at once. Ahead of the target read and not subject to `legality`:
+    -- a group binding is a definition, never a target (CR 115.10a), so CR 608.2b
+    -- has nothing to re-validate. See slotGroup for why being ahead is safe.
+    Just group -> Foldable.toList group
+    Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
+      _ -> []
   ObjectRef.EachMatching filter_ ->
     let context = Filter.MkContext (Just controller) (Just source)
         matching =
@@ -944,12 +954,41 @@ objectRefObjects legality chosen controller source gs ref = case ref of
 -- EachMatching names permanents, so its members arrive as Recipient.ToObject: CR
 -- 109.2 draws the set from the battlefield with no claim about card types beyond
 -- the Filter's own, and classifying each one is the OPCODE's job.
-objectRefRecipients :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [Recipient]
-objectRefRecipients legality chosen controller source gs ref = case ref of
-  ObjectRef.InSlot slot -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-    (Just recipient, True) -> [recipient]
-    _ -> []
-  ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen controller source gs ref)
+objectRefRecipients :: Map.Map SlotName Bool -> Map.Map SlotName Recipient -> ObjectId -> PlayerId -> ObjectId -> GameState -> ObjectRef -> [Recipient]
+objectRefRecipients legality chosen resolving controller source gs ref = case ref of
+  ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
+    -- A group is objects, so its members arrive as Recipient.ToObject exactly as
+    -- EachMatching's do -- the player a slot can hold is the single-target case
+    -- below, and CR 111.1's tokens are never players.
+    Just group -> fmap Recipient.ToObject (Foldable.toList group)
+    Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> [recipient]
+      _ -> []
+  ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen resolving controller source gs ref)
+
+-- The objects a Create bound into `slot` as a GROUP, read off the RESOLVING stack
+-- object's live bindings -- the same place Effect.Sacrifice and ArmDelayedTrigger
+-- read it, and not out of `chosen`, which projects CR 601.2c's targets only.
+--
+-- Live rather than snapshotted, which is what lets a later effect of the same
+-- resolution name what an earlier Create minted: Salt Road Skirmish's "they gain
+-- haste" is the sentence after the one that made them.
+--
+-- PRECEDENCE, and why it is not a coin toss: a Just here wins over the slot's
+-- target, which would skip a CR 608.2b re-validation the target was owed. One
+-- Binding really can carry both fields -- Pawl.Engine.Engine.placeOne merges a
+-- delayed ability's placement-time choices with its captured environment PER
+-- FIELD, precisely so neither is lost -- so the case is not ruled out by the
+-- types.
+--
+-- It is ruled out by a lint instead. A card can only reach it by declaring a
+-- delayed ability's target spec under a name its own Create defines, which is
+-- the card saying two different things with one word, and the Pawl.CardSpec lint
+-- "no delayed ability declares a target spec under a slot its card defines"
+-- rejects it. So this arm never actually chooses, and the ordering is which way
+-- to fail if that lint were ever removed.
+slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
+slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
 
 -- CR 615.3: install one floating prevention shield over `recipient`, for a
 -- duration. The shared body of Effect.PreventNextDamage's and
@@ -1057,7 +1096,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         --
         -- A player recipient survives it untouched: CR 115.4's "any target"
         -- includes one and CR 120.3a is what damage to it does.
-        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       -- An unevaluable quantity is a no-op, the powerOf posture.
       Nothing -> pure ()
@@ -1080,7 +1119,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- rather than two -- and a modification that cannot land at all (a player
       -- recipient, an illegal slot per CR 608.2b, a set that matched nothing)
       -- arrives as the empty one and stores nothing.
-      case objectRefObjects legality chosen controller source gs ref of
+      case objectRefObjects legality chosen resolving controller source gs ref of
         [] -> gs
         targets -> case Expiry.arm controller source duration gs of
           -- CR 611.2b: the duration never started, so the effect does nothing
@@ -1326,7 +1365,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- 702.12b gate is judged (Event.destroy) alike. An illegal slot (CR 608.2b),
     -- a non-object recipient, or a set that matched nothing all arrive here as
     -- the empty list and destroy nothing -- one path, not three.
-    destroyed <- Event.destroyReturning regenerability (objectRefObjects legality chosen controller source gs ref)
+    destroyed <- Event.destroyReturning regenerability (objectRefObjects legality chosen resolving controller source gs ref)
     -- CR 701.8b: "destroyed this way" is what the funnel DESTROYED, never what
     -- the sweep named -- an indestructible permanent (CR 702.12b) and one a
     -- regeneration shield saved (CR 701.8c) were both named and neither was
@@ -1355,7 +1394,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- token that is Event.sacrifice finding no such object at all, since CR
     -- 111.7's state-based action has already made it cease to exist; for a card
     -- permanent it would be that funnel's CR 701.21a battlefield guard.
-    bound <- State.gets (Binding.objectsOf slot . maybe Map.empty Object.bindings . Game.lookupObject resolving)
+    bound <- State.gets (slotGroup slot resolving)
     case bound of
       -- One at a time rather than as one event (#757).
       Just victims -> Monad.mapM_ (Event.sacrifice controller) victims
@@ -1861,7 +1900,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+        recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       -- An unevaluable quantity is a no-op, the powerOf posture DealDamage takes.
       Nothing -> pure ()
@@ -1881,7 +1920,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     --
     -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
     gs <- State.get
-    let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+    let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
     State.modify' $ \g0 -> List.foldl' (installShield controller source duration DamageRewrite.PreventAll) g0 recipients
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
@@ -2255,7 +2294,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       let tap o = o {Object.tapped = TapState.Tapped}
        in gs
             { GameState.objects =
-                foldr (Map.adjust tap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
+                foldr (Map.adjust tap) (GameState.objects gs) (objectRefObjects legality chosen resolving controller source gs ref)
             }
   Effect.Untap ref ->
     State.modify' $ \gs ->
@@ -2267,7 +2306,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       let untap o = o {Object.tapped = TapState.Untapped}
        in gs
             { GameState.objects =
-                foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
+                foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen resolving controller source gs ref)
             }
   Effect.Transform ref ->
     State.modify' $ \gs ->
@@ -2299,7 +2338,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       let (now, g1) = Game.freshTimestamp gs
        in g1
             { GameState.objects =
-                foldr (turnOver resolving now g1) (GameState.objects g1) (objectRefObjects legality chosen controller source g1 ref)
+                foldr (turnOver resolving now g1) (GameState.objects g1) (objectRefObjects legality chosen resolving controller source g1 ref)
             }
   -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
@@ -2318,7 +2357,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- of Treason's slot and Aura Thief's "all enchantments" arrive as the same
       -- list, and a player recipient, an illegal slot (CR 608.2b) and a set that
       -- matched nothing all arrive as the empty one and change nothing.
-      case objectRefObjects legality chosen controller source gs ref of
+      case objectRefObjects legality chosen resolving controller source gs ref of
         [] -> gs
         targets
           -- CR 800.4b: "If an object would change to the control of a player
@@ -2455,11 +2494,13 @@ performHandAction source player =
 -- loser reach a follow-on DealDamage). On the ABILITY path, resolveModes still
 -- folds applyEffect over a `chosen` snapshot taken once before the fold starts,
 -- so a later Sacrifice/Destroy/etc. there still sees the pre-bind value
--- (Nothing). Only ArmDelayedTrigger sees it on either path, because it re-reads
--- Object.bindings from LIVE GameState rather than from `chosen`. A spell-mode
--- effect that tried to read a dangling Create slot would be caught loudly by the
--- D4 lint (declared slots == read slots) rather than silently no-op, so this gap
--- is a documentation defect, not a latent one.
+-- (Nothing). ArmDelayedTrigger and slotGroup see it on either path, because both
+-- re-read Object.bindings from LIVE GameState rather than from `chosen`.
+--
+-- So the gap is narrower than it was but real: a slot bound HERE and read by an
+-- ObjectRef on the ABILITY path still comes back empty, where the same card
+-- text as a spell works (#762). The D4 lint does not catch it -- it asks that a
+-- read slot be DEFINED, which this one is.
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
@@ -2471,9 +2512,8 @@ bindSlot holder slot target gs =
 -- how "those tokens" outlives the resolution that minted them.
 --
 -- A group slot is readable mid-fold on BOTH paths, unlike bindSlot's single
--- object: its one reader (the Sacrifice arm) goes to live GameState rather than
--- to `chosen`, because `chosen` carries CR 601.2c's targets and this is never
--- one.
+-- object: every reader goes through slotGroup, which reads live GameState rather
+-- than `chosen` -- `chosen` carries CR 601.2c's targets and this is never one.
 bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
 bindObjectsSlot holder slot targets gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}
