@@ -636,12 +636,16 @@ castProposed pid sid face castFrom candidates before = do
   let count = case entwined of
         Just _ -> Modal.modeCount modal
         Nothing -> Modal.selectionCount modal
-  -- CR 601.2b: modes are chosen BEFORE X and targets. Elided (forced,
-  -- unprompted) exactly when there is nothing to choose -- as many legal modes
-  -- as the selection demands or fewer (#50). An entwined cast is always in that
-  -- case: entwineOffer has already established that every mode is legal, so
-  -- `legal` has exactly `count` members and CR 702.42a's "all modes" is the only
-  -- answer.
+  -- CR 601.2b: modes are chosen BEFORE X and targets. Forced and unprompted
+  -- exactly when there is nothing to choose -- as many legal modes as the
+  -- selection demands or fewer, so every legal mode must be taken and the
+  -- options are indistinguishable. An entwined cast is always in that case:
+  -- entwineOffer has already established that every mode is legal, so `legal`
+  -- has exactly `count` members and CR 702.42a's "all modes" is the only answer.
+  --
+  -- Cryptic Command ("Choose two --", four modes, the last two targetless) is
+  -- what proves the prompt is really asked when there IS a choice: ModalSpec's
+  -- "ChooseTwo" group answers only a prompt offering all four and demanding two.
   chosenModes <-
     if Natural.length legal <= count
       then pure legal

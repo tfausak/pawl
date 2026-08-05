@@ -1,0 +1,139 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Cryptic Command",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Counter",
+                "value": "spell"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "spell",
+                "spec": {
+                  "pool": {
+                    "type": "Spells"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "MoveToZone",
+                "value": [
+                  "permanent",
+                  {
+                    "type": "Hand"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "permanent",
+                "spec": {
+                  "pool": {
+                    "type": "Permanents"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "Tap",
+                "value": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasCardType",
+                      "value": {
+                        "type": "Creature"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "Opponent"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactly",
+          "value": 2
+        }
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
