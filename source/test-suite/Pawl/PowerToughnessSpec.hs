@@ -711,6 +711,53 @@ kirdApeSpec s registry = Spec.describe s "Kird Ape" $ do
     Spec.assertEqWith s "CR 305.7 the land is now only an Island" (Projection.subtypesOf forestId enchanted) (Set.singleton Subtype.Island)
     Spec.assertEqWith s "so the Ape is back to 1/1" (S.powerToughnessOf apeId enchanted) (Just (1, 1))
     Spec.assertEqWith s "and 2/3 again once the Aura is gone" (S.powerToughnessOf apeId unenchanted) (Just (2, 3))
+  -- The other side of the same coin, and the one #765 was about: the test above
+  -- moves the BOARD under a fixed clause, this one moves the CLAUSE over a fixed
+  -- board.
+  --
+  -- CR 612.1: a text-changing effect "can apply to any words or symbols printed
+  -- on that object, but generally affects only that object's rules text (which
+  -- appears in its text box)". CR 604.2's "as long as" clause is printed in that
+  -- text box exactly as the +1/+2 beside it is, so a Magical Hack naming Forest
+  -- rewrites the clause too -- the hacked Ape asks after a Swamp.
+  --
+  -- CR 612.2 is satisfied on the way in: the clause's Forest is "a land type
+  -- word used as a land type", which is the one use the rule lets a swap reach.
+  -- That both words are BASIC land types is Magical Hack's own restriction
+  -- rather than CR 612.2's.
+  --
+  -- Forest -> SWAMP rather than Forest -> Island, deliberately: the Island that
+  -- pays the Hack's {U} is a land alice controls, so hacking into Island would
+  -- read 2/3 for a reason that has nothing to do with the clause being rewritten.
+  -- Both halves are asserted, since "the Ape is 1/1" alone passes for an engine
+  -- that dropped the ability outright.
+  Spec.it s "CR 612.1 a Magical Hack moves which land the 'as long as' clause names" $ do
+    kirdApe <- S.printingOf s registry "Kird Ape"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    swamp <- S.printingOf s registry "Swamp"
+    magicalHack <- S.printingOf s registry "Magical Hack"
+    let base = S.landsInPlay island 1
+        (_, withForest) = S.addCreature forest S.alice base
+        (apeId, withApe) = S.addCreature kirdApe S.alice withForest
+        (withHack, hackSpell) = S.handOne magicalHack withApe
+        cast = S.runPure (hackAt apeId Subtype.Forest Subtype.Swamp) withHack (S.cast S.alice hackSpell)
+        hacked = S.runPure (hackAt apeId Subtype.Forest Subtype.Swamp) cast Stack.resolveTop
+        withSwamp = snd (S.addCreature swamp S.alice hacked)
+    Spec.assertEqWith s "2/3 with a Forest, as printed" (S.powerToughnessOf apeId withApe) (Just (2, 3))
+    Spec.assertEqWith s "the Forest is still there, but the clause no longer names it" (S.powerToughnessOf apeId hacked) (Just (1, 1))
+    Spec.assertEqWith s "and a Swamp is what it names now" (S.powerToughnessOf apeId withSwamp) (Just (2, 3))
+
+-- Magical Hack's two prompts: its target, forced onto the permanent the test
+-- cares about (the board offers several), and the basic-land-type pair its own
+-- text asks for.
+-- Everything else defers to S.identityAnswer. Same shape as CombatSpec's
+-- castHackAt, which is local there for the same reason this one is local here.
+hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+hackAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
 
 -- Convincing Mirage's two prompts: its CR 303.4a enchant slot, forced onto the
 -- one land the test cares about (the board offers five), and its CR 614.1c

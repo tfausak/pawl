@@ -1199,10 +1199,11 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SpellOrAbilityCounters _ -> condition
   TriggerCondition.DamageToPlayerPrevented _ -> condition
 
--- CR 612.1 through Condition's predicate vocabulary, at the two customers a
--- printed triggered ability has: a CR 603.8 state trigger and a CR 603.4
--- intervening "if". A CR 611.2b duration is stored rather than printed, so no
--- text change reaches it here. Both sides are rewritten, both being full
+-- CR 612.1 through Condition's predicate vocabulary, at the three clauses a
+-- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger
+-- and its CR 603.4 intervening "if", plus a static ability's CR 604.2 "as long
+-- as" clause (gatherStatic). A CR 611.2b duration is stored rather than printed,
+-- so no text change reaches it here. Both sides are rewritten, both being full
 -- Quantities.
 rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
 rewriteCondition pairs condition =
@@ -1527,7 +1528,14 @@ gatherStatic functioning src ts changes stripped n sa =
       -- Free for an unconditional ability, which is all but Kird Ape's: the Maybe
       -- answers before `functioning` -- and so before conditionHolds' projection --
       -- is ever forced.
-      lives = maybe True (functioning lowest) (StaticAbility.condition sa)
+      --
+      -- CR 612.1: the CR 604.2 "as long as" clause is printed in the text box
+      -- just as the affected clause beside it is, so the same word swap reaches
+      -- it (#765). Short-circuited on `null changes` for the same reason
+      -- `affected` is -- Filter.rewrite walks the whole tree either way -- but
+      -- kept inside the maybe, since an unconditional ability has no clause to
+      -- rewrite at all.
+      lives = maybe True (\c -> functioning lowest (if null changes then c else rewriteCondition changes c)) (StaticAbility.condition sa)
    in -- The cheap structural test first, so `stripped`'s projection is forced only
       -- for an ability the rest of the rule could reach.
       if (lowest > Layer.Ability && stripped) || not lives then [] else parts
