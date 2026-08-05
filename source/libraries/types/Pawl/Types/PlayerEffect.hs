@@ -129,8 +129,8 @@ data PlayerEffect
     -- flash is a static ability an object has about casting ITSELF ("the card
     -- it's on"), and Vedalken Orrery gives itself nothing. That the rules spend
     -- CR 601.3b, 601.3c and 601.3d on "as though it had flash" is the point: it
-    -- is a distinct mechanism, and it belongs on the CR 613.11 player axis this
-    -- type is.
+    -- is a distinct mechanism, and it belongs on the CR 613.11 player axis that
+    -- this type is.
     --
     -- NOT a Pawl.Types.CastingPermission either: every arm of that type names a
     -- ZONE a card may be cast from (CR 601.3), and this names a TIME.
@@ -140,8 +140,10 @@ data PlayerEffect
     -- everything (`And []`), while Yeva, Nature's Herald says "green creature
     -- spells" and would narrow it.
     --
-    -- A PERMISSION, so Pawl.Engine.PlayerEffect reads it as a disjunction, unlike
-    -- the CR 101.2 disjunction the prohibitions fold as -- there being nothing
-    -- for a second permission to outvote.
+    -- A PERMISSION, which Pawl.Engine.PlayerEffect folds as a disjunction -- the
+    -- same shape the prohibitions take, for the opposite reason. CR 101.2 makes
+    -- one applicable prohibition enough because nothing outvotes a "can't"; one
+    -- applicable permission is enough because there is nothing for a second to
+    -- outvote.
     CastAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

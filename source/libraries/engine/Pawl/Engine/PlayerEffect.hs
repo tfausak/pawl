@@ -352,9 +352,9 @@ costAdjustments pid oid gs =
 -- CARD carries about casting ITSELF, so folding this into instantSpeed -- let
 -- alone into the CR 307.1 window under it (Turn.sorcerySpeedWindow) -- would make
 -- an equip ability on the same board instant-speed, which CR 307.5 does not say.
--- Pawl.PlayerEffectSpec's Vedalken Orrery group proves both halves: the sorcery
--- is castable on the opponent's turn and the Equipment's CR 307.5 ability is
--- still not offered.
+-- Pawl.PlayerEffectSpec's Vedalken Orrery group proves both halves on one board:
+-- the creature spell is castable on the opponent's turn, and the Equipment's CR
+-- 307.5 equip ability is still not offered.
 --
 -- A DISJUNCTION, and for the opposite of CR 101.2's reason: this is a permission,
 -- and two permissions naming different spells are not in conflict, so one
