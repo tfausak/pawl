@@ -405,16 +405,16 @@ activateAbility pid srcId ability = do
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so
               -- an activated ability that refers to "this creature" (Longtusk Cub)
-              -- resolves the reference as a slot read -- exactly as Engine.placeOne
-              -- does for a TRIGGERED ability's source.
+              -- resolves the reference as a slot read -- exactly as
+              -- Engine.placeBorne does for a TRIGGERED ability's source.
               --
               -- CR 109.5 binds the controller under the reserved you slot in the
               -- same breath: "The words 'you' and 'your' on an object refer to the
               -- object's controller ... For an activated ability, this is the
               -- player who activated the ability." That player is `pid`, the one
               -- CR 602.2 lets activate this ability at all -- so Brothers of Fire's
-              -- "and 1 damage to you" reaches a player, exactly as Engine.placeOne
-              -- does for a TRIGGERED ability's controller (Binding.setYou).
+              -- "and 1 damage to you" reaches a player, exactly as
+              -- Engine.placeBorne does for a TRIGGERED ability's controller.
               --
               -- CR 601.2b's announced X is stamped alongside, onto the ABILITY object
               -- and not the source permanent -- Cinder Elemental sacrifices that

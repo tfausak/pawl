@@ -62,8 +62,15 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- Stamped on BOTH ability paths, because the rule defines the word for both:
 -- "For an activated ability, this is the player who activated the ability. For
 -- a triggered ability, this is the controller of the object when the ability
--- triggered". Pawl.Engine.Engine's trigger placement answers the second,
--- Pawl.Engine.Activate.activateAbility the first.
+-- triggered". Pawl.Engine.Activate.activateAbility answers the first;
+-- Pawl.Engine.Engine.placeBorne and Pawl.Engine.Monarch.placeInherent (CR
+-- 725.2's sourceless pair) answer the second.
+--
+-- A SPELL binds nothing here (#719). Every spell in the pool that says "you"
+-- says it through an opcode carrying a PlayerRef, which Pawl.Engine.Resolve
+-- answers from the resolving controller with no slot involved; a spell mode
+-- reading this slot is a failing test rather than a silent no-op, under the same
+-- "declared slots == read slots" equality lint that forbids declaring it.
 --
 -- "No card's targetSpecs may name it" is lint-enforced as for the names above,
 -- by a sweep that has to reach the ABILITIES to mean anything here: a card
