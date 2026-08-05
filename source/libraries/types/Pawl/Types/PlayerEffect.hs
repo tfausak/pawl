@@ -72,6 +72,27 @@ data PlayerEffect
     -- component, which is Edgewalker's "This effect reduces only the amount of
     -- colored mana you pay" and not CR 118.7b-d (#309).
     ReduceSpellCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost
+  | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
+    -- many lands each turn OVER the one CR 305.2 normally allows.
+    --
+    -- An ADDITIONAL amount and not a total, which is what both cards print ("an
+    -- additional land", "two additional lands") and what CR 305.2 describes --
+    -- continuous effects INCREASE the number, they do not set it. Two of these
+    -- therefore add up rather than one winning, and nothing here is a
+    -- redundancy question: CR 702.18b's "multiple instances are redundant" is a
+    -- rule about a keyword, and CR 305.2 states no such rule.
+    --
+    -- The amount is CARRIED for CantCastMoreThan's reason: Exploration says one
+    -- and Azusa says two, and a card that says three must not need a sibling
+    -- constructor. That is also what makes the gate a COUNT rather than a
+    -- boolean-plus-one -- see Pawl.Engine.PlayerEffect.landPlaysAllowed.
+    --
+    -- The "on each of YOUR TURNS" both cards print is not modelled as a turn
+    -- restriction, and that is exact rather than a shortcut about Magic:
+    -- Pawl.Engine.Action.legalActions gates every land play on being the active
+    -- player, unconditionally, so a grant that also applied on another player's
+    -- turn is unobservable until something can play a land there at all (#566).
+    PlayAdditionalLands Natural.Natural
   | -- | CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
   | -- | CR 500.5 / 703.4q / Upwelling, Omnath Locus of Mana: this player does not

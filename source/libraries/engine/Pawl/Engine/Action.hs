@@ -1,6 +1,6 @@
 module Pawl.Engine.Action where
 
-import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -57,7 +57,13 @@ legalActions pid gs =
       canPlayLand =
         Turn.isMainPhase (GameState.phase gs)
           && GameState.activePlayer gs == pid
-          && not (Set.member pid (GameState.landPlayed gs))
+          -- CR 305.2a: compare the number of lands this player CAN play this
+          -- turn with the number they HAVE already played; the play is legal
+          -- only if the first is greater. A comparison of two counts and never
+          -- a yes/no, because CR 305.2 lets a continuous effect raise the first
+          -- one (Exploration, Azusa Lost but Seeking). The complement of this
+          -- is CR 305.2b, which forbids the play when they are equal.
+          && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
       lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
       -- CR 709.3: one action per castable HALF, so choosing a half is choosing
       -- an action and the engine never asks which one.
