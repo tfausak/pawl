@@ -1936,7 +1936,7 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
       [construct, other] -> do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "declining is illegal"
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [other] gs)) "the Piker alone obeys one of two"
-        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone disobeys the restriction"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone is illegal twice over, on the restriction and on the count"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] gs) "only both together is legal"
       _ -> Spec.assertFailure s "fixture should have two creatures"
   Spec.it s "CR 506.5 whole cards: a lone Construct sits out a real declare attackers step" $ do

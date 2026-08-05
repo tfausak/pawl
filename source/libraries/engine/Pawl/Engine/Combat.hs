@@ -264,8 +264,8 @@ aloneAllows alone declaration = case Set.toList declaration of
   _ -> True
 
 -- CR 508.1c: the active player checks each creature for RESTRICTIONS, and if any
--- are disobeyed the DECLARATION is illegal. blockDeclarationAllowed's attacking twin,
--- and the seam a set-shaped attacking restriction is added at.
+-- are disobeyed the DECLARATION is illegal. blockDeclarationAllowed's attacking
+-- twin, and the seam a set-shaped attacking restriction is added at.
 --
 -- Only the SET-SHAPED restrictions are asked here. The per-creature ones are
 -- canAttackGiven's, and a creature failing one is not on `candidates` at all, so
@@ -277,13 +277,16 @@ attackDeclarationAllowed :: Set ObjectId -> Set ObjectId -> Bool
 attackDeclarationAllowed = aloneAllows
 
 -- Every declaration CR 508.1a lets the active player write down: each candidate
--- independently attacks or does not. candidateBlockDeclarations' attacking twin, and
--- EXPONENTIAL for its reason -- O(2 ^ candidates) here, since an attacker chooses
--- no attacker to pair with.
+-- independently attacks or does not. candidateBlockDeclarations' attacking twin,
+-- and EXPONENTIAL for its reason -- O(2 ^ candidates) here rather than
+-- O((attackers + 1) ^ blockers), because an attacker's only choice is whether to
+-- attack. CR 508.1b's announcement of WHAT it attacks is a later step and no part
+-- of the legality this list is searched for.
 --
 -- Set.empty comes FIRST and every declaration precedes its own supersets, which
--- attackCeiling's tie-breaking fold relies on: with ties going to the earlier
--- entry, the maximum is attained by a declaration no smaller one attains.
+-- attackCeiling's tie-breaking fold relies on: ties go to the earlier entry, so
+-- the declaration that wins is one no PROPER SUBSET of which obeys as many
+-- requirements.
 candidateAttackDeclarations :: [ObjectId] -> [Set ObjectId]
 candidateAttackDeclarations candidates =
   let extend acc oid = concatMap (\declaration -> [declaration, Set.insert oid declaration]) acc
@@ -313,15 +316,16 @@ candidateAttackDeclarations candidates =
 -- illegal for its SIZE, so "all of the required creatures at once" can be a
 -- declaration no player may make, and the maximum stops being the instance set.
 -- The ENUMERATION is then blockCeiling's search, at blockCeiling's exponential
--- cost (#342's shape on the attacking side, #718).
+-- cost -- #342's shape on the attacking side, where nothing is capped and
+-- nothing is sampled for #342's reason (#714).
 --
 -- Keeping the closed form on the boards that admit it is an optimization and NOT
 -- a second rules reading: `alone` empty means no declaration is disallowed by
--- anything the enumeration would filter on, so the enumeration's maximum would be
--- the largest free requirement-obeying declaration, which is the closed form's
--- answer. It matters because the guard is what keeps every board without such a
--- card off the exponential path, including every board in the pool that has a
--- Curse of the Nightly Hunt on it.
+-- anything the enumeration would filter on, so the winning declaration would be
+-- the set of required creatures that attack freely -- element for element what
+-- Set.filter builds. It matters because the guard is what keeps every board
+-- without such a card off the exponential path, including every board in the pool
+-- that has a Curse of the Nightly Hunt on it.
 --
 -- The enumeration is over the creatures that attack FREELY, never over all the
 -- candidates, and that is CR 508.1d's cost clause rather than a cheat: a player
@@ -446,8 +450,8 @@ forcedAttackDeclaration (_, best) = filter (\oid -> Set.member oid best)
 -- Only the per-creature ones. CR 509.1b's restrictions are mostly PAIRWISE
 -- (flying, fear) and cannot be decided about a blocker alone -- those live in
 -- pairAllowed -- and CR 702.111b's menace is SET-SHAPED, which lives in
--- blockDeclarationAllowed. So the rule is answered in three places, one per shape of
--- restriction, and this is the narrowest.
+-- blockDeclarationAllowed. So the rule is answered in three places, one per
+-- shape of restriction, and this is the narrowest.
 --
 -- Summoning sickness is NOT a blocking restriction: CR 302.6 restricts attacking
 -- and activated abilities with the tap or untap symbol, and says nothing about
@@ -684,9 +688,10 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- is taken over declarations menace already allows.
 --
 -- Takes the projected board rather than projecting per read, because the
--- set-shaped conjunct reads a keyword and this sits inside candidateBlockDeclarations'
--- exponential filter (#342). There is no per-read twin the way pairAllowed has
--- one: both callers are already inside a hoisted pass.
+-- set-shaped conjunct reads a keyword and this sits inside
+-- candidateBlockDeclarations' exponential filter (#342). There is no per-read
+-- twin the way pairAllowed has one: both callers are already inside a hoisted
+-- pass.
 blockDeclarationAllowed :: Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId ObjectId -> GameState -> Bool
 blockDeclarationAllowed pcs able declaration gs =
   all (uncurry able) (Map.toList declaration)

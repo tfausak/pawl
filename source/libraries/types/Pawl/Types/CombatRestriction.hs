@@ -46,7 +46,10 @@ import qualified Pawl.Types.Condition as Condition
 -- The axis is missing rather than collapsed, and the missing capability is
 -- named: an attacking restriction with an object (Crown-Hunter Hireling, Armored
 -- Galleon) is one whose CONDITION is about the player CR 508.1b names per
--- creature, and the condition below cannot name that player (#620). A blocking restriction with an object is
+-- creature, and the condition below cannot name that player (#620). A
+-- restriction that BOUNDS THE SIZE of a declaration from above (Silent Arbiter's
+-- "no more than one creature can attack each combat") is a third shape, and no
+-- arm below can state it (#713). A blocking restriction with an object is
 -- what CR 702.9b's evasion keywords already are -- carried on the ATTACKER as a
 -- keyword, never here.
 --
