@@ -30,6 +30,7 @@ import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
@@ -342,6 +343,13 @@ isAbility oid gs = case lookupObject oid gs of
 -- CR 111.1 / 111.6: is this object a token rather than a card? Asks the
 -- object's KIND, a classification in the same standing as isSpell, never the
 -- card's identity. False for an unknown id and for every non-token kind.
+-- CR 110.5a: a permanent's tap status. Absent means untapped, which is what a
+-- nonexistent object answers for every other status too.
+isTapped :: ObjectId -> GameState -> Bool
+isTapped oid gs = case lookupObject oid gs of
+  Nothing -> False
+  Just obj -> Object.tapped obj == TapState.Tapped
+
 isToken :: ObjectId -> GameState -> Bool
 isToken oid gs = case lookupObject oid gs of
   Nothing -> False

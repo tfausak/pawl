@@ -191,7 +191,8 @@ snapshotView shape event = case event of
                 Filter.attachedToCreature = False,
                 Filter.attachedToPermanent = False,
                 Filter.canHostSubject = False,
-                Filter.token = False
+                Filter.token = False,
+                Filter.tapped = False
               }
         else Nothing
   GameEvent.DamageDealt _ -> Nothing

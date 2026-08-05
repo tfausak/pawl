@@ -1693,7 +1693,8 @@ stubView table oid =
                 Filter.attachedToCreature = False,
                 Filter.attachedToPermanent = False,
                 Filter.canHostSubject = False,
-                Filter.token = False
+                Filter.token = False,
+                Filter.tapped = False
               }
         [] -> Nothing
 
