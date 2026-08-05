@@ -836,18 +836,41 @@ setLandSubtypeEffects gs =
         if isSet (ContinuousEffect.modification eff)
           then [(ContinuousEffect.source eff, ContinuousEffect.affected eff)]
           else []
-      -- The affected set is read UNREWRITTEN here, where gatherStatic applies CR
-      -- 612's word swap to the same ability's (#624), so a text-changed source
-      -- would have this gate and the layer fold disagreeing. Unreachable: neither
-      -- subtype-setting static in the pool carries a subtype word a swap could
-      -- reach. Rewriting here is not free either, since textChangesAffecting
-      -- folds the whole effect list and this function is hoisted out of gather's
-      -- walk to avoid per-permanent cost (#584).
+      -- The affected set is REWRITTEN here, the same CR 612 word swap gatherStatic
+      -- applies to the same ability's set (#624). The two must agree: this gate
+      -- decides whose rules-text abilities CR 305.7 strips, and the layer fold
+      -- decides what the subtype becomes, so a text change reaching only one of
+      -- them would have the halves of one rule disagreeing about which permanents
+      -- an ability names.
+      --
+      -- Conversion -- "All Mountains are Plains" -- is the pool's first static
+      -- ability whose affected set names a basic land type, so it is the first
+      -- card a Magical Hack could aim at this read-point at all.
+      --
+      -- The disagreement is still NOT OBSERVABLE, and this rewrite is consistency
+      -- rather than a fix with a test behind it: no test discriminates it, checked
+      -- by mutating it away. This gate decides whose rules-text abilities CR 305.7
+      -- strips, so seeing it needs a permanent whose PRINTED type line carries a
+      -- basic land type AND which has a rules-text static ability reaching other
+      -- objects -- affectsBase reads base characteristics. Every basic land is
+      -- abilityless, and no nonbasic land in the pool carries a basic land type,
+      -- so nothing can currently be on both sides (#584).
+      --
+      -- textChangesAffecting folds the whole effect list, and this function is
+      -- hoisted out of gather's walk to keep that off the per-permanent path, so
+      -- the fold runs once per battlefield permanent here rather than once per
+      -- permanent per projection.
+      --
+      -- The MODIFICATIONS stay unrewritten, and the isSet filter is why that is
+      -- sound: a word swap rewrites which subtype a set arm names, never whether
+      -- it is a set arm, so the filter's answer cannot change. The fold does the
+      -- rewriting that decides the resulting subtype.
       fromPerm permId = case Game.faceOf permId gs of
         Nothing -> []
         Just face ->
-          fmap (\sa -> (permId, StaticAbility.affected sa)) $
-            filter (any isSet . StaticAbility.modifications) (Face.staticAbilities face)
+          let changes = textChangesAffecting permId gs
+           in fmap (\sa -> (permId, rewriteAffected changes (StaticAbility.affected sa))) $
+                filter (any isSet . StaticAbility.modifications) (Face.staticAbilities face)
    in concatMap fromStored (GameState.continuousEffects gs)
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 

@@ -1094,6 +1094,38 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf forestId gs)) "and still a land"
 
+  -- Conversion is the pool's first static ability whose AFFECTED set names a
+  -- basic land type, which is what makes CR 612's word swap reach an affected set
+  -- at all (#584). The pair below differs only in whether the swap is installed.
+  Spec.it s "CR 305.7 Conversion turns Mountains into Plains" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    conversion <- S.printingOf s registry "Conversion"
+    let base = Setup.emptyGame S.bothPlayers
+        (mountainId, g1) = S.addCreature mountain S.alice base
+        (islandId, g2) = S.addCreature island S.alice g1
+        (_, gs) = S.addCreature conversion S.alice g2
+    Spec.assertBool s (Set.member Subtype.Type.Plains (Projection.subtypesOf mountainId gs)) "the Mountain is a Plains"
+    Spec.assertBool s (not (Set.member Subtype.Type.Mountain (Projection.subtypesOf mountainId gs))) "and no longer a Mountain (CR 305.7's set)"
+    Spec.assertBool s (Set.member Subtype.Type.Island (Projection.subtypesOf islandId gs)) "the Island is untouched"
+
+  Spec.it s "CR 612.1 a text change moves which lands Conversion names" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    island <- S.printingOf s registry "Island"
+    conversion <- S.printingOf s registry "Conversion"
+    let base = Setup.emptyGame S.bothPlayers
+        (mountainId, g1) = S.addCreature mountain S.alice base
+        (islandId, g2) = S.addCreature island S.alice g1
+        (conversionId, g3) = S.addCreature conversion S.alice g2
+        -- A Magical Hack on Conversion: "All Mountains are Plains" becomes "All
+        -- Islands are Plains". The swap reaches the AFFECTED set, not a
+        -- modification, which is the read-point this card exists to exercise.
+        gs = S.withEffectAt conversionId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) g3
+    Spec.assertBool s (Set.member Subtype.Type.Plains (Projection.subtypesOf islandId gs)) "the Island is now a Plains"
+    Spec.assertBool s (not (Set.member Subtype.Type.Island (Projection.subtypesOf islandId gs))) "and no longer an Island"
+    Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf mountainId gs)) "the Mountain is left alone"
+    Spec.assertBool s (not (Set.member Subtype.Type.Plains (Projection.subtypesOf mountainId gs))) "and is not a Plains"
+
   -- CR 111.3: a token is not a card, and nothing in CR 613 changes that -- so
   -- Not IsToken reads no projected aspect and no ordering turns on it.
   Spec.it s "Ashaya's 'nontoken creatures' excludes a token creature" $ do
