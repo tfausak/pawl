@@ -944,6 +944,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
+  Effect.TemptWithTheRing -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect

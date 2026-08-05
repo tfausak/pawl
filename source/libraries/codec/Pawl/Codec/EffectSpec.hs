@@ -551,6 +551,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       Effect.Proliferate
       """ {"type":"Proliferate"} """
+  -- CR 701.54a: nullary, because rule 701.54 fixes the chooser, the count and the
+  -- qualification, leaving an author nothing to write.
+  Spec.it s "TemptWithTheRing" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Effect.TemptWithTheRing
+      """ {"type":"TemptWithTheRing"} """
   Spec.it s "PlayerSacrifices" $
     Common.assertJsonCodec
       s

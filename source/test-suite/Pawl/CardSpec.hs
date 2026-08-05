@@ -417,6 +417,7 @@ effectCounts effect = case effect of
   Effect.Search _ _ -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.TemptWithTheRing -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices _ _ quantity -> quantityCounts quantity
   Effect.RestartGame -> []
@@ -614,6 +615,7 @@ effectReplacements effect = case effect of
   Effect.Search _ _ -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.TemptWithTheRing -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame -> []
@@ -1344,6 +1346,7 @@ effectFilters effect = case effect of
   Effect.Search f _ -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.TemptWithTheRing -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices _ f quantity -> unframed (f : quantityFilters quantity)
   Effect.RestartGame -> []

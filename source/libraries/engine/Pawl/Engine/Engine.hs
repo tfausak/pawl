@@ -32,6 +32,7 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve as Resolve
+import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -465,7 +466,8 @@ placeBorne srcId pending = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if Natural.length legal < count
@@ -579,9 +581,10 @@ settleForPriority = Monad.void performSettle
 -- conditional sweep, a monarch exile returning, an SBA firing, a trigger being
 -- placed -- so a settle that changes nothing costs one board projection and one
 -- length comparison per carrier, NOT a deep GameState equality check. On top of
--- that, every pass pays two samples of derived state (checkControlContinuity for
--- CR 302.6, Combat.removeChanged for CR 506.4), because a derived change to
--- control or to card types has nothing else to notice it.
+-- that, every pass pays three samples of derived state (checkControlContinuity
+-- for CR 302.6, Combat.removeChanged for CR 506.4, Ring.endOnControlChange for
+-- CR 701.54a), because a derived change to control or to card types has nothing
+-- else to notice it.
 --
 -- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
 -- a player would get priority" the coarsest moment anything could observe it,
@@ -589,8 +592,8 @@ settleForPriority = Monad.void performSettle
 -- runs FIRST, before the SBA check: a "for as long as you control this" effect
 -- ending (Master Thief) returns a permanent to another player's control, and a
 -- control-scoped state-based action must see the post-sweep control. CR 704.5j's
--- legend rule is the rule that will read it; this engine does not check it yet
--- (#64), so the ordering is not yet observable. The loop re-runs whenever
+-- legend rule is the rule that reads it, and Sba does check it, so the ordering
+-- is observable rather than theoretical. The loop re-runs whenever
 -- ANYTHING fired, because an SBA can itself be what falsifies a condition.
 --
 -- It also REPORTS whether it performed any state-based action or placed any
@@ -610,21 +613,27 @@ performSettle = do
   returned <- Monarch.returnExiledForMonarch
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
-  -- Last, and for the same reason the conditional sweep runs first: both read
-  -- state this settle can still change, and are placed to see what it leaves
-  -- behind. Both read CONTROL, and the CR 506.4 scan also reads CARD TYPES --
+  -- Last, and for the same reason the conditional sweep runs first: all three
+  -- read state this settle can still change, and are placed to see what it leaves
+  -- behind. All three read CONTROL, and the CR 506.4 scan also reads CARD TYPES --
   -- where the sweep is what ends a "for as long as" animation, and so what makes
   -- an attacker stop being a creature.
   --
-  -- Outside the recursion guard on purpose -- neither makes further work, so
-  -- neither is a reason to loop, and both must run even on a pass where nothing
-  -- fired. The settle stops only on a pass where nothing fired, and these two ran
-  -- on that pass, against the finished board, before priority is granted.
+  -- Outside the recursion guard on purpose -- none makes further work, so none is
+  -- a reason to loop, and all must run even on a pass where nothing fired. That
+  -- stops being true the moment CR 701.54c's base ability lands: clearing the
+  -- Ring-bearer designation would then REMOVE a legendary supertype, which is
+  -- input to the CR 704.5j legend rule that already ran on this pass (#707). The
+
+  -- settle stops only on a pass where nothing fired, and these three ran on that
+  -- pass, against the finished board, before priority is granted.
   --
-  -- Order between the two does not matter: CR 506.4 asks about combat and CR
-  -- 302.6 about summoning sickness, and neither reads what the other writes.
+  -- Order among the three does not matter: CR 506.4 asks about combat, CR 302.6
+  -- about summoning sickness and CR 701.54a about the Ring-bearer designation, and
+  -- none reads what another writes.
   State.modify' Combat.removeChanged
   checkControlContinuity
+  Ring.endOnControlChange
   more <- if swept || returned || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 

@@ -45,6 +45,7 @@ encode p answer = case p of
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
   Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
+  Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.ChooseAttackTarget {} -> Response.ChoseAttackTarget answer
@@ -115,6 +116,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseProliferate {} -> case response of
     Response.ChoseProliferation chosen -> Just chosen
+    _ -> Nothing
+  Prompt.ChooseRingBearer {} -> case response of
+    Response.ChoseRingBearer oid -> Just oid
     _ -> Nothing
   Prompt.ChooseLegend {} -> case response of
     Response.ChoseLegend oid -> Just oid
@@ -249,6 +253,9 @@ defaultAnswer p = case p of
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   -- CR 701.34a: any number includes none, so declining is always legal.
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  -- CR 701.54a: the prompt is only raised with two or more creatures the player
+  -- controls, and every one of them is a legal Ring-bearer.
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   -- CR 704.5j: every candidate is a legal thing to keep.
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   -- Declining to ATTACK is not always legal -- a CR 508.1d requirement (Curse

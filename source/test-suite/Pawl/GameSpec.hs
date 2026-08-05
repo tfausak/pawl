@@ -178,7 +178,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               -- CR 400.7: changeZone clears any singled-out face along with
               -- every other per-incarnation field.
               Object.face = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
       )
 
@@ -331,6 +332,7 @@ recordingAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseManaYield _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseProliferate {} -> pure (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseLegend _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
   Prompt.ChooseAttackTarget _ _ _ options -> pure (NonEmpty.head options)
@@ -1518,7 +1520,8 @@ handBobBolt lightningBolt gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1561,6 +1564,7 @@ slaveAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -1844,7 +1848,8 @@ restartOnStack mountain =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

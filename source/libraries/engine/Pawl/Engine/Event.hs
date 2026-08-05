@@ -176,6 +176,44 @@ placeObject pid mkObj dest = do
   State.put (Game.insertIntoZone dest pid newId gs3)
   pure newId
 
+-- CR 114.2: a player gets an emblem with the given abilities, put into the
+-- command zone and both owned and controlled by them. CR 613.7a: its entry
+-- timestamp is what the projection reads when ordering the continuous effect of
+-- any static ability it carries.
+--
+-- Here rather than in Pawl.Engine.Resolve, because there are two minting sites
+-- and only one of them is an opcode: Effect.CreateEmblem is what a CARD says,
+-- and Pawl.Engine.Ring.tempt is what CR 701.54c says. An emblem built two ways
+-- would be an emblem that could differ.
+--
+-- Inert per-incarnation fields (an emblem is never tapped, damaged or
+-- countered): harmless, nothing reads them here. `enteredUnder = Nothing` is
+-- what makes Projection.defaultControllerOf answer the owner, which is CR
+-- 109.4c and so CR 114.2's last sentence.
+createEmblem :: PlayerId -> Card -> Game ObjectId
+createEmblem pid card =
+  let mkObj ts =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.enteredUnder = Nothing,
+            Object.source = Source.OfEmblem card,
+            Object.zone = Zone.Command,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled pid,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
+            Object.timestamp = ts,
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
+          }
+   in placeObject pid mkObj Zone.Command
+
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and
 -- source forward and resetting per-incarnation state. No-op if the id is unknown.
@@ -589,7 +627,8 @@ createTokens controller card n tapped = do
                     Object.chosenNames = Set.empty,
                     Object.timestamp = ts,
                     Object.face = Nothing,
-                    Object.playableFromExileBy = Nothing
+                    Object.playableFromExileBy = Nothing,
+                    Object.ringBearerFor = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids

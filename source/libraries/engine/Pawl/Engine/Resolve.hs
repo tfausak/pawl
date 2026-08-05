@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -90,7 +91,6 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotName (SlotName)
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -137,6 +137,7 @@ slotsOf effect = case effect of
   Effect.Search _ _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
+  Effect.TemptWithTheRing -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices slot _ quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.RestartGame -> Set.empty
@@ -235,6 +236,7 @@ readsX = any effectReadsX
       Effect.Search _ _ -> False
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
+      Effect.TemptWithTheRing -> False
       Effect.ExileHandThenDraw -> False
       Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.X
       Effect.RestartGame -> False
@@ -277,6 +279,7 @@ searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search _ _ -> True
   Effect.Proliferate -> False
+  Effect.TemptWithTheRing -> False
   Effect.PlayerSacrifices {} -> False
   Effect.DealDamage _ _ -> False
   Effect.ModifyTarget {} -> False
@@ -1773,30 +1776,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 }
          in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
   Effect.CreateEmblem card -> do
-    -- CR 114.2 / 613.7a: the emblem enters the command zone under the resolving
-    -- controller; its entry timestamp is what the projection reads when ordering
-    -- its static ability's continuous effect. Inert per-incarnation fields (it is
-    -- never tapped/damaged/countered): harmless, nothing reads them here.
-    let mkObj ts =
-          Object.MkObject
-            { Object.owner = controller,
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfEmblem card,
-              Object.zone = Zone.Command,
-              Object.tapped = TapState.Untapped,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled controller,
-              Object.bindings = Map.empty,
-              Object.counters = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColor = Nothing,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.playableFromExileBy = Nothing
-            }
-    _ <- Event.placeObject controller mkObj Zone.Command
+    -- CR 114.2: the resolving controller gets the emblem. The whole minting is
+    -- Event.createEmblem's, shared with CR 701.54c's Ring emblem.
+    _ <- Event.createEmblem controller card
     pure ()
   Effect.BecomeMonarch target -> do
     gs <- State.get
@@ -2051,6 +2033,11 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                         (GameState.players g)
                   }
             )
+  -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
+  -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
+  -- this arm knows only that some effect asked for it, exactly as the arms around
+  -- it know only that some effect asked for a counter or a card.
+  Effect.TemptWithTheRing -> Ring.tempt controller
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

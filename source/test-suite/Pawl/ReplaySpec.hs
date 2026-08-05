@@ -476,6 +476,24 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 701.54a: which creature a tempted player made their Ring-bearer is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseRingBearer round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseRingBearer decider S.alice (a NonEmpty.:| [b])
+          Spec.assertEqWith s "designating the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "designating the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a Ring-bearer choice does not decode as a legend choice" $ do
+          -- Discriminating: fails if ChooseRingBearer reuses ChoseLegend rather
+          -- than getting its own ObjectId-shaped constructor. The two are the same
+          -- SHAPE -- a Prompt over one ObjectId, answered from a NonEmpty of them --
+          -- so nothing but a distinct constructor keeps a transcript of one from
+          -- replaying as the other.
+          let p = Prompt.ChooseRingBearer decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
         -- CR 508.1b: what each attacking creature was announced as attacking is
         -- a decision, so it has to survive a transcript like any other -- and
         -- both arms of AttackTarget have to survive it, since a transcript that

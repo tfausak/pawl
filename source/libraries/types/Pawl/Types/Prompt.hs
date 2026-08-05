@@ -119,6 +119,23 @@ data Prompt r where
   -- Deliberately not elided for a single candidate, unlike ChooseManaSource: "any
   -- number" includes none, so even one candidate is a real yes or no.
   ChooseProliferate :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [PlayerId.PlayerId] -> Prompt (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
+  -- | CR 701.54a: which creature a tempted player controls becomes their
+  -- Ring-bearer. The NonEmpty is the creatures they control; the answer is the ONE
+  -- that takes the designation.
+  --
+  -- CHOOSE, not target: rule 701.54a says "choose a creature you control", so no
+  -- target spec is declared and nothing is re-checked at resolution (CR 608.2b).
+  --
+  -- Raised only for TWO OR MORE candidates, ChooseLegend's shape. One creature is
+  -- not a choice: the action is mandatory and has exactly one legal answer, so
+  -- performing it is not the engine deciding anything. It is emphatically not an
+  -- elision of ChooseProliferate's kind, whose "any number" makes even a lone
+  -- candidate a real yes or no.
+  --
+  -- NOT raised at all for zero candidates, and that is CR 701.54d rather than an
+  -- omission: the player is tempted anyway, so Pawl.Engine.Ring.tempt still counts
+  -- the temptation and still gives them the emblem.
+  ChooseRingBearer :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 704.5j: which of two or more same-named legendary permanents its
   -- controller keeps. The NonEmpty is the whole same-named group; the answer is the
   -- ONE that survives.

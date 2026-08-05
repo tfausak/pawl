@@ -979,7 +979,7 @@ sbaSpec s =
        in Spec.assertEqWith s "bob won" (GameState.result after) (Just (Result.Won S.bob))
 
     Spec.it s "life <= 0 loses" $
-      let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing, Player.counters = Map.empty}) (GameState.players sbaBase)}
+      let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing, Player.counters = Map.empty, Player.ringTemptations = 0}) (GameState.players sbaBase)}
        in Spec.assertEqWith s "bob won" (GameState.result (S.settleSba gs)) (Just (Result.Won S.bob))
 
     Spec.it s "simultaneous last departures draw" $
