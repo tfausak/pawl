@@ -504,10 +504,9 @@ discardLastAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal and spends
-  -- nothing -- the least-eventful default (mirrors ChooseOptional -> Declines).
-  -- A test
-  -- that wants the cost PAID says so with its own interpreter, which is
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
   -- what makes that answer discriminating.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
@@ -1786,10 +1785,9 @@ castFirstOption p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal and spends
-  -- nothing -- the least-eventful default (mirrors ChooseOptional -> Declines).
-  -- A test
-  -- that wants the cost PAID says so with its own interpreter, which is
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
   -- what makes that answer discriminating.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
@@ -1861,10 +1859,9 @@ castPanglacial p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal and spends
-  -- nothing -- the least-eventful default (mirrors ChooseOptional -> Declines).
-  -- A test
-  -- that wants the cost PAID says so with its own interpreter, which is
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
   -- what makes that answer discriminating.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
