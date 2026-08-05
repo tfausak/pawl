@@ -1,7 +1,6 @@
 module Pawl.Engine.Combat where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -36,7 +35,6 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.TapState as TapState
@@ -833,7 +831,7 @@ chooseDefender = do
           only NonEmpty.:| [] -> pure only
           _ -> do
             let decider = Decide.deciderFor pid gs
-            answer <- Trans.lift (Program.prompt (Prompt.ChooseDefender decider pid candidates))
+            answer <- Game.choose (Prompt.ChooseDefender decider pid candidates)
             pure $
               if List.elem answer (NonEmpty.toList candidates)
                 then answer
@@ -861,7 +859,7 @@ announceAttackTarget pid oid options = case options of
   _ -> do
     gs <- State.get
     let decider = Decide.deciderFor pid gs
-    answer <- Trans.lift (Program.prompt (Prompt.ChooseAttackTarget decider pid oid options))
+    answer <- Game.choose (Prompt.ChooseAttackTarget decider pid oid options)
     pure $
       if List.elem answer (NonEmpty.toList options)
         then answer
@@ -901,7 +899,7 @@ declareAttackers pid = do
     Just defender ->
       Monad.unless (null candidates) $ do
         let decider = Decide.deciderFor pid gs
-        chosen <- Trans.lift (Program.prompt (Prompt.DeclareAttackers decider pid candidates))
+        chosen <- Game.choose (Prompt.DeclareAttackers decider pid candidates)
         -- Filtered, not trusted: an interpreter cannot attack with a creature
         -- that is not legally an attacker.
         let isCandidate oid = List.elem oid candidates
@@ -1156,7 +1154,7 @@ declareBlockers = do
       let candidates = legalBlockers pid gs
       Monad.unless (null candidates) $ do
         let decider = Decide.deciderFor pid gs
-        chosen <- Trans.lift (Program.prompt (Prompt.DeclareBlockers decider pid candidates attacking))
+        chosen <- Game.choose (Prompt.DeclareBlockers decider pid candidates attacking)
         -- CR 509.1b: an illegal declaration is illegal AS A WHOLE. It is NOT
         -- filtered down to its legal entries -- that is unsound, not merely
         -- inelegant: under menace, dropping one blocker from a pair leaves an

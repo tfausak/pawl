@@ -1,7 +1,6 @@
 module Pawl.Engine.Damage where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -31,7 +30,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
@@ -247,8 +245,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                         else []
                     thresholds = Map.fromList (blockerEntries <> defenderEntry)
                 chosen <-
-                  Trans.lift
-                    (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
+                  Game.choose (Prompt.AssignCombatDamage decider pid attacker thresholds power)
                 -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733
                 -- human-error rewind). An illegal answer assigns nothing.
                 let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n

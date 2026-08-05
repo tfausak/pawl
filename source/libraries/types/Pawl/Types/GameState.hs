@@ -144,6 +144,17 @@ data GameState = MkGameState
     -- | CR 613.7: the monotonic source of timestamps for objects (at creation) and
     -- stored continuous effects (at CR 611 creation). See Timestamp.
     nextTimestamp :: Timestamp.Timestamp,
+    -- | CR 104.4b: the timestamp as of the last time a player was offered an
+    -- OPTIONAL action. The gap between this and nextTimestamp is how many events
+    -- have happened with no player able to decide anything, which is
+    -- Pawl.Engine.Engine.checkMandatoryLoop's heuristic for a loop of mandatory
+    -- actions.
+    --
+    -- Written only by Pawl.Engine.Game.choose, so a new prompt site cannot forget
+    -- to reset it. Conceding is deliberately not one of its callers: CR 104.3a
+    -- lets a player concede at any time, so if that counted as the optional
+    -- action, no loop would ever be mandatory.
+    lastChoice :: Timestamp.Timestamp,
     drewFromEmpty :: Set.Set PlayerId.PlayerId,
     landPlayed :: Set.Set PlayerId.PlayerId,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be

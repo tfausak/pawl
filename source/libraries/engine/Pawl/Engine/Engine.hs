@@ -232,7 +232,7 @@ discardToHandSize pid = do
           excess = length held - Natural.toIntSaturating limit
       Monad.when (excess > 0) $ do
         let decider = Decide.deciderFor pid gs
-        chosen <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held (Int.toNaturalSaturating excess)))
+        chosen <- Game.choose (Prompt.ChooseDiscard decider pid held (Int.toNaturalSaturating excess))
         let inHand oid = List.elem oid held
             toDiscard = take excess (filter inHand chosen)
         -- CR 701.9a, through the shared discard funnel: a cleanup discard is a
@@ -478,7 +478,7 @@ placeBorne srcId pending = do
       chosenModes <-
         if Natural.length legal <= count
           then pure legal
-          else Trans.lift (Program.prompt (Prompt.ChooseModes decider controller abilId legal count))
+          else Game.choose (Prompt.ChooseModes decider controller abilId legal count)
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
       -- is placed. A mode with no target slots (Create, or a Draw that names its
       -- drawer without targeting) asks nothing.
@@ -486,7 +486,7 @@ placeBorne srcId pending = do
       chosen <-
         if Map.null sets
           then pure Map.empty
-          else Trans.lift (Program.prompt (Prompt.ChooseTargets decider controller abilId sets))
+          else Game.choose (Prompt.ChooseTargets decider controller abilId sets)
       -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
       -- placed, so "this creature" resolves as an ordinary slot read even after
       -- the source has left the battlefield.
@@ -535,7 +535,7 @@ orderFor gs pending pid = do
     then pure mine
     else do
       let decider = Decide.deciderFor pid gs
-      answer <- Trans.lift (Program.prompt (Prompt.OrderTriggers decider pid (fmap entryOf mine)))
+      answer <- Game.choose (Prompt.OrderTriggers decider pid (fmap entryOf mine))
       pure (permute mine answer)
 
 -- What one pending trigger looks like to the player being asked for CR 603.3b's
@@ -695,7 +695,17 @@ priorityLoop = do
                           Concession.Continues -> do
                             let decider = Decide.deciderFor p gs
                                 actions = Action.legalActions p gs
-                            answered <- Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                            -- CR 104.4b: a menu that is only Pass offers no
+                            -- optional action, so it does not break a loop of
+                            -- mandatory actions. Still ASKED either way -- the
+                            -- interpreter and the Replay fold see every priority
+                            -- grant -- just not RECORDED as a choice, which is
+                            -- what Game.choose does and what
+                            -- checkMandatoryLoop reads.
+                            answered <-
+                              if length actions > 1
+                                then Game.choose (Prompt.ChooseAction decider p actions)
+                                else Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
                             -- FILTERED, NOT TRUSTED. Everything Action.legalActions
                             -- computed -- the controller check, CR 302.6's
                             -- tap-sickness gate, CR 307.5 timing, cost payability,
@@ -714,16 +724,25 @@ priorityLoop = do
                               Action.Type.Pass -> do
                                 let passes = GameState.passes gs + 1
                                     playing = Natural.length (Game.stillPlaying gs)
+                                -- modify' over `State.put gs {...}`: `gs` is the
+                                -- snapshot taken BEFORE the prompt, and putting
+                                -- it back would discard whatever the prompt
+                                -- wrote. Game.choose writes GameState.lastChoice
+                                -- there (CR 104.4b), and a clobbered marker
+                                -- would make every loop look mandatory. The
+                                -- values still read off the snapshot -- `passes`
+                                -- and the successor seat -- are fields no prompt
+                                -- touches.
                                 if passes >= playing
                                   then case GameState.stack gs of
-                                    [] -> State.put gs {GameState.priority = Nothing, GameState.passes = passes}
+                                    [] -> State.modify' (\g -> g {GameState.priority = Nothing, GameState.passes = passes})
                                     _ -> do
                                       Stack.resolveTopWith playSubgame
                                       settleForPriority
                                       State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just (priorityHolder g)})
                                       loop
                                   else do
-                                    State.put gs {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)}
+                                    State.modify' (\g -> g {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)})
                                     loop
                               Action.Type.Play oid -> do
                                 Event.changeZone oid Zone.Battlefield

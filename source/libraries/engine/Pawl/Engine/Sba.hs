@@ -2,7 +2,6 @@ module Pawl.Engine.Sba where
 
 import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -32,7 +31,6 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Pool as Pool
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -356,7 +354,7 @@ legendGroups pcs gs =
 chooseLegendVictims :: (PlayerId, NonEmpty.NonEmpty ObjectId) -> Game [ObjectId]
 chooseLegendVictims (controller, candidates) = do
   gs <- State.get
-  answer <- Trans.lift (Program.prompt (Prompt.ChooseLegend (Decide.deciderFor controller gs) controller candidates))
+  answer <- Game.choose (Prompt.ChooseLegend (Decide.deciderFor controller gs) controller candidates)
   let kept = if List.elem answer (NonEmpty.toList candidates) then answer else NonEmpty.head candidates
   pure (filter (/= kept) (NonEmpty.toList candidates))
 
