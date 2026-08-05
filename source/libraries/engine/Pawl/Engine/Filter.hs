@@ -31,6 +31,12 @@ data View = MkView
     -- a Humility'd one (CR 613.1f) does not.
     keywords :: Set.Set Keyword.Keyword,
     power :: Maybe Integer,
+    -- CR 202.3: the candidate's mana value, computed from its printed mana cost
+    -- (CR 202.3a gives a costless object 0). Unlike `power` this is NOT Nothing
+    -- off the battlefield -- a mana cost is printed on the card and rule 202.3
+    -- names no zone -- which is what lets ManaValueAtMost filter a graveyard.
+    -- Nothing only where there is no card to read: a player view.
+    manaValue :: Maybe Integer,
     controller :: Maybe PlayerId.PlayerId,
     -- Which object this view is OF. Nothing for a printed card off the
     -- battlefield, which is not an object -- so IsSource is vacuously False
@@ -124,6 +130,9 @@ playerView pid =
       -- list of what an object is has no player in it.
       keywords = Set.empty,
       power = Nothing,
+      -- CR 202.3 reads a mana cost, which is printed on an OBJECT (CR 202.1); a
+      -- player has none.
+      manaValue = Nothing,
       controller = Nothing,
       identity = Nothing,
       playerIdentity = Just pid,
@@ -173,6 +182,11 @@ matches context view predicate = case predicate of
   Filter.PowerAtLeast n -> case power view of
     Nothing -> False
     Just p -> p >= n
+  -- CR 202.3, and answerable in every zone -- see the View field's own note.
+  -- Vacuously False for a player, which has no mana value to compare.
+  Filter.ManaValueAtMost n -> case manaValue view of
+    Nothing -> False
+    Just mv -> mv <= n
   -- Every other player is an Opponent by construction: CR 806.1 has a
   -- free-for-all's players compete as individuals against each other, and CR
   -- 102.2 says the same for two players -- one predicate, `c /= p`, serves both.
@@ -275,6 +289,7 @@ rewrite pairs predicate = case predicate of
   -- Modification.GainKeyword (#523).
   Filter.HasKeyword _ -> predicate
   Filter.PowerAtLeast _ -> predicate
+  Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.IsSource -> predicate
   Filter.IsPlayer _ -> predicate

@@ -449,6 +449,11 @@ viewOfCard face =
           -- CR 702: read off the printed face, like the type line above.
           Filter.keywords = Face.keywords face,
           Filter.power = Nothing,
+          -- CR 202.3: unlike power, a mana value IS answerable here -- the mana
+          -- cost is printed on the card and rule 202.3 names no zone. This is
+          -- the arm Ojutai's Command's "mana value 2 or less" reads, its
+          -- candidates being cards in a graveyard.
+          Filter.manaValue = Just (Quantity.manaValueOf face),
           Filter.controller = Nothing,
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
@@ -497,6 +502,13 @@ viewOfCharacteristics oid pc controller gs =
       -- Filter.HasKeyword asks only membership.
       Filter.keywords = Map.keysSet (PC.keywords pc),
       Filter.power = PC.power pc,
+      -- CR 202.3 off the printed face, not the projection: no Modification
+      -- writes a mana cost, so there is nothing projected to read. A TOKEN has a
+      -- face (its effect-defined card) with no mana cost, so CR 202.3a gives it
+      -- 0 through the same path a card takes. Nothing only for an object with no
+      -- card at all -- an ability on the stack, whose CR 202.3a zero this does
+      -- not claim (#674).
+      Filter.manaValue = fmap Quantity.manaValueOf (Game.faceOf oid gs),
       Filter.controller = controller,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
@@ -1482,6 +1494,9 @@ filterReads f = case f of
   -- Reads nothing: no Modification writes Object.source, so no effect can move a
   -- "nontoken" set.
   Filter.Type.IsToken -> Set.empty
+  -- CR 202.3 reads the printed mana cost, and no Modification writes one -- there
+  -- is no mana-cost Aspect for this to name, because nothing could change it.
+  Filter.Type.ManaValueAtMost _ -> Set.empty
   Filter.Type.And fs -> foldMap filterReads fs
   Filter.Type.Or fs -> foldMap filterReads fs
   Filter.Type.Not g -> filterReads g

@@ -612,6 +612,154 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
     Spec.assertEqWith s "bob's graveyard holds the countered Drone and the Piker that left" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
     Spec.assertEqWith s "nothing reached bob's hand: the bounce mode was skipped" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
 
+-- Ojutai's Command's four modes, in printed order (CR 700.2 /
+-- data/cards/ojutais-command.json), under "Choose two --":
+--   0. return target creature card with mana value 2 or less
+--      from your graveyard to the battlefield -- slot "creature"
+--   1. you gain 4 life                        -- no slot
+--   2. counter target creature spell          -- slot "spell"
+--   3. draw a card                            -- no slot
+ojutaiModes :: Set.Set ModeIndex.ModeIndex
+ojutaiModes = Set.fromList (fmap ModeIndex.MkModeIndex [0, 1, 2, 3])
+
+creatureSlot :: SlotName.SlotName
+creatureSlot = SlotName.MkSlotName (Text.pack "creature")
+
+-- alice has three Islands and a Plains ({2}{W}{U}) and Ojutai's Command in hand.
+-- Her graveyard and the stack are EMPTY, which is what makes modes 0 and 2
+-- unfillable: nothing to reanimate, no creature spell to counter.
+ojutaiBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId)
+ojutaiBoard island plains ojutaisCommand =
+  let (_, gs1) = S.addCreature plains S.alice (S.landsInPlay island 3)
+   in S.handOne ojutaisCommand gs1
+
+-- CR 601.2b/700.2: the OTHER side of Cryptic Command's group above -- a "choose
+-- two" whose fillable modes really can come down to exactly two, so the forced
+-- (unprompted) branch of Cast.castProposed is reachable at cast time and the
+-- claim that nothing is hidden from the player can be checked rather than argued.
+-- Ojutai's Command's two targeting modes both look somewhere a cast can leave
+-- empty: your graveyard, and the stack.
+forcedTwoSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+forcedTwoSpec s registry = Spec.describe s "ForcedTwo (CR 700.2a)" $ do
+  -- CR 700.2a: "If one of the modes would be illegal … that mode can't be
+  -- chosen." Two demanded, two choosable, so there is nothing to ask -- and
+  -- neverAskModes turns the prompt into a test failure rather than a comment.
+  Spec.it s "CR 700.2a with exactly two fillable modes no mode prompt is issued" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, gs) = S.addLibraryCard piker S.alice board
+        cast = snd (Engine.runGamePure neverAskModes gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure neverAskModes cast Stack.resolveTop)
+    Spec.assertEqWith
+      s
+      "only the two targetless modes are fillable"
+      (Target.fillableModes (Just S.alice) spellId Map.empty (Face.spell (S.combinedFace ojutaisCommand)) gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 3]))
+    Spec.assertEqWith s "alice gained 4 life (mode 1)" (S.lifeOf S.alice after) (Just 24)
+    Spec.assertEqWith s "alice drew a card (mode 3)" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+
+  -- The falsifier for that pair, and for CR 202.3's bound: the SAME board with a
+  -- creature card in the graveyard. Wall of Stone ({1}{R}{R}, mana value 3) is
+  -- above "2 or less" and leaves the two modes forced; Goblin Piker ({1}{R}, mana
+  -- value 2) is within it and makes a third mode fillable, so the choice is real
+  -- and the prompt must be issued.
+  Spec.it s "CR 202.3 a mana value 3 creature card in the graveyard is still not choosable" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, gs) = S.addGraveyardCard wallOfStone S.alice board
+    Spec.assertEqWith
+      s
+      "the reanimation mode stays unfillable"
+      (Target.fillableModes (Just S.alice) spellId Map.empty (Face.spell (S.combinedFace ojutaisCommand)) gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 3]))
+
+  Spec.it s "CR 202.3 a mana value 2 creature card in the graveyard makes a third mode choosable" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, gs) = S.addGraveyardCard piker S.alice board
+    Spec.assertEqWith
+      s
+      "the reanimation mode joins the two targetless ones"
+      (Target.fillableModes (Just S.alice) spellId Map.empty (Face.spell (S.combinedFace ojutaisCommand)) gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [0, 1, 3]))
+
+  -- CR 115.2's other-zone pool doing real work: the chosen mode reads a card in
+  -- alice's graveyard and puts it onto the battlefield (CR 400.7 mints the new
+  -- object there).
+  Spec.it s "CR 601.2b reanimating and gaining life: both chosen modes resolve" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (pikerId, gs) = S.addGraveyardCard piker S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer = chooseTwo (fmap ModeIndex.MkModeIndex [0, 1]) [(creatureSlot, Recipient.ToObject pikerId)]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "a Goblin Piker is on the battlefield under alice" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "alice gained 4 life (mode 1)" (S.lifeOf S.alice after) (Just 24)
+    Spec.assertEqWith s "alice's hand is empty: mode 3 was not chosen" (length (Game.zoneMembers Zone.Hand S.alice after)) 0
+
+  -- Mode 2's own filter: "target CREATURE spell", so a noncreature spell on the
+  -- stack leaves the two modes forced -- the counter mode is not choosable just
+  -- because something is on the stack.
+  Spec.it s "CR 700.2a a noncreature spell on the stack does not make the counter mode choosable" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (_, withBolt) = S.spellOnStack lightningBolt S.bob board
+        (_, gs) = S.spellOnStack piker S.bob board
+        modal = Face.spell (S.combinedFace ojutaisCommand)
+    Spec.assertEqWith
+      s
+      "an instant on the stack leaves only the targetless modes"
+      (Target.fillableModes (Just S.alice) spellId Map.empty modal withBolt)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 3]))
+    Spec.assertEqWith
+      s
+      "a creature spell on the stack makes the counter mode choosable"
+      (Target.fillableModes (Just S.alice) spellId Map.empty modal gs)
+      (Set.fromList (fmap ModeIndex.MkModeIndex [1, 2, 3]))
+
+  -- All four at once, so the prompt has the widest choice this card can offer.
+  Spec.it s "CR 601.2b all four modes fillable: the prompt is issued and the chosen two resolve" $ do
+    island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
+    ojutaisCommand <- S.printingOf s registry "Ojutai's Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId) = ojutaiBoard island plains ojutaisCommand
+        (deadPiker, withGrave) = S.addGraveyardCard piker S.alice board
+        (castPiker, gs) = S.spellOnStack piker S.bob withGrave
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes _ _ _ legal count ->
+            if legal == ojutaiModes && count == 2
+              then Set.fromList (fmap ModeIndex.MkModeIndex [0, 2])
+              else Set.empty
+          Prompt.ChooseTargets _ _ _ sets ->
+            Map.mapWithKey
+              (\slot _ -> if slot == creatureSlot then Recipient.ToObject deadPiker else Recipient.ToObject castPiker)
+              sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertBool s (notElem castPiker (GameState.stack after)) "bob's creature spell was countered"
+    Spec.assertEqWith s "the graveyard Piker is on the battlefield under alice" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
+    Spec.assertEqWith s "alice is still at 20: mode 1 was not chosen" (S.lifeOf S.alice after) (Just 20)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   gateSpec s registry
@@ -624,3 +772,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   activationModalSpec s registry
   triggerModalSpec s registry
   chooseTwoSpec s registry
+  forcedTwoSpec s registry

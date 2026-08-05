@@ -1622,6 +1622,7 @@ stubView table oid =
                 Filter.subtypes = ss,
                 Filter.keywords = Set.empty,
                 Filter.power = Nothing,
+                Filter.manaValue = Nothing,
                 Filter.controller = ctrl,
                 Filter.identity = Just o,
                 Filter.playerIdentity = Nothing,

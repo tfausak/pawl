@@ -643,9 +643,13 @@ castProposed pid sid face castFrom candidates before = do
   -- entwineOffer has already established that every mode is legal, so `legal`
   -- has exactly `count` members and CR 702.42a's "all modes" is the only answer.
   --
-  -- Cryptic Command ("Choose two --", four modes, the last two targetless) is
-  -- what proves the prompt is really asked when there IS a choice: ModalSpec's
-  -- "ChooseTwo" group answers only a prompt offering all four and demanding two.
+  -- Two cards hold this branch and its complement in place, both "Choose two --"
+  -- of four (ModalSpec): Cryptic Command, whose last two modes take no targets
+  -- and whose "target permanent" mode is fillable in every state that can pay for
+  -- it, so the prompt is always asked and is answered only when it really offers
+  -- all four; and Ojutai's Command, whose two targeting modes look at a graveyard
+  -- and the stack, which a cast can leave empty -- exactly two choosable modes,
+  -- and a spec that fails if a prompt is issued.
   chosenModes <-
     if Natural.length legal <= count
       then pure legal
