@@ -1650,7 +1650,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   Spec.it s "CR 709.3 casting Wane destroys the targeted enchantment" $ do
     plains <- S.printingOf s registry "Plains"
     ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
-    waxWane <- S.printingOf s registry "Wax"
+    waxWane <- S.printingOf s registry "Wane"
     let (prisonId, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
         (gs, oid) = S.handOne waxWane withPrison
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))

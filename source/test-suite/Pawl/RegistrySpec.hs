@@ -54,8 +54,11 @@ withInvalidUtf8Corpus label action = do
 
 -- An IO action that must fail with a specific exception VALUE. The `expected`
 -- argument fixes Exception.try's type, so no ScopedTypeVariables is needed.
--- Only the root check still throws; a card that will not load is a returned
--- CardError, asserted on directly by the cases below.
+-- Building a registry can throw two ways -- a missing root (MissingRoot) or a
+-- broken pool (InvalidCorpus, asserted on via problemsOf below); this checks
+-- the former's exact value, since MissingRoot carries only the one path. Once
+-- built, a card that fails to look up is a returned CardError, asserted on
+-- directly by the cases below.
 expectException :: (Exception.Exception e, Eq e) => Spec.Spec IO n -> String -> e -> IO a -> IO ()
 expectException s label expected action = do
   result <- Exception.try action
@@ -72,13 +75,6 @@ problemsOf s label action = do
   case result of
     Left err -> pure (InvalidCorpus.problems err)
     Right _ -> Spec.assertFailure s (label <> ": expected an InvalidCorpus")
-
--- The message an Invalid carries, for cases that assert on its content rather
--- than on the constructor alone.
-reasonOf :: CardError.CardError -> String
-reasonOf err = case err of
-  CardError.Missing _ -> ""
-  CardError.Invalid _ reason -> reason
 
 spec :: (Monad n) => Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Registry" $ do
@@ -125,14 +121,14 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       first <- Registry.named registry "Goblin Piker"
       Directory.removeFile (root <> "/goblin-piker.json")
       second <- Registry.named registry "Goblin Piker"
-      Spec.assertEqWith s "served from the memo" first second
+      Spec.assertEqWith s "read at construction, before the file vanished" first second
 
   -- CardError says nothing about files, because it belongs to the interface and
-  -- a map-backed registry has no path to report. What #167 bought survives as
-  -- the constructor split: a caller wanting "unknown card X, did you mean...?"
-  -- matches Missing, one wanting "that card is broken" matches Invalid, and
-  -- neither has to read a message to tell them apart. The cases below assert
-  -- the constructor first and the message second.
+  -- a map-backed registry has no path to report. A file registry only ever
+  -- returns CardError.Missing now: a file that will not parse can never make
+  -- it into the map at all -- index rejects the whole pool at construction
+  -- (the InvalidCorpus cases above), rather than a bad file surfacing as a
+  -- CardError.Invalid at lookup time the way it once did.
   Spec.it s "an unknown card is Missing, naming the card"
     . withCorpus "missing" []
     $ \_ registry -> do
@@ -163,6 +159,23 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       Spec.assertBool s (any (List.isInfixOf "wax") problems) ("names the ambiguous name: " <> show problems)
       Spec.assertBool s (any (List.isInfixOf (root <> "/wax-wane.json")) problems) ("names the first claimant: " <> show problems)
       Spec.assertBool s (any (List.isInfixOf (root <> "/wane-wax.json")) problems) ("names the second claimant: " <> show problems)
+
+  -- index's own comment says a name claimed twice is fatal "wherever it comes
+  -- from -- two cards, or one card repeating its own face name"; the case
+  -- above is the two-cards half, this is the one-card half. Built by hand
+  -- (Wane renamed to Wax) rather than by editing data/cards, since a card
+  -- that offends a lint must not be a card file pawl ships.
+  Spec.it s "a corpus where one card repeats a face name is rejected when the registry is built" $ do
+    waxWane <- S.waxWaneJson
+    let selfRepeating = Text.replace (Text.pack "\"name\": \"Wane\"") (Text.pack "\"name\": \"Wax\"") waxWane
+    S.withCorpusDir "self-repeating" [("wax-wane.json", selfRepeating)] $ \root -> do
+      problems <- problemsOf s "self-repeating" (Registry.fileRegistry root)
+      Spec.assertBool s (any (List.isInfixOf (root <> "/wax-wane.json")) problems) ("names the file: " <> show problems)
+      -- Legibility, not just correctness: the message must say the ONE file
+      -- was claimed twice rather than rendering it as though two different
+      -- claimants happened to share a path (#649).
+      Spec.assertBool s (any (List.isInfixOf "wax is claimed by") problems) ("names the repeated name: " <> show problems)
+      Spec.assertBool s (any (List.isInfixOf "its own faces") problems) ("says it is a self-repeat, not a collision: " <> show problems)
 
   -- The filename is a filing convention with no standing in the rules (#649),
   -- so it decides where a file LIVES and never what a lookup may ask for.

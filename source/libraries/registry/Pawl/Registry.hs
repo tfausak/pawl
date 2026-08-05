@@ -10,8 +10,8 @@
 -- Enumerating the pool is deliberately NOT in the INTERFACE: every caller that
 -- wanted it was linting the corpus pawl ships, which is a claim about the data
 -- rather than a question for a registry, and that lives in the test suite. What
--- the test suite does borrow is cardPath and parseCard -- facts about the
--- on-disk format rather than about looking a card up.
+-- the test suite does borrow is cardPath, parseCard, loadRoot and filedAs --
+-- facts about the on-disk format rather than about looking a card up.
 module Pawl.Registry where
 
 import qualified Control.Exception as Exception
@@ -62,7 +62,9 @@ defaultRoot = Paths.getDataFileName "cards"
 -- most once" true by construction, where the MVar it replaces made it true by
 -- holding a lock across a read (#265). The cost is that a caller wanting one
 -- card parses the whole pool; the pool is hand-authored and card-driven, and
--- the test suite already reads all of it twice per run.
+-- the test suite already reads it whole many times over per run --
+-- Pawl.Support.allPrintings alone is unmemoized and is called repeatedly from
+-- CardSpec, CardsSpec and CodecIntegrationSpec.
 fileRegistry :: FilePath -> IO (Registry IO)
 fileRegistry root = do
   exists <- Directory.doesDirectoryExist root
@@ -84,8 +86,12 @@ slugFor = Slug.fromText . CardName.unwrap
 -- cannot be indexed.
 --
 -- CR 709.4a: "Each split card has two names." Both are keys here, which is what
--- makes looking up either half a hit rather than a scan. CR 715.5 and CR 720.5
--- say the same of an adventurer card's and an omen card's alternative name.
+-- makes looking up either half a hit rather than a scan. CR 715.4 gives an
+-- adventurer card only its normal characteristics off the stack, so its
+-- alternative name is not a name it HAS the way a split card's two are -- but
+-- CR 715.5 lets a player CHOOSE that alternative name wherever an effect asks
+-- for a card name, which a name-keyed lookup has to answer to all the same.
+-- CR 720.5 does the same for an omen card's alternative name.
 --
 -- A name claimed twice is fatal wherever it comes from -- two cards, or one card
 -- repeating its own face name. Pawl.CardSpec's "a card's face names are pairwise
@@ -97,8 +103,15 @@ index loaded =
       keyed = [(slugFor (Face.name face), (path, card)) | (path, card) <- named', face <- NonEmpty.toList (Card.faces card)]
       unparsed = [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded]
       claims = Map.fromListWith (<>) [(slug, [path]) | (slug, (path, _)) <- keyed]
+      -- A single path claiming its own slug more than once is one card
+      -- repeating a face name, not two cards colliding -- List.nub tells the
+      -- two apart so the message names what actually happened instead of
+      -- rendering the same path twice, which reads like a bug in the report
+      -- rather than a description of the pool.
       ambiguous =
-        [ Text.unpack (Slug.unwrap slug) <> " is claimed by " <> List.intercalate ", " (List.sort paths)
+        [ case List.nub (List.sort paths) of
+            [one] -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> one <> ", which repeats it across " <> show (length paths) <> " of its own faces"
+            distinct -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> List.intercalate ", " distinct
         | (slug, paths) <- Map.toAscList claims,
           length paths > 1
         ]
@@ -106,8 +119,10 @@ index loaded =
         [] -> Right (Map.fromList [(slug, card) | (slug, (_, card)) <- keyed])
         problems -> Left problems
 
--- Where one card's file lives: one file per card, named by the slug of the
--- card's own name.
+-- Where the file for a given slug lives, one file per card. What the slug IS
+-- varies by caller: for a single-faced card it is the card's own name, but
+-- `filedAs` below derives it from a split or adventurer card's JOINED face
+-- names instead, so "the card's own name" does not hold in general.
 cardPath :: FilePath -> Slug.Slug -> FilePath
 cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 
