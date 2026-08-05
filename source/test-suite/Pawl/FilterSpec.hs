@@ -291,6 +291,38 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         (Filter.rewrite [(Subtype.Mountain, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Mountain)))))
         (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Island))))
 
+    -- CR 702.11d's "[quality]" is rule 702's THIRD carrier of a word, and CR
+    -- 612.2 reaches it on the same terms as the two above: the rule changes "a
+    -- creature type word used as a creature type", and a quality naming a
+    -- creature type is one. The pool's one hexproof (Slippery Bogle) carries no
+    -- quality at all, so nothing here changes an answer a card can ask for
+    -- today; the arm exists because rewriteKeyword classifies a keyword by
+    -- whether it holds a word, and after #726 this one does (#733).
+    Spec.it s "descends into a hexproof quality" $ do
+      Spec.assertEqWith
+        s
+        "hexproof from Goblins became hexproof from Zombies"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype Subtype.Goblin)))))
+        (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype Subtype.Zombie))))
+
+    -- Elenda, Saint of Dusk's "hexproof from instants": a card type is not a
+    -- subtype word, so the swap reaches nothing inside it.
+    Spec.it s "leaves a hexproof quality that names no subtype alone" $ do
+      Spec.assertEqWith
+        s
+        "hexproof from instants untouched"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasCardType CardType.Instant)))))
+        (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasCardType CardType.Instant))))
+
+    -- CR 702.11b's plain hexproof carries no quality at all, which is the
+    -- Nothing the descent has to leave standing rather than invent a filter for.
+    Spec.it s "leaves an unqualified hexproof alone" $ do
+      Spec.assertEqWith
+        s
+        "plain hexproof untouched"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Hexproof Nothing)))
+        (Filter.Type.HasKeyword (Keyword.Hexproof Nothing))
+
   Spec.describe s "AttackedThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do
       Spec.assertBool s (Filter.matches self (blackCreature {Filter.attackedThisTurn = True}) Filter.Type.AttackedThisTurn) "attacked"

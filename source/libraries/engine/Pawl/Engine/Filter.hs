@@ -326,6 +326,15 @@ rewriteKeyword pairs keyword = case keyword of
   -- (as in 'mountaincycling')", so it holds a basic land type exactly as
   -- swampwalk does.
   Keyword.Cycling cost criterion -> Keyword.Cycling cost (fmap (rewrite pairs) criterion)
+  -- CR 702.11d's "hexproof from [quality]", rule 702's third carrier of a word.
+  -- Not a "[type]" like the two above -- CR 702.11d's quality is any quality, and
+  -- the ones cards actually print tend to name a card type or a colour -- but CR
+  -- 612.2 asks the same question of it either way, and `rewrite` answers it: a quality
+  -- naming a creature type is "a creature type word used as a creature type" and
+  -- is swapped; Elenda, Saint of Dusk's "hexproof from instants" comes back
+  -- unchanged because its atom holds no subtype word. CR 702.11b's unqualified
+  -- hexproof is the Nothing, which `fmap` leaves standing.
+  Keyword.Hexproof quality -> Keyword.Hexproof (fmap (rewrite pairs) quality)
   Keyword.Deathtouch -> keyword
   Keyword.Defender -> keyword
   Keyword.DoubleStrike -> keyword
@@ -333,7 +342,6 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Flash -> keyword
   Keyword.Flying -> keyword
   Keyword.Haste -> keyword
-  Keyword.Hexproof -> keyword
   Keyword.Indestructible -> keyword
   Keyword.Lifelink -> keyword
   Keyword.Reach -> keyword
