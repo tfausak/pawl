@@ -1028,8 +1028,8 @@ delayedSpec s registry =
 -- Thatcher Revolt {2}{R} Sorcery: "Create three 1/1 red Human creature tokens
 -- with haste. Sacrifice those tokens at the beginning of the next end step."
 -- delayedSpec's plural sibling: the card refers back to EVERY token it made at
--- once, so the Create's slot holds a SET rather than one object, and the delayed
--- ability sacrifices all of it.
+-- once, so the Create's slot holds a GROUP rather than one object, and the
+-- delayed ability sacrifices all of it.
 tokenSetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 tokenSetSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
@@ -1038,8 +1038,8 @@ tokenSetSpec s registry =
       resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
       humans gs = filter (\oid -> Set.member Subtype.Human (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
       -- Records every Prompt.ChooseBoundToken the resolution issues, so a test
-      -- can assert the plural binding asks NOTHING -- "them" names the whole
-      -- minted set, and where the rules leave nothing to ask, don't prompt.
+      -- can assert the plural binding asks NOTHING -- "them" names every minted
+      -- token, and where the rules leave nothing to ask, don't prompt.
       recordPrompts :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
       recordPrompts p = case p of
         Prompt.ChooseBoundToken _ _ _ candidates -> do
@@ -1068,12 +1068,12 @@ tokenSetSpec s registry =
               Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Haste oid armed) tokens) "each has haste"
               Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers armed)) 1
             other -> Spec.assertFailure s ("expected exactly three Human tokens, got " <> show (length other))
-          -- The second invariant: a set binding names every token, so unlike CR
-          -- 603.7c's singular "it" there is no candidate to choose between.
+          -- The second invariant: a group binding names every token, so unlike
+          -- CR 603.7c's singular "it" there is no candidate to choose between.
           Spec.assertEqWith s "no binding prompt was issued" asked []
-        -- The proving case for #53. Binding one of the three would be the engine
-        -- choosing; binding all three is what "those tokens" says.
-        Spec.it s "CR 603.7c \"those tokens\" names every minted token, so all three are sacrificed" $ do
+        -- Binding one of the three would be the engine choosing; binding all
+        -- three is what "those tokens" says.
+        Spec.it s "CR 111.1 \"those tokens\" names every minted token, so all three are sacrificed" $ do
           revolt <- S.printingOf s registry "Thatcher Revolt"
           mountain <- S.printingOf s registry "Mountain"
           let ((_, armed), _) = castRevolt revolt (boardOf mountain)
@@ -1110,6 +1110,19 @@ tokenSetSpec s registry =
           Spec.assertEqWith s "and both are gone" (humans after) []
           Spec.assertEqWith s "the store is still emptied" (Seq.length (GameState.delayedTriggers after)) 0
           Spec.assertEqWith s "nothing stuck on the stack" (GameState.stack after) []
+        -- The positive control for the three "nothing to ask" assertions above.
+        -- They are claims about the ANSWERER as much as about the engine: a
+        -- recordPrompts that matched the wrong constructor or dropped its
+        -- State.modify' would report an empty list for every case in this group
+        -- and every one of them would pass. So the SAME answerer is pointed at
+        -- Tidal Wave under Doubling Season, the singular case that must prompt.
+        Spec.it s "the recorder does see a prompt when the singular case asks for one" $ do
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          island <- S.printingOf s registry "Island"
+          doublingSeason <- S.printingOf s registry "Doubling Season"
+          let (_, base) = S.addCreature doublingSeason S.alice (S.landsInPlay island 3)
+              (_, asked) = uncurry castUnderPrompts (S.handOne tidalWave base)
+          Spec.assertEqWith s "one prompt, offering the two minted Walls" (fmap length asked) [2]
 
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an

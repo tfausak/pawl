@@ -520,12 +520,19 @@ placeBorne srcId pending = do
       -- slot is stamped over the top regardless. The two DO collide: the
       -- captured environment is built by the same Binding.fromChoices the arming
       -- spell used, so it carries that spell's OWN reserved slots (chosenModes,
-      -- variableX). Map.union is left-biased, so placement-time bindings must be
-      -- the LEFT argument -- they are this ability's own choices; the captured
-      -- environment's only job is to carry forward object references
-      -- placement-time can never supply. Getting the order backwards silently
-      -- substitutes the arming spell's chosen mode or X for this ability's own.
-      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.union (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
+      -- variableX). Binding.mergeBinding is left-biased per FIELD, so
+      -- placement-time bindings must be the LEFT argument -- they are this
+      -- ability's own choices; the captured environment's only job is to carry
+      -- forward object references placement-time can never supply. Getting the
+      -- order backwards silently substitutes the arming spell's chosen mode or X
+      -- for this ability's own.
+      --
+      -- unionWith mergeBinding rather than a left-biased Map.union, which would
+      -- drop the WHOLE captured entry on a name collision: the two sides can now
+      -- carry disjoint FIELDS of one slot -- a delayed ability declaring a target
+      -- spec under the name a Create bound its minted tokens to would keep only
+      -- the target and lose the group. Per-field, both survive.
+      State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou controller (Binding.setTriggerSource srcId (Map.unionWith Binding.mergeBinding (Binding.fromChoices chosen Nothing chosenModes) (PendingTrigger.bindings pending)))}) abilId (GameState.objects g)})
 
 -- CR 101.4 / 603.3b: the players who control a pending trigger, active player
 -- first and then the rest in turn order. Grouped by controller because the

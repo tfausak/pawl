@@ -253,11 +253,11 @@ data Effect card
     -- WHAT it binds is decided by the PRINTED Quantity, which is the only thing
     -- that can tell CR 603.7c's singular "it" from a card's plural "those
     -- tokens": Literal 1 binds the one token (and, if CR 614.16 multiplied the
-    -- count, asks which of them "it" names), and any other quantity binds the
-    -- whole minted set. Tidal Wave is the first; Thatcher Revolt is the second.
-    -- See Pawl.Engine.Resolve.namesTokenSet.
+    -- count, asks which of them "it" names), and any other quantity binds every
+    -- token minted. Tidal Wave is the first; Thatcher Revolt is the second. See
+    -- Pawl.Engine.Resolve.namesEveryToken.
     --
-    -- A SET slot is visible to a later effect of the same resolution on either
+    -- A GROUP slot is visible to a later effect of the same resolution on either
     -- path, since its reader goes to live bindings. A single-object slot is not
     -- on the ABILITY path: resolveModes' `chosen` map is computed once before
     -- the fold begins, so a later Sacrifice or Destroy there still reads the

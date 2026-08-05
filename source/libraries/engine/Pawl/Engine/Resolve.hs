@@ -352,8 +352,8 @@ onsetGatedAbilities effects =
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
--- The slots an effect list DEFINES rather than reads: a Create that names the
--- token it mints (CR 603.7c's "it"), a MoveToZone that names the incarnation CR
+-- The slots an effect list DEFINES rather than reads: a Create that names what
+-- it mints -- one token, or every one of them -- a MoveToZone that names the incarnation CR
 -- 400.7 minted at the destination, a PlaySubgame that names its loser, a Destroy
 -- that names how many it destroyed. The write half of the same lint.
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
@@ -366,20 +366,25 @@ definedSlots effects =
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe bound effects)
 
--- Does a Create's slot name the whole minted SET ("those tokens") rather than one
--- particular token (CR 603.7c's "it")? The PRINTED quantity is what tells them
--- apart, and it is the only thing that can: the card's own word is grammar the
--- opcode does not carry, and the count at resolution is no guide -- CR 614.16
--- lets a replacement multiply either one.
+-- Does a Create's slot name EVERY token it minted ("those tokens") rather than
+-- one particular one (CR 603.7c's "it")? Which of the two a card means is its own
+-- text, and CR 111 gives the opcode no way to carry the word; the PRINTED quantity
+-- is the only thing left that can tell them apart, and the count at RESOLUTION
+-- cannot -- CR 614.16 lets a replacement multiply either one.
 --
 -- Literal 1 is "it": the card printed one token, so a doubled create leaves
 -- several candidates for a singular word and the Create arm asks which. Anything
--- else is "them": every card in the pool that prints more than one token and
--- refers back to them says so in the plural (Thatcher Revolt, Chandra Acolyte of
--- Flame, Orthion), and none prints several while naming just one -- there would
--- be nothing on the card to pick by.
-namesTokenSet :: Quantity.Type.Quantity -> Bool
-namesTokenSet quantity = quantity /= Quantity.Type.Literal 1
+-- else is "them", on the reading that a card printing several tokens and
+-- referring back to them has nothing on it to pick ONE by -- Thatcher Revolt (in
+-- the pool), Chandra Acolyte of Flame and Orthion (not) all say it in the plural,
+-- and Orthion carries both forms with the singular on its ONE-token ability.
+--
+-- An inference from the quantity, and unlike the rejection it replaces it cannot
+-- be linted: nothing in card data records the word, so a future card printing
+-- several while naming one would bind them all with no diagnostic. No such card
+-- is known.
+namesEveryToken :: Quantity.Type.Quantity -> Bool
+namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
 
 -- A resolving spell's PROJECTED modes: only its chosen ones (CR 608.2c/700.2),
 -- with every text change affecting it applied to each effect (CR 612), so the
@@ -1326,16 +1331,20 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     Monad.forM_ mSlot $ \slot ->
       State.modify' (bindAmountSlot source slot (Natural.length destroyed))
   Effect.Sacrifice slot -> do
-    -- CR 111 / 603.7c: a slot a Create bound as a SET names every token at once
-    -- ("those tokens"), so all of them are sacrificed, in mint order. Read off
-    -- the resolving object's LIVE bindings, as ArmDelayedTrigger is, rather than
-    -- out of `chosen`: `chosen` projects CR 601.2c's targets and a set binding is
-    -- never a target, so it is not there and owes CR 608.2b nothing. A member
-    -- that has already left the battlefield is no-opped by the funnel's own CR
-    -- 701.21a guard, which is CR 603.7c's "no longer in the zone it's expected to
-    -- be in" for one member rather than for the whole word.
+    -- A slot a Create bound to a GROUP names every token at once ("those
+    -- tokens"), so all of them are sacrificed, in mint order. Read off the
+    -- resolving object's LIVE bindings, as ArmDelayedTrigger is, rather than out
+    -- of `chosen`: `chosen` projects CR 601.2c's targets and a group binding is
+    -- never a target, so it is not there and owes CR 608.2b nothing.
+    --
+    -- CR 603.7c's zone check applies per MEMBER rather than to the whole word: a
+    -- member that is gone is simply not affected, and the rest still are. For a
+    -- token that is Event.sacrifice finding no such object at all, since CR
+    -- 111.7's state-based action has already made it cease to exist; for a card
+    -- permanent it would be that funnel's CR 701.21a battlefield guard.
     bound <- State.gets (Binding.objectsOf slot . maybe Map.empty Object.bindings . Game.lookupObject resolving)
     case bound of
+      -- One at a time rather than as one event (#757).
       Just victims -> Monad.mapM_ (Event.sacrifice controller) victims
       Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
         (Just recipient, True) -> case Recipient.objectOf recipient of
@@ -1694,21 +1703,23 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- replacement settles the COUNT first, so this joins the tokens that
             -- actually entered, however many that turned out to be.
             Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking minted)
-            case (mSlot, namesTokenSet quantity, minted) of
+            case (mSlot, namesEveryToken quantity, minted) of
               (Nothing, _, _) -> pure ()
               -- Unreachable: createTokens places every token onto the battlefield
               -- (CR 111.2). Total rather than partial: nothing bound matches "the
               -- token was never named" instead of crashing.
               (Just _, _, []) -> pure ()
-              -- CR 111 / 603.7c: the card says "those tokens", so the slot holds
-              -- EVERY token this Create minted. Nothing to ask, whatever CR
-              -- 614.16 did to the count -- a replacement that doubled the create
-              -- just makes the set bigger, and the plural word still names all of
-              -- it. Thatcher Revolt is the producer.
+              -- The card says "those tokens", so the slot holds EVERY token
+              -- this Create minted (CR 111.1: each is its own object). Nothing
+              -- to ask, whatever CR 614.16 did to the count -- a replacement
+              -- that doubled the create just makes the group bigger, and the
+              -- plural word still names all of it. CR 603.7c is what the binding
+              -- is FOR: a delayed ability armed by this same resolution refers
+              -- to these particular objects. Thatcher Revolt is the producer.
               (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
               -- CR 603.7c: bind the minted token into live Object.bindings so a
               -- delayed ability THIS SAME resolution arms can name it. One token
-              -- is the whole candidate set, so there is nothing to ask -- and
+              -- is the whole candidate list, so there is nothing to ask -- and
               -- where the rules leave nothing to ask, don't prompt.
               (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
               -- CR 614.16 got there first: a token replacement (Doubling Season)
@@ -2441,14 +2452,15 @@ bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
--- CR 111 / 603.7c's plural: bind EVERY token a Create minted into `slot`, for a
--- card that refers back to all of them at once. bindSlot's sibling, same holder
--- and same reason -- ArmDelayedTrigger captures this object's whole environment,
--- which is how "those tokens" outlives the resolution that minted them.
+-- bindSlot's plural: bind EVERY token a Create minted into `slot`, for a card
+-- that refers back to all of them at once. Same holder and same reason (CR
+-- 603.7c) -- ArmDelayedTrigger captures this object's whole environment, which is
+-- how "those tokens" outlives the resolution that minted them.
 --
--- A set slot is readable mid-fold on BOTH paths, unlike bindSlot's single object:
--- its one reader (the Sacrifice arm) goes to live GameState rather than to
--- `chosen`, because `chosen` carries CR 601.2c's targets and this is never one.
+-- A group slot is readable mid-fold on BOTH paths, unlike bindSlot's single
+-- object: its one reader (the Sacrifice arm) goes to live GameState rather than
+-- to `chosen`, because `chosen` carries CR 601.2c's targets and this is never
+-- one.
 bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
 bindObjectsSlot holder slot targets gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}

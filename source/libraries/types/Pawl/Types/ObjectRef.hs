@@ -17,7 +17,7 @@ data ObjectRef
     -- slot's single Recipient. Subject to CR 608.2b's illegal-target check when
     -- the slot was a target.
     --
-    -- A slot a Create bound to a whole minted SET is not read here at all, so
+    -- A slot a Create bound to a whole minted GROUP is not read here at all, so
     -- naming one this way affects nothing (#755).
     InSlot SlotName.SlotName
   | -- | Every PERMANENT ON THE BATTLEFIELD matching the Filter -- Day of

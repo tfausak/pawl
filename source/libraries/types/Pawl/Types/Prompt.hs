@@ -444,12 +444,12 @@ data Prompt r where
   ChooseReplacement :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt Natural.Natural
   -- | CR 603.7c: which of several minted tokens a Create's slot binds -- the "it" a
   -- delayed triggered ability armed in the same resolution will name. The ObjectId
-  -- is the resolving source holding the binding; the NonEmpty is the tokens
-  -- actually minted, in creation order.
+  -- is the effect's source; the NonEmpty is the tokens actually minted, in
+  -- creation order.
   --
   -- Reachable only through a replacement: a Create whose printed quantity is
-  -- anything but exactly one binds its whole minted SET instead and asks nothing
-  -- (Resolve.namesTokenSet), so the singular "it" starts out with a single
+  -- anything but exactly one binds every token it minted instead and asks
+  -- nothing (Resolve.namesEveryToken), so the singular "it" starts with a single
   -- candidate -- and CR 614.16 scales the count at RUNTIME, giving it several.
   --
   -- CR 707.10e is the codified analogue and what settles this as a CHOICE rather

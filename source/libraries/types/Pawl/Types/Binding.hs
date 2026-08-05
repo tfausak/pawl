@@ -36,11 +36,11 @@ data Binding = MkBinding
     -- ENTERS. Stored only under Pawl.Engine.Binding.copySource; the layer fold
     -- reads it as the layer-1 seed. Nothing for a non-copy object.
     copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics,
-    -- | CR 111 / 603.7c: EVERY object a Create minted, for a card that refers
-    -- back to all of them at once -- Thatcher Revolt's "those tokens". The
-    -- plural of `target` above and never the same slot as one: a Create's slot
-    -- is a definition, never a target (CR 115.10a), so nothing here is subject
-    -- to CR 608.2b's illegal-target check. Nothing for every other slot.
+    -- | CR 111.1: EVERY object a Create minted, for a card that refers back to
+    -- all of them at once -- Thatcher Revolt's "those tokens". The plural of
+    -- `target` above and never the same slot as one: a Create's slot is a
+    -- definition, never a target (CR 115.10a), so nothing here is subject to CR
+    -- 608.2b's illegal-target check. Nothing for every other slot.
     --
     -- A Seq and not a Set: mint order is the order the tokens entered, which is
     -- the order a reader acts on them in, and it is not an ObjectId ordering.

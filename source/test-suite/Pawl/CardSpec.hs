@@ -1846,10 +1846,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- TRIGGERED ability, so the narrower view saw a declared entry that nothing
   -- appeared to arm and failed the equality outright.
   --
-  -- The multi-token-binding lint below takes the same wide view, for the same
-  -- reason: nothing about CR 603.7c's one-of-several question is peculiar to a
-  -- spell mode. It sweeps nothing new today -- no ability in this pool creates
-  -- tokens and binds one -- so the widening is a hole closed, not a claim.
+  -- The "every slot a delayed ability reads is one its card defines" lint below
+  -- takes the same wide view, for the same reason: nothing about where a Create
+  -- binds its minted tokens is peculiar to a spell mode.
   Spec.it s "every armed delayed ability is declared, and every declared one is armed" $ do
     ps <- S.allPrintings s
     let cardOffends card =

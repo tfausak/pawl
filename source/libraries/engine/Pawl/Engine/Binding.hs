@@ -168,10 +168,10 @@ toObject :: ObjectId -> Binding
 toObject oid = Binding.empty {Binding.target = Just (Recipient.ToObject oid)}
 
 -- A binding that names SEVERAL objects and nothing else -- what a Create binds
--- for a card that refers back to every token it made at once (CR 111 / 603.7c),
--- Thatcher Revolt's "those tokens". toObject's plural, and a distinct field
--- rather than a list of Recipients: this is a definition and never a target
--- (CR 115.10a), so it is not subject to CR 608.2b.
+-- for a card that refers back to every token it made at once, Thatcher Revolt's
+-- "those tokens". toObject's plural, and a distinct field rather than a list of
+-- Recipients: this is a definition and never a target (CR 115.10a), so it is not
+-- subject to CR 608.2b.
 toObjects :: Seq ObjectId -> Binding
 toObjects oids = Binding.empty {Binding.objects = Just oids}
 
@@ -225,9 +225,9 @@ targetsOf = Map.mapMaybe Binding.target
 amountOf :: SlotName -> Map SlotName Binding -> Maybe Natural
 amountOf slot m = Binding.amount =<< Map.lookup slot m
 
--- The objects bound as a SET at a slot, if any (CR 111 / 603.7c). Nothing when
--- the slot holds a single target instead, or nothing at all -- so a reader that
--- offers both shapes can tell "them" from "it" without a tag.
+-- The objects bound as a GROUP at a slot, if any. Nothing when the slot holds a
+-- single target instead, or nothing at all -- so a reader that offers both shapes
+-- can tell "them" from "it" without a tag.
 objectsOf :: SlotName -> Map SlotName Binding -> Maybe (Seq ObjectId)
 objectsOf slot m = Binding.objects =<< Map.lookup slot m
 
