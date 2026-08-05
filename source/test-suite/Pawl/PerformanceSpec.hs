@@ -53,10 +53,13 @@ largeBoard = 256
 -- leave that list empty and the per-object gates would never run at all.
 --
 -- It stops where CR 605.1a's mana-ability test does, which is before
--- Cost.canPay. That is deliberate: the cost fold walks the MANA SOURCES rather
--- than this loop's object, is quadratic in its own right today, and is a
--- separate question (#316's "out of scope", #435). This module measures the
--- projection loop, so the fixture keeps the cost fold out of the reading.
+-- Cost.canPay and Target.fillableModes. That is deliberate: those two ask about
+-- OTHER objects and take a whole-board sweep apiece, so a board whose abilities
+-- reach them is quadratic today and NOT guarded here -- swapping this fixture
+-- for Prodigal Sorcerer reads 15.6x rather than 3.8x (#716). This module
+-- measures the projection loop the enumeration itself runs, so the fixture
+-- keeps those two sweeps out of the reading rather than widening the bound to
+-- admit them.
 --
 -- The hand is empty, so Cast.castableSpells and playableLands are constant work
 -- here and the battlefield loop is the only thing that varies with `n`.

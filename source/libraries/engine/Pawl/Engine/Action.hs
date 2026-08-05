@@ -75,7 +75,9 @@ legalActions pid gs =
       -- sharing them rested on GHC's CSE before and is now stated (#200, #315,
       -- #316). The board is a snapshot of this one `gs` and this is a pure
       -- function of it, so nothing can move between the projection and its
-      -- uses.
+      -- uses. Pawl.PerformanceSpec is what holds the line now: it measures this
+      -- enumeration over 64 and 256 permanents and fails if quadrupling the
+      -- board costs more than 8x, which one projection per object does.
       activations =
         let grants = Projection.controlGrants gs
             pcs = Projection.projectAll gs

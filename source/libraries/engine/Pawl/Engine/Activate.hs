@@ -232,6 +232,10 @@ affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid
 -- conjuncts are deliberately NOT given that board: Target.fillableModes and
 -- Cost.canPay ask about OTHER objects (the target pool, the mana sources), so
 -- each hoists its own board for its own sweep (#316).
+--
+-- Those two hoists are per CALL, and the caller is a loop over the battlefield,
+-- so an ability that reaches them costs one whole-board sweep per permanent
+-- (#716).
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs = activatableGiven (Projection.controlGrants gs) Map.empty pid srcId ability gs
 
