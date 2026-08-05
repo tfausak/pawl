@@ -81,6 +81,14 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.SetCreatureSubtype Subtype.Frog)
       """ {"type":"SetCreatureSubtype","value":{"type":"Frog"}} """
+  -- layer 4, CR 205.1b add (Life and Limb -> Saproling).
+  Spec.it s "AddCreatureSubtype" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.AddCreatureSubtype Subtype.Saproling)
+      """ {"type":"AddCreatureSubtype","value":{"type":"Saproling"}} """
   -- layer 4 (Opalescence -> Creature).
   Spec.it s "AddCardType" $
     Common.assertJsonCodec
