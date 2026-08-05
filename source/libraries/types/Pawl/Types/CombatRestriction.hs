@@ -4,9 +4,10 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 
 -- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an effect saying a
--- creature can't attack, or can't attack unless some condition is met -- or the
--- sentence CR 509.1b writes with "block" in place of "attack". Pacifism states
--- both in one line, and prints one of the first two arms below.
+-- creature can't attack, can't attack alone, or can't attack unless some
+-- condition is met, and the sentence CR 509.1b writes with "block" in place of
+-- "attack". Pacifism states two of those in one line, and prints one of the first
+-- two arms below.
 --
 -- The FIFTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
@@ -27,13 +28,19 @@ import qualified Pawl.Types.Condition as Condition
 -- reason for it.
 --
 -- The arms differ in SHAPE rather than in axis, and there are two shapes. The
--- first two are answered about a creature ALONE, so the reader may apply them to
--- CR 508.1a's and CR 509.1a's candidate list and never look at a declaration.
+-- first two are answered about ONE CREATURE, so the reader may apply them to CR
+-- 508.1a's and CR 509.1a's candidate list and never look at a declaration.
 -- CantAttackAlone cannot be: it is a fact about the whole set of creatures
 -- declared as attackers, so it is answered against the finished declaration
--- instead. Both shapes are CR 508.1c restrictions all the same -- that rule's own
--- Example is a "can't attack alone" board -- so they share the type rather than
--- splitting into a second carrier.
+-- instead. Both are restrictions of the rule they name all the same -- CR 508.1c's
+-- own Example is a "can't attack alone" board -- so they share the type rather
+-- than splitting into a second carrier.
+--
+-- A THIRD shape is not representable: a restriction bounding the SIZE of a
+-- declaration from above, which is Silent Arbiter's "no more than one creature
+-- can attack each combat". CantAttackAlone is not it turned around -- it forbids
+-- a declaration for what it CONTAINS, and no bound on how many creatures a
+-- declaration may name can be recovered from an Affected (#713).
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
@@ -46,12 +53,9 @@ import qualified Pawl.Types.Condition as Condition
 -- The axis is missing rather than collapsed, and the missing capability is
 -- named: an attacking restriction with an object (Crown-Hunter Hireling, Armored
 -- Galleon) is one whose CONDITION is about the player CR 508.1b names per
--- creature, and the condition below cannot name that player (#620). A
--- restriction that BOUNDS THE SIZE of a declaration from above (Silent Arbiter's
--- "no more than one creature can attack each combat") is a third shape, and no
--- arm below can state it (#713). A blocking restriction with an object is
--- what CR 702.9b's evasion keywords already are -- carried on the ATTACKER as a
--- keyword, never here.
+-- creature, and the condition below cannot name that player (#620). A blocking
+-- restriction with an object is what CR 702.9b's evasion keywords already are --
+-- carried on the ATTACKER as a keyword, never here.
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.CombatRestriction is the only module that may case on it. Casing
