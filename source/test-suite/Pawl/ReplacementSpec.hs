@@ -106,7 +106,7 @@ answersFor answer gs game = snd (Replay.record answer gs game)
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Card
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
 
 wasAskedToReplace :: [Response.Response] -> Bool
 wasAskedToReplace responses =
@@ -728,6 +728,135 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     Spec.assertEqWith s "both events were prevented whole" (amounts after) []
     Spec.assertEqWith s "bob's life is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and 3 of the shield's 4 were spent, so 1 remains" (length (GameState.replacements after)) 1
+
+-- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
+-- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
+-- damage that would be dealt to you this turn. Whenever damage that would be
+-- dealt to you is prevented, put that many +1/+1 counters on this creature").
+--
+-- Four properties, and between them they are the rule: a prevention that
+-- prevents something fires the ability, the ability is handed HOW MUCH was
+-- prevented, one prevention effect across several SIMULTANEOUS events fires it
+-- ONCE, and damage prevented to a permanent is not damage prevented to a player.
+-- The card's own 2016-11-08 ruling supplies a fifth -- "any effect that uses the
+-- word 'prevent' will cause it to trigger" -- which is the Mending Hands case.
+--
+-- The DAMAGE BATCHES are hand-built and the SPELL is not, for mendingHandsSpec's
+-- reason: casting the Squire for real is what proves the card, while reaching a
+-- two-attacker combat batch would mean driving a whole combat phase to produce a
+-- fixture these assertions read straight off.
+selflessSquireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selflessSquireSpec s registry = Spec.describe s "Selfless Squire (CR 615.13)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      -- Cast the Squire, let its CR 603.6a enters trigger go on the stack, and
+      -- resolve it -- which is what installs the CR 615.1 shield.
+      castSquire gs spellId =
+        let entered = castAndResolve S.identityAnswer gs spellId
+            triggered = S.runPure S.identityAnswer entered Engine.settleForPriority
+         in S.runPure S.identityAnswer triggered Stack.resolveTop
+      -- Settle one damage batch, then let whatever it triggered go on the stack
+      -- and resolve. One trigger per pass, which is all any case here makes.
+      strikeAndSettle gs batch =
+        let dealt = S.runPure S.identityAnswer gs (Damage.applyDamage batch >> Engine.settleForPriority)
+         in (dealt, S.runPure S.identityAnswer dealt Stack.resolveTop)
+      squireOf gs = case Set.toList (Set.filter (\oid -> fmap S.nameOf (Game.cardOf oid gs) == Just (CardName.MkCardName (Text.pack "Selfless Squire"))) (GameState.battlefield gs)) of
+        oid : _ -> Just oid
+        [] -> Nothing
+  -- THE WHOLE CARD, and the whole of CR 615.13: a prevention effect is applied,
+  -- it prevents some damage, and an ability that watches for exactly that fires
+  -- carrying the amount. 3 damage aimed at alice is prevented whole (CR 615.6),
+  -- and the 1/1 that shielded her becomes a 4/4.
+  Spec.it s "CR 615.13 whole card: damage prevented to alice puts that many +1/+1 counters on the Squire" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    squirePrinting <- S.printingOf s registry "Selfless Squire"
+    let base = S.landsInPlay plains 4
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (g2, spellId) = S.handOne squirePrinting g1
+        shielded = castSquire g2 spellId
+        squire = squireOf shielded
+        (dealt, after) = strikeAndSettle shielded [hit attacker (Recipient.ToPlayer S.alice) 3]
+    Spec.assertEqWith s "setup: the shield is a floating replacement" (length (GameState.replacements shielded)) 1
+    Spec.assertEqWith s "setup: the Squire is on the battlefield as a 1/1" (squire >>= \oid -> S.powerToughnessOf oid shielded) (Just (1, 1))
+    -- CR 615.6: a fully prevented event never happens, so alice loses nothing and
+    -- no damage event is recorded.
+    Spec.assertEqWith s "alice's life is untouched" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "and no damage event happened at all" (amounts after) []
+    -- The discriminating half: the prevention alone would leave the Squire a
+    -- 1/1. What makes it a 4/4 is CR 615.13's trigger reading the amount.
+    Spec.assertEqWith s "exactly one trigger was gathered" (length (GameState.stack dealt)) 1
+    Spec.assertEqWith s "and it put 3 +1/+1 counters on the Squire" (fmap (\oid -> countersOn CounterKind.PlusOnePlusOne oid after) squire) (Just 3)
+    Spec.assertEqWith s "so the 1/1 is now a 4/4" (squire >>= \oid -> S.powerToughnessOf oid after) (Just (4, 4))
+  -- The BASELINE that makes the case above discriminate: the same board with the
+  -- shield never installed. The Squire is put onto the battlefield directly, so
+  -- its CR 603.6a enters trigger never fires and nothing prevents anything.
+  --
+  -- Both halves move: alice takes the damage AND the Squire stays a 1/1. An
+  -- implementation that fired the counters off the DAMAGE rather than off the
+  -- prevention would pass the case above and fail this one.
+  Spec.it s "CR 615.13 no prevention, no trigger: the same 3 damage lands and the Squire stays a 1/1" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    squirePrinting <- S.printingOf s registry "Selfless Squire"
+    let base = S.landsInPlay plains 4
+        (attacker, g1) = S.addCreature pikerPrinting S.bob base
+        (squire, g2) = S.addCreature squirePrinting S.alice g1
+        (dealt, after) = strikeAndSettle g2 [hit attacker (Recipient.ToPlayer S.alice) 3]
+    Spec.assertEqWith s "setup: no shield was installed" (length (GameState.replacements g2)) 0
+    Spec.assertEqWith s "alice takes all 3" (S.lifeOf S.alice after) (Just 17)
+    Spec.assertEqWith s "and the damage event happened" (amounts after) [3]
+    Spec.assertEqWith s "nothing triggered" (length (GameState.stack dealt)) 0
+    Spec.assertEqWith s "so the Squire is still a 1/1" (S.powerToughnessOf squire after) (Just (1, 1))
+  -- CR 615.13's own arithmetic: "each time a prevention effect is applied to ONE
+  -- OR MORE SIMULTANEOUS damage events". One shield across a batch of two is one
+  -- application, so the ability fires ONCE with the total -- not once per event.
+  --
+  -- The counter count cannot tell the two readings apart (3 + 2 either way), so
+  -- what discriminates is the number of triggers gathered.
+  Spec.it s "CR 615.13 one prevention effect across two simultaneous events fires the ability ONCE" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    squirePrinting <- S.printingOf s registry "Selfless Squire"
+    let base = S.landsInPlay plains 4
+        (first, g1) = S.addCreature pikerPrinting S.bob base
+        (second, g2) = S.addCreature pikerPrinting S.bob g1
+        (g3, spellId) = S.handOne squirePrinting g2
+        shielded = castSquire g3 spellId
+        squire = squireOf shielded
+        batch = [hit first (Recipient.ToPlayer S.alice) 3, hit second (Recipient.ToPlayer S.alice) 2]
+        (dealt, after) = strikeAndSettle shielded batch
+    Spec.assertEqWith s "both events were prevented whole" (amounts after) []
+    Spec.assertEqWith s "ONE trigger, not one per event" (length (GameState.stack dealt)) 1
+    Spec.assertEqWith s "carrying the TOTAL prevented" (fmap (\oid -> countersOn CounterKind.PlusOnePlusOne oid after) squire) (Just 5)
+  -- The recipient half of the condition. Selfless Squire says "damage that would
+  -- be dealt to YOU", so a prevention that covers a CREATURE is silence -- and
+  -- the 2016-11-08 ruling's half is here too: the prevention doing the work is
+  -- MENDING HANDS, a card the Squire has nothing to do with, and the Squire is
+  -- put onto the battlefield directly so its own shield is not in play to
+  -- confuse the two.
+  Spec.it s "CR 615.13 someone else's prevention fires it, but only for damage to a PLAYER" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    squirePrinting <- S.printingOf s registry "Selfless Squire"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (victim, g1) = S.addCreature pikerPrinting S.alice base
+        (attacker, g2) = S.addCreature pikerPrinting S.bob g1
+        (squire, g3) = S.addCreature squirePrinting S.alice g2
+        (g4, spellId) = S.handOne mendingHands g3
+        onCreature = castAndResolve (aimCreature victim) g4 spellId
+        onAlice = castAndResolve (aimPlayer S.alice) g4 spellId
+        (creatureDealt, creatureAfter) = strikeAndSettle onCreature [hit attacker (Recipient.ToCreature victim) 3]
+        (playerDealt, playerAfter) = strikeAndSettle onAlice [hit attacker (Recipient.ToPlayer S.alice) 3]
+    Spec.assertEqWith s "the creature's 3 was prevented" (S.damageOf victim creatureAfter) (Just 0)
+    Spec.assertEqWith s "but nothing triggered" (length (GameState.stack creatureDealt)) 0
+    Spec.assertEqWith s "so the Squire stays a 1/1" (S.powerToughnessOf squire creatureAfter) (Just (1, 1))
+    -- The same shield, aimed one recipient over, is the discriminating twin.
+    Spec.assertEqWith s "alice's 3 was prevented too" (S.lifeOf S.alice playerAfter) (Just 20)
+    Spec.assertEqWith s "and THAT fired the Squire" (length (GameState.stack playerDealt)) 1
+    Spec.assertEqWith s "for 3 counters, off a prevention its own ability had nothing to do with" (S.powerToughnessOf squire playerAfter) (Just (4, 4))
 
 -- Apply one damage batch under a given interpreter. Top-level rather than a
 -- `where` binding for castEach's reason: the answer is rank-2 and GHC will not
@@ -1379,6 +1508,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   stonehornSpec s registry
   galvanicBlastSpec s registry
   mendingHandsSpec s registry
+  selflessSquireSpec s registry
   gatherSpecimensSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a

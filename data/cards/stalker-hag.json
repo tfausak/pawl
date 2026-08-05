@@ -1,0 +1,100 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Landwalk",
+          "value": {
+            "type": "HasSubtype",
+            "value": {
+              "type": "Forest"
+            }
+          }
+        },
+        {
+          "type": "Landwalk",
+          "value": {
+            "type": "HasSubtype",
+            "value": {
+              "type": "Swamp"
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Hybrid",
+          "value": [
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Black"
+              }
+            },
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            }
+          ]
+        },
+        {
+          "type": "Hybrid",
+          "value": [
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Black"
+              }
+            },
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            }
+          ]
+        },
+        {
+          "type": "Hybrid",
+          "value": [
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Black"
+              }
+            },
+            {
+              "type": "Colored",
+              "value": {
+                "type": "Green"
+              }
+            }
+          ]
+        }
+      ],
+      "name": "Stalker Hag",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Hag"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@ module Pawl.Types.StaticAbility where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Modification as Modification
 
 -- | A card's printed static continuous ability (CR 604.1/604.2: a static ability
@@ -25,6 +26,23 @@ import qualified Pawl.Types.Modification as Modification
 -- Projection.layer decides that, per CR 613.1.
 data StaticAbility = MkStaticAbility
   { affected :: Affected.Affected,
+    -- | The ability's "as long as" clause -- Kird Ape's "as long as you control
+    -- a Forest" -- or Nothing for an ability that functions unconditionally,
+    -- which is most of them.
+    --
+    -- A SECOND gate, on top of the one CR 604.2 already states: that rule keeps
+    -- the effect active while the permanent is on the battlefield and has the
+    -- ability, which Projection.gatherStatic applies by walking the battlefield,
+    -- and this narrows it further. CR 604.1 is why it can be nothing more than a
+    -- predicate over game state -- a static ability is "simply true", so there is
+    -- no moment at which the clause is checked and latched.
+    --
+    -- NOT a duration, and the distinction is CR 611.2c's parenthetical: a "for as
+    -- long as" duration (CR 611.2b, Pawl.Types.Duration.ForAsLongAs) ENDS a stored
+    -- effect that a resolution created, once and for good, while this gate is
+    -- re-asked on every projection (CR 613.5) and so turns the same effect off and
+    -- on again as the board moves, with no resolution and no trigger in between.
+    condition :: Maybe Condition.Condition,
     modifications :: NonEmpty.NonEmpty Modification.Modification
   }
   deriving (Eq, Ord, Show)

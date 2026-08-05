@@ -17,23 +17,24 @@ import qualified Pawl.Types.Uses as Uses
 -- in the pool arms a floating replacement to anything but AtCleanup or Never, so
 -- the conditional (CR 611.2b) and turn-relative (CR 611.2a) expiries reach this
 -- carrier only through hand-built test fixtures, and AtTurnOf on a replacement
--- has no test at all (#84). `uses` is CR 614.3's used-up count, and a CR 615.7
--- shield is the one row that does not use it: its remaining amount rides
--- DamageRewrite.PreventNext instead, because 615.7 counts damage where this field
--- counts applications.
+-- has no test at all (#84). `uses` is CR 614.3's used-up count, and the
+-- prevention shields are the rows that do not use it: a CR 615.7 shield's
+-- remaining amount rides DamageRewrite.PreventNext instead, because 615.7 counts
+-- damage where this field counts applications, and an unbounded one (CR 615.3)
+-- has nothing to count at all.
 --
 -- CR 615.7's multi-source choice is asked over
 -- Pawl.Engine.Replacement.resolveDamageBatch's batch: each DamageEvent still runs
 -- its own CR 616.1 loop, and what the shielded player (or the shielded
 -- permanent's controller) decides is the ORDER those loops run in.
 --
--- Not implemented: CR 615.13's "prevented" triggers.
--- Pawl.Engine.Replacement.resolveDamage reports only whether an event survived,
--- discarding WHICH candidate applied and how much it prevented, so nothing can
--- fire on a prevention (#612).
---
 -- `timestamp` doubles as this instance's CR 614.5 identity:
 -- GameState.nextTimestamp is monotone, so no two floating replacements share one.
+-- That identity is also what CR 615.13's preventions are GROUPED by
+-- (Pawl.Engine.Replacement.groupPreventions), so a shield spent across two
+-- simultaneous events fires a "when damage is prevented" ability once. Not
+-- implemented: nothing carries it further than the grouping, so a trigger cannot
+-- be keyed to the prevention that fired it -- "prevented this way" (#687).
 --
 -- `origin` is CR 614.15's question, and this carrier is the only one that can be
 -- asked it: a self-replacement is an effect of a resolving spell or ability,

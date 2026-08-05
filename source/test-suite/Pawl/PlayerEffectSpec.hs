@@ -1697,12 +1697,88 @@ nextTurnFor pid gs =
       untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = pid, GameState.phase = untap}) (Engine.runTurnBasedActions untap)
    in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passes = 0}
 
+-- CR 601.3b / Vedalken Orrery {4} Artifact: "You may cast spells as though they
+-- had flash."
+--
+-- One board, built twice. alice holds a Goblin Piker -- a creature card, so CR
+-- 302.1 and CR 117.1a's second sentence give it the sorcery-speed window -- and a
+-- Mountain, behind nine untapped Mountains so that mana is never the reason a
+-- cast is unavailable. It is BOB's precombat main phase and the stack is empty,
+-- so alice's own sorcery-speed window is shut. `extra` goes onto the battlefield
+-- under alice, and the Orrery is the only thing the two boards ever differ by.
+-- Returns the Piker in hand, the ids of `extra` in the order given, and the board.
+orreryBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+orreryBoard mountain piker extra =
+  let (base, oid) = S.pikerInHand mountain piker 9 Phase.PrecombatMain
+      withLand = snd (S.addHandCard mountain S.alice base)
+      put (ids, g) printing = let (i, g1) = S.addCreature printing S.alice g in (ids <> [i], g1)
+      (extraIds, withExtra) = List.foldl' put ([], withLand) extra
+   in ( oid,
+        extraIds,
+        withExtra
+          { GameState.activePlayer = S.bob,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The same board back on ALICE's turn, which is the control every refusal below
+-- is measured against: it is what says the Piker is affordable, offered and
+-- unblocked by anything the Orrery is not responsible for.
+orreryOnOwnTurn :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+orreryOnOwnTurn mountain piker extra =
+  let (oid, _, board) = orreryBoard mountain piker extra
+   in (oid, board {GameState.activePlayer = S.alice})
+
+-- CR 109.5's You scope from the other seat: it is ALICE's turn, BOB holds
+-- priority with a Piker of his own, and both players have nine untapped
+-- Mountains. `owner` is who controls the Orrery, and is the only thing that
+-- varies.
+orreryScopeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+orreryScopeBoard mountain piker orrery owner =
+  let base = S.landsInPlay mountain 9
+      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. 9 :: Int]
+      (bobsPiker, withBobsPiker) = S.addHandCard piker S.bob withBobsLands
+      withOrrery = snd (S.addCreature orrery owner withBobsPiker)
+   in ( bobsPiker,
+        withOrrery
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.bob
+          }
+      )
+
+-- CR 307.5's window, on the same axis and carried by something else entirely:
+-- alice controls a Goblin Piker to equip, a Bonesplitter to equip it with
+-- (data/cards/bonesplitter.json declares the equip ability SorcerySpeed) and
+-- whatever `extra` names, with nine untapped Mountains for the {1}. `active` is
+-- whose turn it is. Returns the Equipment.
+equipBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+equipBoard mountain piker bonesplitter extra active =
+  let base = S.landsInPlay mountain 9
+      withPiker = snd (S.addCreature piker S.alice base)
+      (equipment, withEquipment) = S.addCreature bonesplitter S.alice withPiker
+      withExtra = List.foldl' (\g printing -> snd (S.addCreature printing S.alice g)) withEquipment extra
+   in ( equipment,
+        withExtra
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = active,
+            GameState.priority = Just S.alice
+          }
+      )
+
+isActivateOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isActivateOf oid action = case action of
+  Action.Type.Activate o _ -> o == oid
+  Action.Type.Cast {} -> False
+  Action.Type.Play _ -> False
+  Action.Type.Pass -> False
+
 isPlay :: Action.Type.Action -> Bool
 isPlay action = case action of
   Action.Type.Play _ -> True
-  Action.Type.Pass -> False
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
+  Action.Type.Pass -> False
 
 -- Exploration {G} Enchantment: "You may play an additional land on each of your
 -- turns." Azusa, Lost but Seeking {2}{G} Legendary Creature -- Human Monk: "You
@@ -1812,6 +1888,133 @@ extraLandDropsSpec s registry =
       Spec.assertEqWith s "the allowance is back to one" (PlayerEffect.landPlaysAllowed S.alice gone) 1
       Spec.assertEqWith s "and CR 305.2b refuses a third" (filter isPlay (Action.legalActions S.alice gone)) []
 
+vedalkenOrrerySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+vedalkenOrrerySpec s registry =
+  Spec.describe s "VedalkenOrrery" $ do
+    -- The control. Without it, every refusal below would also be true of a board
+    -- where the Piker was simply unaffordable or unoffered.
+    Spec.it s "CR 117.1a on alice's own turn the creature spell is castable already" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (oid, board) = orreryOnOwnTurn mountain piker []
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+
+    Spec.it s "CR 117.1a on the opponent's turn it is not" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (oid, _, board) = orreryBoard mountain piker []
+      Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
+      Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
+
+    -- The whole card, on the board that just refused: CR 601.3b's permission is
+    -- read beside Cast.instantSpeed, so the sorcery-speed window opens for a card
+    -- that has no flash of its own.
+    Spec.it s "CR 601.3b with Vedalken Orrery it is castable on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+
+    -- The gameplay half, driven through the priority loop rather than by calling
+    -- Cast.castSpell: S.castAnswer takes whatever Cast action it is OFFERED, so
+    -- the two runs differ in the Orrery and in nothing that a test wrote by hand.
+    -- Without it alice is offered no cast at all and simply passes.
+    Spec.it s "CR 601.3b the offered cast resolves and the creature enters on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (_, _, board) = orreryBoard mountain piker [orrery]
+          (_, _, bare) = orreryBoard mountain piker []
+          play gs = S.runPure S.castAnswer gs Engine.priorityLoop
+          after = play board
+      Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
+      Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+      Spec.assertEqWith s "and without the Orrery it never left her hand" (S.countOnBattlefieldByName (S.printingName piker) S.alice (play bare)) 0
+      Spec.assertEqWith s "which is where it still is" (S.handSize S.alice (play bare)) 2
+
+    -- CR 702.8a's keyword is untouched: the card the Orrery let through never
+    -- gained flash, and nothing was written onto it.
+    Spec.it s "CR 702.8a the Piker still has no flash of its own" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      Spec.assertBool s (not (Cast.instantSpeed (S.combinedFace piker))) "no flash on the card"
+      Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission is the player's"
+
+    -- CR 604.2: the permission is gathered live off the battlefield, so removing
+    -- the Orrery shuts the window again with nothing to unwind.
+    Spec.it s "CR 604.2 with the Orrery gone the window shuts again" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (oid, extras, board) = orreryBoard mountain piker [orrery]
+          without = board {GameState.battlefield = foldr Set.delete (GameState.battlefield board) extras}
+      Spec.assertBool s (S.castable S.alice oid board) "castable with it"
+      Spec.assertBool s (not (S.castable S.alice oid without)) "not castable without it"
+
+    -- CR 305.1: playing a land is a special action and is never a cast, so a
+    -- permission about the timing of a CAST does not reach the Mountain in
+    -- alice's hand. Action.legalActions gates a land play on being the active
+    -- player, and the Orrery leaves that alone.
+    Spec.it s "CR 305.1 the land in hand is still unplayable on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (_, _, board) = orreryBoard mountain piker [orrery]
+          (_, ownTurn) = orreryOnOwnTurn mountain piker [orrery]
+      Spec.assertBool s (any isPlay (Action.legalActions S.alice ownTurn)) "playable on her own turn"
+      Spec.assertBool s (not (any isPlay (Action.legalActions S.alice board))) "not on bob's"
+
+    -- CR 109.5 / PlayerScope.You: the Orrery says "you", so alice's does nothing
+    -- for bob. The pair differs only in who controls it.
+    Spec.it s "CR 109.5 alice's Orrery does not widen bob's window" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (bobsPiker, board) = orreryScopeBoard mountain piker orrery S.alice
+      Spec.assertBool s (not (S.castable S.bob bobsPiker board)) "not castable"
+
+    Spec.it s "CR 109.5 bob's own Orrery does" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (bobsPiker, board) = orreryScopeBoard mountain piker orrery S.bob
+      Spec.assertBool s (S.castable S.bob bobsPiker board) "castable"
+
+    -- CR 307.5: the reason the permission is read BESIDE Cast.instantSpeed and
+    -- not inside it, nor inside Turn.sorcerySpeedWindow under it. Bonesplitter's
+    -- equip ability is sorcery-speed, and the Orrery is not about abilities at
+    -- all. Three boards triangulate it: the ability is genuinely offered, the
+    -- opponent's turn genuinely takes it away, and the Orrery does not give it
+    -- back.
+    Spec.it s "CR 307.5 the equip ability is offered on alice's own turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bonesplitter <- S.printingOf s registry "Bonesplitter"
+      let (equipment, board) = equipBoard mountain piker bonesplitter [] S.alice
+      Spec.assertBool s (any (isActivateOf equipment) (Action.legalActions S.alice board)) "offered"
+
+    Spec.it s "CR 307.5 and not on bob's" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bonesplitter <- S.printingOf s registry "Bonesplitter"
+      let (equipment, board) = equipBoard mountain piker bonesplitter [] S.bob
+      Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "not offered"
+
+    Spec.it s "CR 307.5 Vedalken Orrery does not give it back" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bonesplitter <- S.printingOf s registry "Bonesplitter"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (equipment, board) = equipBoard mountain piker bonesplitter [orrery] S.bob
+          (onOwnTurn, ownBoard) = equipBoard mountain piker bonesplitter [orrery] S.alice
+      Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "still not offered"
+      Spec.assertBool s (any (isActivateOf onOwnTurn) (Action.legalActions S.alice ownBoard)) "and still offered on her own turn"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -1827,3 +2030,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   silenceSpec s registry
   extraLandDropsSpec s registry
   matchesSpellSpec s registry
+  vedalkenOrrerySpec s registry

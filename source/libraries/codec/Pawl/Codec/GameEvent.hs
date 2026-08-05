@@ -9,6 +9,7 @@ import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
+import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.ZoneChange as ZoneChange
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
@@ -18,6 +19,7 @@ toJson :: GameEvent.GameEvent -> Value.Value
 toJson e = case e of
   GameEvent.Moved zc pc -> Common.tagged "Moved" . Just . Common.array $ [ZoneChange.toJson zc, ProjectedCharacteristics.toJson pc]
   GameEvent.DamageDealt ev -> Common.tagged "DamageDealt" . Just $ DamageEvent.toJson ev
+  GameEvent.DamagePrevented r n -> Common.tagged "DamagePrevented" . Just . Common.array $ [Recipient.toJson r, Common.encodeNatural n]
   GameEvent.StepBegan p pid -> Common.tagged "StepBegan" . Just . Common.array $ [Phase.toJson p, PlayerId.toJson pid]
   GameEvent.SpellCast pid -> Common.tagged "SpellCast" . Just $ PlayerId.toJson pid
   GameEvent.BecameMonarch pid -> Common.tagged "BecameMonarch" . Just $ PlayerId.toJson pid
@@ -34,6 +36,7 @@ fromJson value = do
   case (t, mv) of
     ("Moved", Just (Value.Array (Array.MkArray [zc, pc]))) -> GameEvent.Moved <$> ZoneChange.fromJson zc <*> ProjectedCharacteristics.fromJson pc
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> DamageEvent.fromJson v
+    ("DamagePrevented", Just (Value.Array (Array.MkArray [r, n]))) -> GameEvent.DamagePrevented <$> Recipient.fromJson r <*> Common.decodeNatural n
     ("StepBegan", Just (Value.Array (Array.MkArray [p, pid]))) -> GameEvent.StepBegan <$> Phase.fromJson p <*> PlayerId.fromJson pid
     ("SpellCast", Just v) -> GameEvent.SpellCast <$> PlayerId.fromJson v
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> PlayerId.fromJson v

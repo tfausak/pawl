@@ -1,0 +1,88 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Whipstitched Zombie",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Beginning",
+                "value": {
+                  "type": "Upkeep"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Sacrifice",
+                    "value": "self"
+                  }
+                ],
+                "unlessPaid": {
+                  "cost": {
+                    "mana": [
+                      {
+                        "type": "OfType",
+                        "value": {
+                          "type": "Colored",
+                          "value": {
+                            "type": "Black"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "payer": "you"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Zombie"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

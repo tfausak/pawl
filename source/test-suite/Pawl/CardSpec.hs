@@ -183,6 +183,7 @@ grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility
 grantsItself keyword =
   StaticAbility.MkStaticAbility
     (Affected.Matching Filter.Type.IsSource)
+    Nothing
     (NonEmpty.singleton (Modification.GainKeyword keyword))
 
 -- CR 709.4's fixture: two halves that DIFFER on every axis Pawl.Engine.Card.merge2
@@ -380,6 +381,14 @@ modificationCounts modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
+-- Every Count reachable from a StaticAbility: its modifications' P/T quantities,
+-- plus CR 604.2's "as long as" gate, which is a Condition and so a pair of
+-- Quantities.
+staticAbilityCounts :: StaticAbility.StaticAbility -> [Count.Type.Count Quantity.Type.Quantity]
+staticAbilityCounts ability =
+  concatMap conditionCounts (Maybe.maybeToList (StaticAbility.condition ability))
+    <> concatMap modificationCounts (StaticAbility.modifications ability)
+
 -- Every Count reachable from a TriggerCondition: only StateIs (CR 603.8, a
 -- trigger's own condition) carries one.
 triggerConditionCounts :: TriggerCondition.TriggerCondition -> [Count.Type.Count Quantity.Type.Quantity]
@@ -404,6 +413,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
   -- exactly as the discard condition above.
   TriggerCondition.SpellOrAbilityCounters _ -> []
+  -- CR 615.13's prevention condition is a PlayerRelation too.
+  TriggerCondition.DamageToPlayerPrevented _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -417,6 +428,7 @@ effectCounts effect = case effect of
   Effect.Search _ _ -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.TemptWithTheRing -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices _ _ quantity -> quantityCounts quantity
   Effect.RestartGame -> []
@@ -436,6 +448,7 @@ effectCounts effect = case effect of
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration _ quantity -> durationCounts duration <> quantityCounts quantity
+  Effect.PreventAllDamage duration _ -> durationCounts duration
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
@@ -501,6 +514,7 @@ combatRestrictionCounts :: CombatRestriction.CombatRestriction -> [Count.Type.Co
 combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackAlone _ condition -> foldMap conditionCounts condition
 
 -- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
@@ -516,7 +530,7 @@ cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.power card))
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
-    <> concatMap (concatMap modificationCounts . StaticAbility.modifications) (Face.staticAbilities card)
+    <> concatMap staticAbilityCounts (Face.staticAbilities card)
     <> concatMap effectCounts (Card.allEffects card)
     <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
@@ -576,7 +590,9 @@ modalReadOffends abilityBound modal =
                   Resolve.definedSlots effects,
                   Map.keysSet (Mode.targetSpecs mode)
                 ]
-            wanted = Set.unions (fmap Resolve.slotsOf effects)
+            -- The whole MODE's reads, not just its effect list's: CR 118.12a's
+            -- "unless [a player] pays" names its payer by slot too.
+            wanted = Resolve.modeSlots mode
          in not (Set.isSubsetOf wanted available)
    in any modeOffends (Modal.modes modal)
 
@@ -612,6 +628,7 @@ effectReplacements effect = case effect of
   Effect.Search _ _ -> []
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.TemptWithTheRing -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices {} -> []
   Effect.RestartGame -> []
@@ -626,6 +643,7 @@ effectReplacements effect = case effect of
   Effect.GainLife _ _ -> []
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage {} -> []
+  Effect.PreventAllDamage {} -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
@@ -689,10 +707,10 @@ phasePatternOffends replacement = case replacement of
 
 -- The third baked field the codec accepts and no card may author, and the third
 -- for the same reason phasePatternOffends gives: a card cannot name an ObjectId
--- or a PlayerId, so CR 615.7's shielded recipient is Resolve's
--- PreventNextDamage arm to write. CR 615.7's remaining amount rides the same
--- carrier and is equally engine-only, so both halves of a shield are checked
--- here at once.
+-- or a PlayerId, so the recipient a shield covers -- CR 615.7's, and CR 615.3's
+-- unbounded one -- is for Resolve's prevention arms to write. CR 615.7's
+-- remaining amount rides the same carrier and is equally engine-only, so both
+-- halves of a shield are checked here at once.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
 damagePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
@@ -829,6 +847,9 @@ triggeredAbilityOffends ability =
 --     listed in rules 601.2b-i", which is what routes an activation through CR
 --     601.2c's target announcement -- and CR 700.2c scopes it to the chosen
 --     mode.
+--   * Binding.you. CR 109.5: "For an activated ability, this is the player who
+--     activated the ability" -- stamped for every activation alongside the
+--     source slot, so Brothers of Fire's "and 1 damage to you" is a slot read.
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
@@ -842,11 +863,6 @@ triggeredAbilityOffends ability =
 --
 -- What is NOT on it is the point:
 --
---   * CR 109.5's `you`, which for an activated ability the rule does define
---     ("For an activated ability, this is the player who activated the
---     ability") -- but Binding.setYou is called only when a TRIGGERED ability is
---     placed (Pawl.Engine.Engine, Pawl.Engine.Monarch), so an activated ability
---     reading the slot reads nothing (#569).
 --   * both event slots (CR 400.7e's `became`, CR 702.70a's `thatPlayer`): an
 --     activation is not an event, so Pawl.Engine.Event.eventBindings never runs
 --     for one.
@@ -870,7 +886,7 @@ activatedAbilityOffends ability =
         if declaresVariable (Cost.Type.mana (ActivatedAbility.cost ability))
           then Set.singleton Binding.variableX
           else Set.empty
-   in modalReadOffends (Set.insert Binding.triggerSource announcedX) (ActivatedAbility.modal ability)
+   in modalReadOffends (Set.union (Set.fromList [Binding.triggerSource, Binding.you]) announcedX) (ActivatedAbility.modal ability)
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
@@ -913,7 +929,7 @@ oneEffectTrigger condition effect =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -936,7 +952,7 @@ oneEffectActivated mana effect =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.timing = ActivationTiming.AnyTime
     }
@@ -949,6 +965,7 @@ lintMode effects slots =
     (Seq.fromList effects)
     (Map.fromList (fmap (\slot -> (slot, TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) slots))
     Optionality.Mandatory
+    Nothing
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -990,7 +1007,8 @@ reservedSlots =
       Binding.triggerSource,
       Binding.you,
       Binding.triggerPlayer,
-      Binding.became
+      Binding.became,
+      Binding.preventedAmount
     ]
 
 -- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
@@ -1124,7 +1142,9 @@ keywordFilters keyword = case keyword of
   Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
-  Keyword.Hexproof -> []
+  -- CR 702.11d's "[quality]", which the variant carries and rule 702.11b's plain
+  -- hexproof does not.
+  Keyword.Hexproof quality -> Maybe.maybeToList quality
   Keyword.Indestructible -> []
   -- CR 702.14c's criterion, which is a Filter since #499.
   Keyword.Landwalk criterion -> [criterion]
@@ -1225,9 +1245,13 @@ modificationFilters modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
+-- Three Filter positions, not two: the affected set, each modification's own
+-- keywords and Counts, and -- since CR 604.2's "as long as" gate landed -- the
+-- Counts inside that condition.
 staticAbilityFilters :: StaticAbility.StaticAbility -> [Filter.Type.Filter Keyword.Keyword]
 staticAbilityFilters ability =
   affectedFilters (StaticAbility.affected ability)
+    <> concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability))
     <> concatMap modificationFilters (StaticAbility.modifications ability)
 
 -- CR 603.6a's "whenever [a permanent] enters" carries one directly; CR 603.8's
@@ -1249,8 +1273,10 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
+  TriggerCondition.DamageToPlayerPrevented _ -> []
 
--- CR 613.11: which spells a cost-modifying player effect applies to.
+-- CR 613.11: which spells a player effect names -- a cost modifier's (CR
+-- 601.2f) or a timing permission's (CR 601.3b).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost f _ -> [f]
@@ -1266,11 +1292,14 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.PlayAdditionalLands _ -> []
   PlayerEffect.NoMaximumHandSize -> []
   -- CR 500.5 carries a ManaFilter, not a Filter: the set it names is MANA, and
-  -- this traversal is about the spells a cost modifier matches.
+  -- this traversal is about the spells a player effect names.
   PlayerEffect.DontLoseUnspentMana _ -> []
   -- CR 702.18a / 702.11c carry a PlayerScope, not a Filter: the set they name is
-  -- players, and this traversal is about the spells a cost modifier matches.
+  -- players, and this traversal is about the spells a player effect names.
   PlayerEffect.CantBeTargetedBy _ -> []
+  -- CR 601.3b's "a spell with certain qualities", which is a Filter over the
+  -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
+  PlayerEffect.CastAsThoughItHadFlash f -> [f]
 
 -- CR 201.4a: the restriction on which cards' names an as-enters name choice may
 -- name (Null Chamber's "other than a basic land card name"). The one Filter an
@@ -1314,6 +1343,7 @@ combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.
 combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttack affected condition -> affectedFilters affected <> foldMap conditionFilters condition
   CombatRestriction.CantBlock affected condition -> affectedFilters affected <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackAlone affected condition -> affectedFilters affected <> foldMap conditionFilters condition
 
 -- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,
 -- which is every position in the type except the one below.
@@ -1344,6 +1374,7 @@ effectFilters effect = case effect of
   Effect.Search f _ -> unframed [f]
   Effect.ExileAllGraveyards -> []
   Effect.Proliferate -> []
+  Effect.TemptWithTheRing -> []
   Effect.ExileHandThenDraw -> []
   Effect.PlayerSacrifices _ f quantity -> unframed (f : quantityFilters quantity)
   Effect.RestartGame -> []
@@ -1362,6 +1393,7 @@ effectFilters effect = case effect of
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
+  Effect.PreventAllDamage duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
@@ -1416,12 +1448,13 @@ activatedAbilityFilters ability =
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
 --   * `power`, `toughness`, `characteristicPT` -- CR 208.2's printed star,
 --     through a Count.
---   * `staticAbilities` -- the affected set, and the layer-6/7 modifications'
---     own keywords and Counts.
+--   * `staticAbilities` -- the affected set, CR 604.2's "as long as" condition,
+--     and the layer-6/7 modifications' own keywords and Counts.
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
 --   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
---   * `playerAbilities` -- CR 613.11's cost modifiers.
+--   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
+--     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `attackRequirements` (CR
 --     508.1d), `blockRequirements` (CR 509.1c) and `attackCosts` (CR 508.1h) --
 --     four more affected sets.
@@ -1564,7 +1597,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     ps <- S.allPrintings s
     let modeOffends m =
           let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
-              reads_ = Set.unions (fmap Resolve.slotsOf (Foldable.toList (Mode.effects m)))
+              -- Resolve.modeSlots and not a fold over the effects alone: CR
+              -- 118.12a's "unless [a player] pays" reads a slot for its payer,
+              -- which must be declared like any other.
+              reads_ = Resolve.modeSlots m
            in -- A slot DEFINED in this mode (a Create's minted token, or a
               -- PlaySubgame's bound subgame outcome) and then read by a later
               -- effect is legitimate dataflow, not an undeclared target -- the
@@ -1746,7 +1782,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory))
+            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory Nothing))
             (ModeSelection.ChooseExactly 1)
         withTriggered slot card =
           card
@@ -1915,9 +1951,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
-  -- The same subset shape over a card's ACTIVATED abilities, whose available
-  -- side is the narrowest of the three: an activation has no event, and is never
-  -- given CR 109.5's `you`. See activatedAbilityOffends for the available side.
+  -- The same subset shape over a card's ACTIVATED abilities, and the one
+  -- available side with no event slot on it at all: an activation is not an
+  -- event. See activatedAbilityOffends for the whole of it.
+  --
+  -- Brothers of Fire is what this caught: its "and 1 damage to you" reads CR
+  -- 109.5's slot from an ACTIVATED ability, which nothing bound until
+  -- Activate.activateAbility started stamping it (#569).
   Spec.it s "every slot an activated ability reads is bound for its activation" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
@@ -1931,18 +1971,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no dangling activated-ability slot" (fmap fst (filter (activatedAbilityOffends . snd) abilities)) []
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
-  -- proven here instead, against hand-built offenders and against three real
-  -- cards that exercise each part of the available side.
+  -- proven here instead, against hand-built offenders and against the four real
+  -- cards that between them exercise every part of the available side.
   --
   -- Every reserved slot an activation does NOT bind gets its own case, because a
   -- classification answering "every slot, always" would pass any one of them
-  -- alone. The `you` case is asserted twice over: rejected for an activated
-  -- ability AND accepted for a triggered one, which is the whole difference
-  -- between the two lints (Binding.setYou is stamped only on the triggered path).
+  -- alone. CR 109.5's `you` is the case that runs the other way, and is asserted
+  -- on BOTH lints: the rule defines the word for an activated ability and for a
+  -- triggered one, so the same effect is accepted either way (#569). Leaving it
+  -- off one lint's available side is what a card would then fail on, so the pair
+  -- is what keeps the two halves of the rule from drifting apart.
   Spec.it s "the lint itself catches an activated ability reading a slot activation never binds" $ do
     longtuskCub <- S.printingOf s registry "Longtusk Cub"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     cinderElemental <- S.printingOf s registry "Cinder Elemental"
+    brothers <- S.printingOf s registry "Brothers of Fire"
     let free = Just (ManaCost.MkManaCost [])
         variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
         -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
@@ -1960,8 +2003,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         drawX = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX)
     Spec.assertBool
       s
-      (activatedAbilityOffends (oneEffectActivated free youDiscards))
-      "CR 109.5 you is rejected: an activation never binds it"
+      (not (activatedAbilityOffends (oneEffectActivated free youDiscards)))
+      "CR 109.5 you is accepted: an activation binds the player who activated it"
     Spec.assertBool
       s
       (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies youDiscards)))
@@ -1990,14 +2033,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (activatedAbilityOffends (oneEffectActivated free drawX))
       "and rejected when it does not"
-    -- The three real cards between them cover every part of the available side
+    -- The four real cards between them cover every part of the available side
     -- that a committed card reaches: CR 113.7's self, CR 601.2c's declared
-    -- target, and an ability whose cost carries CR 601.2b's {X}.
+    -- target, an ability whose cost carries CR 601.2b's {X}, and CR 109.5's
+    -- `you`. Brothers of Fire is the last one's only producer, so dropping it
+    -- from this list would leave that part of the available side asserted by
+    -- the hand-built case alone.
     Spec.assertEqWith
       s
-      "Longtusk Cub, Prodigal Sorcerer and Cinder Elemental are all accepted"
-      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental])
-      [False, False, False]
+      "Longtusk Cub, Prodigal Sorcerer, Cinder Elemental and Brothers of Fire are all accepted"
+      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental, brothers])
+      [False, False, False, False]
   -- The PER-MODE half of all three read lints (#570), which no sweep above can
   -- reach: a one-mode ability cannot have a mode read another mode's slot at
   -- all, and all three multi-mode abilities in the pool have each mode reading
@@ -2263,11 +2309,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- Mode.targetSpecs at once.
         spellOf effects specs =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory))
+            (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory Nothing))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility
             (Affected.Matching Filter.Type.IsSource)
+            Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
         planted =
           [ ( "a target spec",
@@ -2281,6 +2328,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.staticAbilities =
                     [ StaticAbility.MkStaticAbility
                         (Affected.Matching buried)
+                        Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
                     ]
                 }
@@ -2345,7 +2393,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     spellOf
                       [ Effect.Create
                           (Quantity.Type.Literal 1)
-                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) (NonEmpty.singleton Modification.LoseAllAbilities)]}))
+                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}))
                           EntryRiders.defaultValue
                           Nothing
                       ]

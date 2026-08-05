@@ -241,8 +241,8 @@ modalReaderSpec s = Spec.describe s "M4h Modal reader" $ do
     let m =
           ModalT.MkModal
             ( Seq.fromList
-                [ Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))) Map.empty Optionality.Mandatory,
-                  Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))) Map.empty Optionality.Mandatory
+                [ Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))) Map.empty Optionality.Mandatory Nothing,
+                  Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))) Map.empty Optionality.Mandatory Nothing
                 ]
             )
             (ModeSelection.ChooseExactly 1) ::

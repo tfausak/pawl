@@ -59,6 +59,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -464,6 +465,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -503,9 +505,15 @@ discardLastAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -565,7 +573,8 @@ handInPlay printing board =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),
@@ -744,7 +753,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   --
   -- That is the posture castability itself takes -- pawl refuses to propose a
   -- cast it cannot pay rather than proposing and reversing at CR 601.2h -- and
-  -- carrying it through to the announced X is what leaves Mana.announcePhyrexian
+  -- carrying it through to the announced X is what leaves Mana.announce
   -- with no cost it has no offer for (#417).
   Spec.it s "CR 601.2 an unaffordable X ends the cast before CR 601.2c's targets are asked for" $ do
     blaze <- S.printingOf s registry "Blaze"
@@ -1747,6 +1756,7 @@ castFirstOption p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -1779,9 +1789,15 @@ castFirstOption p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -1817,6 +1833,7 @@ castPanglacial p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -1848,9 +1865,15 @@ castPanglacial p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines

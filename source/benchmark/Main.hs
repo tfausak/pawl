@@ -18,6 +18,7 @@ import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -76,6 +77,7 @@ alwaysPass p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -111,9 +113,15 @@ alwaysPass p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -130,6 +138,7 @@ castAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -166,9 +175,15 @@ castAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -184,6 +199,7 @@ fightAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -222,9 +238,15 @@ fightAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines

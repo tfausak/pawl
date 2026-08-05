@@ -5,8 +5,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | What an attacking creature is attacking (CR 508.1b), which CR 506.3 limits to
 -- a player, a planeswalker or a battle. These arms are that enumeration minus the
--- battle, the one card type pawl has no way to print; it grows an OfBattle arm
--- (CR 310.5, #302).
+-- battle: it grows an OfBattle arm (CR 310.5, #302). CardType.Battle exists, so
+-- the missing piece is the arm and the CR 310.8 protector it would be attacked
+-- through, not the card type.
 --
 -- Ord because Pawl.Types.Combat's `attacked` is a Set of these.
 data AttackTarget

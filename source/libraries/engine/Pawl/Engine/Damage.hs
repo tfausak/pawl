@@ -1,7 +1,6 @@
 module Pawl.Engine.Damage where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -31,7 +30,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
-import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
@@ -247,8 +246,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                         else []
                     thresholds = Map.fromList (blockerEntries <> defenderEntry)
                 chosen <-
-                  Trans.lift
-                    (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
+                  Game.choose (Prompt.AssignCombatDamage decider pid attacker thresholds power)
                 -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733
                 -- human-error rewind). An illegal answer assigns nothing.
                 let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n
@@ -315,8 +313,8 @@ gatherCombatDamage assigns = do
 -- built; re-asking here would be a second, later reading of the same question,
 -- which is what CR 608.2b's target re-validation is for and this is not.
 --
--- Only battles are missing from the classification, and only because no card type
--- for one exists yet (#302); CR 120.3h is what it would need.
+-- Only battles are missing from the classification, and only because Recipient
+-- has no ToBattle tag to classify one as (#302); CR 120.3h is what it would need.
 --
 -- The creature test comes first, and for a permanent that is both a creature and
 -- a planeswalker that is the wrong answer -- CR 120.3c and CR 120.3e both apply
@@ -349,9 +347,13 @@ damageRecipient gs recipient = case recipient of
 -- prevents. Those loops still run sequentially and the shield is still spent by
 -- whichever runs first -- what changed is that the shielded side, not the batch's
 -- gather order, says which that is.
+--
+-- The batch is also the unit CR 615.13 counts preventions in, which is the other
+-- half of what resolveDamageBatch answers: one Prevention per prevention effect
+-- that applied to this batch, carrying the total it prevented.
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
-  survivors <- Replacement.resolveDamageBatch events
+  (survivors, prevented) <- Replacement.resolveDamageBatch events
   let markOne g ev = case DamageEvent.target ev of
         Recipient.ToCreature oid ->
           if DamageEvent.dealtByInfect ev
@@ -440,11 +442,19 @@ applyDamage events = do
            in g {GameState.players = Map.adjust gain pid (GameState.players g)}
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
+  --
+  -- CR 615.13's preventions are recorded FIRST, which is the order they happened
+  -- in: a prevention is applied inside the CR 616.1 loop, which settles what the
+  -- event will be BEFORE the surviving damage is dealt. Both records land inside
+  -- one CR 117.5 boundary, so the two kinds of trigger are gathered together
+  -- either way and CR 603.3b lets their controller order them; what this fixes is
+  -- the canonical order the prompt indexes into.
   State.modify'
     ( \gs ->
         let marked = List.foldl' markOne gs survivors
             gained = List.foldl' gainOne marked survivors
-         in List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) gained survivors
+            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) gained prevented
+         in List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
     )
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
