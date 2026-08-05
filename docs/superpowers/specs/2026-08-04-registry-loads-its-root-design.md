@@ -90,11 +90,15 @@ single-face card would need a pointer file beside its face file.
   (#265), and the `Registry` header's carve-out about the file registry listing
   its own root goes with it.
 - `parseCard`'s filename identity check and its `name`/`slug` parameters; it
-  becomes `FilePath -> ByteString -> Either Text Card`.
-- The registry's use of `CardName.join`. That function's comment currently
-  explains that `Registry.parseCard` and `Engine.Card.combined` "must agree on
-  this string exactly"; afterwards only one of them exists, and the `registry`
-  sublibrary stops having to agree with `engine` about anything.
+  becomes `ByteString -> Either Text Card`, since `loadRoot` pairs each result
+  with the path it came from.
+
+The filing convention itself survives as `Registry.filedAs :: Card -> Slug` —
+the face names joined, slugified — because the corpus lint still needs to say
+where a file belongs. What ends is its role in a *lookup*. So `CardName.join`
+keeps two consumers rather than one, and the point of its comment changes rather
+than disappearing: `Engine.Card.combined` and `Registry.filedAs` ask for the same
+string for unrelated reasons and no longer have to agree.
 - **`Pawl.Types.CardError`.** `fetchCard` becomes `CardName -> m (Maybe Card)`.
   `Invalid` becomes unreachable (§6), which leaves one constructor carrying one
   bit plus the name the caller already passed in — and both consumers,
