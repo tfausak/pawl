@@ -88,6 +88,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -603,7 +604,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = Timestamp.MkTimestamp 0,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g4 =
           g3
@@ -644,7 +646,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = Timestamp.MkTimestamp 0,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g3 =
           g2
@@ -665,7 +668,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         ability = case Face.activatedAbilities (S.combinedFace prodigalSorcerer) of
           ab : _ -> ab
-          [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+          [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
         (abilId, g1) = Game.freshObjectId g0
         (ts, g2) = Game.freshTimestamp g1
         slot = SlotName.MkSlotName (Text.pack "target")
@@ -687,7 +690,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = ts,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g3 =
           g2
@@ -707,12 +711,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             ActivationTiming.AnyTime
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -722,10 +726,10 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -745,12 +749,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             ActivationTiming.AnyTime
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -768,12 +772,12 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             ActivationTiming.AnyTime
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -790,7 +794,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           TriggeredAbility.MkTriggeredAbility
             TriggerCondition.SelfEnters
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             Nothing
         (abilId, g4) = Game.freshObjectId g3
         (ts, g5) = Game.freshTimestamp g4
@@ -812,7 +816,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = ts,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -845,7 +850,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.timing = ActivationTiming.AnyTime
             }
@@ -869,7 +874,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = ts,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
         resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
@@ -915,7 +921,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.timing = ActivationTiming.AnyTime
             }
@@ -937,7 +943,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = ts,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -971,7 +978,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1010,7 +1017,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = ts,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1043,7 +1051,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory))
+                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1082,7 +1090,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.timestamp = ts,
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1261,7 +1270,7 @@ installControlBy mindslaver controller target gs0 =
                 },
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory))
+                (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.timing = ActivationTiming.AnyTime
           }
@@ -1285,7 +1294,8 @@ installControlBy mindslaver controller target gs0 =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
    in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)
@@ -1359,7 +1369,8 @@ twoBoltState piker mountain lightningBolt =
             Object.timestamp = Timestamp.MkTimestamp 0,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in gs2
         { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),
@@ -1383,7 +1394,7 @@ cancelVictim island cancel victim =
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing
+      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -1460,6 +1471,287 @@ counterSpec s registry = Spec.describe s "Counter" $ do
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the countered spell is not in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob resolved)) 0
     Spec.assertEqWith s "the countered spell is exiled" (length (Game.zoneMembers Zone.Exile S.bob resolved)) 1
+
+-- The board every Mana Leak case starts from, with only `bobLands` varying.
+-- alice has two Islands (Mana Leak's {1}{U}) and a Mana Leak in hand; bob has
+-- `bobLands` untapped Islands of his own and a Goblin Piker already on the
+-- stack. Returns the Piker's id and the state after alice casts Mana Leak at it.
+--
+-- The Piker is on the stack BEFORE Mana Leak is cast, so it holds the lower
+-- object id and identityAnswer's ChooseTargets -- Set.lookupMin over the legal
+-- recipients -- aims the Leak at it. The cancelVictim route above, and the same
+-- reason.
+manaLeakBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
+manaLeakBoard island manaLeak piker bobLands =
+  let (victimId, leakId, gs) = manaLeakHand island manaLeak piker bobLands
+   in (victimId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
+
+-- manaLeakBoard one step earlier, with the Leak still in alice's hand. Split out
+-- for the case that has to RECORD the cast as well as the resolution: an engine
+-- that offered CR 118.12a's cost at cast time would put its prompt outside a
+-- transcript that starts afterwards, and the countered-Leak case below exists to
+-- catch exactly that.
+manaLeakHand :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+manaLeakHand island manaLeak piker bobLands =
+  let base = S.landsInPlay island 2
+      withBob = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 .. bobLands]
+      (victimId, onStack) = S.spellOnStack piker S.bob withBob
+      (gs, leakId) = S.handOne manaLeak onStack
+   in (victimId, leakId, gs)
+
+-- Pays what a resolving spell or ability offers `who`, and takes the identity
+-- fallback elsewhere (the hackToIsland liar pattern). Deliberately unlike
+-- identityAnswer's Declines, so a test can tell an honoured answer from the
+-- fallback -- and so a pair of branches can differ in NOTHING but this.
+--
+-- Guarded on a NAMED player rather than paying whoever is asked, which is what
+-- makes the cases below prove CR 118.12's "who". An engine that offered the cost
+-- to the wrong player falls through to Declines and fails, rather than paying and
+-- passing: for Mana Leak the payer is the TARGETED spell's controller and not the
+-- resolving spell's, and for Whipstitched Zombie it is the ability's own (CR
+-- 603.3a). The Decider is checked alongside the player for CR 723.1: nobody is
+-- controlling anybody in these fixtures, so the two must agree.
+--
+-- Rank-1, like Pawl.Support.attackTo: the implicit forall is outermost, so
+-- `paysFor S.bob` is the `forall r. Prompt r -> r` that Replay.record wants.
+paysFor :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+paysFor who p = case p of
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _
+    | d == who && player == who ->
+        PaymentDecision.Pays
+  _ -> S.identityAnswer p
+
+bobPaysAnswer :: Prompt.Prompt r -> r
+bobPaysAnswer = paysFor S.bob
+
+-- manaLeakBoard with a Thalia on bob's side and one more Island each. alice
+-- needs the third Island because Thalia taxes HER cast (CR 601.2f), which is
+-- what makes the case below a paired assertion rather than one; bob needs three
+-- untapped Islands and no more, so a gate cost routed through that same rule
+-- would be one mana short.
+--
+-- Thalia is added BEFORE the Piker, so the Piker still holds the lower stack id
+-- and the Leak is aimed as manaLeakBoard describes.
+thaliaLeakBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+thaliaLeakBoard island thalia manaLeak piker =
+  let base = S.landsInPlay island 3
+      (_thaliaId, withThalia) = S.addCreature thalia S.bob base
+      withBob = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) withThalia [1 .. 3 :: Int]
+      (victimId, onStack) = S.spellOnStack piker S.bob withBob
+      (gs, leakId) = S.handOne manaLeak onStack
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId))
+   in (victimId, cast)
+
+-- bobPaysAnswer, plus: BOB's target choices avoid `notThis`. What lets one
+-- interpreter drive the whole countered-Leak exchange -- alice's Mana Leak takes
+-- identityAnswer's lowest-id recipient and hits the Piker, which was on the stack
+-- first, while bob's Cancel skips the Piker and hits the Leak above it. The two
+-- casts are told apart by WHO is casting, which is on the prompt.
+--
+-- Still pays for bob wherever a cost is offered, which is the whole point: the
+-- exchange must be able to answer a ChooseToPay, so that a transcript with none
+-- in it says the prompt was never raised rather than that nobody would have paid.
+bobPaysAndCounters :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+bobPaysAndCounters notThis p = case p of
+  Prompt.ChooseTargets _ player _ sets
+    | player == S.bob ->
+        Map.mapMaybe (Set.lookupMin . Set.filter (\r -> Recipient.objectOf r /= Just notThis)) sets
+  _ -> bobPaysAnswer p
+
+-- The pay-or-not answers in a transcript, in order.
+payResponses :: [Response.Response] -> [Response.Response]
+payResponses = filter isPayResponse
+
+isPayResponse :: Response.Response -> Bool
+isPayResponse response = case response of
+  Response.ChoseToPay _ -> True
+  _ -> False
+
+-- CR 118.12 / 118.12a: Mana Leak's "Counter target spell unless its controller
+-- pays {3}" -- a cost paid when the spell RESOLVES, by a player who is not the
+-- resolving spell's controller, with the counter on the refusal branch.
+--
+-- The first two cases run the SAME board and the SAME cast and differ in NOTHING
+-- but bob's answer, so the difference in outcome is the gate and nothing else;
+-- the third changes only how many Islands he holds. CR 608.2n's "Mana Leak in
+-- alice's graveyard" is asserted in all three: the resolution continues either
+-- way, a refusal being the other branch rather than a failure.
+manaLeakSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
+  Spec.it s "CR 118.12a the targeted spell's controller declines, so it is countered" $ do
+    island <- S.printingOf s registry "Island"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_victimId, cast) = manaLeakBoard island manaLeak piker 3
+        ((_, after), transcript) = Replay.record S.identityAnswer cast Stack.resolveTop
+    -- bob COULD have paid -- three untapped Islands -- so he was really asked,
+    -- and the refusal is his rather than CR 118.3's.
+    Spec.assertEqWith s "bob was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
+    Spec.assertEqWith s "declining spent nothing: bob's Islands are all untapped" (S.tappedCount S.bob after) 0
+    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+  Spec.it s "CR 118.12a the targeted spell's controller pays, so it is not countered" $ do
+    island <- S.printingOf s registry "Island"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = manaLeakBoard island manaLeak piker 3
+        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- The payment really happened: CR 605.3a lets the payer activate mana
+    -- abilities "whenever a rule or effect asks for a mana payment, even if
+    -- it's in the middle of ... resolving a spell", and three Islands paid {3}.
+    Spec.assertEqWith s "paying tapped three of bob's Islands" (S.tappedCount S.bob after) 3
+    -- CR 118.12a's other branch: the counter did not happen, and the spell is
+    -- still there to resolve. Asserting only "not in the graveyard" would pass
+    -- for a spell that never resolved at all, so the next line resolves it.
+    Spec.assertBool s (elem victimId (GameState.stack after)) "the Piker is still on the stack"
+    Spec.assertEqWith s "nothing of bob's is in his graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
+    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    -- CR 400.7 mints a fresh incarnation on the battlefield, so the permanent
+    -- is counted rather than looked up by the spell's id.
+    let played = snd (Engine.runGamePure bobPaysAnswer after Stack.resolveTop)
+    Spec.assertEqWith s "and the Piker then resolves onto the battlefield" (S.creaturesInPlay S.bob played) 1
+  -- CR 118.3 / 118.12: "can't" is the rule's own third case, and its Standstill
+  -- example is exactly an unpayable cost. Two Islands cannot pay {3}, so there
+  -- is one possible answer and the prompt is not raised -- proved by the
+  -- transcript, under an interpreter that WOULD have paid.
+  Spec.it s "CR 118.12 a controller who cannot pay {3} is not asked, and is countered" $ do
+    island <- S.printingOf s registry "Island"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_victimId, cast) = manaLeakBoard island manaLeak piker 2
+        ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "bob was never asked" (payResponses transcript) []
+    Spec.assertEqWith s "nothing of bob's was tapped" (S.tappedCount S.bob after) 0
+    Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
+    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  -- CR 601.2f totals the cost of a spell being CAST -- "the player determines the
+  -- total cost of the spell ... plus all additional costs and cost increases" --
+  -- and a cost paid during resolution is not that, so no cost increase reaches
+  -- it. ONE Thalia proves both halves at once: bob's tax is live enough to make
+  -- alice spend a third Island casting the Leak, and it still leaves the {3} at
+  -- {3}. Routed through Cost.total, the gate would ask for {4}, bob's three
+  -- Islands would fail CR 118.3, and he would never be asked at all.
+  Spec.it s "CR 601.2f a cost increase taxes the CAST and not the resolution payment" $ do
+    island <- S.printingOf s registry "Island"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = thaliaLeakBoard island thalia manaLeak piker
+    -- The control, and the half that must NOT change: Thalia is on the
+    -- battlefield and taxing. Mana Leak is {1}{U}, so an untaxed cast leaves an
+    -- Island untapped and this reads 2.
+    Spec.assertEqWith s "Thalia taxed alice's cast: all three of her Islands paid {2}{U}" (S.tappedCount S.alice cast) 3
+    let ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "bob was asked, so {3} was still payable" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- Three, not four: the same Thalia that just cost alice an Island adds
+    -- nothing here. Thalia herself is untapped, so this counts Islands only.
+    Spec.assertEqWith s "and {3} cost bob exactly three Islands" (S.tappedCount S.bob after) 3
+    Spec.assertBool s (elem victimId (GameState.stack after)) "the Piker was not countered"
+    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  -- CR 608.2d's timing, from the other side of Prompt.ChooseToPay's claim that a
+  -- countered Mana Leak never asks: the cost is offered when the spell RESOLVES,
+  -- so a spell that never resolves offers nothing. The MagicalHackTiming pair
+  -- makes the same argument about a resolution-time choice, and this is built the
+  -- same way -- the CAST is inside the recording, because an engine that offered
+  -- the cost at CR 601.2b-f would raise its prompt there and a transcript opened
+  -- afterwards would never see it.
+  Spec.it s "CR 608.2d a countered Mana Leak never offers its cost" $ do
+    island <- S.printingOf s registry "Island"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cancel <- S.printingOf s registry "Cancel"
+    -- SIX Islands for bob, not three: three pay Cancel's {1}{U}{U} and three are
+    -- left over. Without the spare three he could not have paid {3} anyway, and
+    -- an empty transcript would prove nothing (CR 118.3 would be the reason).
+    let (victimId, leakId, board) = manaLeakHand island manaLeak piker 6
+        (cancelId, gs) = S.addHandCard cancel S.bob board
+        exchange = do
+          S.cast S.alice leakId
+          S.cast S.bob cancelId
+          Stack.resolveTop
+        ((_, after), transcript) = Replay.record (bobPaysAndCounters victimId) gs exchange
+    -- The control: the exchange really happened. CR 701.6a puts the countered
+    -- Leak into its owner's graveyard, and CR 608.2n puts Cancel into bob's.
+    Spec.assertEqWith s "CR 701.6a: the countered Leak is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "CR 608.2n: Cancel resolved into bob's" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertBool s (elem victimId (GameState.stack after)) "and the Piker, never the Leak's business again, is still on the stack"
+    -- And the point: a spell that never resolves never offers its cost.
+    Spec.assertEqWith s "bob was never offered the {3}" (payResponses transcript) []
+    -- Not because he could not have paid it: three Islands are still untapped,
+    -- and this interpreter pays whenever it is asked. Offered at either end of
+    -- the exchange, this would read 6.
+    Spec.assertEqWith s "only Cancel's three Islands are tapped" (S.tappedCount S.bob after) 3
+
+-- Whipstitched Zombie and one untapped Swamp on alice's battlefield, her upkeep
+-- begun and the trigger settled onto the stack (CR 603.3b). Returns the Zombie,
+-- the Swamp and that state.
+--
+-- The Bitterblossom fixture in Pawl.TriggerSpec, one step short: the trigger is
+-- left ON the stack so a case can assert what the board looked like before it
+-- resolved, which is what rules out a Zombie that was never there.
+zombieUpkeep :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+zombieUpkeep swamp zombie =
+  let (zombieId, g1) = S.addCreature zombie S.alice (Setup.emptyGame S.bothPlayers)
+      (swampId, g2) = S.addCreature swamp S.alice g1
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan upkeep S.alice)
+          (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+   in (zombieId, swampId, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
+
+-- CR 118.12a again, reached from Pawl.Engine.Resolve.resolveModes rather than
+-- resolveSpellWith: Whipstitched Zombie's "At the beginning of your upkeep,
+-- sacrifice this creature unless you pay {B}" is a TRIGGERED ability, so the
+-- ability executor asks the gate instead of the spell path. The seam is one
+-- `paid` call shared by both, and this is the half Mana Leak cannot reach.
+--
+-- The payer is the ability's own controller (CR 603.3a's "your upkeep", bound
+-- into Pawl.Engine.Binding.you as the trigger is placed) rather than Mana Leak's
+-- targeted-spell controller -- the same slot read answering a different card.
+--
+-- Both cases start from the SAME board and the SAME settled trigger and differ
+-- in NOTHING but alice's answer.
+whipstitchedZombieSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+whipstitchedZombieSpec s registry = Spec.describe s "WhipstitchedZombie" $ do
+  Spec.it s "CR 118.12a declining the {B} sacrifices the Zombie to its owner's graveyard" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    zombie <- S.printingOf s registry "Whipstitched Zombie"
+    let (zombieId, swampId, onStack) = zombieUpkeep swamp zombie
+        ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
+    -- The two controls the assertions below would otherwise be satisfied by:
+    -- a Zombie that was never on the battlefield, and a trigger that never
+    -- fired. Both are ruled out BEFORE the resolution.
+    Spec.assertBool s (S.onBattlefield zombieId onStack) "the Zombie is on the battlefield before its upkeep trigger resolves"
+    Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
+    -- alice COULD have paid -- one untapped Swamp -- so the refusal is hers
+    -- rather than CR 118.3's.
+    Spec.assertEqWith s "alice was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    -- CR 701.21a: sacrificed, so it is IN the graveyard rather than merely gone.
+    -- The Swamp is still on the battlefield, so that one graveyard card can only
+    -- be the Zombie.
+    Spec.assertEqWith s "the Zombie is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertBool s (S.onBattlefield swampId after) "and the Swamp, which is not what was sacrificed, is still in play"
+    Spec.assertEqWith s "no creature is left in play" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "declining spent nothing: the Swamp is untapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+  Spec.it s "CR 118.12a paying the {B} leaves the Zombie on the battlefield" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    zombie <- S.printingOf s registry "Whipstitched Zombie"
+    let (zombieId, _swampId, onStack) = zombieUpkeep swamp zombie
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- CR 605.3a lets her tap the Swamp for it mid-resolution.
+    Spec.assertEqWith s "paying tapped the Swamp" (S.tappedCount S.alice after) 1
+    -- The same id, not a fresh one: nothing moved zones, so this is the very
+    -- permanent the trigger was about.
+    Spec.assertBool s (S.onBattlefield zombieId after) "the Zombie is still on the battlefield"
+    Spec.assertEqWith s "nothing was sacrificed" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
 
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
 -- added FIRST, so it holds the lowest object id and identityAnswer's
@@ -1992,7 +2284,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         -- illegal (it's no longer a legal CreatureTarget), while the
         -- reserved slot -- never targeted -- stays vacuously legal.
         gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-        mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory
+        mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory Nothing
         run = Resolve.resolveModes abilId source [(ModeIndex.MkModeIndex 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore
@@ -2084,7 +2376,7 @@ handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
   where
     addOne g =
       let (oid, g1) = Game.freshObjectId g
-          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing
+          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing
        in g1
             { GameState.objects = Map.insert oid obj (GameState.objects g1),
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
@@ -4084,6 +4376,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   loseLifeSpec s registry
   greatestSpec s registry
   counterSpec s registry
+  manaLeakSpec s registry
+  whipstitchedZombieSpec s registry
   magicalHackTimingSpec s registry
   artificialEvolutionSpec s registry
   stifleSpec s registry

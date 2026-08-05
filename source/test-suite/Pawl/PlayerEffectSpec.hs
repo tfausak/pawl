@@ -13,6 +13,10 @@
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
 --
+-- Exploration and Azusa, Lost but Seeking are the CR 305.2 pair, and they are a
+-- PAIR on purpose: they grant different numbers of extra land plays, which is
+-- what tells a real count apart from a boolean-plus-one.
+--
 -- Null Chamber also brings CR 201.4's card-name choice and CR 614.1c's entry
 -- replacement in with it, so the group covers Pawl.Engine.Replacement's
 -- EntryRewrite.ChooseCardNames arm and Pawl.Engine.Action.playableLands as well.
@@ -20,6 +24,7 @@ module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
@@ -41,6 +46,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -1650,6 +1656,365 @@ nullChamberSpec s registry =
             (Object.chosenNames chamber)
             (Set.fromList [S.printingName piker, S.printingName lightningBolt])
 
+-- `active` is the active player in their own precombat main phase with an empty
+-- stack (CR 305.1's window) holding FIVE Mountains, while `grantors` are already
+-- on the battlefield under ALICE's control.
+--
+-- Five is deliberately more than any case below plays. Every "and no more"
+-- assertion is otherwise satisfiable by an empty hand, which is the trap this
+-- whole group is built to avoid: each case checks the leftover hand as well as
+-- the lands that landed.
+--
+-- The grantors go under alice while the HAND is the argument's, so the one case
+-- that makes bob active reads alice's Exploration against bob's land plays --
+-- CR 109.5's You scope with the two players actually pulled apart.
+landDropBoard :: Printing.Printing -> [Printing.Printing] -> PlayerId.PlayerId -> GameState.GameState
+landDropBoard mountain grantors active =
+  let put g printing = snd (S.addCreature printing S.alice g)
+      withGrantors = List.foldl' put (Setup.emptyGame S.bothPlayers) grantors
+      add g _ = snd (S.addHandCard mountain active g)
+      withHand = List.foldl' add withGrantors [1 .. 5 :: Int]
+   in withHand
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = active,
+          GameState.priority = Just active
+        }
+
+-- Take every land play the board allows and stop. S.playLandAnswer plays a land
+-- whenever one is offered and passes otherwise, so the loop halts exactly when
+-- CR 305.2a's comparison refuses -- the whole gate, through the real priority
+-- loop, rather than a direct call to Action.legalActions.
+playEveryLand :: GameState.GameState -> GameState.GameState
+playEveryLand gs = S.runPure S.playLandAnswer gs Engine.priorityLoop
+
+-- alice's next turn, as far as CR 305.2 can see it: her untap step, which is
+-- where Engine.runTurnBasedActions resets the per-turn tally -- "during their
+-- turn" in CR 305.2 has to start over somewhere, and that is the first moment of
+-- the new one.
+nextTurnFor :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+nextTurnFor pid gs =
+  let untap = Phase.Beginning BeginningStep.Untap
+      untapped = S.runPure S.identityAnswer (gs {GameState.activePlayer = pid, GameState.phase = untap}) (Engine.runTurnBasedActions untap)
+   in untapped {GameState.phase = Phase.PrecombatMain, GameState.priority = Just pid, GameState.passes = 0}
+
+-- CR 601.3b / Vedalken Orrery {4} Artifact: "You may cast spells as though they
+-- had flash."
+--
+-- One board, built twice. alice holds a Goblin Piker -- a creature card, so CR
+-- 302.1 and CR 117.1a's second sentence give it the sorcery-speed window -- and a
+-- Mountain, behind nine untapped Mountains so that mana is never the reason a
+-- cast is unavailable. It is BOB's precombat main phase and the stack is empty,
+-- so alice's own sorcery-speed window is shut. `extra` goes onto the battlefield
+-- under alice, and the Orrery is the only thing the two boards ever differ by.
+-- Returns the Piker in hand, the ids of `extra` in the order given, and the board.
+orreryBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+orreryBoard mountain piker extra =
+  let (base, oid) = S.pikerInHand mountain piker 9 Phase.PrecombatMain
+      withLand = snd (S.addHandCard mountain S.alice base)
+      put (ids, g) printing = let (i, g1) = S.addCreature printing S.alice g in (ids <> [i], g1)
+      (extraIds, withExtra) = List.foldl' put ([], withLand) extra
+   in ( oid,
+        extraIds,
+        withExtra
+          { GameState.activePlayer = S.bob,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The same board back on ALICE's turn, which is the control every refusal below
+-- is measured against: it is what says the Piker is affordable, offered and
+-- unblocked by anything the Orrery is not responsible for.
+orreryOnOwnTurn :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+orreryOnOwnTurn mountain piker extra =
+  let (oid, _, board) = orreryBoard mountain piker extra
+   in (oid, board {GameState.activePlayer = S.alice})
+
+-- CR 109.5's You scope from the other seat: it is ALICE's turn, BOB holds
+-- priority with a Piker of his own, and both players have nine untapped
+-- Mountains. `owner` is who controls the Orrery, and is the only thing that
+-- varies.
+orreryScopeBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+orreryScopeBoard mountain piker orrery owner =
+  let base = S.landsInPlay mountain 9
+      withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) base [1 .. 9 :: Int]
+      (bobsPiker, withBobsPiker) = S.addHandCard piker S.bob withBobsLands
+      withOrrery = snd (S.addCreature orrery owner withBobsPiker)
+   in ( bobsPiker,
+        withOrrery
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.bob
+          }
+      )
+
+-- CR 307.5's window, on the same axis and carried by something else entirely:
+-- alice controls a Goblin Piker to equip, a Bonesplitter to equip it with
+-- (data/cards/bonesplitter.json declares the equip ability SorcerySpeed) and
+-- whatever `extra` names, with nine untapped Mountains for the {1}. `active` is
+-- whose turn it is. Returns the Equipment.
+equipBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> [Printing.Printing] -> PlayerId.PlayerId -> (ObjectId.ObjectId, GameState.GameState)
+equipBoard mountain piker bonesplitter extra active =
+  let base = S.landsInPlay mountain 9
+      withPiker = snd (S.addCreature piker S.alice base)
+      (equipment, withEquipment) = S.addCreature bonesplitter S.alice withPiker
+      withExtra = List.foldl' (\g printing -> snd (S.addCreature printing S.alice g)) withEquipment extra
+   in ( equipment,
+        withExtra
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = active,
+            GameState.priority = Just S.alice
+          }
+      )
+
+isActivateOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
+isActivateOf oid action = case action of
+  Action.Type.Activate o _ -> o == oid
+  Action.Type.Cast {} -> False
+  Action.Type.Play _ -> False
+  Action.Type.Pass -> False
+
+isPlay :: Action.Type.Action -> Bool
+isPlay action = case action of
+  Action.Type.Play _ -> True
+  Action.Type.Cast {} -> False
+  Action.Type.Activate _ _ -> False
+  Action.Type.Pass -> False
+
+-- Exploration {G} Enchantment: "You may play an additional land on each of your
+-- turns." Azusa, Lost but Seeking {2}{G} Legendary Creature -- Human Monk: "You
+-- may play two additional lands on each of your turns."
+--
+-- TWO producers with DIFFERENT numbers, and that is the point of the group
+-- rather than redundancy: one card cannot tell a real count from a
+-- boolean-plus-one, because both readings answer "two". Azusa's three is what
+-- separates them, and the two of them together answer four, which separates a
+-- SUM from a maximum.
+extraLandDropsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+extraLandDropsSpec s registry =
+  Spec.describe s "ExtraLandDrops" $ do
+    -- The control. CR 305.2's "normally one", played through the same loop, so
+    -- every raised number below is measured against a baseline this group
+    -- established rather than an assumed one.
+    Spec.it s "CR 305.2 with no effect a player plays one land and no more" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      let board = landDropBoard mountain [] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is one" (PlayerEffect.landPlaysAllowed S.alice board) 1
+      Spec.assertEqWith s "one Mountain landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 1
+      Spec.assertEqWith s "and FOUR are still in hand -- the gate refused, an empty hand did not" (S.handSize S.alice after) 4
+      Spec.assertEqWith s "no further land play is offered" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- Exploration's one extra. A gate that ignored the effect answers one here.
+    Spec.it s "CR 305.2 Exploration raises the allowance to two" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let board = landDropBoard mountain [exploration] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is two" (PlayerEffect.landPlaysAllowed S.alice board) 2
+      Spec.assertEqWith s "two Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 2
+      Spec.assertEqWith s "three are still in hand" (S.handSize S.alice after) 3
+      Spec.assertEqWith s "and the third is refused" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- THE DISCRIMINATOR between a count and a boolean. A gate written as "one,
+    -- or two if any effect grants extra lands" passes the Exploration case above
+    -- and stops at two here; only a gate that reads Azusa's NUMBER reaches
+    -- three.
+    Spec.it s "CR 305.2 Azusa's two additional lands make three, not two" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
+      let board = landDropBoard mountain [azusa] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is three" (PlayerEffect.landPlaysAllowed S.alice board) 3
+      Spec.assertEqWith s "three Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 3
+      Spec.assertEqWith s "two are still in hand" (S.handSize S.alice after) 2
+      Spec.assertEqWith s "and the fourth is refused" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- CR 305.2 says continuous effects INCREASE the number, so two of them
+    -- compose: one plus one plus two. Nothing here is redundant -- CR 702.18b
+    -- and CR 702.11h make multiple instances redundant for a KEYWORD, and CR
+    -- 305.2 states no such rule. A maximum rather than a sum answers three.
+    Spec.it s "CR 305.2 Exploration and Azusa together add up to four" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      azusa <- S.printingOf s registry "Azusa, Lost but Seeking"
+      let board = landDropBoard mountain [exploration, azusa] S.alice
+          after = playEveryLand board
+      Spec.assertEqWith s "the allowance is four" (PlayerEffect.landPlaysAllowed S.alice board) 4
+      Spec.assertEqWith s "four Mountains landed" (S.countOnBattlefieldByName (S.printingName mountain) S.alice after) 4
+      Spec.assertEqWith s "one is still in hand" (S.handSize S.alice after) 1
+      Spec.assertEqWith s "and the fifth is refused" (filter isPlay (Action.legalActions S.alice after)) []
+
+    -- CR 109.5: the You scope. alice's Exploration is alice's, and bob playing
+    -- lands on his own turn is still held to CR 305.2's one.
+    Spec.it s "CR 109.5 one player's Exploration does not raise another's allowance" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let board = landDropBoard mountain [exploration] S.bob
+          after = playEveryLand board
+      Spec.assertEqWith s "alice's allowance is two" (PlayerEffect.landPlaysAllowed S.alice board) 2
+      Spec.assertEqWith s "bob's is still one" (PlayerEffect.landPlaysAllowed S.bob board) 1
+      Spec.assertEqWith s "one Mountain landed for bob" (S.countOnBattlefieldByName (S.printingName mountain) S.bob after) 1
+      Spec.assertEqWith s "four are still in his hand" (S.handSize S.bob after) 4
+      Spec.assertEqWith s "and his second is refused" (filter isPlay (Action.legalActions S.bob after)) []
+
+    -- CR 305.2's allowance is PER TURN, and the raised one refills like the
+    -- normal one: CR 703.4c's untap step clears the tally, and the next turn
+    -- gets two again rather than nothing or a running total.
+    Spec.it s "CR 305.2 the raised allowance refills each turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let firstTurn = playEveryLand (landDropBoard mountain [exploration] S.alice)
+          untapped = nextTurnFor S.alice firstTurn
+          secondTurn = playEveryLand untapped
+      Spec.assertEqWith s "two played on the first turn" (GameState.landsPlayed firstTurn) (Map.singleton S.alice 2)
+      Spec.assertEqWith s "the untap step clears the tally" (GameState.landsPlayed untapped) Map.empty
+      Spec.assertEqWith s "two more on the second turn" (GameState.landsPlayed secondTurn) (Map.singleton S.alice 2)
+      Spec.assertEqWith s "four Mountains in play" (S.countOnBattlefieldByName (S.printingName mountain) S.alice secondTurn) 4
+      Spec.assertEqWith s "and the fifth is still in hand, refused" (S.handSize S.alice secondTurn) 1
+
+    -- CR 604.2: the grant is re-read from the battlefield on every look, so
+    -- destroying Exploration between the second land and the third takes the
+    -- extra play back. The already-played tally is untouched by that, which is
+    -- CR 305.2b's comparison landing on "equal" and refusing.
+    Spec.it s "CR 604.2 destroying Exploration mid-turn drops the allowance back to one" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      exploration <- S.printingOf s registry "Exploration"
+      let (explorationId, board) = S.addCreature exploration S.alice (Setup.emptyGame S.bothPlayers)
+          add g _ = snd (S.addHandCard mountain S.alice g)
+          withHand = List.foldl' add board [1 .. 5 :: Int]
+          ready = withHand {GameState.phase = Phase.PrecombatMain, GameState.activePlayer = S.alice, GameState.priority = Just S.alice}
+          gone = S.runPure S.identityAnswer (playEveryLand ready) (Event.destroy Regenerability.Regenerable [explorationId])
+      Spec.assertEqWith s "two lands were played while it stood" (GameState.landsPlayed gone) (Map.singleton S.alice 2)
+      Spec.assertEqWith s "the allowance is back to one" (PlayerEffect.landPlaysAllowed S.alice gone) 1
+      Spec.assertEqWith s "and CR 305.2b refuses a third" (filter isPlay (Action.legalActions S.alice gone)) []
+
+vedalkenOrrerySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+vedalkenOrrerySpec s registry =
+  Spec.describe s "VedalkenOrrery" $ do
+    -- The control. Without it, every refusal below would also be true of a board
+    -- where the Piker was simply unaffordable or unoffered.
+    Spec.it s "CR 117.1a on alice's own turn the creature spell is castable already" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (oid, board) = orreryOnOwnTurn mountain piker []
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+
+    Spec.it s "CR 117.1a on the opponent's turn it is not" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (oid, _, board) = orreryBoard mountain piker []
+      Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
+      Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "not offered"
+
+    -- The whole card, on the board that just refused: CR 601.3b's permission is
+    -- read beside Cast.instantSpeed, so the sorcery-speed window opens for a card
+    -- that has no flash of its own.
+    Spec.it s "CR 601.3b with Vedalken Orrery it is castable on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      Spec.assertBool s (S.castable S.alice oid board) "castable"
+      Spec.assertBool s (any (S.isCastOf oid) (Action.legalActions S.alice board)) "offered"
+
+    -- The gameplay half, driven through the priority loop rather than by calling
+    -- Cast.castSpell: S.castAnswer takes whatever Cast action it is OFFERED, so
+    -- the two runs differ in the Orrery and in nothing that a test wrote by hand.
+    -- Without it alice is offered no cast at all and simply passes.
+    Spec.it s "CR 601.3b the offered cast resolves and the creature enters on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (_, _, board) = orreryBoard mountain piker [orrery]
+          (_, _, bare) = orreryBoard mountain piker []
+          play gs = S.runPure S.castAnswer gs Engine.priorityLoop
+          after = play board
+      Spec.assertEqWith s "bob is still the active player" (GameState.activePlayer after) S.bob
+      Spec.assertEqWith s "the Piker is on the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+      Spec.assertEqWith s "and without the Orrery it never left her hand" (S.countOnBattlefieldByName (S.printingName piker) S.alice (play bare)) 0
+      Spec.assertEqWith s "which is where it still is" (S.handSize S.alice (play bare)) 2
+
+    -- CR 702.8a's keyword is untouched: the card the Orrery let through never
+    -- gained flash, and nothing was written onto it.
+    Spec.it s "CR 702.8a the Piker still has no flash of its own" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (oid, _, board) = orreryBoard mountain piker [orrery]
+      Spec.assertBool s (not (Cast.instantSpeed (S.combinedFace piker))) "no flash on the card"
+      Spec.assertBool s (PlayerEffect.mayCastAsThoughItHadFlash S.alice oid board) "the permission is the player's"
+
+    -- CR 604.2: the permission is gathered live off the battlefield, so removing
+    -- the Orrery shuts the window again with nothing to unwind.
+    Spec.it s "CR 604.2 with the Orrery gone the window shuts again" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (oid, extras, board) = orreryBoard mountain piker [orrery]
+          without = board {GameState.battlefield = foldr Set.delete (GameState.battlefield board) extras}
+      Spec.assertBool s (S.castable S.alice oid board) "castable with it"
+      Spec.assertBool s (not (S.castable S.alice oid without)) "not castable without it"
+
+    -- CR 305.1: playing a land is a special action and is never a cast, so a
+    -- permission about the timing of a CAST does not reach the Mountain in
+    -- alice's hand. Action.legalActions gates a land play on being the active
+    -- player, and the Orrery leaves that alone.
+    Spec.it s "CR 305.1 the land in hand is still unplayable on the opponent's turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (_, _, board) = orreryBoard mountain piker [orrery]
+          (_, ownTurn) = orreryOnOwnTurn mountain piker [orrery]
+      Spec.assertBool s (any isPlay (Action.legalActions S.alice ownTurn)) "playable on her own turn"
+      Spec.assertBool s (not (any isPlay (Action.legalActions S.alice board))) "not on bob's"
+
+    -- CR 109.5 / PlayerScope.You: the Orrery says "you", so alice's does nothing
+    -- for bob. The pair differs only in who controls it.
+    Spec.it s "CR 109.5 alice's Orrery does not widen bob's window" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (bobsPiker, board) = orreryScopeBoard mountain piker orrery S.alice
+      Spec.assertBool s (not (S.castable S.bob bobsPiker board)) "not castable"
+
+    Spec.it s "CR 109.5 bob's own Orrery does" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (bobsPiker, board) = orreryScopeBoard mountain piker orrery S.bob
+      Spec.assertBool s (S.castable S.bob bobsPiker board) "castable"
+
+    -- CR 307.5: the reason the permission is read BESIDE Cast.instantSpeed and
+    -- not inside it, nor inside Turn.sorcerySpeedWindow under it. Bonesplitter's
+    -- equip ability is sorcery-speed, and the Orrery is not about abilities at
+    -- all. Three boards triangulate it: the ability is genuinely offered, the
+    -- opponent's turn genuinely takes it away, and the Orrery does not give it
+    -- back.
+    Spec.it s "CR 307.5 the equip ability is offered on alice's own turn" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bonesplitter <- S.printingOf s registry "Bonesplitter"
+      let (equipment, board) = equipBoard mountain piker bonesplitter [] S.alice
+      Spec.assertBool s (any (isActivateOf equipment) (Action.legalActions S.alice board)) "offered"
+
+    Spec.it s "CR 307.5 and not on bob's" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bonesplitter <- S.printingOf s registry "Bonesplitter"
+      let (equipment, board) = equipBoard mountain piker bonesplitter [] S.bob
+      Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "not offered"
+
+    Spec.it s "CR 307.5 Vedalken Orrery does not give it back" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      piker <- S.printingOf s registry "Goblin Piker"
+      bonesplitter <- S.printingOf s registry "Bonesplitter"
+      orrery <- S.printingOf s registry "Vedalken Orrery"
+      let (equipment, board) = equipBoard mountain piker bonesplitter [orrery] S.bob
+          (onOwnTurn, ownBoard) = equipBoard mountain piker bonesplitter [orrery] S.alice
+      Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "still not offered"
+      Spec.assertBool s (any (isActivateOf onOwnTurn) (Action.legalActions S.alice ownBoard)) "and still offered on her own turn"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -1663,4 +2028,6 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   reliquaryTowerSpec s registry
   storedSpec s registry
   silenceSpec s registry
+  extraLandDropsSpec s registry
   matchesSpellSpec s registry
+  vedalkenOrrerySpec s registry

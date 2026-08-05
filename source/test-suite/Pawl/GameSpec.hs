@@ -64,6 +64,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -178,7 +179,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               -- every other per-incarnation field.
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
-              Object.playableFromExileBy = Nothing
+              Object.playableFromExileBy = Nothing,
+              Object.ringBearerFor = Nothing
             }
       )
 
@@ -235,9 +237,25 @@ actionSpec s registry = Spec.describe s "Action" $ do
     mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice (S.oneMountainState mountain (Phase.Beginning BeginningStep.Upkeep))) [A.Pass]
 
-  Spec.it s "no second land after one is played" $ do
+  -- CR 305.1 / 116.2a: a land play needs an EMPTY STACK as well as a main phase
+  -- of the player's own turn -- the same three conjuncts CR 307.5's window has,
+  -- which is why the gate asks Turn.sorcerySpeedWindow rather than keeping its
+  -- own near-copy. The empty-stack board is the falsifier: a gate that offered
+  -- nothing at all would satisfy the second assertion for the wrong reason.
+  Spec.it s "CR 305.1 no land play while a spell is on the stack" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let gs = (S.oneMountainState mountain Phase.PrecombatMain) {GameState.landPlayed = Set.singleton S.alice}
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.oneMountainState mountain Phase.PrecombatMain
+        (_, withSpell) = S.spellOnStack piker S.alice base
+    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice base) "playable while the stack is empty"
+    Spec.assertEqWith s "only pass while a spell is on it" (Action.legalActions S.alice withSpell) [A.Pass]
+
+  -- CR 305.2b: with the normal allowance of one already spent, no further play
+  -- is legal. The raised-allowance half of CR 305.2 is Pawl.PlayerEffectSpec's
+  -- Exploration and Azusa group.
+  Spec.it s "CR 305.2b no second land after one is played" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let gs = (S.oneMountainState mountain Phase.PrecombatMain) {GameState.landsPlayed = Map.singleton S.alice 1}
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice gs) [A.Pass]
 
 goldfishResult :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (Result.Result, GameState.GameState)
@@ -250,8 +268,12 @@ landState s registry = do
   matchup <- S.redRed (S.printingOf s registry)
   pure (snd (Engine.runGamePure S.playLandAnswer (Setup.emptyGame S.bothPlayers) (Engine.playFrom matchup)))
 
--- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With one land play per
--- turn (CR 305.2) a player can never have more lands out than turns taken.
+-- Alice is active on turns 1, 3, 5, …; bob on 2, 4, 6, …. With CR 305.2's normal
+-- one land play per turn a player can never have more lands out than turns
+-- taken. NORMAL is load-bearing now that a continuous effect can raise the
+-- number (CR 305.2): this bound holds for the red-red matchup because no card in
+-- it grants an extra land play, and Pawl.PlayerEffectSpec is where the raised
+-- number is measured.
 turnsTaken :: PlayerId.PlayerId -> GameState.GameState -> Natural
 turnsTaken pid gs =
   let total = GameState.turnNumber gs
@@ -331,6 +353,7 @@ recordingAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseManaYield _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseProliferate {} -> pure (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseLegend _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.DeclareAttackers {} -> pure []
   Prompt.ChooseAttackTarget _ _ _ options -> pure (NonEmpty.head options)
@@ -376,9 +399,15 @@ recordingAnswer p = case p of
   Prompt.OpeningHandAction {} -> pure Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> pure OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> pure PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> pure EntwineDecision.Declines
@@ -1216,18 +1245,18 @@ turnOrderSpec s registry = Spec.describe s "TurnOrder (CR 800.4)" $ do
     Spec.assertBool s (Set.member S.alice (GameState.drewFromEmpty control)) "but a playing one does -- the guard is what did it"
 
   Spec.it s "CR 800.4j/703.4c a departed active player's untap step does nothing" $ do
-    -- landPlayed is the observable part of the untap step that needs no
+    -- landsPlayed is the observable part of the untap step that needs no
     -- permanents: it is cleared for the active player each untap.
     let base =
           S.threePlayerGame
             { GameState.phase = Phase.Beginning BeginningStep.Untap,
-              GameState.landPlayed = Set.singleton S.alice
+              GameState.landsPlayed = Map.singleton S.alice 1
             }
         gone = Departure.depart Departure.Type.Conceded S.alice base
         after = S.runPure S.identityAnswer gone (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
         control = S.runPure S.identityAnswer base (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
-    Spec.assertEqWith s "no untap-step action happened" (GameState.landPlayed after) (Set.singleton S.alice)
-    Spec.assertEqWith s "a playing active player's land play IS cleared" (GameState.landPlayed control) Set.empty
+    Spec.assertEqWith s "no untap-step action happened" (GameState.landsPlayed after) (Map.singleton S.alice 1)
+    Spec.assertEqWith s "a playing active player's land play IS cleared" (GameState.landsPlayed control) Map.empty
 
   Spec.it s "CR 800.4j/703.4i a departed active player is not asked to declare attackers" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1490,6 +1519,164 @@ spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
   concedeSpec s registry
   turnOrderSpec s registry
   trustedActionSpec s registry
+  lastChoiceSpec s registry
+  mandatoryLoopSpec s
+  mandatoryLoopBoardSpec s registry
+
+-- CR 104.4b at gameplay level. Aether Flash deals 2 damage to each creature that
+-- enters; Synthetic Recursion is a 1/1 that returns itself when it dies. So it
+-- enters, takes lethal damage (CR 704.5g), dies, returns, enters. Nothing in the
+-- cycle is optional and nothing in it makes progress: a loop of mandatory
+-- actions, repeating a sequence of events with no way to stop.
+--
+-- Synthetic Recursion is a LABELED CRUTCH (#683). The canonical board is
+-- Worldgorger Dragon reanimated by Animate Dead, and neither card is authorable
+-- yet.
+mandatoryLoopBoardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b)" $ do
+  Spec.it s "a loop nobody can interrupt is a draw" $ do
+    flash <- S.printingOf s registry "Aether Flash"
+    recursion <- S.printingOf s registry "Synthetic Recursion"
+    let result = runConcedingAt 10000 (loopBoard flash recursion Nothing)
+    Spec.assertEqWith s "CR 104.4b" result Result.Drawn
+
+  Spec.it s "a loop containing an optional action is not" $ do
+    -- CR 104.4b's second sentence. The board differs by ONE card: a Lightning
+    -- Bolt in alice's hand, which her Mountain can pay for, so her menu has a
+    -- Cast on it every time she gets priority. That resets the marker each round,
+    -- so the loop -- otherwise identical, and still running -- is never declared
+    -- a draw. The game ends only because alice eventually concedes (CR 104.3a),
+    -- which is the only way to get a terminating test out of a game the rules say
+    -- does not end.
+    flash <- S.printingOf s registry "Aether Flash"
+    recursion <- S.printingOf s registry "Synthetic Recursion"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let result = runConcedingAt 200 (loopBoard flash recursion (Just (mountain, bolt)))
+    Spec.assertEqWith s "alice conceded, so bob won -- no draw" result (Result.Won S.bob)
+
+-- alice, active, in her precombat main phase: bob's Aether Flash, and alice's
+-- Synthetic Recursion ENTERING (so CR 603.6a's event is there for Aether Flash to
+-- see). Empty libraries and nothing scheduled after this phase, so the loop is
+-- the only thing that can happen and nothing on the board can end the game.
+-- `castable`,
+-- if any, is an untapped land for alice plus a spell in her hand it pays for --
+-- both halves, since Cast.castableSpells offers a spell only when its cost can be
+-- paid.
+--
+-- Seeded ten events short of the limit rather than starting from zero: the
+-- mechanism is the same at any gap, and this keeps the test at a handful of
+-- cycles instead of a few hundred.
+loopBoard :: Printing.Printing -> Printing.Printing -> Maybe (Printing.Printing, Printing.Printing) -> GameState.GameState
+loopBoard flash recursion castable =
+  let base = Setup.emptyGame S.bothPlayers
+      (_, gs1) = S.addCreature flash S.bob base
+      gs2 = case castable of
+        Nothing -> gs1
+        Just (land, spell) ->
+          let (_, withLand) = S.addCreature land S.alice gs1
+           in snd (S.addHandCard spell S.alice withLand)
+      (_, gs3) = S.entersWithTrigger recursion S.alice gs2
+   in gs3
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.remaining = Seq.empty,
+          GameState.nextTimestamp = Timestamp.MkTimestamp (Engine.mandatoryLoopLimit - 10),
+          GameState.lastChoice = Timestamp.MkTimestamp 0
+        }
+
+-- Play the game out, with alice conceding once she has been asked `limit` times.
+-- The concession is a backstop for the test that expects NO draw: without it that
+-- game would run forever, which is exactly what CR 104.4b says should happen to a
+-- loop containing an optional action.
+runConcedingAt :: Int -> GameState.GameState -> Result.Result
+runConcedingAt limit gs =
+  let answer :: Prompt.Prompt r -> State.State Int r
+      answer p = case p of
+        Prompt.Concede pid
+          | pid == S.alice -> do
+              asked <- State.get
+              State.put (asked + 1)
+              pure (if asked >= limit then Concession.Concedes else Concession.Continues)
+        _ -> pure (S.identityAnswer p)
+      ((result, _), _) = State.runState (Engine.runGame answer gs Engine.playGame) 0
+   in result
+
+-- CR 104.4b, the guard itself. The gameplay proof that a real loop reaches it is
+-- the "a mandatory loop (CR 104.4b)" group; these four pin the boundary, which a
+-- board-level test cannot do precisely.
+mandatoryLoopSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+mandatoryLoopSpec s = Spec.describe s "the mandatory-loop guard (CR 104.4b)" $ do
+  Spec.it s "one event short of the limit is not a draw" $ do
+    let after = S.runPure S.identityAnswer (atGap (Engine.mandatoryLoopLimit - 1)) Engine.checkMandatoryLoop
+    Spec.assertEqWith s "still being played" (GameState.result after) Nothing
+
+  Spec.it s "the limit is a draw" $ do
+    let after = S.runPure S.identityAnswer (atGap Engine.mandatoryLoopLimit) Engine.checkMandatoryLoop
+    Spec.assertEqWith s "CR 104.4b" (GameState.result after) (Just Result.Drawn)
+
+  Spec.it s "a game that already ended keeps the result it had" $ do
+    -- A draw must never overwrite a win: the guard fires on a gap only a loop
+    -- should reach, and a won game is not looping.
+    let won = (atGap Engine.mandatoryLoopLimit) {GameState.result = Just (Result.Won S.alice)}
+        after = S.runPure S.identityAnswer won Engine.checkMandatoryLoop
+    Spec.assertEqWith s "alice still won" (GameState.result after) (Just (Result.Won S.alice))
+
+  Spec.it s "playGame draws instead of looping" $ do
+    -- Proves the guard is WIRED, not merely correct: playGame's loop head is what
+    -- reads it. The board is empty, so nothing else can end this game.
+    let (result, _) = Engine.runGamePure S.identityAnswer (atGap Engine.mandatoryLoopLimit) Engine.playGame
+    Spec.assertEqWith s "CR 104.4b" result Result.Drawn
+
+-- An otherwise-idle two-player game in which `n` events have happened since any
+-- player was last offered a choice.
+atGap :: Natural -> GameState.GameState
+atGap n =
+  (Setup.emptyGame S.bothPlayers)
+    { GameState.nextTimestamp = Timestamp.MkTimestamp n,
+      GameState.lastChoice = Timestamp.MkTimestamp 0
+    }
+
+-- CR 104.4b's "loops that contain an optional action": what makes an action
+-- optional is that the player had more than one answer to give. GameState.lastChoice
+-- is how the engine remembers when that last happened, and Pawl.Engine.Game.choose
+-- is the only thing that advances it.
+lastChoiceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lastChoiceSpec s registry = Spec.describe s "lastChoice (CR 104.4b)" $ do
+  Spec.it s "a priority round whose only action is Pass leaves it alone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    let after = S.runPure S.identityAnswer (choicelessBoard mountain Nothing) Engine.priorityLoop
+    Spec.assertEqWith s "no player was offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
+
+  Spec.it s "a priority round offering a castable spell moves it" $ do
+    -- The board differs by ONE card: a Lightning Bolt in alice's hand, which her
+    -- untapped Mountain can pay for, so Action.legalActions offers her a Cast
+    -- beside the Pass. That is the optional action.
+    --
+    -- A spell rather than the Mountain's own mana ability, though CR 605.1a
+    -- makes that an activated ability alice could use: Action.legalActions
+    -- deliberately omits mana abilities (Activate.activatableGiven's
+    -- `not (Mana.isManaAbility ability)`, since CR 605.3b keeps them off the
+    -- stack), so a lone land leaves the menu at exactly [Pass].
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let after = S.runPure S.identityAnswer (choicelessBoard mountain (Just bolt)) Engine.priorityLoop
+    Spec.assertBool s (GameState.lastChoice after > Timestamp.MkTimestamp 0) "alice was offered a choice"
+
+-- alice, active, in her precombat main phase with an empty stack, nothing
+-- scheduled after it, and one untapped Mountain. Her menu is exactly [Pass]
+-- unless `castable` puts something in her hand she can pay for.
+choicelessBoard :: Printing.Printing -> Maybe Printing.Printing -> GameState.GameState
+choicelessBoard mountain castable =
+  let base = Setup.emptyGame S.bothPlayers
+      (_, gs1) = S.addCreature mountain S.alice base
+      gs2 = case castable of
+        Nothing -> gs1
+        Just printing -> snd (S.addHandCard printing S.alice gs1)
+   in gs2
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.remaining = Seq.empty,
+          GameState.lastChoice = Timestamp.MkTimestamp 0
+        }
 
 -- One Lightning Bolt in bob's hand.
 handBobBolt :: Printing.Printing -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
@@ -1514,7 +1701,8 @@ handBobBolt lightningBolt gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1557,6 +1745,7 @@ slaveAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -1590,9 +1779,15 @@ slaveAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -1814,7 +2009,7 @@ restartOnStack mountain =
               Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory))
+                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.timing = ActivationTiming.AnyTime
           }
@@ -1836,7 +2031,8 @@ restartOnStack mountain =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

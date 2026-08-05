@@ -4,8 +4,17 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Scaling as Scaling
 
 -- | CR 614.1a / 615.1: how a replacement or prevention effect rewrites a damage
--- event. PreventAll cancels it outright (Fog) -- CR 615.6, a prevented event
--- never happens.
+-- event. PreventAll cancels it outright -- CR 615.6, a prevented event never
+-- happens. Two producers, and they differ only in what the pattern beside this
+-- rewrite says: Fog authors one on the card and shields nobody in particular,
+-- while Effect.PreventAllDamage bakes one over a named recipient (Selfless
+-- Squire).
+--
+-- CR 615.1a is what makes the two Prevent arms below a different KIND of rewrite
+-- from the two under them, rather than merely a different amount: an effect that
+-- uses the word "prevent" is a prevention effect, so only these two prevent
+-- anything, and only these two fire CR 615.13's triggers.
+-- Pawl.Engine.Replacement.prevents is that classification.
 --
 -- PreventNext is CR 615.7's shield (Mending Hands), and its Natural is the
 -- REMAINING amount, rewritten in place on the row that carries it and dropped

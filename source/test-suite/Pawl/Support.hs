@@ -76,6 +76,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -234,6 +235,7 @@ identityAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   -- CR 508.1b: the defending player, which Combat.attackTargets puts first --
@@ -286,9 +288,15 @@ identityAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -304,6 +312,7 @@ castAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -352,9 +361,15 @@ castAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -374,6 +389,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -411,9 +427,15 @@ aggressiveAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -459,6 +481,7 @@ playLandAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -504,9 +527,15 @@ playLandAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -534,7 +563,8 @@ addCreature printing pid gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -674,6 +704,13 @@ performer = Resolve.performHandAction
 -- The source stand-in for a targeting call whose spec is source-blind (every
 -- spec but OpponentCreatureTarget). Object id 999 names nothing, the same
 -- posture withEffectAt's 998 takes.
+--
+-- SOURCE-BLIND is now a claim about the BOARD as well as about the spec: CR
+-- 702.11d's "hexproof from [quality]" makes Target.legalRecipients read the
+-- source's characteristics, and this id has none to read, so every quality is
+-- vacuously unmatched. A case that puts such a candidate on the board must pass a
+-- real object (S.spellOnStack) or it passes for the wrong reason -- see
+-- Pawl.TargetSpec's rule 702.11d cases, which do.
 noSource :: ObjectId.ObjectId
 noSource = ObjectId.MkObjectId 999
 
@@ -731,7 +768,8 @@ addToken card pid gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -763,7 +801,8 @@ addLibraryCard printing pid gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -795,7 +834,8 @@ addGraveyardCard printing pid gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -834,7 +874,8 @@ addExiledCard printing pid gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -880,7 +921,8 @@ addHandCard printing pid gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -929,7 +971,8 @@ landsInPlay land n =
                   Object.timestamp = ts,
                   Object.face = Nothing,
                   Object.turnedOverAt = Nothing,
-                  Object.playableFromExileBy = Nothing
+                  Object.playableFromExileBy = Nothing,
+                  Object.ringBearerFor = Nothing
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -960,7 +1003,8 @@ handOne printing base =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -997,7 +1041,8 @@ pikerInHand land piker n ph =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       gs3 =
         gs2
@@ -1405,11 +1450,14 @@ handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
 -- LABELED SYNTHETIC: an emblem's characteristics are only its abilities (CR
--- 114.3), but no printing in the pool mints one -- Jace Beleren's abilities do
--- not create emblems -- so tests use this
--- fixture -- an Elspeth-style anthem, "creatures you control get +1/+1". Built
--- by overriding a vanilla card's static abilities; the residual printed fields
--- are inert for a command-zone object (never projected as a permanent). (#125)
+-- 114.3), and no emblem in the pool HAS any. Birthday Escape mints a real one
+-- (CR 701.54c's The Ring), so the pool no longer lacks an emblem PRODUCER -- but
+-- that emblem's four abilities have no carrier, so its static ability list is
+-- empty and it cannot show that Projection.gather reads one from the command
+-- zone. Hence this fixture -- an Elspeth-style anthem, "creatures you control get
+-- +1/+1". Built by overriding a vanilla card's static abilities; the residual
+-- printed fields are inert for a command-zone object (never projected as a
+-- permanent). (#125)
 anthemEmblemCard :: Printing.Printing -> Card.Type.Card
 anthemEmblemCard piker =
   let card = Printing.card piker
@@ -1420,6 +1468,7 @@ anthemEmblemCard piker =
                   { StaticAbility.affected =
                       Affected.Matching
                         (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
+                    StaticAbility.condition = Nothing,
                     StaticAbility.modifications =
                       NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
                   }
@@ -1460,7 +1509,8 @@ oneMountainState mountain ph =
             Object.timestamp = Timestamp.MkTimestamp 0,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1494,8 +1544,9 @@ oneMountainState mountain ph =
           GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
+          GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
-          GameState.landPlayed = mempty,
+          GameState.landsPlayed = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
@@ -1591,7 +1642,8 @@ spellOnStack printing pid gs =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2

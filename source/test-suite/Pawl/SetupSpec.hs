@@ -234,7 +234,8 @@ dirtied pid object =
       Object.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
       Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
       Object.turnedOverAt = Just (Timestamp.MkTimestamp 1),
-      Object.playableFromExileBy = Just pid
+      Object.playableFromExileBy = Just pid,
+      Object.ringBearerFor = Just pid
     }
 
 -- CR 400.7: has this object no memory of a previous existence? Applying the

@@ -1,0 +1,108 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Kird Ape",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "IsSource"
+            }
+          },
+          "condition": {
+            "comparison": {
+              "type": "AtLeast"
+            },
+            "measured": {
+              "type": "Count",
+              "value": {
+                "aggregation": {
+                  "type": "Objects"
+                },
+                "filter": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Forest"
+                      }
+                    },
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    }
+                  ]
+                },
+                "scope": {
+                  "type": "InZone",
+                  "value": [
+                    {
+                      "type": "Battlefield"
+                    },
+                    {
+                      "type": "EachPlayer"
+                    }
+                  ]
+                }
+              }
+            },
+            "threshold": {
+              "type": "Literal",
+              "value": 1
+            }
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Literal",
+                  "value": 1
+                },
+                {
+                  "type": "Literal",
+                  "value": 2
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Ape"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

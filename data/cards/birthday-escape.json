@@ -1,0 +1,51 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Birthday Escape",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              },
+              {
+                "type": "TemptWithTheRing"
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

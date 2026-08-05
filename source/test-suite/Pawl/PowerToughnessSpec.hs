@@ -1,15 +1,19 @@
+{-# LANGUAGE GADTs #-}
+
 -- Covers: Pawl.Engine.Projection (CR 613 layer 7 -- 7a characteristic-defined P/T, the
 -- CR 608.2h freeze that 7b's stored effects owe, 7c modification and 7d P/T
 -- switching), Pawl.Engine.Quantity and Pawl.Engine.ManaCount (the counting
 -- quantities, and CR 208.2a's substitution of 0 for a number a CDA cannot
 -- determine) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer Strength,
 -- Twisted Image, Nightmare, Monstrous War-Leech, Omnath Locus of Mana, Serra
--- Avatar).
+-- Avatar), plus CR 604.2's "as long as" gate on a printed static ability (Kird
+-- Ape).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
 
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
@@ -35,8 +39,11 @@ import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
 -- The battlefield objects whose printed card is Monstrous War-Leech. Found by
@@ -536,6 +543,113 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertEqWith s "no Leech on the battlefield" (leechesOnBattlefield settled) []
   omnathSpec s registry
   serraAvatarSpec s registry
+  kirdApeSpec s registry
+
+-- Kird Ape ({R} Creature -- Ape, printed 1/1), whole text: "This creature gets
+-- +1/+2 as long as you control a Forest." Oracle text verified against Scryfall.
+--
+-- CR 613.4c layer 7c, like Omnath's and unlike Serra Avatar's: the printed
+-- box is 1/1, so the pump is a modification rather than a characteristic-defining
+-- ability. What is new is the "as long as" clause -- the first
+-- StaticAbility.condition in the pool.
+--
+-- CR 604.1 makes a static ability "simply true" and CR 604.2 keeps its effect
+-- active while the permanent is on the battlefield and has the ability; the clause
+-- narrows that to while a Forest is also there. CR 613.5 is why every test below
+-- can assert two different answers on ONE board with nothing but a permanent
+-- moving in between: the layer system is "continually and automatically
+-- performed", so the modification stops and starts with no trigger, no resolution
+-- and no stored effect anywhere.
+--
+-- Deliberately NOT CR 611.2b's "for as long as" duration, which ends a stored
+-- effect once and for good; CR 611.2c's parenthetical ("Note that this works
+-- differently than a continuous effect from a static ability") is the rule that
+-- keeps the two apart, and the last test here is the observable difference -- the
+-- bonus comes BACK.
+kirdApeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kirdApeSpec s registry = Spec.describe s "Kird Ape" $ do
+  -- Both halves of the clause on one board, with a permanent ENTERING between the
+  -- two assertions. Asserting only the second half would pass for an engine that
+  -- ignored the condition entirely; asserting only the first would pass for one
+  -- that dropped the ability outright.
+  Spec.it s "CR 604.2 a 1/1 with no Forest, and a 2/3 the moment one enters" $ do
+    kirdApe <- S.printingOf s registry "Kird Ape"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, withMountain) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
+        (apeId, noForest) = S.addCreature kirdApe S.alice withMountain
+        withForest = snd (S.addCreature forest S.alice noForest)
+    Spec.assertEqWith s "a Mountain is not a Forest" (S.powerToughnessOf apeId noForest) (Just (1, 1))
+    Spec.assertEqWith s "a Forest entered" (S.powerToughnessOf apeId withForest) (Just (2, 3))
+  -- CR 109.5: "you" is the ability's SOURCE's controller. Bob's Forest is on the
+  -- same battlefield -- the Count's scope is every player's (CR 400.1 makes the
+  -- battlefield shared) -- so an engine that counted Forests rather than Forests
+  -- YOU control reads 2/3 here.
+  Spec.it s "CR 109.5 an opponent's Forest is not one you control" $ do
+    kirdApe <- S.printingOf s registry "Kird Ape"
+    forest <- S.printingOf s registry "Forest"
+    let (apeId, board) = S.addCreature kirdApe S.alice (Setup.emptyGame S.bothPlayers)
+        bobsForest = snd (S.addCreature forest S.bob board)
+    Spec.assertEqWith s "bob's Forest does nothing" (S.powerToughnessOf apeId bobsForest) (Just (1, 1))
+  -- The clause read against the PROJECTION rather than the printed type line, and
+  -- the flip driven by a real cast: Convincing Mirage's CR 614.1c as-enters choice
+  -- makes the Forest an Island in layer 4 (CR 613.1d), which is strictly before
+  -- the layer 7c the pump lands in, so the Ape shrinks. An engine that asked
+  -- whether alice controlled a card PRINTED "Forest" leaves it a 2/3.
+  --
+  -- Also the CR 611.2c half: the Aura leaves and the +1/+2 comes back, which a
+  -- duration could not do.
+  Spec.it s "CR 613.1d a Convincing Mirage'd Forest stops being one, and the pump stops with it" $ do
+    kirdApe <- S.printingOf s registry "Kird Ape"
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    convincingMirage <- S.printingOf s registry "Convincing Mirage"
+    let base = S.landsInPlay island 4
+        (forestId, withForest) = S.addCreature forest S.alice base
+        (apeId, withApe) = S.addCreature kirdApe S.alice withForest
+        (withAura, auraSpell) = S.handOne convincingMirage withApe
+        cast = S.runPure (mirageOn forestId Subtype.Island) withAura (S.cast S.alice auraSpell)
+        enchanted = S.runPure (mirageOn forestId Subtype.Island) cast Stack.resolveTop
+        -- CR 704.5m sends an Aura attached to nothing to the graveyard, but this
+        -- only needs the Forest back: the Aura is removed from the battlefield
+        -- directly, so its layer-4 effect is simply no longer gathered.
+        unenchanted = removeFromBattlefield (auraOf enchanted) enchanted
+    Spec.assertEqWith s "2/3 while the Forest is a Forest" (S.powerToughnessOf apeId withApe) (Just (2, 3))
+    Spec.assertEqWith s "CR 305.7 the land is now only an Island" (Projection.subtypesOf forestId enchanted) (Set.singleton Subtype.Island)
+    Spec.assertEqWith s "so the Ape is back to 1/1" (S.powerToughnessOf apeId enchanted) (Just (1, 1))
+    Spec.assertEqWith s "and 2/3 again once the Aura is gone" (S.powerToughnessOf apeId unenchanted) (Just (2, 3))
+
+-- Convincing Mirage's two prompts: its CR 303.4a enchant slot, forced onto the
+-- one land the test cares about (the board offers five), and its CR 614.1c
+-- as-enters basic land type. Everything else defers to S.identityAnswer.
+-- Pawl.AuraSpec has the same answerer for the same card; this one is local
+-- because the group needs it and nothing else here does.
+mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
+mirageOn landId subtype p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject landId)) sets
+  Prompt.ChooseBasicLandType {} -> subtype
+  _ -> S.identityAnswer p
+
+-- The one Convincing Mirage on the battlefield, by printed name (the
+-- leechesOnBattlefield precedent above: the cast's ObjectId names a spell that
+-- CR 400.7 has already replaced).
+auraOf :: GameState.GameState -> ObjectId.ObjectId
+auraOf gs = case filter isMirage (Set.toList (GameState.battlefield gs)) of
+  oid : _ -> oid
+  [] -> ObjectId.MkObjectId 999
+  where
+    isMirage oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Convincing Mirage")) (Game.faceOf oid gs)
+
+-- Take a permanent off the battlefield without routing it anywhere, so a test can
+-- ask what the board looks like once its continuous effect is no longer gathered.
+-- Not a zone change: nothing here is a CR 400.7 move, and no test using it reads
+-- the graveyard.
+removeFromBattlefield :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+removeFromBattlefield oid gs =
+  gs
+    { GameState.battlefield = Set.delete oid (GameState.battlefield gs),
+      GameState.objects = Map.delete oid (GameState.objects gs)
+    }
 
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), first line: "Serra
 -- Avatar's power and toughness are each equal to your life total." Oracle text

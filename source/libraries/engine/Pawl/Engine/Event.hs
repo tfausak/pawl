@@ -94,6 +94,7 @@ movedOf :: GameEvent -> Maybe ZoneChange
 movedOf event = case event of
   GameEvent.Moved zc _ -> Just zc
   GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
@@ -113,6 +114,7 @@ movedOf event = case event of
 damageOf :: GameEvent -> Maybe DamageEvent
 damageOf event = case event of
   GameEvent.DamageDealt ev -> Just ev
+  GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.Moved _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
@@ -129,6 +131,7 @@ castOf event = case event of
   GameEvent.SpellCast pid -> Just pid
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
@@ -143,6 +146,7 @@ revealOf event = case event of
   GameEvent.Revealed pid snapshot -> Just (pid, snapshot)
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
@@ -176,6 +180,45 @@ placeObject pid mkObj dest = do
   State.put (Game.insertIntoZone dest pid newId gs3)
   pure newId
 
+-- CR 114.2: a player gets an emblem with the given abilities, put into the
+-- command zone and both owned and controlled by them. CR 613.7a: its entry
+-- timestamp is what the projection reads when ordering the continuous effect of
+-- any static ability it carries.
+--
+-- Here rather than in Pawl.Engine.Resolve, because there are two minting sites
+-- and only one of them is an opcode: Effect.CreateEmblem is what a CARD says,
+-- and Pawl.Engine.Ring.tempt is what CR 701.54c says. An emblem built two ways
+-- would be an emblem that could differ.
+--
+-- Inert per-incarnation fields (an emblem is never tapped, damaged or
+-- countered): harmless, nothing reads them here. `enteredUnder = Nothing` is
+-- what makes Projection.defaultControllerOf answer the owner, which is CR
+-- 109.4c and so CR 114.2's last sentence.
+createEmblem :: PlayerId -> Card -> Game ObjectId
+createEmblem pid card =
+  let mkObj ts =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.enteredUnder = Nothing,
+            Object.source = Source.OfEmblem card,
+            Object.zone = Zone.Command,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled pid,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
+            Object.timestamp = ts,
+            Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
+          }
+   in placeObject pid mkObj Zone.Command
+
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and
 -- source forward and resetting per-incarnation state. No-op if the id is unknown.
@@ -185,15 +228,17 @@ placeObject pid mkObj dest = do
 changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
--- changeZoneReturning for a move whose effect says how the object ENTERS (CR
--- 110.5b) rather than taking the rule's default.
+-- changeZoneReturning for a move whose effect says how the object ENTERS -- CR
+-- 110.5b's tap state, and CR 110.2a's controller -- rather than taking the
+-- rules' defaults.
 --
 -- A separate door rather than a fifth parameter on changeZone, as changeZoneInBatch
 -- is: the ~30 callers moving under the default have no tap state to name. Handed
 -- to the funnel rather than applied after it, so a permanent an effect says is
--- tapped is never untapped for an instant -- CR 614.1c's entry replacements run
--- inside this call.
-changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Game (Maybe ObjectId)
+-- tapped is never untapped for an instant, and so a permanent an effect says
+-- enters under someone's control never belongs to its owner for an instant --
+-- CR 614.1c's entry replacements run inside this call and read both.
+changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
 changeZoneEntering oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
@@ -204,14 +249,14 @@ changeZoneEntering oid requestedDest = changeZoneAttaching Nothing oid requested
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped Nothing)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -224,9 +269,12 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- 704.5m -- where CR 303.4g says it should instead stay in its current zone (#188).
 --
 -- `asOf` is changeZoneInBatch's batch board, Nothing otherwise. `tapped` is CR
--- 110.5b's status, Untapped for every door but changeZoneEntering.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest seed tapped = do
+-- 110.5b's status, Untapped for every door but changeZoneEntering. `under` is CR
+-- 110.2a's entry controller, Nothing for every door but changeZoneEntering --
+-- and Nothing there too for a move whose effect names no player, which by CR
+-- 110.2 and CR 108.4a leaves the owner answering.
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest seed tapped under = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -281,6 +329,28 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
         Nothing -> pure Nothing
         Just settled -> do
           let dest = ZoneChange.to settled
+              -- CR 110.2a: "If an effect instructs a player to put an object onto
+              -- the battlefield, that object enters the battlefield under that
+              -- player's control unless the effect states otherwise." That
+              -- control is BASE STATE -- CR 110.2 makes the entry controller a
+              -- permanent's default controller thereafter, which is what
+              -- Projection.defaultControllerOf reads -- and not a CR 613.1b
+              -- layer-2 effect, which is the distinction CR 800.4c draws and
+              -- which decides whether CR 800.4a's second clause can end it
+              -- (Pawl.DepartureSpec's Meandering Towershell case is the proof).
+              --
+              -- BATTLEFIELD ONLY, the rule's own scope (CR 110.2, CR 110.5d):
+              -- Projection.controllerOf answers for an object in any zone, so an
+              -- ungated write would give a graveyard card a controller.
+              --
+              -- Gated on the SETTLED destination rather than the requested one,
+              -- so a CR 616.1 rewrite that redirects the move decides this too
+              -- (CR 614.6: the modified event is what happens). Indistinguishable
+              -- from gating on the request today, and not because of a claim
+              -- about Magic: no ReplacementEffect.ZoneChangeR in the pool names
+              -- the battlefield as its destination (Leyline of the Void and Rest
+              -- in Peace, the two that exist, both name exile).
+              --
               -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
               -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),
               -- damage, counters, bindings and the rest all go back to their
@@ -288,8 +358,8 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- a library call the same function. What is set back here is only
               -- what this MOVE decides: the destination, CR 613.7d's moment of
               -- entry, CR 110.5b's "enters tapped" (meaningful only for a
-              -- battlefield destination, CR 110.5a), and CR 701.3's
-              -- attach-on-entry seed.
+              -- battlefield destination, CR 110.5a), CR 110.2a's entry
+              -- controller, and CR 701.3's attach-on-entry seed.
               --
               -- `face` is among what newIncarnation clears, which is right for
               -- the one layout that ships: whichever half CR 709.3b singled out
@@ -310,7 +380,8 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
                   { Object.zone = dest,
                     Object.timestamp = ts,
                     Object.tapped = tapped,
-                    Object.attachedTo = seed
+                    Object.attachedTo = seed,
+                    Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing
                   }
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
@@ -594,7 +665,8 @@ createTokens controller card n tapped = do
                     Object.timestamp = ts,
                     Object.face = Nothing,
                     Object.turnedOverAt = Nothing,
-                    Object.playableFromExileBy = Nothing
+                    Object.playableFromExileBy = Nothing,
+                    Object.ringBearerFor = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids
@@ -684,6 +756,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -722,6 +795,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -737,6 +811,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -756,6 +831,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -780,6 +856,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
@@ -810,6 +887,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
@@ -834,6 +912,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -854,6 +933,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -878,6 +958,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -902,6 +983,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -939,6 +1021,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -966,6 +1049,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -992,10 +1076,48 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+  -- CR 615.13: a prevention effect was applied and prevented some damage, and the
+  -- damage it prevented was addressed to a player the relation admits. CR 109.5 /
+  -- 603.3a fix "you" as the ability's controller, exactly as PlayerDiscards and
+  -- SpellOrAbilityCounters do.
+  --
+  -- The bearer is NOT part of the match: Selfless Squire is a creature watching
+  -- damage addressed to its controller, and CR 615.13 says nothing about which
+  -- object the ability is on.
+  --
+  -- ONE fire per recorded event, and the record is already grouped per prevention
+  -- effect per batch (Replacement.groupPreventions), which is where CR 615.13's
+  -- "one or more simultaneous damage events" is honoured. Nothing here has to
+  -- count.
+  --
+  -- Damage prevented to a PERMANENT is silence rather than a miss: the printed
+  -- sentence says "to you", and the recipient the event carries is what
+  -- distinguishes the two.
+  TriggerCondition.DamageToPlayerPrevented relation -> case event of
+    GameEvent.DamagePrevented recipient _ -> case recipient of
+      Recipient.ToPlayer pid -> case relation of
+        PlayerRelation.You -> pid == you
+        -- CR 102.2: no producer today -- a card watching an opponent's damage
+        -- being prevented.
+        PlayerRelation.Opponent -> pid /= you
+      Recipient.ToCreature _ -> False
+      Recipient.ToPlaneswalker _ -> False
+      Recipient.ToObject _ -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
@@ -1075,6 +1197,16 @@ eventBindings cond event = case (cond, event) of
   -- in for.
   (TriggerCondition.PlayerDiscards _, GameEvent.Discarded discarder _ _) ->
     Binding.setTriggerPlayer discarder Map.empty
+  -- CR 615.13's "that many": how much this prevention effect prevented, which is
+  -- the whole reason the event carries a number. The first reserved slot holding
+  -- an AMOUNT rather than a reference, read back by Quantity.InSlot off the stack
+  -- object these bindings are stamped on (see Binding.preventedAmount).
+  --
+  -- The recipient is NOT bound alongside it. Every payload in the pool acts on
+  -- the ability's own source (Selfless Squire counters itself), and the player
+  -- the recipient names under this condition is CR 109.5's "you", already bound.
+  (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented _ amount) ->
+    Binding.setPreventedAmount amount Map.empty
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -1167,6 +1299,10 @@ eventBindingSlots cond = case cond of
   -- would name the countered card in its owner's graveyard. A card that says
   -- "exile it instead" is the one that must bind `became` here.
   TriggerCondition.SpellOrAbilityCounters _ -> Set.empty
+  -- CR 615.13's amount, guaranteed given a match: the event carries a Natural
+  -- unconditionally, so unlike SelfLeavesTheBattlefield's `became` there is no
+  -- shape of the event that withholds it.
+  TriggerCondition.DamageToPlayerPrevented _ -> Set.singleton Binding.preventedAmount
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -1310,6 +1446,7 @@ eventTriggers events gs =
                     (LastKnown.controller lk, abilitiesOf (LastKnown.characteristics lk))
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
+        GameEvent.DamagePrevented _ _ -> Map.empty
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.SpellCast _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
@@ -1362,6 +1499,7 @@ eventTriggers events gs =
         GameEvent.Discarded _ _ DiscardCause.Ordinary -> Map.empty
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
+        GameEvent.DamagePrevented _ _ -> Map.empty
         GameEvent.StepBegan _ _ -> Map.empty
         GameEvent.SpellCast _ -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
@@ -1472,6 +1610,9 @@ functionsInGraveyard cond = case cond of
   TriggerCondition.SelfLeavesTheBattlefield -> False
   -- CR 113.6's default again: the bearer watches from the battlefield.
   TriggerCondition.SpellOrAbilityCounters _ -> False
+  -- The same default: Selfless Squire watches damage addressed to its controller from
+  -- the battlefield, and a card in a graveyard sees nothing prevented.
+  TriggerCondition.DamageToPlayerPrevented _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -1513,6 +1654,8 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
+  -- Damage can be prevented on anybody's turn.
+  TriggerCondition.DamageToPlayerPrevented _ -> False
 
 -- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
 -- is currently TRUE and which has no instance already on the stack.
@@ -1572,6 +1715,7 @@ stateTriggers gs =
                 TriggerCondition.PermanentDies _ -> False
                 TriggerCondition.SelfLeavesTheBattlefield -> False
                 TriggerCondition.SpellOrAbilityCounters _ -> False
+                TriggerCondition.DamageToPlayerPrevented _ -> False
               pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
            in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
    in concatMap forOne (Set.toAscList (GameState.battlefield gs))

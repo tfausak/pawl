@@ -34,6 +34,7 @@ manaProduced effect = case effect of
   Effect.Search _ _ -> Nothing
   Effect.ExileAllGraveyards -> Nothing
   Effect.Proliferate -> Nothing
+  Effect.TemptWithTheRing -> Nothing
   Effect.ExileHandThenDraw -> Nothing
   Effect.PlayerSacrifices {} -> Nothing
   Effect.RestartGame -> Nothing
@@ -51,6 +52,7 @@ manaProduced effect = case effect of
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
   Effect.PreventNextDamage {} -> Nothing
+  Effect.PreventAllDamage {} -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing

@@ -1,15 +1,21 @@
 -- CR 118: what a cost IS, and everything the closed half needs to do with one --
 -- what the candidates are (costsFor), what the total is (total, CR 601.2f),
--- whether it can be paid (canPay, CR 118.3) and paying it (pay, CR 601.2g/h).
+-- whether it can be paid (canPay, CR 118.3) and paying it (pay).
 -- Pawl.Engine.Mana keeps pools, production and spending; this module keeps the cost.
 --
--- The SOLE casing home for Pawl.Types.CostComponent. Pawl.Engine.Cast and Pawl.Engine.Activate
--- learn nothing about which components exist: they ask "can this be paid" and
--- "pay it", and read one classification (requiresSicknessCheck) for CR 302.6.
+-- `pay` serves TWO contexts, and only the first is CR 601.2g/h: a cost paid as a
+-- spell is cast or an ability activated, and CR 118.12's cost paid when one
+-- RESOLVES (Pawl.Engine.Resolve.paid). `total`'s CR 601.2f adjustments reach only
+-- the first, because that rule totals the cost of a spell being cast or an ability
+-- being activated and a resolution cost is neither.
+--
+-- The SOLE casing home for Pawl.Types.CostComponent. Pawl.Engine.Cast,
+-- Pawl.Engine.Activate and Pawl.Engine.Resolve learn nothing about which
+-- components exist: they ask "can this be paid" and "pay it", and read one
+-- classification (requiresSicknessCheck) for CR 302.6.
 module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -46,7 +52,6 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
@@ -200,9 +205,10 @@ greatestPayableX payableAt cost =
 -- Pawl.Engine.Cast and Pawl.Engine.Activate call at exactly that moment, one step
 -- before CR 601.2f's total.
 --
--- Only CR 107.4f's Phyrexian symbol is announced. CR 107.4e's hybrids are the
--- other "paid in multiple ways" symbols and they are NOT announced here (#261):
--- Pawl.Engine.Mana still resolves them at payment.
+-- CR 107.4f's Phyrexian symbol and CR 107.4e's MONOCOLORED hybrid ({2/R}) are
+-- announced. CR 107.4e's colour/colour hybrid ({W/U}) is the one "paid in
+-- multiple ways" symbol still not announced here (#729): Pawl.Engine.Mana
+-- resolves it at payment.
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, which is
 -- the rule's own words rather than a re-encoding: CR 107.4f pays 2 life for the
@@ -229,7 +235,7 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announcePhyrexian pid oid total_ manaCost
+    (announced, life) <- Mana.announce pid oid total_ manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -366,10 +372,12 @@ canPayComponent pid oid component gs = case component of
   -- `oid` is excluded, and that is CR 601.2a, not a convenience: the card moves
   -- to the stack at step (a), so by the time 601.2f determines the total cost the
   -- spell is NOT in its controller's hand and cannot be discarded to pay its own
-  -- additional cost. Pawl.Engine.Cast pays one step earlier than that, while the
-  -- object is still in hand (#89), so without this filter a hand of "Cathartic
-  -- Reunion plus one other card" would read as payable and the Reunion could
-  -- discard itself. The exclusion is a no-op the moment #89 lands.
+  -- additional cost. A NO-OP for the payment, which Pawl.Engine.Cast runs on the
+  -- CR 400.7 stack incarnation, and load-bearing for the OFFER, which
+  -- Pawl.Engine.Cast.castable measures while the card is still where it was:
+  -- without this filter a hand of "Cathartic Reunion plus one other card" would
+  -- read as payable and the Reunion would be offered on the strength of
+  -- discarding itself.
   CostComponent.DiscardCards n ->
     Natural.length (discardCandidates pid oid gs) >= n
   -- CR 702.29a: payable only while the card is in the paying player's hand, which
@@ -412,7 +420,9 @@ canPayComponent pid oid component gs = case component of
 --
 -- All or nothing (CR 601.2h: partial payments are not allowed). The entry state
 -- is captured and restored on any rejection, so an Unpaid result is a complete
--- no-op even though paying is monadic and a component may prompt.
+-- no-op even though paying is monadic and a component may prompt. That no-op is
+-- what CR 118.12's resolution-time caller rests on too, where an Unpaid result
+-- lands on the same branch as a refusal (Pawl.Engine.Resolve.paid).
 pay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay pid oid cost = do
   before <- State.get
@@ -485,7 +495,7 @@ payComponent pid oid component = case component of
     chosen <-
       if Natural.length candidates <= n
         then pure (Set.fromList candidates)
-        else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider pid oid candidates n))
+        else Game.choose (Prompt.ChooseSacrifices decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
@@ -517,7 +527,7 @@ payComponent pid oid component = case component of
     chosen <-
       if Natural.length held <= n
         then pure held
-        else Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held n))
+        else Game.choose (Prompt.ChooseDiscard decider pid held n)
     let distinct = List.nub chosen
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do
@@ -616,11 +626,15 @@ applyAdjustments adjustments cost =
         -- come off.
         ManaSymbol.Hybrid _ _ -> 0
         -- A monocolored hybrid's {2} half IS generic mana once CR 601.2b's
-        -- nonhybrid equivalent names it, so this arm is decided by the elision
-        -- and not by the rule: pawl makes no such announcement (#261), and Flame
-        -- Javelin's ruling applies a generic reduction only where the chosen
-        -- payment includes generic mana. With no choice recorded there is nothing
-        -- for CR 118.7a to come off, so the symbol is left whole.
+        -- nonhybrid equivalent names it -- but a symbol still spelled {2/R} is one
+        -- CR 601.2b has NOT named, so there is nothing yet for CR 118.7a to come
+        -- off and the symbol is left whole. That is Flame Javelin's own ruling: a
+        -- generic cost reduction applies to it only where the announced payment
+        -- includes generic mana. Pawl.Engine.Mana.announce makes that
+        -- announcement, so the cost actually paid reaches here as a Generic and is
+        -- reduced; what still arrives unannounced is the CASTABILITY GATE's cost,
+        -- which measures the printed symbols, and CR 118.13b/c's costs, which have
+        -- no announcement at all (#730, #373).
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 107.4f makes this a COLOURED mana symbol, and its other half is 2
         -- life rather than any amount of mana, so there is no generic component
@@ -660,13 +674,15 @@ applyAdjustments adjustments cost =
         ManaSymbol.OfType manaType -> Just manaType
         -- CR 107.4e names TWO types, so neither side of the cancellation can read
         -- one off it. In the COST that is the same elision genericOf's
-        -- MonocoloredHybrid arm makes -- pawl announces no choice of half (#261)
-        -- -- and Edgewalker's ruling is what the elision costs. In a REDUCTION it
-        -- is CR 118.7e, where the choice belongs to the player paying, and which
-        -- nothing produces (#309).
+        -- MonocoloredHybrid arm makes -- pawl announces no choice of half for a
+        -- colour/colour hybrid (#729) -- and Edgewalker's ruling is what the
+        -- elision costs. In a REDUCTION it is CR 118.7e, where the choice belongs
+        -- to the player paying, and which nothing produces (#309).
         ManaSymbol.Hybrid _ _ -> Nothing
-        -- Same two reasons: the {2} half is generic mana and the other half is
-        -- one colour, and nothing has announced which is being paid.
+        -- Same two reasons: the {2} half is generic mana and the other half is one
+        -- colour. A symbol still spelled {2/R} here is one CR 601.2b has not named
+        -- -- Pawl.Engine.Mana.announce leaves an OfType behind when it does, which
+        -- the arm above reads -- so there is nothing yet to cancel against.
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- Nothing for two different reasons, one per side. In the COST the symbol
         -- is necessarily UNANNOUNCED, or it would not be a Phyrexian symbol any

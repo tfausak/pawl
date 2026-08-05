@@ -24,17 +24,16 @@ data Object = MkObject
     -- permanent rather than a continuous effect, and this field is where it is
     -- recorded -- the base a CR 613.1b layer-2 effect then overrides.
     --
-    -- Nothing means "no recorded entry controller, so use the owner". That
-    -- covers two things at once: CR 108.4a's fallback for a card that is not a
-    -- permanent at all, and, for a permanent, the fact that every effect in this
-    -- pool that puts one onto the battlefield is controlled by that permanent's
-    -- own owner. The one write is a CR 616.1b replacement redirecting the entry,
-    -- which is CR 110.2a's "unless the effect states otherwise".
+    -- Nothing means "no recorded entry controller, so use the owner". That is CR
+    -- 108.4a's fallback, and it covers every entry no effect spoke about: a
+    -- permanent spell resolving (CR 110.2b), a token, a land played from hand.
     --
-    -- CR 110.2a's OTHER shape -- an effect naming a controller who is not the
-    -- owner -- does not come through this field: Resolve.applyEntryControl still
-    -- expresses it as a stored layer-2 effect, and no card reaches that store
-    -- (#582).
+    -- Two writers, both of them CR 110.2a. Event.changeZoneAttaching records the
+    -- player an effect instructed to put the object onto the battlefield, which
+    -- is the rule's main clause; Pawl.Engine.Replacement's entry loop overwrites
+    -- that with a CR 616.1b rewrite's taker (Gather Specimens), which is its
+    -- "unless the effect states otherwise". Both write only for a BATTLEFIELD
+    -- entry, the rule's own scope (CR 110.2, CR 110.5d).
     --
     -- NOT a control-changing EFFECT: CR 800.4c distinguishes an effect that gives
     -- a player control of an object from the player who controlled it by
@@ -164,7 +163,7 @@ data Object = MkObject
     -- (Game.resolveFace) rather than failing -- unreachable in practice, since
     -- Pawl.CardSpec's "a card's face names are pairwise distinct" corpus lint
     -- holds that of every loadable card, and both writers of this field draw the
-    -- name from that same card's faces: Pawl.Engine.Cast.castSpell names the half
+    -- name from that same card's faces: Pawl.Engine.Cast.asProposed names the half
     -- being cast (CR 709.3b), and Pawl.Engine.Resolve's Transform arm names the
     -- face CR 701.27a turned the permanent over to.
     --
@@ -220,7 +219,36 @@ data Object = MkObject
     -- PLAYABLE and not castable, after the rule's own word. What reads it is
     -- narrower than that: only Pawl.Engine.Cast does, so a land under this
     -- permission would be permitted nothing (#670).
-    playableFromExileBy :: Maybe PlayerId.PlayerId
+    playableFromExileBy :: Maybe PlayerId.PlayerId,
+    -- | CR 701.54b: the Ring-bearer designation, as the player it was made for.
+    -- Nothing for every permanent that is not anyone's Ring-bearer, which is
+    -- almost all of them.
+    --
+    -- ON THE OBJECT, where GameState.monarch is on the game, because CR 701.54b
+    -- says so in as many words: "Ring-bearer is a designation a permanent can
+    -- have." The monarch is one designation naming a player; this is many
+    -- designations, each naming a permanent, one per player at most.
+    --
+    -- A Maybe PlayerId rather than the Bool that CR 701.54e's wording alone
+    -- would suggest ("that creature is on the battlefield under your control and
+    -- has the Ring-bearer designation" reads as an unqualified mark, with "yours"
+    -- coming from control). A bare Bool cannot answer CR 701.54a's SECOND
+    -- ending: "until ... another player gains control of it" ends the
+    -- designation, and a mark that remembers nobody would instead hand the
+    -- Ring-bearer to whoever took the creature. Storing the player the choice was
+    -- made for is what lets Pawl.Engine.Ring.endOnControlChange tell a gained
+    -- creature from a kept one.
+    --
+    -- NOT a copiable value (CR 701.54b's second sentence), and that falls out
+    -- with nothing to enforce: CR 707.2's copy path snapshots
+    -- ProjectedCharacteristics into a Binding, and an Object field is not among
+    -- them. Pawl.RingSpec's "CR 701.54b a Clone of the Ring-bearer is not a
+    -- Ring-bearer" is the test that keeps it so.
+    --
+    -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
+    -- because CR 400.7 makes the moved object a new one -- a Ring-bearer that
+    -- dies and returns is a different creature, and no longer designated.
+    ringBearerFor :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)
 
@@ -259,5 +287,6 @@ newIncarnation object =
       chosenNames = Set.empty,
       face = Nothing,
       turnedOverAt = Nothing,
-      playableFromExileBy = Nothing
+      playableFromExileBy = Nothing,
+      ringBearerFor = Nothing
     }

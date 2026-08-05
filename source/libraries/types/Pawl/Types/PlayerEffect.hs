@@ -72,6 +72,27 @@ data PlayerEffect
     -- component, which is Edgewalker's "This effect reduces only the amount of
     -- colored mana you pay" and not CR 118.7b-d (#309).
     ReduceSpellCost (Filter.Filter Keyword.Keyword) ManaCost.ManaCost
+  | -- | CR 305.2 / Exploration, Azusa Lost but Seeking: this player may play this
+    -- many lands each turn OVER the one CR 305.2 normally allows.
+    --
+    -- An ADDITIONAL amount and not a total, which is what both cards print ("an
+    -- additional land", "two additional lands") and what CR 305.2 describes --
+    -- continuous effects INCREASE the number, they do not set it. Two of these
+    -- therefore add up rather than one winning, and nothing here is a
+    -- redundancy question: CR 702.18b's "multiple instances are redundant" is a
+    -- rule about a keyword, and CR 305.2 states no such rule.
+    --
+    -- The amount is CARRIED for CantCastMoreThan's reason: Exploration says one
+    -- and Azusa says two, and a card that says three must not need a sibling
+    -- constructor. That is also what makes the gate a COUNT rather than a
+    -- boolean-plus-one -- see Pawl.Engine.PlayerEffect.landPlaysAllowed.
+    --
+    -- The "on each of YOUR TURNS" both cards print is not modelled as a turn
+    -- restriction, and that is exact rather than a shortcut about Magic:
+    -- Pawl.Engine.Action.legalActions gates every land play on being the active
+    -- player, unconditionally, so a grant that also applied on another player's
+    -- turn is unobservable until something can play a land there at all (#566).
+    PlayAdditionalLands Natural.Natural
   | -- | CR 402.2 / Reliquary Tower: this player has no maximum hand size.
     NoMaximumHandSize
   | -- | CR 500.5 / 703.4q / Upwelling, Omnath Locus of Mana: this player does not
@@ -121,4 +142,29 @@ data PlayerEffect
     -- PLAYER case and not only the permanent one. A membership question, never a
     -- tally.
     CantBeTargetedBy PlayerScope.PlayerScope
+  | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
+    -- though it had flash -- which by CR 702.8a and CR 117.1a's first sentence
+    -- means any time they have priority.
+    --
+    -- NOT Pawl.Types.Keyword.Flash and not a second producer of it. CR 702.8a's
+    -- flash is a static ability an object has about casting ITSELF ("the card
+    -- it's on"), and Vedalken Orrery gives itself nothing. That the rules spend
+    -- CR 601.3b, 601.3c and 601.3d on "as though it had flash" is the point: it
+    -- is a distinct mechanism, and it belongs on the CR 613.11 player axis that
+    -- this type is.
+    --
+    -- NOT a Pawl.Types.CastingPermission either: every arm of that type names a
+    -- ZONE a card may be cast from (CR 601.3), and this names a TIME.
+    --
+    -- The filter is CR 601.3b's "a spell with certain qualities", and is the axis
+    -- that separates the producers: Vedalken Orrery says "spells" and so matches
+    -- everything (`And []`), while Yeva, Nature's Herald says "green creature
+    -- spells" and would narrow it.
+    --
+    -- A PERMISSION, which Pawl.Engine.PlayerEffect folds as a disjunction -- the
+    -- same shape the prohibitions take, for the opposite reason. CR 101.2 makes
+    -- one applicable prohibition enough because nothing outvotes a "can't"; one
+    -- applicable permission is enough because there is nothing for a second to
+    -- outvote.
+    CastAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

@@ -111,6 +111,7 @@ import qualified Pawl.Codec.TriggeredAbilitySpec
 import qualified Pawl.Codec.TurnScopeSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TypeLineSpec
+import qualified Pawl.Codec.UnlessPaidSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
@@ -153,6 +154,7 @@ import qualified Pawl.Json.ValueSpec
 import qualified Pawl.ManaSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
+import qualified Pawl.PerformanceSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
@@ -162,6 +164,7 @@ import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec
 import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
+import qualified Pawl.RingSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
@@ -324,6 +327,7 @@ spec s registry = do
   Pawl.Codec.TurnScopeSpec.spec s
   Pawl.Codec.TurnWindowSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
+  Pawl.Codec.UnlessPaidSpec.spec s
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
@@ -365,6 +369,7 @@ spec s registry = do
   Pawl.ManaSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
+  Pawl.PerformanceSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
@@ -372,6 +377,7 @@ spec s registry = do
   Pawl.RegistrySpec.spec s
   Pawl.ReplaySpec.spec s registry
   Pawl.ResolveSpec.spec s registry
+  Pawl.RingSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
   Pawl.TargetSpec.spec s registry

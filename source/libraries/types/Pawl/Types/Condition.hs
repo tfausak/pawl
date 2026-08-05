@@ -3,11 +3,17 @@ module Pawl.Types.Condition where
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Quantity as Quantity
 
--- | A predicate over game STATE rather than over an event, with three customers
+-- | A predicate over game STATE rather than over an event, with four customers
 -- and one vocabulary: a state trigger's condition (CR 603.8, checked at every
 -- CR 117.5 boundary), an intervening "if" (CR 603.4 when the trigger event
--- occurs, CR 608.2a again on resolution), and a "for as long as" duration
--- (CR 611.2b, Pawl.Engine.Expiry.arm and Pawl.Engine.Expiry.sweepConditional).
+-- occurs, CR 608.2a again on resolution), a "for as long as" duration
+-- (CR 611.2b, Pawl.Engine.Expiry.arm and Pawl.Engine.Expiry.sweepConditional),
+-- and a printed static ability's "as long as" clause (CR 604.2,
+-- Pawl.Types.StaticAbility.condition and Pawl.Engine.Projection.gatherStatic).
+--
+-- The last two are the pair most easily confused, and CR 611.2c's parenthetical
+-- keeps them apart: the duration ENDS a stored effect once, while the static
+-- ability's clause gates one that is re-derived every projection.
 --
 -- Exactly ONE constructor: there is no escape hatch. CR 611.2b's "for as long as
 -- you control this creature" is a source-restricted count of one

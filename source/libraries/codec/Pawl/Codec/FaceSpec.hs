@@ -78,7 +78,7 @@ decodeFace = Face.fromJson Card.fromJson
 minimalModal :: Modal.Modal Card.Card
 minimalModal =
   Modal.MkModal
-    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
+    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing))
     (ModeSelection.ChooseExactly 1)
 
 -- | CR 603.6a's simplest trigger. The shape does not matter here, only that it
@@ -187,7 +187,7 @@ populatedFace :: Face.Face Card.Card
 populatedFace =
   baseFace
     { Face.keywords = Set.singleton Keyword.Deathtouch,
-      Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached (NonEmpty.singleton Modification.LoseAllAbilities)],
+      Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal ActivationTiming.AnyTime],
       Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy],
       Face.triggeredAbilities = [minimalTriggeredAbility],

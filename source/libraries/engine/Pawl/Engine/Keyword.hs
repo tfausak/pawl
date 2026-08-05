@@ -100,7 +100,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
-  Keyword.Hexproof -> []
+  Keyword.Hexproof _ -> []
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
@@ -147,7 +147,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
-  Keyword.Hexproof -> []
+  Keyword.Hexproof _ -> []
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
@@ -189,7 +189,7 @@ cycling cost searchFor =
     { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.timing = ActivationTiming.AnyTime
     }
@@ -244,7 +244,7 @@ permissionsFor keyword = case keyword of
   Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
-  Keyword.Hexproof -> []
+  Keyword.Hexproof _ -> []
   Keyword.Indestructible -> []
   Keyword.Landwalk _ -> []
   Keyword.Lifelink -> []
@@ -393,7 +393,7 @@ poisonous n =
     { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -435,7 +435,7 @@ battleCry =
     { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }

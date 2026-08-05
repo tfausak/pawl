@@ -1,5 +1,7 @@
 module Pawl.Engine.Game where
 
+import qualified Control.Monad.Trans.Class as Trans
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -10,6 +12,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
+import qualified Pawl.Types.Game as Game.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -22,6 +25,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -51,6 +56,33 @@ freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
 freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
+
+-- Ask a player something they could have answered more than one way, and record
+-- that they were asked (GameState.lastChoice). CR 104.4b's second sentence --
+-- "loops that contain an optional action don't result in a draw" -- is why this
+-- is a funnel rather than a note at each prompt site: being asked this is the
+-- engine's whole definition of an optional action, and a new prompt site that
+-- forgot to say so would make a loop containing it look mandatory.
+--
+-- FOUR prompts deliberately do not come through here, and are asked with a bare
+-- 'Trans.lift (Program.prompt ...)' instead:
+--
+--   * Prompt.Concede, because CR 104.3a lets a player concede at any time, in a
+--     loop or out of one. If conceding counted, no loop would ever be mandatory
+--     and Pawl.Engine.Engine.checkMandatoryLoop could never fire.
+--   * Prompt.ChooseAction when Pass is the only legal action -- passing is not a
+--     decision. Engine.priorityLoop makes that call, being the only caller that
+--     knows the menu.
+--   * Prompt.Shuffle and Prompt.RandomFirstPlayer, which ask for RANDOMNESS
+--     rather than for a choice (CR 701.24, CR 729.2). A loop that reshuffles a
+--     library every cycle is still a loop of mandatory actions.
+--
+-- Every other prompt site already elides its prompt when the answer is forced,
+-- so only the branch that genuinely asks reaches this.
+choose :: Prompt.Prompt a -> Game.Type.Game a
+choose p = do
+  State.modify' (\gs -> gs {GameState.lastChoice = GameState.nextTimestamp gs})
+  Trans.lift (Program.prompt p)
 
 -- CR 400.2: a property of the ZONE and never of the card -- a hand every one of
 -- whose cards is currently revealed is still a hidden zone.
@@ -209,7 +241,7 @@ resolveFace mName card = case mName of
   -- failing. Pawl.CardSpec's "a card's face names are pairwise distinct" corpus
   -- lint holds that of every loadable card, which is what makes faceNamed's
   -- answer unique whenever the name IS one of the card's own faces, and both
-  -- writers of this field (Cast.castSpell and Resolve's CR 701.27a Transform
+  -- writers of this field (Cast.asProposed and Resolve's CR 701.27a Transform
   -- arm) store a name they read from that same card's faces -- so this arm has
   -- no case that reaches it, short of a bug in one of them.
   Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)

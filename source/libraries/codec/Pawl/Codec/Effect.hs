@@ -47,6 +47,7 @@ toJson codec e = case e of
   Effect.Search f d -> Common.tagged "Search" (Just (Common.array [Filter.toJson Keyword.toJson f, SearchDestination.toJson d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
   Effect.Proliferate -> Common.nullary "Proliferate"
+  Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
   Effect.ExileHandThenDraw -> Common.nullary "ExileHandThenDraw"
   Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Common.array [SlotName.toJson slot, Filter.toJson Keyword.toJson f, Quantity.toJson q]))
   Effect.RestartGame -> Common.nullary "RestartGame"
@@ -88,6 +89,7 @@ toJson codec e = case e of
       [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
   Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Common.array [PlayerRef.toJson r, PhaseSelector.toJson sel]))
   Effect.PreventNextDamage d r q -> Common.tagged "PreventNextDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r, Quantity.toJson q]))
+  Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
@@ -137,6 +139,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "Search expects [filter, destination]"
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
+    "TemptWithTheRing" -> Right Effect.TemptWithTheRing
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
       Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> SlotName.fromJson sv <*> Filter.fromJson Keyword.fromJson fv <*> Quantity.fromJson qv
@@ -204,6 +207,9 @@ fromJson decode value = do
     "PreventNextDamage" -> case mv of
       Just (Value.Array (Array.MkArray [d, r, q])) -> Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "PreventNextDamage expects [Duration, ObjectRef, Quantity]"
+    "PreventAllDamage" -> case mv of
+      Just (Value.Array (Array.MkArray [d, r])) -> Effect.PreventAllDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r
+      _ -> Left . Text.pack $ "PreventAllDamage expects [Duration, ObjectRef]"
     "PutCounters" -> case mv of
       Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.PutCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
       _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, slot]"

@@ -55,21 +55,30 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
--- CR 109.5: the reserved slot under which a triggered ability's CONTROLLER is
--- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals
--- 1 damage to you" -- is a slot read rather than a new opcode.
+-- CR 109.5: the reserved slot under which an ability's CONTROLLER is bound
+-- ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
+-- damage to you" -- is a slot read rather than a new opcode.
+--
+-- Stamped on BOTH ability paths, because the rule defines the word for both:
+-- "For an activated ability, this is the player who activated the ability. For
+-- a triggered ability, this is the controller of the object when the ability
+-- triggered". Pawl.Engine.Activate.activateAbility answers the first;
+-- Pawl.Engine.Engine.placeBorne answers the second. CR 725.2's monarch pair is
+-- the third stamp site (Pawl.Engine.Monarch.placeInherent): those abilities
+-- have no object for CR 109.5's second sentence to name a controller of, and CR
+-- 725.2 supplies one itself -- "controlled by the player who was the monarch at
+-- the time the abilities triggered".
+--
+-- A SPELL binds nothing here (#719). Every spell in the pool that says "you"
+-- says it through an opcode carrying a PlayerRef, which Pawl.Engine.Resolve
+-- answers from the resolving controller with no slot involved; a spell mode
+-- reading this slot is a failing test rather than a silent no-op, under the same
+-- "declared slots == read slots" equality lint that forbids declaring it.
 --
 -- "No card's targetSpecs may name it" is lint-enforced as for the names above,
--- by a sweep that has to reach the ABILITIES to mean anything here: "you" is
--- stamped exclusively on triggered abilities, so a card declaring a "you"
--- target spec on one would be prompted for a target and have the answer
--- clobbered by setYou.
---
--- The two ability read lints disagree about this slot on purpose. Both are
--- subset checks: "you" sits on the triggered lint's available side because
--- every triggered ability has it bound, and is deliberately absent from the
--- activated lint's, because no activation binds it -- so an activated ability
--- reading "you" is a failing test rather than a silent no-op (#569).
+-- by a sweep that has to reach the ABILITIES to mean anything here: a card
+-- declaring a "you" target spec on one would be prompted for a target and have
+-- the answer clobbered by setYou.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
@@ -130,6 +139,28 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
+-- CR 615.13: the reserved slot under which a prevention trigger's AMOUNT is
+-- bound -- "put that many +1/+1 counters" on Selfless Squire, "you gain that much
+-- life" on the same family's other cards. Stamped by
+-- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the payload
+-- reads an ordinary Quantity.InSlot rather than a "how much was prevented"
+-- opcode.
+--
+-- A NUMBER, where triggerPlayer and became are references, so this is the first
+-- reserved slot read through Quantity rather than through a Ref. That is why
+-- Pawl.Engine.Quantity.evaluateFor's InSlot arm looks on the stack object as well
+-- as on the effect's source: an amount an EFFECT bound mid-resolution lives on
+-- the source, and one the EVENT supplied lives where every other trigger binding
+-- does.
+--
+-- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
+-- "no card's targetSpecs may name it" sweep as `you`, `thatPlayer` and `became`.
+-- Not swept: the SlotName an effect BINDS into (Destroy's count, MoveToZone's
+-- incarnation), so a card naming this one there would shadow the event's amount
+-- on the source, which InSlot reads first (#691).
+preventedAmount :: SlotName
+preventedAmount = SlotName.MkSlotName (Text.pack "thatMuch")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -143,7 +174,8 @@ toPlayer pid = Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)}
 
 -- A binding that names one NUMBER and nothing else -- what a Destroy that
 -- counts what it destroyed binds for a later "for each ... destroyed this way"
--- to read (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an
+-- to read, and what CR 615.13's prevented amount rides
+-- (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an
 -- amount rather than a recipient, so it rides the same field CR 601.2b's chosen
 -- X does.
 toAmount :: Natural -> Binding
@@ -165,6 +197,10 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 -- Bind an object under the reserved became slot (CR 400.7e).
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
+
+-- Bind a number under the reserved preventedAmount slot (CR 615.13).
+setPreventedAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding
+setPreventedAmount n = Map.insert preventedAmount (toAmount n)
 
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).

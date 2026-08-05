@@ -62,7 +62,7 @@ oneEffect cond eff =
     { TriggeredAbility.condition = cond,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton eff) Map.empty Optionality.Mandatory))
+          (Seq.singleton (Mode.MkMode (Seq.singleton eff) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -167,7 +167,8 @@ placeInherent pending = do
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
 

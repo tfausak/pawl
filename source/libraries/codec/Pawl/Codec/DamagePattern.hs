@@ -14,8 +14,9 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 defaultWhichSource :: SourceRelation.SourceRelation
 defaultWhichSource = SourceRelation.AnySource
 
--- | `whichRecipient` is runtime-only -- CR 615.7's shielded permanent or player
--- is baked by Resolve's PreventNextDamage arm, never authored on a card -- but
+-- | `whichRecipient` is runtime-only -- the permanent or player a shield covers
+-- (CR 615.7's, and CR 615.3's unbounded one) is baked by Resolve's prevention
+-- arms, never authored on a card -- but
 -- this codec is structural over the record and so accepts one from card JSON.
 -- A corpus lint keeps the pool honest instead, as for PhasePattern's
 -- `whosePhase`.
