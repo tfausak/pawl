@@ -13,6 +13,7 @@ import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Modal as Modal
@@ -62,6 +63,15 @@ combined card = case Card.layout card of
   -- characteristics shows one of them, rather than that a card with one shows
   -- it.
   Layout.Adventure -> NonEmpty.head (Card.faces card)
+  -- CR 712.8a: "While a double-faced card is outside the game or in a zone other
+  -- than the battlefield or stack, it has only the characteristics of its front
+  -- face", and CR 712.8d says the same of a permanent showing that face. The
+  -- front face is the first (Pawl.Types.Layout.Transforming), so this is
+  -- Adventure's expression again over a different claim: what a nonmodal
+  -- double-faced card shows where nothing has turned it over.
+  --
+  -- The BACK face is reached only through Object.face, which CR 701.27a writes.
+  Layout.Transforming -> NonEmpty.head (Card.faces card)
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
@@ -185,6 +195,80 @@ castableFaces card = case Card.layout card of
   -- this function's question -- CR 715.3d's exile permission excludes the
   -- Adventure half, and Pawl.Engine.Cast is where that is read.
   Layout.Adventure -> NonEmpty.toList (Card.faces card)
+  -- CR 712.11: "A double-faced spell is cast with its front face up by default."
+  -- ONE option, and no choice to leave the player: unlike Split's halves and
+  -- Adventure's two ways to play, a nonmodal double-faced card's back face is not
+  -- something a player may elect to cast. Only an effect can put it on the stack
+  -- (CR 712.8c / 712.11a's "cast transformed"), which no card in the pool grants
+  -- (#70).
+  Layout.Transforming -> [NonEmpty.head (Card.faces card)]
+
+-- CR 701.27a: "To transform a permanent, turn it over so that its other face is
+-- up." WHICH face that leaves up, by NAME -- the form Object.face stores, and
+-- the whole of what a transform writes.
+--
+-- Takes the face the permanent shows now (Nothing being its front face, CR
+-- 712.8a) and answers the one it would show after. Nothing wherever the rules
+-- say nothing happens instead:
+--
+--   * CR 701.27c / 712.9: "If a spell or ability instructs a player to transform
+--     ... any permanent that isn't represented by a double-faced token or a
+--     double-faced card, nothing happens" -- every layout but Transforming. A
+--     Clone that copied a double-faced permanent is one of those (CR 712.9's own
+--     first Example), and falls out of the layout being read off the object's
+--     stored card rather than off the projection.
+--   * CR 701.27d / 712.10: "the face that permanent would transform into is an
+--     instant or sorcery face" -- read off the face this would land on. No card
+--     in the pool has such a back face, so that guard is written for the cost of
+--     one type-line read rather than exercised.
+--
+-- Not read here, and the reason this answers a NAME rather than performing the
+-- turn: CR 701.27f ignores the instruction outright when the permanent has
+-- already transformed since the asking ability was put on the stack, which needs
+-- state no face carries (#694).
+--
+-- The SUCCESSOR in printed order, wrapping -- "its other face" for the two faces
+-- CR 712.1 gives a double-faced card, and a rotation for any longer list, which
+-- is docs/design.md section 2.11's standing rule against baking arity into the
+-- card model. A one-faced card so labelled rotates back onto itself, which is
+-- the same permanent it already was.
+turnedOver :: Maybe CardName.CardName -> Card.Card -> Maybe CardName.CardName
+turnedOver mName card = case Card.layout card of
+  Layout.Normal -> Nothing
+  Layout.Split -> Nothing
+  Layout.Adventure -> Nothing
+  Layout.Transforming ->
+    let faces = NonEmpty.toList (Card.faces card)
+        -- Nothing, and a name that resolves to no face, both mean the front face
+        -- -- Game.resolveFace's own fallback, so the two agree about which face
+        -- the permanent is being turned FROM.
+        showing = Maybe.fromMaybe 0 (mName >>= \n -> List.findIndex ((== n) . Face.name) faces)
+        after = drop (showing + 1) faces <> take (showing + 1) faces
+     in case after of
+          [] -> Nothing
+          next : _ -> if isInstant next || isSorcery next then Nothing else Just (Face.name next)
+
+-- CR 202.3b / 712.8e: the face a MANA VALUE is read from, which is not always
+-- the face whose other characteristics are live. "While a nonmodal double-faced
+-- permanent has its back face up, it has only the characteristics of its back
+-- face. However, its mana value is calculated using the mana cost of its front
+-- face" -- and CR 202.3a says the same from the other side, exempting that back
+-- face from the mana value of 0 an object with no mana cost otherwise has.
+--
+-- Takes the live face rather than deriving it, so the two questions stay one
+-- call apart: every layout but Transforming answers with exactly what it was
+-- given, and the reader (Pawl.Engine.Game.manaCostFaceOf) is the only place that
+-- has to know the difference.
+--
+-- CR 202.3b's second sentence -- a permanent COPYING the back face of a nonmodal
+-- double-faced object has mana value 0 -- is not implemented: this answers the
+-- front face's cost for every Transforming card, copy or not (#699).
+manaCostFace :: Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
+manaCostFace card live = case Card.layout card of
+  Layout.Normal -> live
+  Layout.Split -> live
+  Layout.Adventure -> live
+  Layout.Transforming -> NonEmpty.head (Card.faces card)
 
 -- The face of this card with the given name, if it has one. CR 709.4a: a card's
 -- faces are referred to BY NAME, which is what a player names in paper and what

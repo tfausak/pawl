@@ -363,6 +363,24 @@ data Effect card
     -- Assault's sweeps are `EachMatching`. ObjectRef for Destroy's reason -- one
     -- opcode rather than a sibling UntapAll to keep in step with it.
     Untap ObjectRef.ObjectRef
+  | -- | CR 701.27a: turn the permanents the ObjectRef names over, so that each
+    -- shows its other face. Thraben Gargoyle's "{6}: Transform this creature" is
+    -- `InSlot` the ability's own source; Moonmist's "transform all Humans" is
+    -- `EachMatching`, which is why this takes Destroy's ObjectRef rather than a
+    -- bare slot.
+    --
+    -- A one-shot under CR 608.2c: what it writes is which face the permanent
+    -- shows (Object.face), and every characteristic read already goes through
+    -- that (Pawl.Engine.Game.faceOf), so nothing is stored and no duration is
+    -- owed. The gates on whether anything happens at all -- CR 701.27c's card
+    -- that is not double-faced, CR 701.27d's instant or sorcery face -- are read
+    -- off the card's LAYOUT by Pawl.Engine.Card.turnedOver, never off which card
+    -- it is.
+    --
+    -- Transform and CR 701.28's convert are different game actions over the same
+    -- physical one (CR 701.28b), and this opcode is the transform half only
+    -- (#698).
+    Transform ObjectRef.ObjectRef
   | -- | CR 506.4: an effect that specifically removes a permanent from combat --
     -- the rule's one clause a card ASKS for rather than a condition the engine has
     -- to notice, which is why it is an opcode and not a sampler like

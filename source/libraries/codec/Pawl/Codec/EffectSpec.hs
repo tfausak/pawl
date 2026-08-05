@@ -427,6 +427,22 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Untap (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       """ {"type":"Untap","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  -- CR 701.27a. Both ObjectRef arms, since the pool prints one of each shape's
+  -- twin: Thraben Gargoyle's "transform this creature" is the slot, and a
+  -- "transform all X" sweep is the filter.
+  Spec.it s "Transform round-trips both ObjectRef arms" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Transform (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "self"))))
+      """ {"type":"Transform","value":"self"} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Transform (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"Transform","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
   Spec.it s "RemoveFromCombat" $
     Common.assertJsonCodec
       s

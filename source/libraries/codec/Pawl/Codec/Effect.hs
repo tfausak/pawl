@@ -92,6 +92,7 @@ toJson codec e = case e of
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
   Effect.Untap r -> Common.tagged "Untap" (Just (ObjectRef.toJson r))
+  Effect.Transform r -> Common.tagged "Transform" (Just (ObjectRef.toJson r))
   Effect.AddPhases ps -> Common.tagged "AddPhases" (Just (Common.array (fmap ExtraPhase.toJson ps)))
   Effect.GainControl d r -> Common.tagged "GainControl" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   -- The duration is ELIDED when absent (CR 603.7b's default) and the onset when
@@ -211,6 +212,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]"
     "Tap" -> Common.withValue mv (fmap Effect.Tap . ObjectRef.fromJson)
     "Untap" -> Common.withValue mv (fmap Effect.Untap . ObjectRef.fromJson)
+    "Transform" -> Common.withValue mv (fmap Effect.Transform . ObjectRef.fromJson)
     "AddPhases" -> case mv of
       Just (Value.Array (Array.MkArray ps)) -> Effect.AddPhases <$> traverse ExtraPhase.fromJson ps
       _ -> Left . Text.pack $ "AddPhases expects [ExtraPhase]"

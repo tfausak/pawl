@@ -166,6 +166,7 @@ import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.TargetSpec
+import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
 import qualified Test.Tasty as Tasty
@@ -374,5 +375,6 @@ spec s registry = do
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
   Pawl.TargetSpec.spec s registry
+  Pawl.TransformSpec.spec s registry
   Pawl.TriggerSpec.spec s registry
   Pawl.TurnSpec.spec s registry

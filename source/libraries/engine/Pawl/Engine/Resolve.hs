@@ -166,6 +166,7 @@ slotsOf effect = case effect of
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
+  Effect.Transform ref -> objectRefSlots ref
   Effect.AddPhases _ -> Set.empty
   Effect.GainControl _ ref -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Set.empty
@@ -241,6 +242,7 @@ readsX = any effectReadsX
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
       Effect.Tap _ -> False
       Effect.Untap _ -> False
+      Effect.Transform _ -> False
       Effect.AddPhases _ -> False
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger {} -> False
@@ -288,6 +290,7 @@ searchesLibrary effect = case effect of
   Effect.GainPlayerCounters {} -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
+  Effect.Transform _ -> False
   Effect.AddPhases _ -> False
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger {} -> False
@@ -563,6 +566,31 @@ resolveAbility abilId srcId ability = do
     Just obj ->
       let chosen = Binding.modesOf (Object.bindings obj)
        in resolveModes abilId srcId (Modal.chosenModes chosen (ActivatedAbility.modal ability))
+
+-- CR 701.27a over ONE object: turn it over, or leave the map exactly as it was.
+-- The Transform arm of applyEffectWith folds this over its victims.
+--
+-- Two ways nothing happens, and neither is an error:
+--
+--   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
+--     PERMANENT, which is what CR 110.1 makes an object on the battlefield, so a
+--     slot naming a card in another zone turns nothing over. Belt and braces
+--     against the common case, where CR 400.7 has already minted a fresh id for
+--     the card that left and this id names nothing at all.
+--   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
+--     CR 701.27d's instant or sorcery face.
+--
+-- Reads the object's OWN card (Game.cardOf), never a projected one, which is the
+-- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
+-- being a one-faced card whatever it copied, and that is the same read.
+turnOver :: GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+turnOver gs oid objects
+  | not (Set.member oid (GameState.battlefield gs)) = objects
+  | otherwise = case (Map.lookup oid objects, Game.cardOf oid gs) of
+      (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
+        Nothing -> objects
+        Just name -> Map.insert oid object {Object.face = Just name} objects
+      _ -> objects
 
 -- CR 701.3a/701.3b: may `src` legally be attached to `destination` right now?
 --
@@ -1988,6 +2016,32 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             { GameState.objects =
                 foldr (Map.adjust untap) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
             }
+  Effect.Transform ref ->
+    State.modify' $ \gs ->
+      -- CR 701.27a: "To transform a permanent, turn it over so that its other
+      -- face is up." One assignment to Object.face per victim, which is all a
+      -- turn IS here -- every characteristic read already resolves through it
+      -- (Game.faceOf), so the permanent's power, type line, keywords and
+      -- abilities all change together and none of them has to be told.
+      --
+      -- The victims are enumerated ONCE, the sweep Tap and Untap above share, so
+      -- an illegal slot (CR 608.2b), a player recipient and a set that matched
+      -- nothing all arrive as the empty list and turn nothing over.
+      --
+      -- WHICH face is Pawl.Engine.Card.turnedOver's answer, off the card's
+      -- layout: it is what withholds a turn from a permanent that is not
+      -- double-faced (CR 701.27c) and from one whose other face is an instant or
+      -- sorcery (CR 701.27d), so this arm never learns which card it is holding.
+      --
+      -- CR 701.27b is why nothing else fires: turning over is its own game
+      -- action, distinct from turning a permanent face up or face down, and a
+      -- card that triggers ON it needs a trigger condition pawl does not have
+      -- (#695). CR 701.27f's gate against a second turn is not implemented
+      -- either (#694).
+      gs
+        { GameState.objects =
+            foldr (turnOver gs) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
+        }
   -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
   -- Turn.splicePhases is handed GameState.phase because "directly after this

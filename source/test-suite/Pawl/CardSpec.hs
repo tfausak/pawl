@@ -442,6 +442,7 @@ effectCounts effect = case effect of
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Transform _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl duration _ -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
@@ -632,6 +633,7 @@ effectReplacements effect = case effect of
   Effect.GainPlayerCounters {} -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
+  Effect.Transform _ -> []
   Effect.AddPhases _ -> []
   Effect.GainControl _ _ -> []
   Effect.ArmDelayedTrigger {} -> []
@@ -1365,6 +1367,7 @@ effectFilters effect = case effect of
   Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.Tap ref -> unframed (objectRefFilters ref)
   Effect.Untap ref -> unframed (objectRefFilters ref)
+  Effect.Transform ref -> unframed (objectRefFilters ref)
   Effect.AddPhases _ -> []
   Effect.GainControl duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))

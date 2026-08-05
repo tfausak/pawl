@@ -223,6 +223,21 @@ faceOf oid gs = do
   card <- cardOf oid gs
   Just (resolveFace (lookupObject oid gs >>= Object.face) card)
 
+-- `faceOf`, narrowed to the one characteristic that is not always read off the
+-- live face: CR 712.8e calculates a nonmodal double-faced permanent's mana value
+-- from its FRONT face's mana cost even while its back face is up. Every mana
+-- value read goes through here rather than through faceOf, and
+-- Pawl.Engine.Card.manaCostFace is where the layout decides.
+--
+-- Its own function rather than a flag on faceOf, because the two answers differ
+-- for exactly one object -- a transformed permanent -- and every OTHER
+-- characteristic of that permanent is its back face's (CR 712.8e's first
+-- sentence). Collapsing them either way is a silent wrong answer.
+manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
+manaCostFaceOf oid gs = do
+  card <- cardOf oid gs
+  Just (Card.manaCostFace card (resolveFace (lookupObject oid gs >>= Object.face) card))
+
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
 -- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the
 -- object is still live, its own `face` narrows the answer the same way faceOf's

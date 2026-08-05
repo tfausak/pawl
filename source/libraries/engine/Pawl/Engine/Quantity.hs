@@ -61,7 +61,10 @@ evaluate viewOf context gs oid = evaluateFor viewOf context gs oid oid
 evaluateFor :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> ObjectId -> Quantity -> Maybe Integer
 evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Literal n -> Just n
-  Quantity.ManaValue -> fmap manaValueOf (Game.faceOf oid gs)
+  -- Game.manaCostFaceOf and not Game.faceOf: CR 712.8e reads a transformed
+  -- permanent's mana value off its FRONT face's cost while every other
+  -- characteristic comes off its back.
+  Quantity.ManaValue -> fmap manaValueOf (Game.manaCostFaceOf oid gs)
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller
   -- decides that by which ViewOf it supplies (Projection.fullView vs.

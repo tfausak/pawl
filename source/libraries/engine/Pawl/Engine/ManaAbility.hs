@@ -56,6 +56,7 @@ manaProduced effect = case effect of
   Effect.GainPlayerCounters {} -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
+  Effect.Transform _ -> Nothing
   Effect.AddPhases _ -> Nothing
   Effect.GainControl _ _ -> Nothing
   Effect.ArmDelayedTrigger {} -> Nothing
