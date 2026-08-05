@@ -746,6 +746,11 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
 --
 -- The row's other fields are Replace's: CR 113.7's source, CR 109.5's controller
 -- baked at installation, and a fresh timestamp for its CR 614.5 identity.
+--
+-- Not implemented: CR 615.5's additional effect. The row carries a
+-- ReplacementEffect and no payload, so a prevention that also does something --
+-- Test of Faith's "for each 1 damage prevented this way, put a +1/+1 counter on
+-- that creature" -- cannot be written (#689).
 installShield :: PlayerId -> ObjectId -> Duration.Duration -> DamageRewrite.DamageRewrite -> GameState -> Recipient -> GameState
 installShield controller source duration rewrite g recipient = case Expiry.arm controller source duration g of
   -- CR 611.2b: the duration never started, so no shield is installed.
