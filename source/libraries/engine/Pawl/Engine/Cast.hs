@@ -140,8 +140,9 @@ instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 -- pool, because the only object whose stack membership the move changes is the
 -- spell itself and CR 115.5 takes that one back out of every stack pool
 -- (Target.legalRecipients). What the CHOSEN HALF changes is no longer part of
--- that argument: `castable` hands every conjunct a state with the half stamped
--- on (asProposed), so the specs read here are the ones the move would show.
+-- that argument: the specs come from `proposedFace`, and `castable` hands this a
+-- state with that same half stamped onto the OBJECT (asProposed), so a filter
+-- that reads the spell's own characteristics reads the half being cast too.
 targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
@@ -408,8 +409,9 @@ attackedThisStep pid gs =
 -- prompts.
 --
 -- What the offer's state and the real stack incarnation still differ in is the
--- object's ZONE, and no cost adjustment reads one: Pawl.Types.Filter's View
--- carries no zone axis, and Projection.viewOfObject applies no zone gate (see
+-- object's ZONE, and no cost adjustment reads one: Pawl.Engine.Filter's View
+-- carries no zone axis, and Projection.viewOfObject applies no zone gate --
+-- projectGiven falls through to the full layer fold off the battlefield (see
 -- Pawl.Types.Affected's MatchingAnywhere).
 asProposed :: ObjectId -> CardName.CardName -> GameState -> GameState
 asProposed oid name gs =
@@ -563,11 +565,10 @@ castWhileSearching pid = do
 -- symbols, then 601.2c chooses the targets, then 601.2f-h totals the cost and
 -- pays it, and 601.2i records that the spell has been cast. The spell is a stack
 -- object for the whole of its own announcement, which is what makes every read
--- below see the CR 400.7 incarnation rather than the card still sitting in a hand.
--- CR 115.5 is what keeps that from being a new bug rather
--- than a fix: the spell now appears in its OWN Pool.Spells, and a spell on the
--- stack being an illegal target for itself takes it back out
--- (Target.legalRecipients).
+-- below see the CR 400.7 incarnation rather than the card still sitting in a
+-- hand. CR 115.5 is what keeps that from being a new bug rather than a fix: the
+-- spell now appears in its OWN Pool.Spells, and a spell on the stack being an
+-- illegal target for itself takes it back out (Target.legalRecipients).
 --
 -- TWO things are read from `before`, one step ahead of the move, because CR
 -- 400.7 mints an incarnation with no memory of where it came from: the zone the

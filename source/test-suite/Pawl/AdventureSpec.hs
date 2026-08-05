@@ -1,8 +1,10 @@
 -- Covers CR 715 end to end: Pawl.Types.Layout's Adventure arm, the two
 -- Pawl.Engine.Card arms that read it (CR 715.4's combined view and CR 715.3's
 -- castable halves) plus Card.isAdventure, Pawl.Engine.Resolve.finishSpell (CR
--- 715.3d's exile), and Pawl.Engine.Cast.permitsCastFromExile -- the pool's only
--- route to playing a card from exile at all.
+-- 715.3d's exile), Pawl.Engine.Cast.permitsCastFromExile -- the pool's only
+-- route to playing a card from exile at all -- and Pawl.Engine.Cast.asProposed,
+-- which is what makes CR 715.3a's "only the alternative characteristics are
+-- evaluated" reach CR 601.2f's cost adjustments and not just the mana cost.
 --
 -- Every case runs against the printed Embereth Shieldbreaker // Battle Display:
 -- a {1}{R} 2/1 Human Knight whose Adventure is a {R} sorcery, "Destroy target
