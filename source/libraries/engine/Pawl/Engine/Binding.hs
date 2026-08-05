@@ -162,6 +162,30 @@ became = SlotName.MkSlotName (Text.pack "became")
 preventedAmount :: SlotName
 preventedAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 
+-- CR 614.1c: the reserved slot under which an as-enters sacrifice records HOW
+-- MANY permanents were sacrificed -- Wood Elemental's "the number of Forests
+-- sacrificed as it entered". Stamped by Pawl.Engine.Event's
+-- EntryRewrite.SacrificeAnyNumber arm on the entering permanent itself, so the
+-- card reads an ordinary Quantity.InSlot rather than a "how many did I eat"
+-- opcode. Second of preventedAmount's kind, and read the same way.
+--
+-- Stamped on the PERMANENT and not on the spell that made it: CR 400.7 mints a
+-- new object on every zone change, so the count belongs to the incarnation that
+-- entered. That is also what makes CR 208.2a bite, since a Wood Elemental that
+-- has not entered -- one on the stack, or in any other zone, where CR 604.3 still
+-- runs its characteristic-defining ability -- carries no such binding, and the
+-- number of Forests it sacrificed as it entered genuinely cannot be determined.
+--
+-- Stamped even when NONE were sacrificed. A permanent that entered having
+-- sacrificed nothing has a determinable count of 0, which is a different fact
+-- from a Wood Elemental that never entered at all, and only the arithmetic
+-- coincides.
+--
+-- Not a target, so the same CR 608.2b posture and the same "no card's
+-- targetSpecs may name it" sweep as preventedAmount.
+sacrificedCount :: SlotName
+sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding

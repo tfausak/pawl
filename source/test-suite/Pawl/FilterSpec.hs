@@ -38,7 +38,8 @@ blackCreature =
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
       Filter.canHostSubject = False,
-      Filter.token = False
+      Filter.token = False,
+      Filter.tapped = False
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -61,7 +62,8 @@ devoidBigCreature =
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
       Filter.canHostSubject = False,
-      Filter.token = False
+      Filter.token = False,
+      Filter.tapped = False
     }
 
 self :: Filter.Context

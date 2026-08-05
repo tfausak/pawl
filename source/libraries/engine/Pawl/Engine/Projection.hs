@@ -493,7 +493,8 @@ viewOfCard face =
           -- zone the battlefield is not (a library search, viewUpTo's fallback),
           -- and CR 704.5d already made a token in any such zone cease to exist --
           -- so no token can reach here, and False is not a lost distinction.
-          Filter.token = False
+          Filter.token = False,
+          Filter.tapped = False
         }
 
 -- Shared assembly: fill a View from a projection's characteristics plus the
@@ -565,7 +566,8 @@ viewOfCharacteristics oid pc controller gs =
       Filter.canHostSubject = False,
       -- CR 111.6: fixed for the life of the object (CR 400.7 mints a new one on
       -- every zone change), so it is a constant input to the projection.
-      Filter.token = Game.isToken oid gs
+      Filter.token = Game.isToken oid gs,
+      Filter.tapped = Game.isTapped oid gs
     }
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result, the value the layer fold
@@ -1653,6 +1655,8 @@ filterReads f = case f of
   -- Reads nothing: no Modification writes Object.source, so no effect can move a
   -- "nontoken" set.
   Filter.Type.IsToken -> Set.empty
+  -- CR 110.5: tap status is not a characteristic, so no layer writes it.
+  Filter.Type.IsTapped -> Set.empty
   -- CR 202.3 reads the printed mana cost, and no Modification writes one -- there
   -- is no mana-cost Aspect for this to name, because nothing could change it.
   Filter.Type.ManaValueAtMost _ -> Set.empty
@@ -1763,7 +1767,7 @@ project oid gs = projectFrom (gather gs) oid gs
 -- nothing.
 --
 -- Not implemented: CR 208.5, which is about the READ POINTS -- powerOf and
--- toughnessOf return Nothing for a creature with no value rather than 0 (#65).
+-- toughnessOf return Nothing for a creature with no value rather than 0 (#759).
 --
 -- CR 604.3a(3): a CDA does not affect any other object, so the Filter.Context is
 -- the object's OWN controller -- contrast applyModification's, which is the

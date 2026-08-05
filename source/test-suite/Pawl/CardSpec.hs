@@ -1010,7 +1010,20 @@ reservedSlots =
       Binding.you,
       Binding.triggerPlayer,
       Binding.became,
-      Binding.preventedAmount
+      Binding.preventedAmount,
+      Binding.sacrificedCount
+    ]
+
+-- The binding slots a card's power, toughness and characteristic-defining P/T
+-- READ. The available side is the reserved set alone: CR 604.3 makes a CDA a
+-- static ability, so there is no resolution whose earlier effect could mint a
+-- slot for it the way Resolve.definedSlots does for a spell's payload.
+powerToughnessSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+powerToughnessSlots card =
+  Set.unions
+    [ maybe Set.empty (Quantity.slots . Power.unwrap) (Face.power card),
+      maybe Set.empty (Quantity.slots . Toughness.unwrap) (Face.toughness card),
+      maybe Set.empty Quantity.slots (Face.characteristicPT card)
     ]
 
 -- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
@@ -1119,6 +1132,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsAttachedToCreature -> 0
   Filter.Type.IsAttachedToPermanent -> 0
   Filter.Type.IsToken -> 0
+  Filter.Type.IsTapped -> 0
 
 -- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
 -- 702.14c's landwalk criterion, plus the components of any Cost a keyword names
@@ -1784,6 +1798,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends = not . Set.null . reservedDeclarations
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card declares a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The read half of the same dataflow question, for the one carrier that has no
+  -- resolution to bind anything: CR 604.3's characteristic-defining P/T. A CDA is
+  -- a static ability, so there is no earlier effect of a resolution to mint its
+  -- slot -- the only writer is the ENGINE, which is what a reserved name means.
+  -- Wood Elemental's is Binding.sacrificedCount.
+  --
+  -- Not folded into the mode lint below: that one compares reads against a
+  -- card's DECLARED slots, and a CDA declares none, so its whole available side
+  -- is the reserved set. The printed boxes are swept alongside the CDA because a
+  -- slot named there reaches the same evaluator (Pawl.Engine.Projection.seedCharacteristicPT
+  -- substitutes only into a Star).
+  Spec.it s "a printed or characteristic-defining P/T reads only reserved slots" $ do
+    ps <- S.allPrintings s
+    let offends card = not (Set.isSubsetOf (powerToughnessSlots card) reservedSlots)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card's CDA names a slot nothing fills" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The sweep above would pass vacuously if powerToughnessSlots reported
+    -- nothing at all, so the one card that does read a slot is named here.
+    woodElemental <- S.printingOf s registry "Wood Elemental"
+    Spec.assertEqWith
+      s
+      "Wood Elemental's CDA reads the as-enters sacrifice count"
+      (powerToughnessSlots (S.combinedFace woodElemental))
+      (Set.singleton Binding.sacrificedCount)
   -- The sweep above passes VACUOUSLY: no committed card declares a reserved
   -- slot anywhere, so on its own it proves nothing about the lint. Proven
   -- here instead against hand-built offenders, in the posture the
