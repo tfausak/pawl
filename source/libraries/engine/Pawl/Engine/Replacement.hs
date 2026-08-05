@@ -136,13 +136,15 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- nothing, which is CR 614.4 read the other way. No producer today, so that half
 -- is unexercised.
 --
--- CR 614.12a: `batch` is the set of ids entering the battlefield AT THE SAME
--- TIME as this loop's subject. Clone may only copy a creature already on the
--- battlefield, and a sibling entering in the same batch is not there yet at the
--- moment the choice is made. (CR 614.13a is the wrong cite: that rule is about
--- an entry effect moving OTHER objects to a different zone; a copy target never
--- changes zones.) The loop's own subject is excluded by legalCopyTargets'
--- `self`, never by this set.
+-- `batch` is the set of ids entering the battlefield AT THE SAME TIME as this
+-- loop's subject. CR 614.12a puts the choice BEFORE the permanent enters, and
+-- Clone may only copy a creature already ON the battlefield, so a sibling
+-- entering in the same batch is not there yet at the moment the choice is made.
+-- No rule states that exclusion outright: it follows from 614.12a's timing plus
+-- the copy effect's own wording. (CR 614.13a is the wrong cite for it -- that
+-- rule is about an entry effect moving OTHER objects to a different zone, and a
+-- copy target never changes zones.) The loop's own subject is excluded by
+-- legalCopyTargets' `self`, never by this set.
 --
 -- `changeZone` handles one entering object at a time and passes `Set.empty`. The
 -- non-empty case is Event.createTokens, which materializes every token of a

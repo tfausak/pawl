@@ -28,11 +28,14 @@ data Affected
     -- every other card in the pool depends on that gate, since Bad Moon's "black
     -- creatures get +1/+1" must not reach a creature card in a graveyard.
     --
-    -- The set the CR describes is every object in every zone. This reaches the
-    -- battlefield and the stack, which are the two zones where a projection
-    -- exists (Projection.viewOfObject). A card in a hand, library, graveyard or
-    -- exile is matched against its PRINTED characteristics by viewOfCard and is
-    -- never reached (#160, #623).
+    -- The set the CR describes is every object in every zone. WHICH of those it
+    -- reaches depends on the reader, and the two readers disagree:
+    -- Projection.viewOfObject has no zone gate, so a card in a hand, library,
+    -- graveyard or exile IS matched against its projected view through every
+    -- caller that goes via it (cost criteria, targeting). Inside the CR 613 fold
+    -- Projection.viewUpTo instead falls back to viewOfCard off the battlefield,
+    -- so the same card is matched against its PRINTED characteristics. That
+    -- split is the defect, not an under-reach on this arm's part (#160, #623).
     --
     -- Not implemented, the symmetric OVER-reach, recorded here because the card's
     -- JSON cannot carry a comment: Painter's own filter is And [], which matches
