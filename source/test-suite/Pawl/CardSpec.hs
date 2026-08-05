@@ -1910,9 +1910,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
-  -- The same subset shape over a card's ACTIVATED abilities, whose available
-  -- side is the narrowest of the three: an activation has no event, so neither
-  -- event slot is on it. See activatedAbilityOffends for the whole of it.
+  -- The same subset shape over a card's ACTIVATED abilities, and the one
+  -- available side with no event slot on it at all: an activation is not an
+  -- event. See activatedAbilityOffends for the whole of it.
   --
   -- Brothers of Fire is what this caught: its "and 1 damage to you" reads CR
   -- 109.5's slot from an ACTIVATED ability, which nothing bound until
@@ -1930,8 +1930,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no dangling activated-ability slot" (fmap fst (filter (activatedAbilityOffends . snd) abilities)) []
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
-  -- proven here instead, against hand-built offenders and against three real
-  -- cards that exercise each part of the available side.
+  -- proven here instead, against hand-built offenders and against the four real
+  -- cards that between them exercise every part of the available side.
   --
   -- Every reserved slot an activation does NOT bind gets its own case, because a
   -- classification answering "every slot, always" would pass any one of them
@@ -1944,6 +1944,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     longtuskCub <- S.printingOf s registry "Longtusk Cub"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     cinderElemental <- S.printingOf s registry "Cinder Elemental"
+    brothers <- S.printingOf s registry "Brothers of Fire"
     let free = Just (ManaCost.MkManaCost [])
         variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
         -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
@@ -1991,14 +1992,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (activatedAbilityOffends (oneEffectActivated free drawX))
       "and rejected when it does not"
-    -- The three real cards between them cover every part of the available side
+    -- The four real cards between them cover every part of the available side
     -- that a committed card reaches: CR 113.7's self, CR 601.2c's declared
-    -- target, and an ability whose cost carries CR 601.2b's {X}.
+    -- target, an ability whose cost carries CR 601.2b's {X}, and CR 109.5's
+    -- `you`. Brothers of Fire is the last one's only producer, so dropping it
+    -- from this list would leave that part of the available side asserted by
+    -- the hand-built case alone.
     Spec.assertEqWith
       s
-      "Longtusk Cub, Prodigal Sorcerer and Cinder Elemental are all accepted"
-      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental])
-      [False, False, False]
+      "Longtusk Cub, Prodigal Sorcerer, Cinder Elemental and Brothers of Fire are all accepted"
+      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental, brothers])
+      [False, False, False, False]
   -- The PER-MODE half of all three read lints (#570), which no sweep above can
   -- reach: a one-mode ability cannot have a mode read another mode's slot at
   -- all, and all three multi-mode abilities in the pool have each mode reading
