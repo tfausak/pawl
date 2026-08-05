@@ -1479,23 +1479,30 @@ manaLeakHand island manaLeak piker bobLands =
       (gs, leakId) = S.handOne manaLeak onStack
    in (victimId, leakId, gs)
 
--- Pays what a resolving spell offers BOB, and takes the identity fallback
--- elsewhere (the hackToIsland liar pattern). Deliberately unlike
+-- Pays what a resolving spell or ability offers `who`, and takes the identity
+-- fallback elsewhere (the hackToIsland liar pattern). Deliberately unlike
 -- identityAnswer's Declines, so a test can tell an honoured answer from the
--- fallback -- and so the two branches below differ in NOTHING but this.
+-- fallback -- and so a pair of branches can differ in NOTHING but this.
 --
--- Guarded on bob rather than paying whoever is asked, which is what makes the
--- cases below prove CR 118.12's "who": the payer is the TARGETED spell's
--- controller, so an engine that asked alice -- the resolving spell's controller,
--- and the answer every other resolution-time prompt has -- would fall through to
--- Declines and fail. The Decider is checked alongside the player for CR 723.1:
--- nobody is controlling anybody here, so the two must agree.
-bobPaysAnswer :: Prompt.Prompt r -> r
-bobPaysAnswer p = case p of
+-- Guarded on a NAMED player rather than paying whoever is asked, which is what
+-- makes the cases below prove CR 118.12's "who". An engine that offered the cost
+-- to the wrong player falls through to Declines and fails, rather than paying and
+-- passing: for Mana Leak the payer is the TARGETED spell's controller and not the
+-- resolving spell's, and for Whipstitched Zombie it is the ability's own (CR
+-- 603.3a). The Decider is checked alongside the player for CR 723.1: nobody is
+-- controlling anybody in these fixtures, so the two must agree.
+--
+-- Rank-1, like Pawl.Support.attackTo: the implicit forall is outermost, so
+-- `paysFor S.bob` is the `forall r. Prompt r -> r` that Replay.record wants.
+paysFor :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+paysFor who p = case p of
   Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _
-    | d == S.bob && player == S.bob ->
+    | d == who && player == who ->
         PaymentDecision.Pays
   _ -> S.identityAnswer p
+
+bobPaysAnswer :: Prompt.Prompt r -> r
+bobPaysAnswer = paysFor S.bob
 
 -- manaLeakBoard with a Thalia on bob's side and one more Island each. alice
 -- needs the third Island because Thalia taxes HER cast (CR 601.2f), which is
@@ -1658,6 +1665,73 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     -- and this interpreter pays whenever it is asked. Offered at either end of
     -- the exchange, this would read 6.
     Spec.assertEqWith s "only Cancel's three Islands are tapped" (S.tappedCount S.bob after) 3
+
+-- Whipstitched Zombie and one untapped Swamp on alice's battlefield, her upkeep
+-- begun and the trigger settled onto the stack (CR 603.3b). Returns the Zombie,
+-- the Swamp and that state.
+--
+-- The Bitterblossom fixture in Pawl.TriggerSpec, one step short: the trigger is
+-- left ON the stack so a case can assert what the board looked like before it
+-- resolved, which is what rules out a Zombie that was never there.
+zombieUpkeep :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+zombieUpkeep swamp zombie =
+  let (zombieId, g1) = S.addCreature zombie S.alice (Setup.emptyGame S.bothPlayers)
+      (swampId, g2) = S.addCreature swamp S.alice g1
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan upkeep S.alice)
+          (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+   in (zombieId, swampId, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
+
+-- CR 118.12a again, reached from Pawl.Engine.Resolve.resolveModes rather than
+-- resolveSpellWith: Whipstitched Zombie's "At the beginning of your upkeep,
+-- sacrifice this creature unless you pay {B}" is a TRIGGERED ability, so the
+-- ability executor asks the gate instead of the spell path. The seam is one
+-- `paid` call shared by both, and this is the half Mana Leak cannot reach.
+--
+-- The payer is the ability's own controller (CR 603.3a's "your upkeep", bound
+-- into Pawl.Engine.Binding.you as the trigger is placed) rather than Mana Leak's
+-- targeted-spell controller -- the same slot read answering a different card.
+--
+-- Both cases start from the SAME board and the SAME settled trigger and differ
+-- in NOTHING but alice's answer.
+whipstitchedZombieSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+whipstitchedZombieSpec s registry = Spec.describe s "WhipstitchedZombie" $ do
+  Spec.it s "CR 118.12a declining the {B} sacrifices the Zombie to its owner's graveyard" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    zombie <- S.printingOf s registry "Whipstitched Zombie"
+    let (zombieId, swampId, onStack) = zombieUpkeep swamp zombie
+        ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
+    -- The two controls the assertions below would otherwise be satisfied by:
+    -- a Zombie that was never on the battlefield, and a trigger that never
+    -- fired. Both are ruled out BEFORE the resolution.
+    Spec.assertBool s (S.onBattlefield zombieId onStack) "the Zombie is on the battlefield before its upkeep trigger resolves"
+    Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
+    -- alice COULD have paid -- one untapped Swamp -- so the refusal is hers
+    -- rather than CR 118.3's.
+    Spec.assertEqWith s "alice was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+    -- CR 701.21a: sacrificed, so it is IN the graveyard rather than merely gone.
+    -- The Swamp is still on the battlefield, so that one graveyard card can only
+    -- be the Zombie.
+    Spec.assertEqWith s "the Zombie is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertBool s (S.onBattlefield swampId after) "and the Swamp, which is not what was sacrificed, is still in play"
+    Spec.assertEqWith s "no creature is left in play" (S.creaturesInPlay S.alice after) 0
+    Spec.assertEqWith s "declining spent nothing: the Swamp is untapped" (S.tappedCount S.alice after) 0
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+  Spec.it s "CR 118.12a paying the {B} leaves the Zombie on the battlefield" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    zombie <- S.printingOf s registry "Whipstitched Zombie"
+    let (zombieId, _swampId, onStack) = zombieUpkeep swamp zombie
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- CR 605.3a lets her tap the Swamp for it mid-resolution.
+    Spec.assertEqWith s "paying tapped the Swamp" (S.tappedCount S.alice after) 1
+    -- The same id, not a fresh one: nothing moved zones, so this is the very
+    -- permanent the trigger was about.
+    Spec.assertBool s (S.onBattlefield zombieId after) "the Zombie is still on the battlefield"
+    Spec.assertEqWith s "nothing was sacrificed" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
 
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
 -- added FIRST, so it holds the lowest object id and identityAnswer's
@@ -4283,6 +4357,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   greatestSpec s registry
   counterSpec s registry
   manaLeakSpec s registry
+  whipstitchedZombieSpec s registry
   magicalHackTimingSpec s registry
   artificialEvolutionSpec s registry
   stifleSpec s registry
