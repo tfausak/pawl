@@ -173,6 +173,24 @@ data GameState = MkGameState
     -- Cleared PER PLAYER at that player's untap step (Engine.runTurnBasedActions),
     -- which is what makes it "this turn".
     landsPlayed :: Map.Map PlayerId.PlayerId Natural.Natural,
+    -- | CR 702.179d: the players whose inherent speed-increase ability has
+    -- already triggered this turn -- that rule's "this ability triggers only
+    -- once each turn", which nothing else in the game state records.
+    --
+    -- STORED rather than derived off the turn-scoped event log, unlike CR
+    -- 508.3a's once-a-turn (Event.declarationsOf) and CR 606.3's
+    -- (Activate.loyaltyActivatedThisTurn). Those two read a log entry that IS the
+    -- thing being limited; this ability's limit is on the TRIGGER, and the log's
+    -- nearest entry is the life loss, which is not the same event: an opponent
+    -- losing life while the player has no speed (CR 702.179b) fires nothing,
+    -- because CR 702.179d hangs the ability off "a player having 1 or more
+    -- speed" -- and a log-derived limit would spend the turn's one trigger on it.
+    --
+    -- Cleared at the turn handoff (Engine.beginTurnOf), beside the event log, so
+    -- "each turn" needs nothing to reset it per player. A Set and not a Bool
+    -- because the rule scopes the limit to the ability, and each player controls
+    -- their own.
+    speedIncreasedThisTurn :: Set.Set PlayerId.PlayerId,
     -- | CR 723.1: pending player-controlling effects, keyed by the player to be
     -- controlled. Map.insert overwrites (CR 723.1a, last created wins). Promoted
     -- to activeControl at the actual start of that player's turn (CR 723.1b).

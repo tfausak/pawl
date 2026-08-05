@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -362,10 +363,12 @@ runTurnBasedActions phase = do
 -- stack, in APNAP order (CR 603.3b): active player's triggers first, then each
 -- other player's in turn order (apnapPlayers). Within one controller's own set,
 -- that player chooses the order (orderPending), asked only when they control two
--- or more. The abilities that fired include CR 725.2's sourceless inherent
--- monarch pair: gathered apart (see `inherent` below), but ordered and placed
--- with everything else, in ONE batch, because CR 603.3b gives the choice to a
--- controller over every triggered ability they control, not over some subset.
+-- or more. The abilities that fired include the sourceless inherent ones the
+-- rulebook states without a card -- CR 725.2's monarch pair and CR 702.179d's
+-- speed increase, gathered apart (see `inherent` and `revving` below) but ordered
+-- and placed with everything else, in ONE batch, because CR 603.3b gives the
+-- choice to a controller over every triggered ability they control, not over some
+-- subset.
 --
 -- CR 603.3b's other half -- first place the triggers whose condition ISN'T
 -- another ability triggering, then the rest, as a separate pass -- is not
@@ -420,9 +423,18 @@ placePendingTriggers = do
       -- (Monarch.reassignOnDeparture) keeps the crown off a departed seat, so
       -- CR 800.4d has nothing to catch here; apnapPlayers filters them anyway.
       inherent = Monarch.inherentMonarchPending evs gs
+      -- CR 702.179d, the rulebook's third inherent ability after CR 725.2's two,
+      -- and gathered for exactly the reason above: it hangs on no object either.
+      -- At most one entry, and only for the active player.
+      revving = Speed.inherentPending evs gs
   State.put
     gs
       { GameState.scannedThrough = Natural.length (GameState.events gs),
+        -- CR 702.179d's "this ability triggers only once each turn", marked as the
+        -- trigger is gathered rather than as it resolves: the limit is on
+        -- TRIGGERING, so an instance countered on the stack has still spent the
+        -- turn's one. Cleared at the turn handoff (beginTurnOf).
+        GameState.speedIncreasedThisTurn = List.foldl' (flip Set.insert) (GameState.speedIncreasedThisTurn gs) (fmap PendingTrigger.controller revving),
         -- CR 603.3a's sample is spent with the batch it was taken for. Cleared
         -- rather than left standing, so the next event to open a batch takes a
         -- fresh one (Event.recordEvent samples only when nothing is unscanned)
@@ -430,7 +442,7 @@ placePendingTriggers = do
         GameState.controlWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
-  ordered <- orderPending (pending <> inherent)
+  ordered <- orderPending (pending <> inherent <> revving)
   Monad.mapM_ placeOne ordered
   pure (not (null ordered))
 
@@ -438,9 +450,12 @@ placePendingTriggers = do
 -- on decides how: an ability BORNE by an object goes through placeBorne, where
 -- every step is keyed to that object -- CR 113.7's reserved source binding, and
 -- the fillableModes/legalSets pair that reads modes and targets relative to it.
--- CR 725.2's sourceless pair has no such object and takes the other arm.
+-- A sourceless ability (CR 725.2's pair, CR 702.179d's) has no such object and
+-- takes the other arm.
 placeOne :: PendingTrigger.PendingTrigger -> Game ()
 placeOne pending = case PendingTrigger.source pending of
+  -- Monarch.placeInherent names no rule of its own -- it is the generic
+  -- sourceless placement, and rule 702.179d's ability rides it too.
   TriggerSource.Sourceless -> Monarch.placeInherent pending
   TriggerSource.OfObject srcId -> placeBorne srcId pending
 
@@ -997,6 +1012,10 @@ beginTurnOf pid gs =
             -- Engine.advance settles immediately before calling this, so nothing
             -- unscanned is discarded.
             GameState.events = Seq.empty,
+            -- CR 702.179d's "only once each turn", cleared beside the log it sits
+            -- next to and for the same reason: this is the handoff, so a new turn
+            -- starts with nobody's speed-increase ability spent.
+            GameState.speedIncreasedThisTurn = Set.empty,
             GameState.scannedThrough = 0,
             -- Cleared with the log it describes: the settle Engine.advance runs
             -- immediately before this leaves nothing unscanned, so the sample has

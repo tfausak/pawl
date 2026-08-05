@@ -45,6 +45,19 @@ data TriggerCondition
     -- (any creature); matched only via Pawl.Engine.Monarch.inherentMatch, never through a
     -- card's bearer.
     CreatureDealtCombatDamageToMonarch
+  | -- | CR 702.179d: "whenever one or more opponents lose life during your turn".
+    -- The inherent speed-increase ability's event, and CreatureDealtCombatDamageToMonarch's
+    -- sibling in every respect -- borne by no card, matched only via
+    -- Pawl.Engine.Speed.inherentPending, never through a card's bearer, which is
+    -- why Pawl.Engine.Event.matchesTrigger answers False for it.
+    --
+    -- Neither of the rule's other two clauses is here. "If your speed is less than
+    -- 4" is CR 603.4's intervening "if", which rides
+    -- Pawl.Types.TriggeredAbility.intervening; "this ability triggers only once
+    -- each turn" is a limit on the ABILITY rather than a description of the event,
+    -- which GameState.speedIncreasedThisTurn carries. Folding either in would make
+    -- this constructor mean one ability instead of one event.
+    OpponentLostLifeDuringYourTurn
   | -- | CR 702.29c: "when you cycle this card". Self-scoped like SelfEnters. The
     -- bearer is the card in the zone it landed in, which is that rule's second
     -- sentence -- the graveyard, for every printing today.

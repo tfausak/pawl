@@ -168,6 +168,7 @@ import qualified Pawl.RingSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
+import qualified Pawl.SpeedSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
@@ -380,6 +381,7 @@ spec s registry = do
   Pawl.RingSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.SpeedSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TransformSpec.spec s registry
   Pawl.TriggerSpec.spec s registry

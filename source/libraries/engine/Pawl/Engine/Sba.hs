@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardType as CardType
@@ -503,6 +504,11 @@ performStateBasedActions = do
       -- CR 704.5k, from the SAME pre-pass state, for the same CR 704.3 reason.
       -- Unlike the legend rule this one asks nobody.
       worldLosers = worldVictims pcs gs
+      -- CR 704.5z, from the SAME pre-pass state again. Lives in
+      -- Pawl.Engine.Speed with the rest of rule 702.179 rather than here, the way
+      -- Pawl.Engine.Monarch keeps rule 725's settle-loop work: this module owns
+      -- WHEN a state-based action is checked, not what each one means.
+      revving = Speed.startingEngines pcs gs
   -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
   -- asks BEFORE anything below moves, so every choice is made against the state
   -- this pass began in -- CR 704.3's simultaneity.
@@ -580,14 +586,19 @@ performStateBasedActions = do
       outcome = Departure.outcomeAfterLeaving leaving departed
       drained = vanished {GameState.damageScannedThrough = watermark}
       balanced = List.foldl' balance drained annihilations
+      -- CR 704.5z: "that player's speed becomes 1", applied to the players
+      -- classified from the pre-pass board above. Applied LATE like every other
+      -- action in this pass, so a permanent this same pass destroyed still starts
+      -- its controller's engines -- CR 704.3 makes the whole check one event.
+      revved = List.foldl' (flip Speed.startEngines) balanced revving
       -- A state-based action was performed iff any of the classifications above
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as
   -- Departure.leaveGame -- the two doors that write GameState.result agree.
-  State.put balanced {GameState.result = GameState.result balanced <|> outcome}
+  State.put revved {GameState.result = GameState.result revved <|> outcome}
   pure acted

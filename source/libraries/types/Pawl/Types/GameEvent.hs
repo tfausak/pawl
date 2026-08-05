@@ -140,6 +140,27 @@ data GameEvent
     -- spell printing that clause is never countered at all -- Event.counter
     -- returns before this is recorded, which CR 603.2g makes mandatory.
     SpellCountered Countering.Countering
+  | -- | CR 119.3: a player LOST LIFE, and how much. Greater than 0 by
+    -- construction: every producer guards its own zero. The rules state that
+    -- explicitly only for the other direction -- CR 119.9's "if a player gains 0
+    -- life, no life gain event has occurred" -- so reading it back onto loss is an
+    -- inference, not a citation; what makes the guard safe here is that nothing
+    -- reads this constructor except CR 702.179d, which a zero must not fire.
+    --
+    -- Recorded at all three places life leaves a player, which is a fact about the
+    -- RULES and not about the engine's plumbing: CR 119.3 for a loss an effect
+    -- instructs (Pawl.Engine.Resolve's LoseLife arm), CR 119.2 for damage dealt to
+    -- a player, which CAUSES life loss rather than being it (Pawl.Engine.Damage),
+    -- and CR 119.4 for life paid as a cost (Pawl.Engine.Mana.payLife). A reader
+    -- asking "did this player lose life" must find all three; anything narrower is
+    -- a different question. CR 119.5's life-total set has no producer in the pool
+    -- and so no site here.
+    --
+    -- LIFE GAIN gets no sibling constructor: nothing reads one (#768). Not one
+    -- "life total changed" constructor covering both, though CR 119.3 does state
+    -- the two directions in a single sentence: they are distinct EVENTS for
+    -- triggers, and every card that cares says which.
+    LifeLost PlayerId.PlayerId Natural.Natural
   | -- | CR 606.3: a LOYALTY ability of this permanent was activated -- the record
     -- that rule's once-per-permanent-per-turn limit is read out of.
     --

@@ -53,9 +53,10 @@ import qualified Pawl.Types.Zone as Zone
 
 -- A single-mode, single-effect triggered ability (the shape all monarch
 -- inherent abilities take): one Mode with no targets, forced (ChooseExactly 1).
--- intervening = Nothing is load-bearing: Stack.resolveTop's OfInherentTrigger
--- arm skips the CR 608.2a resolution recheck, which is sound ONLY because these
--- abilities have no intervening "if".
+-- intervening = Nothing because CR 725.2 states neither ability with an "if"
+-- clause. Stack.resolveTop's OfInherentTrigger arm applies CR 608.2a's
+-- resolution recheck to any inherent ability that HAS one (CR 702.179d's does),
+-- so this is a fact about rule 725.2 rather than a licence the arm relies on.
 oneEffect :: TriggerCondition -> Effect.Effect Card -> TriggeredAbility Card
 oneEffect cond eff =
   TriggeredAbility.MkTriggeredAbility
@@ -118,7 +119,8 @@ inherentMatch monarch cond gs event = case (cond, event) of
 -- Not routed through Event.gatherTriggers, for the reason inherentMatch exists:
 -- these abilities have no bearer, so the scan that walks the battlefield has
 -- nowhere to find them. Skipping Event.interveningHolds costs nothing because
--- CR 603.4 applies to neither ability (see oneEffect).
+-- CR 603.4 applies to neither ability (see oneEffect); an inherent ability that
+-- does carry an "if" checks it in its own gatherer, as Pawl.Engine.Speed does.
 inherentMonarchPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentMonarchPending events gs = case GameState.monarch gs of
   Nothing -> []
@@ -130,12 +132,16 @@ inherentMonarchPending events gs = case GameState.monarch gs of
      in concatMap forAbility monarchAbilities
 
 -- Mint a sourceless inherent trigger onto the stack: the Engine.placeOne arm
--- for a TriggerSource.Sourceless entry, called once CR 603.3b has fixed the
--- batch's order. Single mode, no targets, so the mode is selected outright with
--- no prompt -- licensed by CR 725.2 fixing the full text of both inherent
--- abilities, not by anything general about sourceless triggers. The chosen
--- modes ride under the reserved chosenModes slot, which Stack.resolveTop's
--- OfInherentTrigger arm reads.
+-- for EVERY TriggerSource.Sourceless entry, called once CR 603.3b has fixed the
+-- batch's order. Named for the monarch only because rule 725.2 was the first
+-- rulebook-stated ability to need it; CR 702.179d's speed increase rides it
+-- unchanged, and nothing here reads GameState.monarch.
+--
+-- Single mode, no targets, so the mode is selected outright with no prompt --
+-- licensed by each such rule fixing its ability's full text, not by anything
+-- general about sourceless triggers. An inherent ability with a real choice in
+-- it would have to prompt here. The chosen modes ride under the reserved
+-- chosenModes slot, which Stack.resolveTop's OfInherentTrigger arm reads.
 placeInherent :: PendingTrigger -> Game ()
 placeInherent pending = do
   gs <- State.get

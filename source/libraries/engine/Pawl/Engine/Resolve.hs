@@ -155,6 +155,7 @@ slotsOf effect = case effect of
   Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.LoseLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.GainLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.IncreaseSpeed ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> Quantity.slots quantity
@@ -254,6 +255,7 @@ readsX = any effectReadsX
       Effect.Discard _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.LoseLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.GainLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.IncreaseSpeed _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Create quantity _ _ _ -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
@@ -304,6 +306,7 @@ searchesLibrary effect = case effect of
   Effect.Discard {} -> False
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
+  Effect.IncreaseSpeed {} -> False
   Effect.Create {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
@@ -1644,14 +1647,16 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- Pawl.Engine.Sba.
             Monad.forM_ losers $ \pid ->
               State.modify'
-                ( \g ->
-                    g
-                      { GameState.players =
-                          Map.adjust
-                            (\p -> p {Player.life = Player.life p - n})
-                            pid
-                            (GameState.players g)
-                      }
+                ( Event.recordEvent (GameEvent.LifeLost pid (Integer.toNaturalSaturating n))
+                    . ( \g ->
+                          g
+                            { GameState.players =
+                                Map.adjust
+                                  (\p -> p {Player.life = Player.life p - n})
+                                  pid
+                                  (GameState.players g)
+                            }
+                      )
                 )
       _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror in every respect but the sign. The
@@ -1678,6 +1683,36 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                             (GameState.players g)
                       }
                 )
+      _ -> pure ()
+  -- CR 702.179c: each named player's speed increases by this much. Its one
+  -- producer is Pawl.Engine.Speed's inherent triggered ability (CR 702.179d),
+  -- which is why this arm reads a PlayerRef it will only ever see as
+  -- `Relative You`.
+  --
+  -- The two readings CR 702.179c distinguishes -- a player who HAS speed, whose
+  -- speed goes up by the value, and a player who has NONE, whose speed BECOMES
+  -- the value -- are spelled separately here even though they coincide
+  -- arithmetically against a stand-in zero. They are separate in the rule, and
+  -- the day a card decreases speed the stand-in zero would stop being harmless.
+  --
+  -- No cap is applied. Nothing in rule 702.179 bounds speed from above; what
+  -- keeps it at 4 is that the only ability which raises it is gated on "if your
+  -- speed is less than 4" (CR 702.179d), checked when it triggers (CR 603.4) and
+  -- again as it resolves (CR 608.2a) -- Pawl.Engine.Stack's inherent-trigger arm.
+  -- A cap here would be a rule pawl invented.
+  Effect.IncreaseSpeed ref quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = Filter.MkContext (Just controller) (Just source)
+        revving = playerRefPlayers chosen legality controller gs ref
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Just n
+        | n > 0 ->
+            let by :: Natural
+                by = Integer.toNaturalSaturating n
+                faster p = p {Player.speed = Just (maybe by (+ by) (Player.speed p))}
+             in Monad.forM_ revving $ \pid ->
+                  State.modify' (\g -> g {GameState.players = Map.adjust faster pid (GameState.players g)})
       _ -> pure ()
   -- CR 701.21a: the slot's target player sacrifices `quantity` permanents
   -- matching the filter, and THAT PLAYER chooses which -- the whole difference

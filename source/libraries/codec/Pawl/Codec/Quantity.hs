@@ -24,6 +24,7 @@ toJson q = case q of
   Quantity.Count c -> Common.tagged "Count" . Just $ Count.toJson toJson c
   Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ ManaCount.toJson c
   Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ PlayerRef.toJson p
+  Quantity.Speed p -> Common.tagged "Speed" . Just $ PlayerRef.toJson p
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -38,6 +39,7 @@ fromJson value = do
     ("Count", Just v) -> Quantity.Count <$> Count.fromJson fromJson v
     ("ManaCount", Just v) -> Quantity.ManaCount <$> ManaCount.fromJson v
     ("LifeTotal", Just v) -> Quantity.LifeTotal <$> PlayerRef.fromJson v
+    ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)

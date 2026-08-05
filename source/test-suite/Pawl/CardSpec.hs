@@ -331,6 +331,7 @@ quantityCounts quantity = case quantity of
   -- CR 119.1's scalar attached to a PLAYER: it holds neither a Pawl.Types.Count
   -- nor a Pawl.Types.Filter, so these lints have nothing to sweep here either.
   Quantity.Type.LifeTotal _ -> []
+  Quantity.Type.Speed _ -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this
@@ -402,6 +403,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfCycled -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
@@ -441,6 +443,7 @@ effectCounts effect = case effect of
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.GainLife _ quantity -> quantityCounts quantity
+  Effect.IncreaseSpeed _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
@@ -472,6 +475,14 @@ effectCounts effect = case effect of
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
 -- intervening "if" clause, and its modes' effects.
+-- CR 702.178a's "as long as" gate is a Condition like any other, so it reaches a
+-- Count and through it a Filter -- triggeredAbilityCounts' treatment of CR 603.4's
+-- intervening "if", one field over.
+activatedAbilityCounts :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
+activatedAbilityCounts ability =
+  foldMap conditionCounts (ActivatedAbility.condition ability)
+    <> concatMap effectCounts (Modal.allEffects (ActivatedAbility.modal ability))
+
 triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 triggeredAbilityCounts ability =
   triggerConditionCounts (TriggeredAbility.condition ability)
@@ -481,8 +492,9 @@ triggeredAbilityCounts ability =
 -- Every Count reachable from a card: every site a Pawl.Types.Count can be
 -- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
 -- effect/modification quantity), Condition (a trigger's own condition, a
--- triggered ability's intervening clause, a ForAsLongAs duration, and CR
--- 508.1c's / CR 509.1b's "unless some condition is met"), and every effect
+-- triggered ability's intervening clause, an activated ability's CR 702.178a
+-- gate, a ForAsLongAs duration, and CR 508.1c's / CR 509.1b's "unless some
+-- condition is met"), and every effect
 -- (spell, activated, triggered, delayed), recursing into a minted token or
 -- emblem.
 --
@@ -533,7 +545,7 @@ cardCounts card =
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
     <> concatMap staticAbilityCounts (Face.staticAbilities card)
     <> concatMap effectCounts (Card.allEffects card)
-    <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
+    <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
@@ -642,6 +654,7 @@ effectReplacements effect = case effect of
   Effect.Discard _ _ -> []
   Effect.LoseLife _ _ -> []
   Effect.GainLife _ _ -> []
+  Effect.IncreaseSpeed _ _ -> []
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage {} -> []
   Effect.PreventAllDamage {} -> []
@@ -956,7 +969,8 @@ oneEffectActivated mana effect =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime
+      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.condition = Nothing
     }
 
 -- One CR 700.2 mode for the fixtures below: the effects it runs and the target
@@ -979,7 +993,8 @@ modalActivated modes =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime
+      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.condition = Nothing
     }
 
 -- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
@@ -1199,6 +1214,7 @@ keywordFilters keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
+  Keyword.StartYourEngines -> []
   Keyword.Toxic _ -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
@@ -1301,6 +1317,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.PlayerDiscards _ -> []
@@ -1427,6 +1444,7 @@ effectFilters effect = case effect of
   Effect.Discard _ quantity -> unframed (quantityFilters quantity)
   Effect.LoseLife _ quantity -> unframed (quantityFilters quantity)
   Effect.GainLife _ quantity -> unframed (quantityFilters quantity)
+  Effect.IncreaseSpeed _ quantity -> unframed (quantityFilters quantity)
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> overFaces cardFilters card
@@ -1479,7 +1497,12 @@ triggeredAbilityFilters ability =
 
 activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
 activatedAbilityFilters ability =
-  unframed (costFilters (ActivatedAbility.cost ability))
+  unframed
+    ( costFilters (ActivatedAbility.cost ability)
+        -- CR 702.178a's "as long as" gate, the triggeredAbilityFilters
+        -- treatment of CR 603.4's intervening "if" one field over.
+        <> concatMap conditionFilters (Maybe.maybeToList (ActivatedAbility.condition ability))
+    )
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach

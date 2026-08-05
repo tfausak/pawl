@@ -389,9 +389,10 @@ data Prompt r where
   -- permutation of the entry INDICES giving the order they are put on the stack, so
   -- the last named resolves first.
   --
-  -- A TriggerSource rather than an ObjectId inside the entry because CR 725.2's
-  -- inherent monarch abilities have no source and are ordinary triggered abilities
-  -- otherwise, so they are in this batch with no id to put on the wire.
+  -- A TriggerSource rather than an ObjectId inside the entry because the inherent
+  -- abilities (CR 725.2's monarch pair, CR 702.179d's speed increase) have no
+  -- source and are ordinary triggered abilities otherwise, so they are in this
+  -- batch with no id to put on the wire.
   --
   -- Positional, but no longer positional BY NECESSITY: the entry carries the
   -- ability alongside the source (#61), so two entries are equal exactly when they

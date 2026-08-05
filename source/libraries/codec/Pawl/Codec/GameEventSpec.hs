@@ -113,3 +113,10 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.LoyaltyAbilityActivated (ObjectId.MkObjectId 7))
       """ {"type":"LoyaltyAbilityActivated","value":7} """
+  Spec.it s "LifeLost" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.LifeLost (PlayerId.MkPlayerId 1) 2)
+      """ {"type":"LifeLost","value":[1,2]} """

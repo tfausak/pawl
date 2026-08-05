@@ -119,13 +119,37 @@ resolveTopWith runSubgame = do
         -- zone, never cast). Drop it, like a token.
         Source.OfEmblem _ -> State.put gs {GameState.stack = rest}
         Source.OfInherentTrigger _ ability ->
-          -- CR 725.2: an inherent monarch ability has no source object and no
-          -- intervening "if" (intervening = Nothing); resolve its effects
-          -- directly. Object.owner is the monarch (baked at placement) --
-          -- "you".
-          let chosen = Binding.modesOf (Object.bindings obj)
-              modal = TriggeredAbility.modal ability
-           in Resolve.resolveModes oid oid (Modal.chosenModes chosen modal)
+          -- An inherent ability has no source object, so the ability object
+          -- itself stands in for one and Object.owner is its controller -- the
+          -- monarch for CR 725.2's two abilities, the player whose engines are
+          -- running for CR 702.179d's.
+          --
+          -- CR 608.2a: the intervening "if" is checked AGAIN as the ability
+          -- resolves, exactly as the OfTrigger arm above does it. Rule 725.2's
+          -- abilities have none, so this was once elided; rule 702.179d's "if
+          -- your speed is less than 4" is one, and eliding it would let a
+          -- trigger that waited on the stack raise a speed already at max.
+          --
+          -- No board reaches the removal today, and the branch is here because
+          -- CR 608.2a says so rather than because anything observes it: rule
+          -- 702.179d admits one trigger a turn and nothing else in the pool moves
+          -- a player's speed, so the answer cannot change between the CR 603.4
+          -- check in Pawl.Engine.Speed and this one. The two are mutually
+          -- redundant, not jointly redundant -- Pawl.SpeedSpec's "speed stops at
+          -- 4" case fails when BOTH are removed.
+          --
+          -- The view is `oid`'s own, which has no characteristics to speak of --
+          -- sound because an inherent ability's condition reads a PLAYER (CR
+          -- 702.179d's "your speed"), never the object it hangs on, there being
+          -- none to read.
+          case TriggeredAbility.intervening ability of
+            Just cond
+              | not (Condition.holds (Projection.viewWithLastKnown oid gs) (Filter.MkContext (Just (Object.owner obj)) (Just oid)) gs oid cond) ->
+                  State.modify' (Game.cease oid)
+            _ ->
+              let chosen = Binding.modesOf (Object.bindings obj)
+                  modal = TriggeredAbility.modal ability
+               in Resolve.resolveModes oid oid (Modal.chosenModes chosen modal)
 
 -- CR 400.7a: effects that change a permanent spell's characteristics or
 -- controller keep applying to the permanent it becomes. CR 400.7 mints a fresh

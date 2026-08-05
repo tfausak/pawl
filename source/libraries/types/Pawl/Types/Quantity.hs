@@ -115,4 +115,19 @@ data Quantity
     -- A LEAF, like ManaCount above and unlike Count: it holds no Quantity, so
     -- the recursion this type has does not reach it.
     LifeTotal PlayerRef.PlayerRef
+  | -- | CR 702.179: a player's speed -- what CR 702.179e's "max speed" and CR
+    -- 702.178a's "as long as your speed is 4" ask about. LifeTotal's sibling in
+    -- every respect: one scalar attached to a player rather than a population in
+    -- a zone, so it is not a Count, and it carries the same PlayerRef to say
+    -- whose.
+    --
+    -- CR 702.179f is applied by the EVALUATOR, not by this type: a player with no
+    -- speed at all (Player.speed of Nothing, CR 702.179b) evaluates to 0 here,
+    -- because the rule says their speed IS 0 "for the purpose of an effect that
+    -- refers to speed" -- and this constructor is exactly such an effect's
+    -- reading. Nothing would be "unanswered", which is a different claim and the
+    -- wrong one.
+    --
+    -- A LEAF, like LifeTotal and ManaCount: it holds no Quantity.
+    Speed PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)

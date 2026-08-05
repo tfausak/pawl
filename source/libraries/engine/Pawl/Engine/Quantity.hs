@@ -139,6 +139,19 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.LifeTotal ref -> case Count.playersFor context gs ref of
     Just [pid] -> fmap Player.life (Map.lookup pid (GameState.players gs))
     _ -> Nothing
+  -- CR 702.179e / 702.179f: a player's speed. LifeTotal's arm in every respect
+  -- above -- read live, resolved through the same Count.playersFor, and Nothing
+  -- for a reference naming anything but exactly one player.
+  --
+  -- CR 702.179f is applied HERE and only here: "if that player has no speed,
+  -- their speed is 0 for the purpose of an effect that refers to speed", and
+  -- this arm IS such an effect's reading, so Player.speed of Nothing (CR
+  -- 702.179b) answers Just 0. The outer Nothing means "which player?" went
+  -- unanswered, which is a different claim -- a player the map does not hold at
+  -- all is not a player with no speed.
+  Quantity.Speed ref -> case Count.playersFor context gs ref of
+    Just [pid] -> fmap (maybe 0 toInteger . Player.speed) (Map.lookup pid (GameState.players gs))
+    _ -> Nothing
 
 -- CR 208.2a, last sentence: an undeterminable number is 0, including inside a
 -- calculation. TOTAL where evaluate is partial -- an Integer, never a Maybe.
@@ -175,6 +188,7 @@ substituteStar star quantity = case quantity of
   Quantity.Count _ -> quantity
   Quantity.ManaCount _ -> quantity
   Quantity.LifeTotal _ -> quantity
+  Quantity.Speed _ -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -204,6 +218,8 @@ slots quantity = case quantity of
   -- The same position a third time: this arm's PlayerRef.InSlot names a TARGET
   -- slot, not an amount one.
   Quantity.LifeTotal _ -> Set.empty
+  -- And a fourth: LifeTotal's sibling carries a PlayerRef in the same position.
+  Quantity.Speed _ -> Set.empty
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A
