@@ -1762,12 +1762,21 @@ restartAnswer p = case p of
 -- cast), so no cast is available there and everyone passes to termination (bob
 -- decks) -- except the CR 729.6 nested gate, where the level-1 subgame's
 -- library also holds a castable nested synthetic-subgame sorcery, and the same
--- cast-if-available strategy descends into it. Because subgame prompts are
--- UNTAGGED, the same answerer serves every level. Non-ChooseAction prompts
--- (Shuffle during setup, etc.) delegate to identityAnswer.
--- #153: what one question said about the game that raised it. Three booleans
--- and a depth rather than the GameStates themselves, so a failure prints
--- something a person can read.
+-- cast-if-available strategy descends into it. It takes the question and not
+-- the game it came from (#153), so the one answerer serves every level.
+-- Non-ChooseAction prompts (Shuffle during setup, etc.) delegate to
+-- identityAnswer.
+subgameAnswer :: Prompt.Prompt r -> r
+subgameAnswer p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    case filter isCastAction actions of
+      cast : _ -> cast
+      [] -> A.Pass
+  _ -> S.identityAnswer p
+
+-- #153: what one question said about the game that raised it. A depth and two
+-- booleans rather than the GameStates themselves, so a failure prints something
+-- a person can read.
 data AskTag = MkAskTag
   { askDepth :: Int,
     askedGameHasSurvivor :: Bool,
@@ -1790,14 +1799,6 @@ recordAskedGame survivor asked = do
         :
     )
   pure (subgameAnswer (Asked.prompt asked))
-
-subgameAnswer :: Prompt.Prompt r -> r
-subgameAnswer p = case p of
-  Prompt.ChooseAction _ _ actions ->
-    case filter isCastAction actions of
-      cast : _ -> cast
-      [] -> A.Pass
-  _ -> S.identityAnswer p
 
 -- #136 / CR 729.2: hands the subgame's first-player roll a fixed answer, so a
 -- test can play the same fixture with each player starting. Every other prompt

@@ -39,7 +39,7 @@ prompt i = Then i Return
 -- suspension came from (CR 729.1a): a subgame runs as a nested StateT over THIS
 -- program, so its instructions pass outward through the parent's frame and can
 -- be told there, from outside, which game raised them.
-mapProgram :: (forall b. instr b -> jnstr b) -> Program instr a -> Program jnstr a
+mapProgram :: (forall b. instr b -> instr2 b) -> Program instr a -> Program instr2 a
 mapProgram f program = case program of
   Return a -> Return a
   Then i k -> Then (f i) (mapProgram f . k)

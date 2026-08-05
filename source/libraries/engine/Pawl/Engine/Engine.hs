@@ -1235,11 +1235,12 @@ playGame =
 -- through the SAME Program interpreter and Replay fold, which is what keeps a
 -- transcript replayable across one. They are not indistinguishable from the
 -- parent's for all that: Asked.under below stamps every one of them with the
--- parent game, so an answerer can tell a subgame's question from a main-game one
--- (#153). The parent GameState sits untouched in the outer frame while the
--- subgame runs (CR 729.1a). At the end, funnel each owner's cards back to their main-game
--- library (CR 729.5) and reshuffle. A subgame within a subgame (CR 729.6) is
--- free: the nested playGame's own priorityLoop re-supplies playSubgame.
+-- parent game, so an answerer can tell a subgame's question from a main-game
+-- one (#153). The parent GameState sits untouched in the outer frame while the
+-- subgame runs (CR 729.1a). At the end, funnel each owner's cards back to
+-- their main-game library (CR 729.5) and reshuffle. A subgame within a subgame
+-- (CR 729.6) is free: the nested playGame's own priorityLoop re-supplies
+-- playSubgame.
 --
 -- Nesting terminates: subgameStateFrom draws each level's library from the
 -- PARENT level's library zone at cast time (CR 729.2), already reduced by the

@@ -171,7 +171,10 @@ number drives code (CLAUDE.md: never trust recalled Magic rules).
   - **Arbitrary nesting (CR 729.6) is free recursion:** a subgame resolving another
     Shahrazad calls `playGame` again a level deeper. No `GameState` stack field is
     needed; the call stack *is* the game stack.
-  - **Subgame prompts are untagged** (owner decision, 2026-07-23). Pure and
+  - **Subgame prompts are untagged** (owner decision, 2026-07-23; SUPERSEDED --
+    #153 tagged them, without changing the `Prompt` GADT, by suspending on a
+    `Pawl.Types.Asked` that carries the asking game and the games enclosing it).
+    Pure and
     scripted test interpreters do not need to distinguish which game a prompt
     belongs to, so M5's gameplay tests work directly. A real client's need for
     game-context (which game am I answering; CR 723.4 information visibility) is an

@@ -988,10 +988,10 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- belongs to Artificial Evolution as opposed to Magical Hack, and
             -- the "can't be Wall" restriction rides in from the data as
             -- `forbidden`.
-            ask = case family of
+            question = case family of
               SubtypeFamily.BasicLandType -> Prompt.ChooseLandTypeSwap decider controller resolving slot forbidden
               SubtypeFamily.CreatureType -> Prompt.ChooseCreatureTypeSwap decider controller resolving slot forbidden
-        (from, to) <- Game.ask ask
+        (from, to) <- Game.ask question
         State.modify' $ \gs ->
           -- CR 611.2a: the opcode states no duration, so the effect "lasts
           -- until the end of the game" -- Duration.Indefinite, armed through
