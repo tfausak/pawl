@@ -644,8 +644,9 @@ phyrexianLife = 2
 
 -- CR 107.4e's {2/X} half: the generic mana its OTHER way costs. The one place
 -- that number is written, and it is fixed rather than carried for the reason
--- Pawl.Types.ManaSymbol.MonocoloredHybrid gives -- CR 107.4 prints {2/W}..{2/G}
--- and nothing else.
+-- Pawl.Types.ManaSymbol.MonocoloredHybrid gives -- of CR 107.4's monocolored
+-- hybrid symbols that constructor says only the five {2/W}..{2/G}, and every one
+-- of those is a two.
 monocoloredHybridGeneric :: Natural
 monocoloredHybridGeneric = 2
 
@@ -791,7 +792,9 @@ completions symbols = case symbols of
           <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
   -- CR 107.4e's two ways, neither of which commits life. The {2} is a Generic
   -- symbol and not a demand for two mana of the stated type: CR 107.4e says "two
-  -- mana of any type", which is what generic mana IS (CR 107.4).
+  -- mana of any type", and CR 107.4b says a numerical symbol represents generic
+  -- mana, which "can be paid with any type of mana" -- the same permission, which
+  -- is why the substitution loses nothing.
   ManaSymbol.MonocoloredHybrid manaType : rest ->
     [(ManaSymbol.OfType manaType : tail_, life) | (tail_, life) <- completions rest]
       <> [(ManaSymbol.Generic monocoloredHybridGeneric : tail_, life) | (tail_, life) <- completions rest]
