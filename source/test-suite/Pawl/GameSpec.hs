@@ -645,7 +645,7 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
   Spec.it s "CR 400.7/727.2 gameplay: a restart puts Painter's Servant into a library with its chosen colour forgotten" $ do
     -- The card-driven proof for Setup.startGameFromCards' hand-written zone
     -- move. Painter's Servant is CAST rather than placed, because CR 614.1c's
-    -- colour choice happens only on the entry path (Replacement.runEntry) -- a
+    -- colour choice happens only on the entry path (Event.runEntry) -- a
     -- Servant put straight onto the battlefield has chosenColor = Nothing and
     -- this test would assert nothing. S.identityAnswer answers ChooseColor with
     -- white, which is all this needs: WHICH colour it chose does not matter,

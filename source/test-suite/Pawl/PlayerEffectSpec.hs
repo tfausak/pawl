@@ -1377,7 +1377,7 @@ nonBasicLandName = Filter.Type.Not (Filter.Type.And [Filter.Type.HasSupertype Su
 -- Cast the Chamber and let it resolve, answering both name choices.
 --
 -- CAST rather than S.addCreature, because the choice happens only on the entry
--- path (Replacement.runEntry): a Chamber placed straight onto the battlefield
+-- path (Event.runEntry): a Chamber placed straight onto the battlefield
 -- has an empty chosenNames and prohibits nothing.
 castChamber :: PlayerId.PlayerId -> (PlayerId.PlayerId -> CardName.CardName) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
 castChamber opponent pick gs oid =

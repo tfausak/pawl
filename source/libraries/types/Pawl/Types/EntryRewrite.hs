@@ -62,7 +62,7 @@ data EntryRewrite
   | -- | CR 614.1c's other shape: "[This permanent] enters with ...". CR 306.5b's
     -- intrinsic loyalty ability is the one producer today.
     --
-    -- The counters are placed through Pawl.Engine.Replacement.putCounters, the CR
+    -- The counters are placed through Pawl.Engine.Event.putCounters, the CR
     -- 122.6 funnel, and NOT written into the copiable snapshot AsCopy and
     -- ChoiceOf write to: counters are not characteristics (CR 122.1) and CR 707.2
     -- excludes them from the copiable values outright. Going through the funnel
@@ -100,13 +100,19 @@ data EntryRewrite
     -- Natural settled at projection time. Splitting them would need a channel
     -- from one entry replacement to another that nothing else in CR 614.1c wants.
     --
-    -- ANY NUMBER, not a count: CR 601.2's "choose a number" is not what this
-    -- says, so the prompt is Prompt.ChooseAnyNumberToSacrifice and the empty
+    -- ANY NUMBER, and CR 614.13a's "choose a number of objects that will also
+    -- change zones" is the rule -- so the prompt is
+    -- Prompt.ChooseAnyNumberToSacrifice, which admits every subset, and the empty
     -- answer is legal. Shimatsu is printed 0/0, so declining is a real option
     -- with a real consequence (CR 704.5f buries it).
     --
     -- The permanents leave through the CR 701.21a sacrifice funnel and the
     -- counters arrive through the CR 122.6 one, so Rest in Peace and Doubling
     -- Season both see this the way they see any other sacrifice or counter.
+    --
+    -- CR 702.82a's devour is the same shape with a multiplier -- "N +1/+1
+    -- counters for EACH creature sacrificed this way" -- so it wants this
+    -- constructor plus a per-permanent count. Not carried: one is what Shimatsu
+    -- needs, and no devour card is in the pool.
     SacrificeAnyNumber (Filter.Filter Keyword.Keyword) CounterKind.CounterKind
   deriving (Eq, Ord, Show)

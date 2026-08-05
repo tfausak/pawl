@@ -292,14 +292,23 @@ applyReplacements = applyReplacementsIn Nothing Set.empty
 -- is unexercised.
 --
 -- `batch` is the set of ids entering the battlefield AT THE SAME TIME as this
--- loop's subject. CR 614.12a puts the choice BEFORE the permanent enters, and
--- Clone may only copy a creature already ON the battlefield, so a sibling
--- entering in the same batch is not there yet at the moment the choice is made.
--- No rule states that exclusion outright: it follows from 614.12a's timing plus
--- the copy effect's own wording. (CR 614.13a is the wrong cite for it -- that
--- rule is about an entry effect moving OTHER objects to a different zone, and a
--- copy target never changes zones.) The loop's own subject is excluded by
--- legalCopyTargets' `self`, never by this set.
+-- loop's subject, and TWO of `apply`'s entry arms narrow by it, on two different
+-- rules:
+--
+--   * COPY TARGETS. CR 614.12a puts the choice BEFORE the permanent enters, and
+--     Clone may only copy a creature already ON the battlefield, so a sibling
+--     entering in the same batch is not there yet at the moment the choice is
+--     made. No rule states that exclusion outright: it follows from 614.12a's
+--     timing plus the copy effect's own wording. CR 614.13a is the wrong cite for
+--     it -- that rule is about an entry effect moving OTHER objects to a
+--     different zone, and a copy target never changes zones.
+--   * THE AS-ENTERS SACRIFICE (EntryRewrite.SacrificeAnyNumber). Here CR 614.13a
+--     is exactly the rule, because a sacrificed permanent does change zones:
+--     "You can't choose the object that will become that permanent or any other
+--     object entering the battlefield at the same time as that object."
+--
+-- Both arms exclude the loop's own subject themselves -- legalCopyTargets'
+-- `self`, and the sacrifice arm's `entering` -- never through this set.
 --
 -- `changeZone` handles one entering object at a time and passes `Set.empty`. The
 -- non-empty case is Event.createTokens, which materializes every token of a
@@ -625,12 +634,14 @@ apply batch candidate event =
       -- make either happen.
       --
       -- THE ENTERING OBJECT IS NOT A CANDIDATE, nor is a permanent entering
-      -- beside it. CR 614.12a puts the choice before the permanent enters the
-      -- battlefield, and CR 701.21a lets a player sacrifice only a permanent they
-      -- control -- so neither is one yet at the moment of the choice. This engine
-      -- materializes the entering object before running the entry loop (see
-      -- runEntry), so `sacrifice` would otherwise happily take it; the exclusion
-      -- is legalCopyTargets' `self` and `batch` again, for the same rule.
+      -- beside it. CR 614.13a states it outright -- "you can't choose the object
+      -- that will become that permanent or any other object entering the
+      -- battlefield at the same time as that object" -- and that rule reaches
+      -- this arm and not the copy arm beside it, because a sacrificed permanent
+      -- CHANGES ZONES and a copy target does not (see applyReplacementsIn). This
+      -- engine materializes the entering object before running the entry loop
+      -- (see runEntry), so `sacrifice` would otherwise happily take it: the
+      -- exclusion has to be written, not inherited.
       --
       -- Not implemented: CR 614.12b's combined-affordability check when two such
       -- permanents enter at once (#72).

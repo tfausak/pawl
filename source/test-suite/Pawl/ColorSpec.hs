@@ -496,7 +496,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
     -- below ("CR 604.3 Red Elemental Blast counters a devoid SPELL...").
     --
     -- CAST rather than S.addCreature, because the colour choice happens only on
-    -- the entry path (Replacement.runEntry): a Servant placed straight onto the
+    -- the entry path (Event.runEntry): a Servant placed straight onto the
     -- battlefield has chosenColor = Nothing and its AddChosenColor adds nothing.
     mountain <- S.printingOf s registry "Mountain"
     paintersServant <- S.printingOf s registry "Painter's Servant"

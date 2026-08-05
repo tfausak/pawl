@@ -546,7 +546,7 @@ payComponent pid oid component = case component of
     State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})
     pure Payment.Paid
   -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
-  -- through Replacement.putCounters, which is the CR 614 funnel: CR 614.16 admits
+  -- through Event.putCounters, which is the CR 614 funnel: CR 614.16 admits
   -- a counter-scaling replacement (Doubling Season, Hardened Scales) only where a
   -- resolving spell or ability's EFFECT puts the counter on, and a cost is not an
   -- effect. The counters CR 306.5b's enters-with replacement places DO go through

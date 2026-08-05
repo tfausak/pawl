@@ -24,7 +24,7 @@ import qualified Pawl.Types.Uses as Uses
 -- has nothing to count at all.
 --
 -- CR 615.7's multi-source choice is asked over
--- Pawl.Engine.Replacement.resolveDamageBatch's batch: each DamageEvent still runs
+-- Pawl.Engine.Event.resolveDamageBatch's batch: each DamageEvent still runs
 -- its own CR 616.1 loop, and what the shielded player (or the shielded
 -- permanent's controller) decides is the ORDER those loops run in.
 --

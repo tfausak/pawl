@@ -483,7 +483,7 @@ data Prompt r where
   -- already consumed, so two Sacrifice components of one cost each see the full
   -- candidate list (#112).
   ChooseSacrifices :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
-  -- | CR 614.1c with CR 614.12a: sacrifice ANY NUMBER of the candidates as this
+  -- | CR 614.1c with CR 614.13a: sacrifice ANY NUMBER of the candidates as this
   -- permanent enters, which is a different question from ChooseSacrifices above
   -- and not expressible as it -- that one names how many and Pawl.Engine.Cost
   -- rejects an answer of any other size, while this one admits every subset

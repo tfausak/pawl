@@ -3205,7 +3205,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         after = proliferate proliferatesNothing src gs
     Spec.assertEqWith s "the creature is untouched" (S.counterOf CounterKind.PlusOnePlusOne src after) 2
     Spec.assertEqWith s "bob is untouched" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
-  -- The counter placement rides Replacement.putCounters, so CR 614's counter
+  -- The counter placement rides Event.putCounters, so CR 614's counter
   -- replacements get their opportunity -- proliferate is not a side door that
   -- bypasses Hardened Scales.
   Spec.it s "CR 614 Hardened Scales applies to the counter proliferate adds" $ do
