@@ -171,9 +171,9 @@ data Filter keyword
     -- so nothing in CR 613 can turn a card into a token or back. That is what lets
     -- Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsToken
-  | -- | CR 701.21a: the candidate is tapped. "Untapped" is spelled
-    -- `Not IsTapped`, the one-relation-one-spelling posture IsToken's comment
-    -- states (#163).
+  | -- | CR 110.5: the candidate is tapped. Wood Elemental's "untapped Forests"
+    -- is spelled `Not IsTapped`, the one-relation-one-spelling posture IsToken's
+    -- comment states (#163).
     --
     -- Uncharacteristic, like IsAttacking and IsToken: CR 110.5 makes tap state a
     -- STATUS rather than a characteristic, so nothing in CR 613 projects it and

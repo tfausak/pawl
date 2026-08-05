@@ -14,6 +14,8 @@ module Pawl.PowerToughnessSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Ord as Ord
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Engine as Engine
@@ -43,6 +45,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scope as Scope
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -544,6 +547,95 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   omnathSpec s registry
   serraAvatarSpec s registry
   kirdApeSpec s registry
+  woodElementalSpec s registry
+
+-- Wood Elemental ({3}{G} Creature -- Elemental, printed */*), whole text: "As
+-- this creature enters, sacrifice any number of untapped Forests." / "Wood
+-- Elemental's power and toughness are each equal to the number of Forests
+-- sacrificed as it entered." Oracle text verified against Scryfall.
+--
+-- The card #65 was waiting for. Its CDA reads a Quantity.InSlot, the one
+-- quantity in the pool that can fail to evaluate: the entry replacement
+-- (EntryRewrite.SacrificeAnyNumber) stamps the count on the permanent it made,
+-- so an incarnation that never entered has nothing to read and CR 208.2a's last
+-- sentence -- "if the ability needs to use a number that can't be determined,
+-- including inside a calculation, use 0 instead of that number" -- supplies the
+-- 0. Pawl.Engine.Quantity.determine is where that happens; the first test below
+-- is what proves it, since every other CDA quantity in the pool is total.
+--
+-- It is also the first card whose Filter reads CR 110.5's tap status
+-- (Filter.IsTapped, spelled `Not IsTapped` for "untapped").
+--
+-- The counter half of the same entry rewrite is Shimatsu the Bloodcloaked's, in
+-- Pawl.ReplacementSpec.
+woodElementalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+woodElementalSpec s registry = Spec.describe s "Wood Elemental" $ do
+  -- CR 604.3: a characteristic-defining ability functions in all zones, so the
+  -- card in hand has a power and a toughness to report -- and no number of
+  -- Forests sacrificed as it entered, because it has not entered. CR 208.2a
+  -- makes that 0 rather than leaving the box blank, which is the whole of #65.
+  Spec.it s "CR 208.2a a Wood Elemental that has not entered has an undeterminable count, so it is 0/0" $ do
+    forest <- S.printingOf s registry "Forest"
+    woodElemental <- S.printingOf s registry "Wood Elemental"
+    let (gs, held) = S.handOne woodElemental (S.landsInPlay forest 8)
+    Spec.assertEqWith s "the seed is the slot the entry replacement fills" (PC.characteristicPT (Projection.baseCharacteristics held gs)) (Just (sacrificedCount, sacrificedCount))
+    Spec.assertEqWith s "0/0" (S.powerToughnessOf held gs) (Just (0, 0))
+  -- The proving pair's first half. Eight Forests, four of which pay for the
+  -- {3}{G}: the four still untapped are the whole of the offer, a greedy answer
+  -- takes all four, and the Elemental is a 4/4 that survives CR 704.5f.
+  Spec.it s "CR 208.2a sacrificing four Forests makes it a 4/4 that lives" $ do
+    forest <- S.printingOf s registry "Forest"
+    woodElemental <- S.printingOf s registry "Wood Elemental"
+    let (gs, held) = S.handOne woodElemental (S.landsInPlay forest 8)
+        after = S.runPure sacrificesAll gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+    case newestNamed "Wood Elemental" after of
+      Nothing -> Spec.assertFailure s "Wood Elemental did not reach the battlefield"
+      Just elementalId -> do
+        Spec.assertEqWith s "4/4" (S.powerToughnessOf elementalId after) (Just (4, 4))
+        -- CR 110.5 / 701.21a: only the four UNTAPPED Forests could be chosen, so
+        -- the four the mana came from are still there -- and still tapped. An
+        -- IsTapped that matched nothing would have emptied the board.
+        Spec.assertEqWith s "four Forests survive" (length (forestsOn after)) 4
+        Spec.assertBool s (all (\oid -> Game.isTapped oid after) (forestsOn after)) "every surviving Forest is tapped"
+  -- The pair's second half, and CR 704.5f's own test. S.identityAnswer answers
+  -- the empty set, which "any number" admits: the count is 0, so the CDA makes a
+  -- 0/0 and the state-based action buries it. A Wood Elemental that kept a blank
+  -- P/T -- #65's failure mode -- would still be standing here.
+  Spec.it s "CR 704.5f sacrificing nothing makes a 0/0 that dies" $ do
+    forest <- S.printingOf s registry "Forest"
+    woodElemental <- S.printingOf s registry "Wood Elemental"
+    let (gs, held) = S.handOne woodElemental (S.landsInPlay forest 8)
+        after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the 0/0 Wood Elemental is gone" (newestNamed "Wood Elemental" after) Nothing
+    Spec.assertEqWith s "and every Forest it declined to eat is still there" (length (forestsOn after)) 8
+
+-- Pawl.Engine.Binding.sacrificedCount as a Quantity, which is what Wood
+-- Elemental's characteristicPT holds. Spelled out here rather than imported from
+-- the engine so the assertion is against the NAME the card data commits to.
+sacrificedCount :: Quantity.Type.Quantity
+sacrificedCount = Quantity.Type.InSlot (SlotName.MkSlotName (Text.pack "thatMany"))
+
+-- Sacrifice everything the engine offers. What makes the tap filter testable: a
+-- greedy answer eats every Forest it is shown, so a Forest left standing is one
+-- that was never offered.
+sacrificesAll :: Prompt.Prompt r -> r
+sacrificesAll p = case p of
+  Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList candidates
+  _ -> S.identityAnswer p
+
+-- The Forests on the battlefield, whatever their tap state.
+forestsOn :: GameState.GameState -> [ObjectId.ObjectId]
+forestsOn gs = filter isForest (Set.toList (GameState.battlefield gs))
+  where
+    isForest oid = maybe False (\f -> Face.name f == CardName.MkCardName (Text.pack "Forest")) (Game.faceOf oid gs)
+
+-- The newest battlefield permanent with this printed name -- ids ascend, and CR
+-- 400.7 mints a fresh one on every zone change, so the id a cast was handed
+-- names nothing on the battlefield.
+newestNamed :: String -> GameState.GameState -> Maybe ObjectId.ObjectId
+newestNamed wanted gs =
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack wanted))
+   in Maybe.listToMaybe (List.sortOn Ord.Down (filter named (Set.toList (GameState.battlefield gs))))
 
 -- Kird Ape ({R} Creature -- Ape, printed 1/1), whole text: "This creature gets
 -- +1/+2 as long as you control a Forest." Oracle text verified against Scryfall.

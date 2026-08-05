@@ -340,16 +340,18 @@ isAbility oid gs = case lookupObject oid gs of
       Source.OfEmblem _ -> False
       Source.OfInherentTrigger _ _ -> True
 
--- CR 111.1 / 111.6: is this object a token rather than a card? Asks the
--- object's KIND, a classification in the same standing as isSpell, never the
--- card's identity. False for an unknown id and for every non-token kind.
--- CR 110.5a: a permanent's tap status. Absent means untapped, which is what a
--- nonexistent object answers for every other status too.
+-- CR 110.5: a permanent's tapped/untapped status. CR 110.5d gives status only
+-- to a permanent, so an unknown id -- and a card outside the battlefield -- is
+-- reported untapped, which is the answer every other status arm gives for a
+-- nonexistent object too.
 isTapped :: ObjectId -> GameState -> Bool
 isTapped oid gs = case lookupObject oid gs of
   Nothing -> False
   Just obj -> Object.tapped obj == TapState.Tapped
 
+-- CR 111.1 / 111.6: is this object a token rather than a card? Asks the
+-- object's KIND, a classification in the same standing as isSpell, never the
+-- card's identity. False for an unknown id and for every non-token kind.
 isToken :: ObjectId -> GameState -> Bool
 isToken oid gs = case lookupObject oid gs of
   Nothing -> False

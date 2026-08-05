@@ -1010,7 +1010,8 @@ reservedSlots =
       Binding.you,
       Binding.triggerPlayer,
       Binding.became,
-      Binding.preventedAmount
+      Binding.preventedAmount,
+      Binding.sacrificedCount
     ]
 
 -- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
