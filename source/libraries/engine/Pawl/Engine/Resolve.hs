@@ -92,6 +92,7 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -579,18 +580,67 @@ resolveAbility abilId srcId ability = do
 --     the card that left and this id names nothing at all.
 --   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
 --     CR 701.27d's instant or sorcery face.
+--   * CR 701.27f's already-turned gate, alreadyTurnedFor below.
 --
 -- Reads the object's OWN card (Game.cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
-turnOver :: GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
-turnOver gs oid objects
+--
+-- `now` is minted ONCE for the whole instruction by the caller rather than per
+-- victim, because CR 608.2f processes a swept set simultaneously: two Humans
+-- transformed by one Moonmist turned over at the same moment, and a later CR
+-- 701.27f comparison must not be able to tell them apart.
+turnOver :: ObjectId -> Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+turnOver resolving now gs oid objects
   | not (Set.member oid (GameState.battlefield gs)) = objects
+  | alreadyTurnedFor resolving oid gs = objects
   | otherwise = case (Map.lookup oid objects, Game.cardOf oid gs) of
       (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
         Nothing -> objects
-        Just name -> Map.insert oid object {Object.face = Just name} objects
+        Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
       _ -> objects
+
+-- CR 701.27f, first sentence: "If an activated or triggered ability of a
+-- permanent that isn't a delayed triggered ability of that permanent tries to
+-- transform it, the permanent does so only if it hasn't transformed or converted
+-- since the ability was put onto the stack. ... if the permanent has already
+-- transformed or converted, an instruction to do either is ignored."
+--
+-- True when this resolution must be ignored. Two conditions, and BOTH narrow:
+--
+--   * the resolving object is an ability whose SOURCE is the very permanent
+--     being turned over (CR 113.7a). A spell is not one -- Moonmist transforms a
+--     permanent that already transformed this turn, because the rule names only
+--     abilities -- and neither is an ability of some OTHER permanent, because the
+--     rule says such an ability "tries to transform IT".
+--   * the permanent's last turn is later than the moment the ability was put
+--     onto the stack, which is that ability object's own CR 613.7d timestamp.
+--     Both come from GameState.nextTimestamp, so one `>` decides it and equality
+--     cannot arise -- a fresh stamp is never reissued.
+--
+-- The rule's SECOND sentence measures a delayed triggered ability from when it
+-- was CREATED rather than from when it reached the stack, and that half is not
+-- implemented: a fired delayed ability arrives as the same Source.OfTrigger an
+-- ordinary one does (Engine.placeBorne), and Pawl.Types.DelayedTrigger records
+-- no creation moment to compare against, so this measures it from the stack like
+-- any other trigger (#694).
+alreadyTurnedFor :: ObjectId -> ObjectId -> GameState -> Bool
+alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
+  Nothing -> False
+  Just ability ->
+    abilityOf (Object.source ability)
+      && maybe False (> Object.timestamp ability) (Game.lookupObject victim gs >>= Object.turnedOverAt)
+  where
+    -- A CLASSIFICATION of the resolving object -- which kind of object it is,
+    -- never which card it is. CR 725.2's sourceless inherent trigger has no
+    -- permanent to be an ability OF, so it falls out with the spells.
+    abilityOf source = case source of
+      Source.OfAbility srcId _ -> srcId == victim
+      Source.OfTrigger srcId _ -> srcId == victim
+      Source.OfCard _ -> False
+      Source.OfToken _ -> False
+      Source.OfEmblem _ -> False
+      Source.OfInherentTrigger _ _ -> False
 
 -- CR 701.3a/701.3b: may `src` legally be attached to `destination` right now?
 --
@@ -1707,6 +1757,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               Object.chosenNames = Set.empty,
               Object.timestamp = ts,
               Object.face = Nothing,
+              Object.turnedOverAt = Nothing,
               Object.playableFromExileBy = Nothing
             }
     _ <- Event.placeObject controller mkObj Zone.Command
@@ -2036,12 +2087,18 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- CR 701.27b is why nothing else fires: turning over is its own game
       -- action, distinct from turning a permanent face up or face down, and a
       -- card that triggers ON it needs a trigger condition pawl does not have
-      -- (#695). CR 701.27f's gate against a second turn is not implemented
-      -- either (#694).
-      gs
-        { GameState.objects =
-            foldr (turnOver gs) (GameState.objects gs) (objectRefObjects legality chosen controller source gs ref)
-        }
+      -- (#695).
+      --
+      -- ONE fresh timestamp for the whole instruction, threaded through so CR
+      -- 701.27f can later ask when this happened. Minted even when the sweep
+      -- turns nothing over, which costs a number nobody reads rather than a
+      -- branch: GameState.nextTimestamp is a counter with no meaning beyond its
+      -- order (CR 613.7).
+      let (now, g1) = Game.freshTimestamp gs
+       in g1
+            { GameState.objects =
+                foldr (turnOver resolving now g1) (GameState.objects g1) (objectRefObjects legality chosen controller source g1 ref)
+            }
   -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
   -- Turn.splicePhases is handed GameState.phase because "directly after this

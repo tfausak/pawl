@@ -565,6 +565,7 @@ handInPlay printing board =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( g2

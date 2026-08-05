@@ -174,6 +174,26 @@ data Object = MkObject
     -- with only its front face's characteristics again -- rather than only a
     -- forgetting.
     face :: Maybe CardName.CardName,
+    -- | CR 701.27f: WHEN this permanent last turned over, so that "it hasn't
+    -- transformed or converted since the ability was put onto the stack" is a
+    -- comparison rather than a guess. Nothing for a permanent that never has.
+    --
+    -- A Timestamp and not a count, because the other side of the comparison is
+    -- already one: an ability object's own `timestamp` above IS the moment it
+    -- was put onto the stack (Activate.activateAbility and Engine.placeBorne
+    -- each mint it as they create the object), so the rule's reference point
+    -- needs nothing stamped onto the ability. Two objects, one monotone
+    -- sequence, one `>`.
+    --
+    -- NOT CR 613.7d's timestamp, and deliberately a second field rather than a
+    -- refresh of that one: turning over is not a zone change, so the permanent's
+    -- entry order -- which is what orders its static ability in layers 6 and 7 --
+    -- must not move underneath it.
+    --
+    -- Per-incarnation state, like `face` above: cleared by newIncarnation,
+    -- because CR 400.7 makes the moved object a new one that has never
+    -- transformed.
+    turnedOverAt :: Maybe Timestamp.Timestamp,
     -- | CR 715.3d: the player who may play this card while it remains exiled --
     -- an Adventure spell's controller, written as the resolution that exiled it
     -- finishes. Nothing for every object that did not get there that way, which
@@ -238,5 +258,6 @@ newIncarnation object =
       chosenSubtype = Nothing,
       chosenNames = Set.empty,
       face = Nothing,
+      turnedOverAt = Nothing,
       playableFromExileBy = Nothing
     }

@@ -589,6 +589,7 @@ createTokens controller card n tapped = do
                     Object.chosenNames = Set.empty,
                     Object.timestamp = ts,
                     Object.face = Nothing,
+                    Object.turnedOverAt = Nothing,
                     Object.playableFromExileBy = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)

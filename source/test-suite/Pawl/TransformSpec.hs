@@ -85,8 +85,16 @@ transformEveryCreature = Effect.Transform (ObjectRef.EachMatching (Filter.Type.H
 emptyBoard :: GameState.GameState
 emptyBoard = Setup.emptyGame S.bothPlayers
 
+-- The sweep as some named object's resolution. `resolving` is what CR 701.27f
+-- asks about -- whether the thing turning the permanent over is an ABILITY of
+-- that permanent -- so it is a parameter rather than baked in.
+sweepFrom :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+sweepFrom resolving gs = S.runPure S.identityAnswer gs (Resolve.applyEffect resolving S.noSource S.alice Map.empty Map.empty transformEveryCreature)
+
+-- The sweep as a resolution with no live object behind it at all -- S.noSource
+-- names nothing, which is what an effect applied straight in a spec looks like.
 sweep :: GameState.GameState -> GameState.GameState
-sweep gs = S.runPure S.identityAnswer gs (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty transformEveryCreature)
+sweep = sweepFrom S.noSource
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Transform" $ do
@@ -162,6 +170,61 @@ spec s registry = Spec.describe s "Transform" $ do
           "and it is still an artifact creature, which is what the two faces agree about"
           (Projection.cardTypesOf oid after)
           (Set.fromList [CardType.Artifact, CardType.Creature])
+      abilities -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abilities))
+  -- CR 701.27f: "If an activated or triggered ability of a permanent that isn't a
+  -- delayed triggered ability of that permanent tries to transform it, the
+  -- permanent does so only if it hasn't transformed or converted since the
+  -- ability was put onto the stack. ... if the permanent has already transformed
+  -- or converted, an instruction to do either is ignored."
+  --
+  -- Twelve Islands pay for the {6} twice, so BOTH abilities are on the stack
+  -- before either resolves and the second activation is legal -- the permanent is
+  -- still the Gargoyle, and still offering the ability, while the first waits.
+  --
+  -- The falsifier is the whole point: without the rule the two resolutions turn
+  -- the permanent over and then straight back, and the case ends on the FRONT
+  -- face. `backFace` here is therefore an assertion about CR 701.27f and not a
+  -- restatement of the case above.
+  Spec.it s "CR 701.27f two of the Gargoyle's own abilities on the stack turn it over once" $ do
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    island <- S.printingOf s registry "Island"
+    let (oid, g0) = S.addCreature gargoyle S.alice (S.landsInPlay island 12)
+        gs = g0 {GameState.priority = Just S.alice}
+        activate g = case Activate.abilitiesFor oid g of
+          [ability] -> Right (snd (Engine.runGamePure S.identityAnswer g (Activate.activateAbility S.alice oid ability)))
+          abilities -> Left (length abilities)
+    case activate gs >>= activate of
+      Left n -> Spec.assertFailure s ("expected one activated ability at each activation, got " <> show n)
+      Right activated -> do
+        let once = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+            twice = snd (Engine.runGamePure S.identityAnswer once Stack.resolveTop)
+        Spec.assertEqWith s "both abilities are on the stack" (length (GameState.stack activated)) 2
+        Spec.assertEqWith s "twelve Islands paid for two activations" (S.tappedCount S.alice activated) 12
+        Spec.assertEqWith s "the first to resolve turns it over" (faceReadings oid once) backFace
+        Spec.assertEqWith s "and the second is ignored, so it stays turned over" (faceReadings oid twice) backFace
+        Spec.assertEqWith s "with nothing left on the stack" (length (GameState.stack twice)) 0
+  -- The other half of CR 701.27f, and the reason it cannot be written as a
+  -- once-per-anything: the gate is only for "an activated or triggered ability of
+  -- a permanent ... [that] tries to transform IT". A SPELL is not one, so Moonmist
+  -- turns a permanent over however recently its own ability did.
+  --
+  -- The Gargoyle's own {6} resolves first and stamps the turn; the sweep that
+  -- follows names the PERMANENT as its resolving object, whose source is a card
+  -- (CR 112.1's spell shape) rather than an ability, and must be exempt. Widening
+  -- alreadyTurnedFor to fire for any resolving object leaves this case ending on
+  -- the back face.
+  Spec.it s "CR 701.27f the gate is only for the permanent's own abilities" $ do
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    island <- S.printingOf s registry "Island"
+    let (oid, g0) = S.addCreature gargoyle S.alice (S.landsInPlay island 6)
+        gs = g0 {GameState.priority = Just S.alice}
+    case Activate.abilitiesFor oid gs of
+      [ability] -> do
+        let activated = snd (Engine.runGamePure S.identityAnswer gs (Activate.activateAbility S.alice oid ability))
+            byItsOwnAbility = snd (Engine.runGamePure S.identityAnswer activated Stack.resolveTop)
+            thenBySomethingElse = sweepFrom oid byItsOwnAbility
+        Spec.assertEqWith s "its own {6} turned it over" (faceReadings oid byItsOwnAbility) backFace
+        Spec.assertEqWith s "and a spell turns it straight back, same turn" (faceReadings oid thenBySomethingElse) frontFace
       abilities -> Spec.assertFailure s ("expected one activated ability, got " <> show (length abilities))
   -- CR 712.8e: "While a nonmodal double-faced permanent has its back face up, it
   -- has only the characteristics of its back face. However, its mana value is

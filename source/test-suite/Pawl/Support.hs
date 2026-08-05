@@ -533,6 +533,7 @@ addCreature printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( oid,
@@ -729,6 +730,7 @@ addToken card pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( oid,
@@ -760,6 +762,7 @@ addLibraryCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( oid,
@@ -791,6 +794,7 @@ addGraveyardCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( oid,
@@ -829,6 +833,7 @@ addExiledCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( oid,
@@ -874,6 +879,7 @@ addHandCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( oid,
@@ -922,6 +928,7 @@ landsInPlay land n =
                   Object.chosenNames = Set.empty,
                   Object.timestamp = ts,
                   Object.face = Nothing,
+                  Object.turnedOverAt = Nothing,
                   Object.playableFromExileBy = Nothing
                 }
          in gs2
@@ -952,6 +959,7 @@ handOne printing base =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( gs2
@@ -988,6 +996,7 @@ pikerInHand land piker n ph =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
       gs3 =
@@ -1450,6 +1459,7 @@ oneMountainState mountain ph =
             Object.chosenNames = Set.empty,
             Object.timestamp = Timestamp.MkTimestamp 0,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in GameState.MkGameState
@@ -1580,6 +1590,7 @@ spellOnStack printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing
           }
    in ( oid,
