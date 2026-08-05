@@ -14,14 +14,9 @@ jobs:
     strategy:
       matrix:
         include:
-          # Disabled on 2026-08-05 because macOS frequently takes 2-3x as long
-          # as Ubuntu. Any cross platform issues will hopefully be caught by
-          # the Windows runner.
-          # - runner: macos-latest
           - runner: ubuntu-latest
             bench: true
             test: true
-          - runner: windows-latest
     steps:
       - uses: actions/checkout@v7
       - id: haskell
