@@ -1,8 +1,9 @@
 -- Covers CR 701.27 transform end to end: Pawl.Types.Layout's Transforming arm
 -- and the three Pawl.Engine.Card functions that read it (CR 712.8a/712.8d's
 -- combined view, CR 712.11's castable half, CR 701.27a's turnedOver), the
--- Effect.Transform arm of Pawl.Engine.Resolve, and Pawl.Engine.Game.manaCostFaceOf
--- (CR 712.8e).
+-- Effect.Transform arm of Pawl.Engine.Resolve with CR 701.27f's already-turned
+-- gate (alreadyTurnedFor over Object.turnedOverAt), and
+-- Pawl.Engine.Game.manaCostFaceOf (CR 712.8e).
 --
 -- Every case runs against the printed Thraben Gargoyle // Stonewing Antagonizer,
 -- a nonmodal double-faced card (CR 712.2) whose front face is a {1} 2/2 Artifact

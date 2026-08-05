@@ -226,8 +226,9 @@ castableFaces card = case Card.layout card of
 --
 -- Not read here, and the reason this answers a NAME rather than performing the
 -- turn: CR 701.27f ignores the instruction outright when the permanent has
--- already transformed since the asking ability was put on the stack, which needs
--- state no face carries (#694).
+-- already turned over since the asking ability was put on the stack, which is a
+-- question about two OBJECTS rather than about a card. Pawl.Engine.Resolve's
+-- alreadyTurnedFor asks it, and a Just from here is still only a candidate.
 --
 -- The SUCCESSOR in printed order, wrapping -- "its other face" for the two faces
 -- CR 712.1 gives a double-faced card, and a rotation for any longer list, which
