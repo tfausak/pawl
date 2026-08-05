@@ -21,7 +21,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Cards as Cards
-import qualified Pawl.Corpus as Corpus
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -1643,7 +1642,7 @@ stubView table oid =
 allPrintings :: Spec.Spec IO n -> IO [Printing.Printing]
 allPrintings s = do
   root <- Registry.defaultRoot
-  loaded <- Corpus.loadAll root
-  case [err | (_, Left err) <- loaded] of
+  loaded <- Registry.loadRoot root
+  case [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded] of
     [] -> pure [Printing.MkPrinting card | (_, Right card) <- loaded]
-    errs -> Spec.assertFailure s (List.intercalate "\n" (fmap show errs))
+    errs -> Spec.assertFailure s (List.intercalate "\n" errs)

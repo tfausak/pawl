@@ -10,12 +10,13 @@ import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Text as Text
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Exceptions.InvalidCorpus as InvalidCorpus
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardError as CardError
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
@@ -107,7 +108,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       Spec.assertEqWith
         s
         "both faces"
-        (fmap (fmap Face.name . NonEmpty.toList . Card.faces) byLeft)
+        (fmap (fmap Face.name . NonEmpty.toList . Card.Type.faces) byLeft)
         (Right (fmap (CardName.MkCardName . Text.pack) ["Wax", "Wane"]))
       -- CR 709.4a gives a split card two names and no combined one, so the
       -- joined string is not a name a lookup may ask for -- it survived until
@@ -206,3 +207,21 @@ spec s = Spec.describe s "Pawl.Registry" $ do
     let missing = tmp <> "/pawl-registry-spec-no-such-root"
     Directory.removePathForcibly missing
     expectException s "missing root" MissingRoot.MkMissingRoot {MissingRoot.path = missing} (Registry.fileRegistry missing)
+
+  -- What a registry is built from and what the corpus-wide lints sweep, so
+  -- neither restates how a pool is enumerated. Ascending, .json only, and a
+  -- file that will not parse is a reported Left rather than a thrown exception
+  -- -- one pass names every bad file instead of dying on the first.
+  Spec.it s "loadRoot pairs every card file with what its bytes mean" $ do
+    piker <- S.pikerJson
+    S.withCorpusDir
+      "load-root"
+      [ ("goblin-piker.json", piker),
+        ("bird-maiden.json", Text.pack "{oh no"),
+        ("README.md", Text.pack "not a card")
+      ]
+      $ \root -> do
+        loaded <- Registry.loadRoot root
+        Spec.assertEqWith s "ascending, .json only" (fmap fst loaded) [root <> "/bird-maiden.json", root <> "/goblin-piker.json"]
+        Spec.assertEqWith s "the good one parsed" [Face.name (Card.combined c) | (_, Right c) <- loaded] [CardName.MkCardName $ Text.pack "Goblin Piker"]
+        Spec.assertEqWith s "and the bad one is reported, not thrown" (length [reason | (_, Left reason) <- loaded]) 1
