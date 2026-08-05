@@ -445,12 +445,12 @@ applyDamage events = do
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
   --
-  -- CR 615.13's preventions are recorded FIRST, and the order is CR 615.5's: the
-  -- prevention takes place at the moment the original event would have happened,
-  -- so it precedes the damage the same batch went on to deal. Both are inside one
-  -- CR 117.5 boundary, so the two kinds of trigger are gathered together either
-  -- way and CR 603.3b lets their controller order them; what this fixes is the
-  -- canonical order the prompt indexes into.
+  -- CR 615.13's preventions are recorded FIRST, which is the order they happened
+  -- in: a prevention is applied inside the CR 616.1 loop, which settles what the
+  -- event will be BEFORE the surviving damage is dealt. Both records land inside
+  -- one CR 117.5 boundary, so the two kinds of trigger are gathered together
+  -- either way and CR 603.3b lets their controller order them; what this fixes is
+  -- the canonical order the prompt indexes into.
   State.modify'
     ( \gs ->
         let marked = List.foldl' markOne gs survivors

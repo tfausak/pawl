@@ -8,7 +8,9 @@ module Pawl.Types.Uses where
 -- A sum, not a Bool and not a counter: CR 615.7's prevent-the-next-N shield
 -- (Mending Hands) rides Unlimited and carries its remaining amount on the rewrite
 -- (Pawl.Types.DamageRewrite.PreventNext), because CR 615.7 counts DAMAGE while
--- this type counts APPLICATIONS.
+-- this type counts APPLICATIONS. An unbounded shield (Selfless Squire) rides
+-- Unlimited too, and for the simpler reason that CR 615.3 leaves it nothing but a
+-- duration to end it.
 data Uses
   = Unlimited
   | Once

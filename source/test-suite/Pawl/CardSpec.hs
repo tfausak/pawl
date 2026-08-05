@@ -689,10 +689,9 @@ phasePatternOffends replacement = case replacement of
 
 -- The third baked field the codec accepts and no card may author, and the third
 -- for the same reason phasePatternOffends gives: a card cannot name an ObjectId
--- or a PlayerId, so CR 615.7's shielded recipient is Resolve's
--- PreventNextDamage arm to write. CR 615.7's remaining amount rides the same
--- carrier and is equally engine-only, so both halves of a shield are checked
--- here at once.
+-- or a PlayerId, so CR 615.7's shielded recipient is for Resolve's prevention
+-- arms to write. CR 615.7's remaining amount rides the same carrier and is
+-- equally engine-only, so both halves of a shield are checked here at once.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
 damagePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool

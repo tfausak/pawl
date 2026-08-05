@@ -21,7 +21,8 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 --
 -- That Recipient is BAKED by the engine, never authored, exactly as
 -- Pawl.Types.PhasePattern.whosePhase is: card data cannot name an ObjectId or a
--- PlayerId, so the only producer is Resolve's PreventNextDamage arm.
+-- PlayerId, so the only producers are Resolve's two prevention arms
+-- (PreventNextDamage and PreventAllDamage), which share one `installShield`.
 --
 -- Not implemented: CR 615.1's shields that name a SOURCE by characteristic
 -- ("a red source of your choice", Circle of Protection: Red) rather than by

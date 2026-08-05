@@ -1528,7 +1528,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- CR 614.3 / 615.3: install the floating replacement; Pawl.Engine.Replacement
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
-    -- source, which is what CR 615.13's "prevented" triggers will read (#612).
+    -- source, which together with the timestamp is the row's CR 614.5 identity --
+    -- what a "prevented this way" trigger would have to be keyed on (#687).
     --
     -- CR 614.15: the ORIGIN travels with the row rather than being re-derived,
     -- because it is a fact about the ability that wrote it and nothing on the
