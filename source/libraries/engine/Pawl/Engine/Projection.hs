@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -1217,23 +1218,79 @@ rewriteAggregation pairs aggregation = case aggregation of
 -- ability whose every part lands after layer 6. Neither touches a stored effect
 -- or a counter, since neither is an ability for layer 6 to remove (CR 611.2a; CR
 -- 122.1a/613.4c) -- Humility removes neither.
+--
+-- A THIRD loss, and the reason this needs a second pass of its own: CR 604.2's
+-- "as long as" gate (StaticAbility.condition) drops an ability whose clause is
+-- currently false. Evaluating a Condition needs a projection, and a projection
+-- needs this list, so the gate is answered against the SEED list below rather
+-- than against itself -- the same shape abilitiesRemoved already has, and
+-- well-founded for the same reason: the seed is built with every gate open, so
+-- nothing here re-enters gather.
 gather :: GameState -> [Gathered]
 gather gs =
-  let ungated = gatherGiven (const False) gs
-   in -- Almost every board has no ability-removing effect, and then the gathered
-      -- list IS the ungated one -- no second walk and no projection spent on the
-      -- question. A board that has one pays for the stored effects, emblems and
-      -- counters twice, none of which costs a projection.
-      if any (removesAbilities . gModification) ungated
-        then gatherGiven (abilitiesRemoved ungated gs) gs
+  let ungated = gatherGiven (const False) alwaysFunctioning gs
+   in -- Almost every board has neither an ability-removing effect nor a
+      -- conditional static ability, and then the gathered list IS the ungated one
+      -- -- no second walk and no projection spent on either question. A board that
+      -- has one pays for the stored effects, emblems and counters twice, none of
+      -- which costs a projection.
+      if any (removesAbilities . gModification) ungated || anyConditional gs
+        then gatherGiven (abilitiesRemoved ungated gs) (conditionHolds ungated gs) gs
         else ungated
 
--- gather's body with the CR 613.1f gate left open: `stripped` answers whether a
--- permanent's abilities were removed by the time layer 6 finished. Called twice
--- by gather -- once wired shut to build the list the gate reads, once with the
--- real answer.
-gatherGiven :: (ObjectId -> Bool) -> GameState -> [Gathered]
-gatherGiven stripped gs =
+-- The open CR 604.2 gate: every "as long as" clause answered true without being
+-- looked at. What the seed pass gets, so that the list the real gate reads is the
+-- widest one -- an ability wrongly kept there can only over-project the state a
+-- condition is judged against, never leave gather to re-enter itself.
+--
+-- Not implemented: the CR 613.1f removal question the seed answers is therefore
+-- asked of a conditional ability whose clause is false, as is abilityRemoval's,
+-- and setLandSubtypeEffects and controlGrants read the printed list without the
+-- gate at all (#727).
+alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
+alwaysFunctioning _ _ _ = True
+
+-- Does any static ability in play carry a CR 604.2 "as long as" clause at all?
+-- gather's cheap structural precondition, asked instead of the second walk -- a
+-- pure read of the printed faces, with no projection behind it, mirroring the
+-- ability-removal test it sits beside.
+--
+-- Emblems are included for the reason gatherGiven gathers them (CR 114.4 / 113.6);
+-- no emblem in the pool carries a condition, and a walk that skipped them would
+-- silently ungate the first one that did.
+anyConditional :: GameState -> Bool
+anyConditional gs =
+  let conditional oid = case Game.faceOf oid gs of
+        Nothing -> False
+        Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
+   in any conditional (Set.toList (GameState.battlefield gs))
+        || any conditional (Set.toList (GameState.command gs))
+
+-- CR 604.2: is this static ability's "as long as" clause true right now?
+--
+-- The VIEW is bounded at the ability's own lowest layer -- the point CR 613.6
+-- makes the effect start to apply, and the same point abilitiesRemoved judges a
+-- remover's affected set at. So Kird Ape's layer-7c clause reads a Forest through
+-- layers 1-6, and a Convincing Mirage'd Forest has stopped being one by then.
+-- Bounded rather than full for projectWith's reason: a condition read against a
+-- projection that included its OWN layer would be circular, and the descending
+-- bound is what makes the nesting terminate. Exact for a clause reading a
+-- strictly earlier layer, which every "as long as" clause in the pool does.
+--
+-- CR 109.5: "you" is the SOURCE's controller, as it is for the affected set. The
+-- condition is evaluated AGAINST the source too, so a clause reading Quantity.Power
+-- reads the permanent the ability is printed on.
+conditionHolds :: [Gathered] -> GameState -> ObjectId -> Layer -> Condition.Type.Condition -> Bool
+conditionHolds cands gs src lowest =
+  Condition.holds (viewUpTo lowest cands gs) (Filter.MkContext (controllerOf src gs) (Just src)) gs src
+
+-- gather's body with both ability gates left open: `stripped` answers whether a
+-- permanent's abilities were removed by the time layer 6 finished, and
+-- `functioning` whether a static ability's CR 604.2 "as long as" clause holds.
+-- Called twice by gather -- once wired shut to build the list the gates read, once
+-- with the real answers.
+gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered]
+gatherGiven stripped functioning gs =
   let setEffs = setLandSubtypeEffects gs
       -- A stored effect carries exactly one modification, so CR 613.6 has nothing
       -- to hold together -- and every stored effect's set is CR 611.2c's
@@ -1263,7 +1320,7 @@ gatherGiven stripped gs =
                  in -- One thunk per permanent, shared by all its abilities and
                     -- forced by none unless an ability is entirely above layer 6,
                     -- so the projection costs at most one per permanent.
-                    concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Face.staticAbilities face))
+                    concat (zipWith (gatherStatic (functioning permId) permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Face.staticAbilities face))
               else []
       static = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
@@ -1276,7 +1333,7 @@ gatherGiven stripped gs =
             -- No liveness or text-change pass and never stripped: the pool's CR
             -- 613.1f removers reach creatures, and an emblem is not one (CR
             -- 114.5).
-            concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
+            concat (zipWith (gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       counters = counterGathered gs
    in stored <> static <> emblems <> counters
@@ -1300,7 +1357,7 @@ gatherGiven stripped gs =
 -- The module graph enforces this -- Projection does not import PlayerEffect.
 abilityRemoval :: GameState -> ObjectId -> Bool
 abilityRemoval gs =
-  let ungated = gatherGiven (const False) gs
+  let ungated = gatherGiven (const False) alwaysFunctioning gs
    in -- Almost every board has no ability-removing effect, and then no projection
       -- is spent on the question.
       if any (removesAbilities . gModification) ungated
@@ -1392,8 +1449,14 @@ abilitiesRemoved cands gs oid =
 --
 -- The whole ability is dropped rather than only its layer-7 parts, which is the
 -- same statement -- the branch is taken only when every part is a layer-7 one.
-gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
-gatherStatic src ts changes stripped n sa =
+--
+-- `functioning` is CR 604.2's "as long as" gate, answered by conditionHolds at the
+-- ability's lowest layer. It costs the ability ALL of its parts unconditionally,
+-- where `stripped` costs them only under the two clauses above: CR 613.6's rescue
+-- is about an ability being REMOVED mid-fold, and a clause that is false never let
+-- the effect start to apply at all.
+gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
+gatherStatic functioning src ts changes stripped n sa =
   let ms = fmap (rewriteModification changes) (StaticAbility.modifications sa)
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
@@ -1422,9 +1485,13 @@ gatherStatic src ts changes stripped n sa =
             gModification = m'
           }
       parts = fmap one (NonEmpty.toList ms)
+      -- Free for an unconditional ability, which is all but Kird Ape's: the Maybe
+      -- answers before `functioning` -- and so before conditionHolds' projection --
+      -- is ever forced.
+      lives = maybe True (functioning lowest) (StaticAbility.condition sa)
    in -- The cheap structural test first, so `stripped`'s projection is forced only
       -- for an ability the rest of the rule could reach.
-      if lowest > Layer.Ability && stripped then [] else parts
+      if (lowest > Layer.Ability && stripped) || not lives then [] else parts
 
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c. Each
 -- object's counters are emitted as ONE synthetic 7c ModifyPowerToughness carrying

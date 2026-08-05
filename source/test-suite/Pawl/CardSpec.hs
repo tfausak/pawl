@@ -183,6 +183,7 @@ grantsItself :: Keyword.Keyword -> StaticAbility.StaticAbility
 grantsItself keyword =
   StaticAbility.MkStaticAbility
     (Affected.Matching Filter.Type.IsSource)
+    Nothing
     (NonEmpty.singleton (Modification.GainKeyword keyword))
 
 -- CR 709.4's fixture: two halves that DIFFER on every axis Pawl.Engine.Card.merge2
@@ -380,6 +381,14 @@ modificationCounts modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
+-- Every Count reachable from a StaticAbility: its modifications' P/T quantities,
+-- plus CR 604.2's "as long as" gate, which is a Condition and so a pair of
+-- Quantities.
+staticAbilityCounts :: StaticAbility.StaticAbility -> [Count.Type.Count Quantity.Type.Quantity]
+staticAbilityCounts ability =
+  concatMap conditionCounts (Maybe.maybeToList (StaticAbility.condition ability))
+    <> concatMap modificationCounts (StaticAbility.modifications ability)
+
 -- Every Count reachable from a TriggerCondition: only StateIs (CR 603.8, a
 -- trigger's own condition) carries one.
 triggerConditionCounts :: TriggerCondition.TriggerCondition -> [Count.Type.Count Quantity.Type.Quantity]
@@ -518,7 +527,7 @@ cardCounts card =
   concatMap quantityCounts (Maybe.maybeToList (Face.characteristicPT card))
     <> concatMap (\(Power.MkPower quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.power card))
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
-    <> concatMap (concatMap modificationCounts . StaticAbility.modifications) (Face.staticAbilities card)
+    <> concatMap staticAbilityCounts (Face.staticAbilities card)
     <> concatMap effectCounts (Card.allEffects card)
     <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
@@ -1231,9 +1240,13 @@ modificationFilters modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
+-- Three Filter positions, not two: the affected set, each modification's own
+-- keywords and Counts, and -- since CR 604.2's "as long as" gate landed -- the
+-- Counts inside that condition.
 staticAbilityFilters :: StaticAbility.StaticAbility -> [Filter.Type.Filter Keyword.Keyword]
 staticAbilityFilters ability =
   affectedFilters (StaticAbility.affected ability)
+    <> concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability))
     <> concatMap modificationFilters (StaticAbility.modifications ability)
 
 -- CR 603.6a's "whenever [a permanent] enters" carries one directly; CR 603.8's
@@ -1425,8 +1438,8 @@ activatedAbilityFilters ability =
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
 --   * `power`, `toughness`, `characteristicPT` -- CR 208.2's printed star,
 --     through a Count.
---   * `staticAbilities` -- the affected set, and the layer-6/7 modifications'
---     own keywords and Counts.
+--   * `staticAbilities` -- the affected set, CR 604.2's "as long as" condition,
+--     and the layer-6/7 modifications' own keywords and Counts.
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
 --   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
@@ -2291,6 +2304,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         boostedBy quantity =
           StaticAbility.MkStaticAbility
             (Affected.Matching Filter.Type.IsSource)
+            Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
         planted =
           [ ( "a target spec",
@@ -2304,6 +2318,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.staticAbilities =
                     [ StaticAbility.MkStaticAbility
                         (Affected.Matching buried)
+                        Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
                     ]
                 }
@@ -2368,7 +2383,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     spellOf
                       [ Effect.Create
                           (Quantity.Type.Literal 1)
-                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) (NonEmpty.singleton Modification.LoseAllAbilities)]}))
+                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}))
                           EntryRiders.defaultValue
                           Nothing
                       ]
