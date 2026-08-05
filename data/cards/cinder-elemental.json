@@ -36,7 +36,8 @@
                     "value": [
                       "target",
                       {
-                        "type": "X"
+                        "type": "InSlot",
+                        "value": "X"
                       }
                     ]
                   }

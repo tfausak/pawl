@@ -2,6 +2,7 @@
 module Pawl.ConditionSpec where
 
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
@@ -126,6 +127,6 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
               context
               gs
               (ObjectId.MkObjectId 0)
-              (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) Comparison.Exactly Quantity.Type.X)
+              (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) Comparison.Exactly (Quantity.Type.InSlot Binding.variableX))
         )
         "false"

@@ -317,7 +317,6 @@ quantityCounts quantity = case quantity of
   Quantity.Type.Literal _ -> []
   Quantity.Type.ManaValue -> []
   Quantity.Type.Power -> []
-  Quantity.Type.X -> []
   -- A slot read, not a fold over game state: the value was bound by an earlier
   -- effect of the same resolution and there is no Count inside it.
   Quantity.Type.InSlot _ -> []
@@ -1600,7 +1599,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- pool. Loosen to superset if such a card ever lands.
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
-    let modeOffends m =
+    let modeOffends announcedX m =
           let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
               -- Resolve.modeSlots and not a fold over the effects alone: CR
               -- 118.12a's "unless [a player] pays" reads a slot for its payer,
@@ -1610,9 +1609,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               -- PlaySubgame's bound subgame outcome) and then read by a later
               -- effect is legitimate dataflow, not an undeclared target -- the
               -- same definedSlots exemption the delayed-ability lint below uses.
-              Set.difference reads_ defined /= Map.keysSet (Mode.targetSpecs m)
+              Set.difference (Set.difference reads_ defined) announcedX /= Map.keysSet (Mode.targetSpecs m)
+        -- CR 601.2b's X is an ordinary slot read since #14 retired Quantity.X, so
+        -- it arrives here like any other -- but casting binds it rather than a
+        -- target spec declaring it, so it belongs on the AVAILABLE side exactly
+        -- when the cost prints an {X}. That IS the "reads X iff the cost declares
+        -- {X}" lint, now falling out of the ordinary comparison instead of
+        -- needing its own pass. activatedAbilityOffends says the same thing about
+        -- an activation cost.
         cardOffends card =
-          any modeOffends (Modal.modes (Face.spell card))
+          let announcedX =
+                if declaresVariable (Face.manaCost card)
+                  then Set.singleton Binding.variableX
+                  else Set.empty
+           in any (modeOffends announcedX) (Modal.modes (Face.spell card))
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

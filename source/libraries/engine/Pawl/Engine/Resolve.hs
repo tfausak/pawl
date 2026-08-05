@@ -230,10 +230,10 @@ readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
-      Effect.DealDamage _ quantity -> quantity == Quantity.Type.X
+      Effect.DealDamage _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
-      Effect.ModifyTarget _ modification _ -> elem Quantity.Type.X (Projection.quantitiesOf modification)
+      Effect.ModifyTarget _ modification _ -> elem (Quantity.Type.InSlot Binding.variableX) (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
       Effect.Search _ _ -> False
@@ -241,26 +241,26 @@ readsX = any effectReadsX
       Effect.Proliferate -> False
       Effect.TemptWithTheRing -> False
       Effect.ExileHandThenDraw -> False
-      Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
-      Effect.Draw _ quantity -> quantity == Quantity.Type.X
-      Effect.Mill _ quantity -> quantity == Quantity.Type.X
-      Effect.Discard _ quantity -> quantity == Quantity.Type.X
-      Effect.LoseLife _ quantity -> quantity == Quantity.Type.X
-      Effect.GainLife _ quantity -> quantity == Quantity.Type.X
-      Effect.Create quantity _ _ _ -> quantity == Quantity.Type.X
+      Effect.Draw _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Mill _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Discard _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.LoseLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.GainLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Create quantity _ _ _ -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
-      Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.PreventAllDamage {} -> False
       Effect.Counter _ -> False
-      Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
-      Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Transform _ -> False
