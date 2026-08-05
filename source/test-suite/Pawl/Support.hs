@@ -234,6 +234,7 @@ identityAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   -- CR 508.1b: the defending player, which Combat.attackTargets puts first --
@@ -304,6 +305,7 @@ castAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -374,6 +376,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -459,6 +462,7 @@ playLandAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -533,7 +537,8 @@ addCreature printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -729,7 +734,8 @@ addToken card pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -760,7 +766,8 @@ addLibraryCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -791,7 +798,8 @@ addGraveyardCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -829,7 +837,8 @@ addExiledCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -874,7 +883,8 @@ addHandCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -922,7 +932,8 @@ landsInPlay land n =
                   Object.chosenNames = Set.empty,
                   Object.timestamp = ts,
                   Object.face = Nothing,
-                  Object.playableFromExileBy = Nothing
+                  Object.playableFromExileBy = Nothing,
+                  Object.ringBearerFor = Nothing
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -952,7 +963,8 @@ handOne printing base =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -988,7 +1000,8 @@ pikerInHand land piker n ph =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       gs3 =
         gs2
@@ -1450,7 +1463,8 @@ oneMountainState mountain ph =
             Object.chosenNames = Set.empty,
             Object.timestamp = Timestamp.MkTimestamp 0,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1580,7 +1594,8 @@ spellOnStack printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2

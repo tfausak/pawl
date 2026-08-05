@@ -346,6 +346,7 @@ library engine
     Pawl.Engine.Replacement
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
+    Pawl.Engine.Ring
     Pawl.Engine.Sba
     Pawl.Engine.Setup
     Pawl.Engine.Stack

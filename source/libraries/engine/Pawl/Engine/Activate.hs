@@ -314,7 +314,8 @@ activateAbility pid srcId ability = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       onStack =
         gs2

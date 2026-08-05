@@ -52,7 +52,10 @@ emptyGame order =
           Player.MkPlayer
             { Player.life = startingLife,
               Player.status = Status.Playing,
-              Player.counters = Map.empty
+              Player.counters = Map.empty,
+              -- CR 701.54c: the Ring has tempted nobody in a game that has not
+              -- started.
+              Player.ringTemptations = 0
             }
         )
    in GameState.MkGameState
@@ -119,7 +122,8 @@ createCard pid printing = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       gs3 =
         gs2
@@ -206,7 +210,11 @@ resetPlayers players =
         Status.Playing ->
           player
             { Player.life = startingLife,
-              Player.counters = Map.empty
+              Player.counters = Map.empty,
+              -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
+              -- it. The command zone this line's callers empty is where the
+              -- emblem the count belongs to went.
+              Player.ringTemptations = 0
             }
         Status.Departed _ -> player
    in fmap reset players
