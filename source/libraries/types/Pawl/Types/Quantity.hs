@@ -2,6 +2,7 @@ module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.ManaCount as ManaCount
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 
 -- | A number that may not be a literal number.
@@ -101,4 +102,21 @@ data Quantity
     -- Not part of the knot Count above ties: a ManaCount holds no Quantity, so
     -- this arm is a LEAF and the recursion this type has does not reach it.
     ManaCount ManaCount.ManaCount
+  | -- | CR 119.1: a player's life total -- Serra Avatar's "equal to your life
+    -- total". A player's own scalar, which is why it is NOT a Count: CR 400.1
+    -- scopes a Count over a ZONE and its Aggregation folds over the objects
+    -- there, while a life total is one number attached to a player and no
+    -- population at all.
+    --
+    -- The PlayerRef says WHOSE, the same payload Effect.LoseLife and
+    -- Effect.GainLife already carry to say whose life changes; this is the read
+    -- direction of that pair. CR 109.5's "you" is PlayerRef.Relative
+    -- PlayerRelation.You, resolved against the evaluation context -- for a
+    -- characteristic-defining ability that is the object's OWN controller (CR
+    -- 604.3a(3)), which is what makes Serra Avatar track its controller's life
+    -- rather than its source's.
+    --
+    -- A LEAF, like ManaCount above and unlike Count: it holds no Quantity, so
+    -- the recursion this type has does not reach it.
+    LifeTotal PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)

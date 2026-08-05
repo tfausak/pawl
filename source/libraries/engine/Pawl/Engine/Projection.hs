@@ -1101,6 +1101,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition
   TriggerCondition.SelfDies -> condition
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
@@ -1136,6 +1137,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
+  Quantity.Type.LifeTotal _ -> quantity
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.

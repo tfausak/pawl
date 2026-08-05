@@ -10,6 +10,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SlotName as SlotName
@@ -116,6 +117,22 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
           )
       )
       """ {"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"Greatest","value":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Graveyard"},{"type":"EachPlayer"}]},"filter":{"type":"And","value":[]},"aggregation":{"type":"DistinctCardTypes"}}}}}} """
+  -- CR 119.1, with the PlayerRef on the wire saying whose. Serra Avatar's "your"
+  -- is the Relative arm; the InSlot arm below is the one a recursive decoder
+  -- could lose a payload through, so both are round-tripped.
+  Spec.it s "LifeTotal, relative and from a slot" $ do
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.LifeTotal (PlayerRef.Relative PlayerRelation.You))
+      """ {"type":"LifeTotal","value":{"type":"Relative","value":{"type":"You"}}} """
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.LifeTotal (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"LifeTotal","value":{"type":"InSlot","value":"target"}} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s
