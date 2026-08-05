@@ -23,6 +23,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Decide as Decide
@@ -209,19 +210,26 @@ tempt pid = do
 -- Scoped to the battlefield, matching CR 701.54e's own scope: an object elsewhere
 -- has no controller to compare, and CR 400.7 already dropped the mark on its way
 -- out.
+--
+-- The DESIGNATED permanents are gathered first, off a stored field, and the
+-- control read happens only if there are any (#200's posture, at the one place a
+-- third per-settle sample was added to a loop that already pays two). Almost every
+-- board has no Ring-bearer at all, and such a board pays one battlefield walk and
+-- no projection.
 endOnControlChange :: Game ()
 endOnControlChange = do
   gs <- State.get
-  let grants = Projection.controlGrants gs
-      lapsed oid objs = case Map.lookup oid objs of
-        Nothing -> objs
-        Just obj -> case Object.ringBearerFor obj of
-          Nothing -> objs
-          Just p ->
-            if Projection.controllerOfGiven grants Set.empty oid gs == Just p
-              then objs
-              else Map.insert oid obj {Object.ringBearerFor = Nothing} objs
-  State.put gs {GameState.objects = foldr lapsed (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
+  let marked =
+        Maybe.mapMaybe
+          (\oid -> fmap ((,) oid) (Game.lookupObject oid gs >>= Object.ringBearerFor))
+          (Set.toList (GameState.battlefield gs))
+  Monad.unless (null marked) $ do
+    let grants = Projection.controlGrants gs
+        lapsed (oid, p) objs =
+          if Projection.controllerOfGiven grants Set.empty oid gs == Just p
+            then objs
+            else Map.adjust (\o -> o {Object.ringBearerFor = Nothing}) oid objs
+    State.put gs {GameState.objects = foldr lapsed (GameState.objects gs) marked}
 
 -- | CR 701.54e: is this creature that player's Ring-bearer? True only for a
 -- creature on the battlefield under their control carrying the designation.
