@@ -37,9 +37,9 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 --     card in a graveyard, from rule 702's minting, or from the CR 603.7 delayed
 --     store -- and the last is not an ability "of" the source at all.
 --
--- Both of CR 725.2's inherent abilities are Sourceless, so `source` alone would
--- leave the monarch's end-step draw and its crown steal identical; as values the
--- two abilities differ.
+-- Every inherent ability is Sourceless, so `source` alone would
+-- leave the monarch's end-step draw, its crown steal and CR 702.179d's speed
+-- increase identical; as values the three abilities differ.
 data TriggerEntry = MkTriggerEntry
   { source :: TriggerSource.TriggerSource,
     ability :: TriggeredAbility.TriggeredAbility Card.Card

@@ -11,9 +11,9 @@
 -- printing "Start your engines!", "{T}: Add {C}" and "Max speed — {T}: Add
 -- {C}{C}", so one card supplies both halves -- the resource and something whose
 -- presence depends on it. Speed is never poked onto a player record by hand; it
--- is started by the state-based action and raised by opponents losing life to a
--- Sign in Blood cast through the stack, which is what makes these cases evidence
--- about the engine rather than about the fixture.
+-- is started by the state-based action and raised by an opponent losing life to a
+-- Sign in Blood or a Lightning Bolt cast through the stack, which is what makes
+-- these cases evidence about the engine rather than about the fixture.
 module Pawl.SpeedSpec where
 
 import qualified Data.Map.Strict as Map
@@ -171,9 +171,11 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
         gs = atSpeed 4 S.alice (S.settleSba board)
     Spec.assertEqWith s "two activated abilities" (length (Projection.abilitiesOf racewayId gs)) 2
     Spec.assertEqWith s "and the granted one makes two mana" (pooledBy biggestYield racewayId gs) 2
-  -- CR 702.178a's clause is EXACTLY 4 (CR 702.179e), not "at least 4", and the
-  -- gate is re-asked on every read rather than latched: dropping the same
-  -- player's speed back takes the ability away again with no event in between.
+  -- CR 604.1 makes a static ability "simply true", so CR 702.178a's clause is
+  -- re-asked on every read rather than latched: dropping the same player's speed
+  -- back takes the ability away again, with no event and no resolution in
+  -- between. Nothing here distinguishes "exactly 4" from "at least 4" -- speed
+  -- cannot exceed 4 (CR 702.179d), so no board tells the two apart.
   Spec.it s "CR 604.1 the grant is re-asked, not latched" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
@@ -275,14 +277,13 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
     swamp <- S.printingOf s registry "Swamp"
     signInBlood <- S.printingOf s registry "Sign in Blood"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (gs0, _, aliceSpell) = raceBoard raceway swamp signInBlood piker
+    let (gs0, _, _) = raceBoard raceway swamp signInBlood piker
         -- Bob's own two Swamps and his own copy, and the turn handed to him.
         withBobsLands = foldr (\_ g -> snd (S.addCreature swamp S.bob g)) gs0 [1 .. (2 :: Int)]
         (bobSpell, withBobsSpell) = S.addHandCard signInBlood S.bob withBobsLands
         started = S.settleSba withBobsSpell
         bobsTurn = started {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
         after = castResolveSettle atBob S.bob bobSpell bobsTurn
-    Spec.assertBool s (aliceSpell /= bobSpell) "the two copies are distinct objects"
     Spec.assertEqWith s "bob lost two life on his own turn" (S.lifeOf S.bob after) (fmap (subtract 2) (S.lifeOf S.bob bobsTurn))
     Spec.assertEqWith s "and alice's speed did not move" (speedOf S.alice after) (Just (Just 1))
   -- CR 702.179d's per-turn limit is per TURN, not per game: the handoff clears

@@ -38,8 +38,10 @@ data Source
     -- token it is never a permanent (CR 114.5) and never on the battlefield.
     -- Owned and controlled by the player who created it (CR 114.2 / 109.4c).
     OfEmblem Card.Card
-  | -- | CR 725.2: a triggered ability with no object source, controlled by a
-    -- specific player baked in at trigger time (like DelayedTrigger's controller).
-    -- The monarch's two inherent abilities are the only customers.
+  | -- | CR 725.2 / CR 702.179d: a triggered ability with no object source,
+    -- controlled by a specific player baked in at trigger time (like
+    -- DelayedTrigger's controller). Its customers are the abilities the rulebook
+    -- states without a card to bear them -- the monarch's pair, and the speed
+    -- increase a player with 1 or more speed has.
     OfInherentTrigger PlayerId.PlayerId (TriggeredAbility.TriggeredAbility Card.Card)
   deriving (Eq, Ord, Show)

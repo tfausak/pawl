@@ -9,11 +9,13 @@ import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
 -- | CR 603.3: an ability that has TRIGGERED but is not yet on the stack. Gathered
--- by Pawl.Engine.Event (and, for CR 725.2's sourceless pair, by Pawl.Engine.Monarch) at the CR
--- 117.5 boundary, ordered and placed by Pawl.Engine.Engine.
+-- by Pawl.Engine.Event (and, for the sourceless ones, by Pawl.Engine.Monarch for
+-- CR 725.2's pair and Pawl.Engine.Speed for CR 702.179d's) at the CR 117.5
+-- boundary, ordered and placed by Pawl.Engine.Engine.
 --
 -- `source` is what the ability hangs on -- the object it belongs to (CR 113.7),
--- or nothing at all for the monarch's inherent abilities (CR 725.2). Both kinds
+-- or nothing at all for an inherent ability the rulebook rather than a card
+-- states (CR 725.2, CR 702.179d). Both kinds
 -- share this type so that CR 603.3b can order them as one batch;
 -- `controller` is who controls the ability (CR 603.3a / CR 725.2). `bindings` is
 -- the environment CAPTURED when a CR 603.7 delayed ability was armed -- how "it"
