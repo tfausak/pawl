@@ -377,9 +377,11 @@ data Effect card
     -- off the card's LAYOUT by Pawl.Engine.Card.turnedOver, never off which card
     -- it is.
     --
-    -- Transform and CR 701.28's convert are different game actions over the same
-    -- physical one (CR 701.28b), and this opcode is the transform half only
-    -- (#698).
+    -- CR 701.28's convert is a SEPARATE keyword action that turns a permanent
+    -- over by the same subrules -- CR 701.28a: "This follows rules 701.27a-f,
+    -- 712.9-10, and 712.18. Those rules apply to converting a permanent just as
+    -- they apply to transforming a permanent." So this opcode is the transform
+    -- WORDING only, and a card printing "convert" needs its own (#698).
     Transform ObjectRef.ObjectRef
   | -- | CR 506.4: an effect that specifically removes a permanent from combat --
     -- the rule's one clause a card ASKS for rather than a condition the engine has

@@ -39,7 +39,8 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- CR 709.4 gives a split card its two halves COMBINED, CR 712.8a gives a
 -- double-faced card its FRONT face alone, CR 715.4 gives an adventurer card its
 -- NORMAL characteristics alone. Under Normal there is one face and all three name
--- it; the layouts that make them differ get their arm when they land.
+-- it; the layouts that make them differ each have their arm below. CR 712.3's
+-- modal double-faced kind is the one still to land (#697).
 --
 -- TOTAL, which is what Card.faces being NonEmpty buys: every characteristic read
 -- in the engine funnels through here, and a Maybe would spread to all of them.
@@ -201,8 +202,10 @@ castableFaces card = case Card.layout card of
   -- something a player may elect to cast. Only an effect allowing the card to be
   -- cast "transformed" or "converted" puts a back face on the stack (CR 712.8c /
   -- 712.11a), and pawl has none: the convert wording is #698, and the wordings
-  -- that reach a back face WITHOUT casting put the card onto the battlefield
-  -- transformed instead (CR 712.13a, #70).
+  -- that reach a back face without one on the STACK put the card onto the
+  -- battlefield transformed instead -- CR 712.13a for a double-faced spell
+  -- already on the stack, CR 712.14a for a card put there without being cast
+  -- (#70).
   Layout.Transforming -> [NonEmpty.head (Card.faces card)]
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is

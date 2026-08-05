@@ -34,6 +34,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -281,10 +282,17 @@ spec s registry = Spec.describe s "Transform" $ do
         twice = sweep once
     Spec.assertEqWith s "once: the back face" (faceReadings oid once) backFace
     Spec.assertEqWith s "twice: the front face again, {6} and all" (faceReadings oid twice) frontFace
-  -- Turning a permanent over is not a zone change, so CR 400.7 does not fire and
-  -- the permanent is the SAME object: it keeps its id, and everything recorded
-  -- against that id survives. Damage stands in for the whole per-incarnation set
-  -- (Object.newIncarnation's list) because it is the cheapest of them to mark.
+  -- CR 712.18 states it positively -- "when a double-faced permanent transforms
+  -- or converts, it doesn't become a new object. Any effects that applied to that
+  -- permanent will continue to apply to it" -- and CR 400.7 is the negative half:
+  -- this is not a zone change, so nothing mints an incarnation. The permanent
+  -- keeps its id and everything recorded against that id survives.
+  --
+  -- Damage and a +1/+1 counter are asserted, two of Object.newIncarnation's
+  -- per-incarnation list and the two cheapest to place. The counter earns its
+  -- place twice over: 4/2 plus it is 5/3, so it also proves the back face's P/T
+  -- is a new BASE that layer 7d composes with, rather than a value that replaces
+  -- what the layers had computed.
   --
   -- Worth asserting because the obvious wrong implementation is the one that
   -- reaches for the funnel every other change of what a permanent IS goes
@@ -292,8 +300,12 @@ spec s registry = Spec.describe s "Transform" $ do
   Spec.it s "CR 400.7 does not fire: the turned-over permanent is the same object" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     let (oid, g0) = S.addCreature gargoyle S.alice emptyBoard
-        before = S.markDamage oid 1 g0
+        counted = g0 {GameState.objects = Map.adjust (\o -> o {Object.counters = Map.insert CounterKind.PlusOnePlusOne 1 (Object.counters o)}) oid (GameState.objects g0)}
+        before = S.markDamage oid 1 counted
         after = sweep before
-    Spec.assertEqWith s "the back face is up" (faceReadings oid after) backFace
+    Spec.assertEqWith s "the back face is up" (Projection.nameOf oid after) antagonizerName
     Spec.assertEqWith s "the 1 damage marked on the Gargoyle is still marked" (S.damageOf oid after) (Just 1)
+    Spec.assertEqWith s "and its +1/+1 counter survived the turn" (fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid after)) (Just 1)
+    -- 4/2 from the back face plus the counter layer 7d still applies (CR 712.18).
+    Spec.assertEqWith s "so the back face reads 5/3, not the printed 4/2" (S.powerToughnessOf oid after) (Just (5, 3))
     Spec.assertEqWith s "and the battlefield holds one permanent, not a replacement" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1

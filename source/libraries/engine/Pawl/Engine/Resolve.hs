@@ -582,6 +582,14 @@ resolveAbility abilId srcId ability = do
 --     CR 701.27d's instant or sorcery face.
 --   * CR 701.27f's already-turned gate, alreadyTurnedFor below.
 --
+-- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
+-- "When a double-faced permanent transforms or converts, it doesn't become a new
+-- object. Any effects that applied to that permanent will continue to apply to
+-- it." So no id is minted, no timestamp is reissued, and damage, counters and
+-- attachments ride through untouched -- the rule's own Example is a +2/+2 that
+-- survives the turn. CR 400.7 is the negative half of the same claim: this is not
+-- a zone change, so nothing mints an incarnation.
+--
 -- Reads the object's OWN card (Game.cardOf), never a projected one, which is the
 -- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
 -- being a one-faced card whatever it copied, and that is the same read.
