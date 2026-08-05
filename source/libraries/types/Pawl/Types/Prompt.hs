@@ -582,8 +582,10 @@ data Prompt r where
   -- where the rules leave nothing to ask -- CR 118.3's "a player can't pay a cost
   -- without having the necessary resources to pay it fully", which leaves
   -- declining as the only possible answer. CR 118.12's clause covers that case in
-  -- as many words ("does, doesn't, or CAN'T"), and its Standstill example is
-  -- exactly an unpayable one.
+  -- as many words ("does, doesn't, or CAN'T"). Its Standstill example is NOT this
+  -- one: that cost is mandatory ("sacrifice this enchantment. If you do"), so its
+  -- "can't" is 118.12's "started to pay a mandatory cost" limb, which is the
+  -- positive shape pawl cannot represent at all (#701).
   ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: the player announces whether they intend to pay 2 life or a
   -- coloured mana cost for each Phyrexian symbol. CR 118.13a puts the choice HERE

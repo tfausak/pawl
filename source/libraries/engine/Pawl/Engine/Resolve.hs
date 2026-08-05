@@ -460,7 +460,10 @@ resolveSpellWith runSubgame oid = do
                   -- legality and the targets are the START-of-resolution ones,
                   -- matching CR 608.2b's single re-validation; the per-effect
                   -- re-read below adds only slots this resolution DEFINES, and
-                  -- an "unless" is offered before any effect has run.
+                  -- an "unless" is offered before any of THIS mode's effects have
+                  -- run. A later mode's gate is asked after an earlier mode's
+                  -- effects, which no card reaches: the pool's one unlessPaid is
+                  -- a single-mode spell.
                   gatePaid <-
                     if taken
                       then
@@ -597,24 +600,28 @@ exercises resolving controller idx mode = case Mode.optionality mode of
 -- the branch still ran. Nothing here looks at the target, at the payer's board or
 -- at the mana that moved; it reads Prompt.ChooseToPay's answer.
 --
--- FOUR outcomes. Exactly one skips the instructions -- the payer chose to pay
--- and the payment went through -- and the other three run them:
+-- FIVE outcomes. Exactly one skips the instructions -- the payer chose to pay
+-- and the payment went through -- and the other four run them:
 --
 --   * no payer. The slot is unfilled, has become an illegal target (CR 608.2b),
 --     or names an object that is gone, so there is nobody to offer the cost to
 --     and nobody has paid. Unreachable for Mana Leak, whose single target slot
 --     sends the whole spell through CR 608.2b's fizzle before this is asked.
---   * the payer CANNOT pay (CR 118.3), which CR 118.12's clause names outright
---     ("does, doesn't, or can't") and its Standstill example is. Not asked, there
---     being one possible answer; see Prompt.ChooseToPay.
+--   * the payer CANNOT pay. CR 118.12a has made this cost a "may", and CR 118.3
+--     says "a player can't pay a cost without having the necessary resources to
+--     pay it fully" -- so declining is the only possible answer and there is
+--     nothing to ask. Not asked; see Prompt.ChooseToPay.
 --   * the payer declines.
+--   * the payer chose to pay and the payment did not go through.
 --
 -- A payment that was chosen and then did not go through is read as not paid,
 -- which is the branch that leaves the game where it started: Pawl.Engine.Cost.pay
 -- restores the entry state, so an Unpaid result is a complete no-op and no cost
--- was paid to read a choice off. Nothing in the pool is expected to reach it --
--- canPay has just said the resources were there, and Pawl.Engine.Mana.payCost
--- filters the answers it acts on rather than trusting them.
+-- was paid to read a choice off. Nothing in the pool reaches it, and the reason
+-- is Mana Leak's cost specifically: {3} is GENERIC, so every tap pays it. A
+-- coloured resolution cost would reach it the way Pawl.Engine.Mana.payCost's own
+-- haddock describes -- failure there is reachable, because a player who taps
+-- their only Birds of Paradise for green cannot then pay {B} (#417, #56).
 --
 -- The cost is paid AGAINST `source` rather than the resolving stack object: CR
 -- 113.7a keeps the source on the permanent, which is what a component naming
@@ -643,8 +650,11 @@ paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
 
 -- Which player a resolution cost is offered to. ONE slot read answering in two
 -- ways, since a slot may hold either kind of recipient: a slot bound to a PLAYER
--- names that player, and one bound to an OBJECT names whoever controls it (CR
--- 109.5) -- Mana Leak's "its controller", read off the targeted spell.
+-- names that player, and one bound to an OBJECT names whoever controls it -- CR
+-- 109.4, "only objects on the stack or on the battlefield have a controller",
+-- and CR 405.4 for a spell in particular. Mana Leak's "its controller", read off
+-- the targeted spell. NOT CR 109.5, which is the rule for the words "you" and
+-- "your" on an object; this card says "its controller" instead.
 --
 -- Legality is asked as every other slot read asks it (CR 608.2b): a slot filled
 -- by targeting that has since become illegal names nobody, and a reserved slot

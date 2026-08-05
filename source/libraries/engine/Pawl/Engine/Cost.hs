@@ -1,11 +1,18 @@
 -- CR 118: what a cost IS, and everything the closed half needs to do with one --
 -- what the candidates are (costsFor), what the total is (total, CR 601.2f),
--- whether it can be paid (canPay, CR 118.3) and paying it (pay, CR 601.2g/h).
+-- whether it can be paid (canPay, CR 118.3) and paying it (pay).
 -- Pawl.Engine.Mana keeps pools, production and spending; this module keeps the cost.
 --
--- The SOLE casing home for Pawl.Types.CostComponent. Pawl.Engine.Cast and Pawl.Engine.Activate
--- learn nothing about which components exist: they ask "can this be paid" and
--- "pay it", and read one classification (requiresSicknessCheck) for CR 302.6.
+-- `pay` serves TWO contexts, and only the first is CR 601.2g/h: a cost paid as a
+-- spell is cast or an ability activated, and CR 118.12's cost paid when one
+-- RESOLVES (Pawl.Engine.Resolve.paid). `total`'s CR 601.2f adjustments reach only
+-- the first, because that rule totals the cost of a spell being cast or an ability
+-- being activated and a resolution cost is neither.
+--
+-- The SOLE casing home for Pawl.Types.CostComponent. Pawl.Engine.Cast,
+-- Pawl.Engine.Activate and Pawl.Engine.Resolve learn nothing about which
+-- components exist: they ask "can this be paid" and "pay it", and read one
+-- classification (requiresSicknessCheck) for CR 302.6.
 module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
@@ -412,7 +419,9 @@ canPayComponent pid oid component gs = case component of
 --
 -- All or nothing (CR 601.2h: partial payments are not allowed). The entry state
 -- is captured and restored on any rejection, so an Unpaid result is a complete
--- no-op even though paying is monadic and a component may prompt.
+-- no-op even though paying is monadic and a component may prompt. That no-op is
+-- what CR 118.12's resolution-time caller rests on too, where an Unpaid result
+-- lands on the same branch as a refusal (Pawl.Engine.Resolve.paid).
 pay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
 pay pid oid cost = do
   before <- State.get

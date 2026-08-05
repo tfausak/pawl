@@ -22,7 +22,10 @@ import qualified Pawl.Types.SlotName as SlotName
 -- list on an answer given as the effect is applied, and an Effect arm holding
 -- other effects would put a BRANCH inside the ISA, which design.md section 1
 -- keeps out. A "unless" covering only SOME of a mode's instructions is the case
--- this cannot express, exactly as a partial "may" is (#335).
+-- this cannot express -- Condescend's "counter target spell unless its
+-- controller pays {X}. Scry 2", where the scry happens either way (#703). The
+-- same shape for a "may" rather than an "unless" is #335, and neither issue's
+-- carrier would answer the other.
 --
 -- NEGATIVE only: the effects run when the cost was NOT paid. CR 118.12's other
 -- half -- "[Do something]. If [a player] does, [effect]", where the effects run
@@ -33,8 +36,8 @@ data UnlessPaid = MkUnlessPaid
     -- controller of the object bound here" and PlayerRef.InSlot reads a slot
     -- bound to a PLAYER. Pawl.Engine.Resolve.payerOf takes both readings off one
     -- slot -- a slot bound to a player IS that player, and a slot bound to an
-    -- object names whoever controls it (CR 109.5) -- so a future "unless that
-    -- player pays" needs no second field.
+    -- object names whoever controls it (CR 109.4, and CR 405.4 for a spell) --
+    -- so a future "unless that player pays" needs no second field.
     --
     -- A slot and not the resolving controller, which is the question this card
     -- family forces: Mana Leak's payer is the TARGETED spell's controller, who
