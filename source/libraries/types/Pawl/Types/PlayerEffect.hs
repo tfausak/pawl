@@ -121,4 +121,27 @@ data PlayerEffect
     -- PLAYER case and not only the permanent one. A membership question, never a
     -- tally.
     CantBeTargetedBy PlayerScope.PlayerScope
+  | -- | CR 601.3b / Vedalken Orrery: this player may cast a matching spell as
+    -- though it had flash -- which by CR 702.8a and CR 117.1a's first sentence
+    -- means any time they have priority.
+    --
+    -- NOT Pawl.Types.Keyword.Flash and not a second producer of it. CR 702.8a's
+    -- flash is a static ability an object has about casting ITSELF ("the card
+    -- it's on"), and Vedalken Orrery gives itself nothing. That the rules spend
+    -- CR 601.3b, 601.3c and 601.3d on "as though it had flash" is the point: it
+    -- is a distinct mechanism, and it belongs on the CR 613.11 player axis this
+    -- type is.
+    --
+    -- NOT a Pawl.Types.CastingPermission either: every arm of that type names a
+    -- ZONE a card may be cast from (CR 601.3), and this names a TIME.
+    --
+    -- The filter is CR 601.3b's "a spell with certain qualities", and is the axis
+    -- that separates the producers: Vedalken Orrery says "spells" and so matches
+    -- everything (`And []`), while Yeva, Nature's Herald says "green creature
+    -- spells" and would narrow it.
+    --
+    -- A PERMISSION, so Pawl.Engine.PlayerEffect reads it as a disjunction, unlike
+    -- the CR 101.2 disjunction the prohibitions fold as -- there being nothing
+    -- for a second permission to outvote.
+    CastAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)
