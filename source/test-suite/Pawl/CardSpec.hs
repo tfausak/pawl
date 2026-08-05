@@ -829,6 +829,9 @@ triggeredAbilityOffends ability =
 --     listed in rules 601.2b-i", which is what routes an activation through CR
 --     601.2c's target announcement -- and CR 700.2c scopes it to the chosen
 --     mode.
+--   * Binding.you. CR 109.5: "For an activated ability, this is the player who
+--     activated the ability" -- stamped for every activation alongside the
+--     source slot, so Brothers of Fire's "and 1 damage to you" is a slot read.
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
@@ -842,11 +845,6 @@ triggeredAbilityOffends ability =
 --
 -- What is NOT on it is the point:
 --
---   * CR 109.5's `you`, which for an activated ability the rule does define
---     ("For an activated ability, this is the player who activated the
---     ability") -- but Binding.setYou is called only when a TRIGGERED ability is
---     placed (Pawl.Engine.Engine, Pawl.Engine.Monarch), so an activated ability
---     reading the slot reads nothing (#569).
 --   * both event slots (CR 400.7e's `became`, CR 702.70a's `thatPlayer`): an
 --     activation is not an event, so Pawl.Engine.Event.eventBindings never runs
 --     for one.
@@ -870,7 +868,7 @@ activatedAbilityOffends ability =
         if declaresVariable (Cost.Type.mana (ActivatedAbility.cost ability))
           then Set.singleton Binding.variableX
           else Set.empty
-   in modalReadOffends (Set.insert Binding.triggerSource announcedX) (ActivatedAbility.modal ability)
+   in modalReadOffends (Set.union (Set.fromList [Binding.triggerSource, Binding.you]) announcedX) (ActivatedAbility.modal ability)
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
@@ -1913,8 +1911,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
   -- The same subset shape over a card's ACTIVATED abilities, whose available
-  -- side is the narrowest of the three: an activation has no event, and is never
-  -- given CR 109.5's `you`. See activatedAbilityOffends for the available side.
+  -- side is the narrowest of the three: an activation has no event, so neither
+  -- event slot is on it. See activatedAbilityOffends for the whole of it.
+  --
+  -- Brothers of Fire is what this caught: its "and 1 damage to you" reads CR
+  -- 109.5's slot from an ACTIVATED ability, which nothing bound until
+  -- Activate.activateAbility started stamping it (#569).
   Spec.it s "every slot an activated ability reads is bound for its activation" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
@@ -1933,9 +1935,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   --
   -- Every reserved slot an activation does NOT bind gets its own case, because a
   -- classification answering "every slot, always" would pass any one of them
-  -- alone. The `you` case is asserted twice over: rejected for an activated
-  -- ability AND accepted for a triggered one, which is the whole difference
-  -- between the two lints (Binding.setYou is stamped only on the triggered path).
+  -- alone. CR 109.5's `you` is the case that runs the other way, and is asserted
+  -- on BOTH lints: the rule defines the word for an activated ability and for a
+  -- triggered one, so the same effect is accepted either way (#569). Leaving it
+  -- off one lint's available side is what a card would then fail on, so the pair
+  -- is what keeps the two halves of the rule from drifting apart.
   Spec.it s "the lint itself catches an activated ability reading a slot activation never binds" $ do
     longtuskCub <- S.printingOf s registry "Longtusk Cub"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -1957,8 +1961,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         drawX = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX)
     Spec.assertBool
       s
-      (activatedAbilityOffends (oneEffectActivated free youDiscards))
-      "CR 109.5 you is rejected: an activation never binds it"
+      (not (activatedAbilityOffends (oneEffectActivated free youDiscards)))
+      "CR 109.5 you is accepted: an activation binds the player who activated it"
     Spec.assertBool
       s
       (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies youDiscards)))

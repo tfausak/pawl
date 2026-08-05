@@ -55,21 +55,20 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
--- CR 109.5: the reserved slot under which a triggered ability's CONTROLLER is
--- bound ("you"), so a targetless self-referential clause -- Sarcomancy's "deals
--- 1 damage to you" -- is a slot read rather than a new opcode.
+-- CR 109.5: the reserved slot under which an ability's CONTROLLER is bound
+-- ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
+-- damage to you" -- is a slot read rather than a new opcode.
+--
+-- Stamped on BOTH ability paths, because the rule defines the word for both:
+-- "For an activated ability, this is the player who activated the ability. For
+-- a triggered ability, this is the controller of the object when the ability
+-- triggered". Pawl.Engine.Engine's trigger placement answers the second,
+-- Pawl.Engine.Activate.activateAbility the first.
 --
 -- "No card's targetSpecs may name it" is lint-enforced as for the names above,
--- by a sweep that has to reach the ABILITIES to mean anything here: "you" is
--- stamped exclusively on triggered abilities, so a card declaring a "you"
--- target spec on one would be prompted for a target and have the answer
--- clobbered by setYou.
---
--- The two ability read lints disagree about this slot on purpose. Both are
--- subset checks: "you" sits on the triggered lint's available side because
--- every triggered ability has it bound, and is deliberately absent from the
--- activated lint's, because no activation binds it -- so an activated ability
--- reading "you" is a failing test rather than a silent no-op (#569).
+-- by a sweep that has to reach the ABILITIES to mean anything here: a card
+-- declaring a "you" target spec on one would be prompted for a target and have
+-- the answer clobbered by setYou.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
