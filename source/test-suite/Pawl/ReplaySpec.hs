@@ -45,6 +45,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Prompt as Prompt
@@ -70,6 +71,8 @@ combatReplaySpec s =
       attackPrompt = Prompt.DeclareAttackers decider S.alice [oid]
       blockPrompt = Prompt.DeclareBlockers decider S.bob [oid] [oid]
       damagePrompt = Prompt.AssignCombatDamage decider S.alice oid (Map.singleton (Recipient.ToCreature oid) 0) 2
+      -- CR 118.12a: Mana Leak's {3}, the cost Prompt.ChooseToPay carries.
+      genericThree = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.Type.components = []}
       -- CR 725.2's own pair, one borne and one sourceless: the crown steal hung
       -- on an object and the inherent end-step draw hung on nothing.
       orderEntries =
@@ -267,6 +270,21 @@ combatReplaySpec s =
             "declines"
             (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)))
             OptionalDecision.Declines
+        -- CR 118.12a: both answers to a resolution-time cost, so the transcript
+        -- is proved to distinguish them -- a codec that collapsed them would
+        -- replay a paid Mana Leak as a refused one, which is the whole card.
+        Spec.it s "ChooseToPay records and replays both answers" $ do
+          let p = Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) genericThree
+          Spec.assertEqWith s "paid" (Replay.decode p (Replay.encode p PaymentDecision.Pays)) (Just PaymentDecision.Pays)
+          Spec.assertEqWith s "declined" (Replay.decode p (Replay.encode p PaymentDecision.Declines)) (Just PaymentDecision.Declines)
+        -- CR 118.3a: a transcript that runs short must not spend a player's
+        -- mana on a payment its author never announced.
+        Spec.it s "defaultAnswer declines a resolution-time cost" $
+          Spec.assertEqWith
+            s
+            "declines"
+            (Replay.defaultAnswer (Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) genericThree))
+            PaymentDecision.Declines
         Spec.it s "a mismatched response does not decode as a may" $
           Spec.assertEqWith
             s

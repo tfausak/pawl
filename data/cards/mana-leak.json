@@ -1,0 +1,62 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Mana Leak",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Counter",
+                "value": "spell"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "spell",
+                "spec": {
+                  "pool": {
+                    "type": "Spells"
+                  }
+                }
+              }
+            ],
+            "unlessPaid": {
+              "cost": {
+                "mana": [
+                  {
+                    "type": "Generic",
+                    "value": 3
+                  }
+                ]
+              },
+              "payer": "spell"
+            }
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
