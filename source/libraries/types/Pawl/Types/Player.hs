@@ -32,6 +32,28 @@ data Player = MkPlayer
     -- this number, and none of its four tiers is built: the base one (#707), and
     -- the two-, three- and four-temptation ones, which are triggered abilities an
     -- emblem cannot fire from the command zone (#709).
-    ringTemptations :: Natural.Natural
+    ringTemptations :: Natural.Natural,
+    -- | CR 702.179b: this player's speed, or Nothing for a player who has none.
+    -- "Players do not have speed until a rule or effect sets their speed to a
+    -- specific value", so the absence is a THIRD state and not a zero: CR 704.5z
+    -- starts a player's engines only when they have NO speed, and would fire
+    -- forever against a player whose speed had been driven to 0 if the two were
+    -- spelled alike.
+    --
+    -- Nothing still READS as zero wherever a card asks (CR 702.179f, "if that
+    -- player has no speed, their speed is 0 for the purpose of an effect that
+    -- refers to speed"), which Pawl.Engine.Quantity's Speed arm applies. The
+    -- distinction the Maybe carries is therefore invisible to card text and
+    -- visible only to the two rules that create speed, CR 702.179a and CR
+    -- 702.179c.
+    --
+    -- NOT a PlayerCounterKind, for Player.ringTemptations' reason: CR 122.1
+    -- makes a counter a MARKER an effect can add or remove, and rule 702.179
+    -- never calls speed one -- proliferate (CR 701.34a) would find it if it were.
+    --
+    -- Bounded above at 4 by the only rule that raises it: CR 702.179d increases
+    -- speed only "if your speed is less than 4", and CR 702.179e reads 4 as max
+    -- speed. Nothing in rule 702.179 lowers it.
+    speed :: Maybe Natural.Natural
   }
   deriving (Eq, Show)

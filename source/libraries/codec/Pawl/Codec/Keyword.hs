@@ -49,6 +49,7 @@ toJson k = case k of
   Keyword.Menace -> Common.nullary "Menace"
   Keyword.Devoid -> Common.nullary "Devoid"
   Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
+  Keyword.StartYourEngines -> Common.nullary "StartYourEngines"
 
 fromJson :: Value.Value -> Either Text.Text Keyword.Keyword
 fromJson value = do
@@ -81,4 +82,5 @@ fromJson value = do
     ("Menace", _) -> Right Keyword.Menace
     ("Devoid", _) -> Right Keyword.Devoid
     ("Toxic", Just v) -> Keyword.Toxic <$> Common.decodeNatural v
+    ("StartYourEngines", _) -> Right Keyword.StartYourEngines
     _ -> Left . Text.pack $ "unknown Keyword: " <> t

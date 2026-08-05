@@ -233,6 +233,23 @@ data Effect card
     -- action follows a gain (CR 704.5a is about a total of 0 or less), so this one
     -- can never kill anybody.
     GainLife PlayerRef.PlayerRef Quantity.Quantity
+  | -- | CR 702.179c: the players the PlayerRef names each have their speed
+    -- increased by this much -- "if a player has no speed and they are instructed
+    -- to increase their speed by a certain value, their speed becomes that value",
+    -- which is why the rule needs an opcode of its own rather than a plain
+    -- addition against a stored zero.
+    --
+    -- Its one producer is Pawl.Engine.Speed's inherent triggered ability (CR
+    -- 702.179d), which is minted by the rules core from the rulebook rather than
+    -- read off a card, the way Pawl.Engine.Monarch mints BecomeMonarch. No card in
+    -- the pool prints "your speed increases by" as text of its own (#770), so this
+    -- arm is authored by nothing in data/cards today.
+    --
+    -- NOT a "set speed to" opcode: CR 702.179 has both readings, and only the
+    -- increase has a producer. A SET would also have to say what happens to a
+    -- player with no speed, which is exactly the question CR 702.179c answers for
+    -- this one.
+    IncreaseSpeed PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3). The `card` is the token's text, embedded
     -- literally (tied to Card by Card's own instantiation); Create (Literal 2)

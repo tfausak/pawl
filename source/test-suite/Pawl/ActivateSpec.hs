@@ -91,7 +91,7 @@ chooseNoModes p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -291,7 +291,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
                     Cost.Type.components = []
                   },
               ActivatedAbility.modal = singleModeAbility [] Map.empty,
-              ActivatedAbility.timing = ActivationTiming.AnyTime
+              ActivatedAbility.timing = ActivationTiming.AnyTime,
+              ActivatedAbility.condition = Nothing
             }
     Spec.assertBool s (not (Activate.activatable S.alice srcId costlyAbility gs1)) "one Mountain cannot pay {2}"
 
@@ -789,6 +790,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
                 (ModeSelection.ChooseExactly 1)
             )
             ActivationTiming.AnyTime
+            Nothing
         after = S.runPure chooseNoModes gs (Activate.activateAbility S.alice oid twoModes)
     Spec.assertEqWith s "the activation was rejected: nothing on the stack" (GameState.stack after) []
     Spec.assertEqWith s "so no reveal survives it either" (S.revealsOf after) []

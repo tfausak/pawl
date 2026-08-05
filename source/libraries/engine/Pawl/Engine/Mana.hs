@@ -9,6 +9,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
@@ -21,6 +22,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HybridPayment as HybridPayment
@@ -997,7 +999,11 @@ canPayLife pid n gs =
 -- a barred one.
 payLife :: PlayerId -> Natural -> GameState -> GameState
 payLife pid n gs =
-  gs
-    { GameState.players =
-        Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)
-    }
+  -- CR 119.4's own last clause, "in other words, the player loses that much
+  -- life", is why the payment is recorded as a life loss like any other. CR
+  -- 119.4b's always-payable 0 loses nothing and so records nothing.
+  (if n == 0 then id else Event.recordEvent (GameEvent.LifeLost pid n))
+    gs
+      { GameState.players =
+          Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)
+      }

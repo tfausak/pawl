@@ -1047,6 +1047,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Discard {} -> effect
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect
+  Effect.IncreaseSpeed {} -> effect
   -- CR 612.2a: a token-creating spell defines the token's creature types and its
   -- name with the same words, so a text change reaches both. Those words live in
   -- the token's defining card, which this arm hands to rewriteCard.
@@ -1189,6 +1190,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StepBegins _ _ -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
@@ -1231,6 +1233,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity
+  Quantity.Type.Speed _ -> quantity
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.
@@ -2066,11 +2069,32 @@ colorsGiven pcs oid gs = PC.colors (projectGiven pcs oid gs)
 
 -- CR 602 / 613.1f: an object's activated abilities after the layer system, the
 -- same projection posture as keywordsOf. A Humility'd creature has none.
+--
+-- CR 702.178a's gate is applied HERE, over the finished projection, rather than
+-- inside the fold: "as long as your speed is 4, this object has '[Ability]'" is
+-- an ability the object has or lacks, and every reader of an object's activated
+-- abilities goes through this pair. Layer 6 is asked first and this second, which
+-- is the right order -- a Humility'd Muraganda Raceway has no max speed ability
+-- to gate, whatever its controller's speed.
+--
+-- The condition is re-asked on every read, not sampled: CR 604.1 makes a static
+-- ability "simply true", so speed falling would take the ability away with no
+-- event in between. Cheap by construction -- the filter is skipped entirely for
+-- the overwhelming majority of abilities, which carry no condition.
+--
+-- The view is the FULL one, unlike Projection.conditionHolds' layer-bounded view:
+-- nothing here is inside the fold, so there is no circularity to bound against.
+-- The Filter.Context is the object's own controller and the object itself, which
+-- is what makes CR 109.5's "your" in "your speed is 4" the ability's controller.
 abilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
 abilitiesOf = abilitiesGiven Map.empty
 
 abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
-abilitiesGiven pcs oid gs = PC.activatedAbilities (projectGiven pcs oid gs)
+abilitiesGiven pcs oid gs =
+  let granted ability = case ActivatedAbility.condition ability of
+        Nothing -> True
+        Just cond -> Condition.holds (fullView gs) (Filter.MkContext (controllerOf oid gs) (Just oid)) gs oid cond
+   in filter granted (PC.activatedAbilities (projectGiven pcs oid gs))
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none.

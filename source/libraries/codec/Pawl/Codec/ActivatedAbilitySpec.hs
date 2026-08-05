@@ -64,6 +64,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
               (ModeSelection.ChooseExactly 1)
           )
           ActivationTiming.SorcerySpeed
+          Nothing
       )
       """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"timing":{"type":"SorcerySpeed"}} """
   -- CR 117.1b: AnyTime is the default for every ability but equip, so its key
@@ -77,5 +78,6 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           (Cost.MkCost Nothing [])
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
           ActivationTiming.AnyTime
+          Nothing
       )
       """ {"cost":{"mana":null},"modal":{"modes":[{}]}} """

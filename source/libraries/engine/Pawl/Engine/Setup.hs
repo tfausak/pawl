@@ -55,7 +55,13 @@ emptyGame order =
               Player.counters = Map.empty,
               -- CR 701.54c: the Ring has tempted nobody in a game that has not
               -- started.
-              Player.ringTemptations = 0
+              Player.ringTemptations = 0,
+              -- CR 702.179b: "players do not have speed until a rule or effect
+              -- sets their speed to a specific value", and no rule has. CR
+              -- 704.5z gives one to a player who controls a permanent with start
+              -- your engines!, which is a state-based action and so cannot have
+              -- happened before the game began.
+              Player.speed = Nothing
             }
         )
    in GameState.MkGameState
@@ -93,6 +99,7 @@ emptyGame order =
           GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
+          GameState.speedIncreasedThisTurn = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
@@ -216,7 +223,10 @@ resetPlayers players =
               -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
               -- it. The command zone this line's callers empty is where the
               -- emblem the count belongs to went.
-              Player.ringTemptations = 0
+              Player.ringTemptations = 0,
+              -- CR 727.1 again: a new game starts with nobody having speed (CR
+              -- 702.179b), whatever the restarted one reached.
+              Player.speed = Nothing
             }
         Status.Departed _ -> player
    in fmap reset players
@@ -272,6 +282,7 @@ restartGame perform starter = do
             GameState.lastChoice = GameState.nextTimestamp gs,
             GameState.drewFromEmpty = mempty,
             GameState.landsPlayed = mempty,
+            GameState.speedIncreasedThisTurn = mempty,
             GameState.pendingControl = Map.empty,
             GameState.activeControl = Nothing,
             GameState.monarch = Nothing,
@@ -355,6 +366,7 @@ subgameStateFrom starter parent =
           GameState.lastChoice = GameState.nextTimestamp parent,
           GameState.drewFromEmpty = mempty,
           GameState.landsPlayed = mempty,
+          GameState.speedIncreasedThisTurn = mempty,
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,

@@ -364,3 +364,4 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Menace -> keyword
   Keyword.Devoid -> keyword
   Keyword.Toxic _ -> keyword
+  Keyword.StartYourEngines -> keyword

@@ -117,6 +117,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
+  Keyword.StartYourEngines -> []
 
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a card while it sits in its
 -- owner's hand, and the first sibling here that mints something a player takes
@@ -166,6 +167,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
+  Keyword.StartYourEngines -> []
 
 -- CR 702.29a: cycling means paying its cost and discarding the card to draw a
 -- card. The whole ability, minted from the one cost the keyword carries.
@@ -193,7 +195,9 @@ cycling cost searchFor =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime
+      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      -- CR 702.29a gives the card this ability outright, with no "as long as".
+      ActivatedAbility.condition = Nothing
     }
   where
     -- The only difference between rule 702.29a and rule 702.29e: what the
@@ -265,6 +269,7 @@ permissionsFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Toxic _ -> []
+  Keyword.StartYourEngines -> []
 
 -- CR 702.8a: does this card's keyword set let it be played any time its
 -- controller could cast an instant? Its one reader is

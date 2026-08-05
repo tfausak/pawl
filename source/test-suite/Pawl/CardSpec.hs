@@ -331,6 +331,7 @@ quantityCounts quantity = case quantity of
   -- CR 119.1's scalar attached to a PLAYER: it holds neither a Pawl.Types.Count
   -- nor a Pawl.Types.Filter, so these lints have nothing to sweep here either.
   Quantity.Type.LifeTotal _ -> []
+  Quantity.Type.Speed _ -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this
@@ -402,6 +403,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfCycled -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
@@ -441,6 +443,7 @@ effectCounts effect = case effect of
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.GainLife _ quantity -> quantityCounts quantity
+  Effect.IncreaseSpeed _ quantity -> quantityCounts quantity
   Effect.Create quantity card _ _ -> quantityCounts quantity <> overFaces cardCounts card
   -- The Condition is Galvanic Blast's "if you control three or more
   -- artifacts", and its Counts are as much card data as a Duration's.
@@ -642,6 +645,7 @@ effectReplacements effect = case effect of
   Effect.Discard _ _ -> []
   Effect.LoseLife _ _ -> []
   Effect.GainLife _ _ -> []
+  Effect.IncreaseSpeed _ _ -> []
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage {} -> []
   Effect.PreventAllDamage {} -> []
@@ -956,7 +960,8 @@ oneEffectActivated mana effect =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime
+      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.condition = Nothing
     }
 
 -- One CR 700.2 mode for the fixtures below: the effects it runs and the target
@@ -979,7 +984,8 @@ modalActivated modes =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime
+      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.condition = Nothing
     }
 
 -- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
@@ -1199,6 +1205,7 @@ keywordFilters keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
+  Keyword.StartYourEngines -> []
   Keyword.Toxic _ -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
@@ -1301,6 +1308,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfCycled -> []
   TriggerCondition.PlayerDiscards _ -> []
@@ -1427,6 +1435,7 @@ effectFilters effect = case effect of
   Effect.Discard _ quantity -> unframed (quantityFilters quantity)
   Effect.LoseLife _ quantity -> unframed (quantityFilters quantity)
   Effect.GainLife _ quantity -> unframed (quantityFilters quantity)
+  Effect.IncreaseSpeed _ quantity -> unframed (quantityFilters quantity)
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
   Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> overFaces cardFilters card

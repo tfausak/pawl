@@ -433,7 +433,17 @@ applyDamage events = do
                 if DamageEvent.dealtByInfect ev
                   then givePoison (DamageEvent.amount ev + toxic) player
                   else givePoison toxic (drain player)
-           in g {GameState.players = Map.adjust hit pid (GameState.players g)}
+              -- CR 119.2: damage dealt to a player CAUSES that player to lose
+              -- that much life, so this event is recorded here and not by
+              -- Pawl.Engine.Resolve's LoseLife arm, which never runs for damage.
+              -- Only where life was actually lost: CR 120.3b's infect diversion
+              -- replaces the life loss with poison counters, and zero damage
+              -- loses no life at all.
+              lost =
+                if DamageEvent.dealtByInfect ev || DamageEvent.amount ev == 0
+                  then id
+                  else Event.recordEvent (GameEvent.LifeLost pid (DamageEvent.amount ev))
+           in lost g {GameState.players = Map.adjust hit pid (GameState.players g)}
         -- CR 120.1a, and defensive: combat never builds this shape (CR 510.1b-d
         -- name a creature, a player or a planeswalker), and the one producer that
         -- can -- Resolve's DealDamage arm, naming a permanent generically -- runs

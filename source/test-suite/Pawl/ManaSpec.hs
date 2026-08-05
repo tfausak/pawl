@@ -332,7 +332,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
           ActivatedAbility.MkActivatedAbility
             { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
               ActivatedAbility.modal = singleModeAbility [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))] Map.empty,
-              ActivatedAbility.timing = ActivationTiming.AnyTime
+              ActivatedAbility.timing = ActivationTiming.AnyTime,
+              ActivatedAbility.condition = Nothing
             }
      in Spec.assertBool s (Mana.isManaAbility ab) "mana ability"
 
@@ -344,7 +345,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
                 singleModeAbility
                   [Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green))]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
-              ActivatedAbility.timing = ActivationTiming.AnyTime
+              ActivatedAbility.timing = ActivationTiming.AnyTime,
+              ActivatedAbility.condition = Nothing
             }
      in Spec.assertBool s (not (Mana.isManaAbility ab)) "targets -> not mana"
 
@@ -356,7 +358,8 @@ manaSpec s registry = Spec.describe s "Mana" $ do
                 singleModeAbility
                   [Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "x"))) (Quantity.Literal 1)]
                   (Map.singleton (SlotName.MkSlotName (Text.pack "x")) (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)),
-              ActivatedAbility.timing = ActivationTiming.AnyTime
+              ActivatedAbility.timing = ActivationTiming.AnyTime,
+              ActivatedAbility.condition = Nothing
             }
      in Spec.assertBool s (not (Mana.isManaAbility ab)) "no mana produced -> not mana"
 
@@ -1773,7 +1776,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime Nothing
 
 -- `printing` on the battlefield, settled and untapped, on a board of `n`
 -- `land`s -- the shape every board below wants and none of Support's helpers

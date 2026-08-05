@@ -237,6 +237,25 @@ data Keyword
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --
     -- including two with the same N, which the projection counts separately.
     Toxic Natural.Natural
+  | -- | 702.179a: "start your engines!". A STATIC ability whose whole content is
+    -- a state-based action -- CR 704.5z gives a player with no speed who controls
+    -- a permanent with this keyword a speed of 1 -- so nothing mints an ability
+    -- from it and Pawl.Engine.Sba reads it off the projection directly, the way
+    -- flying is read where it matters rather than turned into an object.
+    --
+    -- Nullary, because rule 702.179a takes no parameter, and its reader takes
+    -- MEMBERSHIP rather than the per-keyword count: the rule asks only whether a
+    -- player controls "a permanent with start your engines!", so a second
+    -- instance can start no second set of engines.
+    --
+    -- Rule 702.178's max speed is deliberately NOT a sibling constructor here.
+    -- CR 702.178a spells it as "as long as your speed is 4, this object has
+    -- '[Ability]'", so the keyword would have to carry a whole ability, which
+    -- would make this type parametric in `card` and drag Filter and Cost -- both
+    -- parameterised by THIS type -- along with it. pawl spells that gate as
+    -- Pawl.Types.ActivatedAbility.condition instead, which is the same "as long
+    -- as" clause Pawl.Types.StaticAbility.condition already carries for CR 604.2.
+    StartYourEngines
   deriving (Eq, Ord, Show)
 
 -- Devoid is folded as a characteristic-defining ability at the start of layer 5

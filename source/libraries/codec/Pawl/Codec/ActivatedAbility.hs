@@ -3,6 +3,7 @@ module Pawl.Codec.ActivatedAbility where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivationTiming as ActivationTiming
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Modal as Modal
@@ -23,6 +24,9 @@ toJson codec aa =
         -- CR 307.5: emitted only for a restricted ability, so the absence of
         -- the key means "no timing rider".
         <> Common.optionalPair "timing" defaultTiming ActivationTiming.toJson (ActivatedAbility.timing aa)
+        -- CR 702.178a: emitted only for a GRANTED ability, so the absence of the
+        -- key means the object simply has this ability.
+        <> Common.optionalPair "condition" Nothing (Common.encodeMaybe Condition.toJson) (ActivatedAbility.condition aa)
     )
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility card)
@@ -31,4 +35,5 @@ fromJson decode value = do
   c <- Common.field "cost" ps >>= Cost.fromJson Keyword.fromJson
   m <- Common.field "modal" ps >>= Modal.fromJson decode
   t <- Common.defaultedField "timing" defaultTiming ActivationTiming.fromJson ps
-  pure (ActivatedAbility.MkActivatedAbility c m t)
+  g <- Common.defaultedField "condition" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  pure (ActivatedAbility.MkActivatedAbility c m t g)
