@@ -17,8 +17,10 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
@@ -623,3 +625,25 @@ data Prompt r where
   -- Elided when only one route is payable -- no source of the symbol's colour, or a
   -- life total below CR 119.4's floor.
   AnnouncePhyrexianPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Color.Color -> NonEmpty.NonEmpty PhyrexianPayment.PhyrexianPayment -> Prompt PhyrexianPayment.PhyrexianPayment
+  -- | CR 601.2b: "If a cost that will be paid as the spell is being cast includes
+  -- hybrid mana symbols, the player announces the nonhybrid equivalent cost they
+  -- intend to pay." CR 118.13a puts that choice HERE rather than at payment. The
+  -- ObjectId is the spell or the permanent whose ability is being activated (CR
+  -- 602.2b); the ManaType is the symbol's own stated type, so a {2/R} and a {2/G}
+  -- in one cost put DISTINGUISHABLE questions on the wire.
+  --
+  -- CR 107.4e's MONOCOLORED half only ({2/R}), which is the half whose two ways
+  -- spend a different NUMBER of mana. A colour/colour hybrid ({W/U}) is still not
+  -- announced and could not be answered with a HybridPayment anyway (#729).
+  --
+  -- One prompt per symbol, in printed order, and the NonEmpty is the routes
+  -- actually payable given the announcements already made -- the
+  -- AnnouncePhyrexianPayment contract, for the same CR 601.2b last sentence, and
+  -- payable is measured at CR 601.2f's TOTAL for the same reason. Two {2/R}s in
+  -- one cost ask two identical questions, which is sound here because the answers
+  -- are interchangeable: both demand the same one mana or the same {2}, so which
+  -- prompt got which is not observable.
+  --
+  -- Elided when only one route is payable -- no source of the symbol's type, or
+  -- too few mana on the board for the {2}.
+  AnnounceHybridPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaType.ManaType -> NonEmpty.NonEmpty HybridPayment.HybridPayment -> Prompt HybridPayment.HybridPayment

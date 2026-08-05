@@ -280,8 +280,9 @@ revealIfHidden pid srcId = do
 -- CR 602.2: announce the activation, revealing the card if it is coming from a
 -- hidden zone (602.2a), put the ability on the stack (a fresh OfAbility object),
 -- then walk CR 601.2b-i as CR 602.2b sends it -- choose modes, announce the value
--- of X, announce the Phyrexian symbols (CR 118.13a), stamp targets, pay -- and
--- keep priority (117.3c). Reject-not-repair on an illegal mode or target answer.
+-- of X, announce the hybrid and Phyrexian symbols (CR 118.13a), stamp targets,
+-- pay -- and keep priority (117.3c). Reject-not-repair on an illegal mode or
+-- target answer.
 --
 -- An announced X can lose the activation all by itself: enumeration measures the
 -- cost at CR 601.2b's X=0 floor, and the value the player names is theirs to
@@ -345,8 +346,9 @@ activateAbility pid srcId ability = do
     else do
       -- CR 602.2b routes the rest of the activation through CR 601.2b-i, so CR
       -- 601.2b's announcement of a variable cost (CR 107.3) governs an activation
-      -- cost's {X} too, and it is asked HERE -- after the modes, before the Phyrexian
-      -- announcement and before CR 601.2c's targets, which is 601.2b's own order.
+      -- cost's {X} too, and it is asked HERE -- after the modes, before CR
+      -- 118.13a's announcement and before CR 601.2c's targets, which is 601.2b's
+      -- own order.
       --
       -- Cinder Elemental exercises it. Not asking was not a missing question but
       -- a free {X}: a ManaSymbol.Variable that survives to payment demands
@@ -370,10 +372,10 @@ activateAbility pid srcId ability = do
       --
       -- Asked with the same predicate that floor was asked with, so a gate and an
       -- announcement cannot disagree about what a cost is. That matters beyond
-      -- tidiness: CR 118.13a's Phyrexian announcement below runs on this cost, and
-      -- an X large enough to leave neither of CR 107.4f's routes payable would
-      -- leave Mana.announcePhyrexian with no offer to make. This gate is what
-      -- keeps that arm out of reach from here (#417).
+      -- tidiness: CR 118.13a's announcement below runs on this cost, and an X
+      -- large enough to leave neither of CR 107.4f's routes payable would leave
+      -- Mana.announce with no offer to make. This gate is what keeps that arm out
+      -- of reach from here (#417).
       --
       -- Reject-not-repair, the posture every other step here takes: the
       -- announcement is NOT clamped to affordableX -- CR 601.2b lets the player
@@ -396,7 +398,8 @@ activateAbility pid srcId ability = do
           -- offer routes against a total this engine never computes.
           --
           -- Run on the cost carrying the ANNOUNCED value, which is CR 601.2b's own
-          -- order (the value of X precedes the Phyrexian announcement).
+          -- order (the value of X precedes the hybrid and Phyrexian
+          -- announcements).
           announcedCost <- Cost.announce pid srcId id announcedAtX
           let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
           chosen <-

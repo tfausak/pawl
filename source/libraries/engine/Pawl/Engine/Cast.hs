@@ -769,10 +769,10 @@ castProposed pid sid face castFrom candidates before = do
               --
               -- Asked with the same predicate the floor was asked with, so a gate
               -- and an announcement cannot disagree about what a cost is. That
-              -- matters beyond tidiness: CR 118.13a's Phyrexian announcement below
-              -- runs on this cost, and on a {X}{G/P} (Corrosive Gale) a large
-              -- enough X leaves NEITHER of CR 107.4f's two routes payable --
-              -- whereupon Mana.announcePhyrexian would have to invent an offer.
+              -- matters beyond tidiness: CR 118.13a's announcement below runs on
+              -- this cost, and on a {X}{G/P} (Corrosive Gale) a large enough X
+              -- leaves NEITHER of CR 107.4f's two routes payable -- whereupon
+              -- Mana.announce would have to invent an offer.
               --
               -- Reject-not-repair: the announcement is NOT clamped to affordableX
               -- (CR 601.2b lets the player name the value freely), it is honoured
@@ -788,9 +788,10 @@ castProposed pid sid face castFrom candidates before = do
               if not (payableCost pid sid gs announcedAtX)
                 then reject
                 else do
-                  -- CR 601.2b's own order puts the Phyrexian announcement AFTER
-                  -- the value of X and before CR 601.2c's targets; CR 118.13a is
-                  -- what forbids deferring it to payment time.
+                  -- CR 601.2b's own order puts the hybrid and Phyrexian
+                  -- announcements AFTER the value of X and before CR 601.2c's
+                  -- targets; CR 118.13a is what forbids deferring them to payment
+                  -- time.
                   --
                   -- Cost.totalMana is handed in so that the routes offered are the
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
