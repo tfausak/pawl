@@ -83,7 +83,14 @@ resolveTopWith runSubgame = do
                           -- CR 303.4: an Aura ENTERS attached, so the target is
                           -- seeded into the new incarnation rather than written
                           -- after the move (see Event.changeZoneAttaching).
-                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped
+                          --
+                          -- No entry controller, here or in the non-Aura branch
+                          -- above: CR 110.2b makes a permanent spell's default
+                          -- controller the player who put it onto the stack, and
+                          -- that is Object.owner for every spell in the pool --
+                          -- nothing here lets a player cast a card they do not
+                          -- own, so the two readings coincide (#83).
+                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped Nothing
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}

@@ -2325,12 +2325,12 @@ controlOverrides gs =
 -- entered under (CR 110.2), and a card that has no controller at all uses its
 -- owner (CR 108.4a).
 --
--- Object.enteredUnder is written only by Replacement's CR 616.1b rewrite and is
--- Nothing on every other object, so for the whole pool bar Gather Specimens'
--- victims this is the owner it always was.
+-- Object.enteredUnder is written only for a BATTLEFIELD entry, and only by the
+-- two writers CR 110.2a names (see Pawl.Types.Object), so it is Nothing on every
+-- card outside the battlefield and this is the owner CR 108.4a asks for.
 --
--- On the hot path (#582): controllerOfGiven runs once per battlefield object
--- inside `controls`, which the SBA sweep calls at every priority boundary. The one
+-- On the hot path: controllerOfGiven runs once per battlefield object inside
+-- `controls`, which the SBA sweep calls at every priority boundary. The one
 -- Maybe match measured inside the benchmark suite's run-to-run stddev.
 defaultControllerOf :: Object.Object -> PlayerId.PlayerId
 defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)

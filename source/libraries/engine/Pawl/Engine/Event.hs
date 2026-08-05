@@ -227,15 +227,17 @@ createEmblem pid card =
 changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
--- changeZoneReturning for a move whose effect says how the object ENTERS (CR
--- 110.5b) rather than taking the rule's default.
+-- changeZoneReturning for a move whose effect says how the object ENTERS -- CR
+-- 110.5b's tap state, and CR 110.2a's controller -- rather than taking the
+-- rules' defaults.
 --
 -- A separate door rather than a fifth parameter on changeZone, as changeZoneInBatch
 -- is: the ~30 callers moving under the default have no tap state to name. Handed
 -- to the funnel rather than applied after it, so a permanent an effect says is
--- tapped is never untapped for an instant -- CR 614.1c's entry replacements run
--- inside this call.
-changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Game (Maybe ObjectId)
+-- tapped is never untapped for an instant, and so a permanent an effect says
+-- enters under someone's control never belongs to its owner for an instant --
+-- CR 614.1c's entry replacements run inside this call and read both.
+changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
 changeZoneEntering oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
@@ -246,14 +248,14 @@ changeZoneEntering oid requestedDest = changeZoneAttaching Nothing oid requested
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped Nothing)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -266,9 +268,12 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- 704.5m -- where CR 303.4g says it should instead stay in its current zone (#188).
 --
 -- `asOf` is changeZoneInBatch's batch board, Nothing otherwise. `tapped` is CR
--- 110.5b's status, Untapped for every door but changeZoneEntering.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest seed tapped = do
+-- 110.5b's status, Untapped for every door but changeZoneEntering. `under` is CR
+-- 110.2a's entry controller, Nothing for every door but changeZoneEntering --
+-- and Nothing there too for a move whose effect names no player, which by CR
+-- 110.2 and CR 108.4a leaves the owner answering.
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest seed tapped under = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -323,6 +328,28 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
         Nothing -> pure Nothing
         Just settled -> do
           let dest = ZoneChange.to settled
+              -- CR 110.2a: "If an effect instructs a player to put an object onto
+              -- the battlefield, that object enters the battlefield under that
+              -- player's control unless the effect states otherwise." That
+              -- control is BASE STATE -- CR 110.2 makes the entry controller a
+              -- permanent's default controller thereafter, which is what
+              -- Projection.defaultControllerOf reads -- and not a CR 613.1b
+              -- layer-2 effect, which is the distinction CR 800.4c draws and
+              -- which decides whether CR 800.4a's second clause can end it
+              -- (Pawl.DepartureSpec's Meandering Towershell case is the proof).
+              --
+              -- BATTLEFIELD ONLY, the rule's own scope (CR 110.2, CR 110.5d):
+              -- Projection.controllerOf answers for an object in any zone, so an
+              -- ungated write would give a graveyard card a controller.
+              --
+              -- Gated on the SETTLED destination rather than the requested one,
+              -- so a CR 616.1 rewrite that redirects the move decides this too
+              -- (CR 614.6: the modified event is what happens). Indistinguishable
+              -- from gating on the request today, and not because of a claim
+              -- about Magic: no ReplacementEffect.ZoneChangeR in the pool names
+              -- the battlefield as its destination (Leyline of the Void and Rest
+              -- in Peace, the two that exist, both name exile).
+              --
               -- CR 400.7: Object.newIncarnation is the whole forgetting -- the
               -- entry controller (CR 110.2), the as-enters choices (CR 614.1c),
               -- damage, counters, bindings and the rest all go back to their
@@ -330,8 +357,8 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
               -- a library call the same function. What is set back here is only
               -- what this MOVE decides: the destination, CR 613.7d's moment of
               -- entry, CR 110.5b's "enters tapped" (meaningful only for a
-              -- battlefield destination, CR 110.5a), and CR 701.3's
-              -- attach-on-entry seed.
+              -- battlefield destination, CR 110.5a), CR 110.2a's entry
+              -- controller, and CR 701.3's attach-on-entry seed.
               --
               -- `face` is among what newIncarnation clears, which is right for
               -- the one layout that ships: whichever half CR 709.3b singled out
@@ -348,7 +375,8 @@ changeZoneAttaching asOf oid requestedDest seed tapped = do
                   { Object.zone = dest,
                     Object.timestamp = ts,
                     Object.tapped = tapped,
-                    Object.attachedTo = seed
+                    Object.attachedTo = seed,
+                    Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing
                   }
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g

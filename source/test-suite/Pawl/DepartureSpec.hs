@@ -2,10 +2,14 @@
 -- consequences of leaving it.
 module Pawl.DepartureSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
@@ -15,19 +19,63 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
+import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import Pawl.Types.Printing (Printing)
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
+
+-- bob's Meandering Towershell, stolen by alice's Control Magic, on a board that
+-- has not started its first turn -- so alice's own untap step is what writes CR
+-- 302.6's continuity claim for the creature she has taken (Engine.settleAll),
+-- and no fixture hand-stamps it. `base` is the seating: the same line of play
+-- runs at three seats and at two.
+--
+-- Both libraries are stocked well past the draws the four turns below take, so
+-- CR 104.3c cannot end the game before the departure under test.
+stolenTowershellBoard :: GameState.GameState -> Printing -> Printing -> Printing -> GameState.GameState
+stolenTowershellBoard base towershell controlMagic island =
+  let (turtle, g1) = S.addCreature towershell S.bob base
+      (aura, g2) = S.addCreature controlMagic S.alice g1
+      g3 = S.attach aura turtle g2
+      stock g pid = List.foldl' (\h _ -> snd (S.addLibraryCard island pid h)) g [1 :: Int .. 12]
+   in List.foldl' stock g3 (GameState.turnOrder g3)
+
+-- The one object in the game made from this printing, with its id -- which CR
+-- 400.7 changes at every zone change, so the id the fixture handed out is gone
+-- by the time the Towershell has been exiled and returned. Both cards the
+-- fixture puts into play are one-of-a-kind, so the printing names them
+-- unambiguously.
+soleObjectOf :: Printing -> GameState.GameState -> Maybe (ObjectId, Object.Object)
+soleObjectOf printing gs =
+  List.find (\(_, obj) -> Object.source obj == Source.OfCard printing) (Map.toList (GameState.objects gs))
+
+-- Run whole steps until the board is at `phase` on turn `turn`, WITHOUT running
+-- that step. Bounded so a bug cannot loop forever; stops on a finished game.
+-- Pawl.TriggerSpec and Pawl.CombatSpec have the same helper for the same card,
+-- kept local to each group per the suite's convention.
+runToTurnStep :: Natural -> Phase.Phase -> GameState.GameState -> GameState.GameState
+runToTurnStep turn phase gs0 =
+  let go n g =
+        if n <= (0 :: Int)
+          || Maybe.isJust (GameState.result g)
+          || (GameState.turnNumber g == turn && GameState.phase g == phase)
+          then g
+          else go (n - 1) (snd (Engine.runGamePure S.aggressiveAnswer g Engine.runStep))
+   in go 128 gs0
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
@@ -308,3 +356,66 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "so the static ability now grants the creature to alice" (Projection.controllerOf creature after) (Just S.alice)
     Spec.assertEqWith s "neither was exiled: nothing was still controlled by bob" (fmap Object.zone (Game.lookupObject aura after), fmap Object.zone (Game.lookupObject creature after)) (Just Zone.Battlefield, Just Zone.Battlefield)
     Spec.assertEqWith s "bob controls nothing" (Projection.controls S.bob after) []
+
+  -- CR 800.4a's FOURTH clause with a real producer at last. CR 110.2a:
+  -- "If an effect instructs a player to put an object onto the battlefield, that
+  -- object enters the battlefield under that player's control unless the effect
+  -- states otherwise." That control is BASE STATE, not an ongoing effect -- the
+  -- one-shot that put the permanent there has finished resolving, and CR 110.2's
+  -- "a permanent's controller is, by default, the player under whose control it
+  -- entered the battlefield" is what answers thereafter. So CR 800.4a's second
+  -- clause has no effect to end, the permanent is still the departing player's
+  -- when the fourth clause looks, and the fourth clause exiles it.
+  --
+  -- The line of play, entirely through the engine: bob owns a Meandering
+  -- Towershell, alice steals it with Control Magic, and alice's untap step
+  -- settles it for her (CR 302.6). She attacks with it; its own trigger exiles
+  -- it, which leaves the Aura attached to nothing and CR 704.5m buries it, so no
+  -- control-granting effect of any kind survives the turn. The delayed ability
+  -- alice controls returns the Towershell "to the battlefield under your
+  -- control" at her next turn's declare attackers step (CR 603.7b), and CR
+  -- 110.2a is then the WHOLE of why she controls a creature bob owns. Then she
+  -- leaves.
+  Spec.it s "CR 800.4a/110.2a a permanent that entered under the departing player's control is exiled, not returned to its owner" $ do
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    island <- S.printingOf s registry "Island"
+    let board = stolenTowershellBoard S.threePlayerGame towershell controlMagic island
+        -- alice's turns are 1 and 4 with three seats, so turn 4's declare
+        -- attackers step is the one "your next turn" names.
+        returned = runToTurnStep 4 (Phase.Combat CombatStep.DeclareBlockers) board
+        after = S.runPure S.identityAnswer returned (Departure.leaveGame Departure.Type.Conceded S.alice)
+        beforeTurtle = soleObjectOf towershell returned
+        afterTurtle = soleObjectOf towershell after
+    -- The setup half, asserted BEFORE the departure so the case cannot pass by
+    -- the Towershell never having come back: "not on the battlefield" is also
+    -- true of a creature still sitting in exile from its own attack trigger.
+    Spec.assertEqWith s "the Towershell came back on alice's next turn, still owned by bob" (fmap (\(_, obj) -> (Object.zone obj, Object.owner obj)) beforeTurtle) (Just (Zone.Battlefield, S.bob))
+    Spec.assertEqWith s "and alice controls it -- by CR 110.2a alone" (fmap (\(oid, _) -> Projection.controllerOf oid returned) beforeTurtle) (Just (Just S.alice))
+    Spec.assertEqWith s "the Control Magic is not what says so -- CR 704.5m buried it when the exile unattached it" (fmap (Object.zone . snd) (soleObjectOf controlMagic returned)) (Just Zone.Graveyard)
+    -- The rule under test.
+    Spec.assertEqWith s "alice leaving EXILES it (CR 800.4a's fourth clause)" (fmap (Object.zone . snd) afterTurtle) (Just Zone.Exile)
+    Spec.assertEqWith s "and exile really holds it -- not merely absent from the battlefield" (fmap (\(oid, _) -> List.elem oid (Game.zoneMembers Zone.Exile S.bob after)) afterTurtle) (Just True)
+    Spec.assertEqWith s "so it did NOT snap back to bob on the battlefield" (fmap (\(oid, _) -> Set.member oid (GameState.battlefield after)) afterTurtle) (Just False)
+    Spec.assertEqWith s "CR 104.2a: bob and carol are still playing, so the game continues" (GameState.result after) Nothing
+    Spec.assertEqWith s "and alice controls nothing" (Projection.controls S.alice after) []
+
+  -- The two-seat control for the case above, and the reason it needs three seats
+  -- at all: CR 800.1 makes a game that begins with two players not a multiplayer
+  -- game, and CR 104.2a ends it the moment alice leaves, so
+  -- continuesAfterDeparture skips the whole of CR 800.4a. The SAME fixture and
+  -- the SAME line of play -- alice's next turn is turn 3 rather than turn 4,
+  -- since there is no carol between them -- leaves the Towershell on the
+  -- battlefield.
+  Spec.it s "CR 800.1/104.2a two seats: the same departure ends the game instead of running CR 800.4a" $ do
+    towershell <- S.printingOf s registry "Meandering Towershell"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    island <- S.printingOf s registry "Island"
+    let board = stolenTowershellBoard (Setup.emptyGame S.bothPlayers) towershell controlMagic island
+        returned = runToTurnStep 3 (Phase.Combat CombatStep.DeclareBlockers) board
+        after = S.runPure S.identityAnswer returned (Departure.leaveGame Departure.Type.Conceded S.alice)
+    Spec.assertEqWith s "the same return happened" (fmap (Object.zone . snd) (soleObjectOf towershell returned)) (Just Zone.Battlefield)
+    Spec.assertEqWith s "under alice, the same way" (fmap (\(oid, _) -> Projection.controllerOf oid returned) (soleObjectOf towershell returned)) (Just (Just S.alice))
+    Spec.assertEqWith s "the seam says CR 800.4a does not run" (Departure.continuesAfterDeparture returned) False
+    Spec.assertEqWith s "so bob simply wins (CR 104.2a)" (GameState.result after) (Just (Result.Won S.bob))
+    Spec.assertEqWith s "and the Towershell is not exiled" (fmap (Object.zone . snd) (soleObjectOf towershell after)) (Just Zone.Battlefield)

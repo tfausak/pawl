@@ -3295,7 +3295,7 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
   -- bob OWNS it; alice steals it and attacks. The steal is Expiry.AtCleanup, so
   -- it is long gone by the return turn -- and it never applied to the returning
   -- incarnation anyway, since CR 400.7 mints a fresh id. So alice controlling
-  -- what comes back can only be the entry rider.
+  -- what comes back can only be CR 110.2a's entry controller.
   Spec.it s "CR 110.2 a Towershell its attacker does not own returns under the ATTACKER's control" $ do
     towershell <- S.printingOf s registry "Meandering Towershell"
     island <- S.printingOf s registry "Island"
@@ -3326,11 +3326,12 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
             -- attacking must be the ACTIVE player's, so getting the control
             -- wrong would also have left it not attacking at all.
             Spec.assertBool s (Map.member back (Combat.Type.attackers (GameState.combat atReturn))) "and it is attacking"
-            -- CR 611.2a: the control has no stated end, so it is Expiry.Never
-            -- and survives the cleanup step. Read a turn later, which is what
-            -- separates it from the AtCleanup the test fixture's own steal uses:
-            -- with any turn-scoped expiry the Towershell would revert to bob
-            -- here, and every assertion above would still have passed.
+            -- Entering under someone's control is BASE state (CR 110.2), not a
+            -- continuous effect, so there is no duration for a cleanup step to
+            -- run out. Read a turn later, which is what separates it from the
+            -- AtCleanup the test fixture's own steal uses: were this carried by
+            -- any turn-scoped effect the Towershell would revert to bob here,
+            -- and every assertion above would still have passed.
             let laterTurn = runToTurnStep 4 Phase.PostcombatMain S.aggressiveAnswer atReturn
             Spec.assertEqWith s "and alice still controls it a turn later" (Projection.controllerOf back laterTurn) (Just S.alice)
           other -> Spec.assertFailure s ("expected one returned Towershell, got " <> show (length other))
