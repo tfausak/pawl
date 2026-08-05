@@ -1488,6 +1488,34 @@ bobPaysAnswer p = case p of
         PaymentDecision.Pays
   _ -> S.identityAnswer p
 
+-- manaLeakBoard with a Thalia on bob's side and one more Island each. alice
+-- needs the third Island because Thalia taxes HER cast (CR 601.2f), which is
+-- what makes the case below a paired assertion rather than one; bob needs three
+-- untapped Islands and no more, so a gate cost routed through that same rule
+-- would be one mana short.
+--
+-- Thalia is added BEFORE the Piker, so the Piker still holds the lower stack id
+-- and the Leak is aimed as manaLeakBoard describes.
+thaliaLeakBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+thaliaLeakBoard island thalia manaLeak piker =
+  let base = S.landsInPlay island 3
+      (_thaliaId, withThalia) = S.addCreature thalia S.bob base
+      withBob = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) withThalia [1 .. 3 :: Int]
+      (victimId, onStack) = S.spellOnStack piker S.bob withBob
+      (gs, leakId) = S.handOne manaLeak onStack
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId))
+   in (victimId, cast)
+
+-- Aims a target choice at the lowest-id legal recipient that is NOT `notThis`,
+-- and takes the identity fallback elsewhere. What lets bob's Cancel name alice's
+-- Mana Leak: identityAnswer would take Set.lookupMin over the whole stack and hit
+-- the Piker, which was there first.
+targetOtherThan :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+targetOtherThan notThis p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    Map.mapMaybe (Set.lookupMin . Set.filter (\r -> Recipient.objectOf r /= Just notThis)) sets
+  _ -> S.identityAnswer p
+
 -- The pay-or-not answers in a transcript, in order.
 payResponses :: [Response.Response] -> [Response.Response]
 payResponses = filter isPayResponse
@@ -1558,6 +1586,56 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     Spec.assertEqWith s "the Piker was countered into bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
     Spec.assertEqWith s "and never reached the battlefield" (S.creaturesInPlay S.bob after) 0
     Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  -- CR 601.2f totals the cost of a spell being CAST -- "the player determines the
+  -- total cost of the spell ... plus all additional costs and cost increases" --
+  -- and a cost paid during resolution is not that, so no cost increase reaches
+  -- it. ONE Thalia proves both halves at once: bob's tax is live enough to make
+  -- alice spend a third Island casting the Leak, and it still leaves the {3} at
+  -- {3}. Routed through Cost.total, the gate would ask for {4}, bob's three
+  -- Islands would fail CR 118.3, and he would never be asked at all.
+  Spec.it s "CR 601.2f a cost increase taxes the CAST and not the resolution payment" $ do
+    island <- S.printingOf s registry "Island"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (victimId, cast) = thaliaLeakBoard island thalia manaLeak piker
+    -- The control, and the half that must NOT change: Thalia is on the
+    -- battlefield and taxing. Mana Leak is {1}{U}, so an untaxed cast leaves an
+    -- Island untapped and this reads 2.
+    Spec.assertEqWith s "Thalia taxed alice's cast: all three of her Islands paid {2}{U}" (S.tappedCount S.alice cast) 3
+    let ((_, after), transcript) = Replay.record bobPaysAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "bob was asked, so {3} was still payable" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- Three, not four: the same Thalia that just cost alice an Island adds
+    -- nothing here. Thalia herself is untapped, so this counts Islands only.
+    Spec.assertEqWith s "and {3} cost bob exactly three Islands" (S.tappedCount S.bob after) 3
+    Spec.assertBool s (elem victimId (GameState.stack after)) "the Piker was not countered"
+    Spec.assertEqWith s "Mana Leak finished resolving into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  -- CR 608.2d's timing, from the other side of Prompt.ChooseToPay's claim that a
+  -- countered Mana Leak never asks: the cost is offered when the spell RESOLVES,
+  -- so a spell that never resolves offers nothing. The MagicalHackTiming pair
+  -- makes the same argument about a resolution-time choice.
+  Spec.it s "CR 608.2d a countered Mana Leak never offers its cost" $ do
+    island <- S.printingOf s registry "Island"
+    manaLeak <- S.printingOf s registry "Mana Leak"
+    piker <- S.printingOf s registry "Goblin Piker"
+    cancel <- S.printingOf s registry "Cancel"
+    -- SIX Islands for bob, not three: three pay Cancel's {1}{U}{U} and three are
+    -- left over. Without the spare three he could not have paid {3} anyway, and
+    -- an empty transcript would prove nothing (CR 118.3 would be the reason).
+    let (victimId, cast) = manaLeakBoard island manaLeak piker 6
+        (cancelId, withCancel) = S.addHandCard cancel S.bob cast
+        -- The Piker is the lowest-id spell on the stack, so identityAnswer would
+        -- aim Cancel at IT; this aims at the next one up, which is the Leak.
+        countered = snd (Engine.runGamePure (targetOtherThan victimId) withCancel (S.cast S.bob cancelId))
+        ((_, after), transcript) = Replay.record bobPaysAnswer countered Stack.resolveTop
+    Spec.assertEqWith s "bob was never offered the {3}" (payResponses transcript) []
+    -- And not because he could not have paid it: three Islands are still
+    -- untapped. Had the Leak resolved, bobPaysAnswer would have spent them and
+    -- this would read 6.
+    Spec.assertEqWith s "only Cancel's three Islands are tapped" (S.tappedCount S.bob after) 3
+    Spec.assertEqWith s "CR 701.6a: the countered Leak is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "CR 608.2n: Cancel resolved into bob's" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertBool s (elem victimId (GameState.stack after)) "and the Piker, never the Leak's business again, is still on the stack"
 
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
 -- added FIRST, so it holds the lowest object id and identityAnswer's
