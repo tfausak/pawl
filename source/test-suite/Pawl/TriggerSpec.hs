@@ -912,7 +912,7 @@ delayedSpec s registry =
         -- direction (`Map.union captured placementTime`) the captured {7} would
         -- win instead, and this assertion would fail.
         Spec.it s "CR 603.7c placement-time's own chosen mode wins a collision with the captured environment" $ do
-          let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty, Mode.optionality = Optionality.Mandatory}
+          let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty, Mode.optionality = Optionality.Mandatory, Mode.unlessPaid = Nothing}
               ability =
                 TriggeredAbility.MkTriggeredAbility
                   { TriggeredAbility.condition = TriggerCondition.SelfEnters,
@@ -2396,6 +2396,108 @@ graveyardTriggerSpec s registry =
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
           Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents entered) entered))) []
 
+-- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), second line: "When
+-- Serra Avatar is put into a graveyard from anywhere, shuffle it into its
+-- owner's library." Oracle text verified against Scryfall. Its first line, the
+-- CR 604.3 life-total P/T, is Pawl.PowerToughnessSpec's half.
+--
+-- CR 603.6c's LAST sentence is the whole reason this is a condition of its own:
+-- "An ability that triggers when a card is put into a certain zone 'from
+-- anywhere' is never treated as a leaves-the-battlefield ability, even if an
+-- object is put into that zone from the battlefield." Two things follow that
+-- SelfDies gets the other way round, and the tests below are built to tell them
+-- apart:
+--
+--   * a NON-battlefield origin fires it. A discarded or milled Serra Avatar
+--     never left the battlefield, and encoding this trigger as SelfDies would
+--     leave it in the graveyard.
+--   * no CR 603.10a look-back. Not being a leaves-the-battlefield ability, this
+--     condition is absent from that rule's list of exceptions, so CR 603.10's
+--     normal reading applies and the bearer is the CR 400.7 incarnation that
+--     ARRIVED in the graveyard -- which is also the card the shuffle has to move,
+--     so "self" names it directly and no `became` slot is needed.
+--
+-- CR 113.6k puts the ability in the graveyard, exactly as it does Narcomoeba's
+-- above, and for a nearer reason: this condition can never trigger with its
+-- bearer on the battlefield, however the card got to the graveyard.
+serraAvatarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+serraAvatarSpec s registry =
+  let avatarName = CardName.MkCardName (Text.pack "Serra Avatar")
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+      -- Settle so any trigger reaches the stack, then resolve it.
+      fireTrigger gs =
+        let placed = S.runPure S.identityAnswer gs Engine.settleForPriority
+         in (placed, S.runPure S.identityAnswer placed Stack.resolveTop)
+      -- One Serra Avatar in a zone of alice's, with priority so
+      -- Engine.settleForPriority has somewhere to give it.
+      cardIn place = do
+        avatar <- S.printingOf s registry "Serra Avatar"
+        let (oid, gs) = place avatar S.alice (Setup.emptyGame S.bothPlayers)
+        pure (oid, gs {GameState.priority = Just S.alice})
+   in Spec.describe s "Serra Avatar" $ do
+        -- The gameplay-level proof, cast to resolution: alice Murders her own
+        -- Avatar. S.identityAnswer targets the least Recipient and
+        -- Recipient.ToCreature sorts before Recipient.ToPlayer, so the one
+        -- creature on the board is the target without a bespoke interpreter.
+        Spec.it s "CR 603.6 whole card: a Murdered Serra Avatar shuffles itself into its owner's library" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          murder <- S.printingOf s registry "Murder"
+          avatar <- S.printingOf s registry "Serra Avatar"
+          let (gs0, spellId) = S.handOne murder (S.landsInPlay swamp 3)
+              (_, board) = S.addCreature avatar S.alice gs0
+              cast = S.runPure S.identityAnswer board (S.cast S.alice spellId)
+              died = S.runPure S.identityAnswer cast Stack.resolveTop
+              (placed, after) = fireTrigger died
+          Spec.assertBool s (Set.member avatarName (namesIn Zone.Graveyard S.alice died)) "it died into the graveyard"
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member avatarName (namesIn Zone.Library S.alice after)) "and CR 701.24 put it into its owner's library"
+          Spec.assertBool s (not (Set.member avatarName (namesIn Zone.Graveyard S.alice after))) "leaving the graveyard"
+        -- "FROM ANYWHERE" doing real work, half one, and the falsifier for
+        -- encoding this trigger as SelfDies: a discarded Serra Avatar never
+        -- touched the battlefield, and CR 700.4's "dies" would have nothing to
+        -- say about it.
+        Spec.it s "CR 603.6 a Serra Avatar put into the graveyard from the HAND triggers" $ do
+          (handCard, gs) <- cardIn S.addHandCard
+          let discarded = S.runPure S.identityAnswer gs (Event.changeZone handCard Zone.Graveyard)
+              (placed, after) = fireTrigger discarded
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member avatarName (namesIn Zone.Library S.alice after)) "it is in its owner's library"
+          Spec.assertBool s (not (Set.member avatarName (namesIn Zone.Graveyard S.alice after))) "and no longer in the graveyard"
+        -- Half two, and the falsifier for the other direction -- collapsing this
+        -- condition into Narcomoeba's SelfPutIntoGraveyardFromLibrary. A mill
+        -- fires BOTH conditions; the hand case above is what only this one sees.
+        Spec.it s "CR 603.6 a Serra Avatar milled from the LIBRARY triggers" $ do
+          (libraryCard, gs) <- cardIn S.addLibraryCard
+          let milled = S.runPure S.identityAnswer gs (Event.changeZone libraryCard Zone.Graveyard)
+              (placed, after) = fireTrigger milled
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member avatarName (namesIn Zone.Library S.alice after)) "it is back in its owner's library"
+        -- The DESTINATION is the whole condition, so it has to be load-bearing:
+        -- an Avatar exiled off the battlefield left the battlefield just as
+        -- surely and reached no graveyard, so this must stay silent where
+        -- SelfLeavesTheBattlefield would fire.
+        --
+        -- Asserted against Event.matchesTrigger DIRECTLY, and deliberately not
+        -- through a gathered scan: an exiled card is not among the graveyard
+        -- candidates eventTriggers offers, so a scan-level assertion would pass
+        -- whether or not this condition reads the destination at all. Both
+        -- destinations are asserted from the one event shape, so the True side is
+        -- what makes the False side mean something.
+        Spec.it s "CR 603.6 only a GRAVEYARD destination matches: exile does not" $ do
+          (creature, gs) <- cardIn S.addCreature
+          let moveTo to = GameEvent.Moved (ZoneChange.MkZoneChange creature creature Zone.Battlefield to) S.emptyCharacteristics
+              matches = Event.matchesTrigger gs creature S.alice TriggerCondition.SelfPutIntoGraveyardFromAnywhere
+          Spec.assertBool s (matches (moveTo Zone.Graveyard)) "a graveyard-bound move matches"
+          Spec.assertBool s (not (matches (moveTo Zone.Exile))) "an exile-bound move does not"
+        -- The gameplay-level companion to the pair above: an Avatar exiled off
+        -- the battlefield really does leave nothing on the stack.
+        Spec.it s "CR 603.6 a Serra Avatar EXILED from the battlefield triggers nothing" $ do
+          (creature, gs) <- cardIn S.addCreature
+          let exiled = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Exile)
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents exiled) exiled))) []
+          Spec.assertBool s (Set.member avatarName (namesIn Zone.Exile S.alice exiled)) "it is in exile"
+
 -- CR 603.6c: leaves-the-battlefield abilities "trigger when a permanent moves
 -- from the battlefield to another zone ... written as, but aren't limited to,
 -- 'When [this object] leaves the battlefield, . . .' or 'Whenever [something]
@@ -2876,6 +2978,11 @@ representativeEvents cond =
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
+        -- Every origin zone is admitted, but the floor is the same for all of
+        -- them: the destination is always a graveyard, which CR 400.2 makes
+        -- public, so CR 400.7e never withholds anything and one event says as
+        -- much as any list would.
+        TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> one (moved Zone.Hand Zone.Graveyard)
         TriggerCondition.SelfDies -> one (moved Zone.Battlefield Zone.Graveyard)
         TriggerCondition.PermanentDies _ -> one (moved Zone.Battlefield Zone.Graveyard)
         -- CR 603.6c admits every destination, and CR 400.2 splits them into
@@ -2906,6 +3013,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
+    TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
@@ -3651,6 +3759,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   battleCrySpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
+  serraAvatarSpec s registry
   diesTriggerSpec s registry
   permanentDiesSpec s registry
   leavesBattlefieldSpec s registry

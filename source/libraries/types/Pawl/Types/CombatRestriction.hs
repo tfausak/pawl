@@ -4,9 +4,10 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 
 -- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an effect saying a
--- creature can't attack, or can't attack unless some condition is met -- or the
--- sentence CR 509.1b writes with "block" in place of "attack". Pacifism states
--- both in one line, and prints one of each arm below.
+-- creature can't attack, can't attack alone, or can't attack unless some
+-- condition is met, and the sentence CR 509.1b writes with "block" in place of
+-- "attack". Pacifism states two of those in one line, and prints one of each of
+-- the first two arms below.
 --
 -- The FIFTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
@@ -21,32 +22,51 @@ import qualified Pawl.Types.Condition as Condition
 -- object, and the two requirement carriers collapse opposite ones -- a blocking
 -- requirement carries the attacker to be blocked and no subject, an attacking
 -- requirement carries the subject and no object. A restriction
--- carries only the SUBJECT on BOTH sides: Pacifism's two halves are the same
--- Affected twice, so the only thing distinguishing them is which declaration
--- they forbid. Splitting them would copy the requirements' shape without the
--- reason for it.
+-- carries only the SUBJECT on every arm: Pacifism's two halves are the same
+-- Affected twice, so the only thing distinguishing THOSE TWO is which
+-- declaration they forbid. Splitting them would copy the requirements' shape
+-- without the reason for it. What tells the third arm from the first is not the
+-- declaration -- both forbid an attack -- but the shape, which is the next
+-- paragraph.
+--
+-- The arms differ in SHAPE rather than in axis, and there are two shapes. The
+-- first two are answered about ONE CREATURE, so the reader may apply them to CR
+-- 508.1a's and CR 509.1a's candidate list and never look at a declaration.
+-- CantAttackAlone cannot be: it is a fact about the whole set of creatures
+-- declared as attackers, so it is answered against the finished declaration
+-- instead. Both are restrictions of the rule they name all the same -- CR 508.1c's
+-- own Example is a "can't attack alone" board -- so they share the type rather
+-- than splitting into a second carrier.
+--
+-- A THIRD shape is not representable: a restriction bounding the SIZE of a
+-- declaration from above, which is Silent Arbiter's "no more than one creature
+-- can attack each combat". CantAttackAlone is not it turned around: it NAMES
+-- creatures and asks whether the declaration holds one of them and nothing else,
+-- where a bound names no creature at all -- and no Affected can be read as a
+-- number (#713).
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
--- split is pawl's, not the rules': this type's answer is a SET OF CREATURES that
--- may not attack, and CantAttack takes its subject off CR 508.1a's candidate
--- list entirely, where a taxed creature has to stay on it. A cost is also a
--- thing to be PAID rather than a fact to be read, and CR 508.1d makes paying it
--- optional, so it could not be a Condition.
+-- split is pawl's, not the rules': CantAttack's answer is a SET OF CREATURES that
+-- may not attack, and it takes its subject off CR 508.1a's candidate list
+-- entirely, where a taxed creature has to stay on it. CantAttackAlone does leave
+-- its subject on that list, and is no better a home: it forbids a DECLARATION,
+-- where a cost is something a declaration pays, and it says nothing about how
+-- many creatures are declared beside a taxed one. A cost is also a thing to be
+-- PAID rather than a fact to be read, and CR 508.1d makes paying it optional, so
+-- it could not be a Condition either.
 --
 -- The axis is missing rather than collapsed, and the missing capability is
 -- named: an attacking restriction with an object (Crown-Hunter Hireling, Armored
 -- Galleon) is one whose CONDITION is about the player CR 508.1b names per
--- creature, and the condition below cannot name that player (#620). A
--- restriction whose subject is a SET (Silent Arbiter) is a different shape again
--- and is not representable here (#533). A blocking restriction with an object is
--- what CR 702.9b's evasion keywords already are -- carried on the ATTACKER as a
--- keyword, never here.
+-- creature, and the condition below cannot name that player (#620). A blocking
+-- restriction with an object is what CR 702.9b's evasion keywords already are --
+-- carried on the ATTACKER as a keyword, never here.
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.CombatRestriction is the only module that may case on it. Casing
--- here is casing on which of two rulebook declarations a restriction forbids,
--- not on an effect's identity.
+-- here is casing on which rulebook declaration a restriction forbids and in what
+-- shape, not on an effect's identity.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, the
 -- posture all five siblings take -- so a Pacifism leaving the battlefield lifts
@@ -83,4 +103,19 @@ data CombatRestriction
     -- blocking restrictions; every other one today is an evasion keyword on the
     -- ATTACKER, which restricts being blocked rather than blocking.
     CantBlock Affected.Affected (Maybe Condition.Condition)
+  | -- | CR 508.1c together with CR 506.5: these creatures can't be the ONLY
+    -- creature declared as an attacker, unless the gate holds. Bonded Construct
+    -- ("This creature can't attack alone") is the pool's printing, and CR
+    -- 508.1c's own Example is a board of two of them.
+    --
+    -- Not CantAttack with a Condition, and the difference is not expressible as
+    -- one: CR 506.5's "alone" is a fact about the DECLARATION being written, and
+    -- a Condition is a predicate over game state, which at CR 508.1c time cannot
+    -- see a declaration that has not been made. That is also why this arm exists
+    -- rather than a cleverer Affected -- Affected names creatures, and no set of
+    -- creatures says "however many of you there are".
+    --
+    -- The gate beside it is the same "unless" every arm carries, and is about
+    -- game state as usual: nothing in the pool prints a gated one.
+    CantAttackAlone Affected.Affected (Maybe Condition.Condition)
   deriving (Eq, Ord, Show)

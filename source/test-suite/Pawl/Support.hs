@@ -21,7 +21,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Cards as Cards
-import qualified Pawl.Corpus as Corpus
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -40,7 +39,6 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -78,6 +76,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -141,10 +140,6 @@ fourPlayers = alice NonEmpty.:| [bob, carol, dave]
 fourPlayerGame :: GameState.GameState
 fourPlayerGame = Setup.emptyGame fourPlayers
 
--- How a spec case fetches a card: a Left becomes an assertion failure naming the
--- card, so a missing or unloadable card fails the case that wanted it rather
--- than escaping as an exception. This is the adapter for everything inside a
--- Spec.it, and the reason those modules need no IO.
 -- A throwaway directory holding `files` (name, contents), for the cases that
 -- need a corpus other than the committed one. The label keeps concurrently
 -- running cases in separate directories, since tasty runs them in parallel.
@@ -179,12 +174,16 @@ waxWaneJson = do
 printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
 printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
 
+-- How a spec case fetches a card: a Nothing becomes an assertion failure naming
+-- the card, so a missing card fails the case that wanted it rather than
+-- escaping as an exception. This is the adapter for everything inside a
+-- Spec.it, and the reason those modules need no IO.
 cardOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Card.Type.Card
 cardOf s registry name = do
   result <- Registry.named registry name
   case result of
-    Left err -> Spec.assertFailure s (show err)
-    Right card -> pure card
+    Nothing -> Spec.assertFailure s ("no such card: " <> name)
+    Just card -> pure card
 
 redRed :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed fetch = do
@@ -236,6 +235,7 @@ identityAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   -- CR 508.1b: the defending player, which Combat.attackTargets puts first --
@@ -288,9 +288,15 @@ identityAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -306,6 +312,7 @@ castAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -354,9 +361,15 @@ castAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -376,6 +389,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -413,9 +427,15 @@ aggressiveAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -461,6 +481,7 @@ playLandAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -506,9 +527,15 @@ playLandAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -535,7 +562,8 @@ addCreature printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -675,6 +703,13 @@ performer = Resolve.performHandAction
 -- The source stand-in for a targeting call whose spec is source-blind (every
 -- spec but OpponentCreatureTarget). Object id 999 names nothing, the same
 -- posture withEffectAt's 998 takes.
+--
+-- SOURCE-BLIND is now a claim about the BOARD as well as about the spec: CR
+-- 702.11d's "hexproof from [quality]" makes Target.legalRecipients read the
+-- source's characteristics, and this id has none to read, so every quality is
+-- vacuously unmatched. A case that puts such a candidate on the board must pass a
+-- real object (S.spellOnStack) or it passes for the wrong reason -- see
+-- Pawl.TargetSpec's rule 702.11d cases, which do.
 noSource :: ObjectId.ObjectId
 noSource = ObjectId.MkObjectId 999
 
@@ -731,7 +766,8 @@ addToken card pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -762,7 +798,8 @@ addLibraryCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -793,7 +830,8 @@ addGraveyardCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -831,7 +869,8 @@ addExiledCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -876,7 +915,8 @@ addHandCard printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -924,7 +964,8 @@ landsInPlay land n =
                   Object.chosenNames = Set.empty,
                   Object.timestamp = ts,
                   Object.face = Nothing,
-                  Object.playableFromExileBy = Nothing
+                  Object.playableFromExileBy = Nothing,
+                  Object.ringBearerFor = Nothing
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -954,7 +995,8 @@ handOne printing base =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -990,7 +1032,8 @@ pikerInHand land piker n ph =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       gs3 =
         gs2
@@ -1398,11 +1441,14 @@ handSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
 
 -- LABELED SYNTHETIC: an emblem's characteristics are only its abilities (CR
--- 114.3), but no printing in the pool mints one -- Jace Beleren's abilities do
--- not create emblems -- so tests use this
--- fixture -- an Elspeth-style anthem, "creatures you control get +1/+1". Built
--- by overriding a vanilla card's static abilities; the residual printed fields
--- are inert for a command-zone object (never projected as a permanent). (#125)
+-- 114.3), and no emblem in the pool HAS any. Birthday Escape mints a real one
+-- (CR 701.54c's The Ring), so the pool no longer lacks an emblem PRODUCER -- but
+-- that emblem's four abilities have no carrier, so its static ability list is
+-- empty and it cannot show that Projection.gather reads one from the command
+-- zone. Hence this fixture -- an Elspeth-style anthem, "creatures you control get
+-- +1/+1". Built by overriding a vanilla card's static abilities; the residual
+-- printed fields are inert for a command-zone object (never projected as a
+-- permanent). (#125)
 anthemEmblemCard :: Printing.Printing -> Card.Type.Card
 anthemEmblemCard piker =
   let card = Printing.card piker
@@ -1413,6 +1459,7 @@ anthemEmblemCard piker =
                   { StaticAbility.affected =
                       Affected.Matching
                         (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You]),
+                    StaticAbility.condition = Nothing,
                     StaticAbility.modifications =
                       NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1))
                   }
@@ -1452,7 +1499,8 @@ oneMountainState mountain ph =
             Object.chosenNames = Set.empty,
             Object.timestamp = Timestamp.MkTimestamp 0,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1486,6 +1534,7 @@ oneMountainState mountain ph =
           GameState.restartSignal = RestartSignal.Playing,
           GameState.nextObjectId = ObjectId.MkObjectId 1,
           GameState.nextTimestamp = Timestamp.MkTimestamp 1,
+          GameState.lastChoice = Timestamp.MkTimestamp 0,
           GameState.drewFromEmpty = mempty,
           GameState.landPlayed = mempty,
           GameState.pendingControl = Map.empty,
@@ -1582,7 +1631,8 @@ spellOnStack printing pid gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( oid,
         gs2
@@ -1636,15 +1686,6 @@ stubView table oid =
               }
         [] -> Nothing
 
--- Every card file in the bundled corpus, by slug. The corpus-wide checks need
--- the directory listing rather than a hand-kept list: a file nobody loads is
--- exactly the file a hand-kept list forgets. Kept as a String list because that
--- is what the sweeps feed back to a lookup.
-corpusSlugs :: IO [String]
-corpusSlugs = do
-  root <- Registry.defaultRoot
-  fmap (fmap (Text.unpack . Slug.unwrap)) (Corpus.slugsIn root)
-
 -- Every card pawl ships, or a failure naming every file that would not load.
 --
 -- Takes no registry: the lint is about the BUNDLED corpus by definition, so
@@ -1653,7 +1694,7 @@ corpusSlugs = do
 allPrintings :: Spec.Spec IO n -> IO [Printing.Printing]
 allPrintings s = do
   root <- Registry.defaultRoot
-  loaded <- Corpus.loadAll root
-  case [err | (_, Left err) <- loaded] of
+  loaded <- Registry.loadRoot root
+  case [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded] of
     [] -> pure [Printing.MkPrinting card | (_, Right card) <- loaded]
-    errs -> Spec.assertFailure s (List.intercalate "\n" (fmap show errs))
+    errs -> Spec.assertFailure s (List.intercalate "\n" errs)

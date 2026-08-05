@@ -25,7 +25,12 @@ toJson k = case k of
   Keyword.Flash -> Common.nullary "Flash"
   Keyword.Flying -> Common.nullary "Flying"
   Keyword.Haste -> Common.nullary "Haste"
-  Keyword.Hexproof -> Common.nullary "Hexproof"
+  -- CR 702.11b encodes as the bare tag and CR 702.11d as the tag plus its
+  -- quality, rather than both carrying an explicit null: rule 702.11b's ability
+  -- takes no parameter, so the card that prints it should say no more than
+  -- Shroud's does, and `asTagged` reports an absent "value" as Nothing anyway.
+  Keyword.Hexproof Nothing -> Common.nullary "Hexproof"
+  Keyword.Hexproof (Just quality) -> Common.tagged "Hexproof" . Just $ Filter.toJson toJson quality
   Keyword.Indestructible -> Common.nullary "Indestructible"
   Keyword.Landwalk criterion -> Common.tagged "Landwalk" . Just $ Filter.toJson toJson criterion
   Keyword.Lifelink -> Common.nullary "Lifelink"
@@ -55,7 +60,8 @@ fromJson value = do
     ("Flash", _) -> Right Keyword.Flash
     ("Flying", _) -> Right Keyword.Flying
     ("Haste", _) -> Right Keyword.Haste
-    ("Hexproof", _) -> Right Keyword.Hexproof
+    ("Hexproof", Just v) -> Keyword.Hexproof . Just <$> Filter.fromJson fromJson v
+    ("Hexproof", Nothing) -> Right (Keyword.Hexproof Nothing)
     ("Indestructible", _) -> Right Keyword.Indestructible
     ("Landwalk", Just v) -> Keyword.Landwalk <$> Filter.fromJson fromJson v
     ("Lifelink", _) -> Right Keyword.Lifelink

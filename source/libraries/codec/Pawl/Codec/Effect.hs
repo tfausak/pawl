@@ -47,6 +47,7 @@ toJson codec e = case e of
   Effect.Search f d -> Common.tagged "Search" (Just (Common.array [Filter.toJson Keyword.toJson f, SearchDestination.toJson d]))
   Effect.ExileAllGraveyards -> Common.nullary "ExileAllGraveyards"
   Effect.Proliferate -> Common.nullary "Proliferate"
+  Effect.TemptWithTheRing -> Common.nullary "TemptWithTheRing"
   Effect.ExileHandThenDraw -> Common.nullary "ExileHandThenDraw"
   Effect.PlayerSacrifices slot f q -> Common.tagged "PlayerSacrifices" (Just (Common.array [SlotName.toJson slot, Filter.toJson Keyword.toJson f, Quantity.toJson q]))
   Effect.RestartGame -> Common.nullary "RestartGame"
@@ -137,6 +138,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "Search expects [filter, destination]"
     "ExileAllGraveyards" -> Right Effect.ExileAllGraveyards
     "Proliferate" -> Right Effect.Proliferate
+    "TemptWithTheRing" -> Right Effect.TemptWithTheRing
     "ExileHandThenDraw" -> Right Effect.ExileHandThenDraw
     "PlayerSacrifices" -> case mv of
       Just (Value.Array (Array.MkArray [sv, fv, qv])) -> Effect.PlayerSacrifices <$> SlotName.fromJson sv <*> Filter.fromJson Keyword.fromJson fv <*> Quantity.fromJson qv

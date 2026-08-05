@@ -1,7 +1,6 @@
 module Pawl.Engine.Activate where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -34,7 +33,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Sickness as Sickness
@@ -232,6 +230,10 @@ affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid
 -- conjuncts are deliberately NOT given that board: Target.fillableModes and
 -- Cost.canPay ask about OTHER objects (the target pool, the mana sources), so
 -- each hoists its own board for its own sweep (#316).
+--
+-- Those two hoists are per CALL, and the caller is a loop over the battlefield,
+-- so an ability that reaches them costs one whole-board sweep per permanent
+-- (#716).
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs = activatableGiven (Projection.controlGrants gs) Map.empty pid srcId ability gs
 
@@ -276,8 +278,9 @@ revealIfHidden pid srcId = do
 -- CR 602.2: announce the activation, revealing the card if it is coming from a
 -- hidden zone (602.2a), put the ability on the stack (a fresh OfAbility object),
 -- then walk CR 601.2b-i as CR 602.2b sends it -- choose modes, announce the value
--- of X, announce the Phyrexian symbols (CR 118.13a), stamp targets, pay -- and
--- keep priority (117.3c). Reject-not-repair on an illegal mode or target answer.
+-- of X, announce the hybrid and Phyrexian symbols (CR 118.13a), stamp targets,
+-- pay -- and keep priority (117.3c). Reject-not-repair on an illegal mode or
+-- target answer.
 --
 -- An announced X can lose the activation all by itself: enumeration measures the
 -- cost at CR 601.2b's X=0 floor, and the value the player names is theirs to
@@ -314,7 +317,8 @@ activateAbility pid srcId ability = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
       onStack =
         gs2
@@ -332,7 +336,7 @@ activateAbility pid srcId ability = do
   chosenModes <-
     if Natural.length legal <= count
       then pure legal
-      else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid abilId legal count))
+      else Game.choose (Prompt.ChooseModes decider pid abilId legal count)
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes makes the whole activation a no-op, guarding every step below.
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
@@ -340,8 +344,9 @@ activateAbility pid srcId ability = do
     else do
       -- CR 602.2b routes the rest of the activation through CR 601.2b-i, so CR
       -- 601.2b's announcement of a variable cost (CR 107.3) governs an activation
-      -- cost's {X} too, and it is asked HERE -- after the modes, before the Phyrexian
-      -- announcement and before CR 601.2c's targets, which is 601.2b's own order.
+      -- cost's {X} too, and it is asked HERE -- after the modes, before CR
+      -- 118.13a's announcement and before CR 601.2c's targets, which is 601.2b's
+      -- own order.
       --
       -- Cinder Elemental exercises it. Not asking was not a missing question but
       -- a free {X}: a ManaSymbol.Variable that survives to payment demands
@@ -354,7 +359,7 @@ activateAbility pid srcId ability = do
       let printedCost = ActivatedAbility.cost ability
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost))))
+          then fmap Just (Game.choose (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
@@ -365,10 +370,10 @@ activateAbility pid srcId ability = do
       --
       -- Asked with the same predicate that floor was asked with, so a gate and an
       -- announcement cannot disagree about what a cost is. That matters beyond
-      -- tidiness: CR 118.13a's Phyrexian announcement below runs on this cost, and
-      -- an X large enough to leave neither of CR 107.4f's routes payable would
-      -- leave Mana.announcePhyrexian with no offer to make. This gate is what
-      -- keeps that arm out of reach from here (#417).
+      -- tidiness: CR 118.13a's announcement below runs on this cost, and an X
+      -- large enough to leave neither of CR 107.4f's routes payable would leave
+      -- Mana.announce with no offer to make. This gate is what keeps that arm out
+      -- of reach from here (#417).
       --
       -- Reject-not-repair, the posture every other step here takes: the
       -- announcement is NOT clamped to affordableX -- CR 601.2b lets the player
@@ -391,13 +396,14 @@ activateAbility pid srcId ability = do
           -- offer routes against a total this engine never computes.
           --
           -- Run on the cost carrying the ANNOUNCED value, which is CR 601.2b's own
-          -- order (the value of X precedes the Phyrexian announcement).
+          -- order (the value of X precedes the hybrid and Phyrexian
+          -- announcements).
           announcedCost <- Cost.announce pid srcId id announcedAtX
           let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
           chosen <-
             if Map.null sets
               then pure Map.empty
-              else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid abilId sets))
+              else Game.choose (Prompt.ChooseTargets decider pid abilId sets)
           let keysAgree = Map.keysSet chosen == Map.keysSet sets
               eachLegal = and (Map.intersectionWith Set.member chosen sets)
           if not (keysAgree && eachLegal)
@@ -405,14 +411,25 @@ activateAbility pid srcId ability = do
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so
               -- an activated ability that refers to "this creature" (Longtusk Cub)
-              -- resolves the reference as a slot read -- exactly as Engine.placeOne
-              -- does for a TRIGGERED ability's source.
+              -- resolves the reference as a slot read -- exactly as
+              -- Engine.placeBorne does for a TRIGGERED ability's source.
+              --
+              -- CR 109.5 binds the controller under the reserved you slot in the
+              -- same breath: "The words 'you' and 'your' on an object refer to the
+              -- object's controller ... For an activated ability, this is the
+              -- player who activated the ability." That player is `pid`, the one
+              -- CR 602.2 lets activate this ability at all -- so Brothers of Fire's
+              -- "and 1 damage to you" reaches a player, exactly as
+              -- Engine.placeBorne does for a TRIGGERED ability's controller.
               --
               -- CR 601.2b's announced X is stamped alongside, onto the ABILITY object
               -- and not the source permanent -- Cinder Elemental sacrifices that
               -- permanent to pay, so the ability is the only holder still there to
-              -- read at resolution (Quantity.evaluateFor).
-              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes)}) abilId (GameState.objects g)})
+              -- read at resolution (Quantity.evaluateFor). CR 113.7a is why the
+              -- ability keeps all three once its source is gone: "Once activated or
+              -- triggered, an ability exists on the stack independently of its
+              -- source."
+              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes))}) abilId (GameState.objects g)})
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
               -- components. The gates above prove SOME sequence of choices pays for
               -- this ability -- but Unpaid is reachable all the same, because the

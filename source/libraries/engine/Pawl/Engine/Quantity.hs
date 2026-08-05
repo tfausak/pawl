@@ -1,6 +1,7 @@
 module Pawl.Engine.Quantity where
 
 import Control.Applicative ((<|>))
+import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
@@ -12,10 +13,12 @@ import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.Player as Player
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.SlotName (SlotName)
@@ -115,6 +118,22 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- reader to evaluate. It still needs the CONTEXT, which is what resolves its
   -- CR 109.5 "you" -- Omnath, Locus of Mana counts its own controller's pool.
   Quantity.ManaCount c -> ManaCount.evaluate context gs c
+  -- CR 119.1: a player's life total, read STRAIGHT OFF GameState.players at the
+  -- moment of the call for the reason the mana-pool arm above is -- CR 119.3
+  -- adjusts a life total whenever an effect says so, with no state-based action
+  -- and no priority pass owed in between, so a stored or sampled copy would go
+  -- stale mid-resolution.
+  --
+  -- The PlayerRef is resolved by the same Count.playersFor the two arms above
+  -- use, which is what keeps one reference from meaning different players in
+  -- different arms. Nothing for anything but EXACTLY ONE player: a life total is
+  -- one player's scalar, so a reference naming several answers "whose?" rather
+  -- than answering with a sum. Summing or maximising over several is a different
+  -- shape -- an aggregation, as Pawl.Types.Aggregation is for objects -- and no
+  -- card in the pool asks for one (#681).
+  Quantity.LifeTotal ref -> case Count.playersFor context gs ref of
+    Just [pid] -> fmap Player.life (Map.lookup pid (GameState.players gs))
+    _ -> Nothing
 
 -- CR 208.2a, last sentence: an undeterminable number is 0, including inside a
 -- calculation. TOTAL where evaluate is partial -- an Integer, never a Maybe.
@@ -151,6 +170,7 @@ substituteStar star quantity = case quantity of
   Quantity.InSlot _ -> quantity
   Quantity.Count _ -> quantity
   Quantity.ManaCount _ -> quantity
+  Quantity.LifeTotal _ -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -176,6 +196,9 @@ slots quantity = case quantity of
   -- no slot at all, and PlayerRef.InSlot names a TARGET slot, which is
   -- Resolve's half of the lint. Count's Scope is in the same position.
   Quantity.ManaCount _ -> Set.empty
+  -- The same position a third time: this arm's PlayerRef.InSlot names a TARGET
+  -- slot, not an amount one.
+  Quantity.LifeTotal _ -> Set.empty
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A

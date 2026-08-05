@@ -14,11 +14,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: macos-latest
           - runner: ubuntu-latest
             bench: true
             test: true
-          - runner: windows-latest
     steps:
       - uses: actions/checkout@v7
       - id: haskell

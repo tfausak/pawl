@@ -261,5 +261,5 @@ data Face card = MkFace
 defaultSpell :: Modal.Modal card
 defaultSpell =
   Modal.MkModal
-    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
+    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing))
     (ModeSelection.ChooseExactly 1)

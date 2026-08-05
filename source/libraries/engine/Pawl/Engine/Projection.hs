@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -177,13 +178,26 @@ applyModification lyr src cands gs oid m pc =
         -- same Set.member guard: a word swapped in the text box has nothing to
         -- do with whether the type line carries it.
         --
+        -- The KEYWORD half is CR 702.14a's: swampwalk holds a land-type word, and
+        -- Magical Hack's own reminder text is that example. It reaches only the
+        -- keywords the object PRINTS, which is CR 612.3 falling out of the layer
+        -- order again -- a granted keyword arrives at layer 6, after this.
+        --
+        -- Map.mapKeysWith (+) rather than Map.mapKeys, because the swap can
+        -- collide two keys: a creature with both islandwalk and swampwalk hacked
+        -- Island -> Swamp has one kind of landwalk twice. Summing rather than
+        -- dropping one matches what two GainKeywords of the same keyword already
+        -- do, and CR 702.14e makes the total unobservable for landwalk anyway --
+        -- Combat.landwalkAllowsGiven reads membership, never the count.
+        --
         -- Not implemented: the swap does not reach PC.replacementEffects, a
         -- mode's targetSpecs, or an activated ability's cost (#635).
         Modification.ChangeSubtypeWord from to ->
           let pairs = [(from, to)]
               pc' =
                 pc
-                  { PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
+                  { PC.keywords = Map.mapKeysWith (+) (Filter.rewriteKeyword pairs) (PC.keywords pc),
+                    PC.activatedAbilities = fmap (rewriteActivatedAbility pairs) (PC.activatedAbilities pc),
                     PC.triggeredAbilities = fmap (rewriteTriggeredAbility pairs) (PC.triggeredAbilities pc)
                   }
            in if Set.member from (PC.subtypes pc')
@@ -886,6 +900,10 @@ textChangesAffecting oid gs =
 -- the gate changes no answer. What it removes is the dependence on that: the rule
 -- is stated rather than inferred from the payload, so malformed data cannot
 -- smuggle a cross-family rewrite through.
+--
+-- Exhaustive rather than a catch-all, which is what had let GainKeyword go
+-- unrewritten while carrying CR 702.14a's land-type word: a later arm that can
+-- hold a word must break this build instead of falling through.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
 rewriteModification pairs m =
   let -- `inFamily from` is CR 612.2's gate.
@@ -896,12 +914,47 @@ rewriteModification pairs m =
         -- CR 612.2's other named example: the swap rewrites a Turn to Frog's Frog
         -- on the stack, so the spell resolves making its target the new type.
         Modification.SetCreatureSubtype s -> Modification.SetCreatureSubtype (swap Subtype.isCreatureType from to s)
+        -- CR 702.14a: "[type]walk" holds a land-type word, so a hacked Lord of
+        -- Atlantis grants swampwalk rather than the printed islandwalk. The
+        -- GRANTER's text is what this reads -- gatherStatic calls it with the
+        -- source's own changes -- which is CR 612.3: a text change on the
+        -- creature that RECEIVED the keyword may not touch it, and the layer
+        -- order keeps that true (this is layer 6, the swap is layer 3).
+        --
+        -- Filter.rewriteKeyword rather than a swap here, since the word is inside
+        -- a Filter. No family gate is restated at that descent, for the reason
+        -- Filter.rewrite's own comment gives: a HasSubtype atom may name a word of
+        -- any family, so the family the word is used AS is the family it belongs
+        -- to, and the exact lookup already asks CR 612.2's question.
+        Modification.GainKeyword k -> Modification.GainKeyword (Filter.rewriteKeyword [(from, to)] k)
         -- Carries no word: the type is read off the source at projection time,
         -- not printed on the card, so CR 612.1 has nothing here to reach.
         Modification.SetLandSubtypeToChosen -> acc
         -- A control op carries no subtype word either.
         Modification.SetController _ -> acc
-        _ -> acc
+        Modification.SetControllerToSource -> acc
+        -- An ability wipe names nothing at all, and neither does a P/T switch.
+        Modification.LoseAllAbilities -> acc
+        Modification.SwitchPowerToughness -> acc
+        -- Not implemented: a Quantity.Count carries a Filter, and it is left
+        -- unrewritten, so a "+1/+1 for each Swamp you control" would keep
+        -- counting Swamps after a swap (#711).
+        Modification.SetBasePowerToughness _ _ -> acc
+        Modification.ModifyPowerToughness _ _ -> acc
+        -- CR 205.2a's card types are a different list from CR 205.3's subtypes,
+        -- so this position holds no word a subtype pair could name.
+        Modification.AddCardType _ -> acc
+        -- The two words of a STORED text change are the choice its own
+        -- resolution announced (CR 608.2d), not words printed on the object this
+        -- rewrite walks. A text changer's PRINTED clause is reached instead, by
+        -- rewriteEffect's ChangeText arm.
+        Modification.ChangeSubtypeWord _ _ -> acc
+        -- CR 612.2 names colour words as a family a text change can swap, but
+        -- pawl's only text changer swaps subtypes (Modification.ChangeSubtypeWord),
+        -- so no pair reaching here holds a colour word to write.
+        Modification.SetColor _ -> acc
+        Modification.AddColor _ -> acc
+        Modification.AddChosenColor -> acc
    in List.foldl' apply1 m pairs
 
 -- rewriteModification's sibling for the other half of a static ability. Under CR
@@ -944,6 +997,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Search filter_ destination -> Effect.Search (Filter.rewrite pairs filter_) destination
   Effect.ExileAllGraveyards -> effect
   Effect.Proliferate -> effect
+  Effect.TemptWithTheRing -> effect
   Effect.ExileHandThenDraw -> effect
   Effect.PlayerSacrifices slot filter_ quantity -> Effect.PlayerSacrifices slot (Filter.rewrite pairs filter_) quantity
   Effect.RestartGame -> effect
@@ -1102,6 +1156,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition
   TriggerCondition.SelfDies -> condition
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
@@ -1138,6 +1193,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity
+  Quantity.Type.LifeTotal _ -> quantity
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.
@@ -1164,23 +1220,79 @@ rewriteAggregation pairs aggregation = case aggregation of
 -- ability whose every part lands after layer 6. Neither touches a stored effect
 -- or a counter, since neither is an ability for layer 6 to remove (CR 611.2a; CR
 -- 122.1a/613.4c) -- Humility removes neither.
+--
+-- A THIRD loss, and the reason this needs a second pass of its own: CR 604.2's
+-- "as long as" gate (StaticAbility.condition) drops an ability whose clause is
+-- currently false. Evaluating a Condition needs a projection, and a projection
+-- needs this list, so the gate is answered against the SEED list below rather
+-- than against itself -- the same shape abilitiesRemoved already has, and
+-- well-founded for the same reason: the seed is built with every gate open, so
+-- nothing here re-enters gather.
 gather :: GameState -> [Gathered]
 gather gs =
-  let ungated = gatherGiven (const False) gs
-   in -- Almost every board has no ability-removing effect, and then the gathered
-      -- list IS the ungated one -- no second walk and no projection spent on the
-      -- question. A board that has one pays for the stored effects, emblems and
-      -- counters twice, none of which costs a projection.
-      if any (removesAbilities . gModification) ungated
-        then gatherGiven (abilitiesRemoved ungated gs) gs
+  let ungated = gatherGiven (const False) alwaysFunctioning gs
+   in -- Almost every board has neither an ability-removing effect nor a
+      -- conditional static ability, and then the gathered list IS the ungated one
+      -- -- no second walk and no projection spent on either question. A board that
+      -- has one pays for the stored effects, emblems and counters twice, none of
+      -- which costs a projection.
+      if any (removesAbilities . gModification) ungated || anyConditional gs
+        then gatherGiven (abilitiesRemoved ungated gs) (conditionHolds ungated gs) gs
         else ungated
 
--- gather's body with the CR 613.1f gate left open: `stripped` answers whether a
--- permanent's abilities were removed by the time layer 6 finished. Called twice
--- by gather -- once wired shut to build the list the gate reads, once with the
--- real answer.
-gatherGiven :: (ObjectId -> Bool) -> GameState -> [Gathered]
-gatherGiven stripped gs =
+-- The open CR 604.2 gate: every "as long as" clause answered true without being
+-- looked at. What the seed pass gets, so that the list the real gate reads is the
+-- widest one -- an ability wrongly kept there can only over-project the state a
+-- condition is judged against, never leave gather to re-enter itself.
+--
+-- Not implemented: the CR 613.1f removal question the seed answers is therefore
+-- asked of a conditional ability whose clause is false, as is abilityRemoval's,
+-- and setLandSubtypeEffects and controlGrants read the printed list without the
+-- gate at all (#727).
+alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
+alwaysFunctioning _ _ _ = True
+
+-- Does any static ability in play carry a CR 604.2 "as long as" clause at all?
+-- gather's cheap structural precondition, asked instead of the second walk -- a
+-- pure read of the printed faces, with no projection behind it, mirroring the
+-- ability-removal test it sits beside.
+--
+-- Emblems are included for the reason gatherGiven gathers them (CR 114.4 / 113.6);
+-- no emblem in the pool carries a condition, and a walk that skipped them would
+-- silently ungate the first one that did.
+anyConditional :: GameState -> Bool
+anyConditional gs =
+  let conditional oid = case Game.faceOf oid gs of
+        Nothing -> False
+        Just face -> any (Maybe.isJust . StaticAbility.condition) (Face.staticAbilities face)
+   in any conditional (Set.toList (GameState.battlefield gs))
+        || any conditional (Set.toList (GameState.command gs))
+
+-- CR 604.2: is this static ability's "as long as" clause true right now?
+--
+-- The VIEW is bounded at the ability's own lowest layer -- the point CR 613.6
+-- makes the effect start to apply, and the same point abilitiesRemoved judges a
+-- remover's affected set at. So Kird Ape's layer-7c clause reads a Forest through
+-- layers 1-6, and a Convincing Mirage'd Forest has stopped being one by then.
+-- Bounded rather than full for projectWith's reason: a condition read against a
+-- projection that included its OWN layer would be circular, and the descending
+-- bound is what makes the nesting terminate. Exact for a clause reading a
+-- strictly earlier layer, which every "as long as" clause in the pool does.
+--
+-- CR 109.5: "you" is the SOURCE's controller, as it is for the affected set. The
+-- condition is evaluated AGAINST the source too, so a clause reading Quantity.Power
+-- reads the permanent the ability is printed on.
+conditionHolds :: [Gathered] -> GameState -> ObjectId -> Layer -> Condition.Type.Condition -> Bool
+conditionHolds cands gs src lowest =
+  Condition.holds (viewUpTo lowest cands gs) (Filter.MkContext (controllerOf src gs) (Just src)) gs src
+
+-- gather's body with both ability gates left open: `stripped` answers whether a
+-- permanent's abilities were removed by the time layer 6 finished, and
+-- `functioning` whether a static ability's CR 604.2 "as long as" clause holds.
+-- Called twice by gather -- once wired shut to build the list the gates read, once
+-- with the real answers.
+gatherGiven :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> GameState -> [Gathered]
+gatherGiven stripped functioning gs =
   let setEffs = setLandSubtypeEffects gs
       -- A stored effect carries exactly one modification, so CR 613.6 has nothing
       -- to hold together -- and every stored effect's set is CR 611.2c's
@@ -1210,7 +1322,7 @@ gatherGiven stripped gs =
                  in -- One thunk per permanent, shared by all its abilities and
                     -- forced by none unless an ability is entirely above layer 6,
                     -- so the projection costs at most one per permanent.
-                    concat (zipWith (gatherStatic permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Face.staticAbilities face))
+                    concat (zipWith (gatherStatic (functioning permId) permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Face.staticAbilities face))
               else []
       static = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
@@ -1223,7 +1335,7 @@ gatherGiven stripped gs =
             -- No liveness or text-change pass and never stripped: the pool's CR
             -- 613.1f removers reach creatures, and an emblem is not one (CR
             -- 114.5).
-            concat (zipWith (gatherStatic emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
+            concat (zipWith (gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       counters = counterGathered gs
    in stored <> static <> emblems <> counters
@@ -1247,7 +1359,7 @@ gatherGiven stripped gs =
 -- The module graph enforces this -- Projection does not import PlayerEffect.
 abilityRemoval :: GameState -> ObjectId -> Bool
 abilityRemoval gs =
-  let ungated = gatherGiven (const False) gs
+  let ungated = gatherGiven (const False) alwaysFunctioning gs
    in -- Almost every board has no ability-removing effect, and then no projection
       -- is spent on the question.
       if any (removesAbilities . gModification) ungated
@@ -1339,8 +1451,14 @@ abilitiesRemoved cands gs oid =
 --
 -- The whole ability is dropped rather than only its layer-7 parts, which is the
 -- same statement -- the branch is taken only when every part is a layer-7 one.
-gatherStatic :: ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
-gatherStatic src ts changes stripped n sa =
+--
+-- `functioning` is CR 604.2's "as long as" gate, answered by conditionHolds at the
+-- ability's lowest layer. It costs the ability ALL of its parts unconditionally,
+-- where `stripped` costs them only under the two clauses above: CR 613.6's rescue
+-- is about an ability being REMOVED mid-fold, and a clause that is false never let
+-- the effect start to apply at all.
+gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
+gatherStatic functioning src ts changes stripped n sa =
   let ms = fmap (rewriteModification changes) (StaticAbility.modifications sa)
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
@@ -1369,9 +1487,13 @@ gatherStatic src ts changes stripped n sa =
             gModification = m'
           }
       parts = fmap one (NonEmpty.toList ms)
+      -- Free for an unconditional ability, which is all but Kird Ape's: the Maybe
+      -- answers before `functioning` -- and so before conditionHolds' projection --
+      -- is ever forced.
+      lives = maybe True (functioning lowest) (StaticAbility.condition sa)
    in -- The cheap structural test first, so `stripped`'s projection is forced only
       -- for an ability the rest of the rule could reach.
-      if lowest > Layer.Ability && stripped then [] else parts
+      if (lowest > Layer.Ability && stripped) || not lives then [] else parts
 
 -- CR 122.1a / 613.4c: +1/+1 and -1/-1 counters modify P/T in layer 7c. Each
 -- object's counters are emitted as ONE synthetic 7c ModifyPowerToughness carrying
@@ -1505,10 +1627,12 @@ filterReads f = case f of
 
 -- Which aspects a Modification writes -- the other half of the pair above.
 --
--- Four arms write Keywords, each writing PC.keywords in applyModification:
--- GainKeyword and LoseAllAbilities per CR 613.1f, and both subtype-setting arms
--- per CR 305.7. Filter.HasKeyword reads that map, so all four can move an affected
--- set. Keyword counters need no arm, arriving here as synthetic GainKeywords.
+-- Five arms write Keywords, each writing PC.keywords in applyModification:
+-- GainKeyword and LoseAllAbilities per CR 613.1f, both subtype-setting arms per
+-- CR 305.7, and ChangeSubtypeWord per CR 612.1 -- a text change reaches the land
+-- type inside a landwalk keyword, so it rewrites the map's KEYS.
+-- Filter.HasKeyword reads that map, so all five can move an affected set. Keyword
+-- counters need no arm, arriving here as synthetic GainKeywords.
 --
 -- An ability change can also matter to CR 613.8 by changing an effect's EXISTENCE,
 -- a different clause that lives in staticAbilitiesLive.
@@ -1523,7 +1647,7 @@ modificationWrites m = case m of
   Modification.SetLandSubtypeToChosen -> Set.fromList [Subtypes, Keywords]
   Modification.AddLandSubtype _ -> Set.singleton Subtypes
   Modification.SetCreatureSubtype _ -> Set.singleton Subtypes
-  Modification.ChangeSubtypeWord _ _ -> Set.singleton Subtypes
+  Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
   Modification.SetColor _ -> Set.singleton Colors
   Modification.AddColor _ -> Set.singleton Colors

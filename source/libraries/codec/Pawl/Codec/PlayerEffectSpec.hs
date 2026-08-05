@@ -121,3 +121,21 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.CantBeTargetedBy PlayerScope.Opponents)
       """ {"type":"CantBeTargetedBy","value":{"type":"Opponents"}} """
+  -- CR 601.3b / Vedalken Orrery: "spells" names no quality, so the filter is the
+  -- trivial predicate. This is the shape data/cards/vedalken-orrery.json carries.
+  Spec.it s "CastAsThoughItHadFlash, Vedalken Orrery's unqualified spells" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CastAsThoughItHadFlash (Filter.And []))
+      """ {"type":"CastAsThoughItHadFlash","value":{"type":"And","value":[]}} """
+  -- CR 601.3b's "certain qualities" (Yeva, Nature's Herald), so a codec that
+  -- dropped the payload would round-trip one of these and not both.
+  Spec.it s "CastAsThoughItHadFlash, a filter that names qualities" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CastAsThoughItHadFlash (Filter.And [Filter.HasColor Color.Green, Filter.HasCardType CardType.Creature]))
+      """ {"type":"CastAsThoughItHadFlash","value":{"type":"And","value":[{"type":"HasColor","value":{"type":"Green"}},{"type":"HasCardType","value":{"type":"Creature"}}]}} """

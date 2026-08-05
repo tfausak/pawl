@@ -58,6 +58,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
                       (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))
                       (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
                       Optionality.Mandatory
+                      Nothing
                   )
               )
               (ModeSelection.ChooseExactly 1)
@@ -74,7 +75,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       fromJson
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [])
-          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory)) (ModeSelection.ChooseExactly 1))
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
           ActivationTiming.AnyTime
       )
       """ {"cost":{"mana":null},"modal":{"modes":[{}]}} """

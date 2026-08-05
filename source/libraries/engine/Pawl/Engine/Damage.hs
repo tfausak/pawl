@@ -1,7 +1,6 @@
 module Pawl.Engine.Damage where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -32,7 +31,6 @@ import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prevention as Prevention
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
@@ -248,8 +246,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                         else []
                     thresholds = Map.fromList (blockerEntries <> defenderEntry)
                 chosen <-
-                  Trans.lift
-                    (Program.prompt (Prompt.AssignCombatDamage decider pid attacker thresholds power))
+                  Game.choose (Prompt.AssignCombatDamage decider pid attacker thresholds power)
                 -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733
                 -- human-error rewind). An illegal answer assigns nothing.
                 let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n
@@ -316,8 +313,8 @@ gatherCombatDamage assigns = do
 -- built; re-asking here would be a second, later reading of the same question,
 -- which is what CR 608.2b's target re-validation is for and this is not.
 --
--- Only battles are missing from the classification, and only because no card type
--- for one exists yet (#302); CR 120.3h is what it would need.
+-- Only battles are missing from the classification, and only because Recipient
+-- has no ToBattle tag to classify one as (#302); CR 120.3h is what it would need.
 --
 -- The creature test comes first, and for a permanent that is both a creature and
 -- a planeswalker that is the wrong answer -- CR 120.3c and CR 120.3e both apply

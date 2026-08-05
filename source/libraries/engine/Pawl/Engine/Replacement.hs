@@ -17,7 +17,6 @@
 module Pawl.Engine.Replacement where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -61,7 +60,6 @@ import Pawl.Types.PhaseSelector (PhaseSelector)
 import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.Prevention (Prevention)
 import qualified Pawl.Types.Prevention as Prevention
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.ProposedEvent (ProposedEvent)
@@ -654,7 +652,7 @@ choose gs event candidates = case candidates of
         Nothing -> pure (Just first)
         Just pid -> do
           let decider = Decide.deciderFor pid gs
-          answer <- Trans.lift (Program.prompt (Prompt.ChooseReplacement decider pid (fmap ReplacementCandidate.source candidates)))
+          answer <- Game.choose (Prompt.ChooseReplacement decider pid (fmap ReplacementCandidate.source candidates))
           -- Reject-not-repair, as payment and Engine.permute already do: an
           -- out-of-range index leaves the canonical first standing rather than
           -- dropping the event or crashing.
@@ -751,7 +749,7 @@ apply batch candidate event =
           Just controller -> do
             let decider = Decide.deciderFor controller gs
             let legal = legalCopyTargets batch oid gs
-            answer <- Trans.lift (Program.prompt (Prompt.ChooseCopyTarget decider controller oid legal))
+            answer <- Game.choose (Prompt.ChooseCopyTarget decider controller oid legal)
             -- FILTERED, NOT TRUSTED (#222). legalCopyTargets is the ONLY thing
             -- enforcing CR 614.12a's same-batch exclusion, so honouring an
             -- unoffered answer would let a Clone copy a sibling token entering
@@ -793,7 +791,7 @@ apply batch candidate event =
                   Nothing -> pure first
                   Just controller -> do
                     let decider = Decide.deciderFor controller gs
-                    answer <- Trans.lift (Program.prompt (Prompt.ChooseEntryOption decider controller oid options))
+                    answer <- Game.choose (Prompt.ChooseEntryOption decider controller oid options)
                     pure (at options answer first)
             consume (ReplacementCandidate.identity candidate)
             State.modify' (applyEntryOption oid picked)
@@ -817,7 +815,7 @@ apply batch candidate event =
           Nothing -> pure Color.White
           Just controller -> do
             let decider = Decide.deciderFor controller gs
-            Trans.lift (Program.prompt (Prompt.ChooseColor decider controller oid))
+            Game.choose (Prompt.ChooseColor decider controller oid)
         consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenColor = Just picked}
@@ -842,7 +840,7 @@ apply batch candidate event =
           Nothing -> pure Subtype.Mountain
           Just controller -> do
             let decider = Decide.deciderFor controller gs
-            Trans.lift (Program.prompt (Prompt.ChooseBasicLandType decider controller oid))
+            Game.choose (Prompt.ChooseBasicLandType decider controller oid)
         consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
           let stamp o = o {Object.chosenSubtype = Just picked}
@@ -880,7 +878,7 @@ apply batch candidate event =
               [sole] -> pure (Just sole)
               first : second : rest -> do
                 let offered = first NonEmpty.:| (second : rest)
-                answer <- Trans.lift (Program.prompt (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered))
+                answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered)
                 -- FILTERED, NOT TRUSTED, the posture Sba.chooseLegendVictims
                 -- takes: an answer naming somebody who is not an opponent would
                 -- otherwise hand a second name to a player the card never asked,
@@ -890,7 +888,7 @@ apply batch candidate event =
             -- order. Both names are chosen as one event, so the order is the
             -- rule's and not the card's reading order.
             let choosers = filter (\pid -> pid == controller || Just pid == opponent) (Game.apnapOrder gs)
-                ask pid = Trans.lift (Program.prompt (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction))
+                ask pid = Game.choose (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction)
             fmap Set.fromList (Monad.mapM ask choosers)
         consume (ReplacementCandidate.identity candidate)
         State.modify' $ \g ->
@@ -1289,7 +1287,7 @@ askOne batch (pid, positions) = do
     [] -> pure batch
     first : _ -> do
       let decider = Decide.deciderFor pid gs
-      answer <- Trans.lift (Program.prompt (Prompt.OrderDamage decider pid group))
+      answer <- Game.choose (Prompt.OrderDamage decider pid group)
       -- Reject-not-repair, as `choose` and Engine's trigger ordering already do:
       -- an answer that is not a permutation of the offered indices leaves the
       -- canonical order standing rather than dropping or duplicating an event.

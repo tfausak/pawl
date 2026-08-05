@@ -10,45 +10,42 @@
 -- Enumerating the pool is deliberately NOT in the INTERFACE: every caller that
 -- wanted it was linting the corpus pawl ships, which is a claim about the data
 -- rather than a question for a registry, and that lives in the test suite. What
--- the test suite does borrow is cardPath and parseCard -- facts about the
--- on-disk format rather than about looking a card up. Only how the bytes are
--- obtained differs; see loadFile.
---
--- The file-backed registry does list its own root, in byFaceName, to answer one
--- lookup that the one-file-per-name convention cannot (CR 709.4a). That is not
--- the same thing: the listing is not reachable through the Registry record, so
--- it is one lookup's implementation rather than a question a caller can ask.
+-- the test suite does borrow is cardPath, loadRoot and filedAs -- facts about
+-- the on-disk format rather than about looking a card up. parseCard is an
+-- internal helper of loadRoot and has no test-suite caller of its own.
 module Pawl.Registry where
 
-import qualified Control.Concurrent.MVar as MVar
 import qualified Control.Exception as Exception
 import qualified Data.ByteString as ByteString
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Encoding
 import qualified Paths_pawl as Paths
 import qualified Pawl.Codec.Card as Card
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Exceptions.InvalidCorpus as InvalidCorpus
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.CardError as CardError
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import qualified System.Directory as Directory
-import qualified System.IO.Error as IOError
 
+-- Nothing rather than an error value: with the file registry loading its root up
+-- front, a pool that cannot be used fails when the registry is BUILT, so the
+-- only thing left for a lookup to say is that no card has that name -- and the
+-- caller supplied the name (#649).
 newtype Registry m = MkRegistry
-  { fetchCard :: CardName.CardName -> m (Either CardError.CardError Card.Card)
+  { fetchCard :: CardName.CardName -> m (Maybe Card.Card)
   }
 
 -- A card by name ("Goblin Piker") or by slug ("goblin-piker") -- a file-backed
 -- registry slugifies, and slugify is idempotent, so both are the same lookup.
 -- Takes a String because pawl does not enable OverloadedStrings: the newtype is
 -- what the interface speaks, this is what callers write.
-named :: Registry m -> String -> m (Either CardError.CardError Card.Card)
+named :: Registry m -> String -> m (Maybe Card.Card)
 named registry = fetchCard registry . CardName.MkCardName . Text.pack
 
 -- The card corpus's default root: data/cards declared as cabal data-files,
@@ -58,162 +55,127 @@ named registry = fetchCard registry . CardName.MkCardName . Text.pack
 defaultRoot :: IO FilePath
 defaultRoot = Paths.getDataFileName "cards"
 
--- A registry over a directory of one-card-per-file JSON, each named by the slug
--- of the card's own name, memoized per name.
+-- A registry over a directory of one-card-per-file JSON, read once, here.
 --
--- The root is checked here rather than at the first lookup because a mistyped
--- --cards-dir otherwise surfaces as N identical failures, one per card, instead
--- of one clear failure at startup (#167).
+-- The root is checked before anything else because a mistyped --cards-dir
+-- otherwise surfaces as N identical failures, one per card, instead of one
+-- clear failure at startup (#167). Every other way the pool can be broken is
+-- reported the same way and at the same moment, by `index`.
+--
+-- Eager rather than memoized per name: the map makes "each file is parsed at
+-- most once" true by construction, where the MVar it replaces made it true by
+-- holding a lock across a read (#265). The cost is that a caller wanting one
+-- card parses the whole pool; the pool is hand-authored and card-driven, and
+-- the test suite already reads it whole many times over per run --
+-- Pawl.Support.allPrintings alone is unmemoized and is called repeatedly from
+-- CardSpec, CardsSpec and CodecIntegrationSpec.
 fileRegistry :: FilePath -> IO (Registry IO)
 fileRegistry root = do
   exists <- Directory.doesDirectoryExist root
   if not exists
     then Exception.throwIO MissingRoot.MkMissingRoot {MissingRoot.path = root}
     else do
-      -- An MVar rather than an IORef because tasty runs cases concurrently:
-      -- holding it across the read-and-parse is what makes "each file is parsed
-      -- at most once" exact rather than merely likely. Not a TVar either, since
-      -- the lock has to span a readFile, which no transaction can (#265).
-      cache <- MVar.newMVar Map.empty
-      pure (MkRegistry (memoized root cache))
+      loaded <- loadRoot root
+      case index loaded of
+        Left problems -> Exception.throwIO InvalidCorpus.MkInvalidCorpus {InvalidCorpus.root = root, InvalidCorpus.problems = problems}
+        Right cards -> pure (MkRegistry (\name -> pure (Map.lookup (slugFor name) cards)))
 
--- A failed load is not remembered, so a fixed file is picked up by the next
--- lookup (modifyMVar restores the cache when the read throws).
-memoized ::
-  FilePath ->
-  MVar.MVar (Map.Map Slug.Slug (Either CardError.CardError Card.Card)) ->
-  CardName.CardName ->
-  IO (Either CardError.CardError Card.Card)
-memoized root cache name =
-  let slug = Slug.fromText (CardName.unwrap name)
-   in MVar.modifyMVar cache $ \entries ->
-        case Map.lookup slug entries of
-          Just hit -> pure (entries, hit)
-          Nothing -> do
-            direct <- loadFile root name slug
-            result <- case direct of
-              Left (CardError.Missing _) -> byFaceName root name slug direct
-              _ -> pure direct
-            pure (either (const entries) (const (Map.insert slug result entries)) result, result)
+-- The slug a name is looked up by. `named` accepts a name or a slug for the
+-- same reason: slugify is idempotent, so the two are one lookup.
+slugFor :: CardName.CardName -> Slug.Slug
+slugFor = Slug.fromText . CardName.unwrap
 
--- CR 709.4a: "Each split card has two names." Neither of them is the joined
--- string parseCard files the card under, so a lookup by one half's own name
--- misses the direct path and lands here: list the root, keep the filenames
--- whose slug contains the requested one as a whole hyphen-separated run, and
--- read those in order until one's faces include a face of the requested name.
--- `missing` is what a fruitless scan answers with, so a name no file carries is
--- still the CardError.Missing loadFile already produced -- the fallback can add
--- an answer and never change one.
+-- Every name every card has, pointing at that card -- or every reason the pool
+-- cannot be indexed.
 --
--- Confirmation is by FACE NAME and never by filename: the filename only narrows
--- what is worth reading, so a beeswax-wane.json could not answer for "Wax".
--- Faces are compared by slug for the same reason `named` accepts either form --
--- slugify is idempotent, so a name and its slug are one lookup.
+-- CR 709.4a: "Each split card has two names." Both are keys here, which is what
+-- makes looking up either half a hit rather than a scan. CR 715.4 gives an
+-- adventurer card only its normal characteristics off the stack, so its
+-- alternative name is not a name it HAS the way a split card's two are -- but
+-- CR 715.5 lets a player CHOOSE that alternative name wherever an effect asks
+-- for a card name, which a name-keyed lookup has to answer to all the same.
+-- CR 720.5 does the same for an omen card's alternative name.
 --
--- Not a member of the Registry record, which is what bounds the interface: a
--- caller holding a Registry can ask for a named card and nothing else, so this
--- stays one lookup's implementation. Not a claim about module exports -- pawl
--- writes no export lists, so this function is exported like every other.
---
--- A stopgap either way, since it re-lists the root on every miss and leaves the
--- joined filename standing in for a name the rules do not give the card (#649).
-byFaceName ::
-  FilePath ->
-  CardName.CardName ->
-  Slug.Slug ->
-  Either CardError.CardError Card.Card ->
-  IO (Either CardError.CardError Card.Card)
-byFaceName root name slug missing = do
-  -- Sorted so the "first" a scan accepts is a fact about the pool rather than
-  -- about the order a directory happens to enumerate in.
-  files <- fmap List.sort (Directory.listDirectory root)
-  scan (filter (containsRun slug) (Maybe.mapMaybe fileSlug files))
-  where
-    carries card = any ((== slug) . Slug.fromText . CardName.unwrap . Face.name) (Card.faces card)
-    scan candidates = case candidates of
-      [] -> pure missing
-      candidate : rest -> do
-        loaded <- loadFile root name candidate
-        case loaded of
-          Right card | carries card -> pure loaded
-          _ -> scan rest
+-- A name claimed twice is fatal wherever it comes from -- two cards, or one card
+-- repeating its own face name. Pawl.CardSpec's "a card's face names are pairwise
+-- distinct" lint is the INTRA-card half of that and holds only over the corpus
+-- pawl ships; this holds over whatever root a caller points at.
+index :: [(FilePath, Either Text.Text Card.Card)] -> Either [String] (Map.Map Slug.Slug Card.Card)
+index loaded =
+  let parsed = [(path, card) | (path, Right card) <- loaded]
+      keyed = [(slugFor (Face.name face), (path, card)) | (path, card) <- parsed, face <- NonEmpty.toList (Card.faces card)]
+      unparsed = [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded]
+      claims = Map.fromListWith (<>) [(slug, [path]) | (slug, (path, _)) <- keyed]
+      -- A single path claiming its own slug more than once is one card
+      -- repeating a face name, not two cards colliding -- List.nub tells the
+      -- two apart so the message names what actually happened instead of
+      -- rendering the same path twice, which reads like a bug in the report
+      -- rather than a description of the pool.
+      ambiguous =
+        [ case List.nub (List.sort paths) of
+            [one] -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> one <> ", which repeats it across " <> show (length paths) <> " of its own faces"
+            distinct -> Text.unpack (Slug.unwrap slug) <> " is claimed by " <> List.intercalate ", " distinct
+        | (slug, paths) <- Map.toAscList claims,
+          length paths > 1
+        ]
+   in case unparsed <> ambiguous of
+        [] -> Right (Map.fromList [(slug, card) | (slug, (_, card)) <- keyed])
+        problems -> Left problems
 
--- The slug a card file is filed under, from its name. Nothing for anything that
--- is not a .json file, which is not a card file at all.
-fileSlug :: FilePath -> Maybe Slug.Slug
-fileSlug file = fmap Slug.fromText (Text.stripSuffix (Text.pack ".json") (Text.pack file))
-
--- Whether `part`'s hyphen-separated words appear consecutively in `whole`'s.
--- Whole words rather than a substring, so "wax" runs inside "wax-wane" but not
--- inside "beeswax-wane".
---
--- A narrowing and NOT a guarantee. All it decides is which files are worth
--- reading, so all it buys is that a miss does not parse the whole pool; what
--- makes the answer right is byFaceName's face-name confirmation, which refuses
--- a beeswax-wane.json for "Wax" whether or not this filtered it out first.
--- Loosening this to a plain substring would cost reads and change no answer,
--- which is why the case that pins the behaviour ("a filename that merely
--- contains the name asked for does not answer for it") is written against the
--- confirmation and not against this.
-containsRun :: Slug.Slug -> Slug.Slug -> Bool
-containsRun part whole = List.isInfixOf (wordsOf part) (wordsOf whole)
-  where
-    wordsOf = Text.splitOn (Text.singleton '-') . Slug.unwrap
-
--- Where one card's file lives: one file per card, named by the slug of the
--- card's own name.
+-- Where the file for a given slug lives, one file per card. What the slug IS
+-- varies by caller: for a single-faced card it is the card's own name, but
+-- `filedAs` below derives it from a split or adventurer card's JOINED face
+-- names instead, so "the card's own name" does not hold in general.
 cardPath :: FilePath -> Slug.Slug -> FilePath
 cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 
 -- What a card file's bytes mean. Pure, and separate from reading them, because
--- that is exactly what this module and the test suite's Pawl.Corpus agree
--- about; they disagree about how to obtain the bytes and about what a failure
--- to obtain them means. `path` is carried only to name the file in the error.
+-- that is exactly what a lookup and the corpus-wide lints agree about; they
+-- disagree about how to obtain the bytes and about what a failure to obtain
+-- them means. The caller pairs the reason with the path.
 --
 -- Decoded as UTF-8 explicitly rather than via Data.Text.IO.readFile, which
 -- decodes using the locale encoding -- ASCII under LC_ALL=C -- so a card with a
 -- non-ASCII character would fail with "invalid byte sequence" instead of naming
 -- the offending file.
 --
--- The name check: the file's face names, joined, must slugify back to the name
--- it is filed under, or a lookup would quietly serve a different card than it
--- was asked for. Both callers inherit it.
---
--- Pawl.Types.CardName.join rather than a second "//" intercalation written
--- here: Pawl.Engine.Card.combined joins the same way, and the registry
--- sublibrary sits ABOVE engine and cannot call into it, so `types` is where the
--- two agree by construction. For a one-face card the join is that face's own
--- name, which is why 227 files were filed under it before any card printed a
--- second face.
---
--- The joined string is a filing convention and not a name the card has -- CR
--- 709.4a gives a split card two names and no combined one -- so it decides
--- where a file LIVES and never what a lookup may ask for; see #649.
-parseCard :: CardName.CardName -> Slug.Slug -> FilePath -> ByteString.ByteString -> Either CardError.CardError Card.Card
-parseCard name slug path bytes = do
-  contents <- either (\err -> invalid ("not valid UTF-8: " <> show err)) Right (Encoding.decodeUtf8' bytes)
-  card <- either (invalid . Text.unpack) Right (Common.parse contents >>= Card.fromJson)
-  let joined = CardName.join (fmap Face.name (Card.faces card))
-      actual = Slug.fromText . CardName.unwrap $ joined
-  if actual == slug
-    then Right card
-    else invalid ("is named " <> show joined <> ", which files under " <> show actual)
-  where
-    invalid reason = Left (CardError.Invalid name (path <> ": " <> reason))
+-- Says NOTHING about where the file was found: that is `filedAs` below, and
+-- keeping the two apart is what lets a root be read without a filename deciding
+-- what any of it answers for.
+parseCard :: ByteString.ByteString -> Either Text.Text Card.Card
+parseCard bytes = do
+  contents <- either (\err -> Left (Text.pack ("not valid UTF-8: " <> show err))) Right (Encoding.decodeUtf8' bytes)
+  Common.parse contents >>= Card.fromJson
 
--- Read one file, and say what a failure to read it means. The registry asks for
--- one named card, so a file that is not there is an answer (CardError.Missing)
--- rather than a crash.
-loadFile :: FilePath -> CardName.CardName -> Slug.Slug -> IO (Either CardError.CardError Card.Card)
-loadFile root name slug = do
-  result <- IOError.tryIOError (ByteString.readFile path)
-  case result of
-    -- Only a missing file is a Missing card. A permission error or a bad mount
-    -- is neither that nor an unusable card, so it passes through as the IOError
-    -- it already is.
-    Left err
-      | IOError.isDoesNotExistError err -> pure (Left (CardError.Missing name))
-      | otherwise -> Exception.throwIO err
-    Right bytes -> pure (parseCard name slug path bytes)
-  where
-    path = cardPath root slug
+-- The slug a card's file is named for: its face names joined, slugified.
+--
+-- A FILING convention and not a name the card has -- CR 709.4a gives a split
+-- card two names and no combined one (#649) -- so this decides where a file
+-- LIVES and never what a lookup may ask for. Also not Pawl.Engine.Card.combined's
+-- name, which is a different question and only coincidentally the same string:
+-- CR 715.4 gives an adventurer card its normal face's name alone, so the
+-- combined view would name embereth-shieldbreaker while the file is
+-- embereth-shieldbreaker-battle-display.
+filedAs :: Card.Card -> Slug.Slug
+filedAs = Slug.fromText . CardName.unwrap . CardName.join . fmap Face.name . Card.faces
+
+-- Every card file in a root, ascending by path, each paired with what its bytes
+-- mean. One IO pass over the whole directory: this is what a registry is built
+-- from and what the corpus-wide lints sweep, so neither has to restate how a
+-- pool is enumerated.
+--
+-- Per-file Either rather than an exception, so one pass can name every bad file
+-- instead of dying on the first -- but that covers only a file that will not
+-- PARSE. ByteString.readFile below is unguarded: a file that cannot be READ (a
+-- permission error, or one removed between listDirectory and the read) throws
+-- a raw IOException and aborts construction rather than being reported as one
+-- more problem. The deleted loadFile drew this same line; it survives here.
+--
+-- Sorted so that what a caller reports first is a fact about the pool rather
+-- than about the order a directory happens to enumerate in. Non-.json entries
+-- are ignored outright -- a README is not a broken card.
+loadRoot :: FilePath -> IO [(FilePath, Either Text.Text Card.Card)]
+loadRoot root = do
+  entries <- fmap List.sort (Directory.listDirectory root)
+  let paths = fmap (\entry -> root <> "/" <> entry) (filter (List.isSuffixOf ".json") entries)
+  mapM (\path -> fmap (\bytes -> (path, parseCard bytes)) (ByteString.readFile path)) paths

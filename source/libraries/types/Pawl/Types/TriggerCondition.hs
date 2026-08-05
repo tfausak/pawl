@@ -87,12 +87,41 @@ data TriggerCondition
     -- No zone pair is carried, so this is not a general "moved from A to B": the
     -- two zones are exactly what makes CR 113.6k apply, and a second card wanting
     -- a different pair is the one that must generalise this.
+    -- SelfPutIntoGraveyardFromAnywhere below is a card wanting NO origin zone,
+    -- and is a sibling rather than that generalisation: Narcomoeba's printed
+    -- sentence names a library and must stay silent for a discard.
     --
     -- The printed "your ... your" needs no controller check. A card is always put
     -- into its OWNER's graveyard from its OWNER's library, and a card in a
     -- graveyard has no controller (CR 108.4), so CR 113.8 makes the ability's
     -- controller that same owner.
     SelfPutIntoGraveyardFromLibrary
+  | -- | CR 603.6: "when this card is put into a graveyard from anywhere" -- Serra
+    -- Avatar's. Self-scoped like SelfEnters, and the WIDEST of the three
+    -- put-into-a-graveyard conditions: any zone at all is a legal origin, so a
+    -- discard, a mill, a countered spell and a death all fire it.
+    --
+    -- NOT a leaves-the-battlefield ability, which is CR 603.6c's own last
+    -- sentence saying so in as many words, and the reason this is a sibling of
+    -- SelfDies rather than its generalisation. Two consequences follow, and both
+    -- are what make the two constructors behave differently rather than one being
+    -- a wider Filter over the other:
+    --
+    --   * no CR 603.10a look-back. That rule's list of exceptions covers
+    --     leaves-the-battlefield abilities and this is not one, so CR 603.10's
+    --     normal reading applies: the bearer is the object as it exists
+    --     immediately AFTER the event, which is the CR 400.7 incarnation in the
+    --     graveyard. SelfDies reads the departing incarnation instead.
+    --   * CR 113.6k puts the ability in the graveyard. Since the trigger never
+    --     fires with the bearer on the battlefield, the condition cannot trigger
+    --     from there, so it functions in every zone it can trigger from -- which
+    --     is what lets a Serra Avatar discarded out of a hand trigger at all.
+    --
+    -- SUPERSET of SelfPutIntoGraveyardFromLibrary above in what it matches, and
+    -- still a separate constructor: Narcomoeba's printed sentence names one
+    -- origin zone and must stay silent for a discard, so collapsing the two would
+    -- be a rules divergence rather than a refactor.
+    SelfPutIntoGraveyardFromAnywhere
   | -- | CR 603.6c, narrowed to the one written form Doomed Traveler prints -- CR
     -- 700.4's "dies", the battlefield-to-graveyard pair. NOT the whole of CR
     -- 603.6c, whose first clause reaches any zone at all; that is

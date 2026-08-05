@@ -180,6 +180,44 @@ placeObject pid mkObj dest = do
   State.put (Game.insertIntoZone dest pid newId gs3)
   pure newId
 
+-- CR 114.2: a player gets an emblem with the given abilities, put into the
+-- command zone and both owned and controlled by them. CR 613.7a: its entry
+-- timestamp is what the projection reads when ordering the continuous effect of
+-- any static ability it carries.
+--
+-- Here rather than in Pawl.Engine.Resolve, because there are two minting sites
+-- and only one of them is an opcode: Effect.CreateEmblem is what a CARD says,
+-- and Pawl.Engine.Ring.tempt is what CR 701.54c says. An emblem built two ways
+-- would be an emblem that could differ.
+--
+-- Inert per-incarnation fields (an emblem is never tapped, damaged or
+-- countered): harmless, nothing reads them here. `enteredUnder = Nothing` is
+-- what makes Projection.defaultControllerOf answer the owner, which is CR
+-- 109.4c and so CR 114.2's last sentence.
+createEmblem :: PlayerId -> Card -> Game ObjectId
+createEmblem pid card =
+  let mkObj ts =
+        Object.MkObject
+          { Object.owner = pid,
+            Object.enteredUnder = Nothing,
+            Object.source = Source.OfEmblem card,
+            Object.zone = Zone.Command,
+            Object.tapped = TapState.Untapped,
+            Object.damage = 0,
+            Object.sickness = Sickness.Settled pid,
+            Object.bindings = Map.empty,
+            Object.counters = Map.empty,
+            Object.attachedTo = Nothing,
+            Object.chosenColor = Nothing,
+            Object.chosenSubtype = Nothing,
+            Object.chosenNames = Set.empty,
+            Object.timestamp = ts,
+            Object.face = Nothing,
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
+          }
+   in placeObject pid mkObj Zone.Command
+
 -- The single zone-change primitive (CR 400.7): the source object ceases; a NEW
 -- object with a fresh id is created in the destination, carrying owner and
 -- source forward and resetting per-incarnation state. No-op if the id is unknown.
@@ -593,7 +631,8 @@ createTokens controller card n tapped = do
                     Object.chosenNames = Set.empty,
                     Object.timestamp = ts,
                     Object.face = Nothing,
-                    Object.playableFromExileBy = Nothing
+                    Object.playableFromExileBy = Nothing,
+                    Object.ringBearerFor = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (Replacement.runEntry (Set.fromList ids)) ids
@@ -856,6 +895,31 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved zc _ ->
       ZoneChange.object zc == bearer
         && ZoneChange.from zc == Zone.Library
+        && ZoneChange.to zc == Zone.Graveyard
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+  -- CR 603.6 with NO origin zone: the destination is the whole condition, so a
+  -- discard, a mill, a countered spell and a death all match. `from` is
+  -- deliberately unread, which is the one line separating this from the two
+  -- conditions on either side of it.
+  --
+  -- Matched on `object`, the arriving incarnation, and NOT on `departed`: CR
+  -- 603.6c's last sentence takes this out of the leaves-the-battlefield family,
+  -- so CR 603.10a's look-back does not reach it and CR 603.10's normal reading --
+  -- the objects that exist immediately after the event -- applies. That is also
+  -- what makes the graveyard the one zone the scan has to find the bearer in,
+  -- however far away the card started.
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> case event of
+    GameEvent.Moved zc _ ->
+      ZoneChange.object zc == bearer
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
@@ -1176,6 +1240,11 @@ eventBindingSlots cond = case cond of
   -- incarnation, so binding it again under `became` would be a second name for
   -- one object. Narcomoeba reads the source slot instead.
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Set.empty
+  -- The same answer for the same reason: with no look-back (CR 603.6c's last
+  -- sentence), this condition's bearer already IS the arriving incarnation, so
+  -- `became` would be a second name for one object. Serra Avatar's "shuffle IT"
+  -- reads the source slot.
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> Set.empty
   -- CR 400.7e: the incarnation the card became, which CR 603.10a's look-back
   -- keeps out of the source slot.
   TriggerCondition.SelfDies -> Set.singleton Binding.became
@@ -1484,6 +1553,14 @@ functionsInGraveyard cond = case cond of
   -- from a library while on the battlefield, so this can never trigger from there
   -- and the graveyard it lands in is the one zone it can.
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> True
+  -- True for a NEARER reason than the library condition's, and the one that
+  -- matters: this condition CAN follow a battlefield-to-graveyard move, but CR
+  -- 603.6c's last sentence denies it the leaves-the-battlefield look-back, so
+  -- the bearer is never the permanent on the battlefield -- it is always the card
+  -- that arrived in the graveyard. Nothing it can trigger from is the
+  -- battlefield, so CR 113.6k puts it in every zone it can, and the graveyard is
+  -- where the scan meets it whatever zone the card came from.
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> True
   -- The mirror image, False for a reason rather than by default: a dies trigger CAN
   -- trigger from the battlefield, which CR 603.10a's look-back is what makes true
   -- of a permanent that is a graveyard card by the time the scan runs.
@@ -1538,6 +1615,7 @@ controllerTurnScoped cond = case cond of
   -- its thief's turn.
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
   TriggerCondition.SelfDies -> False
   TriggerCondition.PermanentDies _ -> False
   TriggerCondition.SelfLeavesTheBattlefield -> False
@@ -1598,6 +1676,7 @@ stateTriggers gs =
                 TriggerCondition.SelfCycled -> False
                 TriggerCondition.PlayerDiscards _ -> False
                 TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+                TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
                 TriggerCondition.SelfDies -> False
                 TriggerCondition.PermanentDies _ -> False
                 TriggerCondition.SelfLeavesTheBattlefield -> False

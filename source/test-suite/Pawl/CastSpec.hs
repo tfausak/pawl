@@ -59,6 +59,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -464,6 +465,7 @@ discardLastAnswer p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -503,9 +505,15 @@ discardLastAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -565,7 +573,8 @@ handInPlay printing board =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
+            Object.playableFromExileBy = Nothing,
+            Object.ringBearerFor = Nothing
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),
@@ -744,7 +753,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
   --
   -- That is the posture castability itself takes -- pawl refuses to propose a
   -- cast it cannot pay rather than proposing and reversing at CR 601.2h -- and
-  -- carrying it through to the announced X is what leaves Mana.announcePhyrexian
+  -- carrying it through to the announced X is what leaves Mana.announce
   -- with no cost it has no offer for (#417).
   Spec.it s "CR 601.2 an unaffordable X ends the cast before CR 601.2c's targets are asked for" $ do
     blaze <- S.printingOf s registry "Blaze"
@@ -1630,7 +1639,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   Spec.it s "CR 709.3 casting Wax gives the targeted creature +2/+2" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
@@ -1650,7 +1659,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   Spec.it s "CR 709.3 casting Wane destroys the targeted enchantment" $ do
     plains <- S.printingOf s registry "Plains"
     ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wane"
     let (prisonId, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
         (gs, oid) = S.handOne waxWane withPrison
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))
@@ -1664,7 +1673,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   -- through the game state rather than off the card, so this is the combined
   -- view a resting object actually projects.
   Spec.it s "CR 709.4b a split card in a graveyard is green and white with mana value 2" $ do
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     let (oid, gs) = S.addGraveyardCard waxWane S.alice (Setup.emptyGame S.bothPlayers)
     case Game.faceOf oid gs of
       Nothing -> Spec.assertFailure s "expected a card in the graveyard"
@@ -1679,7 +1688,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   Spec.it s "CR 709.3b the Wax on the stack is named Wax, where the card in hand is not" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
@@ -1691,7 +1700,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
       [] -> Spec.assertFailure s "expected the spell on the stack"
       top : _ -> Spec.assertEqWith s "on the stack, the half being cast" (Projection.nameOf top cast) waxName
   Spec.it s "CR 709.3a each half is offered and gated on its own" $ do
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -1747,6 +1756,7 @@ castFirstOption p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -1779,9 +1789,15 @@ castFirstOption p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -1817,6 +1833,7 @@ castPanglacial p = case p of
   Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers {} -> []
   Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
@@ -1848,9 +1865,15 @@ castPanglacial p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
+  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
+  -- test that wants the cost PAID says so with its own interpreter, which is
+  -- what makes that answer discriminating.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: the head is a legal answer -- every offered route is payable --
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
