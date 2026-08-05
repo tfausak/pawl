@@ -208,4 +208,23 @@ data TriggerCondition
     -- it (CR 608.2n) and records no event to match. The countered-ability sibling
     -- of that record does not exist, and no card in the pool wants one (#541).
     SpellOrAbilityCounters PlayerRelation.PlayerRelation
+  | -- | CR 615.13: "whenever damage that would be dealt to you is prevented" --
+    -- Selfless Squire's. Matched against GameEvent.DamagePrevented, whose
+    -- Recipient is whom the prevented damage was addressed to; the PlayerRelation
+    -- reads that player against CR 109.5's "you", the ability's controller (CR
+    -- 603.3a). PlayerDiscards' shape, not a Self- condition's: the bearer is a
+    -- creature watching damage addressed to its controller.
+    --
+    -- Scoped to a PLAYER recipient rather than any recipient, which is the
+    -- printed sentence rather than an omission -- CR 615.13 itself says nothing
+    -- about who the damage was addressed to, so a card watching damage to a
+    -- CREATURE being prevented would be a different condition, and no card in the
+    -- pool is one. It fires for damage prevented to a player and stays silent for
+    -- damage prevented to a permanent.
+    --
+    -- NOT linked to the prevention effect that fired it. Selfless Squire's own
+    -- ruling is explicit that any prevention at all triggers it, including one
+    -- its own first ability had nothing to do with; a card printing "prevented
+    -- this way" is what must add the link (#687).
+    DamageToPlayerPrevented PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)
