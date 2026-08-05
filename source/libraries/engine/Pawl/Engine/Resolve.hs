@@ -642,7 +642,7 @@ paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
         if not (Cost.canPay payer source cost gs)
           then pure False
           else do
-            decision <- Trans.lift (Program.prompt (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cost))
+            decision <- Game.ask (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cost)
             case decision of
               PaymentDecision.Declines -> pure False
               PaymentDecision.Pays -> do
