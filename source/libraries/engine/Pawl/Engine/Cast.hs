@@ -563,8 +563,8 @@ castWhileSearching pid = do
 -- symbols, then 601.2c chooses the targets, then 601.2f-h totals the cost and
 -- pays it, and 601.2i records that the spell has been cast. The spell is a stack
 -- object for the whole of its own announcement, which is what makes every read
--- below see the CR 400.7 incarnation rather than the card still sitting in a hand
--- (#89's casting half). CR 115.5 is what keeps that from being a new bug rather
+-- below see the CR 400.7 incarnation rather than the card still sitting in a hand.
+-- CR 115.5 is what keeps that from being a new bug rather
 -- than a fix: the spell now appears in its OWN Pool.Spells, and a spell on the
 -- stack being an illegal target for itself takes it back out
 -- (Target.legalRecipients).
@@ -776,7 +776,8 @@ castProposed pid sid face castFrom candidates before = do
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian
                       -- symbols announced above, then the total cost. A criterion
                       -- is read against the spell's STACK incarnation, the
-                      -- projection CR 601.2f's total is owed (#89's casting half).
+                      -- projection CR 601.2f's total is owed -- the same one
+                      -- castable's own gate read through asProposed.
                       let paidCost = Cost.total pid sid announcedCost gs
                       payment <- Cost.pay pid sid paidCost
                       case payment of
