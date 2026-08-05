@@ -2073,9 +2073,10 @@ colorsGiven pcs oid gs = PC.colors (projectGiven pcs oid gs)
 -- CR 702.178a's gate is applied HERE, over the finished projection, rather than
 -- inside the fold: "as long as your speed is 4, this object has '[Ability]'" is
 -- an ability the object has or lacks, and every reader of an object's activated
--- abilities goes through this pair. Layer 6 is asked first and this second, which
--- is the right order -- a Humility'd Muraganda Raceway has no max speed ability
--- to gate, whatever its controller's speed.
+-- abilities goes through this pair. The layer system is asked first and this
+-- second, which is the right order -- a Muraganda Raceway whose rules text CR
+-- 305.7 stripped has no max speed ability to gate, whatever its controller's
+-- speed, and CR 613.1f's LoseAllAbilities says the same of a creature.
 --
 -- The condition is re-asked on every read, not sampled: CR 604.1 makes a static
 -- ability "simply true", so speed falling would take the ability away with no

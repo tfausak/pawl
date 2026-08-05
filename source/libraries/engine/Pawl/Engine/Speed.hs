@@ -80,9 +80,10 @@ speedOf pid gs = fmap (Maybe.fromMaybe 0 . Player.speed) (Map.lookup pid (GameSt
 -- Membership, not a count: CR 704.5z asks whether a player controls "a permanent
 -- with start your engines!", so a second copy starts no second set of engines.
 --
--- The PROJECTED keywords, never the printed ones, because layer 6 grants and
--- removes abilities -- a Humility'd Raceway has no start your engines! to read
--- (CR 613.1f), and an effect that granted the keyword would be found here.
+-- The PROJECTED keywords, never the printed ones, because the layer system grants
+-- and removes abilities -- a Muraganda Raceway whose rules text CR 305.7 stripped
+-- has no start your engines! to read, CR 613.1f says the same of a creature, and
+-- an effect that GRANTED the keyword would be found here.
 --
 -- Ascending, so the pass's writes and any transcript are deterministic.
 startingEngines :: Map ObjectId PC.ProjectedCharacteristics -> GameState -> [PlayerId]
