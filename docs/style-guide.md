@@ -1,9 +1,10 @@
-# Haskell style guide
+# Style guide
 
-> [Haskell 2010](https://www.haskell.org/onlinereport/haskell2010/) ought to be enough for anybody.
+> [Haskell 2010](https://www.haskell.org/onlinereport/haskell2010/) ought to be
+> enough for anybody.
 
-This guide describes how I like to write [Haskell](https://www.haskell.org). It
-focuses more on style and best practices than formatting and layout.
+This guide describes preferences for writing Haskell. It focuses more on style
+and best practices than formatting and layout.
 
 These are _recommendations_, not hard and fast rules. Deviating from the guide
 is encouraged as long as you can defend your decision in code review.
