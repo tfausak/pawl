@@ -172,6 +172,33 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
         twice = castAndResolve S.identityAnswer S.alice secondSpell once
     Spec.assertEqWith s "the second creature was designated first" (markedFor S.alice once) [secondCreature]
     Spec.assertEqWith s "and the first creature holds it alone afterwards" (markedFor S.alice twice) [firstCreature]
+  -- CR 701.54a's "YOUR Ring-bearer", which is what makes the first ending
+  -- per-player: alice designating a creature ends alice's previous designation and
+  -- must not touch bob's. The guard that does it is `designate`'s `== Just pid`,
+  -- and every other case here tempts one player only -- so a blanket clear would
+  -- pass all of them.
+  Spec.it s "CR 701.54a two players each keep their own Ring-bearer" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    escape <- S.printingOf s registry "Birthday Escape"
+    let (_, g1) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
+        (aliceCreature, g2) = S.addCreature piker S.alice g1
+        -- bob's own side, one object at a time: S.landsInPlay only ever fills
+        -- alice's, and Birthday Escape's draw half needs bob a library to draw from
+        -- or CR 704.5b takes him out of the game before anything can be asserted.
+        (_, g3) = S.addCreature island S.bob g2
+        (_, g4) = S.addLibraryCard piker S.bob g3
+        (bobCreature, g5) = S.addCreature piker S.bob g4
+        (g6, aliceSpell) = S.handOne escape g5
+        (bobSpell, g7) = S.addHandCard escape S.bob g6
+        aliceTempted = castAndResolve S.identityAnswer S.alice aliceSpell g7
+        bobsTurn = aliceTempted {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+        bothTempted = castAndResolve S.identityAnswer S.bob bobSpell bobsTurn
+    -- Anti-vacuity: bob's temptation has to have happened at all, or "alice kept
+    -- hers" is true of a board where nothing touched it.
+    Spec.assertEqWith s "bob really was tempted" (temptationsOf S.bob bothTempted) (Just 1)
+    Spec.assertEqWith s "bob designated his own creature" (markedFor S.bob bothTempted) [bobCreature]
+    Spec.assertEqWith s "and alice still has hers" (markedFor S.alice bothTempted) [aliceCreature]
   -- CR 701.54a's SECOND ending: "or another player gains control of it". Act of
   -- Treason's grant is UntilEndOfTurn, so this also pins that the designation does
   -- not come BACK when the loan does -- the reason Object.ringBearerFor remembers a
