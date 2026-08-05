@@ -48,15 +48,16 @@ slugify is idempotent, so both remain the same lookup.
 The filename becomes **only a stem**: nothing in the lookup path reads it, and a
 file could be named anything. That the corpus files itself by the joined slug
 survives as a lint in the test suite, which is where a claim about what pawl
-ships belongs — `Pawl.CardsSpec.checkFile` already derives the path from the card
-and reads it, so the convention is enforced there without new code.
+ships belongs — a new `Pawl.CardSpec` sweep derives the path from the card and
+reads it, so the convention is enforced there.
 
 ### 3.1 The cost
 
 Startup becomes O(pool) rather than O(cards actually used): a caller who wants
 one card pays to parse all of them. At 232 files and 372 KB that is a cost the
-test suite already pays twice per run, through `Corpus.loadAll` and
-`Pawl.CardsSpec`. The pool is hand-authored and card-driven, so it grows by
+test suite already reads whole many times over per run — `Pawl.Support.allPrintings`
+alone is unmemoized and is called repeatedly from `CardSpec`, `CardsSpec` and
+`CodecIntegrationSpec`. The pool is hand-authored and card-driven, so it grows by
 single cards rather than by sets.
 
 ## 4. Why not a registry of faces

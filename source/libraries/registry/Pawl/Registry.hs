@@ -10,8 +10,9 @@
 -- Enumerating the pool is deliberately NOT in the INTERFACE: every caller that
 -- wanted it was linting the corpus pawl ships, which is a claim about the data
 -- rather than a question for a registry, and that lives in the test suite. What
--- the test suite does borrow is cardPath, parseCard, loadRoot and filedAs --
--- facts about the on-disk format rather than about looking a card up.
+-- the test suite does borrow is cardPath, loadRoot and filedAs -- facts about
+-- the on-disk format rather than about looking a card up. parseCard is an
+-- internal helper of loadRoot and has no test-suite caller of its own.
 module Pawl.Registry where
 
 import qualified Control.Exception as Exception
@@ -101,8 +102,8 @@ slugFor = Slug.fromText . CardName.unwrap
 -- pawl ships; this holds over whatever root a caller points at.
 index :: [(FilePath, Either Text.Text Card.Card)] -> Either [String] (Map.Map Slug.Slug Card.Card)
 index loaded =
-  let named' = [(path, card) | (path, Right card) <- loaded]
-      keyed = [(slugFor (Face.name face), (path, card)) | (path, card) <- named', face <- NonEmpty.toList (Card.faces card)]
+  let parsed = [(path, card) | (path, Right card) <- loaded]
+      keyed = [(slugFor (Face.name face), (path, card)) | (path, card) <- parsed, face <- NonEmpty.toList (Card.faces card)]
       unparsed = [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded]
       claims = Map.fromListWith (<>) [(slug, [path]) | (slug, (path, _)) <- keyed]
       -- A single path claiming its own slug more than once is one card
@@ -136,7 +137,7 @@ cardPath root slug = root <> "/" <> Text.unpack (Slug.unwrap slug) <> ".json"
 -- Decoded as UTF-8 explicitly rather than via Data.Text.IO.readFile, which
 -- decodes using the locale encoding -- ASCII under LC_ALL=C -- so a card with a
 -- non-ASCII character would fail with "invalid byte sequence" instead of naming
--- the offending file. The caller pairs the reason with the path.
+-- the offending file.
 --
 -- Says NOTHING about where the file was found: that is `filedAs` below, and
 -- keeping the two apart is what lets a root be read without a filename deciding
@@ -164,7 +165,11 @@ filedAs = Slug.fromText . CardName.unwrap . CardName.join . fmap Face.name . Car
 -- pool is enumerated.
 --
 -- Per-file Either rather than an exception, so one pass can name every bad file
--- instead of dying on the first.
+-- instead of dying on the first -- but that covers only a file that will not
+-- PARSE. ByteString.readFile below is unguarded: a file that cannot be READ (a
+-- permission error, or one removed between listDirectory and the read) throws
+-- a raw IOException and aborts construction rather than being reported as one
+-- more problem. The deleted loadFile drew this same line; it survives here.
 --
 -- Sorted so that what a caller reports first is a fact about the pool rather
 -- than about the order a directory happens to enumerate in. Non-.json entries

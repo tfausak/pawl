@@ -139,10 +139,6 @@ fourPlayers = alice NonEmpty.:| [bob, carol, dave]
 fourPlayerGame :: GameState.GameState
 fourPlayerGame = Setup.emptyGame fourPlayers
 
--- How a spec case fetches a card: a Nothing becomes an assertion failure naming
--- the card, so a missing card fails the case that wanted it rather than
--- escaping as an exception. This is the adapter for everything inside a
--- Spec.it, and the reason those modules need no IO.
 -- A throwaway directory holding `files` (name, contents), for the cases that
 -- need a corpus other than the committed one. The label keeps concurrently
 -- running cases in separate directories, since tasty runs them in parallel.
@@ -177,6 +173,10 @@ waxWaneJson = do
 printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
 printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
 
+-- How a spec case fetches a card: a Nothing becomes an assertion failure naming
+-- the card, so a missing card fails the case that wanted it rather than
+-- escaping as an exception. This is the adapter for everything inside a
+-- Spec.it, and the reason those modules need no IO.
 cardOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Card.Type.Card
 cardOf s registry name = do
   result <- Registry.named registry name

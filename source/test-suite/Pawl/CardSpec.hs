@@ -1635,12 +1635,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   else Just (path <> ": belongs at " <> Text.unpack (Slug.unwrap belongs) <> ".json")
     Spec.assertEqWith s "every file is filed under its own name" (Maybe.mapMaybe offends loaded) []
   -- The other direction: the sweep above SLUGIFIES the stem before comparing
-  -- it to Registry.filedAs, so a committed Wax-Wane.json would still pass it
-  -- -- Slug.fromText folds the case away before the comparison ever runs. This
-  -- case is the only thing pinning the RAW stem itself to already be a slug.
-  -- Slug.fromText normalizes rather than validates, so the assertion is that
-  -- it is the identity on every stem -- read the listing directly, because
-  -- Registry.loadRoot yields paths rather than the raw stems this needs.
+  -- it to Registry.filedAs, so a committed Wax-Wane.json would still pass it --
+  -- Slug.fromText normalizes rather than validates, folding case away before
+  -- the comparison ever runs. This case is the only thing pinning the RAW stem
+  -- itself to already be a slug, i.e. that Slug.fromText is the identity on
+  -- every stem -- read the listing directly, because Registry.loadRoot yields
+  -- paths rather than the raw stems this needs.
   Spec.it s "every file name in data/cards is already a slug" $ do
     root <- Registry.defaultRoot
     entries <- Directory.listDirectory root

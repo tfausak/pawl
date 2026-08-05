@@ -1,7 +1,7 @@
 -- Covers Pawl.Registry. Every test builds its own corpus in a temporary
 -- directory: the committed data/cards is read-only here, and the failure modes
--- (a missing file, a malformed file, two cards claiming one name) have no
--- representative in it by construction.
+-- (an unknown card, a missing root, a malformed file, two cards claiming one
+-- name) have no representative in it by construction.
 module Pawl.RegistrySpec where
 
 import qualified Control.Exception as Exception
@@ -24,7 +24,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified System.Directory as Directory
 
 -- A registry over a throwaway corpus, handing the case both the root (for the
--- paths it asserts on) and the registry itself.
+-- one case that removes a file from it) and the registry itself.
 withCorpus :: String -> [(FilePath, Text.Text)] -> (FilePath -> Registry.Registry IO -> IO a) -> IO a
 withCorpus label files action =
   S.withCorpusDir label files (\dir -> Registry.fileRegistry dir >>= action dir)
@@ -93,8 +93,8 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       Spec.assertEq s byName bySlug
 
   -- CR 709.4a: "Each split card has two names." Neither of them is the joined
-  -- string the file is named for, so a lookup by either half's own name has to
-  -- reach the file all the same (#649).
+  -- string the file is named for, so a lookup by either half's own name is a
+  -- map hit under its own key, the same as any other name (#649).
   Spec.it s "CR 709.4a a split card is found by either of its names" $ do
     waxWane <- S.waxWaneJson
     withCorpus "split-by-either-name" [("wax-wane.json", waxWane)] $ \_ registry -> do
@@ -116,7 +116,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       byJoined <- Registry.named registry "Wax // Wane"
       Spec.assertEqWith s "and not by the two joined" byJoined Nothing
 
-  Spec.it s "a card is parsed at most once: the file may vanish after the first load" $ do
+  Spec.it s "a card is parsed at most once: it is still found once its file has vanished" $ do
     piker <- S.pikerJson
     withCorpus "cached" [("goblin-piker.json", piker)] $ \root registry -> do
       first <- Registry.named registry "Goblin Piker"
@@ -147,6 +147,17 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       Spec.assertEqWith s "one problem, for the one bad file" (length problems) 1
       Spec.assertBool s (any (List.isInfixOf (root <> "/bird-maiden.json")) problems) ("names the path: " <> show problems)
       Spec.assertBool s (not (any (List.isInfixOf "goblin-piker") problems)) ("and not the good file: " <> show problems)
+
+  -- index's comment claims it "names every offender at once, not the first
+  -- (#167)" -- the single-bad-file case above cannot discriminate that from
+  -- dying on the first, since there is only one to name. Two bad files are what
+  -- proves the whole pass runs rather than stopping early.
+  Spec.it s "a corpus with two malformed files names both, not just the first" $ do
+    S.withCorpusDir "malformed-two" [("bird-maiden.json", Text.pack "{oh no"), ("wax-wane.json", Text.pack "[also no")] $ \root -> do
+      problems <- problemsOf s "malformed-two" (Registry.fileRegistry root)
+      Spec.assertEqWith s "one problem per bad file" (length problems) 2
+      Spec.assertBool s (any (List.isInfixOf (root <> "/bird-maiden.json")) problems) ("names the first: " <> show problems)
+      Spec.assertBool s (any (List.isInfixOf (root <> "/wax-wane.json")) problems) ("names the second: " <> show problems)
 
   -- CR 709.4a: a name belongs to a card, so one name answering for two cards is
   -- a broken pool rather than a lookup with a preference. Impossible while
