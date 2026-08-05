@@ -100,6 +100,15 @@ data EntryRewrite
     -- Natural settled at projection time. Splitting them would need a channel
     -- from one entry replacement to another that nothing else in CR 614.1c wants.
     --
+    -- The CounterKind is a Maybe because the count need not buy counters at all.
+    -- Wood Elemental sacrifices any number of untapped Forests and reads the
+    -- count back through a characteristic-defining ability (CR 208.2a) instead,
+    -- so it carries Nothing. The count reaches that ability the way CR 615.13's
+    -- prevented amount reaches Selfless Squire's payload: the arm stamps it on
+    -- the entering object under Pawl.Engine.Binding.sacrificedCount, a reserved
+    -- slot the card's Quantity.InSlot reads. Stamped for BOTH shapes, so the
+    -- Maybe says what the count buys and never whether it was recorded.
+    --
     -- ANY NUMBER, and CR 614.13a's "choose a number of objects that will also
     -- change zones" is the rule -- so the prompt is
     -- Prompt.ChooseAnyNumberToSacrifice, which admits every subset, and the empty
@@ -114,5 +123,5 @@ data EntryRewrite
     -- counters for EACH creature sacrificed this way" -- so it wants this
     -- constructor plus a per-permanent count. Not carried: one is what Shimatsu
     -- needs, and no devour card is in the pool.
-    SacrificeAnyNumber (Filter.Filter Keyword.Keyword) CounterKind.CounterKind
+    SacrificeAnyNumber (Filter.Filter Keyword.Keyword) (Maybe CounterKind.CounterKind)
   deriving (Eq, Ord, Show)

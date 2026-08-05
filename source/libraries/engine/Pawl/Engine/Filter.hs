@@ -112,7 +112,10 @@ data View = MkView
     -- a token's effect-defined characteristics equivalent to printed ones, so no
     -- characteristic axis distinguishes the two and no CR 613 layer can change the
     -- answer. False for every candidate with no object behind it.
-    token :: Bool
+    token :: Bool,
+    -- | CR 110.5a's tap status. Not a characteristic, so no projection writes it;
+    -- read straight off the object.
+    tapped :: Bool
   }
   deriving (Eq, Show)
 
@@ -153,7 +156,8 @@ playerView pid =
       -- AttachTarget arm, whose candidates are battlefield permanents.
       canHostSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
-      token = False
+      token = False,
+      tapped = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -242,6 +246,7 @@ matches context view predicate = case predicate of
   -- the two arms above it cannot change while the game runs, because CR 111.3
   -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
+  Filter.IsTapped -> tapped view
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
@@ -289,6 +294,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsAttachedToPermanent -> predicate
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
+  Filter.IsTapped -> predicate
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as

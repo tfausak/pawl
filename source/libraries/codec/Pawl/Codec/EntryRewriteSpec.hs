@@ -12,6 +12,7 @@ import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -90,5 +91,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       s
       EntryRewrite.toJson
       EntryRewrite.fromJson
-      (EntryRewrite.SacrificeAnyNumber (Filter.And []) CounterKind.PlusOnePlusOne)
+      (EntryRewrite.SacrificeAnyNumber (Filter.And []) (Just CounterKind.PlusOnePlusOne))
       """ {"type":"SacrificeAnyNumber","value":[{"type":"And","value":[]},{"type":"PlusOnePlusOne"}]} """
+  -- The same rewrite buying no counters: Wood Elemental's count is read back by
+  -- a characteristic-defining ability instead (CR 208.2a), so the second element
+  -- is null. Its criterion is the narrowing one -- an untapped Forest (CR 110.5).
+  Spec.it s "SacrificeAnyNumber with no counters (Wood Elemental)" $
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      (EntryRewrite.SacrificeAnyNumber (Filter.And [Filter.HasSubtype Subtype.Forest, Filter.Not Filter.IsTapped]) Nothing)
+      """ {"type":"SacrificeAnyNumber","value":[{"type":"And","value":[{"type":"HasSubtype","value":{"type":"Forest"}},{"type":"Not","value":{"type":"IsTapped"}}]},null]} """
