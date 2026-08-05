@@ -234,6 +234,19 @@ actionSpec s registry = Spec.describe s "Action" $ do
     mountain <- S.printingOf s registry "Mountain"
     Spec.assertEqWith s "only pass" (Action.legalActions S.alice (S.oneMountainState mountain (Phase.Beginning BeginningStep.Upkeep))) [A.Pass]
 
+  -- CR 305.1 / 116.2a: a land play needs an EMPTY STACK as well as a main phase
+  -- of the player's own turn -- the same three conjuncts CR 307.5's window has,
+  -- which is why the gate asks Turn.sorcerySpeedWindow rather than keeping its
+  -- own near-copy. The empty-stack board is the falsifier: a gate that offered
+  -- nothing at all would satisfy the second assertion for the wrong reason.
+  Spec.it s "CR 305.1 no land play while a spell is on the stack" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = S.oneMountainState mountain Phase.PrecombatMain
+        (_, withSpell) = S.spellOnStack piker S.alice base
+    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice base) "playable while the stack is empty"
+    Spec.assertEqWith s "only pass while a spell is on it" (Action.legalActions S.alice withSpell) [A.Pass]
+
   -- CR 305.2b: with the normal allowance of one already spent, no further play
   -- is legal. The raised-allowance half of CR 305.2 is Pawl.PlayerEffectSpec's
   -- Exploration and Azusa group.

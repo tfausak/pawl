@@ -51,12 +51,16 @@ playableLands pid gs =
 
 legalActions :: PlayerId -> GameState -> [Action]
 legalActions pid gs =
-  let -- CR 702.8a's window says "play this card", which reaches a land as well
+  let -- CR 305.1 / 116.2a: the window is a main phase of this player's own turn
+      -- with the stack empty, which is CR 307.5's "as a sorcery" window
+      -- conjunct for conjunct -- so it is asked through the one predicate rather
+      -- than a near-copy that can drift (see Turn.sorcerySpeedWindow).
+      --
+      -- CR 702.8a's window says "play this card", which reaches a land as well
       -- as a spell; this gate does not consult the keyword, so a land card with
       -- flash would still be playable only at sorcery speed (#566).
       canPlayLand =
-        Turn.isMainPhase (GameState.phase gs)
-          && GameState.activePlayer gs == pid
+        Turn.sorcerySpeedWindow pid gs
           -- CR 305.2a: compare the number of lands this player CAN play this
           -- turn with the number they HAVE already played; the play is legal
           -- only if the first is greater. A comparison of two counts and never
