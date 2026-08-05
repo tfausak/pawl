@@ -834,6 +834,9 @@ triggeredAbilityOffends ability =
 --     listed in rules 601.2b-i", which is what routes an activation through CR
 --     601.2c's target announcement -- and CR 700.2c scopes it to the chosen
 --     mode.
+--   * Binding.you. CR 109.5: "For an activated ability, this is the player who
+--     activated the ability" -- stamped for every activation alongside the
+--     source slot, so Brothers of Fire's "and 1 damage to you" is a slot read.
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
@@ -847,11 +850,6 @@ triggeredAbilityOffends ability =
 --
 -- What is NOT on it is the point:
 --
---   * CR 109.5's `you`, which for an activated ability the rule does define
---     ("For an activated ability, this is the player who activated the
---     ability") -- but Binding.setYou is called only when a TRIGGERED ability is
---     placed (Pawl.Engine.Engine, Pawl.Engine.Monarch), so an activated ability
---     reading the slot reads nothing (#569).
 --   * both event slots (CR 400.7e's `became`, CR 702.70a's `thatPlayer`): an
 --     activation is not an event, so Pawl.Engine.Event.eventBindings never runs
 --     for one.
@@ -875,7 +873,7 @@ activatedAbilityOffends ability =
         if declaresVariable (Cost.Type.mana (ActivatedAbility.cost ability))
           then Set.singleton Binding.variableX
           else Set.empty
-   in modalReadOffends (Set.insert Binding.triggerSource announcedX) (ActivatedAbility.modal ability)
+   in modalReadOffends (Set.union (Set.fromList [Binding.triggerSource, Binding.you]) announcedX) (ActivatedAbility.modal ability)
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
@@ -1923,9 +1921,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
-  -- The same subset shape over a card's ACTIVATED abilities, whose available
-  -- side is the narrowest of the three: an activation has no event, and is never
-  -- given CR 109.5's `you`. See activatedAbilityOffends for the available side.
+  -- The same subset shape over a card's ACTIVATED abilities, and the one
+  -- available side with no event slot on it at all: an activation is not an
+  -- event. See activatedAbilityOffends for the whole of it.
+  --
+  -- Brothers of Fire is what this caught: its "and 1 damage to you" reads CR
+  -- 109.5's slot from an ACTIVATED ability, which nothing bound until
+  -- Activate.activateAbility started stamping it (#569).
   Spec.it s "every slot an activated ability reads is bound for its activation" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
@@ -1939,18 +1941,21 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith s "no dangling activated-ability slot" (fmap fst (filter (activatedAbilityOffends . snd) abilities)) []
   -- The sweep above passes VACUOUSLY on the rejecting side: no committed
   -- activated ability reads a slot it is not given, so the REJECTING direction is
-  -- proven here instead, against hand-built offenders and against three real
-  -- cards that exercise each part of the available side.
+  -- proven here instead, against hand-built offenders and against the four real
+  -- cards that between them exercise every part of the available side.
   --
   -- Every reserved slot an activation does NOT bind gets its own case, because a
   -- classification answering "every slot, always" would pass any one of them
-  -- alone. The `you` case is asserted twice over: rejected for an activated
-  -- ability AND accepted for a triggered one, which is the whole difference
-  -- between the two lints (Binding.setYou is stamped only on the triggered path).
+  -- alone. CR 109.5's `you` is the case that runs the other way, and is asserted
+  -- on BOTH lints: the rule defines the word for an activated ability and for a
+  -- triggered one, so the same effect is accepted either way (#569). Leaving it
+  -- off one lint's available side is what a card would then fail on, so the pair
+  -- is what keeps the two halves of the rule from drifting apart.
   Spec.it s "the lint itself catches an activated ability reading a slot activation never binds" $ do
     longtuskCub <- S.printingOf s registry "Longtusk Cub"
     sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
     cinderElemental <- S.printingOf s registry "Cinder Elemental"
+    brothers <- S.printingOf s registry "Brothers of Fire"
     let free = Just (ManaCost.MkManaCost [])
         variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
         -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
@@ -1968,8 +1973,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         drawX = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Type.InSlot Binding.variableX)
     Spec.assertBool
       s
-      (activatedAbilityOffends (oneEffectActivated free youDiscards))
-      "CR 109.5 you is rejected: an activation never binds it"
+      (not (activatedAbilityOffends (oneEffectActivated free youDiscards)))
+      "CR 109.5 you is accepted: an activation binds the player who activated it"
     Spec.assertBool
       s
       (not (triggeredAbilityOffends (oneEffectTrigger TriggerCondition.SelfDies youDiscards)))
@@ -1998,14 +2003,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (activatedAbilityOffends (oneEffectActivated free drawX))
       "and rejected when it does not"
-    -- The three real cards between them cover every part of the available side
+    -- The four real cards between them cover every part of the available side
     -- that a committed card reaches: CR 113.7's self, CR 601.2c's declared
-    -- target, and an ability whose cost carries CR 601.2b's {X}.
+    -- target, an ability whose cost carries CR 601.2b's {X}, and CR 109.5's
+    -- `you`. Brothers of Fire is the last one's only producer, so dropping it
+    -- from this list would leave that part of the available side asserted by
+    -- the hand-built case alone.
     Spec.assertEqWith
       s
-      "Longtusk Cub, Prodigal Sorcerer and Cinder Elemental are all accepted"
-      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental])
-      [False, False, False]
+      "Longtusk Cub, Prodigal Sorcerer, Cinder Elemental and Brothers of Fire are all accepted"
+      (fmap (any activatedAbilityOffends . Face.activatedAbilities . S.combinedFace) [longtuskCub, sorcerer, cinderElemental, brothers])
+      [False, False, False, False]
   -- The PER-MODE half of all three read lints (#570), which no sweep above can
   -- reach: a one-mode ability cannot have a mode read another mode's slot at
   -- all, and all three multi-mode abilities in the pool have each mode reading

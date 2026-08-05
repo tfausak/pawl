@@ -105,6 +105,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
   variableActivationCostSpec s registry
+  youOnActivatedAbilitySpec s registry
   textChangedAbilitySpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
@@ -1320,6 +1321,112 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
     (_, noneId, none) <- cinderBoard s registry 0
     Spec.assertBool s (Activate.activatable S.alice srcId (theAbility cinder) one) "one Mountain admits X=0"
     Spec.assertBool s (not (Activate.activatable S.alice noneId (theAbility cinder) none)) "no Mountain pays even the {R}"
+
+-- Aims every target slot at one CREATURE. aimAt's counterpart for a board whose
+-- point is that no PLAYER was targeted: CR 115.4's "any target" pool offers a
+-- creature as Recipient.ToCreature, so a life total left at 20 is proof the
+-- targeted instruction went elsewhere.
+aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  _ -> S.identityAnswer p
+
+-- alice's three untapped Mountains, `owner`'s Brothers of Fire and the other
+-- player's Hill Giant, with `owner` holding priority. Returns the Brothers, the
+-- Giant and the state.
+brothersBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+brothersBoard brothers mountain hillGiant owner =
+  let other = if owner == S.alice then S.bob else S.alice
+      lands = List.foldl' (\g _ -> snd (S.addCreature mountain owner g)) (Setup.emptyGame S.bothPlayers) [1 :: Int .. 3]
+      (srcId, g1) = S.addCreature brothers owner lands
+      (giantId, g2) = S.addCreature hillGiant other g1
+   in (srcId, giantId, g2 {GameState.priority = Just owner})
+
+-- CR 109.5's ACTIVATED-ability sentence, on the path that had no answer for it
+-- (#569): "The words 'you' and 'your' on an object refer to the object's
+-- controller ... For an activated ability, this is the player who activated the
+-- ability."
+--
+-- Brothers of Fire -- "{1}{R}{R}: This creature deals 1 damage to any target and
+-- 1 damage to you" (checked against Scryfall) -- is the pool's first card whose
+-- ACTIVATED ability names its controller through a reserved SLOT rather than
+-- through an opcode carrying a PlayerRef (#378): DealDamage takes an ObjectRef,
+-- which reaches a player only through a bound recipient. CR 120.3a is what turns
+-- that damage into the life loss these assertions read: "Damage dealt to a player
+-- by a source without infect causes that player to lose that much life."
+--
+-- THE FALSIFIER for the group: an unbound `you` is a silent NO-OP rather than a
+-- crash -- Resolve finds no recipient for the instruction and it does nothing --
+-- so the controller sits at 20 while the targeted half resolves normally. Both
+-- halves are asserted in every case, because a one-sided assertion would also
+-- pass for an engine that aimed both instructions at the same recipient.
+youOnActivatedAbilitySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+youOnActivatedAbilitySpec s registry = Spec.describe s "YouOnActivatedAbility" $ do
+  -- The "any target" half is aimed at a CREATURE, never at a player, which is
+  -- what makes the controller's life loss attributable: alice is not a recipient
+  -- of the targeted instruction at all, so her 19 can only have come from the
+  -- `you` one. Hill Giant is a 3/3, so it survives the ping and CR 120.3e's mark
+  -- is readable straight off it.
+  Spec.it s "CR 109.5/120.3a whole card: Brothers of Fire pings a creature and burns the player who activated it" $ do
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    mountain <- S.printingOf s registry "Mountain"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (srcId, giantId, board) = brothersBoard brothers mountain hillGiant S.alice
+        act = do Activate.activateAbility S.alice srcId (theAbility brothers); Stack.resolveTop
+        after = snd (Engine.runGamePure (aimAtCreature giantId) board act)
+    Spec.assertEqWith s "one damage marked on bob's Giant" (S.damageOf giantId after) (Just 1)
+    Spec.assertEqWith s "and alice, who activated it, took the other one" (S.lifeOf S.alice after) (Just 19)
+    Spec.assertEqWith s "bob was never a recipient of either half" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "all three Mountains paid the {1}{R}{R}" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "and nothing was left on the stack" (GameState.stack after) []
+
+  -- WHICH player, asserted against the two constants that would pass the case
+  -- above: the same card under bob's control burns BOB, while alice is still the
+  -- active player and still at 20. An engine stamping GameState.activePlayer, or
+  -- the game's first player, cannot pass both cases.
+  Spec.it s "CR 109.5/602.2 the burn follows the player who activated it, not the active player" $ do
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    mountain <- S.printingOf s registry "Mountain"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (srcId, giantId, board) = brothersBoard brothers mountain hillGiant S.bob
+        act = do Activate.activateAbility S.bob srcId (theAbility brothers); Stack.resolveTop
+        after = snd (Engine.runGamePure (aimAtCreature giantId) board act)
+    Spec.assertEqWith s "alice is the active player throughout" (GameState.activePlayer after) S.alice
+    Spec.assertEqWith s "one damage marked on alice's Giant" (S.damageOf giantId after) (Just 1)
+    Spec.assertEqWith s "bob, who activated it, took the other one" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "and alice's life is untouched" (S.lifeOf S.alice after) (Just 20)
+
+  -- The binding is on the ABILITY OBJECT, which is what lets it survive its
+  -- source. CR 113.7a: "Once activated or triggered, an ability exists on the
+  -- stack independently of its source." Asserted before resolution, so this reads
+  -- the stamp itself rather than its consequence -- the twin of the CR 601.2b
+  -- announced-X assertion above.
+  Spec.it s "CR 109.5/113.7a the activator is bound on the ability object as it goes on the stack" $ do
+    brothers <- S.printingOf s registry "Brothers of Fire"
+    mountain <- S.printingOf s registry "Mountain"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    let (srcId, giantId, board) = brothersBoard brothers mountain hillGiant S.alice
+        after = snd (Engine.runGamePure (aimAtCreature giantId) board (Activate.activateAbility S.alice srcId (theAbility brothers)))
+    case GameState.stack after of
+      [] -> Spec.assertFailure s "expected the ability on the stack"
+      top : _ -> case Game.lookupObject top after of
+        Nothing -> Spec.assertFailure s "stack id should resolve"
+        Just obj -> do
+          Spec.assertEqWith
+            s
+            "you names alice"
+            (Map.lookup Binding.you (Object.bindings obj))
+            (Just (Binding.toPlayer S.alice))
+          Spec.assertEqWith
+            s
+            "and CR 113.7's source slot still names the Brothers"
+            (Map.lookup Binding.triggerSource (Object.bindings obj))
+            (Just (Binding.toObject srcId))
 
 -- Answers the Hack: it targets `spellId` (rather than identityAnswer's
 -- lowest-id land) and swaps `from` for `to`. Everything else falls through to

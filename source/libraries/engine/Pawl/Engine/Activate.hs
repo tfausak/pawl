@@ -410,14 +410,25 @@ activateAbility pid srcId ability = do
             else do
               -- CR 113.7: bind the source permanent under the reserved self slot, so
               -- an activated ability that refers to "this creature" (Longtusk Cub)
-              -- resolves the reference as a slot read -- exactly as Engine.placeOne
-              -- does for a TRIGGERED ability's source.
+              -- resolves the reference as a slot read -- exactly as
+              -- Engine.placeBorne does for a TRIGGERED ability's source.
+              --
+              -- CR 109.5 binds the controller under the reserved you slot in the
+              -- same breath: "The words 'you' and 'your' on an object refer to the
+              -- object's controller ... For an activated ability, this is the
+              -- player who activated the ability." That player is `pid`, the one
+              -- CR 602.2 lets activate this ability at all -- so Brothers of Fire's
+              -- "and 1 damage to you" reaches a player, exactly as
+              -- Engine.placeBorne does for a TRIGGERED ability's controller.
               --
               -- CR 601.2b's announced X is stamped alongside, onto the ABILITY object
               -- and not the source permanent -- Cinder Elemental sacrifices that
               -- permanent to pay, so the ability is the only holder still there to
-              -- read at resolution (Quantity.evaluateFor).
-              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes)}) abilId (GameState.objects g)})
+              -- read at resolution (Quantity.evaluateFor). CR 113.7a is why the
+              -- ability keeps all three once its source is gone: "Once activated or
+              -- triggered, an ability exists on the stack independently of its
+              -- source."
+              State.modify' (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.bindings = Binding.setYou pid (Binding.setTriggerSource srcId (Binding.fromChoices chosen mAmount chosenModes))}) abilId (GameState.objects g)})
               -- CR 601.2g/h via Pawl.Engine.Cost.pay: the mana window, then the
               -- components. The gates above prove SOME sequence of choices pays for
               -- this ability -- but Unpaid is reachable all the same, because the
