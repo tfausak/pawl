@@ -1463,12 +1463,21 @@ counterSpec s registry = Spec.describe s "Counter" $ do
 -- reason.
 manaLeakBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
 manaLeakBoard island manaLeak piker bobLands =
+  let (victimId, leakId, gs) = manaLeakHand island manaLeak piker bobLands
+   in (victimId, snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId)))
+
+-- manaLeakBoard one step earlier, with the Leak still in alice's hand. Split out
+-- for the case that has to RECORD the cast as well as the resolution: an engine
+-- that offered CR 118.12a's cost at cast time would put its prompt outside a
+-- transcript that starts afterwards, and the countered-Leak case below exists to
+-- catch exactly that.
+manaLeakHand :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+manaLeakHand island manaLeak piker bobLands =
   let base = S.landsInPlay island 2
       withBob = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) base [1 .. bobLands]
       (victimId, onStack) = S.spellOnStack piker S.bob withBob
       (gs, leakId) = S.handOne manaLeak onStack
-      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId))
-   in (victimId, cast)
+   in (victimId, leakId, gs)
 
 -- Pays what a resolving spell offers BOB, and takes the identity fallback
 -- elsewhere (the hackToIsland liar pattern). Deliberately unlike
@@ -1506,15 +1515,21 @@ thaliaLeakBoard island thalia manaLeak piker =
       cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice leakId))
    in (victimId, cast)
 
--- Aims a target choice at the lowest-id legal recipient that is NOT `notThis`,
--- and takes the identity fallback elsewhere. What lets bob's Cancel name alice's
--- Mana Leak: identityAnswer would take Set.lookupMin over the whole stack and hit
--- the Piker, which was there first.
-targetOtherThan :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-targetOtherThan notThis p = case p of
-  Prompt.ChooseTargets _ _ _ sets ->
-    Map.mapMaybe (Set.lookupMin . Set.filter (\r -> Recipient.objectOf r /= Just notThis)) sets
-  _ -> S.identityAnswer p
+-- bobPaysAnswer, plus: BOB's target choices avoid `notThis`. What lets one
+-- interpreter drive the whole countered-Leak exchange -- alice's Mana Leak takes
+-- identityAnswer's lowest-id recipient and hits the Piker, which was on the stack
+-- first, while bob's Cancel skips the Piker and hits the Leak above it. The two
+-- casts are told apart by WHO is casting, which is on the prompt.
+--
+-- Still pays for bob wherever a cost is offered, which is the whole point: the
+-- exchange must be able to answer a ChooseToPay, so that a transcript with none
+-- in it says the prompt was never raised rather than that nobody would have paid.
+bobPaysAndCounters :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+bobPaysAndCounters notThis p = case p of
+  Prompt.ChooseTargets _ player _ sets
+    | player == S.bob ->
+        Map.mapMaybe (Set.lookupMin . Set.filter (\r -> Recipient.objectOf r /= Just notThis)) sets
+  _ -> bobPaysAnswer p
 
 -- The pay-or-not answers in a transcript, in order.
 payResponses :: [Response.Response] -> [Response.Response]
@@ -1613,7 +1628,10 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
   -- CR 608.2d's timing, from the other side of Prompt.ChooseToPay's claim that a
   -- countered Mana Leak never asks: the cost is offered when the spell RESOLVES,
   -- so a spell that never resolves offers nothing. The MagicalHackTiming pair
-  -- makes the same argument about a resolution-time choice.
+  -- makes the same argument about a resolution-time choice, and this is built the
+  -- same way -- the CAST is inside the recording, because an engine that offered
+  -- the cost at CR 601.2b-f would raise its prompt there and a transcript opened
+  -- afterwards would never see it.
   Spec.it s "CR 608.2d a countered Mana Leak never offers its cost" $ do
     island <- S.printingOf s registry "Island"
     manaLeak <- S.printingOf s registry "Mana Leak"
@@ -1622,20 +1640,24 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     -- SIX Islands for bob, not three: three pay Cancel's {1}{U}{U} and three are
     -- left over. Without the spare three he could not have paid {3} anyway, and
     -- an empty transcript would prove nothing (CR 118.3 would be the reason).
-    let (victimId, cast) = manaLeakBoard island manaLeak piker 6
-        (cancelId, withCancel) = S.addHandCard cancel S.bob cast
-        -- The Piker is the lowest-id spell on the stack, so identityAnswer would
-        -- aim Cancel at IT; this aims at the next one up, which is the Leak.
-        countered = snd (Engine.runGamePure (targetOtherThan victimId) withCancel (S.cast S.bob cancelId))
-        ((_, after), transcript) = Replay.record bobPaysAnswer countered Stack.resolveTop
-    Spec.assertEqWith s "bob was never offered the {3}" (payResponses transcript) []
-    -- And not because he could not have paid it: three Islands are still
-    -- untapped. Had the Leak resolved, bobPaysAnswer would have spent them and
-    -- this would read 6.
-    Spec.assertEqWith s "only Cancel's three Islands are tapped" (S.tappedCount S.bob after) 3
+    let (victimId, leakId, board) = manaLeakHand island manaLeak piker 6
+        (cancelId, gs) = S.addHandCard cancel S.bob board
+        exchange = do
+          S.cast S.alice leakId
+          S.cast S.bob cancelId
+          Stack.resolveTop
+        ((_, after), transcript) = Replay.record (bobPaysAndCounters victimId) gs exchange
+    -- The control: the exchange really happened. CR 701.6a puts the countered
+    -- Leak into its owner's graveyard, and CR 608.2n puts Cancel into bob's.
     Spec.assertEqWith s "CR 701.6a: the countered Leak is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
     Spec.assertEqWith s "CR 608.2n: Cancel resolved into bob's" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
     Spec.assertBool s (elem victimId (GameState.stack after)) "and the Piker, never the Leak's business again, is still on the stack"
+    -- And the point: a spell that never resolves never offers its cost.
+    Spec.assertEqWith s "bob was never offered the {3}" (payResponses transcript) []
+    -- Not because he could not have paid it: three Islands are still untapped,
+    -- and this interpreter pays whenever it is asked. Offered at either end of
+    -- the exchange, this would read 6.
+    Spec.assertEqWith s "only Cancel's three Islands are tapped" (S.tappedCount S.bob after) 3
 
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
 -- added FIRST, so it holds the lowest object id and identityAnswer's
