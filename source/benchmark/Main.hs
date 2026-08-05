@@ -105,6 +105,9 @@ alwaysPass p = case p of
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
+  -- permanent away. The engine's own replay fallback takes the maximal one.
+  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
@@ -167,6 +170,9 @@ castAnswer p = case p of
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
+  -- permanent away. The engine's own replay fallback takes the maximal one.
+  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
@@ -230,6 +236,9 @@ fightAnswer p = case p of
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
+  -- permanent away. The engine's own replay fallback takes the maximal one.
+  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand

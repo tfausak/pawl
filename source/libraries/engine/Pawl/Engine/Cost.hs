@@ -24,12 +24,12 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
-import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import Pawl.Types.Cost (Cost)
@@ -38,7 +38,6 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Face as Face
-import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -296,31 +295,11 @@ removeLoyalty n obj =
   let have = Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj)
    in obj {Object.counters = Map.insert CounterKind.Loyalty (Natural.minusSaturating have n) (Object.counters obj)}
 
--- Which permanents a Filter admits, matched through the PROJECTION and never
--- against printed characteristics: card types and subtypes are CR 613.1d layer 4,
--- so Blood Moon changes the answer. A sacrifice cost frames no player, so the
--- perspective is Nothing (its filters never reference one).
---
--- The lower Pawl.Engine.Filter is the ONE matcher: Pawl.Engine.Replacement
--- narrows its permanents through the same call, so there is no duplicate to keep
--- in step and no Cost->Replacement cycle to avoid (#111).
-matchesFilter :: GameState -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesFilter gs filter_ oid =
-  -- No source in scope at this site.
-  Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
-
--- The permanents this player may sacrifice for a Filter, ascending -- the order
--- ChooseSacrifices offers them in, which is what makes both the elision test and
--- the transcript fallback deterministic.
-sacrificeCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-sacrificeCandidates pid filter_ gs =
-  List.sort (filter (matchesFilter gs filter_) (Projection.controls pid gs))
-
 -- The cards this player may discard to pay a cost on `oid`: their hand, in its
 -- own order, minus `oid` itself. See canPayComponent's DiscardCards arm for why
 -- the exclusion is CR 601.2a and not a convenience. Hand order rather than
--- sorted, unlike sacrificeCandidates: Game.zoneMembers already returns a hand in
--- a fixed order, which Prompt.ChooseDiscard offers it in.
+-- sorted, unlike Replacement.sacrificeCandidates: Game.zoneMembers already
+-- returns a hand in a fixed order, which Prompt.ChooseDiscard offers it in.
 discardCandidates :: PlayerId -> ObjectId -> GameState -> [ObjectId]
 discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid gs)
 
@@ -366,7 +345,7 @@ canPayComponent pid oid component gs = case component of
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
   -- effect" is not enforced across two components of ONE cost (#104).
   CostComponent.Sacrifice n criterion ->
-    Natural.length (sacrificeCandidates pid criterion gs) >= n
+    Natural.length (Replacement.sacrificeCandidates pid criterion gs) >= n
   -- CR 601.2f: payable only if the hand holds at least that many cards.
   --
   -- `oid` is excluded, and that is CR 601.2a, not a convenience: the card moves
@@ -490,7 +469,7 @@ payComponent pid oid component = case component of
   -- no-op.
   CostComponent.Sacrifice n criterion -> do
     gs <- State.get
-    let candidates = sacrificeCandidates pid criterion gs
+    let candidates = Replacement.sacrificeCandidates pid criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length candidates <= n
@@ -567,7 +546,7 @@ payComponent pid oid component = case component of
     State.modify' (\gs -> gs {GameState.players = Map.adjust spend pid (GameState.players gs)})
     pure Payment.Paid
   -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
-  -- through Replacement.putCounters, which is the CR 614 funnel: CR 614.16 admits
+  -- through Event.putCounters, which is the CR 614 funnel: CR 614.16 admits
   -- a counter-scaling replacement (Doubling Season, Hardened Scales) only where a
   -- resolving spell or ability's EFFECT puts the counter on, and a cost is not an
   -- effect. The counters CR 306.5b's enters-with replacement places DO go through

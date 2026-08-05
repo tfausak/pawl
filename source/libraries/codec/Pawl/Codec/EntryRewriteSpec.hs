@@ -81,3 +81,14 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       EntryRewrite.UnderSourceControl
       """ {"type":"UnderSourceControl"} """
+  -- CR 614.1c / 701.21a: an as-enters sacrifice of any number, carrying both the
+  -- criterion the chosen permanents must match -- Shimatsu the Bloodcloaked's is
+  -- "any number of permanents", the empty conjunction -- and the counter kind the
+  -- count buys.
+  Spec.it s "SacrificeAnyNumber (Shimatsu the Bloodcloaked)" $
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      (EntryRewrite.SacrificeAnyNumber (Filter.And []) CounterKind.PlusOnePlusOne)
+      """ {"type":"SacrificeAnyNumber","value":[{"type":"And","value":[]},{"type":"PlusOnePlusOne"}]} """

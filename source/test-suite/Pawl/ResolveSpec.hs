@@ -3205,7 +3205,7 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
         after = proliferate proliferatesNothing src gs
     Spec.assertEqWith s "the creature is untouched" (S.counterOf CounterKind.PlusOnePlusOne src after) 2
     Spec.assertEqWith s "bob is untouched" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
-  -- The counter placement rides Replacement.putCounters, so CR 614's counter
+  -- The counter placement rides Event.putCounters, so CR 614's counter
   -- replacements get their opportunity -- proliferate is not a side door that
   -- bypasses Hardened Scales.
   Spec.it s "CR 614 Hardened Scales applies to the counter proliferate adds" $ do
@@ -3275,6 +3275,7 @@ targetsPlayer victim p = case p of
 namesInstead :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 namesInstead wanted p = case p of
   Prompt.ChooseSacrifices {} -> Set.singleton wanted
+  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
   _ -> S.identityAnswer p
 
 -- Answers Prompt.ChooseSacrifices with `wanted`, when it is on offer. A pair of
@@ -3284,6 +3285,7 @@ sacrifices :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 sacrifices wanted p = case p of
   Prompt.ChooseSacrifices _ _ _ candidates _ ->
     if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
+  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
   _ -> S.identityAnswer p
 
 playerSacrificesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
