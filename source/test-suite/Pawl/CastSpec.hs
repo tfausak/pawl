@@ -487,6 +487,20 @@ castSpec s registry = Spec.describe s "Cast" $ do
     Spec.assertEqWith s "Panglacial is on the stack" onStack 1
     Spec.assertEqWith s "Panglacial left the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
     Spec.assertEqWith s "seven Forests tapped to pay {5}{G}{G}" (S.tappedCount S.alice after) 7
+  -- CR 601.3's subject is "a spell or ability". The offer used to be made from
+  -- Stack's Source.OfAbility arm alone, so a searching SPELL never got it; it now
+  -- lives in the Search effect itself, which both paths reach (#57).
+  Spec.it s "CR 601.3 a searching SPELL offers the cast too" $ do
+    forest <- S.printingOf s registry "Forest"
+    rampantGrowth <- S.printingOf s registry "Rampant Growth"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
+    let base = S.landsInPlay forest 9
+        (_, withWurm) = S.addLibraryCard panglacialWurm S.alice base
+        (_, withLand) = S.addLibraryCard forest S.alice withWurm
+        (growthId, gs) = S.addHandCard rampantGrowth S.alice withLand
+        after = S.runPure castFirstOption gs (S.cast S.alice growthId >> Stack.resolveTop)
+    Spec.assertEqWith s "Panglacial left the library, so the search offered it" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
+
   Spec.it s "CR 601.2i casting a spell records a SpellCast event for the caster" $ do
     mountain <- S.printingOf s registry "Mountain"
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
