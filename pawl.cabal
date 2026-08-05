@@ -700,6 +700,7 @@ test-suite pawl-test-suite
     Pawl.ManaSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
+    Pawl.PerformanceSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
