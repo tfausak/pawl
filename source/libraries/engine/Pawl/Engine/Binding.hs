@@ -63,8 +63,11 @@ triggerSource = SlotName.MkSlotName (Text.pack "self")
 -- "For an activated ability, this is the player who activated the ability. For
 -- a triggered ability, this is the controller of the object when the ability
 -- triggered". Pawl.Engine.Activate.activateAbility answers the first;
--- Pawl.Engine.Engine.placeBorne and Pawl.Engine.Monarch.placeInherent (CR
--- 725.2's sourceless pair) answer the second.
+-- Pawl.Engine.Engine.placeBorne answers the second. CR 725.2's monarch pair is
+-- the third stamp site (Pawl.Engine.Monarch.placeInherent): those abilities
+-- have no object for CR 109.5's second sentence to name a controller of, and CR
+-- 725.2 supplies one itself -- "controlled by the player who was the monarch at
+-- the time the abilities triggered".
 --
 -- A SPELL binds nothing here (#719). Every spell in the pool that says "you"
 -- says it through an opcode carrying a PlayerRef, which Pawl.Engine.Resolve
