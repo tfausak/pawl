@@ -172,6 +172,9 @@ inherentPending :: [GameEvent] -> GameState -> [PendingTrigger]
 inherentPending events gs =
   let you = GameState.activePlayer gs
       opponents = Set.fromList (filter (/= you) (Game.stillPlaying gs))
+      -- A PARTIAL case with a wildcard, Pawl.Engine.Monarch.inherentMatch's
+      -- posture and not an oversight: this matcher answers about one event shape,
+      -- and a new GameEvent constructor is not an event rule 702.179d names.
       lostLife event = case event of
         GameEvent.LifeLost pid _ -> Set.member pid opponents
         _ -> False
