@@ -136,13 +136,12 @@ instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 --
 -- MEASURED BEFORE THE MOVE, which castSpell no longer is, and that is structural
 -- rather than an oversight: this is an OFFER, computed by Action.legalActions
--- while every card is still where it was, and there is no honest way to ask it of
--- a stack incarnation that does not exist. The two agree for every card in this
+-- while every card is still where it was. The two agree for every card in this
 -- pool, because the only object whose stack membership the move changes is the
 -- spell itself and CR 115.5 takes that one back out of every stack pool
--- (Target.legalRecipients); a card whose cost or targeting genuinely differs
--- between hand and stack is #89's own expiry trigger. castableWhileSearching
--- reads the same pre-move projection for the same reason.
+-- (Target.legalRecipients). What the CHOSEN HALF changes is no longer part of
+-- that argument: `castable` hands every conjunct a state with the half stamped
+-- on (asProposed), so the specs read here are the ones the move would show.
 targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
@@ -162,11 +161,12 @@ targetable pid oid name gs = case proposedFace oid name gs of
 -- disagree about what a cost is are two ways of getting the same question wrong.
 -- castSpell asks this same predicate again once the announced X exists (#417).
 --
--- Not implemented: the half being cast does not reach CR 601.2f's adjustments.
--- The candidate `cost` comes from the chosen face, but Cost.total reads the
--- object's characteristics through Game.faceOf, which sees no stamped face
--- while the card is still in hand and so answers with CR 709.4's combined view
--- (#656).
+-- The HALF being cast reaches CR 601.2f's adjustments through the state, not
+-- through an argument: `cost` comes from the chosen face and Cost.total reads
+-- the object's characteristics through Game.faceOf, so both callers hand in a
+-- state with that face stamped on (asProposed) and the two cannot name different
+-- halves. AdventureSpec's "Thalia taxes the Adventure half and not the creature
+-- half" is what holds it.
 payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
 
@@ -388,6 +388,33 @@ attackedThisStep :: PlayerId -> GameState -> Bool
 attackedThisStep pid gs =
   Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
 
+-- CR 709.3a / 715.3a: the half being cast, RECORDED ON THE OBJECT, so that every
+-- characteristic read of it resolves through Game.resolveFace to that half alone
+-- (CR 709.3b / 715.3b) rather than to the unnamed fallback -- CR 709.4's combined
+-- view for a split card, CR 715.4's normal half for an adventurer card.
+--
+-- ONE writer, two callers, which is the point. castSpell stamps the CR 400.7
+-- incarnation CR 601.2a has just put on the stack and keeps the result; castable
+-- stamps a state it only READS, since the card has not moved and nothing here
+-- moves it. What a gate measures and what the incarnation shows therefore cannot
+-- name different halves.
+--
+-- NOT a simulation of CR 601.2a's move, and it does not need to be: both rules
+-- say outright that castability is evaluated against the chosen half -- CR 709.3a
+-- "only the chosen half is evaluated to see if it can be cast", CR 715.3a "only
+-- the alternative characteristics are evaluated to see if it can be cast" -- and
+-- CR 601.2b's last sentence puts that choice before the announcement. So no
+-- object is minted (CR 400.7), no CR 616.1 replacement loop runs, and nothing
+-- prompts.
+--
+-- What the offer's state and the real stack incarnation still differ in is the
+-- object's ZONE, and no cost adjustment reads one: Pawl.Types.Filter's View
+-- carries no zone axis, and Projection.viewOfObject applies no zone gate (see
+-- Pawl.Types.Affected's MatchingAnywhere).
+asProposed :: ObjectId -> CardName.CardName -> GameState -> GameState
+asProposed oid name gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name}) oid (GameState.objects gs)}
+
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least
 -- ONE candidate cost is payable.
@@ -396,22 +423,29 @@ attackedThisStep pid gs =
 -- things: a continuous effect on the player (Rule of Law, Silence), the card's
 -- own printed text, and CR 205.4e itself.
 --
--- Asked of ONE HALF, named: CR 709.3a evaluates only the chosen half to see if
--- it can be cast, so every conjunct below reads that face and a split card is
--- asked this question once per half.
+-- Asked of ONE HALF, named: CR 709.3a and CR 715.3a evaluate only the chosen half
+-- to see if it can be cast, so a multi-face card is asked this question once per
+-- half. That name reaches the conjuncts TWICE over, and both are needed: as an
+-- argument, which is how the ones that read the card resolve their face, and as
+-- `asProposed`'s stamp, which is how the ones that read the OBJECT -- CR 601.2f's
+-- adjustments through Cost.total, and the target specs -- resolve theirs.
+-- Thalia's "noncreature spells cost {1} more to cast" is the observable: it taxes
+-- the Sorcery half of an adventurer card and not the Creature half, off one card
+-- in one hand.
 castable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 castable pid oid name gs =
-  timingOk pid oid name gs
-    && inCastableZone pid oid name gs
-    -- CR 601.3: gated HERE, upstream of Action.legalActions, because the engine
-    -- never offers an illegal action and then rejects it. The half's own name
-    -- goes with it, since CR 601.3a's prohibitions name a quality of the spell
-    -- (Null Chamber) and CR 709.3a evaluates only the chosen half.
-    && not (PlayerEffect.prohibitsCasting pid name gs)
-    && printedRestrictionsOk pid oid name gs
-    && legendaryRestrictionOk pid oid name gs
-    && any (payableCost pid oid gs) (Cost.costsFor name oid gs)
-    && targetable pid oid name gs
+  let proposed = asProposed oid name gs
+   in timingOk pid oid name proposed
+        && inCastableZone pid oid name proposed
+        -- CR 601.3: gated HERE, upstream of Action.legalActions, because the
+        -- engine never offers an illegal action and then rejects it. The half's
+        -- own name goes with it, since CR 601.3a's prohibitions name a quality of
+        -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half.
+        && not (PlayerEffect.prohibitsCasting pid name proposed)
+        && printedRestrictionsOk pid oid name proposed
+        && legendaryRestrictionOk pid oid name proposed
+        && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
+        && targetable pid oid name proposed
 
 -- Every cast this player may propose right now, in castZones' order, as the
 -- (object, half) pairs Action.Cast is built from. `castable` re-checks the
@@ -482,15 +516,19 @@ castableWhileSearching pid gs =
         Nothing -> False
         Just face ->
           let name = Face.name face
+              -- The same stamped state `castable` gates on, for the same rule:
+              -- CR 601.3's exception is about TIMING, so the half a library cast
+              -- is evaluated against is still CR 709.3a's chosen one.
+              proposed = asProposed oid name gs
            in permitsCastWhileSearching face
                 -- CR 601.3's prohibit half, moved inside `allowed` when it grew
                 -- a name: a quality-bearing prohibition stops one card without
                 -- stopping the search's other candidates.
-                && not (PlayerEffect.prohibitsCasting pid name gs)
-                && any (payableCost pid oid gs) (Cost.costsFor name oid gs)
-                && printedRestrictionsOk pid oid name gs
-                && legendaryRestrictionOk pid oid name gs
-                && targetable pid oid name gs
+                && not (PlayerEffect.prohibitsCasting pid name proposed)
+                && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
+                && printedRestrictionsOk pid oid name proposed
+                && legendaryRestrictionOk pid oid name proposed
+                && targetable pid oid name proposed
    in filter allowed (Game.zoneMembers Zone.Library pid gs)
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them
@@ -579,19 +617,16 @@ castSpell pid oid name = do
           -- projection included. Event.changeZone cleared the field on the way
           -- in (CR 400.7), so this is a write onto a fresh object.
           --
+          -- Through asProposed, the same write castable's gate reads through, so
+          -- the offer and the announcement cannot name different halves.
+          --
           -- JUST AFTER the move, not during it: anything that runs inside CR
           -- 601.2a -- a CR 616.1 entry replacement, or a trigger the move fires
           -- -- reads the stack object before this stamp lands, and so sees CR
           -- 709.4's combined view instead of the chosen half. Not implemented;
           -- no card in the pool replaces or triggers on a cast card's move to
           -- the stack (#659).
-          State.modify'
-            ( \g ->
-                g
-                  { GameState.objects =
-                      Map.adjust (\o -> o {Object.face = Just name}) sid (GameState.objects g)
-                  }
-            )
+          State.modify' (asProposed sid name)
           castProposed pid sid face castFrom candidates before
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
