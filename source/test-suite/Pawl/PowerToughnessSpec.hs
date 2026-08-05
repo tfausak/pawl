@@ -548,7 +548,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
 -- Kird Ape ({R} Creature -- Ape, printed 1/1), whole text: "This creature gets
 -- +1/+2 as long as you control a Forest." Oracle text verified against Scryfall.
 --
--- CR 613.4c layer 7c, like Omnath's below and unlike Serra Avatar's: the printed
+-- CR 613.4c layer 7c, like Omnath's and unlike Serra Avatar's: the printed
 -- box is 1/1, so the pump is a modification rather than a characteristic-defining
 -- ability. What is new is the "as long as" clause -- the first
 -- StaticAbility.condition in the pool.
@@ -642,8 +642,8 @@ auraOf gs = case filter isMirage (Set.toList (GameState.battlefield gs)) of
 
 -- Take a permanent off the battlefield without routing it anywhere, so a test can
 -- ask what the board looks like once its continuous effect is no longer gathered.
--- Not a zone change: nothing here is a CR 400.7 move, and no test below reads the
--- graveyard.
+-- Not a zone change: nothing here is a CR 400.7 move, and no test using it reads
+-- the graveyard.
 removeFromBattlefield :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 removeFromBattlefield oid gs =
   gs

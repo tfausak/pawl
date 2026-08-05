@@ -1189,6 +1189,11 @@ gather gs =
 -- looked at. What the seed pass gets, so that the list the real gate reads is the
 -- widest one -- an ability wrongly kept there can only over-project the state a
 -- condition is judged against, never leave gather to re-enter itself.
+--
+-- Not implemented: the CR 613.1f removal question the seed answers is therefore
+-- asked of a conditional ability whose clause is false, as is abilityRemoval's,
+-- and setLandSubtypeEffects and controlGrants read the printed list without the
+-- gate at all (#727).
 alwaysFunctioning :: ObjectId -> Layer -> Condition.Type.Condition -> Bool
 alwaysFunctioning _ _ _ = True
 
@@ -1214,9 +1219,10 @@ anyConditional gs =
 -- makes the effect start to apply, and the same point abilitiesRemoved judges a
 -- remover's affected set at. So Kird Ape's layer-7c clause reads a Forest through
 -- layers 1-6, and a Convincing Mirage'd Forest has stopped being one by then.
--- Bounded rather than full for projectWith's reason (#157): a condition read
--- against a projection that included its OWN layer would be circular, and the
--- descending bound is what makes the nesting terminate.
+-- Bounded rather than full for projectWith's reason: a condition read against a
+-- projection that included its OWN layer would be circular, and the descending
+-- bound is what makes the nesting terminate. Exact for a clause reading a
+-- strictly earlier layer, which every "as long as" clause in the pool does.
 --
 -- CR 109.5: "you" is the SOURCE's controller, as it is for the affected set. The
 -- condition is evaluated AGAINST the source too, so a clause reading Quantity.Power
