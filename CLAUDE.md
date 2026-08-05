@@ -54,8 +54,9 @@ to agents as written. What it doesn't say:
   mechanical refactor does not need a fleet of subagents; a subtle rules change
   does. `/code-review` is one way to run it, but its recipe is fixed and written
   for a PR that does not exist yet at this point.
-- **The PR body carries the case for merging**, since only the owner merges and
-  your work terminates at opening a PR likely to be merged. Give: what changed
+- **The PR body carries the case for merging**, since the owner reads every PR
+  that lands and your work terminates at opening one likely to be merged. Give:
+  what changed
   and why, with `Closes #N`; the CR citations behind it, each checked against
   `rules.txt`; the design calls made and the alternatives rejected; how it was
   verified (build warning-clean, `hooky run` clean, suite count before → after,
@@ -65,8 +66,12 @@ to agents as written. What it doesn't say:
   but flip it once the self-review's findings are pushed and the suite is green —
   that is what "ready for review" means, and a finished PR left as a draft is
   waiting on nobody. Don't wait for CI. Don't start the next unit either: one
-  unit at a time in the single checkout, since two branches would contend for
-  `HEAD`.
+  unit at a time per checkout, since two branches would contend for `HEAD`.
+  **The drain loop is the exception.** A session running the drain goal sets the
+  PR to auto-merge, waits for it to land, and then picks up the next issue —
+  that loop is the one thing that merges its own work, and it does so only for
+  PRs it opened. It runs in `.claude/worktrees/drain`, so it never contends with
+  an interactive session for `HEAD`.
 - **Most of what's left is card-driven** — it fires when a card demands it, so
   the backlog is a menu rather than a queue. Working one means **finding the
   real card and adding it to `data/cards/`**; that is expected, not a side
@@ -103,7 +108,11 @@ dev shell (`nix develop` or direnv).
 - **One build at a time.** `jobs: $ncpus` already saturates the machine, so a
   second concurrent build buys nothing and can lose: two of them racing on the
   same `dist-newstyle` have left it broken mid-write. If you dispatch subagents,
-  tell them not to build or test — you are already doing it for them.
+  tell them not to build or test — you are already doing it for them. This is
+  about corruption, not politeness, so it is per-checkout: the drain worktree has
+  its own `dist-newstyle` and may build while this one does. Its
+  `cabal.project.local` sets `jobs: 4` rather than `$ncpus` so the two together
+  leave the machine usable.
 - `hooky fix` then `hooky run` — format and lint. Acts on **staged** files only:
   `git add` first, or it reports "hooks skipped" and checks nothing. `hooky fix`
   reformats, so stage again before `hooky run`.
