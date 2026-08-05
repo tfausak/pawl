@@ -56,12 +56,12 @@ to agents as written. What it doesn't say:
   for a PR that does not exist yet at this point.
 - **The PR body carries the case for merging**, since the owner reads every PR
   that lands and your work terminates at opening one likely to be merged. Give:
-  what changed
-  and why, with `Closes #N`; the CR citations behind it, each checked against
-  `rules.txt`; the design calls made and the alternatives rejected; how it was
-  verified (build warning-clean, `hooky run` clean, suite count before → after,
-  and the proving test); whether the diff makes the rules core case on an
-  effect's *identity* — an explicit "no" is cheap; and what was deferred.
+  what changed and why, with `Closes #N`; the CR citations behind it, each
+  checked against `rules.txt`; the design calls made and the alternatives
+  rejected; how it was verified (build warning-clean, `hooky run` clean, suite
+  count before → after, and the proving test); whether the diff makes the rules
+  core case on an effect's *identity* — an explicit "no" is cheap; and what was
+  deferred.
 - **Mark the PR ready for review, then report it and stop.** Open it as a draft,
   but flip it once the self-review's findings are pushed and the suite is green —
   that is what "ready for review" means, and a finished PR left as a draft is
