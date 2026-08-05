@@ -611,6 +611,65 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     Spec.assertEqWith s "CR 727.2: the battlefield is empty (every card returned to a library)" (Set.null (GameState.battlefield after)) True
     Spec.assertEqWith s "the game did not end -- the new game is live" (GameState.result after) Nothing
 
+  Spec.it s "CR 400.7/727.2 gameplay: a restart puts Painter's Servant into a library with its chosen colour forgotten" $ do
+    -- The card-driven proof for Setup.startGameFromCards' hand-written zone
+    -- move. Painter's Servant is CAST rather than placed, because CR 614.1c's
+    -- colour choice happens only on the entry path (Replacement.runEntry) -- a
+    -- Servant put straight onto the battlefield has chosenColor = Nothing and
+    -- this test would assert nothing. S.identityAnswer answers ChooseColor with
+    -- white, which is all this needs: WHICH colour it chose does not matter,
+    -- only that it chose one.
+    --
+    -- Then bob activates the synthetic restart and CR 727.2 rebuilds every
+    -- library from the existing cards. The Servant is a new object in that
+    -- library (CR 400.7), so the colour it chose is gone.
+    syntheticRestart <- S.printingOf s registry "Synthetic Restart"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    mountain <- S.printingOf s registry "Mountain"
+    let base = S.landsInPlay mountain 2
+        (inHand, handId) = S.handOne paintersServant base
+        -- alice's bulk pool is built BEFORE the cast, and deliberately so. Both
+        -- players need >= 7 owned cards or CR 727.3's short-deck loss ends the
+        -- rebuilt game, but the Servant also has to still be IN alice's library
+        -- afterwards: a DRAWN Servant goes through Event.changeZone and comes
+        -- out clean no matter what startGameFromCards did, which is the vacuous
+        -- pass this test exists to avoid. startGameFromCards orders each
+        -- library by object id and the opening hand comes off the front, so
+        -- minting these mountains first leaves the Servant's battlefield
+        -- incarnation -- whose id the cast mints last -- at the back, behind
+        -- the seven cards drawn. The library assertion below is what keeps that
+        -- reasoning honest if it ever stops holding.
+        bulked = addManyG mountain 24 S.alice inHand
+        castServant = snd (Engine.runGamePure S.identityAnswer bulked (S.cast S.alice handId))
+        painted = snd (Engine.runGamePure S.identityAnswer castServant Stack.resolveTop)
+        (_restartId, withRestart) = S.addCreature syntheticRestart S.bob painted
+        filled = addManyG mountain 7 S.bob withRestart
+        gStart =
+          filled
+            { GameState.activePlayer = S.bob,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.bob
+            }
+        after = snd (Engine.runGamePure restartAnswer gStart Engine.priorityLoop)
+        -- The Servant's BATTLEFIELD incarnation: the cast minted new ids at
+        -- each hop (CR 400.7), so `handId` is not it. startGameFromCards keeps
+        -- the id it rebuilds, so this same id is what to look for afterwards.
+        entered = Set.toList (Set.difference (GameState.battlefield painted) (GameState.battlefield bulked))
+    case entered of
+      [servantId] -> case (Game.lookupObject servantId gStart, Game.lookupObject servantId after) of
+        -- The discriminator: the Servant really did make a CR 614.1c choice
+        -- going in, and the object that carried it is still the same object,
+        -- sitting in a library, coming out.
+        (Just before, Just rebuilt) -> do
+          Spec.assertBool s (Maybe.isJust (Object.chosenColor before)) "CR 614.1c: the cast Servant chose a colour as it entered"
+          Spec.assertEqWith s "CR 727.2: the rebuilt Servant is the same object, in a library" (Object.zone rebuilt) Zone.Library
+          Spec.assertEqWith s "CR 400.7: the Servant in the library forgot the colour it chose" (Object.chosenColor rebuilt) Nothing
+        (_, Nothing) -> Spec.assertFailure s "the opening draw took the Servant out of the library; raise alice's pool"
+        _ -> Spec.assertFailure s "the fixture lost the Servant before the restart"
+      _ -> Spec.assertFailure s "Painter's Servant did not reach the battlefield"
+    Spec.assertEqWith s "CR 727.2: the restart really ran (the battlefield is empty)" (Set.null (GameState.battlefield after)) True
+    Spec.assertEqWith s "the game did not end, so the rebuild is the live state" (GameState.result after) Nothing
+
   Spec.it s "CR 729.2/729.3/729.5: playSubgame runs a nested game, bob decks, cards funnel back" $ do
     mountain <- S.printingOf s registry "Mountain"
     let g0 = Setup.emptyGame S.bothPlayers

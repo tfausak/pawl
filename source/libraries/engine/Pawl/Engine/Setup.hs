@@ -163,22 +163,11 @@ startGameFromCards perform = do
       isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
-      toLibraryCard obj =
-        obj
-          { Object.zone = Zone.Library,
-            Object.tapped = TapState.Untapped,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            -- CR 400.7: a hand-written zone move outside Event.changeZone, so
-            -- every per-incarnation reset it would have done has to be repeated
-            -- here. This list is NOT the whole of that reset: `attachedTo`,
-            -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
-            -- survive the move (#653).
-            Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
-          }
+      -- CR 400.7: a hand-written zone move outside Event.changeZone, so the
+      -- per-incarnation reset that funnel performs has to happen here too --
+      -- through the same Object.newIncarnation, so that a field added later
+      -- cannot be forgotten on one path and reset on the other.
+      toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
       cards = fmap toLibraryCard (Map.filter isCard (GameState.objects gs))
       libraryOf pid = Seq.fromList (Map.keys (Map.filter (\obj -> Object.owner obj == pid) cards))
   State.put
@@ -401,22 +390,10 @@ funnelBack finalSub parent =
   let isCard obj = case Object.source obj of
         Source.OfCard _ -> True
         _ -> False
-      toLibraryCard obj =
-        obj
-          { Object.zone = Zone.Library,
-            Object.tapped = TapState.Untapped,
-            Object.damage = 0,
-            Object.sickness = Sickness.Sick,
-            Object.bindings = Map.empty,
-            Object.counters = Map.empty,
-            -- CR 400.7, exactly as startGameFromCards' own toLibraryCard: a
-            -- hand-written zone move outside Event.changeZone repeating that
-            -- reset, and repeating it INCOMPLETELY -- `attachedTo`,
-            -- `enteredUnder`, `chosenColor`, `chosenSubtype` and `chosenNames`
-            -- survive here too (#653).
-            Object.face = Nothing,
-            Object.playableFromExileBy = Nothing
-          }
+      -- CR 400.7, exactly as startGameFromCards' own toLibraryCard: the second
+      -- hand-written zone move outside Event.changeZone, performing that
+      -- funnel's per-incarnation reset through the one shared function.
+      toLibraryCard obj = (Object.newIncarnation obj) {Object.zone = Zone.Library}
       returned = fmap toLibraryCard (Map.filter isCard (GameState.objects finalSub))
       oldLibIds =
         Set.fromList
