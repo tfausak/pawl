@@ -108,6 +108,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Shroud -> []
   Keyword.Trample -> []
   Keyword.Vigilance -> []
+  Keyword.Banding -> []
   Keyword.Fear -> []
   Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
@@ -155,6 +156,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Shroud -> []
   Keyword.Trample -> []
   Keyword.Vigilance -> []
+  Keyword.Banding -> []
   Keyword.Fear -> []
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
@@ -252,6 +254,7 @@ permissionsFor keyword = case keyword of
   Keyword.Shroud -> []
   Keyword.Trample -> []
   Keyword.Vigilance -> []
+  Keyword.Banding -> []
   Keyword.Fear -> []
   Keyword.Menace -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a

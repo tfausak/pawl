@@ -340,6 +340,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.DoubleStrike -> keyword
   Keyword.FirstStrike -> keyword
   Keyword.Flash -> keyword
+  Keyword.Banding -> keyword
   Keyword.Flying -> keyword
   Keyword.Haste -> keyword
   Keyword.Indestructible -> keyword

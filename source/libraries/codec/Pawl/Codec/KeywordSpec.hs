@@ -193,6 +193,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Vigilance
       """ {"type":"Vigilance"} """
+  -- CR 702.22: only the combat-damage-division halves are modeled; see the type.
+  Spec.it s "Banding" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Banding
+      """ {"type":"Banding"} """
   -- CR 702.29e: the typecycling filter rides the same keyword arm and
   -- is absent for plain cycling, so both spellings have to survive the trip.
   Spec.it s "Cycling round-trips with and without a typecycling filter" $ do
