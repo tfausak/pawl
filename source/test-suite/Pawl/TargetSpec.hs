@@ -576,7 +576,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         resolve g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
         (theirPiker, atTheirs) = castAt S.bob
         (myPiker, atMine) = castAt S.alice
-        hexproofed oid = S.withEffect oid (Modification.GainKeyword Keyword.Hexproof)
+        hexproofed oid = S.withEffect oid (Modification.GainKeyword (Keyword.Hexproof Nothing))
     Spec.assertEqWith s "untouched, bob's Piker dies" (S.creaturesInPlay S.bob (resolve atTheirs)) 0
     Spec.assertEqWith s "hexproofed in response, it survives alice's Doom Blade" (S.creaturesInPlay S.bob (resolve (hexproofed theirPiker atTheirs))) 1
     Spec.assertEqWith s "untouched, alice's own Piker dies" (S.creaturesInPlay S.alice (resolve atMine)) 0

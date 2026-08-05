@@ -1124,7 +1124,9 @@ keywordFilters keyword = case keyword of
   Keyword.Flash -> []
   Keyword.Flying -> []
   Keyword.Haste -> []
-  Keyword.Hexproof -> []
+  -- CR 702.11d's "[quality]", which the variant carries and rule 702.11b's plain
+  -- hexproof does not.
+  Keyword.Hexproof quality -> Maybe.maybeToList quality
   Keyword.Indestructible -> []
   -- CR 702.14c's criterion, which is a Filter since #499.
   Keyword.Landwalk criterion -> [criterion]

@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -65,13 +66,43 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Haste
       """ {"type":"Haste"} """
+  -- CR 702.11b's plain hexproof takes no parameter, so it encodes as the bare
+  -- tag -- the wire format Slippery Bogle's committed printing already carries,
+  -- unchanged by rule 702.11d's quality arriving beside it.
   Spec.it s "Hexproof" $
     Common.assertJsonCodec
       s
       Keyword.toJson
       Keyword.fromJson
-      Keyword.Hexproof
+      (Keyword.Hexproof Nothing)
       """ {"type":"Hexproof"} """
+  -- CR 702.11d's "[quality]" rides the same constructor, so "hexproof from
+  -- black" and plain hexproof must encode differently -- a codec that dropped the
+  -- quality would round-trip Slippery Bogle and silently turn Knight of Grace
+  -- into it, which is the far-too-strong reading #555 opened with.
+  Spec.it s "Hexproof carries CR 702.11d's quality" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Hexproof (Just (Filter.HasColor Color.Black)))
+      """ {"type":"Hexproof","value":{"type":"HasColor","value":{"type":"Black"}}} """
+    -- CR 702.16a's "any characteristic value or information": a quality need not
+    -- be a colour. Eradicator Valkyrie's "hexproof from planeswalkers".
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Hexproof (Just (Filter.HasCardType CardType.Planeswalker)))
+      """ {"type":"Hexproof","value":{"type":"HasCardType","value":{"type":"Planeswalker"}}} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Hexproof Nothing) /= Keyword.toJson (Keyword.Hexproof (Just (Filter.HasColor Color.Black))))
+      "hexproof and hexproof from black encode differently"
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Hexproof (Just (Filter.HasColor Color.Black))) /= Keyword.toJson (Keyword.Hexproof (Just (Filter.HasColor Color.White))))
+      "and so do hexproof from black and hexproof from white"
   Spec.it s "Indestructible" $
     Common.assertJsonCodec
       s
