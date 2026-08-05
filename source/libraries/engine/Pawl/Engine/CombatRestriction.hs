@@ -66,10 +66,10 @@ attackingAlone cr = case cr of
   CombatRestriction.CantAttackAlone a _ -> Just a
 
 -- CR 508.1c / CR 509.1b's second clause: the condition the creature can't
--- attack (or block) UNLESS. Read off either arm, because the clause is the same
--- sentence in both rules: which declaration a restriction forbids and whether
--- it is gated are independent, and Blind-Spot Giant prints one gate across both
--- arms.
+-- attack (or block) UNLESS. Read off any arm, because the clause is the same
+-- sentence in both rules: which declaration a restriction forbids, in what
+-- shape, and whether it is gated are all independent, and Blind-Spot Giant
+-- prints one gate across two arms.
 --
 -- Nothing is the UNCONDITIONAL restriction (Pacifism), not a gate that fails.
 gate :: CombatRestriction.CombatRestriction -> Maybe Condition.Type.Condition
@@ -78,14 +78,14 @@ gate cr = case cr of
   CombatRestriction.CantBlock _ c -> c
   CombatRestriction.CantAttackAlone _ c -> c
 
--- The shared walk behind both questions above, over the restrictions `select`
--- keeps.
+-- The shared walk behind all three questions above, over the restrictions
+-- `select` keeps.
 --
 -- A set of ids and not a per-creature predicate: the caller asks this once per
--- declaration pass and then tests every candidate against the answer, where a
--- predicate would walk the whole battlefield per candidate and make the pass
--- quadratic (#200). `candidates` is the caller's chosen-from set (CR 508.1a for
--- attacking, CR 509.1a for blocking).
+-- declaration pass and then tests against the answer, where a predicate would
+-- walk the whole battlefield per candidate and make the pass quadratic (#200).
+-- `candidates` is the caller's chosen-from set (CR 508.1a for attacking, CR
+-- 509.1a for blocking).
 --
 -- WHAT THE CALLER DOES WITH THE ANSWER is the caller's, and the two things done
 -- with it are not interchangeable. `cantAttack` and `cantBlock` name creatures
@@ -129,7 +129,7 @@ restricted select candidates gs =
           (Projection.project creature gs)
           gs
       -- CR 508.1c / CR 509.1b's second clause. A gate that HOLDS lifts the
-      -- restriction, so the creature stays on the candidate list; one that does
+      -- restriction, so the creature is in none of the sets above; one that does
       -- not leaves it in force, which is why an ungated restriction is False
       -- here.
       --
