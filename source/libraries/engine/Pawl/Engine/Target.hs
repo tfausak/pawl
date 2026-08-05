@@ -86,8 +86,8 @@ legalRecipients perspective source spec gs =
       -- CR 702.11d's "[quality] spells ... or abilities ... from [quality]
       -- sources" -- the SOURCE's characteristics, which no other targeting
       -- question here reads. `source` is already the object rule 702.11d names in
-      -- both halves: the spell object for a spell, and for an ability the
-      -- permanent that is its source (CR 113.7a).
+      -- both halves: the spell object for a spell, and for an ability the object
+      -- CR 113.7 says generated it, which is the permanent this caller passes.
       --
       -- Hoisted like `pcs`, so one slot takes one view rather than one per
       -- candidate; and a THUNK, so a slot with no "hexproof from" candidate on it
@@ -233,19 +233,26 @@ targetable pcs perspective source sourceView gs recipient =
   let restrictedObject oid =
         let keywords = Projection.keywordsGiven pcs oid gs
             -- The candidate's controller, read at most once and only where a
-            -- hexproof ability is present to ask about it -- both readers below
+            -- hexproof ability is present to ask about it -- both readers of it
             -- sit behind the `hexproofs` list being non-empty, which is no
             -- candidate at all on almost every board. See opponentOf.
             controller = Projection.controllerOf oid gs
             hexproofs = Maybe.mapMaybe hexproofQuality (Map.keys keywords)
             -- CR 702.11b's Nothing stops every spell an opponent controls; CR
-            -- 702.11d's Just stops only the ones whose source has the quality.
+            -- 702.11d's Just stops only the ones whose source has the quality. CR
+            -- 702.11f's card has several of these and is stopped by ANY of them,
+            -- that rule making it several abilities rather than one compound one.
             stops quality = case quality of
               Nothing -> True
               Just f -> Filter.matches (Filter.MkContext controller (Just source)) sourceView f
+            -- The three conjuncts are in cost order, and the order is the whole
+            -- reason `sourceView` costs nothing on an ordinary board: no hexproof
+            -- ability at all reads no controller, a hexproof ability its own
+            -- controller is aiming past reads no source view, and only the last
+            -- conjunct forces it.
             restricted =
               Map.member Keyword.Shroud keywords
-                || (any stops hexproofs && opponentOf perspective controller)
+                || (not (null hexproofs) && opponentOf perspective controller && any stops hexproofs)
          in not (Set.member oid (GameState.battlefield gs) && restricted)
    in case recipient of
         Recipient.ToPlayer pid -> not (PlayerEffect.protectedFromTargeting perspective pid gs)
