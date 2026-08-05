@@ -6,8 +6,8 @@
 -- overrides it. Mostly directly-constructed continuous effects, so the engine is
 -- proven independently of any card wiring; the card-level proofs live alongside.
 -- Also Pawl.Engine.Subtype, the CR 205.3i land-type and CR 205.3m creature-type
--- classifications the layer-4 SetLandSubtype and SetCreatureSubtype arms fold
--- with.
+-- classifications the layer-4 SetLandSubtype, SetCreatureSubtype and
+-- AddCreatureSubtype arms fold with.
 module Pawl.ProjectionSpec where
 
 import qualified Data.Foldable as Foldable
