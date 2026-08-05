@@ -3132,6 +3132,15 @@ leavesBattlefieldSpec s registry =
 -- rather than through its `_ -> Map.empty` fallthrough. A pair that did not
 -- match would pin nothing: both sides would read empty for every condition.
 --
+-- The INHERENT conditions are the exception, and it is the rules' rather than an
+-- oversight: CR 725.2's and CR 702.179d's abilities hang on no card, so
+-- Event.matchesTrigger answers False for them whatever the event and their real
+-- matchers live in Pawl.Engine.Monarch and Pawl.Engine.Speed. Their arms below
+-- name the event the RULE names anyway. What the pin says of those two is
+-- therefore weaker but not vacuous -- that neither claims a slot the log could
+-- never bind -- and it is what fails if either grows a binding arm here without
+-- eventBindingSlots being told.
+--
 -- A NON-EMPTY LIST rather than one event, because Event.eventBindingSlots
 -- answers the guaranteed FLOOR -- the slots bound for every event a condition
 -- admits -- and a condition that binds a slot for some of its events and not

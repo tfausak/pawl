@@ -68,6 +68,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.CreatureDealtCombatDamageToMonarch
       """ {"type":"CreatureDealtCombatDamageToMonarch"} """
+  -- CR 702.179d: one or more opponents lost life during your turn.
+  Spec.it s "OpponentLostLifeDuringYourTurn" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.OpponentLostLifeDuringYourTurn
+      """ {"type":"OpponentLostLifeDuringYourTurn"} """
   -- CR 702.29c.
   Spec.it s "SelfCycled" $
     Common.assertJsonCodec
