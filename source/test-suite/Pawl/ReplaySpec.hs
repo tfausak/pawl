@@ -35,6 +35,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -521,6 +522,67 @@ combatReplaySpec s =
                   Color.Green
                   (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 118.13a again, for CR 107.4e's monocolored hybrid: which half a
+        -- {2/R} was announced as decides how much mana the spell cost, so it
+        -- has to survive a transcript.
+        Spec.it s "AnnounceHybridPayment round-trips through the transcript" $ do
+          let p =
+                Prompt.AnnounceHybridPayment
+                  decider
+                  S.alice
+                  oid
+                  (ManaType.Colored Color.Red)
+                  (HybridPayment.PaysTyped NonEmpty.:| [HybridPayment.PaysGeneric])
+          Spec.assertEqWith
+            s
+            "the generic route round trips"
+            (Replay.decode p (Replay.encode p HybridPayment.PaysGeneric))
+            (Just HybridPayment.PaysGeneric)
+          -- Discriminating for the same reason the pairs above are: a decode
+          -- that ignored the response and returned the head would pass one leg
+          -- by accident.
+          Spec.assertEqWith
+            s
+            "the coloured route round trips"
+            (Replay.decode p (Replay.encode p HybridPayment.PaysTyped))
+            (Just HybridPayment.PaysTyped)
+        Spec.it s "a Phyrexian announcement does not decode as a hybrid one" $ do
+          -- Discriminating: fails if AnnounceHybridPayment reuses another
+          -- two-valued response rather than getting its own constructor -- and
+          -- AnnouncedPhyrexianPayment is the nearest miss, the other CR 118.13a
+          -- announcement, recorded by the other arm of the same function.
+          let p =
+                Prompt.AnnounceHybridPayment
+                  decider
+                  S.alice
+                  oid
+                  (ManaType.Colored Color.Red)
+                  (HybridPayment.PaysTyped NonEmpty.:| [HybridPayment.PaysGeneric])
+              phyrexian =
+                Prompt.AnnouncePhyrexianPayment
+                  decider
+                  S.alice
+                  oid
+                  Color.Green
+                  (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Replay.encode phyrexian PhyrexianPayment.PaysMana)) Nothing
+          Spec.assertEqWith s "nor the other way round" (Replay.decode phyrexian (Replay.encode p HybridPayment.PaysTyped)) Nothing
+        Spec.it s "a short transcript announces the first offered hybrid route" $
+          -- Every offered route is payable (the prompt is raised only with two
+          -- payable routes), so the head is a legal answer.
+          Spec.assertEqWith
+            s
+            "the head"
+            ( Replay.defaultAnswer
+                ( Prompt.AnnounceHybridPayment
+                    decider
+                    S.alice
+                    oid
+                    (ManaType.Colored Color.Red)
+                    (HybridPayment.PaysGeneric NonEmpty.:| [HybridPayment.PaysTyped])
+                )
+            )
+            HybridPayment.PaysGeneric
         Spec.it s "a short transcript announces the first offered Phyrexian route" $
           -- Every offered route is payable (the prompt is raised only with two
           -- payable routes), so the head is a legal answer.
