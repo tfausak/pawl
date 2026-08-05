@@ -6,8 +6,8 @@ import qualified Pawl.Types.Condition as Condition
 -- | CR 508.1c / CR 509.1b: one printed COMBAT RESTRICTION -- an effect saying a
 -- creature can't attack, can't attack alone, or can't attack unless some
 -- condition is met, and the sentence CR 509.1b writes with "block" in place of
--- "attack". Pacifism states two of those in one line, and prints one of the first
--- two arms below.
+-- "attack". Pacifism states two of those in one line, and prints one of each of
+-- the first two arms below.
 --
 -- The FIFTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
@@ -23,9 +23,11 @@ import qualified Pawl.Types.Condition as Condition
 -- requirement carries the attacker to be blocked and no subject, an attacking
 -- requirement carries the subject and no object. A restriction
 -- carries only the SUBJECT on every arm: Pacifism's two halves are the same
--- Affected twice, so the only thing distinguishing them is which declaration
--- they forbid. Splitting them would copy the requirements' shape without the
--- reason for it.
+-- Affected twice, so the only thing distinguishing THOSE TWO is which
+-- declaration they forbid. Splitting them would copy the requirements' shape
+-- without the reason for it. What tells the third arm from the first is not the
+-- declaration -- both forbid an attack -- but the shape, which is the next
+-- paragraph.
 --
 -- The arms differ in SHAPE rather than in axis, and there are two shapes. The
 -- first two are answered about ONE CREATURE, so the reader may apply them to CR
@@ -38,17 +40,21 @@ import qualified Pawl.Types.Condition as Condition
 --
 -- A THIRD shape is not representable: a restriction bounding the SIZE of a
 -- declaration from above, which is Silent Arbiter's "no more than one creature
--- can attack each combat". CantAttackAlone is not it turned around -- it forbids
--- a declaration for what it CONTAINS, and no bound on how many creatures a
--- declaration may name can be recovered from an Affected (#713).
+-- can attack each combat". CantAttackAlone is not it turned around: it NAMES
+-- creatures and asks whether the declaration holds one of them and nothing else,
+-- where a bound names no creature at all -- and no Affected can be read as a
+-- number (#713).
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
--- split is pawl's, not the rules': this type's answer is a SET OF CREATURES that
--- may not attack, and CantAttack takes its subject off CR 508.1a's candidate
--- list entirely, where a taxed creature has to stay on it. A cost is also a
--- thing to be PAID rather than a fact to be read, and CR 508.1d makes paying it
--- optional, so it could not be a Condition.
+-- split is pawl's, not the rules': CantAttack's answer is a SET OF CREATURES that
+-- may not attack, and it takes its subject off CR 508.1a's candidate list
+-- entirely, where a taxed creature has to stay on it. CantAttackAlone does leave
+-- its subject on that list, and is no better a home: it forbids a DECLARATION,
+-- where a cost is something a declaration pays, and it says nothing about how
+-- many creatures are declared beside a taxed one. A cost is also a thing to be
+-- PAID rather than a fact to be read, and CR 508.1d makes paying it optional, so
+-- it could not be a Condition either.
 --
 -- The axis is missing rather than collapsed, and the missing capability is
 -- named: an attacking restriction with an object (Crown-Hunter Hireling, Armored

@@ -341,7 +341,9 @@ candidateAttackDeclarations candidates =
 -- reaches for, and declining to attack with it stays legal -- which is why the
 -- two components come apart. `required` stays every instance in force, because
 -- that is what a declaration's obedience is counted against, and paying is
--- mandatory once a taxed creature does attack (CR 508.1j); `best` is drawn from
+-- mandatory once a taxed creature does attack -- CR 508.1j allows no partial
+-- payment and CR 508.1's preamble makes a declaration the player cannot comply
+-- with illegal; `best` is drawn from
 -- the untaxed creatures alone, and it is what makes "no attacks" legal under a
 -- Curse of the Nightly Hunt while a Ghostly Prison is out.
 -- AttackCost.attacksFreely is asked against CR 508.1b's whole target list, so a
@@ -1038,11 +1040,14 @@ declareAttackers pid = do
             -- interpreter never arrives here, and the player's answer was taken
             -- and rejected before this ran. Where a requirement leaves several
             -- legal declarations -- any SUPERSET of the required creatures that
-            -- CR 508.1c allows also attains the maximum -- this takes the first
-            -- in candidateAttackDeclarations' order, which no smaller declaration
-            -- attains. That is a real choice among distinguishable declarations,
-            -- and it is why nothing but a broken interpreter may reach it; the
-            -- same is true of forcedBlockDeclaration.
+            -- CR 508.1c allows also attains the maximum -- this takes the
+            -- SMALLEST, on both of attackCeiling's paths: the closed form's
+            -- answer is the required creatures that attack freely, and the
+            -- enumeration's is the first in candidateAttackDeclarations' order,
+            -- which no proper subset of attains. That is the least the rules can
+            -- be said to have forced. It is a real choice among distinguishable
+            -- declarations, and it is why nothing but a broken interpreter may
+            -- reach it; the same is true of forcedBlockDeclaration.
             attacking =
               if attackDeclarationAllowed alone (Set.fromList offered) && obeysAttackRequirements bound offered
                 then offered
