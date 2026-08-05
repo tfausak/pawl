@@ -1,8 +1,10 @@
 module Pawl.Types.Binding where
 
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
 
@@ -33,10 +35,19 @@ data Binding = MkBinding
     -- | CR 707.2 / 707.5: the copiable-value snapshot a permanent copies AS IT
     -- ENTERS. Stored only under Pawl.Engine.Binding.copySource; the layer fold
     -- reads it as the layer-1 seed. Nothing for a non-copy object.
-    copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics
+    copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics,
+    -- | CR 111 / 603.7c: EVERY object a Create minted, for a card that refers
+    -- back to all of them at once -- Thatcher Revolt's "those tokens". The
+    -- plural of `target` above and never the same slot as one: a Create's slot
+    -- is a definition, never a target (CR 115.10a), so nothing here is subject
+    -- to CR 608.2b's illegal-target check. Nothing for every other slot.
+    --
+    -- A Seq and not a Set: mint order is the order the tokens entered, which is
+    -- the order a reader acts on them in, and it is not an ObjectId ordering.
+    objects :: Maybe (Seq.Seq ObjectId.ObjectId)
   }
   deriving (Eq, Ord, Show)
 
 -- | The empty binding: no choice of any kind. The unit for merging.
 empty :: Binding
-empty = MkBinding {target = Nothing, amount = Nothing, modes = Nothing, copy = Nothing}
+empty = MkBinding {target = Nothing, amount = Nothing, modes = Nothing, copy = Nothing, objects = Nothing}

@@ -2094,15 +2094,6 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (triggeredAbilityOffends (secondModeReads TriggerCondition.SelfEnters))
       "and a later mode is still rejected when the condition binds nothing"
-  -- CR 603.7c: binding a slot to a MULTI-token Create would silently name one
-  -- of them. Rejected rather than guessed (#53).
-  Spec.it s "no Create binds a slot while making more than one token" $ do
-    ps <- S.allPrintings s
-    let offenders =
-          filter
-            (anyFace (Resolve.bindsSeveralTokens . cardResolutionEffects) . Printing.card)
-            ps
-    Spec.assertEqWith s "no multi-token binding" (fmap (S.nameOf . Printing.card) offenders) []
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
   -- exile, command) must pair with PlayerRef.EachPlayer -- the type
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a

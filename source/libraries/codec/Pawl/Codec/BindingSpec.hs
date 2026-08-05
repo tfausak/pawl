@@ -3,6 +3,7 @@
 module Pawl.Codec.BindingSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Binding as Binding
@@ -11,6 +12,7 @@ import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteris
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.SlotName as SlotName
@@ -26,7 +28,7 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       Binding.empty
       """ {} """
   -- A codec totality check, not a claim about a reachable game state: no real
-  -- slot carries all four fields at once. The stand-in snapshot is needed
+  -- slot carries all five fields at once. The stand-in snapshot is needed
   -- because this sublibrary cannot reach the registry or Projection.project.
   Spec.it s "MkBinding, every field populated" $
     Common.assertJsonCodec
@@ -37,13 +39,14 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
           { Binding.target = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 0)),
             Binding.amount = Just 3,
             Binding.modes = Just (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]),
-            Binding.copy = Just ProjectedCharacteristicsSpec.testCharacteristics
+            Binding.copy = Just ProjectedCharacteristicsSpec.testCharacteristics,
+            Binding.objects = Just (Seq.fromList [ObjectId.MkObjectId 7, ObjectId.MkObjectId 4])
           }
       )
       ( "{\"target\":{\"type\":\"ToPlayer\",\"value\":0},"
           <> "\"amount\":3,\"modes\":[0,2],\"copy\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
-          <> "}"
+          <> ",\"objects\":[7,4]}"
       )
   -- A name-keyed map is a sorted array of entries so the render is
   -- deterministic. The two entries are inserted in DESCENDING slot-name order,

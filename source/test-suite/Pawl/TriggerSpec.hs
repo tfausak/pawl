@@ -11,7 +11,9 @@
 -- reaching one of those, with Magical Hack aimed at Barbarian Outcast --
 -- `textChangedTriggerSpec`. CR 608.2i turn history (Khabál Ghoul's
 -- "died this turn") -- `historySpec`. CR 603.7 delayed triggered abilities
--- -- `delayedSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
+-- -- `delayedSpec`, and the plural of its object binding -- a Create whose slot
+-- holds every token it minted, so a card can say "those tokens", with Thatcher
+-- Revolt -- `tokenSetSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingSpec`. The CR 603.4 / 608.2a intervening "if" --
 -- `interveningSpec`. Also Pawl.Engine.Keyword: CR
@@ -1022,6 +1024,92 @@ delayedSpec s registry =
               Spec.assertEqWith s "only the second minted Wall is left" (walls after) [secondWall]
               Spec.assertBool s (Set.notMember firstWall (GameState.battlefield after)) "the first minted Wall was bound, and it is gone"
             other -> Spec.assertFailure s ("expected two Wall tokens, got " <> show (length other))
+
+-- Thatcher Revolt {2}{R} Sorcery: "Create three 1/1 red Human creature tokens
+-- with haste. Sacrifice those tokens at the beginning of the next end step."
+-- delayedSpec's plural sibling: the card refers back to EVERY token it made at
+-- once, so the Create's slot holds a SET rather than one object, and the delayed
+-- ability sacrifices all of it.
+tokenSetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tokenSetSpec s registry =
+  let endStep = Phase.Ending EndingStep.EndStep
+      beginEndStep gs = Event.recordEvent (GameEvent.StepBegan endStep S.alice) (gs {GameState.phase = endStep})
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      humans gs = filter (\oid -> Set.member Subtype.Human (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+      -- Records every Prompt.ChooseBoundToken the resolution issues, so a test
+      -- can assert the plural binding asks NOTHING -- "them" names the whole
+      -- minted set, and where the rules leave nothing to ask, don't prompt.
+      recordPrompts :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+      recordPrompts p = case p of
+        Prompt.ChooseBoundToken _ _ _ candidates -> do
+          State.modify' (<> [NonEmpty.toList candidates])
+          pure (NonEmpty.head candidates)
+        _ -> pure (S.identityAnswer p)
+      castUnderPrompts gs oid =
+        State.runState
+          ( Engine.runGame recordPrompts gs $ do
+              S.cast S.alice oid
+              Engine.priorityLoop
+          )
+          []
+      -- alice casts Thatcher Revolt from hand onto the given board and lets it
+      -- resolve, handing back the board alongside any prompts it issued.
+      castRevolt revolt base = uncurry castUnderPrompts (S.handOne revolt base)
+      boardOf mountain = S.landsInPlay mountain 3
+   in Spec.describe s "DelayedTrigger token set" $ do
+        Spec.it s "CR 111.3 the spell mints three 1/1 Humans with haste and arms one delayed ability" $ do
+          revolt <- S.printingOf s registry "Thatcher Revolt"
+          mountain <- S.printingOf s registry "Mountain"
+          let ((_, armed), asked) = castRevolt revolt (boardOf mountain)
+          case humans armed of
+            tokens@[_, _, _] -> do
+              Spec.assertEqWith s "each is 1/1" (fmap (`Projection.powerOf` armed) tokens) [Just 1, Just 1, Just 1]
+              Spec.assertBool s (all (\oid -> Projection.hasKeyword Keyword.Type.Haste oid armed) tokens) "each has haste"
+              Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers armed)) 1
+            other -> Spec.assertFailure s ("expected exactly three Human tokens, got " <> show (length other))
+          -- The second invariant: a set binding names every token, so unlike CR
+          -- 603.7c's singular "it" there is no candidate to choose between.
+          Spec.assertEqWith s "no binding prompt was issued" asked []
+        -- The proving case for #53. Binding one of the three would be the engine
+        -- choosing; binding all three is what "those tokens" says.
+        Spec.it s "CR 603.7c \"those tokens\" names every minted token, so all three are sacrificed" $ do
+          revolt <- S.printingOf s registry "Thatcher Revolt"
+          mountain <- S.printingOf s registry "Mountain"
+          let ((_, armed), _) = castRevolt revolt (boardOf mountain)
+              after = resolveAll (settle (beginEndStep armed))
+          Spec.assertEqWith s "three were minted" (length (humans armed)) 3
+          Spec.assertEqWith s "and none is left" (humans after) []
+          Spec.assertEqWith s "the store is empty" (Seq.length (GameState.delayedTriggers after)) 0
+        -- CR 614.16 meets the plural binding, and this is where it differs from
+        -- CR 603.7c's singular "it": a replacement that multiplies the count just
+        -- makes the set bigger. "Those tokens" still names all of them, so there
+        -- is nothing to ask and nothing survives -- where the singular case must
+        -- prompt (see delayedSpec's doubled Tidal Wave).
+        Spec.it s "CR 614.16 a doubled Create binds all six, unprompted" $ do
+          revolt <- S.printingOf s registry "Thatcher Revolt"
+          mountain <- S.printingOf s registry "Mountain"
+          doublingSeason <- S.printingOf s registry "Doubling Season"
+          let (_, base) = S.addCreature doublingSeason S.alice (boardOf mountain)
+              ((_, armed), asked) = castRevolt revolt base
+              after = resolveAll (settle (beginEndStep armed))
+          Spec.assertEqWith s "the replacement really doubled the Create" (length (humans armed)) 6
+          Spec.assertEqWith s "still nothing to ask" asked []
+          Spec.assertEqWith s "and all six are sacrificed" (humans after) []
+        -- CR 603.7c's "no longer in the zone it's expected to be in": one token
+        -- already gone does not spare the others, and the ability is still spent.
+        Spec.it s "CR 603.7c one token already gone leaves the rest sacrificed" $ do
+          revolt <- S.printingOf s registry "Thatcher Revolt"
+          mountain <- S.printingOf s registry "Mountain"
+          let ((_, armed), _) = castRevolt revolt (boardOf mountain)
+              killed = case humans armed of
+                token : _ -> S.settleSba (S.runPure S.identityAnswer armed (Event.destroy Regenerability.Regenerable [token]))
+                [] -> armed
+              after = resolveAll (settle (beginEndStep killed))
+          Spec.assertEqWith s "two were left to sacrifice" (length (humans killed)) 2
+          Spec.assertEqWith s "and both are gone" (humans after) []
+          Spec.assertEqWith s "the store is still emptied" (Seq.length (GameState.delayedTriggers after)) 0
+          Spec.assertEqWith s "nothing stuck on the stack" (GameState.stack after) []
 
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an
@@ -3750,6 +3838,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   textChangedTriggerSpec s registry
   historySpec s registry
   delayedSpec s registry
+  tokenSetSpec s registry
   towershellOnsetSpec s registry
   towershellSkipSpec s registry
   orderingSpec s registry

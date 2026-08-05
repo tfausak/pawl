@@ -447,9 +447,10 @@ data Prompt r where
   -- is the resolving source holding the binding; the NonEmpty is the tokens
   -- actually minted, in creation order.
   --
-  -- Reachable only through a replacement: the CardSpec lint rejects a card whose
-  -- Create binds a slot while its printed quantity is anything but exactly one
-  -- (#53), but CR 614.16 scales the count at RUNTIME, long after that lint passed.
+  -- Reachable only through a replacement: a Create whose printed quantity is
+  -- anything but exactly one binds its whole minted SET instead and asks nothing
+  -- (Resolve.namesTokenSet), so the singular "it" starts out with a single
+  -- candidate -- and CR 614.16 scales the count at RUNTIME, giving it several.
   --
   -- CR 707.10e is the codified analogue and what settles this as a CHOICE rather
   -- than a rule the engine may apply itself: where a replacement causes a copy to

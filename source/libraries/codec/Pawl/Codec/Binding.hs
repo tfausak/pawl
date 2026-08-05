@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ModeIndex as ModeIndex
+import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.SlotName as SlotName
@@ -19,7 +20,8 @@ toJson b =
     [ Common.optionalPair "target" Nothing (Common.encodeMaybe Recipient.toJson) (Binding.target b),
       Common.optionalPair "amount" Nothing (Common.encodeMaybe Common.encodeNatural) (Binding.amount b),
       Common.optionalPair "modes" Nothing (Common.encodeMaybe (Common.encodeSet ModeIndex.toJson)) (Binding.modes b),
-      Common.optionalPair "copy" Nothing (Common.encodeMaybe ProjectedCharacteristics.toJson) (Binding.copy b)
+      Common.optionalPair "copy" Nothing (Common.encodeMaybe ProjectedCharacteristics.toJson) (Binding.copy b),
+      Common.optionalPair "objects" Nothing (Common.encodeMaybe (Common.encodeSeq ObjectId.toJson)) (Binding.objects b)
     ]
 
 fromJson :: Value.Value -> Either Text.Text Binding.Binding
@@ -29,12 +31,14 @@ fromJson value = do
   a <- Common.defaultedField "amount" Nothing (Common.decodeMaybe Common.decodeNatural) ps
   m <- Common.defaultedField "modes" Nothing (Common.decodeMaybe (Common.decodeSet ModeIndex.fromJson)) ps
   c <- Common.defaultedField "copy" Nothing (Common.decodeMaybe ProjectedCharacteristics.fromJson) ps
+  o <- Common.defaultedField "objects" Nothing (Common.decodeMaybe (Common.decodeSeq ObjectId.fromJson)) ps
   pure
     Binding.MkBinding
       { Binding.target = t,
         Binding.amount = a,
         Binding.modes = m,
-        Binding.copy = c
+        Binding.copy = c,
+        Binding.objects = o
       }
 
 -- A name-keyed map as a sorted array of entries, so the render is

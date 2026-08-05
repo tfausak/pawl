@@ -366,16 +366,20 @@ definedSlots effects =
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe bound effects)
 
--- Does any Create bind a slot while minting more than one token? CR 603.7c's "it"
--- names ONE object, so binding one of several would be the engine choosing (#53).
--- The PRINTED quantity is all a lint can see; a CR 614.16 replacement multiplies
--- the count at resolution, which the Create arm handles by asking the controller.
-bindsSeveralTokens :: [Effect Card.Type.Card] -> Bool
-bindsSeveralTokens effects =
-  let offends effect = case effect of
-        Effect.Create quantity _ _ (Just _) -> quantity /= Quantity.Type.Literal 1
-        _ -> False
-   in any offends effects
+-- Does a Create's slot name the whole minted SET ("those tokens") rather than one
+-- particular token (CR 603.7c's "it")? The PRINTED quantity is what tells them
+-- apart, and it is the only thing that can: the card's own word is grammar the
+-- opcode does not carry, and the count at resolution is no guide -- CR 614.16
+-- lets a replacement multiply either one.
+--
+-- Literal 1 is "it": the card printed one token, so a doubled create leaves
+-- several candidates for a singular word and the Create arm asks which. Anything
+-- else is "them": every card in the pool that prints more than one token and
+-- refers back to them says so in the plural (Thatcher Revolt, Chandra Acolyte of
+-- Flame, Orthion), and none prints several while naming just one -- there would
+-- be nothing on the card to pick by.
+namesTokenSet :: Quantity.Type.Quantity -> Bool
+namesTokenSet quantity = quantity /= Quantity.Type.Literal 1
 
 -- A resolving spell's PROJECTED modes: only its chosen ones (CR 608.2c/700.2),
 -- with every text change affecting it applied to each effect (CR 612), so the
@@ -1321,18 +1325,29 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- different thing that Resolve's arms happen to treat the same way today.
     Monad.forM_ mSlot $ \slot ->
       State.modify' (bindAmountSlot source slot (Natural.length destroyed))
-  Effect.Sacrifice slot ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
-        Nothing -> pure () -- a player recipient cannot be sacrificed
-        -- CR 701.21: through the single funnel, which is NOT Event.destroy --
-        -- CR 701.21a: sacrificing is not destroying. The sacrificing player is
-        -- this effect's controller, which for the "this creature" shape this
-        -- opcode serves is the permanent's own controller; the funnel's CR 701.21a
-        -- guard turns any other case into a no-op rather than a wrong sacrifice.
-        Just target -> Event.sacrifice controller target
-      -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
-      _ -> pure ()
+  Effect.Sacrifice slot -> do
+    -- CR 111 / 603.7c: a slot a Create bound as a SET names every token at once
+    -- ("those tokens"), so all of them are sacrificed, in mint order. Read off
+    -- the resolving object's LIVE bindings, as ArmDelayedTrigger is, rather than
+    -- out of `chosen`: `chosen` projects CR 601.2c's targets and a set binding is
+    -- never a target, so it is not there and owes CR 608.2b nothing. A member
+    -- that has already left the battlefield is no-opped by the funnel's own CR
+    -- 701.21a guard, which is CR 603.7c's "no longer in the zone it's expected to
+    -- be in" for one member rather than for the whole word.
+    bound <- State.gets (Binding.objectsOf slot . maybe Map.empty Object.bindings . Game.lookupObject resolving)
+    case bound of
+      Just victims -> Monad.mapM_ (Event.sacrifice controller) victims
+      Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case Recipient.objectOf recipient of
+          Nothing -> pure () -- a player recipient cannot be sacrificed
+          -- CR 701.21: through the single funnel, which is NOT Event.destroy --
+          -- CR 701.21a: sacrificing is not destroying. The sacrificing player is
+          -- this effect's controller, which for the "this creature" shape this
+          -- opcode serves is the permanent's own controller; the funnel's CR 701.21a
+          -- guard turns any other case into a no-op rather than a wrong sacrifice.
+          Just target -> Event.sacrifice controller target
+        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+        _ -> pure ()
   Effect.RemoveFromCombat slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
@@ -1679,31 +1694,36 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- replacement settles the COUNT first, so this joins the tokens that
             -- actually entered, however many that turned out to be.
             Monad.when (EntryRiders.attacking entry) (Monad.mapM_ Combat.putOntoBattlefieldAttacking minted)
-            case (mSlot, minted) of
-              (Nothing, _) -> pure ()
+            case (mSlot, namesTokenSet quantity, minted) of
+              (Nothing, _, _) -> pure ()
               -- Unreachable: createTokens places every token onto the battlefield
               -- (CR 111.2). Total rather than partial: nothing bound matches "the
               -- token was never named" instead of crashing.
-              (Just _, []) -> pure ()
+              (Just _, _, []) -> pure ()
+              -- CR 111 / 603.7c: the card says "those tokens", so the slot holds
+              -- EVERY token this Create minted. Nothing to ask, whatever CR
+              -- 614.16 did to the count -- a replacement that doubled the create
+              -- just makes the set bigger, and the plural word still names all of
+              -- it. Thatcher Revolt is the producer.
+              (Just slot, True, _) -> State.modify' (bindObjectsSlot resolving slot (Seq.fromList minted))
               -- CR 603.7c: bind the minted token into live Object.bindings so a
               -- delayed ability THIS SAME resolution arms can name it. One token
               -- is the whole candidate set, so there is nothing to ask -- and
-              -- where the rules leave nothing to ask, don't prompt. The
-              -- Pawl.CardSpec lint keeps the PRINTED quantity at 1 (#53), which is
-              -- why this is the ordinary case.
-              (Just slot, [only]) -> State.modify' (bindSlot resolving slot only)
+              -- where the rules leave nothing to ask, don't prompt.
+              (Just slot, False, [only]) -> State.modify' (bindSlot resolving slot only)
               -- CR 614.16 got there first: a token replacement (Doubling Season)
-              -- multiplied the count at RESOLUTION, after the lint had passed, so
-              -- several tokens now stand where CR 603.7c's "it" names one
-              -- PARTICULAR object. CR 707.10e is the codified analogue -- when a
-              -- replacement makes a copy target more than one object, "the copy's
-              -- controller chooses one of them" -- so this asks rather than
-              -- picking the first, which would be the engine choosing.
+              -- multiplied the count at RESOLUTION, so several tokens now stand
+              -- where CR 603.7c's "it" names one PARTICULAR object. CR 707.10e is
+              -- the codified analogue -- when a replacement makes a copy target
+              -- more than one object, "the copy's controller chooses one of them"
+              -- -- so this asks rather than picking the first, which would be the
+              -- engine choosing. The plural arm above never reaches here: a card
+              -- that says "them" wants all of them and asks nothing.
               --
               -- FILTERED, NOT TRUSTED, the same posture Sba.chooseLegendVictims
               -- takes: an answer naming something that was not minted falls back
               -- to the first, since the slot must end up bound either way.
-              (Just slot, first : second : rest) -> do
+              (Just slot, False, first : second : rest) -> do
                 gs1 <- State.get
                 let candidates = first NonEmpty.:| (second : rest)
                     decider = Decide.deciderFor controller gs1
@@ -2419,6 +2439,19 @@ performHandAction source player =
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
+   in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
+
+-- CR 111 / 603.7c's plural: bind EVERY token a Create minted into `slot`, for a
+-- card that refers back to all of them at once. bindSlot's sibling, same holder
+-- and same reason -- ArmDelayedTrigger captures this object's whole environment,
+-- which is how "those tokens" outlives the resolution that minted them.
+--
+-- A set slot is readable mid-fold on BOTH paths, unlike bindSlot's single object:
+-- its one reader (the Sacrifice arm) goes to live GameState rather than to
+-- `chosen`, because `chosen` carries CR 601.2c's targets and this is never one.
+bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
+bindObjectsSlot holder slot targets gs =
+  let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}
    in gs {GameState.objects = Map.adjust put holder (GameState.objects gs)}
 
 -- The default runner for every resolution that is NOT a subgame-bearing spell:
