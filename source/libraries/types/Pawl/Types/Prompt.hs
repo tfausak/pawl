@@ -483,6 +483,23 @@ data Prompt r where
   -- already consumed, so two Sacrifice components of one cost each see the full
   -- candidate list (#112).
   ChooseSacrifices :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 601.2 / 614.1c: sacrifice ANY NUMBER of the candidates, which is a
+  -- different question from ChooseSacrifices above and not expressible as it --
+  -- that one names how many and Pawl.Engine.Cost rejects an answer of any other
+  -- size, while this one admits every subset including the empty one. Wood
+  -- Elemental's "sacrifice any number of untapped Forests" as it enters.
+  --
+  -- No count field, because there is no count: the offer IS the candidate list.
+  --
+  -- ASKED EVEN AT ONE CANDIDATE, unlike ChooseSacrifices' elision: with a free
+  -- choice of subset, one candidate still leaves two distinguishable answers
+  -- (sacrifice it or not), so eliding would decide for the player. Asked even at
+  -- ZERO candidates would not -- the empty set is the only answer -- so the
+  -- caller skips the prompt there.
+  --
+  -- Answers as Response.ChoseSacrifices: the payload is the same set of
+  -- permanents, and a transcript that replays one replays the other.
+  ChooseAnyNumberToSacrifice :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 701.3a: where an effect that moves an already-attached permanent puts it.
   -- The first ObjectId is the permanent being moved (Crown of the Ages' targeted
   -- Aura); the NonEmpty is the destinations its card text admits.
