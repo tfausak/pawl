@@ -745,8 +745,20 @@ priorityLoop = do
                             -- grant -- just not RECORDED as a choice, which is
                             -- what Game.choose does and what
                             -- checkMandatoryLoop reads.
+                            --
+                            -- Matched two-deep rather than `length actions > 1`:
+                            -- Action.legalActions is lazy and Pass is its head,
+                            -- so `List.elem answered actions` below stops at the
+                            -- first cons for a passing answer. Taking the length
+                            -- would force the whole spine -- castableSpells and
+                            -- the activation walk -- at every priority grant,
+                            -- which measured as a 70% slowdown on Pawl.ReplaySpec's
+                            -- played-out game.
+                            let offersAChoice = case actions of
+                                  _ : _ : _ -> True
+                                  _ -> False
                             answered <-
-                              if length actions > 1
+                              if offersAChoice
                                 then Game.choose (Prompt.ChooseAction decider p actions)
                                 else Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
                             -- FILTERED, NOT TRUSTED. Everything Action.legalActions

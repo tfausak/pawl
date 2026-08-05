@@ -1432,6 +1432,84 @@ spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
   trustedActionSpec s registry
   lastChoiceSpec s registry
   mandatoryLoopSpec s
+  mandatoryLoopBoardSpec s registry
+
+-- CR 104.4b at gameplay level. Aether Flash deals 2 damage to each creature that
+-- enters; Synthetic Recursion is a 1/1 that returns itself when it dies. So it
+-- enters, takes lethal damage (CR 704.5g), dies, returns, enters. Nothing in the
+-- cycle is optional and nothing in it makes progress: a loop of mandatory
+-- actions, repeating a sequence of events with no way to stop.
+--
+-- Synthetic Recursion is a LABELED CRUTCH (#N1). The canonical board is
+-- Worldgorger Dragon reanimated by Animate Dead, and neither card is authorable
+-- yet.
+mandatoryLoopBoardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b)" $ do
+  Spec.it s "a loop nobody can interrupt is a draw" $ do
+    flash <- S.printingOf s registry "Aether Flash"
+    recursion <- S.printingOf s registry "Synthetic Recursion"
+    let result = runConcedingAt 10000 (loopBoard flash recursion Nothing)
+    Spec.assertEqWith s "CR 104.4b" result Result.Drawn
+
+  Spec.it s "a loop containing an optional action is not" $ do
+    -- CR 104.4b's second sentence. The board differs by ONE card: a Lightning
+    -- Bolt in alice's hand, which her Mountain can pay for, so her menu has a
+    -- Cast on it every time she gets priority. That resets the marker each round,
+    -- so the loop -- otherwise identical, and still running -- is never declared
+    -- a draw. The game ends only because alice eventually concedes (CR 104.3a),
+    -- which is the only way to get a terminating test out of a game the rules say
+    -- does not end.
+    flash <- S.printingOf s registry "Aether Flash"
+    recursion <- S.printingOf s registry "Synthetic Recursion"
+    mountain <- S.printingOf s registry "Mountain"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let result = runConcedingAt 200 (loopBoard flash recursion (Just (mountain, bolt)))
+    Spec.assertEqWith s "alice conceded, so bob won -- no draw" result (Result.Won S.bob)
+
+-- alice, active, in her precombat main phase: bob's Aether Flash, and alice's
+-- Synthetic Recursion ENTERING (so CR 603.6a's event is there for Aether Flash to
+-- see). Empty libraries and nothing scheduled after this phase, so the loop is
+-- the only thing that can happen and nothing else can end the game. `castable`,
+-- if any, is an untapped land for alice plus a spell in her hand it pays for --
+-- both halves, since Cast.castableSpells offers a spell only when its cost can be
+-- paid.
+--
+-- Seeded ten events short of the limit rather than starting from zero: the
+-- mechanism is the same at any gap, and this keeps the test at a handful of
+-- cycles instead of a few hundred.
+loopBoard :: Printing.Printing -> Printing.Printing -> Maybe (Printing.Printing, Printing.Printing) -> GameState.GameState
+loopBoard flash recursion castable =
+  let base = Setup.emptyGame S.bothPlayers
+      (_, gs1) = S.addCreature flash S.bob base
+      gs2 = case castable of
+        Nothing -> gs1
+        Just (land, spell) ->
+          let (_, withLand) = S.addCreature land S.alice gs1
+           in snd (S.addHandCard spell S.alice withLand)
+      (_, gs3) = S.entersWithTrigger recursion S.alice gs2
+   in gs3
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.remaining = Seq.empty,
+          GameState.nextTimestamp = Timestamp.MkTimestamp (Engine.mandatoryLoopLimit - 10),
+          GameState.lastChoice = Timestamp.MkTimestamp 0
+        }
+
+-- Play the game out, with alice conceding once she has been asked `limit` times.
+-- The concession is a backstop for the test that expects NO draw: without it that
+-- game would run forever, which is exactly what CR 104.4b says should happen to a
+-- loop containing an optional action.
+runConcedingAt :: Int -> GameState.GameState -> Result.Result
+runConcedingAt limit gs =
+  let answer :: Prompt.Prompt r -> State.State Int r
+      answer p = case p of
+        Prompt.Concede pid
+          | pid == S.alice -> do
+              asked <- State.get
+              State.put (asked + 1)
+              pure (if asked >= limit then Concession.Concedes else Concession.Continues)
+        _ -> pure (S.identityAnswer p)
+      ((result, _), _) = State.runState (Engine.runGame answer gs Engine.playGame) 0
+   in result
 
 -- CR 104.4b, the guard itself. The gameplay proof that a real loop reaches it is
 -- the "a mandatory loop" group below; these four pin the boundary, which a
