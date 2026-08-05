@@ -985,6 +985,23 @@ modalActivated modes =
 -- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
 -- `abilityBound` -- the condition's event slots and CR 109.5's `you` -- to EVERY
 -- mode rather than only the first.
+-- Does any of these abilities DECLARE a target spec under a name already in
+-- `defined`? Split from the sweep below so the rejecting direction can be put to
+-- a hand-built ability, which no committed card supplies.
+shadowsSlots :: Set.Set SlotName.SlotName -> [TriggeredAbility.TriggeredAbility Card.Type.Card] -> Bool
+shadowsSlots defined abilities =
+  let declaredOf ability =
+        foldMap (Map.keysSet . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
+   in not (Set.disjoint defined (foldMap declaredOf abilities))
+
+-- shadowsSlots for one face: the slots its own effects define, against the target
+-- specs its delayed abilities declare.
+shadowsDefinedSlot :: Face.Face Card.Type.Card -> Bool
+shadowsDefinedSlot card =
+  shadowsSlots
+    (Resolve.definedSlots (cardResolutionEffects card))
+    (Map.elems (Face.delayedAbilities card))
+
 modalTrigger ::
   TriggerCondition.TriggerCondition ->
   [Mode.Mode Card.Type.Card] ->
@@ -1010,7 +1027,20 @@ reservedSlots =
       Binding.you,
       Binding.triggerPlayer,
       Binding.became,
-      Binding.preventedAmount
+      Binding.preventedAmount,
+      Binding.sacrificedCount
+    ]
+
+-- The binding slots a card's power, toughness and characteristic-defining P/T
+-- READ. The available side is the reserved set alone: CR 604.3 makes a CDA a
+-- static ability, so there is no resolution whose earlier effect could mint a
+-- slot for it the way Resolve.definedSlots does for a spell's payload.
+powerToughnessSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+powerToughnessSlots card =
+  Set.unions
+    [ maybe Set.empty (Quantity.slots . Power.unwrap) (Face.power card),
+      maybe Set.empty (Quantity.slots . Toughness.unwrap) (Face.toughness card),
+      maybe Set.empty Quantity.slots (Face.characteristicPT card)
     ]
 
 -- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
@@ -1119,6 +1149,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsAttachedToCreature -> 0
   Filter.Type.IsAttachedToPermanent -> 0
   Filter.Type.IsToken -> 0
+  Filter.Type.IsTapped -> 0
 
 -- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
 -- 702.14c's landwalk criterion, plus the components of any Cost a keyword names
@@ -1784,6 +1815,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends = not . Set.null . reservedDeclarations
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card declares a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The read half of the same dataflow question, for the one carrier that has no
+  -- resolution to bind anything: CR 604.3's characteristic-defining P/T. A CDA is
+  -- a static ability, so there is no earlier effect of a resolution to mint its
+  -- slot -- the only writer is the ENGINE, which is what a reserved name means.
+  -- Wood Elemental's is Binding.sacrificedCount.
+  --
+  -- Not folded into the mode lint below: that one compares reads against a
+  -- card's DECLARED slots, and a CDA declares none, so its whole available side
+  -- is the reserved set. The printed boxes are swept alongside the CDA because a
+  -- slot named there reaches the same evaluator (Pawl.Engine.Projection.seedCharacteristicPT
+  -- substitutes only into a Star).
+  Spec.it s "a printed or characteristic-defining P/T reads only reserved slots" $ do
+    ps <- S.allPrintings s
+    let offends card = not (Set.isSubsetOf (powerToughnessSlots card) reservedSlots)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card's CDA names a slot nothing fills" (fmap (S.nameOf . Printing.card) offenders) []
+    -- The sweep above would pass vacuously if powerToughnessSlots reported
+    -- nothing at all, so the one card that does read a slot is named here.
+    woodElemental <- S.printingOf s registry "Wood Elemental"
+    Spec.assertEqWith
+      s
+      "Wood Elemental's CDA reads the as-enters sacrifice count"
+      (powerToughnessSlots (S.combinedFace woodElemental))
+      (Set.singleton Binding.sacrificedCount)
   -- The sweep above passes VACUOUSLY: no committed card declares a reserved
   -- slot anywhere, so on its own it proves nothing about the lint. Proven
   -- here instead against hand-built offenders, in the posture the
@@ -1893,6 +1948,35 @@ lintSpec s registry = Spec.describe s "Lint" $ do
            in any (modalReadOffends bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- A delayed ability may not DECLARE a target spec under a name its own card
+  -- already DEFINES, because the two would land in one slot and the reader would
+  -- have to pick. Pawl.Engine.Engine.placeOne merges the ability's placement-time
+  -- choices with the environment captured when it was armed, per FIELD, so a
+  -- collision leaves one Binding carrying both a CR 601.2c target and a Create's
+  -- minted group -- and Pawl.Engine.Resolve.slotGroup answers with the group,
+  -- silently discarding a target that CR 608.2b was owed a re-validation of.
+  --
+  -- Rejected rather than resolved by precedence: the card would be saying two
+  -- different things under one name, which is a card-data mistake and not a rules
+  -- question the engine should have an answer to. The neighbouring "every slot a
+  -- delayed ability reads is bound by its card" lint cannot catch it -- that one
+  -- is a SUBSET check with both sides on the available list, so a name appearing
+  -- in both passes it twice over.
+  Spec.it s "no delayed ability declares a target spec under a slot its card defines" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace shadowsDefinedSlot . Printing.card) ps
+    Spec.assertEqWith s "no delayed ability shadows a defined slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sweep above is vacuous on its own -- no card offends, and none would
+  -- under a predicate that always answered False -- so both directions are put
+  -- to a hand-built pair. The accepted one is Thatcher Revolt's exact shape,
+  -- which must stay legal: reading a defined slot is the whole point, and only
+  -- DECLARING one is the mistake.
+  Spec.it s "the shadowing lint accepts a delayed ability that only reads the slot" $ do
+    let tokens = SlotName.MkSlotName (Text.pack "tokens")
+        reads_ = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] []]
+        declares = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] [tokens]]
+    Spec.assertBool s (not (shadowsSlots (Set.singleton tokens) [reads_])) "reading a Create's slot is legal"
+    Spec.assertBool s (shadowsSlots (Set.singleton tokens) [declares]) "declaring a target spec under the same name is not"
   -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
   -- alone. See onsetOffends for why the onset and the condition's TurnScope
   -- are two halves of one printed "your next turn", and what goes wrong when a

@@ -146,6 +146,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsToken
       """ {"type":"IsToken"} """
+  Spec.it s "IsTapped" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsTapped
+      """ {"type":"IsTapped"} """
   Spec.it s "And" $
     Common.assertJsonCodec
       s

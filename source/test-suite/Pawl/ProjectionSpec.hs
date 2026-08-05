@@ -1210,7 +1210,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   --
   -- Her power is then Nothing rather than the 0 CR 208.5 asks for ("If a
   -- creature somehow has no value for its power, its power is 0"), which is
-  -- the read-point gap #65 already tracks -- not something this fixture is
+  -- the read-point gap #759 tracks -- not something this fixture is
   -- claiming is right.
   Spec.it s "CR 305.7 Blood Moon takes Ashaya's CDA with the rest of her rules text" $ do
     forest <- S.printingOf s registry "Forest"

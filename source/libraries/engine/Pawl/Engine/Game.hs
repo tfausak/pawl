@@ -30,6 +30,7 @@ import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
@@ -338,6 +339,15 @@ isAbility oid gs = case lookupObject oid gs of
       Source.OfTrigger _ _ -> True
       Source.OfEmblem _ -> False
       Source.OfInherentTrigger _ _ -> True
+
+-- CR 110.5: a permanent's tapped/untapped status. CR 110.5d gives status only
+-- to a permanent, so an unknown id -- and a card outside the battlefield -- is
+-- reported untapped, which is the answer every other status arm gives for a
+-- nonexistent object too.
+isTapped :: ObjectId -> GameState -> Bool
+isTapped oid gs = case lookupObject oid gs of
+  Nothing -> False
+  Just obj -> Object.tapped obj == TapState.Tapped
 
 -- CR 111.1 / 111.6: is this object a token rather than a card? Asks the
 -- object's KIND, a classification in the same standing as isSpell, never the

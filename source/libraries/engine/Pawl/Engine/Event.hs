@@ -628,6 +628,13 @@ apply batch candidate event =
       -- counters on it." -- one rewrite, because the count the second sentence
       -- uses is the answer to the first.
       --
+      -- Wood Elemental is the same rewrite reading its count somewhere else: "As
+      -- this creature enters, sacrifice any number of untapped Forests. Wood
+      -- Elemental's power and toughness are each equal to the number of Forests
+      -- sacrificed as it entered." No counters, so `kind` is Nothing and the count
+      -- is left for the card's characteristic-defining ability (CR 208.2a) to read
+      -- back out of Binding.sacrificedCount.
+      --
       -- The only entry arm that PERFORMS a game action rather than stamping a
       -- value, which is why this module and not Pawl.Engine.Replacement holds
       -- `apply`: the sacrifice is `sacrifice` below, CR 701.21a's one funnel, and
@@ -655,7 +662,7 @@ apply batch candidate event =
           -- Unreachable, and defensive for the arms above's reason: the object is
           -- materialized on the battlefield before this loop runs, so
           -- controllerOf falls back to its owner. Sacrifices nothing rather than
-          -- guessing at a player, and so places no counters.
+          -- guessing at a player, and so places no counters and records no count.
           Nothing -> pure (Just event)
           Just controller -> do
             let entering oid2 = oid2 == oid || Set.member oid2 batch
@@ -679,7 +686,16 @@ apply batch candidate event =
             -- sacrificed -- every member was on the battlefield under this
             -- player's control when it was offered, and nothing between there and
             -- here moves one.
-            putCounters oid kind (Natural.length chosen)
+            let many = Natural.length chosen
+            -- Recorded on the entering permanent BEFORE the counters, and
+            -- unconditionally, so a card that reads the count rather than
+            -- spending it on counters has it (Wood Elemental). See
+            -- Binding.sacrificedCount for why 0 is recorded rather than left
+            -- absent.
+            State.modify' $ \gs2 ->
+              let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
+               in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
+            Monad.mapM_ (\k -> putCounters oid k many) kind
             pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
