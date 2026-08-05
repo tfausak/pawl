@@ -84,6 +84,26 @@ to agents as written. What it doesn't say:
   `rules-correctness`, `bug`, and the expiry triggers `expires:milestone` and
   `expires:card-driven`. Priority labels (`priority-high` and friends) are the
   owner's; prefer high-priority issues when picking, and never set one yourself.
+- **When no printing can reach the rule, write a synthetic card.** A real card
+  still wins whenever one exists, and "I could not find one" is not the test —
+  search first. But some rules no printing crosses: the `wontfix` pile is full of
+  them, and this is what that label meant. A synthetic card in
+  `data/cards/synthetic/` is then the cheap, honest prover, and its directory
+  keeps "no printed card reaches this" legible rather than buried.
+  **The boundary:** legitimate when you can cite the rule it exercises *and*
+  nothing in the CR forbids such a card existing — the gap is a design accident.
+  Illegitimate when the absence is rules-*enforced*, because then the elision is
+  provably sound and a synthetic card would pin behaviour for a situation the
+  rules make impossible. Two lands that both set land subtypes are legitimate
+  (nothing forbids one); half a battle is not (CR 310 makes the first battle need
+  the whole subsystem).
+- **The drain loop delegates a whole issue to one subagent.** Selection, the
+  merge call and the report stay with the orchestrator; triage and implementation
+  go to the agent, because both are grep-heavy and that is where the context
+  actually goes. ONE agent at a time — a single agent owning a unit sequentially
+  is still one build, two are not. Give it the issue number and the four checks
+  above; everything else it needs is in this file, which is the point of writing
+  them down.
 - **File the issue, cite it inline.** When you elide something, open an issue
   carrying the status, rationale and expiry trigger, then leave a comment at the
   code site stating only what is *not* implemented, plus `(#N)`. Never write the
@@ -127,6 +147,22 @@ dev shell (`nix develop` or direnv).
    "Obsolete"), and CR 733 is about human error at a table, not engine
    validation. Cite the rule number in the code comment so the next reader can
    check your work.
+4. **Mutate the change away and re-run.** A green suite is not evidence the test
+   proves anything, and in this repository it repeatedly has not been. Break the
+   line you just wrote, confirm the new test *fails*, put it back. Three tests in
+   one drain run would otherwise have shipped green and proved nothing: a pair
+   asserting the same total in both branches, a "no-op" assertion that also holds
+   when the cast never reached the step, and a gate rewrite no test distinguished
+   at all. If nothing fails, say so in the PR rather than implying coverage.
+5. **Distrust the issue body.** Six cycles of one drain run found a stated
+   blocker already removed by unrelated work — an engine fix already implemented,
+   a vocabulary that had since landed, a half already delivered. Re-derive the
+   status against the tree before planning against it, and correct the issue in a
+   comment when it is wrong.
+6. **Verify a scripted edit's blast radius.** Bulk `sed`/Python rewrites land in
+   comments, strings, and the middle of multi-line case bodies. Read the diff
+   stat and confirm the shape (all insertions? the count you expected?) before
+   staging.
 
 ## Code conventions
 
