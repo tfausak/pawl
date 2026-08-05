@@ -322,6 +322,23 @@ data Effect card
     -- CR 615.7's shield is spent in damage, not in applications, so Resolve
     -- installs it Unlimited.
     PreventNextDamage Duration.Duration ObjectRef.ObjectRef Quantity.Quantity
+  | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the recipients
+    -- an ObjectRef names, for a duration -- Selfless Squire's "prevent all damage
+    -- that would be dealt to you this turn".
+    --
+    -- PreventNextDamage above with the Quantity removed, and the missing field is
+    -- the whole difference: CR 615.7's shield is spent in damage and ends when it
+    -- reaches 0, while this one has no amount to spend and ends only when its
+    -- duration does (CR 615.3's other terminator). That is why it installs a
+    -- DamageRewrite.PreventAll rather than a PreventNext of some large number:
+    -- there is no number, and a shield that counted down would be a different
+    -- card.
+    --
+    -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason: the
+    -- pattern must name the shielded permanent or player, which card data cannot
+    -- write. Fog IS such a Replace precisely because it shields nobody in
+    -- particular.
+    PreventAllDamage Duration.Duration ObjectRef.ObjectRef
   | -- | CR 701.6/701.6a: counter the slot's target via the Event.counter funnel.
     -- ONE opcode for both of that rule's subjects -- Cancel's slot is a
     -- Pool.Spells one and Stifle's a Pool.Abilities one -- because which ending

@@ -161,6 +161,8 @@ slotsOf effect = case effect of
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
   Effect.PreventNextDamage duration ref quantity ->
     Set.unions [durationSlots duration, objectRefSlots ref, Quantity.slots quantity]
+  -- The same two reads, minus the shield size this opcode does not carry.
+  Effect.PreventAllDamage duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
@@ -236,6 +238,7 @@ readsX = any effectReadsX
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PreventAllDamage {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
@@ -283,6 +286,7 @@ searchesLibrary effect = case effect of
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   Effect.PreventNextDamage {} -> False
+  Effect.PreventAllDamage {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
@@ -734,6 +738,55 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
     (Just recipient, True) -> [recipient]
     _ -> []
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen controller source gs ref)
+
+-- CR 615.3: install one floating prevention shield over `recipient`, for a
+-- duration. The shared body of Effect.PreventNextDamage's and
+-- Effect.PreventAllDamage's arms, which differ only in the DamageRewrite they
+-- hand it -- CR 615.7's countdown or CR 615.1's unbounded one.
+--
+-- The row's other fields are Replace's: CR 113.7's source, CR 109.5's controller
+-- baked at installation, and a fresh timestamp for its CR 614.5 identity.
+installShield :: PlayerId -> ObjectId -> Duration.Duration -> DamageRewrite.DamageRewrite -> GameState -> Recipient -> GameState
+installShield controller source duration rewrite g recipient = case Expiry.arm controller source duration g of
+  -- CR 611.2b: the duration never started, so no shield is installed.
+  Nothing -> g
+  Just expiry ->
+    let (ts, g1) = Game.freshTimestamp g
+        active =
+          ActiveReplacement.MkActiveReplacement
+            { ActiveReplacement.effect =
+                ReplacementEffect.DamageR
+                  DamagePattern.MkDamagePattern
+                    { -- Both producers say "damage that would be dealt", naming
+                      -- no kind, so the shield takes combat and noncombat alike.
+                      DamagePattern.whichKind = Nothing,
+                      -- Nor does either name a source, which is CR 615.7's own
+                      -- "the number of events or sources dealing it doesn't
+                      -- matter". CR 615.9's shields against a source of a chosen
+                      -- quality are a different rule, and have no producer
+                      -- (#588).
+                      DamagePattern.whichSource = SourceRelation.AnySource,
+                      DamagePattern.whichRecipient = Just recipient
+                    }
+                  rewrite,
+              ActiveReplacement.source = source,
+              -- CR 109.5, baked as Replace's is: nothing reads it on a shield
+              -- today (the pattern names its recipient outright and has no
+              -- ControllerRelation to resolve), but the row cannot be built
+              -- without one.
+              ActiveReplacement.controller = controller,
+              ActiveReplacement.timestamp = ts,
+              ActiveReplacement.expiry = expiry,
+              -- CR 615.7's shield is spent in DAMAGE, not in applications, so
+              -- the use count is not what ends it (see Pawl.Types.Uses); a
+              -- PreventAll shield has nothing to spend at all.
+              ActiveReplacement.uses = Uses.Unlimited,
+              -- CR 614.15: a prevention shield replaces damage from any source,
+              -- including one this resolution is not itself dealing, so it is
+              -- not a self-replacement.
+              ActiveReplacement.origin = ReplacementOrigin.Other
+            }
+     in g1 {GameState.replacements = active : GameState.replacements g1}
 
 -- One effect, applied. The case on the constructor is this module's charter.
 -- `runSubgame` is the injected nested-game runner; only the PlaySubgame arm
@@ -1543,49 +1596,19 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- the same state `setShield` leaves a spent one in.
         Monad.when (n > 0) . State.modify' $ \g0 ->
           let amount = Integer.toNaturalSaturating n
-              install g recipient = case Expiry.arm controller source duration g of
-                -- CR 611.2b: the duration never started, so no shield is installed.
-                Nothing -> g
-                Just expiry ->
-                  let (ts, g1) = Game.freshTimestamp g
-                      active =
-                        ActiveReplacement.MkActiveReplacement
-                          { ActiveReplacement.effect =
-                              ReplacementEffect.DamageR
-                                DamagePattern.MkDamagePattern
-                                  { -- Mending Hands says "damage that would be
-                                    -- dealt", naming no kind, so the shield
-                                    -- takes combat and noncombat alike.
-                                    DamagePattern.whichKind = Nothing,
-                                    -- Nor does it name a source, which is CR
-                                    -- 615.7's own "the number of events or
-                                    -- sources dealing it doesn't matter". CR
-                                    -- 615.9's shields against a source of a
-                                    -- chosen quality are a different rule, and
-                                    -- have no producer (#588).
-                                    DamagePattern.whichSource = SourceRelation.AnySource,
-                                    DamagePattern.whichRecipient = Just recipient
-                                  }
-                                (DamageRewrite.PreventNext amount),
-                            ActiveReplacement.source = source,
-                            -- CR 109.5, baked as Replace's is: nothing reads it
-                            -- on a shield today (the pattern names its recipient
-                            -- outright and has no ControllerRelation to resolve),
-                            -- but the row cannot be built without one.
-                            ActiveReplacement.controller = controller,
-                            ActiveReplacement.timestamp = ts,
-                            ActiveReplacement.expiry = expiry,
-                            -- CR 615.7's shield is spent in DAMAGE, not in
-                            -- applications, so the use count is not what ends it
-                            -- (see Pawl.Types.Uses).
-                            ActiveReplacement.uses = Uses.Unlimited,
-                            -- CR 614.15: a prevention shield replaces damage from
-                            -- any source, including one this resolution is not
-                            -- itself dealing, so it is not a self-replacement.
-                            ActiveReplacement.origin = ReplacementOrigin.Other
-                          }
-                   in g1 {GameState.replacements = active : GameState.replacements g1}
-           in List.foldl' install g0 recipients
+           in List.foldl' (installShield controller source duration (DamageRewrite.PreventNext amount)) g0 recipients
+  Effect.PreventAllDamage duration ref -> do
+    -- CR 615.1 / 615.3: install one floating prevention shield per recipient the
+    -- ref names, with no amount to count down -- "prevent all damage that would
+    -- be dealt to you this turn" (Selfless Squire). The row is
+    -- PreventNextDamage's above in every respect but its rewrite, which is why
+    -- both go through `installShield`; what differs is that CR 615.7's "reduced
+    -- to 0" terminator does not exist here, so only the duration ends it.
+    --
+    -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
+    gs <- State.get
+    let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+    State.modify' $ \g0 -> List.foldl' (installShield controller source duration DamageRewrite.PreventAll) g0 recipients
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the

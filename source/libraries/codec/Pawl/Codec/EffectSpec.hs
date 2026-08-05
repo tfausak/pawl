@@ -359,6 +359,14 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4))
       """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":4}]} """
+  -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
+  Spec.it s "PreventAllDamage" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PreventAllDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))))
+      """ {"type":"PreventAllDamage","value":[{"type":"UntilEndOfTurn"},"you"]} """
   -- CR 113.9: this opcode counters an ability as well as a spell, with the type
   -- unchanged, so the wire shape is too.
   Spec.it s "Counter" $
