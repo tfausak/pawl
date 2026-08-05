@@ -3163,6 +3163,12 @@ representativeEvents cond =
         TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
         TriggerCondition.SelfDealsCombatDamageToPlayer -> one combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
+        -- CR 702.179d's own event. Like the monarch's condition above it, this
+        -- one is matched by Pawl.Engine.Speed.inherentPending rather than by
+        -- Event.matchesTrigger, which answers False for it whatever the event --
+        -- so the pin here is that an inherent condition binds nothing from the
+        -- log, which is what Event.eventBindingSlots claims for it.
+        TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost S.bob 2)
         TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed)
@@ -3198,6 +3204,7 @@ everyTriggerCondition =
     TriggerCondition.StateIs (Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
+    TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
