@@ -7,34 +7,9 @@ import qualified Data.Text.Encoding as Encoding
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Printing as Printing
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
-import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Printing as Printing
-
--- Where a card's file lives, by the FILING convention Pawl.Registry.parseCard
--- enforces: every face name joined, slugified.
---
--- Not Card.combined's name, which is a different question and only coincidentally
--- the same string. CR 709.4a's joined name IS what the combined view of a split
--- card shows, but CR 715.4 gives an adventurer card its normal face's name alone
--- -- so reading the file's location off the combined view would look for
--- embereth-shieldbreaker.json while the registry files that card under
--- embereth-shieldbreaker-battle-display.json. The joined string is a filing
--- convention rather than a name the card has (#649), and this is the side of
--- that distinction a PATH is on; a lookup by either face's own name still lands
--- through Registry.byFaceName.
-slugOf :: Printing.Printing -> Slug.Slug
-slugOf =
-  Slug.fromText
-    . CardName.unwrap
-    . CardName.join
-    . fmap Face.name
-    . Card.Type.faces
-    . Printing.card
 
 spec :: Spec.Spec IO n -> n ()
 spec s = Spec.describe s "Pawl.Cards" $ do
@@ -45,7 +20,7 @@ spec s = Spec.describe s "Pawl.Cards" $ do
 
 checkFile :: Spec.Spec IO n -> FilePath -> Printing.Printing -> IO ()
 checkFile s root p = do
-  let slug = slugOf p
+  let slug = Registry.filedAs (Printing.card p)
   let path = Registry.cardPath root slug
   -- Read as bytes and decoded as UTF-8 explicitly, for the reason
   -- Pawl.Registry.parseCard is: Data.Text.IO.readFile decodes using the locale

@@ -360,6 +360,7 @@ library exceptions
   hs-source-dirs: source/libraries/exceptions
   -- cabal-gild: discover source/libraries/exceptions
   exposed-modules:
+    Pawl.Exceptions.InvalidCorpus
     Pawl.Exceptions.MissingRoot
 
 -- Quality of life improvements for packages Pawl doesn't own, in the spirit of
@@ -496,7 +497,6 @@ library types
     Pawl.Types.BlockRequirement
     Pawl.Types.CandidateId
     Pawl.Types.Card
-    Pawl.Types.CardError
     Pawl.Types.CardName
     Pawl.Types.CardType
     Pawl.Types.CastingPermission
@@ -682,8 +682,6 @@ test-suite pawl-test-suite
     Pawl.ConditionSpec
     Pawl.CopySpec
     Pawl.CoreSpec
-    Pawl.Corpus
-    Pawl.CorpusSpec
     Pawl.CostSpec
     Pawl.CountSpec
     Pawl.DamageSpec

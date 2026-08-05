@@ -1613,23 +1613,34 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (cardSlotNamesCollide (face {Face.activatedAbilities = [distinct]}))) "and two modes naming distinct slots are accepted"
     Spec.assertBool s (cardSlotNamesCollide fused) "Dream's Grip with both modes on one slot is rejected"
     Spec.assertBool s (not (collides dreamsGrip)) "and the real card, naming them 'tapped' and 'untapped', is accepted"
-  Spec.it s "every file in data/cards loads, and its card is named by its file name" $ do
-    -- Name-against-file-name is checked on each load
-    -- (Pawl.Registry.parseCard), so sweeping the listing is the whole assertion:
-    -- a stray file, a file whose card was renamed, and a file that no test
-    -- happens to name all fail here. A hand-kept list is exactly what forgets
-    -- the file nobody loads.
-    slugs <- S.corpusSlugs
-    Spec.assertBool s (not (null slugs)) "the corpus is not empty"
-    mapM_ (S.cardOf s registry) slugs
-  -- The other direction: a lookup slugifies the NAME it is asked for,
-  -- then builds a path from that slug -- so a file whose stem is not itself a
-  -- slugify fixed point is never opened by that path; a lookup would quietly
-  -- open some OTHER file (or none) instead of raising the mismatch above.
-  -- Every committed file name must therefore already be its own slug.
-  -- Slug.fromText normalizes rather than validates, so the assertion is that
-  -- it is the identity on every stem -- read the listing directly, because
-  -- Corpus.slugsIn has already normalized the evidence away.
+  -- The filing convention, now that no lookup enforces it (#649): a file's stem
+  -- must be the slug Registry.filedAs derives from the card inside it.
+  --
+  -- A stray file, a file whose card was renamed, and a file that no test
+  -- happens to name all fail here. A hand-kept list is exactly what forgets
+  -- the file nobody loads.
+  Spec.it s "every file in data/cards is filed under its card's joined face names" $ do
+    root <- Registry.defaultRoot
+    loaded <- Registry.loadRoot root
+    Spec.assertBool s (not (null loaded)) "the corpus is not empty"
+    let stemOf path =
+          let file = reverse (takeWhile (/= '/') (reverse path))
+           in reverse (drop (length ".json") (reverse file))
+        offends (path, result) = case result of
+          Left reason -> Just (path <> ": " <> Text.unpack reason)
+          Right card ->
+            let belongs = Registry.filedAs card
+             in if Slug.fromText (Text.pack (stemOf path)) == belongs
+                  then Nothing
+                  else Just (path <> ": belongs at " <> Text.unpack (Slug.unwrap belongs) <> ".json")
+    Spec.assertEqWith s "every file is filed under its own name" (Maybe.mapMaybe offends loaded) []
+  -- The other direction: the sweep above SLUGIFIES the stem before comparing
+  -- it to Registry.filedAs, so a committed Wax-Wane.json would still pass it --
+  -- Slug.fromText normalizes rather than validates, folding case away before
+  -- the comparison ever runs. This case is the only thing pinning the RAW stem
+  -- itself to already be a slug, i.e. that Slug.fromText is the identity on
+  -- every stem -- read the listing directly, because Registry.loadRoot yields
+  -- paths rather than the raw stems this needs.
   Spec.it s "every file name in data/cards is already a slug" $ do
     root <- Registry.defaultRoot
     entries <- Directory.listDirectory root

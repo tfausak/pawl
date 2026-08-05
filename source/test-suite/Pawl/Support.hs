@@ -21,7 +21,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Cards as Cards
-import qualified Pawl.Corpus as Corpus
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
@@ -40,7 +39,6 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
@@ -141,10 +139,6 @@ fourPlayers = alice NonEmpty.:| [bob, carol, dave]
 fourPlayerGame :: GameState.GameState
 fourPlayerGame = Setup.emptyGame fourPlayers
 
--- How a spec case fetches a card: a Left becomes an assertion failure naming the
--- card, so a missing or unloadable card fails the case that wanted it rather
--- than escaping as an exception. This is the adapter for everything inside a
--- Spec.it, and the reason those modules need no IO.
 -- A throwaway directory holding `files` (name, contents), for the cases that
 -- need a corpus other than the committed one. The label keeps concurrently
 -- running cases in separate directories, since tasty runs them in parallel.
@@ -179,12 +173,16 @@ waxWaneJson = do
 printingOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Printing.Printing
 printingOf s registry = fmap Printing.MkPrinting . cardOf s registry
 
+-- How a spec case fetches a card: a Nothing becomes an assertion failure naming
+-- the card, so a missing card fails the case that wanted it rather than
+-- escaping as an exception. This is the adapter for everything inside a
+-- Spec.it, and the reason those modules need no IO.
 cardOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Card.Type.Card
 cardOf s registry name = do
   result <- Registry.named registry name
   case result of
-    Left err -> Spec.assertFailure s (show err)
-    Right card -> pure card
+    Nothing -> Spec.assertFailure s ("no such card: " <> name)
+    Just card -> pure card
 
 redRed :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed fetch = do
@@ -1636,15 +1634,6 @@ stubView table oid =
               }
         [] -> Nothing
 
--- Every card file in the bundled corpus, by slug. The corpus-wide checks need
--- the directory listing rather than a hand-kept list: a file nobody loads is
--- exactly the file a hand-kept list forgets. Kept as a String list because that
--- is what the sweeps feed back to a lookup.
-corpusSlugs :: IO [String]
-corpusSlugs = do
-  root <- Registry.defaultRoot
-  fmap (fmap (Text.unpack . Slug.unwrap)) (Corpus.slugsIn root)
-
 -- Every card pawl ships, or a failure naming every file that would not load.
 --
 -- Takes no registry: the lint is about the BUNDLED corpus by definition, so
@@ -1653,7 +1642,7 @@ corpusSlugs = do
 allPrintings :: Spec.Spec IO n -> IO [Printing.Printing]
 allPrintings s = do
   root <- Registry.defaultRoot
-  loaded <- Corpus.loadAll root
-  case [err | (_, Left err) <- loaded] of
+  loaded <- Registry.loadRoot root
+  case [path <> ": " <> Text.unpack reason | (path, Left reason) <- loaded] of
     [] -> pure [Printing.MkPrinting card | (_, Right card) <- loaded]
-    errs -> Spec.assertFailure s (List.intercalate "\n" (fmap show errs))
+    errs -> Spec.assertFailure s (List.intercalate "\n" errs)

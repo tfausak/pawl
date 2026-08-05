@@ -122,7 +122,6 @@ import qualified Pawl.CombatSpec
 import qualified Pawl.ConditionSpec
 import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
-import qualified Pawl.CorpusSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
 import qualified Pawl.DamageSpec
@@ -334,7 +333,6 @@ spec s registry = do
   Pawl.CombatSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
-  Pawl.CorpusSpec.spec s
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry

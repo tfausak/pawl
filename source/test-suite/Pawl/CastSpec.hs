@@ -1630,7 +1630,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   Spec.it s "CR 709.3 casting Wax gives the targeted creature +2/+2" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
@@ -1650,7 +1650,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   Spec.it s "CR 709.3 casting Wane destroys the targeted enchantment" $ do
     plains <- S.printingOf s registry "Plains"
     ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wane"
     let (prisonId, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
         (gs, oid) = S.handOne waxWane withPrison
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))
@@ -1664,7 +1664,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   -- through the game state rather than off the card, so this is the combined
   -- view a resting object actually projects.
   Spec.it s "CR 709.4b a split card in a graveyard is green and white with mana value 2" $ do
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     let (oid, gs) = S.addGraveyardCard waxWane S.alice (Setup.emptyGame S.bothPlayers)
     case Game.faceOf oid gs of
       Nothing -> Spec.assertFailure s "expected a card in the graveyard"
@@ -1679,7 +1679,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
   Spec.it s "CR 709.3b the Wax on the stack is named Wax, where the card in hand is not" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
         cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
@@ -1691,7 +1691,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
       [] -> Spec.assertFailure s "expected the spell on the stack"
       top : _ -> Spec.assertEqWith s "on the stack, the half being cast" (Projection.nameOf top cast) waxName
   Spec.it s "CR 709.3a each half is offered and gated on its own" $ do
-    waxWane <- S.printingOf s registry "Wax // Wane"
+    waxWane <- S.printingOf s registry "Wax"
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
