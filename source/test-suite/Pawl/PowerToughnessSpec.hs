@@ -3,7 +3,8 @@
 -- switching), Pawl.Engine.Quantity and Pawl.Engine.ManaCount (the counting
 -- quantities, and CR 208.2a's substitution of 0 for a number a CDA cannot
 -- determine) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer Strength,
--- Twisted Image, Nightmare, Monstrous War-Leech, Omnath Locus of Mana).
+-- Twisted Image, Nightmare, Monstrous War-Leech, Omnath Locus of Mana, Serra
+-- Avatar).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -31,6 +32,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerRef as PlayerRef
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Scope as Scope
@@ -532,6 +535,89 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
     Spec.assertEqWith s "the spell left the stack" (GameState.stack settled) []
     Spec.assertEqWith s "no Leech on the battlefield" (leechesOnBattlefield settled) []
   omnathSpec s registry
+  serraAvatarSpec s registry
+
+-- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), first line: "Serra
+-- Avatar's power and toughness are each equal to your life total." Oracle text
+-- verified against Scryfall.
+--
+-- CR 604.3 layer 7a, like Tarmogoyf's and Nightmare's above and unlike Omnath's:
+-- the printed box is a star, so the pair comes from a characteristic-defining
+-- ability rather than from a CR 613.4c modification. What is new is WHAT it
+-- reads -- Quantity.LifeTotal, CR 119.1's scalar attached to a PLAYER, which is
+-- neither a population over a zone (Count) nor a mana pool (ManaCount).
+--
+-- The card's second line, the CR 603.6 from-anywhere graveyard trigger, is
+-- Pawl.TriggerSpec's half.
+serraAvatarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+serraAvatarSpec s registry = Spec.describe s "Serra Avatar" $ do
+  -- CR 707.2a again, for the reason Tarmogoyf's seed test above states: what the
+  -- seed holds must be the unevaluated quantity, not a number frozen at entry.
+  Spec.it s "CR 604.3 the seed carries the life total as a QUANTITY, with the printed star substituted" $ do
+    avatar <- S.printingOf s registry "Serra Avatar"
+    let (avatarId, gs) = S.addCreature avatar S.alice (Setup.emptyGame S.bothPlayers)
+        yourLife = Quantity.Type.LifeTotal (PlayerRef.Relative PlayerRelation.You)
+    Spec.assertEqWith s "both boxes are the same quantity" (PC.characteristicPT (Projection.baseCharacteristics avatarId gs)) (Just (yourLife, yourLife))
+  Spec.it s "CR 119.1 a starting life total of 20 makes it a 20/20" $ do
+    avatar <- S.printingOf s registry "Serra Avatar"
+    let (avatarId, gs) = S.addCreature avatar S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "alice is at 20" (S.lifeOf S.alice gs) (Just 20)
+    Spec.assertEqWith s "power" (Projection.powerOf avatarId gs) (Just 20)
+    Spec.assertEqWith s "toughness" (Projection.toughnessOf avatarId gs) (Just 20)
+  -- THE LIVENESS FALSIFIER, upward. CR 119.3 adjusts a life total the moment an
+  -- effect says to, and nothing touches the Avatar -- only the next projection's
+  -- read of alice's life. Renewed Faith is targetless, so no interpreter here has
+  -- to choose who gains.
+  Spec.it s "CR 119.3 Renewed Faith's 6 life makes the Avatar a 26/26" $ do
+    plains <- S.printingOf s registry "Plains"
+    renewedFaith <- S.printingOf s registry "Renewed Faith"
+    avatar <- S.printingOf s registry "Serra Avatar"
+    let (gs0, spellId) = S.handOne renewedFaith (S.landsInPlay plains 3)
+        (avatarId, board) = S.addCreature avatar S.alice gs0
+        cast = S.runPure S.identityAnswer board (S.cast S.alice spellId)
+        after = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "20/20 before" (S.powerToughnessOf avatarId board) (Just (20, 20))
+    Spec.assertEqWith s "alice gained 6" (S.lifeOf S.alice after) (Just 26)
+    Spec.assertEqWith s "26/26 after" (S.powerToughnessOf avatarId after) (Just (26, 26))
+  -- The same falsifier downward, and the one that matters for the board: an
+  -- Avatar that stayed 20/20 while its controller fell to 18 would be reading a
+  -- number frozen at entry. S.identityAnswer targets the least Recipient and
+  -- Sign in Blood's pool is Players, so alice (player 0) is the target without a
+  -- bespoke interpreter.
+  Spec.it s "CR 119.3 Sign in Blood's 2 life makes the Avatar an 18/18" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    avatar <- S.printingOf s registry "Serra Avatar"
+    let (gs0, spellId) = S.handOne signInBlood (twoCardLibrary swamp (S.landsInPlay swamp 2))
+        (avatarId, board) = S.addCreature avatar S.alice gs0
+        cast = S.runPure S.identityAnswer board (S.cast S.alice spellId)
+        after = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "20/20 before" (S.powerToughnessOf avatarId board) (Just (20, 20))
+    Spec.assertEqWith s "alice lost 2" (S.lifeOf S.alice after) (Just 18)
+    Spec.assertEqWith s "18/18 after" (S.powerToughnessOf avatarId after) (Just (18, 18))
+  -- CR 109.5 / 604.3a(3): "your" in a characteristic-defining ability is the
+  -- object's OWN controller. The two players are held at different life totals
+  -- and nothing but control moves between the assertions, so an Avatar reading
+  -- its owner's life -- or its source's, or the active player's -- gives 18 where
+  -- the rule gives 20.
+  Spec.it s "CR 109.5 the life total read is the CONTROLLER's, not the owner's" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    signInBlood <- S.printingOf s registry "Sign in Blood"
+    avatar <- S.printingOf s registry "Serra Avatar"
+    let (gs0, spellId) = S.handOne signInBlood (twoCardLibrary swamp (S.landsInPlay swamp 2))
+        (avatarId, board) = S.addCreature avatar S.alice gs0
+        cast = S.runPure S.identityAnswer board (S.cast S.alice spellId)
+        drained = S.runPure S.identityAnswer cast Stack.resolveTop
+        stolen = S.giveControl avatarId S.bob drained
+    Spec.assertEqWith s "alice at 18, bob untouched at 20" (S.lifeOf S.alice drained, S.lifeOf S.bob drained) (Just 18, Just 20)
+    Spec.assertEqWith s "under alice: 18/18" (S.powerToughnessOf avatarId drained) (Just (18, 18))
+    Spec.assertEqWith s "under bob: 20/20" (S.powerToughnessOf avatarId stolen) (Just (20, 20))
+
+-- Two cards in alice's library, so Sign in Blood's "draws two cards" has
+-- something to draw: an empty library would lose her the game to CR 704.5b
+-- rather than shrink her Avatar.
+twoCardLibrary :: Printing.Printing -> GameState.GameState -> GameState.GameState
+twoCardLibrary printing gs = snd (S.addLibraryCard printing S.alice (snd (S.addLibraryCard printing S.alice gs)))
 
 -- Omnath, Locus of Mana ({2}{G} Legendary Creature -- Elemental), second line:
 -- "Omnath gets +1/+1 for each unspent green mana you have." Oracle text verified

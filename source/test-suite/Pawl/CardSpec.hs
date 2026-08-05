@@ -328,6 +328,9 @@ quantityCounts quantity = case quantity of
   -- about the Filters a card authors -- have nothing to sweep here. See
   -- Pawl.Types.ManaCount.
   Quantity.Type.ManaCount _ -> []
+  -- CR 119.1's scalar attached to a PLAYER: it holds neither a Pawl.Types.Count
+  -- nor a Pawl.Types.Filter, so these lints have nothing to sweep here either.
+  Quantity.Type.LifeTotal _ -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this
@@ -395,6 +398,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
   -- CR 701.6a's countering condition is a PlayerRelation, which holds no Count,
@@ -1241,6 +1245,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfCycled -> []
   TriggerCondition.PlayerDiscards _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
