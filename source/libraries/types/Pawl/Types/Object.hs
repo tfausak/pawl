@@ -151,9 +151,9 @@ data Object = MkObject
     -- zone change (CR 400.7 makes each a new object). Read by the projection when
     -- ordering layer 6/7.
     timestamp :: Timestamp.Timestamp,
-    -- | CR 709.3b / 712.8f: which face this object is showing, where the rules
-    -- single one out. Nothing everywhere else, and the layout decides -- see
-    -- Pawl.Engine.Game.faceOf.
+    -- | CR 709.3b / 712.8e / 712.8f: which face this object is showing, where the
+    -- rules single one out. Nothing everywhere else, and the layout decides --
+    -- see Pawl.Engine.Game.faceOf.
     --
     -- A CardName rather than a positional index: CR 709.3 has a player choose
     -- which half they are casting, and CR 709.4a is what gives a card's faces
@@ -163,11 +163,16 @@ data Object = MkObject
     -- longer names a face of that card falls back to the combined view
     -- (Game.resolveFace) rather than failing -- unreachable in practice, since
     -- Pawl.CardSpec's "a card's face names are pairwise distinct" corpus lint
-    -- holds that of every loadable card, and the only writer of this field draws
-    -- the name from that same card's faces.
+    -- holds that of every loadable card, and both writers of this field draw the
+    -- name from that same card's faces: Pawl.Engine.Cast.castSpell names the half
+    -- being cast (CR 709.3b), and Pawl.Engine.Resolve's Transform arm names the
+    -- face CR 701.27a turned the permanent over to.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
-    -- because CR 400.7 makes the moved object a new one.
+    -- because CR 400.7 makes the moved object a new one. That clear is also CR
+    -- 712.8a -- a transformed permanent that leaves the battlefield is a card
+    -- with only its front face's characteristics again -- rather than only a
+    -- forgetting.
     face :: Maybe CardName.CardName,
     -- | CR 715.3d: the player who may play this card while it remains exiled --
     -- an Adventure spell's controller, written as the resolution that exiled it

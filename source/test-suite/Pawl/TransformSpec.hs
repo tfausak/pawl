@@ -114,8 +114,8 @@ spec s registry = Spec.describe s "Transform" $ do
   -- at the point of casting.
   --
   -- Asserted TWICE, because the offer list alone cannot tell CR 712.11 from an
-  -- accident: Stonewing Antagonizer prints no mana cost, and CR 202.1's "some
-  -- objects have no mana cost" is unpayable rather than free
+  -- accident: Stonewing Antagonizer prints no mana cost, and CR 202.1b's "having
+  -- no mana cost represents an unpayable cost" is not a free one
   -- (Pawl.Engine.Cost.canPay's Nothing arm), so a back face proposed all the way
   -- to the cost gate would be dropped there and the list would read the same.
   -- The falsifier -- Pawl.Engine.Card.castableFaces answering with the whole

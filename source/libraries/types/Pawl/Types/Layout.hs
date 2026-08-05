@@ -23,7 +23,7 @@ data Layout
     -- fixed positions (CR 715.2's inset frame on the left, the card's own on the
     -- right) rather than names, so the order Pawl.Types.Card.faces already
     -- carries is what says which is which -- the same positional reading CR
-    -- 712.8a's front face will take.
+    -- 712.8a's front face takes below.
     Adventure
   | -- | CR 712.2: a NONMODAL double-faced card -- one Magic card face on each
     -- side, with an ability on one or both faces that turns the card over. The

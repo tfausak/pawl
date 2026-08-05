@@ -198,9 +198,11 @@ castableFaces card = case Card.layout card of
   -- CR 712.11: "A double-faced spell is cast with its front face up by default."
   -- ONE option, and no choice to leave the player: unlike Split's halves and
   -- Adventure's two ways to play, a nonmodal double-faced card's back face is not
-  -- something a player may elect to cast. Only an effect can put it on the stack
-  -- (CR 712.8c / 712.11a's "cast transformed"), which no card in the pool grants
-  -- (#70).
+  -- something a player may elect to cast. Only an effect allowing the card to be
+  -- cast "transformed" or "converted" puts a back face on the stack (CR 712.8c /
+  -- 712.11a), and pawl has none: the convert wording is #698, and the wordings
+  -- that reach a back face WITHOUT casting put the card onto the battlefield
+  -- transformed instead (CR 712.13a, #70).
   Layout.Transforming -> [NonEmpty.head (Card.faces card)]
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is
