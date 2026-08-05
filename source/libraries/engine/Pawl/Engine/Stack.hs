@@ -1,13 +1,11 @@
 module Pawl.Engine.Stack where
 
-import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
-import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -15,7 +13,6 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
-import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import Pawl.Types.Game (Game)
@@ -95,16 +92,9 @@ resolveTopWith runSubgame = do
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}
         Source.OfAbility srcId ability -> do
-          -- CR 601.3 (Panglacial): before resolving an ability that searches a
-          -- library, offer its controller the chance to cast a
-          -- castable-while-searching card from their library. The ability is
-          -- still on the stack, so a cast lands on top of it. Offered at
-          -- resolution start, not per-Search-effect within a multi-effect
-          -- ability -- exact intra-resolution interleaving is not modelled
-          -- (#57). CR 700.2c: only the CHOSEN modes are scanned.
-          let chosen = Binding.modesOf (Object.bindings obj)
-          Monad.when (any Resolve.searchesLibrary (Modal.modesEffects chosen (ActivatedAbility.modal ability))) $
-            Cast.castWhileSearching (Object.owner obj)
+          -- CR 601.3's offer is NOT made here. It belongs to the Search effect
+          -- itself (Resolve's Effect.Search arm), so it sees the state the player
+          -- is actually searching from and reaches searching SPELLS too (#57).
           Resolve.resolveAbility oid srcId ability
         Source.OfTrigger srcId ability ->
           -- CR 608.2a: an intervening "if" is checked AGAIN as the ability

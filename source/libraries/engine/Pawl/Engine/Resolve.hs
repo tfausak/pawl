@@ -12,6 +12,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
@@ -1189,6 +1190,19 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Nothing -> False
           Just face -> Filter.matches searchContext (Projection.viewOfCard face) filter_
      in do
+          -- CR 601.3 (Panglacial Wurm): the chance to cast a
+          -- castable-while-searching card is offered AT THE SEARCH, not when the
+          -- resolution began (#57). Two things follow, and both are the rule
+          -- rather than conveniences:
+          --
+          --   * everything this resolution sequences BEFORE the search has
+          --     already happened, so the offer is made in the game state the
+          --     player is actually searching from -- Scapeshift's sacrificed
+          --     lands are gone before the Wurm's affordability is judged;
+          --   * CR 601.3's subject is "a spell or ability", and this site is
+          --     reached by both. The old site was Stack's Source.OfAbility arm
+          --     alone, so a searching SPELL was never offered the cast at all.
+          Cast.castWhileSearching controller
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
               decider = Decide.deciderFor controller gs
