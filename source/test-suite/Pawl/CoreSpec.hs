@@ -50,6 +50,11 @@ cardTypesInAllGraveyards =
 data Toy r where
   Ask :: Toy Int
 
+-- The same question wearing a label, for exercising Program.mapProgram -- the
+-- shape Pawl.Types.Asked has, where the label says which game asked.
+data Labelled r where
+  MkLabelled :: Int -> Toy r -> Labelled r
+
 toyProgram :: Program.Program Toy Int
 toyProgram = do
   x <- Program.prompt Ask
@@ -72,6 +77,20 @@ programSpec s = Spec.describe s "Pawl.Types.Program" $ do
               h : t -> do State.put t; pure h
               [] -> pure 0
     Spec.assertEq s (State.evalState (Program.foldProgramM answer toyProgram) [1, 2]) 3
+
+  -- #153: Engine.playSubgame labels a whole subgame's questions from outside,
+  -- after the program is built, which is only sound if rewriting instructions
+  -- leaves the control flow and the answers alone.
+  Spec.it s "mapProgram relabels every instruction and threads answers unchanged" $ do
+    let labelled :: Program.Program Labelled Int
+        labelled = Program.mapProgram (MkLabelled 7) toyProgram
+        answer :: Labelled b -> State.State [Int] b
+        answer (MkLabelled label i) = case i of
+          Ask -> do
+            xs <- State.get
+            State.put (label : xs)
+            pure (length xs)
+    Spec.assertEq s (State.runState (Program.foldProgramM answer labelled) []) (1, [7, 7])
 
 -- A GameState holding one object whose binding environment carries the given
 -- chosen X (Nothing = no amount bound), for exercising Quantity.evaluate's X arm.

@@ -1,7 +1,6 @@
 module Pawl.Engine.Resolve where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -79,7 +78,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
@@ -1141,10 +1139,10 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- belongs to Artificial Evolution as opposed to Magical Hack, and
             -- the "can't be Wall" restriction rides in from the data as
             -- `forbidden`.
-            ask = case family of
+            question = case family of
               SubtypeFamily.BasicLandType -> Prompt.ChooseLandTypeSwap decider controller resolving slot forbidden
               SubtypeFamily.CreatureType -> Prompt.ChooseCreatureTypeSwap decider controller resolving slot forbidden
-        (from, to) <- Game.choose ask
+        (from, to) <- Game.choose question
         State.modify' $ \gs ->
           -- CR 611.2a: the opcode states no duration, so the effect "lasts
           -- until the end of the game" -- Duration.Indefinite, armed through
@@ -1220,7 +1218,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           -- says only how to look. CR 701.23h and CR 701.24b both describe the
           -- shuffle as something an effect instructs, never as part of a search.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
-          shuffleAnswer <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
+          shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
           State.modify' (reorderLibrary controller (Game.honourShuffle lib shuffleAnswer))
   -- Rest in Peace's ETB: exile every card in every graveyard (CR 400.7 each move
   -- funnels through changeZone). A graveyard->exile move matches no M3f

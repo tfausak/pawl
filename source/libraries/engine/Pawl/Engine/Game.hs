@@ -8,11 +8,12 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Types.Asked as Asked
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
-import qualified Pawl.Types.Game as Game.Type
+import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -32,6 +33,24 @@ import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Timestamp as Timestamp
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
+
+-- Ask a player a question and wait for the answer. The ONE way the engine
+-- suspends: every prompt in the codebase goes through here, including the ones
+-- that come by way of 'choose' below.
+--
+-- What it adds over lifting Program.prompt directly is the game the question
+-- came from (#153). StateT sits outside the Program, so the interpreter cannot
+-- see the state at a suspension; reading it here, on the inside, is what lets
+-- Asked carry it. `enclosing` starts empty and Engine.playSubgame pushes onto it
+-- from the frame above (CR 729.1a) -- this function cannot know it is inside a
+-- subgame, and does not have to.
+--
+-- Here in the lowest engine layer because every prompting module imports it,
+-- down to Pawl.Engine.Replacement, which must never import Pawl.Engine.Event.
+ask :: Prompt.Prompt r -> Game r
+ask p = do
+  gs <- State.get
+  Trans.lift (Program.prompt (Asked.MkAsked {Asked.enclosing = [], Asked.game = gs, Asked.prompt = p}))
 
 -- CR 106.4: this player's mana pool. Absent from the map means an empty pool,
 -- which is why every reader goes through here rather than through the Map. Here
@@ -65,7 +84,7 @@ freshTimestamp gs =
 -- forgot to say so would make a loop containing it look mandatory.
 --
 -- FOUR prompts deliberately do not come through here, and are asked with a bare
--- 'Trans.lift (Program.prompt ...)' instead:
+-- 'ask' instead:
 --
 --   * Prompt.Concede, because CR 104.3a lets a player concede at any time, in a
 --     loop or out of one. If conceding counted, no loop would ever be mandatory
@@ -79,10 +98,10 @@ freshTimestamp gs =
 --
 -- Every other prompt site already elides its prompt when the answer is forced,
 -- so only the branch that genuinely asks reaches this.
-choose :: Prompt.Prompt a -> Game.Type.Game a
+choose :: Prompt.Prompt a -> Game a
 choose p = do
   State.modify' (\gs -> gs {GameState.lastChoice = GameState.nextTimestamp gs})
-  Trans.lift (Program.prompt p)
+  ask p
 
 -- CR 400.2: a property of the ZONE and never of the card -- a hand every one of
 -- whose cards is currently revealed is still a hidden zone.
