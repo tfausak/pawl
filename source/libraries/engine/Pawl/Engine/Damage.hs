@@ -12,7 +12,6 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AttackTarget (AttackTarget)
@@ -363,7 +362,7 @@ damageRecipient gs recipient = case recipient of
 -- property; the loop's unit stays one event, uniform with the other five
 -- classes, which is what CR 614.5 and CR 615.10 both describe.
 --
--- The whole batch goes through Replacement.resolveDamageBatch rather than
+-- The whole batch goes through Event.resolveDamageBatch rather than
 -- through resolveDamage one event at a time, and CR 615.7 is the reason: a
 -- prevent-the-next-N shield (Mending Hands) is ONE resource allocated across
 -- several simultaneous events, and the shielded side chooses which damage it
@@ -376,12 +375,12 @@ damageRecipient gs recipient = case recipient of
 -- that applied to this batch, carrying the total it prevented.
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
-  (survivors, prevented) <- Replacement.resolveDamageBatch events
+  (survivors, prevented) <- Event.resolveDamageBatch events
   let markOne g ev = case DamageEvent.target ev of
         Recipient.ToCreature oid ->
           if DamageEvent.dealtByInfect ev
             then -- CR 120.3d / 702.90c: -1/-1 counters, no marked damage. Added
-            -- directly (not via Replacement.putCounters): this is a consequence of
+            -- directly (not via Event.putCounters): this is a consequence of
             -- a damage event that already ran the CR 616 replacement loop, so
             -- a "would put -1/-1 from infect" CR 614 sub-replacement is out of
             -- scope (#122).

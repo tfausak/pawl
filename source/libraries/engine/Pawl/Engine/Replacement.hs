@@ -1,25 +1,32 @@
--- CR 616.1's loop: the SOLE home of casing on ProposedEvent and
--- ReplacementEffect, beside Pawl.Engine.Resolve (Effect), Pawl.Engine.Event
--- (TriggerCondition) and Pawl.Engine.Projection (Modification). Pawl.Codec also
--- cases on ReplacementEffect, but only as the JSON data boundary, never to
--- decide game behaviour.
+-- CR 616.1's SELECTION half: which replacement effects exist, which of them
+-- apply to a proposed event, how they bucket and order, who chooses among them,
+-- and how a chosen row is spent. Everything here answers a question ABOUT an
+-- event; nothing here performs one.
 --
--- CR 616.1 is a LOOP, not an ordering prompt: choose one applicable effect from
--- the highest non-empty of five ordered buckets, apply it, then repeat over the
--- effects applicable NOW (CR 616.1f) -- and CR 616.2 lets an effect become
--- applicable because another one modified the event. A foldl' over a list
--- computed once is structurally incapable of either.
+-- The other half -- CR 616.1's loop itself and `apply`, which carries out the
+-- chosen rewrite -- lives in Pawl.Engine.Event, next to the CR 400.7 zone-change
+-- funnel. That is not a preference: the two are mutually recursive by the rules.
+-- A zone change raises its event through the loop (CR 614.4), and a chosen
+-- rewrite can itself change zones -- CR 614.1c's "as this permanent enters,
+-- sacrifice any number of permanents" is a replacement whose application is a CR
+-- 701.21a sacrifice. One module has to hold both ends of that cycle, and it is
+-- the performing one.
 --
--- This module must NOT import Pawl.Engine.Event: Event raises proposed events
--- through this loop, so the dependency runs one way only. That is also why the
--- entry copy-target legal set lives here rather than in Pawl.Engine.Target --
--- Target imports Pawl.Engine.Sba, which imports Pawl.Engine.Event.
+-- So this module must NOT import Pawl.Engine.Event, and the classification it
+-- exports is what Event calls down into. That is also why the entry copy-target
+-- legal set lives here rather than in Pawl.Engine.Target -- Target imports
+-- Pawl.Engine.Sba, which imports Pawl.Engine.Event.
+--
+-- Casing on ProposedEvent and ReplacementEffect is shared with Pawl.Engine.Event
+-- and nowhere else, beside Pawl.Engine.Resolve (Effect) and
+-- Pawl.Engine.Projection (Modification). Pawl.Codec also cases on
+-- ReplacementEffect, but only as the JSON data boundary, never to decide game
+-- behaviour.
 module Pawl.Engine.Replacement where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
-import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Set (Set)
@@ -34,7 +41,6 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
 import Pawl.Types.Card (Card)
-import qualified Pawl.Types.Color as Color
 import Pawl.Types.ControllerRelation (ControllerRelation)
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -75,24 +81,12 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SourceRelation as SourceRelation
-import qualified Pawl.Types.Subtype as Subtype
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.Uses as Uses
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
-
--- CR 614: settle a proposed zone change. Nothing means the move does not happen.
--- The typed door Pawl.Engine.Event uses, so Event never cases on a ProposedEvent.
---
--- `asOf` is applyReplacementsIn's: Nothing for a lone move, Just the pre-batch
--- board when this move is one member of a CR 608.2f / 704.3 batch.
-resolveZoneChange :: Maybe GameState -> ZoneChange -> Game (Maybe ZoneChange)
-resolveZoneChange asOf zc = do
-  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldChangeZone zc)
-  pure (outcome >>= asZoneChange)
 
 asZoneChange :: ProposedEvent -> Maybe ZoneChange
 asZoneChange event = case event of
@@ -103,114 +97,6 @@ asZoneChange event = case event of
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
-
--- CR 616.1's loop. `Nothing` means the event DOES NOT HAPPEN (CR 615.6, CR
--- 701.19a). A rewrite that cancels an event has already performed its own
--- consequences by the time it returns Nothing.
-applyReplacements :: ProposedEvent -> Game (Maybe ProposedEvent)
-applyReplacements = applyReplacementsIn Nothing Set.empty
-
--- CR 608.2f / 704.3: `asOf` is the board a BATCH's candidates are read from --
--- `Just` the state the batch began in, or `Nothing` for the live board. Only the
--- destroy funnel passes `Just` (Event.destroy, Event.destroyInBatch), along with
--- the graveyard moves it and Pawl.Engine.Sba's put-into-graveyard batch make
--- through Event.changeZoneInBatch. Everything else is a lone event and wants the
--- live board. CR 608.2f and CR 704.3 make a batch ONE event, so CR 614.4 asks
--- which effects existed before the BATCH, not before the member being processed
--- -- otherwise Rest in Peace animated by Opalescence and swept by Day of
--- Judgment answers according to an order CR 608.2f gives nobody the right to
--- decide.
---
--- `asOf` and `batch` both name a batch, and they are OPPOSITES: `asOf` widens
--- the candidate set to include effects of permanents the batch is itself
--- removing, while `batch` NARROWS the copy-target set to exclude permanents
--- entering beside the loop's subject. Deliberately not one parameter: different
--- batches, different readers, and no call site ever supplies both.
---
--- What `asOf` does NOT freeze: the FLOATING store stays live (see `collect`),
--- because CR 614.3 has `consume` spend a one-shot as it applies and a frozen
--- store would hand a spent regeneration shield to the next member of the batch;
--- the loop still RE-COLLECTS every iteration, so CR 616.1f and CR 616.2 are
--- untouched; and `apply`'s writes and `choose`'s chooser lookup read the LIVE
--- state. A permanent that ENTERED after the batch began therefore contributes
--- nothing, which is CR 614.4 read the other way. No producer today, so that half
--- is unexercised.
---
--- `batch` is the set of ids entering the battlefield AT THE SAME TIME as this
--- loop's subject. CR 614.12a puts the choice BEFORE the permanent enters, and
--- Clone may only copy a creature already ON the battlefield, so a sibling
--- entering in the same batch is not there yet at the moment the choice is made.
--- No rule states that exclusion outright: it follows from 614.12a's timing plus
--- the copy effect's own wording. (CR 614.13a is the wrong cite for it -- that
--- rule is about an entry effect moving OTHER objects to a different zone, and a
--- copy target never changes zones.) The loop's own subject is excluded by
--- legalCopyTargets' `self`, never by this set.
---
--- `changeZone` handles one entering object at a time and passes `Set.empty`. The
--- non-empty case is Event.createTokens, which materializes every token of a
--- Create BEFORE running any of their entry loops (CR 614.16's doubled count is
--- settled once, up front), so a later token's entry loop would otherwise find
--- its siblings already sitting on the battlefield.
---
--- A simultaneously-entering sibling can reach a later token's entry loop through
--- three channels; only the first needs this explicit exclusion:
---   1. Copy targets -- excluded by `batch`. IMPLEMENTED BUT UNTESTED: no card in
---      the pool puts two copy-choosers onto the battlefield at once (#73).
---   2. Candidate collection -- unreachable regardless of `batch`, though no
---      longer impossible by construction. Every entry replacement a PERMANENT
---      carries in this pool is CR 614.1c's self-only `IsSource` (Clone, Primal
---      Plasma, CR 306.5b's loyalty), which no sibling can satisfy; CR 614.1d's
---      other-objects form exists (Gather Specimens) but as a FLOATING row rather
---      than a sibling's ability. A permanent printing a 614.1d entry replacement
---      (Essence of the Wild) would reach a sibling here, correctly and by the
---      card's own text.
---   3. Projection -- a sibling's STATIC ABILITIES would be visible to a later
---      token's projection, and nothing here excludes them the way `batch`
---      excludes copy targets. CR 614.12 does not sanction this: a
---      simultaneously-entering sibling's static abilities do not already exist
---      relative to it. NOT IMPLEMENTED AT ALL, and unreached today only because
---      every token card in the pool has empty `staticAbilities` (#78).
-applyReplacementsIn :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent)
-applyReplacementsIn asOf batch = fmap fst . applyReplacementsReporting asOf batch
-
--- The same loop, answering CR 615.13's second question as well: WHICH prevention
--- effects applied on the way, and how much each of them prevented.
---
--- A separate entry rather than a wider applyReplacementsIn because only the
--- damage class can answer anything but the empty list -- CR 615.1 makes a
--- prevention effect a thing that watches a DAMAGE event -- so every other caller
--- would be threading a value it knows is empty.
-applyReplacementsReporting :: Maybe GameState -> Set ObjectId -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
-applyReplacementsReporting asOf batch = loop asOf batch Set.empty []
-
-loop :: Maybe GameState -> Set ObjectId -> Set CandidateId -> [Prevention] -> ProposedEvent -> Game (Maybe ProposedEvent, [Prevention])
-loop asOf batch applied prevented event = do
-  gs <- State.get
-  -- From scratch each iteration: collect against the CURRENT state (or, for a
-  -- CR 608.2f batch, the state the batch began in), minus CR 614.5's
-  -- already-applied set. Re-collecting is what makes CR 616.2 work.
-  let unused candidate = not (Set.member (ReplacementCandidate.identity candidate) applied)
-      fresh = filter unused (applicable asOf gs event)
-  case highestBucket fresh of
-    -- CR 616.1f / 614.6: no candidate remains, so the surviving event happens.
-    [] -> pure (Just event, prevented)
-    bucket -> do
-      picked <- choose gs event bucket
-      case picked of
-        -- Unreachable: highestBucket returns [] for an empty input, so `bucket`
-        -- is non-empty and `choose` always picks. Total rather than partial.
-        Nothing -> pure (Just event, prevented)
-        Just candidate -> do
-          outcome <- apply batch candidate event
-          -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
-          -- no arm of that fold has to report anything and none can forget to.
-          -- What makes it exact rather than a guess is `prevents` below: only a
-          -- PREVENTION rewrite's shrinkage is prevention, where CR 614.1a's
-          -- SetAmount and Scale shrink an event without preventing a point of it.
-          let prevented1 = prevented <> Maybe.maybeToList (preventionBy candidate event outcome)
-          case outcome of
-            Nothing -> pure (Nothing, prevented1)
-            Just rewritten -> loop asOf batch (Set.insert (ReplacementCandidate.identity candidate) applied) prevented1 rewritten
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -446,12 +332,27 @@ matchesZoneOwner gs src rel oid =
 -- enchantment counts) and subtype membership (CR 205.3, so Blood Moon is seen).
 -- A replacement's pattern frames no player, so the perspective is Nothing.
 --
--- Pawl.Engine.Cost narrows its sacrifice candidates through the SAME call, so
--- there is no duplicate matcher to keep in step (#111).
+-- sacrificeCandidates below is the one caller that narrows a whole battlefield
+-- with it, and Pawl.Engine.Cost reaches it through that -- so there is no
+-- duplicate matcher to keep in step (#111).
 matchesPermanent :: GameState -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent gs filter_ oid =
   -- No source in scope at this site.
   Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
+
+-- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
+-- the order Prompt.ChooseSacrifices and Prompt.ChooseAnyNumberToSacrifice offer
+-- them in, which is what makes both the elision test and the transcript fallback
+-- deterministic.
+--
+-- Here rather than in Pawl.Engine.Cost, which was where it lived while paying a
+-- cost was the only way to sacrifice anything: CR 614.1c's as-enters sacrifice
+-- (EntryRewrite.SacrificeAnyNumber) asks the same question from Pawl.Engine.Event,
+-- which is BELOW Cost. One home keeps CR 701.21a's "a permanent they control"
+-- answered once.
+sacrificeCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+sacrificeCandidates pid filter_ gs =
+  List.sort (filter (matchesPermanent gs filter_) (Projection.controls pid gs))
 
 -- CR 614.1c-d: does the entering object satisfy this entry replacement's Filter?
 --
@@ -526,6 +427,7 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR _ EntryRewrite.ChooseBasicLandType -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
+  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -548,19 +450,19 @@ bucketOfEffect re = case re of
 -- which folds CR 109.5's "you" into its indistinguishability test exactly for
 -- the arms that answer True.
 --
--- Consumption is deliberately NOT what this asks about. Every `apply` arm spends
+-- Consumption is deliberately NOT what this asks about. Every Event.apply arm spends
 -- its own candidate (CR 614.5), but the loop gives each candidate its own
 -- opportunity in any order, so which was spent first is not a board difference.
 --
 -- One arm per constructor, no wildcard, and the EntryR arms split per
 -- EntryRewrite, so a new constructor breaks the build HERE as well as in
--- bucketOfEffect and `apply`. A wildcard defaulting to False would hand an
--- author who teaches `apply` a new controller-reading rewrite an unasked choice
+-- bucketOfEffect and Event.apply. A wildcard defaulting to False would hand an
+-- author who teaches Event.apply a new controller-reading rewrite an unasked choice
 -- instead of a build failure.
 readsApplier :: ReplacementEffect -> Bool
 readsApplier re = case re of
   -- The destination zone is the effect's own second field, and the pattern is
-  -- matched before `apply` runs (Rest in Peace, Leyline of the Void).
+  -- matched before Event.apply runs (Rest in Peace, Leyline of the Void).
   ReplacementEffect.ZoneChangeR _ _ -> False
   -- CR 707.5 / 109.5: Clone's "you" is the ENTERING object's controller, read
   -- live off the board at CR 614.12a's moment, not the candidate's -- so two
@@ -581,6 +483,11 @@ readsApplier re = case re of
   -- CR 614.1c's "enters with": the counter kind and count are the effect's own
   -- fields, and they land on the entering object (CR 306.5b's loyalty included).
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> False
+  -- CR 614.1c again, and NO despite performing a sacrifice: the sacrificing
+  -- player is the ENTERING object's controller, read live off the board at CR
+  -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
+  -- the effect. Two such rows would offer the same player the same permanents.
+  ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are
@@ -629,7 +536,7 @@ readsApplier re = case re of
 -- other way: two Rest in Peace under different controllers exile the same card
 -- to the same zone whichever applies, so asking about them would raise a
 -- question the rules leave nothing to decide. `source` is folded in nowhere for
--- the same reason -- every use of it above is a test run BEFORE `apply`, not a
+-- the same reason -- every use of it above is a test run BEFORE Event.apply, not a
 -- branch inside it.
 --
 -- Not implemented: two floating rows alike in `effect` and `controller` but
@@ -697,356 +604,6 @@ chooserOf gs event = case event of
   -- so the player whose turn it is chooses among applicable skips.
   ProposedEvent.WouldBeginPhase _ pid -> Just pid
 
--- CR 614.6: apply one chosen effect. Nothing means the event does not happen.
---
--- One arm per ReplacementEffect constructor, same shape as `applies`, so a new
--- constructor breaks the build HERE too. A wildcard fallback would defeat that:
--- an author who teaches `applies` a new arm but forgets this one gets a silent
--- no-op replacement. Every arm below either rewrites its paired event or, for a
--- pair `applies` already excludes, falls through to `pure (Just event)` --
--- unreachable in practice, but present so the match stays total per constructor
--- rather than total by wildcard.
---
--- The same discipline applies one level down, to each arm's inner SUM type
--- (DamageRewrite, DestructionRewrite, EntryRewrite, Scaling), never to the
--- pattern RECORDS, which are read for their fields rather than cased. An arm
--- must CASE on the inner sum, not bind it with `_`: `_` is exhaustive
--- UNCONDITIONALLY, so it raises no build failure and no warning when a new
--- constructor is added, silently treating a real rewrite as a no-op.
---
--- CounterR's and TokenR's arms delegate Scaling whole to `scale`, which is where
--- the exhaustive case lives -- a new Scaling constructor breaks `scale`'s build
--- and both arms' transitively, so casing it again inline would not strengthen
--- anything.
-apply :: Set ObjectId -> ReplacementCandidate -> ProposedEvent -> Game (Maybe ProposedEvent)
-apply batch candidate event =
-  case (ReplacementCandidate.effect candidate, event) of
-    (ReplacementEffect.ZoneChangeR _ toDest, ProposedEvent.WouldChangeZone zc) -> do
-      consume (ReplacementCandidate.identity candidate)
-      pure (Just (ProposedEvent.WouldChangeZone zc {ZoneChange.to = toDest}))
-    -- Unreachable: `applies` admits ZoneChangeR only against WouldChangeZone.
-    (ReplacementEffect.ZoneChangeR _ _, _) -> pure (Just event)
-    -- CR 707.5 / 614.1c / 614.12a: the entering object's controller chooses a
-    -- permanent to copy, and its copiable characteristics are stamped as this
-    -- object's copy snapshot. Writing to the COPIABLE layer (CR 613.1a) is what
-    -- makes CR 707.2 fall out for free: a later Clone of this object copies the
-    -- stamped values with no further machinery. Clone's "may" is real: Nothing
-    -- leaves the object as its printed self (a 0/0, which CR 704.5f then buries).
-    --
-    -- The class match is on the OUTER tuple, so the INNER `case rewrite of` is
-    -- what carries the exhaustiveness obligation -- a wildcard-bound `_` on the
-    -- outer pattern would let a new EntryRewrite constructor fall through
-    -- silently whenever it happened to pair with WouldEnter.
-    (ReplacementEffect.EntryR _ rewrite, ProposedEvent.WouldEnter oid) -> case rewrite of
-      EntryRewrite.AsCopy -> do
-        consume (ReplacementCandidate.identity candidate)
-        gs <- State.get
-        case Projection.controllerOf oid gs of
-          -- Unreachable: the object is materialized on the battlefield before this
-          -- loop runs, so controllerOf falls back to its owner. Defensive: make no
-          -- unprompted copy choice.
-          Nothing -> pure (Just event)
-          Just controller -> do
-            let decider = Decide.deciderFor controller gs
-            let legal = legalCopyTargets batch oid gs
-            answer <- Game.choose (Prompt.ChooseCopyTarget decider controller oid legal)
-            -- FILTERED, NOT TRUSTED (#222). legalCopyTargets is the ONLY thing
-            -- enforcing CR 614.12a's same-batch exclusion, so honouring an
-            -- unoffered answer would let a Clone copy a sibling token entering
-            -- beside it.
-            let chosen = case answer of
-                  Just src | List.elem src legal -> Just src
-                  _ -> Nothing
-            case chosen of
-              Nothing -> pure (Just event)
-              Just src2 -> do
-                State.modify' $ \g ->
-                  let stamp o = o {Object.bindings = Binding.setCopy (Projection.copiableCharacteristics src2 g) (Object.bindings o)}
-                   in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
-                pure (Just event)
-      -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed
-      -- power/toughness-and-keywords option to become. Written into the COPIABLE
-      -- snapshot (applyEntryOption), which is what makes CR 616.2 fall out for
-      -- free: a Clone that copies Primal Plasma also copies this ability (CR
-      -- 707.5), and the loop's next iteration finds it newly applicable.
-      EntryRewrite.ChoiceOf options -> do
-        gs <- State.get
-        case options of
-          -- Malformed card data: an as-enters choice with nothing to choose
-          -- from. No-op rather than a partial function, but still consumed -- a
-          -- floating one-shot must not survive to apply again.
-          [] -> do
-            consume (ReplacementCandidate.identity candidate)
-            pure (Just event)
-          first : rest -> do
-            picked <-
-              if null rest
-                then -- One option is not a choice; where the rules leave
-                -- nothing to ask, don't prompt.
-                  pure first
-                else case Projection.controllerOf oid gs of
-                  -- Unreachable: the object is materialized on the
-                  -- battlefield before this loop runs, so controllerOf falls
-                  -- back to its owner. Defensive: make no unprompted choice.
-                  Nothing -> pure first
-                  Just controller -> do
-                    let decider = Decide.deciderFor controller gs
-                    answer <- Game.choose (Prompt.ChooseEntryOption decider controller oid options)
-                    pure (at options answer first)
-            consume (ReplacementCandidate.identity candidate)
-            State.modify' (applyEntryOption oid picked)
-            pure (Just event)
-      -- CR 614.1c: Painter's Servant's as-enters colour choice. Unlike ChoiceOf
-      -- above, this is asked every time the entering object has a controller to
-      -- ask: CR 105.1's five colours are always all legal and always
-      -- distinguishable, so there is no one-option case to elide.
-      --
-      -- Written to Object.chosenColor, NOT to the copiable snapshot -- see
-      -- EntryRewrite.ChooseColor.
-      EntryRewrite.ChooseColor -> do
-        gs <- State.get
-        picked <- case Projection.controllerOf oid gs of
-          -- Unreachable, and defensive for ChoiceOf's reason: the object is
-          -- materialized on the battlefield before this loop runs, so
-          -- controllerOf falls back to its owner. A WEAKER fallback than
-          -- ChoiceOf's, and the one place on this path the engine would decide
-          -- something: there is no colour the card named to default to, so white
-          -- is conjured. It stands only because the branch cannot be reached.
-          Nothing -> pure Color.White
-          Just controller -> do
-            let decider = Decide.deciderFor controller gs
-            Game.choose (Prompt.ChooseColor decider controller oid)
-        consume (ReplacementCandidate.identity candidate)
-        State.modify' $ \g ->
-          let stamp o = o {Object.chosenColor = Just picked}
-           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
-        pure (Just event)
-      -- CR 614.1c: Convincing Mirage's as-enters basic land type choice. Asked
-      -- every time the entering object has a controller to ask, for
-      -- ChooseColor's reason just above: CR 305.6's five basic land types are
-      -- always all legal and always distinguishable, so there is no one-option
-      -- case to elide.
-      --
-      -- Written to Object.chosenSubtype, NOT to the copiable snapshot -- see
-      -- EntryRewrite.ChooseBasicLandType.
-      EntryRewrite.ChooseBasicLandType -> do
-        gs <- State.get
-        picked <- case Projection.controllerOf oid gs of
-          -- Unreachable, and defensive for ChoiceOf's reason: the object is
-          -- materialized on the battlefield before this loop runs, so
-          -- controllerOf falls back to its owner. The same WEAKER fallback
-          -- ChooseColor's arm carries, and for the same reason: no type the card
-          -- named to default to, so Mountain is conjured.
-          Nothing -> pure Subtype.Mountain
-          Just controller -> do
-            let decider = Decide.deciderFor controller gs
-            Game.choose (Prompt.ChooseBasicLandType decider controller oid)
-        consume (ReplacementCandidate.identity candidate)
-        State.modify' $ \g ->
-          let stamp o = o {Object.chosenSubtype = Just picked}
-           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
-        pure (Just event)
-      -- CR 614.1c with CR 201.4: Null Chamber's as-enters name choices. Unlike
-      -- the two arms above, this one has to settle WHO is asked before it can
-      -- ask anything: the card names its controller and one opponent, and CR
-      -- 101.4 puts their two simultaneous choices in APNAP order.
-      --
-      -- Written to Object.chosenNames, NOT to the copiable snapshot -- see
-      -- EntryRewrite.ChooseCardNames.
-      EntryRewrite.ChooseCardNames restriction -> do
-        gs <- State.get
-        picked <- case Projection.controllerOf oid gs of
-          -- Unreachable, and defensive for ChoiceOf's reason: the object is
-          -- materialized on the battlefield before this loop runs, so
-          -- controllerOf falls back to its owner. Names NOTHING rather than
-          -- conjuring a name, which the two arms above cannot do -- their
-          -- fallbacks pick from a fixed five, and CR 201.4's offer is every card
-          -- in the Oracle card reference.
-          Nothing -> pure Set.empty
-          Just controller -> do
-            -- CR 102.1 makes a player one of the people IN the game, and CR
-            -- 104.3a lets one leave at any time -- so the offer is
-            -- Game.stillPlaying and not GameState.turnOrder, which keeps a
-            -- departed seat.
-            let opponents = filter (/= controller) (Game.stillPlaying gs)
-            opponent <- case opponents of
-              -- CR 102.2: a two-player game leaves exactly one opponent, and
-              -- one option is not a choice. The empty case is a game whose
-              -- other seats have all left (CR 104.2a) -- nobody to ask, and no
-              -- second name.
-              [] -> pure Nothing
-              [sole] -> pure (Just sole)
-              first : second : rest -> do
-                let offered = first NonEmpty.:| (second : rest)
-                answer <- Game.choose (Prompt.ChooseOpponent (Decide.deciderFor controller gs) controller oid offered)
-                -- FILTERED, NOT TRUSTED, the posture Sba.chooseLegendVictims
-                -- takes: an answer naming somebody who is not an opponent would
-                -- otherwise hand a second name to a player the card never asked,
-                -- so it falls back to the head.
-                pure (Just (if List.elem answer (NonEmpty.toList offered) then answer else first))
-            -- CR 101.4: the active player chooses first, then the rest in turn
-            -- order. Both names are chosen as one event, so the order is the
-            -- rule's and not the card's reading order.
-            let choosers = filter (\pid -> pid == controller || Just pid == opponent) (Game.apnapOrder gs)
-                ask pid = Game.choose (Prompt.ChooseCardName (Decide.deciderFor pid gs) pid oid restriction)
-            fmap Set.fromList (Monad.mapM ask choosers)
-        consume (ReplacementCandidate.identity candidate)
-        State.modify' $ \g ->
-          let stamp o = o {Object.chosenNames = picked}
-           in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
-        pure (Just event)
-      -- CR 306.5b via CR 614.1c: this permanent enters with N counters. Through
-      -- Event.putCounters, the CR 122.6 funnel, and NOT a direct write to
-      -- Object.counters, because CR 614.16 makes a counter-scaling replacement
-      -- apply even when the original event was not itself an effect -- so
-      -- Doubling Season has to see these. That nested CR 616.1 loop is why the
-      -- counters are placed here rather than folded into the entry event's own
-      -- payload. Consumed like every other arm, so CR 614.5 keeps the loop's next
-      -- iteration from placing them twice.
-      EntryRewrite.WithCounters kind n -> do
-        consume (ReplacementCandidate.identity candidate)
-        putCounters oid kind n
-        pure (Just event)
-      -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
-      -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
-      -- controller, baked when the row was installed -- and that is a permanent
-      -- change: the card's "this turn" bounds how long the REPLACEMENT is around
-      -- to catch entries, never how long the creature stays yours.
-      --
-      -- Written to the object rather than to the surviving ProposedEvent, which
-      -- is why WouldEnter still carries only an ObjectId. This engine
-      -- materializes the entering permanent BEFORE running the entry loop (see
-      -- runEntry, and CR 614.12), so the would-be controller is exactly
-      -- Projection.controllerOf on the live board. That is also what makes CR
-      -- 616.2 fall out: the loop's next iteration re-matches against a board
-      -- where the control has already changed, which a value parked on the event
-      -- would not show it. All five arms above land on the object for the same
-      -- reason.
-      --
-      -- No prompt, and none is owed: CR 616.1b's rewrite has no choice in it,
-      -- and the choice the rule DOES describe -- which of several
-      -- control-modifying effects to apply -- is `choose`'s, one level up.
-      --
-      -- Not implemented: `you` is not checked against CR 800.4a, so this can
-      -- hand a permanent to a player who has left the game (#592).
-      EntryRewrite.UnderSourceControl -> do
-        consume (ReplacementCandidate.identity candidate)
-        case ReplacementCandidate.controller candidate of
-          -- CR 109.5 has no answer: a permanent-sourced instance whose source
-          -- has left the board. Defensive, with no producer today, and it leaves
-          -- the entry alone rather than guessing at a player.
-          Nothing -> pure (Just event)
-          Just you -> do
-            State.modify' $ \gs ->
-              let claim obj = obj {Object.enteredUnder = Just you}
-               in gs {GameState.objects = Map.adjust claim oid (GameState.objects gs)}
-            pure (Just event)
-    -- Unreachable: `applies` admits EntryR only against WouldEnter.
-    (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
-    (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of
-      -- CR 615.6: a prevented event never happens -- it is not marked, not
-      -- drained, and never recorded, so no deathtouch bit exists for the CR
-      -- 704.5h SBA to read.
-      DamageRewrite.PreventAll -> do
-        consume (ReplacementCandidate.identity candidate)
-        pure Nothing
-      -- CR 615.7's shield covers as much of THIS event as it has left, and
-      -- whatever it could not cover survives as a smaller event of the same
-      -- source, recipient and riders. Nothing when it covered all of it, which
-      -- is CR 615.6: a prevented event never happens.
-      --
-      -- No choice is made here, and none is owed: within one event CR 615.7
-      -- leaves nothing to decide, since the prevention is neither optional nor
-      -- divisible by anyone's say-so. The choice the rule DOES describe -- which
-      -- of several simultaneous events the shield covers -- is asked one level
-      -- up, in resolveDamageBatch.
-      --
-      -- NOT `consume`. That spends a row per APPLICATION, while CR 615.7's unit
-      -- is the amount of damage rather than the number of events or sources
-      -- dealing it. `setShield` writes the remainder back and drops the row at 0.
-      DamageRewrite.PreventNext remaining -> do
-        let amount = DamageEvent.amount de
-            -- Both subtractions below are total on Natural: `prevented` is a min
-            -- of the two operands, so it is no greater than either.
-            prevented = min remaining amount
-        setShield (ReplacementCandidate.identity candidate) pat (remaining - prevented)
-        if prevented >= amount
-          then pure Nothing
-          else pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = amount - prevented}))
-      -- CR 614.1a's "instead" with a flat amount (Galvanic Blast). Only the
-      -- AMOUNT is rewritten, and that is the rule rather than economy: a
-      -- replaced damage event keeps its source, its recipient and every
-      -- deal-time rider it was proposed with.
-      DamageRewrite.SetAmount n -> do
-        consume (ReplacementCandidate.identity candidate)
-        pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = n}))
-      -- CR 614.1a: Furnace of Rath's "it deals double that damage ... instead".
-      -- Through the same `scale` the counter and token rewrites use, so a
-      -- doubling means one thing across every event class.
-      DamageRewrite.Scale scaling -> do
-        consume (ReplacementCandidate.identity candidate)
-        pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = scale scaling (DamageEvent.amount de)}))
-    -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
-    (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
-    -- CR 701.19a: regeneration removes marked damage, taps the permanent and
-    -- removes it from combat. The DESTRUCTION does not happen, so nothing
-    -- downstream of it (a put-into-graveyard, and therefore Rest in Peace's
-    -- redirect) ever runs.
-    (ReplacementEffect.DestructionR rewrite, ProposedEvent.WouldBeDestroyed oid _) -> case rewrite of
-      DestructionRewrite.Regenerate -> do
-        consume (ReplacementCandidate.identity candidate)
-        State.modify' $ \gs ->
-          let healTap obj = obj {Object.damage = 0, Object.tapped = TapState.Tapped}
-              healed = gs {GameState.objects = Map.adjust healTap oid (GameState.objects gs)}
-           in Game.removeFromCombat oid healed
-        pure Nothing
-    -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
-    (ReplacementEffect.DestructionR _, _) -> pure (Just event)
-    -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
-    (ReplacementEffect.CounterR _ scaling, ProposedEvent.WouldPutCounters oid kind n) -> do
-      consume (ReplacementCandidate.identity candidate)
-      pure (Just (ProposedEvent.WouldPutCounters oid kind (scale scaling n)))
-    -- Unreachable: `applies` admits CounterR only against WouldPutCounters.
-    (ReplacementEffect.CounterR _ _, _) -> pure (Just event)
-    -- CR 614.16: Doubling Season scales token creation.
-    (ReplacementEffect.TokenR _ scaling, ProposedEvent.WouldCreateTokens pid card n) -> do
-      consume (ReplacementCandidate.identity candidate)
-      pure (Just (ProposedEvent.WouldCreateTokens pid card (scale scaling n)))
-    -- Unreachable: `applies` admits TokenR only against WouldCreateTokens.
-    (ReplacementEffect.TokenR _ _, _) -> pure (Just event)
-    -- CR 614.1b / 614.10: a skip is "instead of doing X, do nothing", so the
-    -- step or phase simply does not begin. Nothing is done first, unlike
-    -- DamageRewrite.PreventAll's sibling arm: a skip has no consequence of its
-    -- own to perform before it cancels.
-    --
-    -- The obligation the doc above places on every arm -- case on the inner sum
-    -- rather than bind it with `_` -- has nothing to bind here: PhaseR carries a
-    -- pattern and no rewrite, because CR 614.1b leaves a skip only one possible
-    -- outcome. The day a PhaseRewrite exists, this arm owes it a case.
-    --
-    -- CR 614.10a's arithmetic -- two skip effects mean two occurrences skipped,
-    -- one per instance -- falls out of the floating store's SHAPE rather than
-    -- out of care taken here. Two Fatigues prepend two ActiveReplacements, and a
-    -- list of instances with distinct timestamps cannot coalesce the way a Set of
-    -- patterns or a Boolean flag would; `consume` below deletes by (source,
-    -- timestamp), so it spends exactly the one that applied; and returning
-    -- Nothing ENDS the CR 616.1 loop, so no second skip can be spent on the same
-    -- step.
-    --
-    -- The occurrence skipped is the one the PATTERN named, which for Stonehorn
-    -- Dignitary is a whole combat phase rather than a step of one. Nothing here
-    -- has to know that: Engine.runStep raises the phase question exactly once per
-    -- phase, so a whole-phase skip gets exactly one chance to apply.
-    --
-    -- Eon Hub's PhaseR reaches the same arm and consumes nothing: it is a
-    -- permanent's static ability, so its CandidateId is OfPermanent and `consume`
-    -- is a no-op for it. It is the store, not this arm, that tells the two apart.
-    (ReplacementEffect.PhaseR _, ProposedEvent.WouldBeginPhase _ _) -> do
-      consume (ReplacementCandidate.identity candidate)
-      pure Nothing
-    -- Unreachable: `applies` admits PhaseR only against WouldBeginPhase.
-    (ReplacementEffect.PhaseR _, _) -> pure (Just event)
-
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
 -- already there, which is what Primal Plasma's own Gatherer ruling requires -- a
@@ -1079,33 +636,6 @@ legalCopyTargets :: Set ObjectId -> ObjectId -> GameState -> [ObjectId]
 legalCopyTargets batch self gs =
   let eligible oid = oid /= self && not (Set.member oid batch) && Projection.isCreatureOf oid gs
    in filter eligible (Set.toAscList (GameState.battlefield gs))
-
--- CR 614.1c / 614.12: run the entry loop for an object that has just been
--- materialized on the battlefield.
---
--- The object is in GameState.objects and its zone index BEFORE this runs,
--- because CR 614.12 asks for the permanent's characteristics AS IT WOULD EXIST
--- ON THE BATTLEFIELD -- a projection of the object in the state where it has
--- entered, so the cheapest correct implementation is to put it there and project
--- it normally. Nothing observes the interim object: this finishes before the
--- Moved event is recorded, so no trigger scan and no state-based action can see
--- it.
---
--- `Monad.void` discards the `Nothing` that means the event does not happen. Safe
--- here: every EntryR arm always returns `Just`, and only DamageR/DestructionR
--- ever return `Nothing`, neither of which pairs with WouldEnter -- the only
--- event this loop proposes.
---
--- Always the LIVE board (`Nothing`), even when the zone change containing this
--- entry belongs to a CR 608.2f batch: the entering object is not on the
--- pre-batch board at all, and CR 614.12 asks about now rather than about when
--- the containing event began. CR 616.1g recognizes an entry like this as an
--- event CONTAINED within another rather than a second member of the batch, but
--- speaks only to the ORDER the two events' effects are chosen in, not to which
--- board each collects from. That a contained event keeps its own footing is this
--- engine's reading, resting on CR 614.12; no rule states it outright.
-runEntry :: Set ObjectId -> ObjectId -> Game ()
-runEntry batch oid = Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
 
 -- CR 614.3: a floating replacement whose `uses` is Once is spent by being
 -- applied. A permanent's STATIC replacement ability has no use count at all --
@@ -1176,7 +706,7 @@ prevents rewrite = case rewrite of
 -- CR 615.13: how much of this event the candidate just applied PREVENTED, or
 -- Nothing when it prevented nothing.
 --
--- `before` is the event as it was offered to `apply` and `after` what came back,
+-- `before` is the event as it was offered to Event.apply and `after` what came back,
 -- so this is the CR 615.6 arithmetic read off the pair: Nothing means the event
 -- does not happen at all, which is the whole of it prevented.
 --
@@ -1203,35 +733,6 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
                     }
               else Nothing
   _ -> Nothing
-
--- CR 615: settle one proposed damage event. Nothing means it does not happen;
--- the second answer is CR 615.13's, one entry per prevention effect that applied
--- to THIS event and prevented some of it.
-resolveDamage :: DamageEvent.DamageEvent -> Game (Maybe DamageEvent.DamageEvent, [Prevention])
-resolveDamage de = do
-  (outcome, prevented) <- applyReplacementsReporting Nothing Set.empty (ProposedEvent.WouldDealDamage de)
-  pure (outcome >>= asDamageEvent, prevented)
-
--- CR 608.2f / 510.2: settle a whole batch of SIMULTANEOUS damage events, and
--- answer the survivors. The typed door Pawl.Engine.Damage uses, so Damage never
--- cases on a ProposedEvent or on a ReplacementEffect.
---
--- Each event still runs its OWN CR 616.1 loop and the loop's unit is still one
--- event, which is what CR 614.5 and CR 615.10 both describe. Two things this
--- adds over calling resolveDamage per event, and both are rules the BATCH is the
--- only place to state:
---
---   * CR 615.7's ORDER, because the shield is a single resource allocated across
---     the whole batch and the rule gives that choice to the shielded side.
---   * CR 615.13's GROUPING, because that rule fires an ability "each time a
---     prevention effect is applied to one or more simultaneous damage events",
---     so one instance reaching three of this batch's events is ONE prevention of
---     the total rather than three.
-resolveDamageBatch :: [DamageEvent.DamageEvent] -> Game ([DamageEvent.DamageEvent], [Prevention])
-resolveDamageBatch events = do
-  ordered <- orderForShields events
-  settled <- Monad.mapM resolveDamage ordered
-  pure (Maybe.mapMaybe fst settled, groupPreventions (concatMap snd settled))
 
 -- CR 615.13: collapse a batch's per-event preventions to one entry per applying
 -- instance per recipient, carrying the total that instance prevented.
@@ -1377,20 +878,6 @@ asDamageEvent event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
 
--- CR 701.8 / 614.8: settle a proposed destruction. `Just` is the object actually
--- destroyed -- which need not be the one asked about, since a rewrite may
--- redirect it; `Nothing` means a replacement took the event (regeneration), and
--- that rewrite has already done its own work.
---
--- `asOf` is applyReplacementsIn's, and the destroy funnel always supplies it: CR
--- 608.2f gives even a single Doom Blade a one-element batch, and when that batch
--- is itself part of a CR 704.3 pass the board is the pass's rather than the
--- batch's (Event.destroyInBatch).
-resolveDestruction :: Maybe GameState -> Regenerability.Regenerability -> ObjectId -> Game (Maybe ObjectId)
-resolveDestruction asOf regenerability oid = do
-  outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid regenerability)
-  pure (outcome >>= asDestruction)
-
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
   ProposedEvent.WouldBeDestroyed target _ -> Just target
@@ -1400,36 +887,6 @@ asDestruction event = case event of
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
-
--- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
--- permanent -- not to be confused with Pawl.Engine.Event.counter, CR 701.6's
--- countering of a spell). CR 122.6 makes this the right single seam, since it
--- covers both counters put on a permanent already on the battlefield and
--- counters an object is given as it enters. A zero count after the loop puts
--- nothing on.
---
--- It lives HERE rather than beside the other change-and-emit funnels in
--- Pawl.Engine.Event because CR 122.6's as-it-enters clause is served by `apply`'s
--- EntryRewrite.WithCounters arm above, and Pawl.Engine.Event already depends on
--- this module. A copy of the body there would be a second funnel, which is the
--- one thing a funnel must not have.
-putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game ()
-putCounters oid kind n = do
-  resolved <- resolveCounters oid kind n
-  case resolved of
-    Nothing -> pure ()
-    Just (target, settledKind, settledCount) ->
-      Monad.when (settledCount > 0)
-        . State.modify'
-        $ \gs ->
-          let bump obj = obj {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters obj)}
-           in gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
-
--- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
-resolveCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind, Natural))
-resolveCounters oid kind n = do
-  outcome <- applyReplacements (ProposedEvent.WouldPutCounters oid kind n)
-  pure (outcome >>= asCounters)
 
 asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind, Natural)
 asCounters event = case event of
@@ -1441,12 +898,6 @@ asCounters event = case event of
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
 
--- CR 111.1: settle a proposed token creation. Nothing means none are created.
-resolveTokens :: PlayerId -> Card -> Natural -> Game (Maybe (PlayerId, Card, Natural))
-resolveTokens pid card n = do
-  outcome <- applyReplacements (ProposedEvent.WouldCreateTokens pid card n)
-  pure (outcome >>= asTokens)
-
 asTokens :: ProposedEvent -> Maybe (PlayerId, Card, Natural)
 asTokens event = case event of
   ProposedEvent.WouldCreateTokens pid card n -> Just (pid, card, n)
@@ -1456,25 +907,6 @@ asTokens event = case event of
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
-
--- CR 500.11 / 614.10: settle whether a step or phase begins at all, on the turn
--- of `pid`. False means a skip took it, and proceeding past it is then the
--- caller's whole obligation -- CR 614.1b replaces a skipped step with nothing, so
--- there is no rewritten event to carry out. How far past it reaches is the
--- caller's too: one schedule entry for a PhaseSelector.Step, the phase's
--- remaining entries for a whole phase (Engine.runStep, Turn.dropRestOfPhase).
---
--- Answers a Bool rather than the settled event, unlike resolveDestruction, whose
--- `Just` had to carry an identity because a rewrite can redirect which object is
--- destroyed. Nothing can rewrite a WouldBeginPhase: PhaseR is the only effect the
--- class admits and it only ever cancels.
---
--- The typed door Pawl.Engine.Engine uses, so Engine never cases on a
--- ProposedEvent.
-beginsPhase :: PhaseSelector -> PlayerId -> Game Bool
-beginsPhase selector pid = do
-  outcome <- applyReplacements (ProposedEvent.WouldBeginPhase selector pid)
-  pure (Maybe.isJust (outcome >>= asPhaseBegin))
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
 -- skips become floating replacement effects, one per selector. Called by

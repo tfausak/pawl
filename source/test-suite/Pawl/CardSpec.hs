@@ -1306,11 +1306,13 @@ playerEffectFilters playerEffect = case playerEffect of
   -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
   PlayerEffect.CastAsThoughItHadFlash f -> [f]
 
--- CR 201.4a: the restriction on which cards' names an as-enters name choice may
--- name (Null Chamber's "other than a basic land card name"). The one Filter an
--- EntryRewrite carries, and a predicate over a CARD in the Oracle card reference
--- rather than over an object on the board -- which is the same shape
--- Effect.Search's is, and why it belongs in this walk.
+-- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
+-- restriction on which cards' names an as-enters name choice may name (Null
+-- Chamber's "other than a basic land card name"), a predicate over a CARD in the
+-- Oracle card reference rather than over an object on the board -- the same shape
+-- Effect.Search's is, and why it belongs in this walk. CR 614.1c's as-enters
+-- sacrifice carries one of the ordinary kind, over permanents on the battlefield
+-- (Shimatsu the Bloodcloaked's "any number of permanents"). Neither is framed.
 entryRewriteFilters :: EntryRewrite.EntryRewrite -> [Filter.Type.Filter Keyword.Keyword]
 entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseCardNames f -> [f]
@@ -1320,6 +1322,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.WithCounters _ _ -> []
   EntryRewrite.UnderSourceControl -> []
+  EntryRewrite.SacrificeAnyNumber f _ -> [f]
 
 -- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
 -- is "one or more counters would be put on a creature YOU control", and EntryR's
@@ -1330,7 +1333,8 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 --
 -- EntryR's REWRITE holds one too, on a second axis: its pattern says which
 -- objects entering it applies to, and entryRewriteFilters above says which
--- cards a name choice inside it may name.
+-- cards a name choice inside it may name and which permanents an as-enters
+-- sacrifice may take.
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]

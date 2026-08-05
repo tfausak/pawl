@@ -1083,11 +1083,11 @@ runStep = do
   -- phase nobody skipped.
   phaseBegins <- case Turn.phaseBeginningAt phase of
     Nothing -> pure True
-    Just selector -> Replacement.beginsPhase selector active
+    Just selector -> Event.beginsPhase selector active
   if not phaseBegins
     then skipWholePhase phase
     else do
-      begins <- Replacement.beginsPhase (PhaseSelector.Step phase) active
+      begins <- Event.beginsPhase (PhaseSelector.Step phase) active
       if not begins
         then advance
         else runStepThatBegan phase

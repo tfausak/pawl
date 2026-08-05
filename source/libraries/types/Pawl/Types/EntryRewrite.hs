@@ -18,8 +18,10 @@ import qualified Pawl.Types.Keyword as Keyword
 -- load-bearing here too: a copied "as [this] enters" ability takes effect, so a
 -- Clone of a Primal Plasma runs the COPIED choice rather than skipping it.
 --
--- No constructor carries a cost: CR 614.12b has no producer here, because no
--- entry replacement in this pool has a cost attached to its choice (#72).
+-- SacrificeAnyNumber is the one constructor whose choice COSTS something. CR
+-- 614.12b's combined-affordability check across permanents entering
+-- simultaneously is still not implemented -- the entry loop has no budget to
+-- measure a batch against (#72).
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption.EntryOption]
@@ -88,4 +90,23 @@ data EntryRewrite
     -- who controlled the object by default, and a permanent that ENTERED under
     -- your control is the second of those.
     UnderSourceControl
+  | -- | CR 614.1c's two sentences of Shimatsu the Bloodcloaked read as one
+    -- rewrite: "As this creature enters, sacrifice any number of permanents.
+    -- This creature enters with that many +1/+1 counters on it." The Filter is
+    -- which permanents may be chosen; the CounterKind is what the count buys.
+    --
+    -- ONE constructor rather than a sacrifice arm beside WithCounters, because
+    -- the number is not known until the choice is made and WithCounters carries a
+    -- Natural settled at projection time. Splitting them would need a channel
+    -- from one entry replacement to another that nothing else in CR 614.1c wants.
+    --
+    -- ANY NUMBER, not a count: CR 601.2's "choose a number" is not what this
+    -- says, so the prompt is Prompt.ChooseAnyNumberToSacrifice and the empty
+    -- answer is legal. Shimatsu is printed 0/0, so declining is a real option
+    -- with a real consequence (CR 704.5f buries it).
+    --
+    -- The permanents leave through the CR 701.21a sacrifice funnel and the
+    -- counters arrive through the CR 122.6 one, so Rest in Peace and Doubling
+    -- Season both see this the way they see any other sacrifice or counter.
+    SacrificeAnyNumber (Filter.Filter Keyword.Keyword) CounterKind.CounterKind
   deriving (Eq, Ord, Show)

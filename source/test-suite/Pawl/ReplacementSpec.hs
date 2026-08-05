@@ -1436,8 +1436,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               ActiveReplacement.origin = ReplacementOrigin.Other
             }
         g3 = S.addReplacement active g2
-        asked = answersFor S.identityAnswer g3 (Replacement.runEntry Set.empty piker)
-        after = S.runPure S.identityAnswer g3 (Replacement.runEntry Set.empty piker)
+        asked = answersFor S.identityAnswer g3 (Event.runEntry Set.empty piker)
+        after = S.runPure S.identityAnswer g3 (Event.runEntry Set.empty piker)
     Spec.assertBool s (not (wasAskedForEntryOption asked)) "no ChooseEntryOption was raised"
     Spec.assertEqWith s "the sole option applied anyway" (Projection.powerOf piker after) (Just 3)
   Spec.it s "CR 614.16 Doubling Season turns Dragon Fodder's two Goblins into four" $ do
@@ -1494,14 +1494,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
         (piker, g1) = S.addCreature pikerPrinting S.alice base
-        (settled, _) = S.runPureWith S.identityAnswer g1 (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)
+        (settled, _) = S.runPureWith S.identityAnswer g1 (Event.resolveDestruction Nothing Regenerability.Regenerable piker)
     Spec.assertEqWith s "the object it was asked about" settled (Just piker)
   Spec.it s "CR 701.19a a regenerated destruction settles on nothing" $ do
     swamp <- S.printingOf s registry "Swamp"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
     let base = S.landsInPlay swamp 1
         (piker, g1) = S.addCreature pikerPrinting S.alice base
-        (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Replacement.resolveDestruction Nothing Regenerability.Regenerable piker)
+        (settled, _) = S.runPureWith S.identityAnswer (S.addRegenShield piker g1) (Event.resolveDestruction Nothing Regenerability.Regenerable piker)
     Spec.assertEqWith s "consumed by the shield" settled Nothing
   stepSkipSpec s registry
   fatigueSpec s registry
@@ -1510,6 +1510,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   mendingHandsSpec s registry
   selflessSquireSpec s registry
   gatherSpecimensSpec s registry
+  shimatsuSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -1985,3 +1986,84 @@ blastShape src ts =
       ActiveReplacement.uses = Uses.Unlimited,
       ActiveReplacement.origin = ReplacementOrigin.SelfReplacement
     }
+
+-- alice controls `n` Mountains and `extra` further permanents, and holds a
+-- Shimatsu the Bloodcloaked. Returns the state, the Shimatsu's hand id, and the
+-- ids of the extra permanents in the order they were added.
+--
+-- Goblin Piker for the extras: a vanilla creature, so nothing it carries can
+-- reach the entry loop and the only thing that changes when one is sacrificed is
+-- the count.
+shimatsuBoard :: Printing.Printing -> Int -> Printing.Printing -> Int -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
+shimatsuBoard mountain n pikerPrinting extra shimatsu =
+  let base = S.landsInPlay mountain n
+      addOne (ids, g) _ = let (oid, g1) = S.addCreature pikerPrinting S.alice g in (ids <> [oid], g1)
+      (pikers, withPikers) = List.foldl' addOne ([], base) (replicate extra ())
+      (gs, held) = S.handOne shimatsu withPikers
+   in ( gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held,
+        pikers
+      )
+
+-- Sacrifice exactly `wanted` when the as-enters choice is offered, and nothing
+-- else about the game.
+sacrificesExactly :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+sacrificesExactly wanted p = case p of
+  Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList (filter (`elem` candidates) wanted)
+  _ -> S.identityAnswer p
+
+-- Sacrifice EVERYTHING the engine offers. What makes the CR 614.12a exclusion
+-- testable: if the entering Shimatsu were among its own candidates, a greedy
+-- answer would sacrifice it.
+sacrificesAll :: Prompt.Prompt r -> r
+sacrificesAll p = case p of
+  Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList candidates
+  _ -> S.identityAnswer p
+
+shimatsuSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+shimatsuSpec s registry =
+  Spec.describe s "Shimatsu the Bloodcloaked (CR 614.1c)" $ do
+    Spec.it s "CR 614.1c sacrificing two permanents enters a 2/2 with two +1/+1 counters" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+      let (gs, held, pikers) = shimatsuBoard mountain 4 pikerPrinting 3 shimatsu
+      case pikers of
+        first : second : _ ->
+          let after = S.runPure (sacrificesExactly [first, second]) gs (S.cast S.alice held >> Stack.resolveTop)
+           in case newestNamed (CardName.MkCardName $ Text.pack "Shimatsu the Bloodcloaked") after of
+                Nothing -> Spec.assertFailure s "Shimatsu did not reach the battlefield"
+                Just shimatsuId -> do
+                  Spec.assertEqWith s "two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne shimatsuId after) 2
+                  -- Printed 0/0, so the counters are the whole of its body.
+                  Spec.assertEqWith s "power" (Projection.powerOf shimatsuId after) (Just 2)
+                  Spec.assertEqWith s "toughness" (Projection.toughnessOf shimatsuId after) (Just 2)
+                  -- CR 701.21a: to the OWNER's graveyard, and only the two named.
+                  Spec.assertEqWith s "the two chosen Pikers left the battlefield" (filter (\oid -> Set.member oid (GameState.battlefield after)) [first, second]) []
+        _ -> Spec.assertFailure s "fixture did not build two Pikers"
+    Spec.it s "CR 704.5f sacrificing nothing enters a 0/0 that dies" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+      let (gs, held, _) = shimatsuBoard mountain 4 pikerPrinting 2 shimatsu
+          -- S.identityAnswer answers the empty set: sacrifice nothing.
+          after = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop >> Engine.settleForPriority)
+      Spec.assertEqWith s "the 0/0 Shimatsu is gone" (newestNamed (CardName.MkCardName $ Text.pack "Shimatsu the Bloodcloaked") after) Nothing
+    Spec.it s "CR 614.12a/701.21a Shimatsu is not among the permanents it may sacrifice" $ do
+      mountain <- S.printingOf s registry "Mountain"
+      pikerPrinting <- S.printingOf s registry "Goblin Piker"
+      shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+      -- Four Mountains and two Pikers, all of them alice's permanents, so a
+      -- greedy answer sacrifices six -- and would sacrifice seven if the
+      -- entering Shimatsu were offered to itself.
+      let (gs, held, _) = shimatsuBoard mountain 4 pikerPrinting 2 shimatsu
+          after = S.runPure sacrificesAll gs (S.cast S.alice held >> Stack.resolveTop)
+      case newestNamed (CardName.MkCardName $ Text.pack "Shimatsu the Bloodcloaked") after of
+        Nothing -> Spec.assertFailure s "Shimatsu sacrificed itself"
+        Just shimatsuId -> do
+          Spec.assertEqWith s "six counters, one per OTHER permanent" (countersOn CounterKind.PlusOnePlusOne shimatsuId after) 6
+          Spec.assertEqWith s "nothing else of alice's is left" (Set.toList (GameState.battlefield after)) [shimatsuId]
