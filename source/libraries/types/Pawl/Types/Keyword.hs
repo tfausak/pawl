@@ -199,4 +199,4 @@ data Keyword
 -- (Projection.applyColorDefining), per CR 613.3. A devoid GRANTED by a layer-6
 -- effect still does nothing to colour: CR 604.3a(2) makes such a grant
 -- non-characteristic-defining, so it would be an ordinary layer-5 effect, which
--- is not built. No card in the pool grants devoid (#622).
+-- is not built. No card in the pool grants devoid (#675).

@@ -667,7 +667,7 @@ definesColorless = Set.member Keyword.Devoid
 --
 -- Not implemented: a devoid granted by a layer-6 effect does nothing to colour.
 -- Per CR 604.3a(2) such a grant is an ordinary layer-5 colour effect timestamped
--- when granted (CR 613.7a), which this does not build (#622).
+-- when granted (CR 613.7a), which this does not build (#675).
 applyColorDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applyColorDefining pc =
   if definesColorless (Map.keysSet (PC.keywords pc))
