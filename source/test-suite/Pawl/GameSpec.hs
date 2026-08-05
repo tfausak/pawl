@@ -35,6 +35,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -774,6 +775,45 @@ ruleSpec s registry = Spec.describe s "Rules" $ do
     -- alice's hand. The load-bearing check is that spellId's old
     -- incarnation is not lingering in her hand's member list.
     Spec.assertEqWith s "the subgame spell's original id no longer sits in alice's hand (cast)" (notElem spellId (Game.zoneMembers Zone.Hand S.alice after)) True
+
+  Spec.it s "CR 729.1a #153: a question names the game it came from, so a subgame's is not a main-game one" $ do
+    -- The same cast-a-subgame fixture as the two cases around this one, run
+    -- through the Asked seam instead of the Prompt one. `survivorId` is a
+    -- creature on the MAIN battlefield, and CR 729.2 puts only library cards
+    -- into the subgame -- so it is a fact that holds of one game and not the
+    -- other, which is exactly what an untagged question could not tell you.
+    mountain <- S.printingOf s registry "Mountain"
+    syntheticSubgame <- S.printingOf s registry "Synthetic Subgame"
+    let g0 = Setup.emptyGame S.bothPlayers
+        g1 = poolToLibraryG S.bob (poolToLibraryG S.alice (addManyG mountain 3 S.bob (addManyG mountain 8 S.alice g0)))
+        (survivorId, g2) = S.addCreature mountain S.alice g1
+        (_spellId, g3) = S.addHandCard syntheticSubgame S.alice g2
+        gStart =
+          g3
+            { GameState.activePlayer = S.alice,
+              GameState.phase = Phase.PrecombatMain,
+              GameState.priority = Just S.alice
+            }
+        tags = reverse (State.execState (Engine.runGameAsked (recordAskedGame survivorId) gStart Engine.priorityLoop) [])
+        (mainAsks, subAsks) = List.partition (\tag -> askDepth tag == 0) tags
+    Spec.assertBool s (not (null mainAsks)) "the main game asked something"
+    Spec.assertBool s (not (null subAsks)) "and so did the subgame -- otherwise the split below is vacuous"
+    Spec.assertEqWith s "no question came from deeper than one subgame" (filter (\tag -> askDepth tag > 1) tags) []
+    Spec.assertEqWith
+      s
+      "CR 729.2: no subgame question is about a board holding the main game's creature"
+      (filter askedGameHasSurvivor subAsks)
+      []
+    Spec.assertEqWith
+      s
+      "and every one of them still reaches the main game, which does hold it"
+      (filter (not . mainGameHasSurvivor) subAsks)
+      []
+    Spec.assertEqWith
+      s
+      "a main-game question is about the main game, and it holds the creature"
+      (filter (not . askedGameHasSurvivor) mainAsks)
+      []
 
   Spec.it s "CR 729.5/729.4b gameplay: cards funnel back, main-game board survives, main-game counters untouched" $ do
     -- library pool built first, THEN the survivor is added to the battlefield --
@@ -1725,6 +1765,32 @@ restartAnswer p = case p of
 -- cast-if-available strategy descends into it. Because subgame prompts are
 -- UNTAGGED, the same answerer serves every level. Non-ChooseAction prompts
 -- (Shuffle during setup, etc.) delegate to identityAnswer.
+-- #153: what one question said about the game that raised it. Three booleans
+-- and a depth rather than the GameStates themselves, so a failure prints
+-- something a person can read.
+data AskTag = MkAskTag
+  { askDepth :: Int,
+    askedGameHasSurvivor :: Bool,
+    mainGameHasSurvivor :: Bool
+  }
+  deriving (Eq, Show)
+
+-- Answers as subgameAnswer does, tagging each question with the game it came
+-- from. The distinguishing fact is whether that game's battlefield holds
+-- `survivor`, a main-game creature that CR 729.2 keeps out of the subgame.
+recordAskedGame :: ObjectId.ObjectId -> Asked.Asked r -> State.State [AskTag] r
+recordAskedGame survivor asked = do
+  let holds gs = Set.member survivor (GameState.battlefield gs)
+  State.modify'
+    ( MkAskTag
+        { askDepth = length (Asked.enclosing asked),
+          askedGameHasSurvivor = holds (Asked.game asked),
+          mainGameHasSurvivor = holds (Asked.mainGame asked)
+        }
+        :
+    )
+  pure (subgameAnswer (Asked.prompt asked))
+
 subgameAnswer :: Prompt.Prompt r -> r
 subgameAnswer p = case p of
   Prompt.ChooseAction _ _ actions ->
