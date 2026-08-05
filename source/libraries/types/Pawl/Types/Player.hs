@@ -30,7 +30,8 @@ data Player = MkPlayer
     --
     -- Read by nothing yet. CR 701.54c makes the emblem's ability set a function of
     -- this number, and none of its four tiers is built: the base one (#707), and
-    -- the two-, three- and four-temptation ones (#706).
+    -- the two-, three- and four-temptation ones, which are triggered abilities an
+    -- emblem cannot fire from the command zone (#709).
     ringTemptations :: Natural.Natural
   }
   deriving (Eq, Show)

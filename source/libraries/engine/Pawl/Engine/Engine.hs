@@ -592,8 +592,8 @@ settleForPriority = Monad.void performSettle
 -- runs FIRST, before the SBA check: a "for as long as you control this" effect
 -- ending (Master Thief) returns a permanent to another player's control, and a
 -- control-scoped state-based action must see the post-sweep control. CR 704.5j's
--- legend rule is the rule that will read it; this engine does not check it yet
--- (#64), so the ordering is not yet observable. The loop re-runs whenever
+-- legend rule is the rule that reads it, and Sba does check it, so the ordering
+-- is observable rather than theoretical. The loop re-runs whenever
 -- ANYTHING fired, because an SBA can itself be what falsifies a condition.
 --
 -- It also REPORTS whether it performed any state-based action or placed any
@@ -620,7 +620,11 @@ performSettle = do
   -- an attacker stop being a creature.
   --
   -- Outside the recursion guard on purpose -- none makes further work, so none is
-  -- a reason to loop, and all must run even on a pass where nothing fired. The
+  -- a reason to loop, and all must run even on a pass where nothing fired. That
+  -- stops being true the moment CR 701.54c's base ability lands: clearing the
+  -- Ring-bearer designation would then REMOVE a legendary supertype, which is
+  -- input to the CR 704.5j legend rule that already ran on this pass (#707). The
+
   -- settle stops only on a pass where nothing fired, and these three ran on that
   -- pass, against the finished board, before priority is granted.
   --

@@ -189,7 +189,7 @@ placeObject pid mkObj dest = do
 -- Inert per-incarnation fields (an emblem is never tapped, damaged or
 -- countered): harmless, nothing reads them here. `enteredUnder = Nothing` is
 -- what makes Projection.defaultControllerOf answer the owner, which is CR
--- 109.4c and so CR 114.2's second sentence.
+-- 109.4c and so CR 114.2's last sentence.
 createEmblem :: PlayerId -> Card -> Game ObjectId
 createEmblem pid card =
   let mkObj ts =

@@ -1,8 +1,8 @@
 -- | CR 701.54, "the Ring tempts you": the Ring-bearer designation, the emblem
 -- named The Ring, and the count of how often a player has been tempted.
 --
--- The per-player sibling of Pawl.Engine.Monarch. Both hold a designation the
--- rules give a player rather than a card, and both are named by a rule number, so
+-- The per-player sibling of Pawl.Engine.Monarch. Both hold a designation that
+-- rides no card's text, and both are named by a rule number, so
 -- casing on either here is casing on the RULEBOOK -- rule 701 is a keyword-action
 -- rule exactly as rule 702 is a keyword rule, and Pawl.Engine.Keyword's standing
 -- to mint an ability from a Keyword is this module's standing to mint the emblem
@@ -11,10 +11,12 @@
 -- Effect.TemptWithTheRing arm calls `tempt` and asks nothing about which effect it
 -- came from.
 --
--- Where they DIVERGE is the storage, and CR 701.54b is why: "Ring-bearer is a
--- designation A PERMANENT can have", where CR 725.1's monarch is one the game has.
--- So this rides Object.ringBearerFor and GameState grows no field, while the count
--- rides Player.ringTemptations.
+-- Where they DIVERGE is WHAT the designation is on, and the two rules say so in
+-- the same words about different things: CR 701.54b, "Ring-bearer is a designation
+-- A PERMANENT can have", against CR 725.1, "the monarch is a designation A PLAYER
+-- can have". The storage follows from that rather than the other way round -- this
+-- rides Object.ringBearerFor and GameState grows no field, where the monarch is a
+-- GameState field. The count rides Player.ringTemptations, being a player's.
 module Pawl.Engine.Ring where
 
 import qualified Control.Monad as Monad
@@ -63,7 +65,9 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- Not implemented: all four of CR 701.54c's abilities, so `staticAbilities` is
 -- empty. The base one is "Your Ring-bearer is legendary and can't be blocked by
 -- creatures with greater power" (#707); the two-, three- and four-temptation ones
--- are triggered, which an emblem cannot carry at all today (#706).
+-- are triggered, and an emblem's triggered ability never fires because the trigger
+-- scans read only the battlefield, where CR 114.4 puts an emblem's abilities in
+-- the command zone (#709).
 theRingEmblem :: Card.Card
 theRingEmblem =
   Card.MkCard
@@ -195,10 +199,14 @@ tempt pid = do
 --
 -- A SAMPLE of derived state, and a near-clone of Engine.checkControlContinuity
 -- (CR 302.6) for the same reason: control is computed by CR 613.1b's layer 2 and
--- so CHANGES with no event to notice it, while this designation is stored. CR
--- 704.3 makes "whenever a player would get priority" the coarsest moment anything
--- can observe the condition, so running in the settle loop is indistinguishable
--- from checking continuously.
+-- so CHANGES with no event to notice it, while this designation is stored.
+--
+-- Running in the settle loop is indistinguishable from checking continuously
+-- TODAY, and what makes it so is what pawl cannot yet express rather than a rule:
+-- nothing reads the designation at all (#707, #708), so there is no reader to
+-- catch a stale one between passes. When one lands, the claim has to be re-argued
+-- against it -- CR 704.3 is about when state-based actions are CHECKED and settles
+-- nothing about how finely a designation can be observed.
 --
 -- ONLY EVER CLEARS. That is the rule, not a conservatism: 701.54a ENDS the
 -- designation when another player gains control, so a creature borrowed and handed
@@ -231,11 +239,20 @@ endOnControlChange = do
             else Map.adjust (\o -> o {Object.ringBearerFor = Nothing}) oid objs
     State.put gs {GameState.objects = foldr lapsed (GameState.objects gs) marked}
 
--- | CR 701.54e: is this creature that player's Ring-bearer? True only for a
--- creature on the battlefield under their control carrying the designation.
+-- | CR 701.54e: is this permanent that player's Ring-bearer? True for one on the
+-- battlefield under their control carrying the designation, which is the rule's
+-- three conjuncts and no more.
+--
+-- No creature-ness test, deliberately. CR 701.54e's subject is "a creature", but
+-- that is the ANTECEDENT -- "some abilities check to see if a creature 'is your
+-- Ring-bearer'" -- and the condition it then states is exactly these three. The
+-- designation itself outlives creature-ness, since CR 701.54a ends it only when
+-- another creature takes it or another player gains control; a Ring-bearer turned
+-- into a land by Song of the Dryads is still designated. The caller supplies the
+-- creature restriction its own printed sentence carries.
 --
 -- Read by no rule yet -- what would read it is the emblem's own abilities, and
--- none of the four has a carrier (#707, #706). It is here because it is the rule's
+-- none of the four has a carrier (#707, #709). It is here because it is the rule's
 -- own predicate and Pawl.RingSpec proves the designation through it.
 isRingBearerOf :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 isRingBearerOf pid oid gs =
