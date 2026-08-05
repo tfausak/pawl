@@ -985,6 +985,23 @@ modalActivated modes =
 -- modalActivated's TRIGGERED twin, so the per-mode lint can be shown to hand
 -- `abilityBound` -- the condition's event slots and CR 109.5's `you` -- to EVERY
 -- mode rather than only the first.
+-- Does any of these abilities DECLARE a target spec under a name already in
+-- `defined`? Split from the sweep below so the rejecting direction can be put to
+-- a hand-built ability, which no committed card supplies.
+shadowsSlots :: Set.Set SlotName.SlotName -> [TriggeredAbility.TriggeredAbility Card.Type.Card] -> Bool
+shadowsSlots defined abilities =
+  let declaredOf ability =
+        foldMap (Map.keysSet . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
+   in not (Set.disjoint defined (foldMap declaredOf abilities))
+
+-- shadowsSlots for one face: the slots its own effects define, against the target
+-- specs its delayed abilities declare.
+shadowsDefinedSlot :: Face.Face Card.Type.Card -> Bool
+shadowsDefinedSlot card =
+  shadowsSlots
+    (Resolve.definedSlots (cardResolutionEffects card))
+    (Map.elems (Face.delayedAbilities card))
+
 modalTrigger ::
   TriggerCondition.TriggerCondition ->
   [Mode.Mode Card.Type.Card] ->
@@ -1893,6 +1910,35 @@ lintSpec s registry = Spec.describe s "Lint" $ do
            in any (modalReadOffends bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- A delayed ability may not DECLARE a target spec under a name its own card
+  -- already DEFINES, because the two would land in one slot and the reader would
+  -- have to pick. Pawl.Engine.Engine.placeOne merges the ability's placement-time
+  -- choices with the environment captured when it was armed, per FIELD, so a
+  -- collision leaves one Binding carrying both a CR 601.2c target and a Create's
+  -- minted group -- and Pawl.Engine.Resolve.slotGroup answers with the group,
+  -- silently discarding a target that CR 608.2b was owed a re-validation of.
+  --
+  -- Rejected rather than resolved by precedence: the card would be saying two
+  -- different things under one name, which is a card-data mistake and not a rules
+  -- question the engine should have an answer to. The neighbouring "every slot a
+  -- delayed ability reads is bound by its card" lint cannot catch it -- that one
+  -- is a SUBSET check with both sides on the available list, so a name appearing
+  -- in both passes it twice over.
+  Spec.it s "no delayed ability declares a target spec under a slot its card defines" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace shadowsDefinedSlot . Printing.card) ps
+    Spec.assertEqWith s "no delayed ability shadows a defined slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sweep above is vacuous on its own -- no card offends, and none would
+  -- under a predicate that always answered False -- so both directions are put
+  -- to a hand-built pair. The accepted one is Thatcher Revolt's exact shape,
+  -- which must stay legal: reading a defined slot is the whole point, and only
+  -- DECLARING one is the mistake.
+  Spec.it s "the shadowing lint accepts a delayed ability that only reads the slot" $ do
+    let tokens = SlotName.MkSlotName (Text.pack "tokens")
+        reads_ = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] []]
+        declares = modalTrigger TriggerCondition.SelfEnters [lintMode [Effect.Sacrifice tokens] [tokens]]
+    Spec.assertBool s (not (shadowsSlots (Set.singleton tokens) [reads_])) "reading a Create's slot is legal"
+    Spec.assertBool s (shadowsSlots (Set.singleton tokens) [declares]) "declaring a target spec under the same name is not"
   -- The pairing Pawl.Types.Onset.FromYourNextTurn depends on and cannot enforce
   -- alone. See onsetOffends for why the onset and the condition's TurnScope
   -- are two halves of one printed "your next turn", and what goes wrong when a

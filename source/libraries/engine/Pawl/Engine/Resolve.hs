@@ -877,7 +877,10 @@ playerRefPlayers chosen legality controller gs ref = case ref of
 --
 -- InSlot asks legality the way every other slot read does (CR 608.2b): a slot
 -- filled by targeting that has since become illegal names nobody, and a player
--- recipient names no object.
+-- recipient names no object. It asks that of a TARGET; a slot a Create bound to
+-- a group of minted tokens is answered before the question is put, since a group
+-- is a definition rather than a target (CR 115.10a) and CR 608.2b has nothing to
+-- re-validate about one.
 --
 -- EachMatching folds the battlefield (CR 109.2: a description with a card type
 -- and no zone "means a permanent of that card type ... on the battlefield")
@@ -922,7 +925,7 @@ objectRefObjects legality chosen resolving controller source gs ref = case ref o
     -- The slot names every token a Create bound there ("they"), so all of them
     -- are named at once. Ahead of the target read and not subject to `legality`:
     -- a group binding is a definition, never a target (CR 115.10a), so CR 608.2b
-    -- has nothing to re-validate and the slot never appears in `chosen`.
+    -- has nothing to re-validate. See slotGroup for why being ahead is safe.
     Just group -> Foldable.toList group
     Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
@@ -970,6 +973,20 @@ objectRefRecipients legality chosen resolving controller source gs ref = case re
 -- Live rather than snapshotted, which is what lets a later effect of the same
 -- resolution name what an earlier Create minted: Salt Road Skirmish's "they gain
 -- haste" is the sentence after the one that made them.
+--
+-- PRECEDENCE, and why it is not a coin toss: a Just here wins over the slot's
+-- target, which would skip a CR 608.2b re-validation the target was owed. One
+-- Binding really can carry both fields -- Pawl.Engine.Engine.placeOne merges a
+-- delayed ability's placement-time choices with its captured environment PER
+-- FIELD, precisely so neither is lost -- so the case is not ruled out by the
+-- types.
+--
+-- It is ruled out by a lint instead. A card can only reach it by declaring a
+-- delayed ability's target spec under a name its own Create defines, which is
+-- the card saying two different things with one word, and the Pawl.CardSpec lint
+-- "no delayed ability declares a target spec under a slot its card defines"
+-- rejects it. So this arm never actually chooses, and the ordering is which way
+-- to fail if that lint were ever removed.
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
 slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
 
@@ -1377,7 +1394,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- token that is Event.sacrifice finding no such object at all, since CR
     -- 111.7's state-based action has already made it cease to exist; for a card
     -- permanent it would be that funnel's CR 701.21a battlefield guard.
-    bound <- State.gets (Binding.objectsOf slot . maybe Map.empty Object.bindings . Game.lookupObject resolving)
+    bound <- State.gets (slotGroup slot resolving)
     case bound of
       -- One at a time rather than as one event (#757).
       Just victims -> Monad.mapM_ (Event.sacrifice controller) victims
@@ -2477,11 +2494,13 @@ performHandAction source player =
 -- loser reach a follow-on DealDamage). On the ABILITY path, resolveModes still
 -- folds applyEffect over a `chosen` snapshot taken once before the fold starts,
 -- so a later Sacrifice/Destroy/etc. there still sees the pre-bind value
--- (Nothing). Only ArmDelayedTrigger sees it on either path, because it re-reads
--- Object.bindings from LIVE GameState rather than from `chosen`. A spell-mode
--- effect that tried to read a dangling Create slot would be caught loudly by the
--- D4 lint (declared slots == read slots) rather than silently no-op, so this gap
--- is a documentation defect, not a latent one.
+-- (Nothing). ArmDelayedTrigger and slotGroup see it on either path, because both
+-- re-read Object.bindings from LIVE GameState rather than from `chosen`.
+--
+-- So the gap is narrower than it was but real: a slot bound HERE and read by an
+-- ObjectRef on the ABILITY path still comes back empty, where the same card
+-- text as a spell works (#762). The D4 lint does not catch it -- it asks that a
+-- read slot be DEFINED, which this one is.
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
@@ -2493,9 +2512,8 @@ bindSlot holder slot target gs =
 -- how "those tokens" outlives the resolution that minted them.
 --
 -- A group slot is readable mid-fold on BOTH paths, unlike bindSlot's single
--- object: its readers (the Sacrifice arm, and slotGroup for every
--- ObjectRef-taking opcode) go to live GameState rather than to `chosen`, because
--- `chosen` carries CR 601.2c's targets and this is never one.
+-- object: every reader goes through slotGroup, which reads live GameState rather
+-- than `chosen` -- `chosen` carries CR 601.2c's targets and this is never one.
 bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
 bindObjectsSlot holder slot targets gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}

@@ -1145,9 +1145,7 @@ tokenGroupReadSpec s registry =
       -- alice casts the Skirmish off four Swamps with bob's creature the only
       -- one on the battlefield, so S.identityAnswer's lowest-legal-recipient
       -- pick is that creature and nothing else can be targeted by accident.
-      board swamp victim =
-        let (victimId, gs) = S.addCreature victim S.bob (S.landsInPlay swamp 4)
-         in (victimId, gs)
+      board swamp victim = S.addCreature victim S.bob (S.landsInPlay swamp 4)
       castSkirmish skirmish base =
         let (gs, oid) = S.handOne skirmish base
          in resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid)))
@@ -1190,6 +1188,29 @@ tokenGroupReadSpec s registry =
               after = resolveAll (settle (beginEndStep armed))
           Spec.assertEqWith s "two before the end step" (length (warriors armed)) 2
           Spec.assertEqWith s "none after it" (warriors after) []
+        -- CR 608.2b: "if all its targets ... are now illegal, the spell doesn't
+        -- resolve". The card's own Gatherer ruling spells out what that costs
+        -- here -- "it won't resolve and none of its effects will happen" -- so
+        -- the tokens the LATER sentences would have made are never minted and
+        -- the group is never bound. Also the negative control for the group
+        -- read: no group, and the haste sentence still has to be harmless.
+        Spec.it s "CR 608.2b an illegal target takes the whole spell, tokens and all" $ do
+          skirmish <- S.printingOf s registry "Salt Road Skirmish"
+          swamp <- S.printingOf s registry "Swamp"
+          rats <- S.printingOf s registry "Typhoid Rats"
+          let (victim, base) = board swamp rats
+              (gs, oid) = S.handOne skirmish base
+              onStack = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice oid))
+              -- The target leaves before the Skirmish resolves, which is the only
+              -- way to make it illegal without a second card.
+              gone = S.settleSba (S.runPure S.identityAnswer onStack (Event.destroy Regenerability.Regenerable [victim]))
+              after = resolveAll gone
+          Spec.assertBool s (Set.notMember victim (GameState.battlefield after)) "the target really left"
+          Spec.assertEqWith s "no Warriors were minted" (warriors after) []
+          Spec.assertEqWith s "and nothing was armed" (Seq.length (GameState.delayedTriggers after)) 0
+          -- Otherwise "no Warriors" would also be true of a spell still sitting
+          -- on the stack, which is a different bug wearing the same result.
+          Spec.assertEqWith s "the spell left the stack rather than stalling on it" (GameState.stack after) []
 
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an

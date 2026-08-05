@@ -38,12 +38,23 @@ data Binding = MkBinding
     copy :: Maybe ProjectedCharacteristics.ProjectedCharacteristics,
     -- | CR 111.1: EVERY object a Create minted, for a card that refers back to
     -- all of them at once -- Thatcher Revolt's "those tokens". The plural of
-    -- `target` above and never the same slot as one: a Create's slot is a
-    -- definition, never a target (CR 115.10a), so nothing here is subject to CR
-    -- 608.2b's illegal-target check. Nothing for every other slot.
+    -- `target` above, and a separate field rather than a plural Recipient
+    -- because a Create's slot is a definition, never a target (CR 115.10a), so
+    -- nothing here is subject to CR 608.2b's illegal-target check. Nothing for
+    -- every other slot.
     --
-    -- A Seq and not a Set: mint order is the order the tokens entered, which is
-    -- the order a reader acts on them in, and it is not an ObjectId ordering.
+    -- No slot carries BOTH this and a target. mergeBinding would keep both, and
+    -- Pawl.Engine.Engine.placeOne's per-field join is where they could meet, so
+    -- the guarantee is a lint rather than a type: a card reaching it would have
+    -- to declare a delayed ability's target spec under a name its own Create
+    -- defines, which Pawl.CardSpec rejects. Pawl.Engine.Resolve.slotGroup records
+    -- which way it would fail anyway.
+    --
+    -- A Seq and not a Set: mint order is the order the tokens entered, and it is
+    -- not an ObjectId ordering. Effect.Sacrifice acts in it. The ObjectRef
+    -- readers do not depend on it -- CR 611.2c's continuous effects freeze a SET
+    -- and the one-shots are CR 608.2f-simultaneous batches -- but ordering the
+    -- field arbitrarily would be inventing an order the game does not have.
     objects :: Maybe (Seq.Seq ObjectId.ObjectId)
   }
   deriving (Eq, Ord, Show)
