@@ -150,10 +150,15 @@ data GameState = MkGameState
     -- Pawl.Engine.Engine.checkMandatoryLoop's heuristic for a loop of mandatory
     -- actions.
     --
-    -- Written only by Pawl.Engine.Game.choose, so a new prompt site cannot forget
-    -- to reset it. Conceding is deliberately not one of its callers: CR 104.3a
-    -- lets a player concede at any time, so if that counted as the optional
-    -- action, no loop would ever be mandatory.
+    -- Advanced only by Pawl.Engine.Game.choose, so a new prompt site cannot
+    -- forget to reset it. Conceding is deliberately not one of its callers: CR
+    -- 104.3a lets a player concede at any time, so if that counted as the
+    -- optional action, no loop would ever be mandatory.
+    --
+    -- Pawl.Engine.Setup also SETS it, at the three seams where a game begins
+    -- (emptyGame, restartGame, subgameStateFrom) and where one ends back into its
+    -- parent (funnelBack). Each sets it to the timestamp supply's value there, so
+    -- neither a fresh game nor a resumed one inherits a gap run up elsewhere.
     lastChoice :: Timestamp.Timestamp,
     drewFromEmpty :: Set.Set PlayerId.PlayerId,
     landPlayed :: Set.Set PlayerId.PlayerId,

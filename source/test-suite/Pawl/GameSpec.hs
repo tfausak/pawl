@@ -1440,7 +1440,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Game" $ do
 -- cycle is optional and nothing in it makes progress: a loop of mandatory
 -- actions, repeating a sequence of events with no way to stop.
 --
--- Synthetic Recursion is a LABELED CRUTCH (#N1). The canonical board is
+-- Synthetic Recursion is a LABELED CRUTCH (#683). The canonical board is
 -- Worldgorger Dragon reanimated by Animate Dead, and neither card is authorable
 -- yet.
 mandatoryLoopBoardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1469,7 +1469,8 @@ mandatoryLoopBoardSpec s registry = Spec.describe s "a mandatory loop (CR 104.4b
 -- alice, active, in her precombat main phase: bob's Aether Flash, and alice's
 -- Synthetic Recursion ENTERING (so CR 603.6a's event is there for Aether Flash to
 -- see). Empty libraries and nothing scheduled after this phase, so the loop is
--- the only thing that can happen and nothing else can end the game. `castable`,
+-- the only thing that can happen and nothing on the board can end the game.
+-- `castable`,
 -- if any, is an untapped land for alice plus a spell in her hand it pays for --
 -- both halves, since Cast.castableSpells offers a spell only when its cost can be
 -- paid.
@@ -1512,7 +1513,7 @@ runConcedingAt limit gs =
    in result
 
 -- CR 104.4b, the guard itself. The gameplay proof that a real loop reaches it is
--- the "a mandatory loop" group below; these four pin the boundary, which a
+-- the "a mandatory loop (CR 104.4b)" group; these four pin the boundary, which a
 -- board-level test cannot do precisely.
 mandatoryLoopSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 mandatoryLoopSpec s = Spec.describe s "the mandatory-loop guard (CR 104.4b)" $ do
@@ -1525,8 +1526,8 @@ mandatoryLoopSpec s = Spec.describe s "the mandatory-loop guard (CR 104.4b)" $ d
     Spec.assertEqWith s "CR 104.4b" (GameState.result after) (Just Result.Drawn)
 
   Spec.it s "a game that already ended keeps the result it had" $ do
-    -- A draw must never overwrite a win: the guard fires on a state only a loop
-    -- could reach, and a won game is not looping.
+    -- A draw must never overwrite a win: the guard fires on a gap only a loop
+    -- should reach, and a won game is not looping.
     let won = (atGap Engine.mandatoryLoopLimit) {GameState.result = Just (Result.Won S.alice)}
         after = S.runPure S.identityAnswer won Engine.checkMandatoryLoop
     Spec.assertEqWith s "alice still won" (GameState.result after) (Just (Result.Won S.alice))
@@ -1549,7 +1550,7 @@ atGap n =
 -- CR 104.4b's "loops that contain an optional action": what makes an action
 -- optional is that the player had more than one answer to give. GameState.lastChoice
 -- is how the engine remembers when that last happened, and Pawl.Engine.Game.choose
--- is the only thing that writes it.
+-- is the only thing that advances it.
 lastChoiceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 lastChoiceSpec s registry = Spec.describe s "lastChoice (CR 104.4b)" $ do
   Spec.it s "a priority round whose only action is Pass leaves it alone" $ do

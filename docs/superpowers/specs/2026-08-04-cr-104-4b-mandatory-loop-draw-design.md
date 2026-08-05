@@ -122,9 +122,10 @@ where a half-applied effect would be observable.
 
 CR 104.4b's own words are "repeating a sequence of **events**", and
 `nextTimestamp` advances on exactly those: an object entering a zone (CR 613.7d)
-and a continuous effect beginning (CR 613.7a). A quiet game issues roughly one
-per turn, so a game that ends slowly by decking sits three orders of magnitude
-below the threshold. A two-card recursion loop issues several per cycle and
+and a continuous effect beginning (CR 613.7a). A game in which no player can act
+issues roughly one per turn — the draw — so the slowest way a real game ends,
+decking out from a 60-card library, spends on the order of fifty, some twenty
+times under the threshold. A two-card recursion loop issues several per cycle and
 trips in a few hundred.
 
 A count of engine iterations was rejected for exactly that margin: a game in

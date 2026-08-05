@@ -638,9 +638,10 @@ performSettle = do
 -- "has this gone on longer than any real game would?". The MARGIN is what makes
 -- it safe. GameState.nextTimestamp advances on the events CR 104.4b names -- an
 -- object entering a zone (CR 613.7d) and a continuous effect beginning (CR
--- 613.7a) -- and a game in which nothing happens issues about one per turn, so a
--- game that ends slowly by decking out (CR 704.5b) sits three orders of magnitude
--- under this. A two-card recursion loop issues several per cycle and arrives in a
+-- 613.7a) -- and a game in which no player can act issues about one per turn, the
+-- draw. So the slowest way a real game ends, decking out from a 60-card library
+-- (CR 704.5b), spends on the order of fifty of these, roughly twenty times under
+-- the limit. A two-card recursion loop issues several per cycle and arrives in a
 -- few hundred.
 --
 -- Counting engine iterations instead was rejected for want of that margin: a game
@@ -1224,8 +1225,11 @@ grantsPriorityNow phase = case phase of
 -- It is NOT bounded in general, and Magic does not bound it either: an ability
 -- that triggers at the beginning of each cleanup step loops forever, and CR
 -- 104.4b's draw is the rules' answer to that rather than a bound on the loop.
--- pawl does not detect such a loop (#484), which is the same engine-liveness gap
--- #338 opened from the turn side.
+-- That draw is what `checkMandatoryLoop` applies, so a chain no card in the pool
+-- can build today would end the game rather than hang it -- heuristically, since
+-- deciding it exactly is the halting problem. The bound above is still the reason
+-- ordinary turns end in one or two cleanup steps; the guard is only the backstop
+-- for the ones it does not cover.
 cleanupException :: Game Bool
 cleanupException = do
   fired <- performSettle
@@ -1244,11 +1248,18 @@ cleanupException = do
     State.modify' (\gs -> gs {GameState.remaining = Turn.spliceExtraCleanup (GameState.remaining gs)})
   pure fired
 
--- Terminates because libraries are finite, each turn draws at most one card, and
--- drawing from an empty library is a loss (CR 704.5b). That argument rests on the
--- DRAW step being reached, and a CR 614.1b skip of it (runStep's check above)
--- suspends it, exactly as a real Stasis lock suspends a real game -- so there is
--- still no progress bound behind it (#338).
+-- Ordinarily terminates because libraries are finite, each turn draws at most one
+-- card, and drawing from an empty library is a loss (CR 704.5b). That argument
+-- rests on the DRAW step being reached, and a CR 614.1b skip of it (runStep's
+-- check above) suspends it, exactly as a real Stasis lock suspends a real game.
+--
+-- `checkMandatoryLoop` at this loop's head is the backstop for every repetition
+-- the argument does not cover, and it is a HEURISTIC rather than a bound: CR
+-- 104.4b's draw fires once events have repeated far past the point at which any
+-- player could have chosen otherwise. A game two players CAN still act in is left
+-- alone to run as long as they like, which is what that rule's second sentence
+-- asks for -- so a Stasis lock is not ended by it either. `Pawl.GameSpec`'s
+-- "a mandatory loop (CR 104.4b)" group holds both halves.
 --
 -- Fatigue is not yet a way to hang this loop: its skip is CR 614.10a's "next",
 -- spent on one occurrence, so each copy postpones the draw by one turn rather
@@ -1267,7 +1278,7 @@ cleanupException = do
 -- CR 514.3a's extra CLEANUP steps are the one repetition that does not go through
 -- a draw step at all, so the library argument says nothing about them. They carry
 -- their own termination argument, at `cleanupException`, and it is bounded for
--- the pool rather than in general (#484).
+-- the pool rather than in general -- the guard above is what covers the rest.
 playGame :: Game Result
 playGame =
   let loop = do

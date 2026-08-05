@@ -64,7 +64,8 @@ freshTimestamp gs =
 -- engine's whole definition of an optional action, and a new prompt site that
 -- forgot to say so would make a loop containing it look mandatory.
 --
--- FOUR prompts deliberately stay bare 'Trans.lift (Program.prompt ...)':
+-- FOUR prompts deliberately do not come through here, and are asked with a bare
+-- 'Trans.lift (Program.prompt ...)' instead:
 --
 --   * Prompt.Concede, because CR 104.3a lets a player concede at any time, in a
 --     loop or out of one. If conceding counted, no loop would ever be mandatory
@@ -73,7 +74,7 @@ freshTimestamp gs =
 --     decision. Engine.priorityLoop makes that call, being the only caller that
 --     knows the menu.
 --   * Prompt.Shuffle and Prompt.RandomFirstPlayer, which ask for RANDOMNESS
---     rather than for a choice (CR 701.20, CR 729.2). A loop that reshuffles a
+--     rather than for a choice (CR 701.24, CR 729.2). A loop that reshuffles a
 --     library every cycle is still a loop of mandatory actions.
 --
 -- Every other prompt site already elides its prompt when the answer is forced,
