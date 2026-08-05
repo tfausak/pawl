@@ -347,8 +347,8 @@ defaultAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.3a: paying is optional, so declining is always legal, and it spends
-  -- nothing -- which keeps a short transcript from tapping a payer's board.
+  -- CR 118.12a: the cost rides a "may", so declining is always legal, and it
+  -- spends nothing -- which keeps a short transcript from tapping a payer's board.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: every offered route is payable, and the prompt is raised only
   -- where two are.

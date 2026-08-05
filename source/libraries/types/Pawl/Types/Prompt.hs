@@ -577,8 +577,8 @@ data Prompt r where
   -- countered Mana Leak never asks -- observably different from an announcement
   -- at CR 601.2f-h, where the cost of a spell being cast is paid.
   --
-  -- NEVER elided for a payable cost: CR 118.3a makes paying optional and both
-  -- answers reach different boards. The one case not asked is where the rules
+  -- NEVER elided for a payable cost: CR 118.12a's rewriting makes the cost a
+  -- "may", and both answers reach different boards. The one case not asked is where the rules
   -- leave nothing to ask -- CR 118.3's "a player can't pay a cost without having
   -- the necessary resources to pay it fully", which leaves declining as the only
   -- possible answer. CR 118.12's clause covers that case in as many words ("does,

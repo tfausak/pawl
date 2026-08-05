@@ -112,8 +112,9 @@ alwaysPass p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.3a: paying is optional, and declining spends nothing -- the
-  -- least-eventful default (mirrors ChooseOptional -> Declines). A test
+  -- CR 118.12a: the cost rides a "may", so declining is legal and spends
+  -- nothing -- the least-eventful default (mirrors ChooseOptional -> Declines).
+  -- A test
   -- that wants the cost PAID says so with its own interpreter, which is
   -- what makes that answer discriminating.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
@@ -172,8 +173,9 @@ castAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.3a: paying is optional, and declining spends nothing -- the
-  -- least-eventful default (mirrors ChooseOptional -> Declines). A test
+  -- CR 118.12a: the cost rides a "may", so declining is legal and spends
+  -- nothing -- the least-eventful default (mirrors ChooseOptional -> Declines).
+  -- A test
   -- that wants the cost PAID says so with its own interpreter, which is
   -- what makes that answer discriminating.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
@@ -233,8 +235,9 @@ fightAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 118.3a: paying is optional, and declining spends nothing -- the
-  -- least-eventful default (mirrors ChooseOptional -> Declines). A test
+  -- CR 118.12a: the cost rides a "may", so declining is legal and spends
+  -- nothing -- the least-eventful default (mirrors ChooseOptional -> Declines).
+  -- A test
   -- that wants the cost PAID says so with its own interpreter, which is
   -- what makes that answer discriminating.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines

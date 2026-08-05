@@ -26,7 +26,7 @@ import qualified Pawl.Types.SlotName as SlotName
 --
 -- NEGATIVE only: the effects run when the cost was NOT paid. CR 118.12's other
 -- half -- "[Do something]. If [a player] does, [effect]", where the effects run
--- when it WAS paid (Standstill) -- has no producer and no representation (#687).
+-- when it WAS paid (Standstill) -- has no producer and no representation (#701).
 data UnlessPaid = MkUnlessPaid
   { -- | Which player is offered the cost. A SLOT rather than a
     -- Pawl.Types.PlayerRef, because the answer Mana Leak needs is "the

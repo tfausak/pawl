@@ -277,7 +277,7 @@ combatReplaySpec s =
           let p = Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) genericThree
           Spec.assertEqWith s "paid" (Replay.decode p (Replay.encode p PaymentDecision.Pays)) (Just PaymentDecision.Pays)
           Spec.assertEqWith s "declined" (Replay.decode p (Replay.encode p PaymentDecision.Declines)) (Just PaymentDecision.Declines)
-        -- CR 118.3a: a transcript that runs short must not spend a player's
+        -- CR 118.12a: a transcript that runs short must not spend a player's
         -- mana on a payment its author never announced.
         Spec.it s "defaultAnswer declines a resolution-time cost" $
           Spec.assertEqWith

@@ -1520,7 +1520,9 @@ manaLeakSpec s registry = Spec.describe s "ManaLeak" $ do
     let (victimId, cast) = manaLeakBoard island manaLeak piker 3
         ((_, after), transcript) = Replay.record paysAnswer cast Stack.resolveTop
     Spec.assertEqWith s "bob was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
-    -- The payment really happened: {3} came off three Islands (CR 118.3a).
+    -- The payment really happened: CR 605.3a lets the payer activate mana
+    -- abilities "whenever a rule or effect asks for a mana payment, even if
+    -- it's in the middle of ... resolving a spell", and three Islands paid {3}.
     Spec.assertEqWith s "paying tapped three of bob's Islands" (S.tappedCount S.bob after) 3
     -- CR 118.12a's other branch: the counter did not happen, and the spell is
     -- still there to resolve. Asserting only "not in the graveyard" would pass

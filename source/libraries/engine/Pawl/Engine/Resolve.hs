@@ -616,6 +616,9 @@ exercises resolving controller idx mode = case Mode.optionality mode of
 -- The cost is paid AGAINST `source` rather than the resolving stack object: CR
 -- 113.7a keeps the source on the permanent, which is what a component naming
 -- "this" must reach. The two are the same object for a spell.
+--
+-- CR 118.13b's announcement -- how a symbol payable in multiple ways is being
+-- paid, chosen immediately before this payment -- is not made (#702).
 paid :: ObjectId -> ObjectId -> ModeIndex -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Mode.Mode Card.Type.Card -> Game Bool
 paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
   Nothing -> pure False
