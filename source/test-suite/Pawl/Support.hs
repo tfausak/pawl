@@ -139,9 +139,9 @@ fourPlayers = alice NonEmpty.:| [bob, carol, dave]
 fourPlayerGame :: GameState.GameState
 fourPlayerGame = Setup.emptyGame fourPlayers
 
--- How a spec case fetches a card: a Left becomes an assertion failure naming the
--- card, so a missing or unloadable card fails the case that wanted it rather
--- than escaping as an exception. This is the adapter for everything inside a
+-- How a spec case fetches a card: a Nothing becomes an assertion failure naming
+-- the card, so a missing card fails the case that wanted it rather than
+-- escaping as an exception. This is the adapter for everything inside a
 -- Spec.it, and the reason those modules need no IO.
 -- A throwaway directory holding `files` (name, contents), for the cases that
 -- need a corpus other than the committed one. The label keeps concurrently
@@ -181,8 +181,8 @@ cardOf :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> m Card.
 cardOf s registry name = do
   result <- Registry.named registry name
   case result of
-    Left err -> Spec.assertFailure s (show err)
-    Right card -> pure card
+    Nothing -> Spec.assertFailure s ("no such card: " <> name)
+    Just card -> pure card
 
 redRed :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 redRed fetch = do

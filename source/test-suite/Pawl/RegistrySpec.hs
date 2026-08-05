@@ -9,6 +9,7 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as ByteString.Char8
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Exceptions.InvalidCorpus as InvalidCorpus
@@ -17,7 +18,6 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
-import qualified Pawl.Types.CardError as CardError
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Printing as Printing
@@ -58,7 +58,7 @@ withInvalidUtf8Corpus label action = do
 -- Building a registry can throw two ways -- a missing root (MissingRoot) or a
 -- broken pool (InvalidCorpus, asserted on via problemsOf below); this checks
 -- the former's exact value, since MissingRoot carries only the one path. Once
--- built, a card that fails to look up is a returned CardError, asserted on
+-- built, a card that fails to look up is a returned Nothing, asserted on
 -- directly by the cases below.
 expectException :: (Exception.Exception e, Eq e) => Spec.Spec IO n -> String -> e -> IO a -> IO ()
 expectException s label expected action = do
@@ -109,12 +109,12 @@ spec s = Spec.describe s "Pawl.Registry" $ do
         s
         "both faces"
         (fmap (fmap Face.name . NonEmpty.toList . Card.Type.faces) byLeft)
-        (Right (fmap (CardName.MkCardName . Text.pack) ["Wax", "Wane"]))
+        (Just (fmap (CardName.MkCardName . Text.pack) ["Wax", "Wane"]))
       -- CR 709.4a gives a split card two names and no combined one, so the
       -- joined string is not a name a lookup may ask for -- it survived until
       -- now only because it happened to be the file name (#649).
       byJoined <- Registry.named registry "Wax // Wane"
-      Spec.assertEqWith s "and not by the two joined" byJoined . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Wax // Wane"
+      Spec.assertEqWith s "and not by the two joined" byJoined Nothing
 
   Spec.it s "a card is parsed at most once: the file may vanish after the first load" $ do
     piker <- S.pikerJson
@@ -124,17 +124,17 @@ spec s = Spec.describe s "Pawl.Registry" $ do
       second <- Registry.named registry "Goblin Piker"
       Spec.assertEqWith s "read at construction, before the file vanished" first second
 
-  -- CardError says nothing about files, because it belongs to the interface and
+  -- A lookup says nothing about files, because it belongs to the interface and
   -- a map-backed registry has no path to report. A file registry only ever
-  -- returns CardError.Missing now: a file that will not parse can never make
-  -- it into the map at all -- index rejects the whole pool at construction
-  -- (the InvalidCorpus cases above), rather than a bad file surfacing as a
-  -- CardError.Invalid at lookup time the way it once did.
-  Spec.it s "an unknown card is Missing, naming the card"
+  -- returns Nothing now: a file that will not parse can never make it into the
+  -- map at all -- index rejects the whole pool at construction (the
+  -- InvalidCorpus cases above), rather than a bad file surfacing as a lookup
+  -- failure the way it once did.
+  Spec.it s "an unknown card is missing"
     . withCorpus "missing" []
     $ \_ registry -> do
       result <- Registry.named registry "Goblin Piker"
-      Spec.assertEqWith s "missing, by name" result . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Goblin Piker"
+      Spec.assertEqWith s "missing, by name" result Nothing
 
   -- A file that will not parse has no face names, so there is no key it could
   -- be filed under and no lookup that could report it. Construction is the only
@@ -184,9 +184,9 @@ spec s = Spec.describe s "Pawl.Registry" $ do
     piker <- S.pikerJson
     withCorpus "misfiled" [("bird-maiden.json", piker)] $ \_ registry -> do
       byOwnName <- Registry.named registry "Goblin Piker"
-      Spec.assertBool s (either (const False) (const True) byOwnName) "found by the name the card has"
+      Spec.assertBool s (Maybe.isJust byOwnName) "found by the name the card has"
       byFileName <- Registry.named registry "Bird Maiden"
-      Spec.assertEqWith s "and not by the name its file has" byFileName . Left . CardError.Missing . CardName.MkCardName $ Text.pack "Bird Maiden"
+      Spec.assertEqWith s "and not by the name its file has" byFileName Nothing
 
   Spec.it s "a corpus with an undecodable file is rejected, naming the decode failure"
     . withInvalidUtf8Corpus "invalid-utf8"
@@ -201,7 +201,7 @@ spec s = Spec.describe s "Pawl.Registry" $ do
   -- (b) A mistyped --cards-dir should fail once, at startup, rather than
   -- once per card looked up (#167). This is the one failure that is still an
   -- exception: it is a failure of CONSTRUCTING a file registry, not of
-  -- fetching a card, so no CardError can express it.
+  -- fetching a card, so no lookup result can express it.
   Spec.it s "a root that does not exist is rejected when the registry is built, not at the first lookup" $ do
     tmp <- Directory.getTemporaryDirectory
     let missing = tmp <> "/pawl-registry-spec-no-such-root"

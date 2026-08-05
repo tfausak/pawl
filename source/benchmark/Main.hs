@@ -264,8 +264,8 @@ fetchOrThrow :: Registry.Registry IO -> String -> IO Printing.Printing
 fetchOrThrow registry name = do
   result <- Registry.named registry name
   case result of
-    Left err -> Exception.throwIO (userError (show err))
-    Right card -> pure (Printing.MkPrinting card)
+    Nothing -> Exception.throwIO (userError ("no such card: " <> name))
+    Just card -> pure (Printing.MkPrinting card)
 
 loadRedDeck :: Registry.Registry IO -> IO Deck.Deck
 loadRedDeck registry = do

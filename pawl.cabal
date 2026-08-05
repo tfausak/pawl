@@ -497,7 +497,6 @@ library types
     Pawl.Types.BlockRequirement
     Pawl.Types.CandidateId
     Pawl.Types.Card
-    Pawl.Types.CardError
     Pawl.Types.CardName
     Pawl.Types.CardType
     Pawl.Types.CastingPermission

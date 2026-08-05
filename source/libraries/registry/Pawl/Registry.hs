@@ -28,20 +28,23 @@ import qualified Pawl.Exceptions.InvalidCorpus as InvalidCorpus
 import qualified Pawl.Exceptions.MissingRoot as MissingRoot
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.CardError as CardError
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import qualified System.Directory as Directory
 
+-- Nothing rather than an error value: with the file registry loading its root up
+-- front, a pool that cannot be used fails when the registry is BUILT, so the
+-- only thing left for a lookup to say is that no card has that name -- and the
+-- caller supplied the name (#649).
 newtype Registry m = MkRegistry
-  { fetchCard :: CardName.CardName -> m (Either CardError.CardError Card.Card)
+  { fetchCard :: CardName.CardName -> m (Maybe Card.Card)
   }
 
 -- A card by name ("Goblin Piker") or by slug ("goblin-piker") -- a file-backed
 -- registry slugifies, and slugify is idempotent, so both are the same lookup.
 -- Takes a String because pawl does not enable OverloadedStrings: the newtype is
 -- what the interface speaks, this is what callers write.
-named :: Registry m -> String -> m (Either CardError.CardError Card.Card)
+named :: Registry m -> String -> m (Maybe Card.Card)
 named registry = fetchCard registry . CardName.MkCardName . Text.pack
 
 -- The card corpus's default root: data/cards declared as cabal data-files,
@@ -74,8 +77,7 @@ fileRegistry root = do
       loaded <- loadRoot root
       case index loaded of
         Left problems -> Exception.throwIO InvalidCorpus.MkInvalidCorpus {InvalidCorpus.root = root, InvalidCorpus.problems = problems}
-        Right cards ->
-          pure (MkRegistry (\name -> pure (maybe (Left (CardError.Missing name)) Right (Map.lookup (slugFor name) cards))))
+        Right cards -> pure (MkRegistry (\name -> pure (Map.lookup (slugFor name) cards)))
 
 -- The slug a name is looked up by. `named` accepts a name or a slug for the
 -- same reason: slugify is idempotent, so the two are one lookup.
