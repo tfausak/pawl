@@ -673,6 +673,13 @@ performer = Resolve.performHandAction
 -- The source stand-in for a targeting call whose spec is source-blind (every
 -- spec but OpponentCreatureTarget). Object id 999 names nothing, the same
 -- posture withEffectAt's 998 takes.
+--
+-- SOURCE-BLIND is now a claim about the BOARD as well as about the spec: CR
+-- 702.11d's "hexproof from [quality]" makes Target.legalRecipients read the
+-- source's characteristics, and this id has none to read, so every quality is
+-- vacuously unmatched. A case that puts such a candidate on the board must pass a
+-- real object (S.spellOnStack) or it passes for the wrong reason -- see
+-- Pawl.TargetSpec's rule 702.11d cases, which do.
 noSource :: ObjectId.ObjectId
 noSource = ObjectId.MkObjectId 999
 

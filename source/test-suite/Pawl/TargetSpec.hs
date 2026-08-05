@@ -7,8 +7,10 @@
 -- together: the two rules differ in exactly one thing, whether the restriction
 -- reads WHO is targeting. One case covers the other side of the
 -- restriction/admission split -- Pawl.Engine.Sba's CR 303.4c re-check, which
--- asks what an enchant spec ADMITS and must not ask a targeting question -- and
--- the last ten cover
+-- asks what an enchant spec ADMITS and must not ask a targeting question --
+-- three cover rule 702.11's "hexproof from [quality]" variant (CR 702.11d and
+-- 702.11e), the only restriction here that reads what the SOURCE is rather than
+-- who controls it -- and the last ten cover
 -- CR 115.2's two escape hatches from "only permanents are legal targets": its
 -- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead, Withered Wretch
 -- and Riftsweeper. (Those letters are prose inside rule 115.2, not subrule
@@ -49,7 +51,9 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modal as Modal
@@ -553,6 +557,115 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
           s
           (Set.member (Recipient.ToCreature bogleId) (Target.legalRecipients (Just S.alice) S.noSource theSpec humbled))
           "under Humility it is a legal target"
+
+  -- CR 702.11d: "'Hexproof from [quality]' on a permanent means 'This permanent
+  -- can't be the target of [quality] spells your opponents control or abilities
+  -- your opponents control from [quality] sources.'" The variant narrows CR
+  -- 702.11b by the SOURCE's characteristics, which no other targeting question in
+  -- pawl asks -- Target.legalRecipients holds the source for CR 601.2c's
+  -- "another" and never looked at what it is.
+  --
+  -- SIX ANSWERS OFF ONE BOARD, and the shape is what makes them discriminating:
+  -- the same Goblin Piker and the same two committed spells throughout, with only
+  -- the QUALITY mutated between the rows. Doom Blade is black and Angelic Edict
+  -- is white, so each spell is stopped in exactly one row and legal in the other
+  -- two. An implementation that never admitted the Piker at all fails the legal
+  -- cells; one that ignored the quality and read the variant as plain hexproof
+  -- fails the legal cells of the two Just rows; one that read the CANDIDATE's
+  -- colour rather than the source's fails every stopped cell, the Piker being red
+  -- (CR 202.2, {2}{R}).
+  --
+  -- Each spell is a REAL object on the stack, which is what makes the source
+  -- readable at all: S.noSource names no object, so its view carries no colour
+  -- and every quality would be vacuously unmatched -- the whole case would pass
+  -- for the wrong reason.
+  --
+  -- SYNTHETIC GRANT, and the one crutch here: no card in data/cards prints or
+  -- grants the variant yet (#555 stays open for the card, blocked on #725), so
+  -- the ability arrives as a stored layer-6 continuous effect, exactly as the CR
+  -- 608.2b case below grants plain hexproof. The granted shape is real Magic --
+  -- Skrelv, Defector Mite and Sungold Sentinel both grant one -- and both of them
+  -- choose a colour first, which pawl cannot prompt for.
+  Spec.it s "CR 702.11d hexproof from black stops an opponent's black spell and admits their white one" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        withHexproof quality = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof quality)) board
+    case (S.spellTargetSpec doomBlade, S.spellTargetSpec angelicEdict) of
+      (Just blackSpec, Just whiteSpec) -> do
+        -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents, so
+        -- the same Piker is tagged differently in the two sets (CR 115).
+        let reaches printing theSpec tag gs =
+              let (spellId, onStack) = S.spellOnStack printing S.alice gs
+               in Set.member (tag pikerId) (Target.legalRecipients (Just S.alice) spellId theSpec onStack)
+            blackReaches = reaches doomBlade blackSpec Recipient.ToCreature
+            whiteReaches = reaches angelicEdict whiteSpec Recipient.ToObject
+            fromBlack = withHexproof (Just (Filter.Type.HasColor Color.Black))
+            fromWhite = withHexproof (Just (Filter.Type.HasColor Color.White))
+        Spec.assertBool s (blackReaches board) "with no hexproof at all, alice's Doom Blade reaches bob's Piker"
+        Spec.assertBool s (whiteReaches board) "and so does her Angelic Edict"
+        Spec.assertBool s (not (blackReaches fromBlack)) "hexproof from black stops the black spell"
+        Spec.assertBool s (whiteReaches fromBlack) "and leaves the white one alone -- the half a plain-hexproof reading loses"
+        Spec.assertBool s (not (whiteReaches fromWhite)) "mutate the quality to white and the white spell is stopped instead"
+        Spec.assertBool s (blackReaches fromWhite) "while the black one reaches again"
+        -- CR 702.11b is the same constructor with no quality, and stops both.
+        Spec.assertBool s (not (blackReaches (withHexproof Nothing))) "unqualified hexproof stops the black spell"
+        Spec.assertBool s (not (whiteReaches (withHexproof Nothing))) "and the white one too"
+      _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
+
+  -- CR 702.11d's "your opponents control", which the quality does not replace:
+  -- the variant narrows WHICH spells are stopped and leaves CR 702.11b's
+  -- controller axis exactly where it was. Bob's own black Doom Blade may still
+  -- destroy his own creature with hexproof from black.
+  --
+  -- ONE BOARD, ONE SPELL, TWO PERSPECTIVES, the way the CR 702.11b case above
+  -- reads Slippery Bogle: an implementation that dropped the controller test once
+  -- the quality matched would make the Piker untargetable by everybody, and one
+  -- that dropped the quality test would be the far-too-strong reading #555 opened
+  -- with. Neither passes both assertions.
+  Spec.it s "CR 702.11d hexproof from black does not stop its own controller's black spell" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        guarded = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor Color.Black)))) board
+    case S.spellTargetSpec doomBlade of
+      Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
+      Just theSpec -> do
+        let (spellId, onStack) = S.spellOnStack doomBlade S.bob guarded
+            reaches caster = Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients (Just caster) spellId theSpec onStack)
+        Spec.assertBool s (reaches S.bob) "bob may aim his own Doom Blade at his own Piker (CR 702.11d, 'your opponents control')"
+        Spec.assertBool s (not (reaches S.alice)) "alice may not aim the same spell at it"
+
+  -- CR 702.11e: "Any effect that causes an object to lose hexproof will cause an
+  -- object to lose all 'hexproof from [quality]' abilities."
+  --
+  -- Humility ("All creatures lose all abilities and have base power and toughness
+  -- 1/1", CR 613.1f layer 6) is pawl's only hexproof-remover -- Modification has
+  -- GainKeyword and LoseAllAbilities and nothing narrower -- so it is the witness
+  -- this rule gets. The rule is really held BY CONSTRUCTION rather than by this
+  -- case: the quality rides the Hexproof constructor, so there is no second
+  -- keyword for an ability-removing effect to miss, and the CR 613.1f case above
+  -- and this one are the same code path with a different payload.
+  --
+  -- The grant is stamped BEFORE Humility enters, so CR 613.7's timestamp order
+  -- puts the removal last within layer 6. Stamped the other way round the grant
+  -- would win, which is CR 613.7 working and not this rule failing.
+  Spec.it s "CR 702.11e Humility takes hexproof from black away with the rest of the abilities" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    humility <- S.printingOf s registry "Humility"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (pikerId, board) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        guarded = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor Color.Black)))) board
+        humbled = S.withHumility humility guarded
+    case S.spellTargetSpec doomBlade of
+      Nothing -> Spec.assertFailure s "Doom Blade should declare a target slot"
+      Just theSpec -> do
+        let reaches gs =
+              let (spellId, onStack) = S.spellOnStack doomBlade S.alice gs
+               in Set.member (Recipient.ToCreature pikerId) (Target.legalRecipients (Just S.alice) spellId theSpec onStack)
+        Spec.assertBool s (not (reaches guarded)) "before Humility alice's Doom Blade cannot reach the Piker"
+        Spec.assertBool s (reaches humbled) "under Humility it can, the variant having gone with the rest"
 
   -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
   -- targets are still legal. ... If all its targets, for every instance of the
