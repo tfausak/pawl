@@ -366,10 +366,12 @@ canPayComponent pid oid component gs = case component of
   -- `oid` is excluded, and that is CR 601.2a, not a convenience: the card moves
   -- to the stack at step (a), so by the time 601.2f determines the total cost the
   -- spell is NOT in its controller's hand and cannot be discarded to pay its own
-  -- additional cost. Pawl.Engine.Cast pays one step earlier than that, while the
-  -- object is still in hand (#89), so without this filter a hand of "Cathartic
-  -- Reunion plus one other card" would read as payable and the Reunion could
-  -- discard itself. The exclusion is a no-op the moment #89 lands.
+  -- additional cost. A NO-OP for the payment, which Pawl.Engine.Cast runs on the
+  -- CR 400.7 stack incarnation, and load-bearing for the OFFER, which
+  -- Pawl.Engine.Cast.castable measures while the card is still where it was:
+  -- without this filter a hand of "Cathartic Reunion plus one other card" would
+  -- read as payable and the Reunion would be offered on the strength of
+  -- discarding itself.
   CostComponent.DiscardCards n ->
     Natural.length (discardCandidates pid oid gs) >= n
   -- CR 702.29a: payable only while the card is in the paying player's hand, which

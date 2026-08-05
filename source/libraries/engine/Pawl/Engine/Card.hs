@@ -56,7 +56,8 @@ combined card = case Card.layout card of
   -- CR 715.4: "In every zone except the stack, and while on the stack not as an
   -- Adventure, an adventurer card has only its normal characteristics." The
   -- alternative characteristics of CR 715.2 are reached ONLY through
-  -- Object.face, which CR 715.3b writes for the one incarnation that has them --
+  -- Object.face, which CR 715.3b writes for the stack incarnation and CR 715.3a's
+  -- offer writes speculatively (Cast.asProposed) --
   -- so the face this returns is the normal one, and the same expression Normal
   -- takes is a different claim: that a card with TWO printed sets of
   -- characteristics shows one of them, rather than that a card with one shows
