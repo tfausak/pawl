@@ -184,9 +184,10 @@ applyModification lyr src cands gs oid m pc =
         --
         -- Map.mapKeysWith (+) rather than Map.mapKeys, because the swap can
         -- collide two keys: a creature with both islandwalk and swampwalk hacked
-        -- Island -> Swamp has one kind of landwalk twice. Summing is CR 702.14e's
-        -- redundancy counted rather than discarded, matching what two GainKeywords
-        -- of the same keyword already do.
+        -- Island -> Swamp has one kind of landwalk twice. Summing rather than
+        -- dropping one matches what two GainKeywords of the same keyword already
+        -- do, and CR 702.14e makes the total unobservable for landwalk anyway --
+        -- Combat.landwalkAllowsGiven reads membership, never the count.
         --
         -- Not implemented: the swap does not reach PC.replacementEffects, a
         -- mode's targetSpecs, or an activated ability's cost (#635).
@@ -936,14 +937,13 @@ rewriteModification pairs m =
         -- counting Swamps after a swap (#711).
         Modification.SetBasePowerToughness _ _ -> acc
         Modification.ModifyPowerToughness _ _ -> acc
-        -- A card type is not a subtype (CR 205.2a vs 205.3), so CR 612.2's gate
-        -- would reject the pair even if the words could collide.
+        -- CR 205.2a's card types are a different list from CR 205.3's subtypes,
+        -- so this position holds no word a subtype pair could name.
         Modification.AddCardType _ -> acc
-        -- The swapped-in words of a STORED text change are the choice its own
-        -- resolution made (CR 612.1's ChooseLandTypeSwap), not words printed on
-        -- the object this rewrite is walking. Artificial Evolution aimed at a
-        -- Magical Hack still on the stack reaches the PRINTED restriction
-        -- instead, which is rewriteEffect's ChangeText arm.
+        -- The two words of a STORED text change are the choice its own
+        -- resolution announced (CR 608.2d), not words printed on the object this
+        -- rewrite walks. A text changer's PRINTED clause is reached instead, by
+        -- rewriteEffect's ChangeText arm.
         Modification.ChangeSubtypeWord _ _ -> acc
         -- CR 612.2 names colour words as a family a text change can swap, but
         -- pawl's only text changer swaps subtypes (Modification.ChangeSubtypeWord),
