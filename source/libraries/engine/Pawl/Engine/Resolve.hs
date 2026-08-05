@@ -1104,8 +1104,12 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- incarnation before CR 614.1c's entry loop and the Moved snapshot can
         -- read it, so a CR 616.1b entry replacement that filters on control
         -- (Gather Specimens' "under an opponent's control") sees the controller
-        -- the permanent actually enters under. The funnel ignores it for a
-        -- non-battlefield destination, which is CR 110.2's own scope.
+        -- the permanent actually enters under. No card in the pool observes that
+        -- ordering -- Gather Specimens' row is Uses.Unlimited, so applying it to
+        -- a creature already entering under its own controller changes nothing
+        -- and consumes nothing -- so it buys the ordering rather than a passing
+        -- test. The funnel ignores the player entirely for a non-battlefield
+        -- destination, which is CR 110.2's own scope.
         --
         -- No CR 800.4b guard, unlike Effect.GainControl's arm: `controller` here
         -- is whoever controls the resolving spell or ability, and a departed
@@ -1129,6 +1133,12 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               -- creature's own (Meandering Towershell's ruling says so in as
               -- many words). The Create arm calls the same function for the same
               -- rule.
+              --
+              -- It reads the new permanent's controller, and CR 506.3b refuses
+              -- one who is not the active player -- which the funnel above has
+              -- already settled. A Towershell its attacker does not own would
+              -- otherwise return to its owner and then fail to be attacking at
+              -- all (Pawl.CombatSpec pins both halves).
               Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
               -- CR 603.7c: bind the arriving incarnation into the resolving
               -- object's live bindings, so a delayed ability THIS SAME

@@ -357,7 +357,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     Spec.assertEqWith s "neither was exiled: nothing was still controlled by bob" (fmap Object.zone (Game.lookupObject aura after), fmap Object.zone (Game.lookupObject creature after)) (Just Zone.Battlefield, Just Zone.Battlefield)
     Spec.assertEqWith s "bob controls nothing" (Projection.controls S.bob after) []
 
-  -- CR 800.4a's FOURTH clause with a real producer at last (#582). CR 110.2a:
+  -- CR 800.4a's FOURTH clause with a real producer at last. CR 110.2a:
   -- "If an effect instructs a player to put an object onto the battlefield, that
   -- object enters the battlefield under that player's control unless the effect
   -- states otherwise." That control is BASE STATE, not an ongoing effect -- the

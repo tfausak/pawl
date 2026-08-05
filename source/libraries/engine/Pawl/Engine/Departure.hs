@@ -163,6 +163,15 @@ objectsLeaveWith pid gs =
 --     (CR 723.1b). CR 800.4b says the same thing one step later, at
 --     Engine.beginTurnOf's promotion; neither is the other's spare.
 --
+-- Object.enteredUnder is NOT a carrier and must never be swept here, however
+-- much it looks like one: CR 110.2a's entry controller is the player who
+-- controls the permanent BY DEFAULT (CR 110.2), which is the other side of the
+-- line CR 800.4c draws, and no effect is giving it to them -- the one-shot that
+-- put the permanent there finished resolving. Clearing it would put the
+-- permanent back under its owner and leave the fourth clause with nothing to
+-- exile, which is the bug this engine had; Pawl.DepartureSpec's Meandering
+-- Towershell case is what catches it coming back.
+--
 -- Control has a FOURTH source that is deliberately absent from that list: a
 -- layer-2 control-granting STATIC ability (Control Magic's
 -- Modification.SetControllerToSource, CR 613.1b), which

@@ -2205,8 +2205,8 @@ controlOverrides gs =
 -- two writers CR 110.2a names (see Pawl.Types.Object), so it is Nothing on every
 -- card outside the battlefield and this is the owner CR 108.4a asks for.
 --
--- On the hot path (#582): controllerOfGiven runs once per battlefield object
--- inside `controls`, which the SBA sweep calls at every priority boundary. The one
+-- On the hot path: controllerOfGiven runs once per battlefield object inside
+-- `controls`, which the SBA sweep calls at every priority boundary. The one
 -- Maybe match measured inside the benchmark suite's run-to-run stddev.
 defaultControllerOf :: Object.Object -> PlayerId.PlayerId
 defaultControllerOf obj = Maybe.fromMaybe (Object.owner obj) (Object.enteredUnder obj)
