@@ -667,6 +667,33 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
         Spec.assertBool s (not (reaches guarded)) "before Humility alice's Doom Blade cannot reach the Piker"
         Spec.assertBool s (reaches humbled) "under Humility it can, the variant having gone with the rest"
 
+  -- The whole card, through the CAST path rather than as a set membership: CR
+  -- 601.2c makes a spell with no legal target for a slot uncastable at all, which
+  -- is what Pawl.Engine.Cast.castable asks through Target.fillableModes.
+  --
+  -- The point this case makes that the set-membership ones cannot: the source
+  -- Cast passes is the card IN HAND, not a spell object on the stack, and rule
+  -- 702.11d's quality has to be answerable of it. A black card in a hand is black
+  -- (CR 202.2), so the two frames agree -- but nothing else here would notice if
+  -- they stopped.
+  --
+  -- Both rows again, so neither answer is a Doom Blade that never worked: the
+  -- board differs only in the quality, and the white row goes all the way through
+  -- resolution to a dead Piker.
+  Spec.it s "CR 601.2c whole card: hexproof from black leaves alice's Doom Blade no legal target, hexproof from white leaves it one" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    let (pikerId, board) = S.addCreature piker S.bob (S.landsInPlay swamp 2) -- {1}{B}
+        (base, dbId) = S.handOne doomBlade board
+        guarded quality = S.withEffect pikerId (Modification.GainKeyword (Keyword.Hexproof (Just (Filter.Type.HasColor quality)))) base
+        resolve gs = snd (Engine.runGamePure S.identityAnswer (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice dbId))) Stack.resolveTop)
+    Spec.assertBool s (S.castable S.alice dbId base) "with no hexproof at all the spell has a legal target"
+    Spec.assertBool s (not (S.castable S.alice dbId (guarded Color.Black))) "hexproof from black leaves the black Doom Blade none"
+    Spec.assertBool s (S.castable S.alice dbId (guarded Color.White)) "hexproof from white leaves it the same one it had"
+    Spec.assertEqWith s "and bob's Piker dies to it" (S.creaturesInPlay S.bob (resolve (guarded Color.White))) 0
+    Spec.assertEqWith s "while the black row leaves it alive" (S.creaturesInPlay S.bob (guarded Color.Black)) 1
+
   -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
   -- targets are still legal. ... If all its targets, for every instance of the
   -- word 'target,' are now illegal, the spell or ability doesn't resolve." The
