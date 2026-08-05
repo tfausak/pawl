@@ -1939,6 +1939,32 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
         Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone is illegal twice over, on the restriction and on the count"
         Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] gs) "only both together is legal"
       _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1d a Ghostly Prison excuses the whole maximum even where attacking together is legal" $ do
+    -- The cost clause reaching the ENUMERATION, which is the one path of
+    -- attackCeiling the cases above leave untested: the restriction is in force,
+    -- so the closed form is not taken, and the search still has to be over the
+    -- creatures that attack FREELY. With the Prison out and no Forests, neither
+    -- creature does, so the maximum is zero even though attacking together would
+    -- obey both requirements and disobey nothing.
+    --
+    -- An enumeration that ranged over every candidate would answer two here and
+    -- make declining illegal, which is CR 508.1d's third sentence exactly
+    -- backwards: a player is never required to pay a cost to attack.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, mine, _) = imprisoning prison forest S.bob [bondedConstruct, piker] 0
+        taxed = cursingBoard curse S.alice board
+        (plain, _, _) = cursing curse S.alice [bondedConstruct, piker] []
+    case mine of
+      [construct, other] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] plain)) "without the Prison, declining is illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] taxed) "with it, declining is legal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] taxed) "and attacking together anyway is still legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] taxed)) "while the Construct alone stays illegal, cost or no cost"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
   Spec.it s "CR 506.5 whole cards: a lone Construct sits out a real declare attackers step" $ do
     -- The gameplay-level case, through the priority loop and CR 703.4i's
     -- turn-based action rather than a direct call, with the interpreter that
