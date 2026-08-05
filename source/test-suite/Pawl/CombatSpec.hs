@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
@@ -955,10 +957,11 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   -- CR 702.14c's SECOND clause: "with the specified type or supertype (as in
-  -- 'artifact landwalk')". Vectis Gloves is the only paper source, and it is the
-  -- pool's first GRANTED landwalk -- every other printing carries the keyword on
-  -- its own type line -- so this is also the first case where the criterion
-  -- arrives through a CR 613.1f layer-6 GainKeyword rather than off the card.
+  -- 'artifact landwalk')". Vectis Gloves is the only paper source of artifact
+  -- landwalk, and it GRANTS the keyword rather than printing it on a creature --
+  -- so the criterion arrives through a CR 613.1f layer-6 GainKeyword rather than
+  -- off the card, which is the other way to have one (Lord of Atlantis is the
+  -- pool's second grant, in TextChangedLandwalk below).
   Spec.it s "CR 702.14c an artifact landwalker granted by Vectis Gloves walks on an artifact land" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     gloves <- S.printingOf s registry "Vectis Gloves"
@@ -1009,6 +1012,165 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
         Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+-- CR 612.1's word swap, cast for real: alice pays {U} out of her own Island and
+-- resolves a Magical Hack aimed at `target`, replacing `from` with `to`.
+--
+-- Her OWN Island, deliberately. CR 702.14c reads the DEFENDING player's lands,
+-- so mana on alice's side of the board cannot satisfy the landwalk this Hack is
+-- about to rewrite, and every land bob controls in these cases is there to be
+-- read rather than tapped.
+castHackAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> GameState.GameState -> GameState.GameState
+castHackAt hackId target from to gs =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject target)) sets
+        Prompt.ChooseLandTypeSwap {} -> (from, to)
+        _ -> S.identityAnswer p
+   in S.runPure answer (gs {GameState.priority = Just S.alice}) (do S.cast S.alice hackId; Stack.resolveTop)
+
+-- The board both landwalk text-change groups attack from: alice attacks with
+-- everything she has, bob defends with a Goblin Piker and one land of
+-- `landName`, and alice holds a Magical Hack plus the Island that pays for it.
+-- With `hacked`, she casts it at `hackTarget` (chosen from her permanents by the
+-- caller) before attackers are declared.
+--
+-- Returns the post-declaration state, the attacker of interest and the blocker.
+hackedLandwalkBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [Printing.Printing] ->
+  ([ObjectId.ObjectId] -> Maybe ObjectId.ObjectId) ->
+  Bool ->
+  Subtype.Subtype ->
+  Subtype.Subtype ->
+  Printing.Printing ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+hackedLandwalkBoard s registry mine hackTarget hacked from to defendersLand = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  island <- S.printingOf s registry "Island"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let (gs0, ours, theirs) = S.combatBoardOf mine [piker]
+      (_, gs1) = S.addCreature island S.alice gs0
+      (_, gs2) = S.addCreature defendersLand S.bob gs1
+      (hackId, gs3) = S.addHandCard magicalHack S.alice gs2
+      board = case (hacked, hackTarget ours) of
+        (True, Just t) -> castHackAt hackId t from to gs3
+        _ -> gs3
+      attacked = snd (Engine.runGamePure S.aggressiveAnswer board (Combat.declareAttackers S.alice))
+  case (ours, theirs) of
+    (a : _, b : _) -> pure (attacked, a, b)
+    _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+-- CR 612.1 reaching a keyword's own land type, end to end through the real
+-- engine, in both of the two ways a creature can have one.
+--
+-- CR 702.14a: landwalk "appears within an object's rules
+-- text as '[type]walk'". CR 612.1: a text change reaches
+-- "any words or symbols printed on that object". So the land type in swampwalk
+-- is a word a Magical Hack swaps -- which is the example Magical Hack's own
+-- reminder text gives, "you may change 'swampwalk' to 'plainswalk'".
+--
+-- Each half is a 2x2: hacked or not, crossed with the OLD land and the NEW one
+-- on bob's side. The diagonal is what discriminates -- "the Merfolk was blocked"
+-- is equally true of a landwalk that never applied for some unrelated reason, so
+-- the unhacked pair is asserted alongside as the paired control.
+textChangedLandwalkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
+  -- The GRANTED half. Lord of Atlantis {U}{U} Creature -- Merfolk 2/2, "Other
+  -- Merfolk get +1/+1 and have islandwalk." (checked against Scryfall,
+  -- 2026-08-05) and Tidal Warrior, the pool's other Merfolk, are the whole
+  -- board.
+  --
+  -- Which creature the Hack NAMES is the whole of CR 612.3: "any abilities that
+  -- are granted to an object can't be modified by text-changing effects that
+  -- affect that object". Naming the Lord rewrites the grant; naming the Warrior
+  -- that RECEIVED islandwalk must not, and the case below asserts exactly that.
+  --
+  -- Two mechanisms give it, and the first is the one that scopes the rewrite:
+  -- gatherStatic is called with the SOURCE's own changes, so a Hack on the
+  -- Warrior never reaches the Lord's GainKeyword at all. The layer order (the
+  -- swap at 3, the grant at 6) is the second and weaker one.
+  let -- combatBoardOf returns the ids in printing order, so the Warrior is the
+      -- head and the Lord is the second. Which of the two the Hack names is the
+      -- parameter, since that is the whole difference between CR 612.1's case
+      -- and CR 612.3's.
+      theWarrior = Maybe.listToMaybe
+      theLord = Maybe.listToMaybe . drop 1
+      lordBoardAt hackTarget hacked land = do
+        lord <- S.printingOf s registry "Lord of Atlantis"
+        tidalWarrior <- S.printingOf s registry "Tidal Warrior"
+        landP <- S.printingOf s registry land
+        hackedLandwalkBoard s registry [tidalWarrior, lord] hackTarget hacked Subtype.Island Subtype.Swamp landP
+      lordBoard = lordBoardAt theLord
+  Spec.it s "CR 702.14c an unhacked Lord of Atlantis grants ISLANDwalk" $ do
+    -- The premise, and the control the two hacked cases are read against: with
+    -- the Lord's text as printed, bob's Island stops the block and his Swamp
+    -- does not.
+    (onIsland, warrior, blocker) <- lordBoard False "Island"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland)) "an Island stops the block"
+    -- The Lord's OTHER modification, which the swap must leave alone: a Tidal
+    -- Warrior is a printed 1/1, so a 2/2 is the +1/+1 half still applying.
+    Spec.assertEqWith s "and the Warrior is a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
+    (onSwamp, warrior', blocker') <- lordBoard False "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp) "a Swamp does not"
+  Spec.it s "CR 612.1 a hacked Lord of Atlantis grants SWAMPwalk instead" $ do
+    -- THE CASE. Island -> Swamp on the Lord, and bob's board never moves: the
+    -- Island that used to stop the block no longer does, and the Swamp that
+    -- used to allow it no longer does either. Both halves fail against a
+    -- rewrite that walks past a Modification.GainKeyword.
+    (onIsland, warrior, blocker) <- lordBoard True "Island"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland) "an Island no longer stops the block"
+    let after = S.runPure S.aggressiveAnswer onIsland Combat.declareBlockers
+    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf warrior after) (Set.singleton blocker)
+    Spec.assertEqWith s "the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
+    (onSwamp, warrior', blocker') <- lordBoard True "Swamp"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp)) "a Swamp stops it now"
+  Spec.it s "CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing" $ do
+    -- CR 612.3 itself, and the case the two above are read against a THIRD
+    -- time: the same Island -> Swamp swap, aimed at the WARRIOR. Its islandwalk
+    -- is the Lord's text and not its own, so the swap cannot reach it and the
+    -- board answers exactly as the unhacked one does.
+    --
+    -- The Warrior is a legal and non-vacuous target: its own printed text says
+    -- "target land becomes an Island until end of turn", so the Hack really does
+    -- have an Island of its own to rewrite there. What it must not rewrite is
+    -- the keyword, which arrived from somewhere else.
+    (onIsland, warrior, blocker) <- lordBoardAt theWarrior True "Island"
+    -- THE ANTI-VACUITY CHECK, and it has to come first: every assertion below
+    -- also holds of a Hack that was never cast at all. This one says the swap
+    -- really did land, and on the Warrior.
+    Spec.assertEqWith s "the Hack resolved onto the Warrior" (Projection.textChangesAffecting warrior onIsland) [(Subtype.Island, Subtype.Swamp)]
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland)) "an Island still stops the block"
+    Spec.assertEqWith s "and the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
+    -- The half that keeps this from passing by the landwalk simply vanishing: a
+    -- Warrior that had wrongly picked up swampwalk would make this one illegal.
+    (onSwamp, warrior', blocker') <- lordBoardAt theWarrior True "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp) "and a Swamp still does not"
+    let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
+    Spec.assertEqWith s "the block sticks" (Combat.blockersOf warrior' after) (Set.singleton blocker')
+  -- The PRINTED half, one carrier over: Bog Wraith ("Creature -- Wraith 3/3,
+  -- Swampwalk" and nothing else) has the keyword on its own type line rather
+  -- than from a grant, so the swap has to reach the projection's keyword map at
+  -- CR 613.1c layer 3 instead of a static ability's modification. Same rule,
+  -- different site -- and the pair below is what tells the two apart.
+  let wraithBoard hacked land = do
+        bogWraith <- S.printingOf s registry "Bog Wraith"
+        landP <- S.printingOf s registry land
+        hackedLandwalkBoard s registry [bogWraith] Maybe.listToMaybe hacked Subtype.Swamp Subtype.Island landP
+  Spec.it s "CR 702.14c an unhacked Bog Wraith walks on SWAMPS" $ do
+    (onSwamp, wraith, blocker) <- wraithBoard False "Swamp"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker wraith) onSwamp)) "a Swamp stops the block"
+    (onIsland, wraith', blocker') <- wraithBoard False "Island"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' wraith') onIsland) "an Island does not"
+  Spec.it s "CR 612.1 a hacked Bog Wraith walks on ISLANDS" $ do
+    (onSwamp, wraith, blocker) <- wraithBoard True "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker wraith) onSwamp) "a Swamp no longer stops the block"
+    let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
+    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf wraith after) (Set.singleton blocker)
+    (onIsland, wraith', blocker') <- wraithBoard True "Island"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' wraith') onIsland)) "an Island stops it now"
 
 -- CR 702.111: grant menace to `oid` with a stored continuous effect, withFear's
 -- twin. Used only by the CR 509.1b "after a legal block has been declared" case
@@ -3366,6 +3528,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   vigilanceSpec s registry
   hasteSpec s registry
   evasionSpec s registry
+  textChangedLandwalkSpec s registry
   menaceSpec s registry
   blockRequirementSpec s registry
   attackRequirementSpec s registry

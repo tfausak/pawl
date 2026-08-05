@@ -253,12 +253,11 @@ matches context view predicate = case predicate of
 -- module owns. Pawl.Engine.Resolve threads one call per Filter-carrying effect
 -- arm rather than learning what is inside each one.
 --
--- HasSubtype is the only atom REWRITTEN here. Most of the rest name a card type,
--- a supertype, a colour, a number, a relation or a status, none of which CR 612's
--- word swap reaches; HasKeyword is the one exception, and its own arm below says
--- why it is left alone anyway. Written out exhaustively rather than with a
--- catch-all, so a later atom that can carry a subtype fails to compile here
--- instead of silently going unrewritten.
+-- HasSubtype and HasKeyword are the atoms REWRITTEN here. The rest name a card
+-- type, a supertype, a colour, a number, a relation or a status, none of which CR
+-- 612's word swap reaches. Written out exhaustively rather than with a catch-all,
+-- so a later atom that can carry a subtype fails to compile here instead of
+-- silently going unrewritten.
 --
 -- CR 612.2's family gate is not restated on the HasSubtype arm, for the reason
 -- Pawl.Engine.Projection's type-line half gives: a HasSubtype atom may name a
@@ -273,21 +272,11 @@ rewrite pairs predicate = case predicate of
   Filter.HasCardType _ -> predicate
   Filter.HasSupertype _ -> predicate
   Filter.HasColor _ -> predicate
-  -- Not rewritten, and CR 702.14a is why it is a live question rather than an
-  -- obvious no: landwalk carries a criterion naming a land type
-  -- (Keyword.Landwalk (HasSubtype Swamp)), so a text-changing effect could in
-  -- principle reach the word inside this atom, and since that payload is a
-  -- Filter (#499) this very function would be the fix.
-  --
-  -- Still nothing to rewrite: the pool's one granted landwalk (Vectis Gloves)
-  -- has a HasCardType Artifact criterion, which names no subtype word for CR
-  -- 612.1's swap to reach, and nothing in the pool filters by a landwalk either.
-  -- Note the separate half: Projection.project's ChangeSubtypeWord arm rewrites
-  -- PC.subtypes and never PC.keywords, so a Magical Hack on Bog Wraith would not
-  -- make islandwalk even if this arm recursed. Matches
-  -- Pawl.Engine.Projection.rewriteModification's identical silence on
-  -- Modification.GainKeyword (#523).
-  Filter.HasKeyword _ -> predicate
+  -- CR 702.14a: a keyword can hold a land-type word too, so "creature with
+  -- swampwalk" is text a swap reaches exactly as "creature that's a Swamp" is.
+  -- rewriteKeyword below is the descent, shared with the two sites that rewrite
+  -- a keyword rather than a filter over one.
+  Filter.HasKeyword k -> Filter.HasKeyword (rewriteKeyword pairs k)
   Filter.PowerAtLeast _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
@@ -300,3 +289,63 @@ rewrite pairs predicate = case predicate of
   Filter.IsAttachedToPermanent -> predicate
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
+
+-- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
+-- word in them: CR 702.14a has landwalk "appear within an object's rules text as
+-- '[type]walk'", so the land type in swampwalk is a word in the text box like any
+-- other and a text-changing effect reaches it. Magical Hack's own reminder text
+-- is that example -- "you may change 'swampwalk' to 'plainswalk'".
+--
+-- Casing on Keyword is legitimate for the reason Pawl.Types.Keyword's comment
+-- gives: rule 702 is part of the rulebook, so a keyword is a citation rather than
+-- an effect's identity.
+--
+-- The whole descent is `rewrite` over the Filters a keyword carries, which
+-- answers CR 702.14a's SECOND clause for free -- the [type] "can also be the card
+-- type land plus any combination of land types, card types, and/or supertypes",
+-- and of those four shapes (CR 702.14c) only a land type is a HasSubtype atom.
+-- Vectis Gloves' artifact landwalk and Dryad Sophisticate's nonbasic landwalk come
+-- back unchanged because their criteria hold no subtype word, not because this
+-- function recognizes which shape it was handed; Legions of Lim-Dûl's snow
+-- swampwalk has its Swamp swapped and keeps its Snow, which is the case a
+-- shape-aware version would have had to get right on purpose.
+--
+-- Exhaustive rather than a wildcard, unlike Combat.landwalkAllowsGiven's single
+-- named constructor: this CLASSIFIES every keyword by whether it holds a word,
+-- so a new one carrying a Filter must break this build rather than silently keep
+-- the printed word.
+--
+-- Not rewritten: the Cost that cycling, flashback and entwine carry. A cost may
+-- hold a Filter through CostComponent.Sacrifice, which is the ability-cost half
+-- of #635 one carrier over.
+rewriteKeyword :: [(Subtype.Subtype, Subtype.Subtype)] -> Keyword.Keyword -> Keyword.Keyword
+rewriteKeyword pairs keyword = case keyword of
+  -- CR 702.14a's "[type]walk".
+  Keyword.Landwalk criterion -> Keyword.Landwalk (rewrite pairs criterion)
+  -- CR 702.29e's "[Type]cycling", rule 702's other "[type]": "usually a subtype
+  -- (as in 'mountaincycling')", so it holds a basic land type exactly as
+  -- swampwalk does.
+  Keyword.Cycling cost criterion -> Keyword.Cycling cost (fmap (rewrite pairs) criterion)
+  Keyword.Deathtouch -> keyword
+  Keyword.Defender -> keyword
+  Keyword.DoubleStrike -> keyword
+  Keyword.FirstStrike -> keyword
+  Keyword.Flash -> keyword
+  Keyword.Flying -> keyword
+  Keyword.Haste -> keyword
+  Keyword.Hexproof -> keyword
+  Keyword.Indestructible -> keyword
+  Keyword.Lifelink -> keyword
+  Keyword.Reach -> keyword
+  Keyword.Shroud -> keyword
+  Keyword.Trample -> keyword
+  Keyword.Vigilance -> keyword
+  Keyword.Flashback _ -> keyword
+  Keyword.Fear -> keyword
+  Keyword.Entwine _ -> keyword
+  Keyword.Poisonous _ -> keyword
+  Keyword.Infect -> keyword
+  Keyword.BattleCry -> keyword
+  Keyword.Menace -> keyword
+  Keyword.Devoid -> keyword
+  Keyword.Toxic _ -> keyword
