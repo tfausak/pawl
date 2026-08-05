@@ -132,7 +132,7 @@ became = SlotName.MkSlotName (Text.pack "became")
 
 -- CR 615.13: the reserved slot under which a prevention trigger's AMOUNT is
 -- bound -- "put that many +1/+1 counters" on Selfless Squire, "you gain that much
--- life" on the cards that will follow it. Stamped by
+-- life" on the same family's other cards. Stamped by
 -- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the payload
 -- reads an ordinary Quantity.InSlot rather than a "how much was prevented"
 -- opcode.
@@ -146,6 +146,9 @@ became = SlotName.MkSlotName (Text.pack "became")
 --
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
 -- "no card's targetSpecs may name it" sweep as `you`, `thatPlayer` and `became`.
+-- Not swept: the SlotName an effect BINDS into (Destroy's count, MoveToZone's
+-- incarnation), so a card naming this one there would shadow the event's amount
+-- on the source, which InSlot reads first (#691).
 preventedAmount :: SlotName
 preventedAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 
@@ -162,7 +165,8 @@ toPlayer pid = Binding.empty {Binding.target = Just (Recipient.ToPlayer pid)}
 
 -- A binding that names one NUMBER and nothing else -- what a Destroy that
 -- counts what it destroyed binds for a later "for each ... destroyed this way"
--- to read (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an
+-- to read, and what CR 615.13's prevented amount rides
+-- (Quantity.InSlot). Mirrors toObject and toPlayer, but the value is an
 -- amount rather than a recipient, so it rides the same field CR 601.2b's chosen
 -- X does.
 toAmount :: Natural -> Binding

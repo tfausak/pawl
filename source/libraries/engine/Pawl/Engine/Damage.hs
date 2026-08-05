@@ -350,6 +350,7 @@ damageRecipient gs recipient = case recipient of
 -- prevents. Those loops still run sequentially and the shield is still spent by
 -- whichever runs first -- what changed is that the shielded side, not the batch's
 -- gather order, says which that is.
+--
 -- The batch is also the unit CR 615.13 counts preventions in, which is the other
 -- half of what resolveDamageBatch answers: one Prevention per prevention effect
 -- that applied to this batch, carrying the total it prevented.

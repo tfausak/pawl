@@ -184,14 +184,14 @@ data TriggerCondition
     -- Recipient is whom the prevented damage was addressed to; the PlayerRelation
     -- reads that player against CR 109.5's "you", the ability's controller (CR
     -- 603.3a). PlayerDiscards' shape, not a Self- condition's: the bearer is a
-    -- creature watching its controller's life total.
+    -- creature watching damage addressed to its controller.
     --
     -- Scoped to a PLAYER recipient rather than any recipient, which is the
     -- printed sentence rather than an omission -- CR 615.13 itself says nothing
-    -- about who the damage was addressed to, and a card watching damage to a
-    -- CREATURE being prevented (Vigor's shape) is a different condition. It fires
-    -- for damage prevented to a player and stays silent for damage prevented to a
-    -- permanent.
+    -- about who the damage was addressed to, so a card watching damage to a
+    -- CREATURE being prevented would be a different condition, and no card in the
+    -- pool is one. It fires for damage prevented to a player and stays silent for
+    -- damage prevented to a permanent.
     --
     -- NOT linked to the prevention effect that fired it. Selfless Squire's own
     -- ruling is explicit that any prevention at all triggers it, including one

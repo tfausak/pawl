@@ -15,9 +15,11 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 -- every other damage pattern in the pool -- Fog's prevention, Furnace of Rath's
 -- "if A SOURCE would deal damage" -- is AnySource.
 --
--- `whichRecipient` is CR 615.7's shielded permanent or player, and Nothing means
--- EVERY recipient rather than a missing answer. Mending Hands names the one
--- CR 115.4 recipient its resolution chose; Fog and Furnace of Rath name none.
+-- `whichRecipient` is the permanent or player a prevention shield covers -- CR
+-- 615.7's, and CR 615.3's unbounded one -- and Nothing means EVERY recipient
+-- rather than a missing answer. Mending Hands and Selfless Squire each name the
+-- one CR 115.4 recipient their resolution chose; Fog and Furnace of Rath name
+-- none.
 --
 -- That Recipient is BAKED by the engine, never authored, exactly as
 -- Pawl.Types.PhasePattern.whosePhase is: card data cannot name an ObjectId or a

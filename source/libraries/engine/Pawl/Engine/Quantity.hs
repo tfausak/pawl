@@ -52,10 +52,11 @@ evaluate viewOf context gs oid = evaluateFor viewOf context gs oid oid
 --     left its id naming nothing, and CR 113.7a is what lets the ability
 --     resolve regardless (#544).
 --
--- Quantity.InSlot deliberately stays on `oid`: Resolve.bindAmountSlot writes
--- that value to the effect's source mid-resolution (Bane of Progress binds and
--- reads one inside a TRIGGERED ability, where the two ids differ), and each
--- amount is read where it was written.
+-- Quantity.InSlot asks `oid` FIRST and falls back to `announcedOn`, because it
+-- has two writers: Resolve.bindAmountSlot writes to the effect's source
+-- mid-resolution (Bane of Progress binds and reads one inside a TRIGGERED
+-- ability, where the two ids differ), while Event.eventBindings writes to the
+-- stack object as a trigger is gathered. See the arm itself.
 evaluateFor :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> ObjectId -> Quantity -> Maybe Integer
 evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Literal n -> Just n

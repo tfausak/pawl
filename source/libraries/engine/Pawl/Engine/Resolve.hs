@@ -747,6 +747,12 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
 -- The row's other fields are Replace's: CR 113.7's source, CR 109.5's controller
 -- baked at installation, and a fresh timestamp for its CR 614.5 identity.
 --
+-- One shield PER RECIPIENT, which is why both arms fold this over the set their
+-- ObjectRef names rather than installing a single row: CR 615.11 says an effect
+-- covering several recipients "creates a prevention shield for each applicable
+-- creature when the spell or ability that generates that effect resolves". Every
+-- producer in the pool names exactly one, so the fold is over a singleton today.
+--
 -- Not implemented: CR 615.5's additional effect. The row carries a
 -- ReplacementEffect and no payload, so a prevention that also does something --
 -- Test of Faith's "for each 1 damage prevented this way, put a +1/+1 counter on

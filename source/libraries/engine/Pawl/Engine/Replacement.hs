@@ -1164,6 +1164,10 @@ setShield identity_ pat left = case identity_ of
 -- is -- in the same genre as bucketOf, readsApplier and shieldRemaining above.
 -- One arm per constructor, no wildcard, so a new rewrite that prevents damage
 -- breaks the build here rather than silently going unreported.
+--
+-- Not implemented: CR 615.12's damage that "can't be prevented", which asks a
+-- second question this predicate cannot -- a prevention still APPLIES to such an
+-- event, prevents none of it, and leaves its shield unspent (#690).
 prevents :: DamageRewrite.DamageRewrite -> Bool
 prevents rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
@@ -1236,11 +1240,12 @@ resolveDamageBatch events = do
 --
 -- Keyed on the RECIPIENT as well as the instance, which is narrower than the
 -- rule's own unit -- 615.13 counts one application of one prevention effect,
--- whoever the simultaneous events were addressed to. Every shield in the pool
--- names exactly one recipient (Resolve's two prevention arms bake one), so the
--- two readings coincide today. Not implemented: a prevention effect naming NO
--- recipient (Fog's shape) that reaches two recipients in one batch reports two
--- preventions where the rule describes one (#688).
+-- whoever the simultaneous events were addressed to. Every prevention the ENGINE
+-- bakes names exactly one recipient (Resolve's two prevention arms), and the one
+-- card-authored prevention that names none -- Fog's -- has no CR 615.13 trigger
+-- paired with it, so the two readings coincide today. Not implemented: a
+-- prevention effect naming NO recipient that reaches two recipients in one batch
+-- reports two preventions where the rule describes one (#688).
 --
 -- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
 -- these triggers are offered in -- is canonical rather than gather-dependent.

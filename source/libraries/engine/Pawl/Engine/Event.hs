@@ -990,8 +990,8 @@ matchesTrigger gs bearer you cond event = case cond of
   -- SpellOrAbilityCounters do.
   --
   -- The bearer is NOT part of the match: Selfless Squire is a creature watching
-  -- its controller's life total, and CR 615.13 says nothing about which object
-  -- the ability is on.
+  -- damage addressed to its controller, and CR 615.13 says nothing about which
+  -- object the ability is on.
   --
   -- ONE fire per recorded event, and the record is already grouped per prevention
   -- effect per batch (Replacement.groupPreventions), which is where CR 615.13's
@@ -1499,7 +1499,7 @@ functionsInGraveyard cond = case cond of
   TriggerCondition.SelfLeavesTheBattlefield -> False
   -- CR 113.6's default again: the bearer watches from the battlefield.
   TriggerCondition.SpellOrAbilityCounters _ -> False
-  -- The same default: Selfless Squire watches its controller's life total from
+  -- The same default: Selfless Squire watches damage addressed to its controller from
   -- the battlefield, and a card in a graveyard sees nothing prevented.
   TriggerCondition.DamageToPlayerPrevented _ -> False
 

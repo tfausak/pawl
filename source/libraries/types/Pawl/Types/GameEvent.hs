@@ -45,7 +45,7 @@ data GameEvent
     -- Pawl.Engine.Replacement.groupPreventions does that grouping; this record is
     -- what it turned into.
     --
-    -- Not derivable from DamageDealt below, which is the whole reason this is its
+    -- Not derivable from DamageDealt above, which is the whole reason this is its
     -- own constructor: CR 615.6 makes a fully prevented event never happen, so
     -- there is no DamageDealt to subtract from -- and even a partly prevented one
     -- records only what got through.
