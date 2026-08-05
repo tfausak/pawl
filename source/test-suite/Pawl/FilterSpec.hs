@@ -278,16 +278,17 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         (Filter.rewrite [(Subtype.Swamp, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.And [Filter.Type.HasSupertype Supertype.Snow, Filter.Type.HasSubtype Subtype.Swamp]))))
         (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.And [Filter.Type.HasSupertype Supertype.Snow, Filter.Type.HasSubtype Subtype.Island])))
 
-    -- CR 702.29e's "[type]cycling" is rule 702's OTHER "[type]", and a basic
-    -- land type is one of the things it may be (plainscycling). Nothing in the
-    -- pool prints typecycling; the arm exists because rewriteKeyword classifies
-    -- every keyword by whether it holds a word rather than naming landwalk.
+    -- CR 702.29e's "[Type]cycling" is rule 702's OTHER "[type]", and the rule's
+    -- own example is a basic land type: "usually a subtype (as in
+    -- 'mountaincycling')". Nothing in the pool prints typecycling; the arm
+    -- exists because rewriteKeyword classifies every keyword by whether it holds
+    -- a word rather than naming landwalk.
     Spec.it s "descends into a typecycling criterion too" $ do
       let cost = Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
       Spec.assertEqWith
         s
-        "plainscycling became islandcycling"
-        (Filter.rewrite [(Subtype.Plains, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Plains)))))
+        "mountaincycling became islandcycling"
+        (Filter.rewrite [(Subtype.Mountain, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Mountain)))))
         (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Island))))
 
   Spec.describe s "AttackedThisTurn" $ do

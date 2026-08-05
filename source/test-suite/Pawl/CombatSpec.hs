@@ -957,10 +957,11 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   -- CR 702.14c's SECOND clause: "with the specified type or supertype (as in
-  -- 'artifact landwalk')". Vectis Gloves is the only paper source, and it is the
-  -- pool's first GRANTED landwalk -- every other printing carries the keyword on
-  -- its own type line -- so this is also the first case where the criterion
-  -- arrives through a CR 613.1f layer-6 GainKeyword rather than off the card.
+  -- 'artifact landwalk')". Vectis Gloves is the only paper source of artifact
+  -- landwalk, and it GRANTS the keyword rather than printing it on a creature --
+  -- so the criterion arrives through a CR 613.1f layer-6 GainKeyword rather than
+  -- off the card, which is the other way to have one (Lord of Atlantis is the
+  -- pool's second grant, in TextChangedLandwalk below).
   Spec.it s "CR 702.14c an artifact landwalker granted by Vectis Gloves walks on an artifact land" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     gloves <- S.printingOf s registry "Vectis Gloves"
@@ -1109,8 +1110,8 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
   Spec.it s "CR 612.1 a hacked Lord of Atlantis grants SWAMPwalk instead" $ do
     -- THE CASE. Island -> Swamp on the Lord, and bob's board never moves: the
     -- Island that used to stop the block no longer does, and the Swamp that
-    -- used to allow it no longer does either. Both halves fail against the
-    -- rewrite that walks past a GainKeyword, which is what #523 was.
+    -- used to allow it no longer does either. Both halves fail against a
+    -- rewrite that walks past a Modification.GainKeyword.
     (onIsland, warrior, blocker) <- lordBoard True "Island"
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland) "an Island no longer stops the block"
     let after = S.runPure S.aggressiveAnswer onIsland Combat.declareBlockers

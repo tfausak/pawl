@@ -899,9 +899,9 @@ textChangesAffecting oid gs =
 -- is stated rather than inferred from the payload, so malformed data cannot
 -- smuggle a cross-family rewrite through.
 --
--- Exhaustive rather than a catch-all, which is what let GainKeyword go
--- unrewritten while carrying CR 702.14a's land-type word (#523): a later arm that
--- can hold a word must break this build instead of falling through.
+-- Exhaustive rather than a catch-all, which is what had let GainKeyword go
+-- unrewritten while carrying CR 702.14a's land-type word: a later arm that can
+-- hold a word must break this build instead of falling through.
 rewriteModification :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modification -> Modification
 rewriteModification pairs m =
   let -- `inFamily from` is CR 612.2's gate.

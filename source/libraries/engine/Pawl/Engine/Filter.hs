@@ -322,8 +322,9 @@ rewriteKeyword :: [(Subtype.Subtype, Subtype.Subtype)] -> Keyword.Keyword -> Key
 rewriteKeyword pairs keyword = case keyword of
   -- CR 702.14a's "[type]walk".
   Keyword.Landwalk criterion -> Keyword.Landwalk (rewrite pairs criterion)
-  -- CR 702.29e's "[type]cycling", the rule's other "[type]" -- plainscycling
-  -- holds a basic land type exactly as swampwalk does.
+  -- CR 702.29e's "[Type]cycling", rule 702's other "[type]": "usually a subtype
+  -- (as in 'mountaincycling')", so it holds a basic land type exactly as
+  -- swampwalk does.
   Keyword.Cycling cost criterion -> Keyword.Cycling cost (fmap (rewrite pairs) criterion)
   Keyword.Deathtouch -> keyword
   Keyword.Defender -> keyword
