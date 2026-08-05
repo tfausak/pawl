@@ -40,6 +40,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
 deckSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -232,6 +233,7 @@ dirtied pid object =
       Object.chosenSubtype = Just Subtype.Forest,
       Object.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
       Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
+      Object.turnedOverAt = Just (Timestamp.MkTimestamp 1),
       Object.playableFromExileBy = Just pid,
       Object.ringBearerFor = Just pid
     }

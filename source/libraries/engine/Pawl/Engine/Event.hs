@@ -213,6 +213,7 @@ createEmblem pid card =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing
           }
@@ -368,8 +369,12 @@ changeZoneAttaching asOf oid requestedDest seed tapped under = do
               -- double-faced spell that becomes a permanent is put onto the
               -- battlefield with the same face up that was face up on the
               -- stack", so a stack-to-battlefield move must CARRY the face
-              -- rather than drop it. Not implemented; no double-faced card is in
-              -- the pool to reach it (#657).
+              -- rather than drop it. Not implemented, and unreachable for a
+              -- narrower reason than an empty pool now that one double-faced card
+              -- ships: CR 712.11 lets a transforming card be cast only with its
+              -- front face up, so the face this drops resolves back to the face it
+              -- had. A card cast transformed (CR 712.8c) or a modal double-faced
+              -- card would expose it (#657).
               mkObj ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,
@@ -659,6 +664,7 @@ createTokens controller card n tapped = do
                     Object.chosenNames = Set.empty,
                     Object.timestamp = ts,
                     Object.face = Nothing,
+                    Object.turnedOverAt = Nothing,
                     Object.playableFromExileBy = Nothing,
                     Object.ringBearerFor = Nothing
                   }

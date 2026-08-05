@@ -521,8 +521,10 @@ viewOfCharacteristics oid pc controller gs =
       -- face (its effect-defined card) with no mana cost, so CR 202.3a gives it
       -- 0 through the same path a card takes. Nothing only for an object with no
       -- card at all -- an ability on the stack, whose CR 202.3a zero this does
-      -- not claim (#674).
-      Filter.manaValue = fmap Quantity.manaValueOf (Game.faceOf oid gs),
+      -- not claim (#674). CR 712.8e is why the face comes from
+      -- Game.manaCostFaceOf rather than Game.faceOf: a transformed permanent's
+      -- mana value is its FRONT face's, where everything else here is its back's.
+      Filter.manaValue = fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs),
       Filter.controller = controller,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
@@ -1024,6 +1026,7 @@ rewriteEffect pairs effect = case effect of
   Effect.GainPlayerCounters {} -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
+  Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
   Effect.AddPhases _ -> effect
   Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger {} -> effect

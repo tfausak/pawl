@@ -472,6 +472,7 @@ placeBorne srcId pending = do
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing
           }

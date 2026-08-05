@@ -717,6 +717,7 @@ test-suite pawl-test-suite
     Pawl.SetupSpec
     Pawl.Support
     Pawl.TargetSpec
+    Pawl.TransformSpec
     Pawl.TriggerSpec
     Pawl.TurnSpec
 

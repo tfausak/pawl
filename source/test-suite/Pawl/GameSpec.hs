@@ -178,6 +178,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               -- CR 400.7: changeZone clears any singled-out face along with
               -- every other per-incarnation field.
               Object.face = Nothing,
+              Object.turnedOverAt = Nothing,
               Object.playableFromExileBy = Nothing,
               Object.ringBearerFor = Nothing
             }
@@ -1699,6 +1700,7 @@ handBobBolt lightningBolt gs =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing
           }
@@ -2028,6 +2030,7 @@ restartOnStack mountain =
             Object.chosenNames = Set.empty,
             Object.timestamp = ts,
             Object.face = Nothing,
+            Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing
           }

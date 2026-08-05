@@ -94,7 +94,10 @@ slugFor = Slug.fromText . CardName.unwrap
 -- alternative name is not a name it HAS the way a split card's two are -- but
 -- CR 715.5 lets a player CHOOSE that alternative name wherever an effect asks
 -- for a card name, which a name-keyed lookup has to answer to all the same.
--- CR 720.5 does the same for an omen card's alternative name.
+-- CR 720.5 does the same for an omen card's alternative name, and CR 201.4d for
+-- the back face of a double-faced card -- CR 712.8a gives that card only its
+-- front face's characteristics off the battlefield, so its back face's name is
+-- keyed here for the same reason an adventurer card's alternative name is.
 --
 -- A name claimed twice is fatal wherever it comes from -- two cards, or one card
 -- repeating its own face name. Pawl.CardSpec's "a card's face names are pairwise
