@@ -77,6 +77,53 @@ spec s registry = Spec.describe s "Adventure" $ do
     -- creature's {1}{R}, so an engine pricing either half off the other offers
     -- the wrong one -- or, if it priced both off a combined cost, neither.
     Spec.assertEqWith s "one Mountain: only the Adventure" (namesOffered one) [battleDisplayName]
+  -- CR 715.3a's "only the alternative characteristics are evaluated to see if it
+  -- can be cast", read for the COST rather than for the mana cost alone. Thalia,
+  -- Guardian of Thraben's "noncreature spells cost {1} more to cast"
+  -- (EachPlayer-scoped, so her own controller pays it) is what makes CR 601.2f's
+  -- adjustments visible from the OFFER side: the Adventure is a Sorcery and is
+  -- taxed, the creature half is a Creature and is not, and both offers come off
+  -- ONE card sitting in ONE hand.
+  --
+  -- The falsifier is pricing the offer off the card's hand characteristics, which
+  -- CR 715.4 makes the CREATURE half: Battle Display would then dodge the tax and
+  -- be offered at {R}, a cast the player cannot actually pay for.
+  --
+  -- THE ARITHMETIC. Taxed, Battle Display's {R} totals {1}{R}; the creature's
+  -- {1}{R} is untaxed and stays {1}{R}. So two Mountains buy either half and one
+  -- Mountain buys neither.
+  Spec.it s "CR 715.3a/601.2f Thalia taxes the Adventure half and not the creature half" $ do
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    let namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+        -- The Bonesplitter is the Adventure's legal target, without which every
+        -- absent offer below would be about targeting instead of about cost.
+        artifactAnd n = snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain n))
+        taxed n = snd (S.addCreature thalia S.alice (artifactAnd n))
+        offeredFrom board = namesOffered (fst (S.handOne shieldbreaker board))
+    -- The control, and what keeps the empty list below from passing vacuously:
+    -- the same one Mountain WITH no Thalia offers the Adventure, so its absence
+    -- under Thalia is the tax and nothing else.
+    Spec.assertEqWith s "no Thalia, one Mountain: the Adventure" (offeredFrom (artifactAnd 1)) [battleDisplayName]
+    Spec.assertEqWith s "Thalia, one Mountain: neither half" (offeredFrom (taxed 1)) []
+    -- The other half of the discriminating pair: an engine that taxed the
+    -- CREATURE half too would need {2}{R} for it and offer only the Adventure.
+    Spec.assertEqWith s "Thalia, two Mountains: both halves" (offeredFrom (taxed 2)) [shieldbreakerName, battleDisplayName]
+  -- The offer above and the payment below are the same claim asked twice, which
+  -- is the point: castSpell prices the spell CR 601.2a already moved to the
+  -- stack, so a taxed Adventure that reaches CR 601.2h spends both Mountains.
+  Spec.it s "CR 601.2f the taxed Adventure actually pays the extra mana" $ do
+    shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
+    mountain <- S.printingOf s registry "Mountain"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    let board = snd (S.addCreature thalia S.alice (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 2))))
+        (gs, oid) = S.handOne shieldbreaker board
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName))
+    Spec.assertEqWith s "the Adventure is on the stack" (length (GameState.stack cast)) 1
+    Spec.assertEqWith s "both Mountains paid {R} plus Thalia's {1}" (S.tappedCount S.alice cast) 2
   -- CR 715.3d: "Instead of putting a spell that was cast as an Adventure into
   -- its owner's graveyard as it resolves, its controller exiles it."
   Spec.it s "CR 715.3d the resolved Adventure destroys the artifact and is exiled" $ do
