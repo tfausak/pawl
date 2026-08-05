@@ -1224,7 +1224,6 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Literal _ -> quantity
   Quantity.Type.ManaValue -> quantity
   Quantity.Type.Power -> quantity
-  Quantity.Type.X -> quantity
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity

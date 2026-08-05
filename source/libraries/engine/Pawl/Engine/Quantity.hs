@@ -73,11 +73,6 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- Projection.viewWithLastKnown). Nothing when the object has no power: it is
   -- not a creature, or it is gone and no last known information was kept.
   Quantity.Power -> viewOf oid >>= Filter.power
-  -- CR 601.2b: read the chosen X from the announcing object's binding
-  -- environment.
-  Quantity.X -> case Game.lookupObject announcedOn gs of
-    Nothing -> Nothing
-    Just obj -> fmap toInteger (Binding.amountOf Binding.variableX (Object.bindings obj))
   -- A value bound into the slot, read off the effect's SOURCE and then off the
   -- object on the stack. Nothing when neither holds an amount there: the
   -- producing effect has not run, or bound nothing.
@@ -95,6 +90,13 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- cannot collide over one name: a mid-resolution bind names a slot the CARD
   -- declared, and an event-supplied one names a reserved slot no card may declare
   -- (see Pawl.Engine.Binding.preventedAmount).
+  --
+  -- CR 601.2b's X arrives here too, since #14 retired its dedicated arm. That arm
+  -- read `announcedOn` ALONE, where this reads the source first and falls back --
+  -- a difference only when the two ids differ AND the source carries an X binding
+  -- of its own. It cannot: casting writes X to the object it announced on, and CR
+  -- 400.7 mints a new object with no bindings on every zone change, so a
+  -- permanent never carries the X its spell was cast for.
   Quantity.InSlot slot ->
     let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
      in fmap toInteger (boundOn oid <|> boundOn announcedOn)
@@ -169,7 +171,6 @@ substituteStar star quantity = case quantity of
   Quantity.Literal _ -> quantity
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
-  Quantity.X -> quantity
   Quantity.InSlot _ -> quantity
   Quantity.Count _ -> quantity
   Quantity.ManaCount _ -> quantity
@@ -179,16 +180,17 @@ substituteStar star quantity = case quantity of
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
 -- this way" names a slot nothing binds is a failing test, not a silent no-op.
 --
--- X is NOT here, deliberately. It reads Binding.variableX, which casting fills
--- and no card declares as a target slot, so returning it would make the
--- equality lint demand a target spec for X on every card that reads one.
--- Resolve.readsX owns that half of the contract.
+-- Binding.variableX is reported like any other slot, which is what #14 bought:
+-- the "reads X iff the cost declares {X}" lint is then just the ordinary
+-- available-slots comparison, because Pawl.CardSpec puts variableX on the
+-- AVAILABLE side exactly when the cost prints an {X}. No arm here has to know
+-- that X is special, and nothing subtracts it -- the fact lives where it belongs,
+-- in what casting makes available.
 slots :: Quantity -> Set SlotName
 slots quantity = case quantity of
   Quantity.Literal _ -> Set.empty
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
-  Quantity.X -> Set.empty
   Quantity.InSlot slot -> Set.singleton slot
   Quantity.Star -> Set.empty
   Quantity.Plus a b -> Set.union (slots a) (slots b)

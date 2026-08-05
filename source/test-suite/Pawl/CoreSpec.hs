@@ -120,12 +120,12 @@ quantitySpec s registry = Spec.describe s "Pawl.Engine.Quantity" $ do
   Spec.it s "evaluate reads X from the object's binding environment" $ do
     mountain <- S.printingOf s registry "Mountain"
     let (oid, gs) = withBoundAmount mountain (Just 5)
-    Spec.assertEq s (Quantity.evaluate noView noContext gs oid Quantity.Type.X) $ Just 5
+    Spec.assertEq s (Quantity.evaluate noView noContext gs oid (Quantity.Type.InSlot Binding.variableX)) $ Just 5
 
   Spec.it s "evaluate X is Nothing when no amount was bound" $ do
     mountain <- S.printingOf s registry "Mountain"
     let (oid, gs) = withBoundAmount mountain Nothing
-    Spec.assertEq s (Quantity.evaluate noView noContext gs oid Quantity.Type.X) Nothing
+    Spec.assertEq s (Quantity.evaluate noView noContext gs oid (Quantity.Type.InSlot Binding.variableX)) Nothing
 
   Spec.it s "CR 208.2 Star alone is not evaluable -- it is notation, resolved at the seed" $ do
     Spec.assertEq s (Quantity.evaluate noView noContext (Setup.emptyGame S.bothPlayers) (ObjectId.MkObjectId 0) Quantity.Type.Star) Nothing
