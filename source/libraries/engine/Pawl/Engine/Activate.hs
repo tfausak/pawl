@@ -1,7 +1,6 @@
 module Pawl.Engine.Activate where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -34,7 +33,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Sickness as Sickness
@@ -338,7 +336,7 @@ activateAbility pid srcId ability = do
   chosenModes <-
     if Natural.length legal <= count
       then pure legal
-      else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid abilId legal count))
+      else Game.ask (Prompt.ChooseModes decider pid abilId legal count)
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes makes the whole activation a no-op, guarding every step below.
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
@@ -361,7 +359,7 @@ activateAbility pid srcId ability = do
       let printedCost = ActivatedAbility.cost ability
       mAmount <-
         if Cost.hasVariable printedCost
-          then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost))))
+          then fmap Just (Game.ask (Prompt.ChooseX decider pid abilId (affordableX pid srcId gs printedCost)))
           else pure Nothing
       let announcedAtX = maybe printedCost (\x -> Cost.substituteX x printedCost) mAmount
       -- CR 602.2: an activation a player cannot comply with is illegal, and the
@@ -405,7 +403,7 @@ activateAbility pid srcId ability = do
           chosen <-
             if Map.null sets
               then pure Map.empty
-              else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid abilId sets))
+              else Game.ask (Prompt.ChooseTargets decider pid abilId sets)
           let keysAgree = Map.keysSet chosen == Map.keysSet sets
               eachLegal = and (Map.intersectionWith Set.member chosen sets)
           if not (keysAgree && eachLegal)

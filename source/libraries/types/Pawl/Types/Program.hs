@@ -30,6 +30,20 @@ instance Monad (Program instr) where
 prompt :: instr a -> Program instr a
 prompt i = Then i Return
 
+-- Rewrite every instruction a program suspends on, leaving the control flow
+-- alone. A natural transformation of the instruction functor, so it cannot see
+-- or change an answer -- which is what makes it safe to apply to a program that
+-- is already half built.
+--
+-- The one caller is Engine.playSubgame, which uses it to name the game each
+-- suspension came from (CR 729.1a): a subgame runs as a nested StateT over THIS
+-- program, so its instructions pass outward through the parent's frame and can
+-- be told there, from outside, which game raised them.
+mapProgram :: (forall b. instr b -> jnstr b) -> Program instr a -> Program jnstr a
+mapProgram f program = case program of
+  Return a -> Return a
+  Then i k -> Then (f i) (mapProgram f . k)
+
 foldProgram :: (forall b. instr b -> b) -> Program instr a -> a
 foldProgram answer program = case program of
   Return a -> a

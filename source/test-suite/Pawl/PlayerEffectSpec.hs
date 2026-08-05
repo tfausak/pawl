@@ -61,7 +61,6 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Supertype as Supertype
@@ -1434,7 +1433,7 @@ nullChamberSpec s registry =
           picks pid = if pid == S.alice then S.printingName piker else S.printingName cancel
           asked =
             State.execState
-              (Program.foldProgramM (recordingChamberAnswer S.bob picks) (State.runStateT (S.cast S.alice oid >> Stack.resolveTop) board))
+              (Engine.runGame (recordingChamberAnswer S.bob picks) board (S.cast S.alice oid >> Stack.resolveTop))
               []
       Spec.assertEqWith s "alice is active" (GameState.activePlayer board) S.alice
       Spec.assertEqWith s "alice names first, then bob" (fmap fst asked) [S.alice, S.bob]
@@ -1460,7 +1459,7 @@ nullChamberSpec s registry =
           picks pid = if pid == S.alice then S.printingName piker else S.printingName cancel
           asked =
             State.execState
-              (Program.foldProgramM (recordingChamberAnswer S.bob picks) (State.runStateT (S.cast S.alice oid >> Stack.resolveTop) board))
+              (Engine.runGame (recordingChamberAnswer S.bob picks) board (S.cast S.alice oid >> Stack.resolveTop))
               []
       Spec.assertEqWith s "the card's own restriction, on both asks" (fmap snd asked) [nonBasicLandName, nonBasicLandName]
 

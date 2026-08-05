@@ -1,7 +1,6 @@
 module Pawl.Engine.Cast where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -40,7 +39,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Supertype as Supertype
@@ -581,7 +579,7 @@ castWhileSearching pid = do
     [] -> pure ()
     options -> do
       let decider = Decide.deciderFor pid gs
-      choice <- Trans.lift (Program.prompt (Prompt.CastWhileSearching decider pid options))
+      choice <- Game.ask (Prompt.CastWhileSearching decider pid options)
       case choice of
         Nothing -> pure ()
         Just oid ->
@@ -698,7 +696,7 @@ castProposed pid sid face castFrom candidates before = do
   entwined <- case entwineOffer pid sid candidates gs of
     Nothing -> pure Nothing
     Just extra -> do
-      decision <- Trans.lift (Program.prompt (Prompt.ChooseEntwine decider pid sid extra))
+      decision <- Game.ask (Prompt.ChooseEntwine decider pid sid extra)
       pure $ case decision of
         EntwineDecision.Entwines -> Just extra
         EntwineDecision.Declines -> Nothing
@@ -725,7 +723,7 @@ castProposed pid sid face castFrom candidates before = do
   chosenModes <-
     if Natural.length legal <= count
       then pure legal
-      else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid sid legal count))
+      else Game.ask (Prompt.ChooseModes decider pid sid legal count)
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes rewinds the whole cast, guarding every step below.
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
@@ -748,7 +746,7 @@ castProposed pid sid face castFrom candidates before = do
         else do
           chosenCost <- case payable of
             [only] -> pure only
-            _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid sid payable))
+            _ -> Game.ask (Prompt.ChooseCost decider pid sid payable)
           if notElem chosenCost payable
             then reject
             else do
@@ -759,7 +757,7 @@ castProposed pid sid face castFrom candidates before = do
               -- unaffordable announcement still reverses the whole cast (#417).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost))))
+                  then fmap Just (Game.ask (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost)))
                   else pure Nothing
               -- CR 601.2: a step the player cannot comply with makes the casting
               -- illegal and returns the game to before it was proposed. The X just
@@ -805,7 +803,7 @@ castProposed pid sid face castFrom candidates before = do
                   chosen <-
                     if Map.null sets
                       then pure Map.empty
-                      else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid sid sets))
+                      else Game.ask (Prompt.ChooseTargets decider pid sid sets)
                   let keysAgree = Map.keysSet chosen == Map.keysSet sets
                       eachLegal = and (Map.intersectionWith Set.member chosen sets)
                   if not (keysAgree && eachLegal)

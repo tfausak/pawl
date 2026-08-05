@@ -1,7 +1,6 @@
 -- Covers Pawl.Engine.Setup and Pawl.Types.Deck: setup, deck composition, opening hands.
 module Pawl.SetupSpec where
 
-import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -32,7 +31,6 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
@@ -137,7 +135,7 @@ deckSpec s registry = Spec.describe s "Deck" $ do
 setupState :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 setupState s registry = do
   matchup <- S.redRed (S.printingOf s registry)
-  pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
+  pure (snd (Engine.runGamePure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.newGame S.performer matchup)))
 
 setupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 setupSpec s registry = Spec.describe s "Setup" $ do
@@ -187,7 +185,7 @@ setupSpec s registry = Spec.describe s "Setup" $ do
 greenBlackSetup :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 greenBlackSetup s registry = do
   matchup <- S.greenBlack (S.printingOf s registry)
-  pure (Program.foldProgram S.identityAnswer (State.execStateT (Setup.newGame S.performer matchup) (Setup.emptyGame S.bothPlayers)))
+  pure (snd (Engine.runGamePure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Setup.newGame S.performer matchup)))
 
 greenBlackSetupSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 greenBlackSetupSpec s registry = Spec.describe s "GreenBlackSetup" $ do

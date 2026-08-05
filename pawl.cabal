@@ -492,6 +492,7 @@ library types
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected
     Pawl.Types.Aggregation
+    Pawl.Types.Asked
     Pawl.Types.AttackCost
     Pawl.Types.AttackRequirement
     Pawl.Types.AttackTarget

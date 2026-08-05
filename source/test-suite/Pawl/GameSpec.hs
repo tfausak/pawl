@@ -72,7 +72,6 @@ import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Response as Response
@@ -397,7 +396,7 @@ askedPlayers :: Printing.Printing -> Printing.Printing -> [PlayerId.PlayerId]
 askedPlayers mountain piker =
   let (gs, _) = S.pikerInHand mountain piker 3 Phase.PrecombatMain
    in State.execState
-        (Program.foldProgramM recordingAnswer (State.runStateT Engine.priorityLoop gs))
+        (Engine.runGame recordingAnswer gs Engine.priorityLoop)
         []
 
 ruleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

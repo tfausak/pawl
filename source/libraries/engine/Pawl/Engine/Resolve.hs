@@ -1,7 +1,6 @@
 module Pawl.Engine.Resolve where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -79,7 +78,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
@@ -582,7 +580,7 @@ exercises resolving controller idx mode = case Mode.optionality mode of
   Optionality.Optional -> do
     gs <- State.get
     let decider = Decide.deciderFor controller gs
-    decision <- Trans.lift (Program.prompt (Prompt.ChooseOptional decider controller resolving idx))
+    decision <- Game.ask (Prompt.ChooseOptional decider controller resolving idx)
     pure $ case decision of
       OptionalDecision.Exercises -> True
       OptionalDecision.Declines -> False
@@ -993,7 +991,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             ask = case family of
               SubtypeFamily.BasicLandType -> Prompt.ChooseLandTypeSwap decider controller resolving slot forbidden
               SubtypeFamily.CreatureType -> Prompt.ChooseCreatureTypeSwap decider controller resolving slot forbidden
-        (from, to) <- Trans.lift (Program.prompt ask)
+        (from, to) <- Game.ask ask
         State.modify' $ \gs ->
           -- CR 611.2a: the opcode states no duration, so the effect "lasts
           -- until the end of the game" -- Duration.Indefinite, armed through
@@ -1043,7 +1041,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
               decider = Decide.deciderFor controller gs
-          answer <- Trans.lift (Program.prompt (Prompt.SearchLibrary decider controller matches))
+          answer <- Game.ask (Prompt.SearchLibrary decider controller matches)
           -- CR 701.23a: the card found is one the search's own filter admits.
           -- Filtered, not trusted (#222): naming a card the filter excluded, or one
           -- that is not in the library at all, finds nothing rather than fetching
@@ -1069,7 +1067,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           -- says only how to look. CR 701.23h and CR 701.24b both describe the
           -- shuffle as something an effect instructs, never as part of a search.
           lib <- State.gets (Game.zoneMembers Zone.Library controller)
-          shuffleAnswer <- Trans.lift (Program.prompt (Prompt.Shuffle lib))
+          shuffleAnswer <- Game.ask (Prompt.Shuffle lib)
           State.modify' (reorderLibrary controller (Game.honourShuffle lib shuffleAnswer))
   -- Rest in Peace's ETB: exile every card in every graveyard (CR 400.7 each move
   -- funnels through changeZone). A graveyard->exile move matches no M3f
@@ -1359,7 +1357,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   else do
                     -- CR 701.9b: the discarding player chooses which cards.
                     let decider = Decide.deciderFor target gs
-                    choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held count))
+                    choices <- Game.ask (Prompt.ChooseDiscard decider target held count)
                     -- FILTERED AND COMPLETED, the posture PlayerSacrifices takes
                     -- below. Dropping the invalid picks is not enough: this branch
                     -- is reached only when the hand is LARGER than the count, so CR
@@ -1472,7 +1470,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 picked <-
                   if Natural.length candidates <= count
                     then pure (Set.fromList candidates)
-                    else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider victim source candidates count))
+                    else Game.ask (Prompt.ChooseSacrifices decider victim source candidates count)
                 -- FILTERED AND COMPLETED, not merely filtered. Dropping the
                 -- invalid picks is not enough: Diabolic Edict is not "may", so an
                 -- interpreter answering with too few -- or with nothing -- would
@@ -1543,7 +1541,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 gs1 <- State.get
                 let candidates = first NonEmpty.:| (second : rest)
                     decider = Decide.deciderFor controller gs1
-                answer <- Trans.lift (Program.prompt (Prompt.ChooseBoundToken decider controller source candidates))
+                answer <- Game.ask (Prompt.ChooseBoundToken decider controller source candidates)
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot resolving slot named)
       _ -> pure ()
@@ -1891,7 +1889,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   -- answer naming something that was never offered falls back to
                   -- the first candidate, since the effect is mandatory and must
                   -- pick something.
-                  answer <- Trans.lift (Program.prompt (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered))
+                  answer <- Game.ask (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
                   pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
               gs1 <- State.get
               -- CR 303.4j, for an Aura -- "the Aura doesn't move" -- and CR
@@ -2007,7 +2005,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         players = filter (not . null . kindsFor) everyone
     Monad.unless (null permanents && null players) $ do
       (pickedPermanents, pickedPlayers) <-
-        Trans.lift (Program.prompt (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players))
+        Game.ask (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players)
       -- FILTERED, NOT TRUSTED, the posture every other prompt reader takes: an
       -- answer naming something that was not offered is dropped rather than
       -- honoured, so a bogus id cannot mint a counter on a permanent that had

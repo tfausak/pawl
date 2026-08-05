@@ -1,7 +1,6 @@
 module Pawl.Engine.Mulligan where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -23,7 +22,6 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
 
@@ -38,7 +36,7 @@ shuffleLibrary :: PlayerId -> Game ()
 shuffleLibrary pid = do
   gs <- State.get
   let ids = Game.zoneMembers Zone.Library pid gs
-  answer <- Trans.lift (Program.prompt (Prompt.Shuffle ids))
+  answer <- Game.ask (Prompt.Shuffle ids)
   let shuffled = Game.honourShuffle ids answer
   State.put gs {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library gs)}
 
@@ -95,7 +93,7 @@ handWindow field ask perform pid = do
     [] -> pure ()
     _ -> do
       decider <- State.gets (Decide.deciderFor pid)
-      answer <- Trans.lift (Program.prompt (ask decider pid (fmap fst candidates)))
+      answer <- Game.ask (ask decider pid (fmap fst candidates))
       case answer of
         Nothing -> pure ()
         Just oid -> case lookup oid candidates of
@@ -138,7 +136,7 @@ mulliganRounds perform counts deciding = do
       else do
         decider <- State.gets (Decide.deciderFor pid)
         offer <- State.gets (offerFor counts pid)
-        decision <- Trans.lift (Program.prompt (Prompt.DeclareMulligan decider pid offer))
+        decision <- Game.ask (Prompt.DeclareMulligan decider pid offer)
         pure (pid, decision)
   let mulliganers = fmap fst (filter (\(_, d) -> d == MulliganDecision.Mulligan) decisions)
   case mulliganers of
@@ -214,7 +212,7 @@ takeMulligan counts pid = do
     if n > 0 && length newHand >= 2
       then do
         decider <- State.gets (Decide.deciderFor pid)
-        answer <- Trans.lift (Program.prompt (Prompt.Bottom decider pid newHand n))
+        answer <- Game.ask (Prompt.Bottom decider pid newHand n)
         -- CR 103.5: the cards bottomed come from THIS hand, and there are
         -- exactly `n` of them. Filtered, not trusted (#222); a short answer is
         -- topped up from the front of the hand. nub, not just filter: an answer

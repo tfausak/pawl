@@ -16,7 +16,6 @@
 module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -53,7 +52,6 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
@@ -497,7 +495,7 @@ payComponent pid oid component = case component of
     chosen <-
       if Natural.length candidates <= n
         then pure (Set.fromList candidates)
-        else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider pid oid candidates n))
+        else Game.ask (Prompt.ChooseSacrifices decider pid oid candidates n)
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
@@ -529,7 +527,7 @@ payComponent pid oid component = case component of
     chosen <-
       if Natural.length held <= n
         then pure held
-        else Trans.lift (Program.prompt (Prompt.ChooseDiscard decider pid held n))
+        else Game.ask (Prompt.ChooseDiscard decider pid held n)
     let distinct = List.nub chosen
     if all (\c -> List.elem c held) distinct && Natural.length distinct == n
       then do

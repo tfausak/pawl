@@ -1,7 +1,6 @@
 module Pawl.Engine.Mana where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -43,7 +42,6 @@ import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProductionTag as ProductionTag
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Subtype (Subtype)
@@ -323,7 +321,7 @@ chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty Mana -> GameState -
 chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
   _ -> do
-    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid candidates))
+    answer <- Game.ask (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid candidates)
     pure $
       if List.elem answer (NonEmpty.toList candidates)
         then answer
@@ -632,7 +630,7 @@ chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game Obje
 chooseSource pid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
   _ -> do
-    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates))
+    answer <- Game.ask (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates)
     pure $
       if List.elem answer (NonEmpty.toList candidates)
         then answer
@@ -735,7 +733,7 @@ announce pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
       [] -> pure fallback
       [only] -> pure only
       first : others -> do
-        answer <- Trans.lift (Program.prompt (mkPrompt (first NonEmpty.:| others)))
+        answer <- Game.ask (mkPrompt (first NonEmpty.:| others))
         pure (if List.elem answer offers then answer else first)
     go done committed remaining = case remaining of
       [] -> pure (ManaCost.MkManaCost (reverse done), committed)

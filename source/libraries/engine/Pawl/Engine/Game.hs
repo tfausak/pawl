@@ -1,15 +1,19 @@
 module Pawl.Engine.Game where
 
+import qualified Control.Monad.Trans.Class as Trans
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Types.Asked as Asked
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
+import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -22,11 +26,30 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Timestamp as Timestamp
 import Pawl.Types.Zone (Zone)
 import qualified Pawl.Types.Zone as Zone
+
+-- Ask a player a question and wait for the answer. The ONE way the engine
+-- suspends: every prompt in the codebase goes through here.
+--
+-- What it adds over lifting Program.prompt directly is the game the question
+-- came from (#153). StateT sits outside the Program, so the interpreter cannot
+-- see the state at a suspension; reading it here, on the inside, is what lets
+-- Asked carry it. `enclosing` starts empty and Engine.playSubgame pushes onto it
+-- from the frame above (CR 729.1a) -- this function cannot know it is inside a
+-- subgame, and does not have to.
+--
+-- Here in the lowest engine layer because every prompting module imports it,
+-- down to Pawl.Engine.Replacement, which must never import Pawl.Engine.Event.
+ask :: Prompt.Prompt r -> Game r
+ask p = do
+  gs <- State.get
+  Trans.lift (Program.prompt (Asked.MkAsked {Asked.enclosing = [], Asked.game = gs, Asked.prompt = p}))
 
 -- CR 106.4: this player's mana pool. Absent from the map means an empty pool,
 -- which is why every reader goes through here rather than through the Map. Here

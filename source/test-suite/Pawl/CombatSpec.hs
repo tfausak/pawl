@@ -54,7 +54,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
@@ -302,7 +301,7 @@ recordingBlockers p = case p of
 -- flips it to put the accumulators first.
 runRecordingBlockers :: GameState.GameState -> (([PlayerId.PlayerId], [ObjectId.ObjectId]), GameState.GameState)
 runRecordingBlockers gs =
-  let (after, seen) = State.runState (Program.foldProgramM recordingBlockers (State.execStateT Combat.declareBlockers gs)) ([], [])
+  let (after, seen) = State.runState (fmap snd (Engine.runGame recordingBlockers gs Combat.declareBlockers)) ([], [])
    in (seen, after)
 
 -- CR 506.2/506.2a/507.1/703.4h: WHO is being attacked. Distinct from
@@ -316,11 +315,11 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- defends, so this exact assertion cannot pass.
     --
     -- State.runState (State s a) s0 :: (a, s): here `a` is the GameState
-    -- returned by execStateT/foldProgramM and `s` is choosesDefender's own
-    -- accumulator, so the tuple comes back (after, asked).
+    -- Engine.runGame returns and `s` is choosesDefender's own accumulator, so
+    -- the tuple comes back (after, asked).
     let (after, asked) =
           State.runState
-            (Program.foldProgramM (choosesDefender S.carol) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) S.threePlayerGame))
+            (fmap snd (Engine.runGame (choosesDefender S.carol) S.threePlayerGame (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "carol is the defending player" (Combat.Type.defender (GameState.combat after)) (Just S.carol)
     Spec.assertEqWith s "and alice, the active player, is who was asked" asked [S.alice]
@@ -352,7 +351,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let controlled = S.threePlayerGame {GameState.activeControl = Just (Decider.MkDecider S.carol)}
         (_, deciders) =
           State.runState
-            (Program.foldProgramM (choosesDefenderRecordingDecider S.bob) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) controlled))
+            (fmap snd (Engine.runGame (choosesDefenderRecordingDecider S.bob) controlled (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "carol, alice's controller, is who was asked" deciders [Decider.MkDecider S.carol]
   Spec.it s "CR 506.2 two players: the nonactive player defends and nobody is asked" $ do
@@ -364,7 +363,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- would leave Nothing, which Task 4 turns into "no attack is possible".
     let (after, asked) =
           State.runState
-            (Program.foldProgramM (choosesDefender S.alice) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) (Setup.emptyGame S.bothPlayers)))
+            (fmap snd (Engine.runGame (choosesDefender S.alice) (Setup.emptyGame S.bothPlayers) (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "bob defends" (Combat.Type.defender (GameState.combat after)) (Just S.bob)
     Spec.assertEqWith s "nobody was asked" asked []
@@ -376,7 +375,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let gone = Departure.depart Departure.Type.Conceded S.carol S.threePlayerGame
         (after, asked) =
           State.runState
-            (Program.foldProgramM (choosesDefender S.carol) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) gone))
+            (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "bob, the only one left" (Combat.Type.defender (GameState.combat after)) (Just S.bob)
     Spec.assertEqWith s "nobody was asked" asked []
@@ -387,7 +386,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let alone = Departure.depart Departure.Type.Conceded S.carol (Departure.depart Departure.Type.Conceded S.bob S.threePlayerGame)
         (after, asked) =
           State.runState
-            (Program.foldProgramM (choosesDefender S.bob) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) alone))
+            (fmap snd (Engine.runGame (choosesDefender S.bob) alone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "nobody defends" (Combat.Type.defender (GameState.combat after)) Nothing
     Spec.assertEqWith s "nobody was asked" asked []
@@ -409,7 +408,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
         (after, asked) =
           State.runState
-            (Program.foldProgramM (choosesDefender S.carol) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) gone))
+            (fmap snd (Engine.runGame (choosesDefender S.carol) gone (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "no defending player" (Combat.Type.defender (GameState.combat after)) Nothing
     Spec.assertEqWith s "and nobody was asked" asked []
@@ -424,7 +423,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     let gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
         (after, asked) =
           State.runState
-            (Program.foldProgramM (choosesDefender S.carol) (State.execStateT Combat.chooseDefender gone))
+            (fmap snd (Engine.runGame (choosesDefender S.carol) gone Combat.chooseDefender))
             []
     Spec.assertEqWith s "no defending player" (Combat.Type.defender (GameState.combat after)) Nothing
     Spec.assertEqWith s "and nobody was asked" asked []
@@ -435,7 +434,7 @@ defendingPlayerSpec s registry = Spec.describe s "DefendingPlayer" $ do
     -- the attacking player.
     let (after, _) =
           State.runState
-            (Program.foldProgramM (choosesDefender S.alice) (State.execStateT (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat)) S.threePlayerGame))
+            (fmap snd (Engine.runGame (choosesDefender S.alice) S.threePlayerGame (Engine.runTurnBasedActions (Phase.Combat CombatStep.BeginningOfCombat))))
             []
     Spec.assertEqWith s "the first candidate, never the active player" (Combat.Type.defender (GameState.combat after)) (Just S.bob)
   Spec.it s "CR 506.2a the candidates are every other player still in the game" $
