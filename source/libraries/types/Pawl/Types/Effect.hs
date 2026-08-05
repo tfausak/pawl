@@ -322,6 +322,23 @@ data Effect card
     -- CR 615.7's shield is spent in damage, not in applications, so Resolve
     -- installs it Unlimited.
     PreventNextDamage Duration.Duration ObjectRef.ObjectRef Quantity.Quantity
+  | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the recipients
+    -- an ObjectRef names, for a duration -- Selfless Squire's "prevent all damage
+    -- that would be dealt to you this turn".
+    --
+    -- PreventNextDamage above with the Quantity removed, and the missing field is
+    -- the whole difference: CR 615.7's shield is spent in damage and ends when it
+    -- reaches 0, while this one has no amount to spend and ends only when its
+    -- duration does (CR 615.3's other terminator). That is why it installs a
+    -- DamageRewrite.PreventAll rather than a PreventNext of some large number:
+    -- there is no number, and a shield that counted down would be a different
+    -- card.
+    --
+    -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason: the
+    -- pattern must name the shielded permanent or player, which card data cannot
+    -- write. Fog IS such a Replace precisely because it shields nobody in
+    -- particular.
+    PreventAllDamage Duration.Duration ObjectRef.ObjectRef
   | -- | CR 701.6/701.6a: counter the slot's target via the Event.counter funnel.
     -- ONE opcode for both of that rule's subjects -- Cancel's slot is a
     -- Pool.Spells one and Stifle's a Pool.Abilities one -- because which ending
@@ -470,6 +487,30 @@ data Effect card
     -- opportunity; player counters are added directly, matching GainPlayerCounters
     -- and gapped for the same reason (#122).
     Proliferate
+  | -- | CR 701.54a: the Ring tempts the resolving controller -- they get an emblem
+    -- named The Ring if they have none (CR 701.54c), then choose a creature they
+    -- control to become their Ring-bearer.
+    --
+    -- CHOOSE, not target, the word rule 701.54a itself uses: no target spec, the
+    -- creature is picked on RESOLUTION via Prompt.ChooseRingBearer, and nothing is
+    -- subject to CR 608.2b's illegal-target check -- Proliferate's posture, and
+    -- why this carries no SlotName either.
+    --
+    -- Nullary, because rule 701.54a fixes everything an author could vary: the
+    -- chooser is "you", the count is one creature, and the qualification is
+    -- "you control". Contrast PlayerSacrifices, whose Filter carries what the
+    -- edict names -- a temptation always names a creature.
+    --
+    -- ONE opcode rather than an emblem-maker composed with a choice, because CR
+    -- 701.54c fixes their ORDER ("before choosing a creature") and makes the first
+    -- conditional on state the second writes. Composing them in card data would
+    -- also put CR 701.54c's emblem text into the open half, where the rulebook
+    -- already has it.
+    --
+    -- Performed by Pawl.Engine.Ring.tempt. CR 701.54d's "even if some or all of
+    -- those actions were impossible" is why that is one procedure ending in a
+    -- count rather than a chain that can stop early.
+    TemptWithTheRing
   | -- | CR 701.21a: the slot's target PLAYER sacrifices this many permanents
     -- matching the Filter, chosen by that player. Diabolic Edict's exact shape.
     --

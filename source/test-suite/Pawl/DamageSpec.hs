@@ -979,7 +979,7 @@ sbaSpec s =
        in Spec.assertEqWith s "bob won" (GameState.result after) (Just (Result.Won S.bob))
 
     Spec.it s "life <= 0 loses" $
-      let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing, Player.counters = Map.empty}) (GameState.players sbaBase)}
+      let gs = sbaBase {GameState.players = Map.insert S.alice (Player.MkPlayer {Player.life = 0, Player.status = Status.Playing, Player.counters = Map.empty, Player.ringTemptations = 0}) (GameState.players sbaBase)}
        in Spec.assertEqWith s "bob won" (GameState.result (S.settleSba gs)) (Just (Result.Won S.bob))
 
     Spec.it s "simultaneous last departures draw" $
@@ -1733,7 +1733,7 @@ m2cPropertySpec s registry =
 --
 -- All three clauses of that rule are now live: the creature one has been since
 -- M3a, and CR 306.8's loyalty removal made the planeswalker one so (#494). Only
--- "battle" is still aspirational, for want of the card type (#302).
+-- "battle" is still aspirational, for want of a Recipient.ToBattle tag (#302).
 --
 -- So the function has three answers for a generically named permanent --
 -- ToCreature, ToPlaneswalker, or Nothing -- plus the pass-through for a

@@ -556,6 +556,36 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         gs = S.withEffectAt landId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) gs0
     Spec.assertEqWith s "still Forest" (Projection.subtypesOf landId gs) (Set.singleton Subtype.Type.Forest)
 
+  -- CR 612.1 colliding two KEYS of the projection's keyword map. Stalker Hag
+  -- {B/G}{B/G}{B/G} Creature -- Hag 3/2, "Swampwalk, forestwalk" (checked
+  -- against Scryfall, 2026-08-05) is the pool's only creature printing two
+  -- landwalks, and a printing is the only way to reach this branch: both
+  -- keywords must be on the map at CR 613.1c layer 3, and a GRANTED one arrives
+  -- at layer 6, after the swap.
+  --
+  -- Forest -> Swamp maps both keys onto Landwalk (HasSubtype Swamp), which is
+  -- why applyModification uses Map.mapKeysWith (+) and not Map.mapKeys: the Hag
+  -- still has TWO landwalk abilities, redundant under CR 702.14e rather than
+  -- merged into one. Nothing in the rules core can tell 2 from 1 here --
+  -- Pawl.Engine.Combat.landwalkAllowsGiven reads Map.keys and never a count --
+  -- so the map itself is the only place the choice between summing and
+  -- discarding is visible, and the assertion is on the map for that reason.
+  Spec.it s "CR 612.1 a swap that collides two landwalk keys keeps both abilities" $ do
+    stalkerHag <- S.printingOf s registry "Stalker Hag"
+    let (hagId, gs0) = S.addCreature stalkerHag S.alice (Setup.emptyGame S.bothPlayers)
+        gs = S.withEffectAt hagId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Forest Subtype.Type.Swamp) gs0
+        walk t = Keyword.Landwalk (Filter.Type.HasSubtype t)
+    Spec.assertEqWith
+      s
+      "before: one swampwalk and one forestwalk"
+      (Projection.keywordsOf hagId gs0)
+      (Map.fromList [(walk Subtype.Type.Swamp, 1), (walk Subtype.Type.Forest, 1)])
+    Spec.assertEqWith
+      s
+      "after: one key, and both abilities still counted"
+      (Projection.keywordsOf hagId gs)
+      (Map.singleton (walk Subtype.Type.Swamp) 2)
+
   -- CR 612.1: a text-changing effect "can apply to any words or symbols printed
   -- on that object, but generally affects only that object's rules text ...
   -- and/or the text that appears in its type line". A static ability's AFFECTED

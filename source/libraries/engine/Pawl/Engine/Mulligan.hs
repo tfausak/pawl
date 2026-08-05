@@ -40,7 +40,11 @@ shuffleLibrary pid = do
   let ids = Game.zoneMembers Zone.Library pid gs
   answer <- Trans.lift (Program.prompt (Prompt.Shuffle ids))
   let shuffled = Game.honourShuffle ids answer
-  State.put gs {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library gs)}
+  -- modify' rather than putting `gs` back: it was read before the prompt, and a
+  -- prompt may write state -- Game.choose writes GameState.lastChoice. This one
+  -- does not (Prompt.Shuffle is bare, being randomness rather than a choice),
+  -- so this is defending the invariant rather than fixing a live bug.
+  State.modify' (\g -> g {GameState.library = Map.insert pid (Seq.fromList shuffled) (GameState.library g)})
 
 -- CR 103.5: draw opening hands, then run the declaration/mulligan/bottom round
 -- loop to completion. Assumes each player's library is already built and
@@ -95,7 +99,7 @@ handWindow field ask perform pid = do
     [] -> pure ()
     _ -> do
       decider <- State.gets (Decide.deciderFor pid)
-      answer <- Trans.lift (Program.prompt (ask decider pid (fmap fst candidates)))
+      answer <- Game.choose (ask decider pid (fmap fst candidates))
       case answer of
         Nothing -> pure ()
         Just oid -> case lookup oid candidates of
@@ -138,7 +142,7 @@ mulliganRounds perform counts deciding = do
       else do
         decider <- State.gets (Decide.deciderFor pid)
         offer <- State.gets (offerFor counts pid)
-        decision <- Trans.lift (Program.prompt (Prompt.DeclareMulligan decider pid offer))
+        decision <- Game.choose (Prompt.DeclareMulligan decider pid offer)
         pure (pid, decision)
   let mulliganers = fmap fst (filter (\(_, d) -> d == MulliganDecision.Mulligan) decisions)
   case mulliganers of
@@ -214,7 +218,7 @@ takeMulligan counts pid = do
     if n > 0 && length newHand >= 2
       then do
         decider <- State.gets (Decide.deciderFor pid)
-        answer <- Trans.lift (Program.prompt (Prompt.Bottom decider pid newHand n))
+        answer <- Game.choose (Prompt.Bottom decider pid newHand n)
         -- CR 103.5: the cards bottomed come from THIS hand, and there are
         -- exactly `n` of them. Filtered, not trusted (#222); a short answer is
         -- topped up from the front of the hand. nub, not just filter: an answer

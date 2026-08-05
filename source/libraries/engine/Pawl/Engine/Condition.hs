@@ -1,6 +1,7 @@
--- CR 603.8 / 603.4 / 611.2b: is this Condition currently true? The only module
--- that may evaluate a Pawl.Types.Condition -- the standing Pawl.Engine.Expiry
--- has over Pawl.Types.Expiry and Pawl.Engine.Projection over Modification.
+-- CR 603.8 / 603.4 / 611.2b / 604.2: is this Condition currently true? The only
+-- module that may evaluate a Pawl.Types.Condition -- the standing
+-- Pawl.Engine.Expiry has over Pawl.Types.Expiry and Pawl.Engine.Projection over
+-- Modification.
 --
 -- Total, so it must collapse the Maybe its two inputs carry: an undeterminable
 -- quantity on EITHER side makes the condition FALSE. That is the conservative
@@ -15,6 +16,12 @@
 -- Projection.viewWithLastKnown and not Projection.fullView. Nothing here can
 -- compensate for the wrong one -- a source read as an empty object simply
 -- answers False.
+--
+-- CR 604.7 settles it for the fourth caller, and settles it the other way: a
+-- static ability "can't use an object's last known information", so
+-- Projection.conditionHolds passes a live Projection.viewUpTo for a CR 604.2 "as
+-- long as" clause -- bounded rather than full, which is a layer question rather
+-- than a last-known one.
 module Pawl.Engine.Condition where
 
 import qualified Pawl.Engine.Count as Count

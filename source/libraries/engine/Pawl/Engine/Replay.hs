@@ -23,6 +23,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Program as Program
 import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
@@ -44,6 +45,7 @@ encode p answer = case p of
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
   Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
+  Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
   Prompt.ChooseLegend {} -> Response.ChoseLegend answer
   Prompt.DeclareAttackers {} -> Response.DeclaredAttackers answer
   Prompt.ChooseAttackTarget {} -> Response.ChoseAttackTarget answer
@@ -75,7 +77,9 @@ encode p answer = case p of
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
+  Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
+  Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -113,6 +117,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseProliferate {} -> case response of
     Response.ChoseProliferation chosen -> Just chosen
+    _ -> Nothing
+  Prompt.ChooseRingBearer {} -> case response of
+    Response.ChoseRingBearer oid -> Just oid
     _ -> Nothing
   Prompt.ChooseLegend {} -> case response of
     Response.ChoseLegend oid -> Just oid
@@ -204,8 +211,14 @@ decode p response = case p of
   Prompt.ChooseOptional {} -> case response of
     Response.ChoseOptional decision -> Just decision
     _ -> Nothing
+  Prompt.ChooseToPay {} -> case response of
+    Response.ChoseToPay decision -> Just decision
+    _ -> Nothing
   Prompt.AnnouncePhyrexianPayment {} -> case response of
     Response.AnnouncedPhyrexianPayment way -> Just way
+    _ -> Nothing
+  Prompt.AnnounceHybridPayment {} -> case response of
+    Response.AnnouncedHybridPayment way -> Just way
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -244,6 +257,9 @@ defaultAnswer p = case p of
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
   -- CR 701.34a: any number includes none, so declining is always legal.
   Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
+  -- CR 701.54a: the prompt is only raised with two or more creatures the player
+  -- controls, and every one of them is a legal Ring-bearer.
+  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
   -- CR 704.5j: every candidate is a legal thing to keep.
   Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   -- Declining to ATTACK is not always legal -- a CR 508.1d requirement (Curse
@@ -342,9 +358,15 @@ defaultAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 118.12a: the cost rides a "may", so declining is always legal, and it
+  -- spends nothing -- which keeps a short transcript from tapping a payer's board.
+  Prompt.ChooseToPay {} -> PaymentDecision.Declines
   -- CR 118.13a: every offered route is payable, and the prompt is raised only
   -- where two are.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.13a again, for CR 107.4e's monocolored hybrid: every offered route is
+  -- payable, and the prompt is raised only where two are.
+  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.

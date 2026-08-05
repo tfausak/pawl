@@ -1,7 +1,6 @@
 module Pawl.Engine.Cast where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -40,7 +39,6 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Supertype as Supertype
@@ -68,13 +66,23 @@ sorcerySpeed = Turn.sorcerySpeedWindow
 -- Flash is that second sentence being OVERRIDDEN rather than restated, so
 -- instantSpeed's disjunction is CR 101.1 resolved, not CR 117.1a read generously.
 --
+-- THREE disjuncts, not two, because the widening arrives on two different axes.
+-- instantSpeed is what the CARD is (CR 304.1) or what it says about itself (CR
+-- 702.8a); PlayerEffect.mayCastAsThoughItHadFlash is what an effect says about
+-- the PLAYER (CR 601.3b, Vedalken Orrery). They are read BESIDE each other and
+-- neither is folded into the other -- see instantSpeed below for what folding
+-- would cost.
+--
 -- The window the RULES give a spell, and not the whole of when it may be cast: a
 -- card may narrow this further with a printed restriction (CR 601.3), which
 -- `castable` conjoins separately through printedRestrictionsOk.
 timingOk :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 timingOk pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
-  Just face -> instantSpeed face || sorcerySpeed pid gs
+  Just face ->
+    instantSpeed face
+      || PlayerEffect.mayCastAsThoughItHadFlash pid oid gs
+      || sorcerySpeed pid gs
 
 -- The half whose cast is being proposed (CR 709.3a: "Only the chosen half is
 -- evaluated to see if it can be cast"). Nothing when the id is unknown or no
@@ -120,9 +128,12 @@ soleCastableFace oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
 -- wherever the cast is being proposed from -- CR 702.8a's "functions in any zone
 -- from which you could play the card it's on".
 --
--- The PLAYER-scoped sibling is not this and is not built: an effect that lets a
--- player cast OTHER spells as though they had flash (CR 601.3b, Vedalken Orrery)
--- would be read here beside this predicate, never folded into it (#565).
+-- The PLAYER-scoped sibling is NOT this and is deliberately not folded in: an
+-- effect that lets a player cast OTHER spells as though they had flash (CR
+-- 601.3b, Vedalken Orrery) is read in timingOk above, beside this predicate,
+-- through PlayerEffect.mayCastAsThoughItHadFlash. Widening this one instead would
+-- say the Orrery gave every card in every zone the flash keyword, which is not
+-- what CR 702.8a's "the card it's on" means.
 instantSpeed :: Face.Face Card.Type.Card -> Bool
 instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 
@@ -568,7 +579,7 @@ castWhileSearching pid = do
     [] -> pure ()
     options -> do
       let decider = Decide.deciderFor pid gs
-      choice <- Trans.lift (Program.prompt (Prompt.CastWhileSearching decider pid options))
+      choice <- Game.choose (Prompt.CastWhileSearching decider pid options)
       case choice of
         Nothing -> pure ()
         Just oid ->
@@ -685,7 +696,7 @@ castProposed pid sid face castFrom candidates before = do
   entwined <- case entwineOffer pid sid candidates gs of
     Nothing -> pure Nothing
     Just extra -> do
-      decision <- Trans.lift (Program.prompt (Prompt.ChooseEntwine decider pid sid extra))
+      decision <- Game.choose (Prompt.ChooseEntwine decider pid sid extra)
       pure $ case decision of
         EntwineDecision.Entwines -> Just extra
         EntwineDecision.Declines -> Nothing
@@ -712,7 +723,7 @@ castProposed pid sid face castFrom candidates before = do
   chosenModes <-
     if Natural.length legal <= count
       then pure legal
-      else Trans.lift (Program.prompt (Prompt.ChooseModes decider pid sid legal count))
+      else Game.choose (Prompt.ChooseModes decider pid sid legal count)
   -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
   -- modes rewinds the whole cast, guarding every step below.
   if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
@@ -735,7 +746,7 @@ castProposed pid sid face castFrom candidates before = do
         else do
           chosenCost <- case payable of
             [only] -> pure only
-            _ -> Trans.lift (Program.prompt (Prompt.ChooseCost decider pid sid payable))
+            _ -> Game.choose (Prompt.ChooseCost decider pid sid payable)
           if notElem chosenCost payable
             then reject
             else do
@@ -746,7 +757,7 @@ castProposed pid sid face castFrom candidates before = do
               -- unaffordable announcement still reverses the whole cast (#417).
               mAmount <-
                 if Cost.hasVariable chosenCost
-                  then fmap Just (Trans.lift (Program.prompt (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost))))
+                  then fmap Just (Game.choose (Prompt.ChooseX decider pid sid (affordableX pid sid gs chosenCost)))
                   else pure Nothing
               -- CR 601.2: a step the player cannot comply with makes the casting
               -- illegal and returns the game to before it was proposed. The X just
@@ -756,10 +767,10 @@ castProposed pid sid face castFrom candidates before = do
               --
               -- Asked with the same predicate the floor was asked with, so a gate
               -- and an announcement cannot disagree about what a cost is. That
-              -- matters beyond tidiness: CR 118.13a's Phyrexian announcement below
-              -- runs on this cost, and on a {X}{G/P} (Corrosive Gale) a large
-              -- enough X leaves NEITHER of CR 107.4f's two routes payable --
-              -- whereupon Mana.announcePhyrexian would have to invent an offer.
+              -- matters beyond tidiness: CR 118.13a's announcement below runs on
+              -- this cost, and on a {X}{G/P} (Corrosive Gale) a large enough X
+              -- leaves NEITHER of CR 107.4f's two routes payable -- whereupon
+              -- Mana.announce would have to invent an offer.
               --
               -- Reject-not-repair: the announcement is NOT clamped to affordableX
               -- (CR 601.2b lets the player name the value freely), it is honoured
@@ -775,9 +786,10 @@ castProposed pid sid face castFrom candidates before = do
               if not (payableCost pid sid gs announcedAtX)
                 then reject
                 else do
-                  -- CR 601.2b's own order puts the Phyrexian announcement AFTER
-                  -- the value of X and before CR 601.2c's targets; CR 118.13a is
-                  -- what forbids deferring it to payment time.
+                  -- CR 601.2b's own order puts the hybrid and Phyrexian
+                  -- announcements AFTER the value of X and before CR 601.2c's
+                  -- targets; CR 118.13a is what forbids deferring them to payment
+                  -- time.
                   --
                   -- Cost.totalMana is handed in so that the routes offered are the
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
@@ -791,7 +803,7 @@ castProposed pid sid face castFrom candidates before = do
                   chosen <-
                     if Map.null sets
                       then pure Map.empty
-                      else Trans.lift (Program.prompt (Prompt.ChooseTargets decider pid sid sets))
+                      else Game.choose (Prompt.ChooseTargets decider pid sid sets)
                   let keysAgree = Map.keysSet chosen == Map.keysSet sets
                       eachLegal = and (Map.intersectionWith Set.member chosen sets)
                   if not (keysAgree && eachLegal)

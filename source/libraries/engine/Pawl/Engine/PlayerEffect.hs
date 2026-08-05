@@ -230,12 +230,19 @@ prohibitsCasting pid name gs =
         PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        -- CR 305.2 raises how many LANDS may be played, and a land is never
+        -- cast (CR 305.1), so this grant reaches nothing here.
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         -- CR 702.18a / 702.11c restrict TARGETING, not casting: a player with
         -- shroud may cast anything, and Pawl.Engine.Target.targetable is where
         -- the restriction lands (CR 115.4, CR 601.2c).
         PlayerEffect.CantBeTargetedBy _ -> False
+        -- CR 601.3b ALLOWS, and this is the prohibit half: a permission is not a
+        -- prohibition, and CR 101.2 would let a prohibition outvote it anyway.
+        -- mayCastAsThoughItHadFlash below is where it is read.
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -256,16 +263,26 @@ prohibitsPlayingLand pid name gs =
         PlayerEffect.CantPlayLandChosenName -> Set.member name (chosenNamesOf source gs)
         -- CR 305.1 again, in the other direction: a prohibition on CASTING says
         -- nothing about a special action, so Silence and Rule of Law leave a
-        -- land play alone. CR 305.2/305.3's own limits are the closed half's and
-        -- are asked by Action.legalActions, not here.
+        -- land play alone. CR 305.2's and CR 305.3's limits are the closed
+        -- half's and are asked by Action.legalActions -- the first as a count
+        -- (landPlaysAllowed below is only its left-hand side), the second as
+        -- part of Turn.sorcerySpeedWindow. Neither is a question about WHICH
+        -- land, which is all this one asks.
         PlayerEffect.CantCastChosenName -> False
         PlayerEffect.CantCastSpells -> False
         PlayerEffect.CantCastMoreThan _ -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        -- CR 305.2 raises HOW MANY lands may be played, never WHICH: a grant is
+        -- no permission for a land this rule stops. landPlaysAllowed below is
+        -- the gate that reads it.
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
+        -- CR 305.1 again: a land is never cast, so a permission about the timing
+        -- of a CAST has nothing to widen here either.
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -278,12 +295,15 @@ prohibitsPlayingLand pid name gs =
 chosenNamesOf :: Maybe ObjectId -> GameState -> Set.Set CardName
 chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid -> Game.lookupObject oid gs)
 
--- Does this spell match the cost-adjustment Filter? Evaluated against the
--- PROJECTED view (Projection.viewOfObject) -- a card type is CR 613.1d layer 4
--- and a colour is CR 613.1e layer 5 -- never a printed characteristic. The
--- perspective is the spell's own controller (CR 109.5). Runs through the
--- identity-blind Filter.matches: this module never learns which spell produced
--- the Filter.
+-- Does this spell match a player effect's Filter? Shared by the two questions
+-- that carry one -- CR 601.2f's cost adjustments and CR 601.3b's timing
+-- permission -- so that "which spells does this effect name?" has one reading.
+--
+-- Evaluated against the PROJECTED view (Projection.viewOfObject) -- a card type
+-- is CR 613.1d layer 4 and a colour is CR 613.1e layer 5 -- never a printed
+-- characteristic. The perspective is the spell's own controller (CR 109.5). Runs
+-- through the identity-blind Filter.matches: this module never learns which
+-- spell produced the Filter.
 matchesSpell :: Filter Keyword -> ObjectId -> GameState -> Bool
 matchesSpell filter_ oid gs =
   -- No source in scope at this site: `oid` is the AFFECTED object, not a source.
@@ -313,9 +333,11 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -323,11 +345,61 @@ costAdjustments pid oid gs =
         PlayerEffect.CantCastMoreThan _ -> Nothing
         PlayerEffect.CantCastChosenName -> Nothing
         PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
       effects = fmap snd (applying pid gs)
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
+
+-- CR 601.3b: may `pid` begin to cast `oid` as though it had flash (Vedalken
+-- Orrery)? By CR 702.8a that means "any time you could cast an instant", which CR
+-- 117.1a's first sentence makes "any time they have priority" -- so a True here
+-- is the whole of the widening, and Pawl.Engine.Cast.timingOk needs no second
+-- window to compare against.
+--
+-- The typed question Cast.timingOk asks BESIDE Cast.instantSpeed rather than
+-- inside it, and that is the point of the constructor. Flash is a permission a
+-- CARD carries about casting ITSELF, so folding this into instantSpeed -- let
+-- alone into the CR 307.1 window under it (Turn.sorcerySpeedWindow) -- would make
+-- an equip ability on the same board instant-speed, which CR 307.5 does not say.
+-- Pawl.PlayerEffectSpec's Vedalken Orrery group proves both halves on one board:
+-- the creature spell is castable on the opponent's turn, and the Equipment's CR
+-- 307.5 equip ability is still not offered.
+--
+-- A DISJUNCTION, and for the opposite of CR 101.2's reason: this is a permission,
+-- and two permissions naming different spells are not in conflict, so one
+-- applicable effect is enough and no list of them can outvote another. CR
+-- 613.11's timestamp order has nothing to order here.
+--
+-- matchesSpell is called only from inside the arm that already matched, so a
+-- board with no such effect on it runs no projections at all -- the posture
+-- costAdjustments takes above.
+--
+-- CR 601.3b's SECOND SENTENCE is not implemented: the rule lets a player begin
+-- casting as though a spell had flash when a choice still to be made during the
+-- proposal could give the spell the qualities the effect names, and nothing here
+-- searches choice space (#721).
+--
+-- Takes the OBJECT and not the half being proposed, so a split card's filter is
+-- matched against CR 709.4's combined view rather than against the chosen half
+-- (#656) -- the same seam costAdjustments has, through the same matchesSpell.
+mayCastAsThoughItHadFlash :: PlayerId -> ObjectId -> GameState -> Bool
+mayCastAsThoughItHadFlash pid oid gs =
+  let allows effect = case effect of
+        PlayerEffect.CastAsThoughItHadFlash criterion -> matchesSpell criterion oid gs
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+   in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
 -- ability controlled by `caster`?
@@ -367,9 +439,56 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
    in any (stops . snd) (applying pid gs)
+
+-- CR 305.2: the number of lands a player may normally play during their turn.
+-- The base of landPlaysAllowed below, named for the same reason
+-- defaultMaximumHandSize is: the rule states a number, and a bare literal in the
+-- gate would not say which rule it came from.
+defaultLandPlays :: Natural
+defaultLandPlays = 1
+
+-- CR 305.2 / 305.2a: how many lands `pid` may play this turn -- the LEFT-hand
+-- side of CR 305.2a's comparison, whose right-hand side is
+-- GameState.landsPlayed. Pawl.Engine.Action.legalActions compares them, so that
+-- module never learns which effect raised the number.
+--
+-- A SUM over every applicable grant, added to CR 305.2's normal one. CR 305.2
+-- says continuous effects "may increase this number", and an increase composes:
+-- Exploration beside Azusa is one plus one plus two. Nothing makes them
+-- redundant -- CR 702.18b and CR 702.11h say so for a KEYWORD, and CR 305.2
+-- states no such rule -- so this is a tally and not a membership test, which is
+-- the opposite posture from protectedFromTargeting above.
+--
+-- Saturating addition is not a concern here and the type says why: a Natural
+-- cannot overflow, and every summand is one.
+--
+-- Read LIVE through `applying`, like every other question in this module, so an
+-- Exploration destroyed after the extra land was played simply stops being found
+-- (CR 604.2) -- and the already-played count outliving the grant is exactly CR
+-- 305.2b, which then permits no further play.
+landPlaysAllowed :: PlayerId -> GameState -> Natural
+landPlaysAllowed pid gs =
+  let grantOf effect = case effect of
+        PlayerEffect.PlayAdditionalLands extra -> Just extra
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        -- CR 305.1's name-based prohibition stops ONE land rather than changing
+        -- the turn's allowance, which is why Action.playableLands asks it per
+        -- card and this per player.
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost _ _ -> Nothing
+        PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+   in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
 -- starting hand size, which is a different seven (Mulligan.openingHand) that
@@ -391,8 +510,10 @@ maximumHandSize pid gs =
         PlayerEffect.CantPlayLandChosenName -> False
         PlayerEffect.IncreaseSpellCost _ _ -> False
         PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
    in if any (removes . snd) (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
@@ -431,7 +552,9 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantPlayLandChosenName -> Nothing
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
         PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters

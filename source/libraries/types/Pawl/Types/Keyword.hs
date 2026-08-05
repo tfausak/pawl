@@ -22,8 +22,8 @@ import qualified Pawl.Types.Filter as Filter
 -- Set -- see Pawl.Types.Face.keywords.
 --
 -- This module TIES THE KNOT that Pawl.Types.Filter's keyword parameter opens:
--- Filter has a HasKeyword arm and this type carries a Filter (702.29e, 702.14c)
--- and a Cost (702.29a/702.34a/702.42a) whose components carry one too, so the
+-- Filter has a HasKeyword arm and this type carries a Filter (702.11d, 702.14c,
+-- 702.29e) and a Cost (702.29a/702.34a/702.42a) whose components carry one too, so the
 -- three would be a module cycle if any were concrete. They are parametric and
 -- this one is not, which makes `Filter Keyword` and `Cost Keyword` the only
 -- instantiations anywhere.
@@ -47,21 +47,46 @@ data Keyword
     Flash
   | Flying -- 702.9
   | Haste -- 702.10
-  | -- | 702.11b: this permanent can't be the target of spells or abilities your
-    -- opponents control.
+  | -- | 702.11b with Nothing: this permanent can't be the target of spells or
+    -- abilities your opponents control. 702.11d with Just: "hexproof from
+    -- [quality]" -- this permanent can't be the target of [quality] spells your
+    -- opponents control or abilities your opponents control from [quality]
+    -- sources.
     --
     -- Shroud's sibling (702.18a) and deliberately NOT the same constructor: the
-    -- CONTROLLER AXIS is the whole difference. Shroud names no player, so it stops
-    -- the permanent's own controller as readily as anyone else; hexproof's "your
-    -- opponents control" makes the answer depend on WHO is aiming the spell, which
-    -- is why Pawl.Engine.Target.targetable reads CR 109.5's "you" and not only the
-    -- candidate.
+    -- CONTROLLER AXIS is what separates them, and both arms of this one carry it.
+    -- Shroud names no player, so it stops the permanent's own controller as
+    -- readily as anyone else; hexproof's "your opponents control" makes the answer
+    -- depend on WHO is aiming the spell, which is why
+    -- Pawl.Engine.Target.targetable reads CR 109.5's "you" and not only the
+    -- candidate. The quality below narrows the same rule a second time, by WHAT is
+    -- aiming -- the question protection (702.16b) asks and the one shroud never
+    -- does.
     --
-    -- Nullary, because rule 702.11b takes no parameter. Rule 702.11d's "hexproof
-    -- from [quality]" is the parameterized variant and is not this constructor
-    -- (#555): it reads the SOURCE's characteristics, which is protection's shape
-    -- (702.16).
-    Hexproof
+    -- The quality RIDES this constructor rather than taking one of its own,
+    -- because rule 702.11d's last sentence says "a 'hexproof from [quality]'
+    -- ability is a hexproof ability" and rule 702.11e spends three sentences
+    -- spelling out what that buys: an effect that removes hexproof removes these
+    -- too, an effect that ignores hexproof ignores these too, and an effect that
+    -- looks for hexproof finds these too. One constructor makes all three true for
+    -- free at every reader instead of restating them at each -- the argument CR
+    -- 702.29f makes for typecycling riding Cycling. Humility (CR 613.1f) drops a
+    -- "hexproof from black" because it drops KEYWORDS, not because anything
+    -- enumerated the pair.
+    --
+    -- A Filter and not a Color, because rule 702.11d's "[quality]" is any quality:
+    -- "hexproof from planeswalkers" (Eradicator Valkyrie) is a card type,
+    -- "hexproof from instants" (Elenda, Saint of Dusk) another, and "hexproof from
+    -- monocolored" (Sphinx of the Guildpact) is CR 105.2a's exactly-one-colour,
+    -- which needs the combinators. Cycling's `Maybe (Filter Keyword)` exactly.
+    --
+    -- CR 702.11f's "hexproof from [quality A] and from [quality B]" and CR
+    -- 702.11g's "hexproof from each [characteristic]" need no arm of their own:
+    -- both rules say the card HAS SEVERAL hexproof abilities rather than one
+    -- compound one, and Pawl.Types.Face.keywords is a Set, so such a card prints
+    -- one entry per quality. CR 702.11h's redundancy is then per key, which is
+    -- what its "the same hexproof ability" means.
+    Hexproof (Maybe (Filter.Filter Keyword))
   | Indestructible -- 702.12
   | -- | 702.14a: "[type]walk", where the type is usually a land type but need not
     -- be. The qualification rides the constructor, as Cycling's Filter does, so
@@ -108,11 +133,12 @@ data Keyword
     -- target-legality gate (Pawl.Engine.Target.targetable), where every
     -- restriction rule 702 states lands.
     --
-    -- Nullary, because rule 702.18a takes no parameter. It is neither hexproof's
-    -- "your opponents control" (702.11b) nor protection's stated quality
-    -- (702.16a), and that those two ask about the targeting player and the source
-    -- respectively is exactly why they are separate keywords rather than fields
-    -- here.
+    -- Nullary, because rule 702.18a takes no parameter, and it asks neither of
+    -- the two questions its neighbours do: not hexproof's "your opponents
+    -- control" (702.11b/702.11d) about the targeting player, and not the stated
+    -- quality of hexproof's variant (702.11d) or of protection (702.16a) about
+    -- the source. That it asks neither is exactly why it is a separate keyword
+    -- rather than another field on Hexproof above.
     Shroud
   | Trample -- 702.19
   | Vigilance -- 702.20
@@ -180,7 +206,8 @@ data Keyword
     -- creatures. Nullary like fear (702.36) and unlike landwalk -- the number two
     -- is written into the rule.
     --
-    -- The first restriction of the SET shape #533 named, and its blocking half.
+    -- The blocking side's SET-SHAPED combat restriction, whose attacking
+    -- counterpart is Bonded Construct's "can't attack alone".
     -- Every other evasion ability here asks about one (blocker, attacker) pair or
     -- less; menace asks how MANY creatures are blocking, which no pairwise
     -- predicate can answer, so it is read by

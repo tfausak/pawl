@@ -64,7 +64,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           { TriggeredAbility.condition = TriggerCondition.SelfEnters,
             TriggeredAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Create (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing)) Map.empty Optionality.Mandatory))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Create (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing)) Map.empty Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening = Nothing
           }
@@ -81,7 +81,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn,
             TriggeredAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Quantity.Literal 1))) Map.empty Optionality.Mandatory))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Quantity.Literal 1))) Map.empty Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening =
               Just
@@ -108,7 +108,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn,
                   TriggeredAbility.modal =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "token")))) Map.empty Optionality.Mandatory))
+                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "token")))) Map.empty Optionality.Mandatory Nothing))
                       (ModeSelection.ChooseExactly 1),
                   TriggeredAbility.intervening = Nothing
                 }
@@ -118,7 +118,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Combat CombatStep.BeginningOfCombat) TurnScope.EachTurn,
                   TriggeredAbility.modal =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))) Map.empty Optionality.Mandatory))
+                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))) Map.empty Optionality.Mandatory Nothing))
                       (ModeSelection.ChooseExactly 1),
                   TriggeredAbility.intervening = Nothing
                 }
@@ -137,7 +137,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
             Modal.MkModal
-              (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory))
+              (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing
         }

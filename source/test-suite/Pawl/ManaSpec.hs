@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Mana: mana payment and castability. CR 118.13a's announcement lives
--- here too (Mana.announcePhyrexian), so the cases that reach it through
+-- here too (Mana.announce), so the cases that reach it through
 -- Cast.castSpell and Activate.activateAbility are in this spec rather than in
 -- CastSpec or ActivateSpec -- the module under test is this one, and the two entry
 -- points are how the rule is reached.
@@ -41,6 +41,7 @@ import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -85,7 +86,7 @@ resolvedCreature land creature nLands =
 -- single-mode ActivatedAbility now takes.
 singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
 singleModeAbility effects specs =
-  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory)) (ModeSelection.ChooseExactly 1)
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)
 
 -- Answers Prompt.ChooseManaSource with `wanted` whenever it is on offer, and
 -- defers everything else to S.identityAnswer. Its sibling avoids that source
@@ -1290,12 +1291,14 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     -- business; that it hits for 4 is the card's.
     Spec.assertEqWith s "4 damage to the chosen target" (S.lifeOf S.alice resolved) (Just 16)
 
-  -- The elision, made visible rather than left implied. Both halves are
-  -- payable out of this pool and they leave DIFFERENT pools behind, so
-  -- unlike a colour/colour hybrid the choice is observable, and pawl
-  -- makes it: it spends the fewest units. CR 601.2b puts that choice with
-  -- the player, at announcement (#261).
-  Spec.it s "CR 601.2b the engine takes a {2/R}'s one-mana half when both halves are payable (#261)" $
+  -- What CR 118.13a's announcement leaves behind. Both halves are payable
+  -- out of this pool and they leave DIFFERENT pools behind, so the choice
+  -- is observable and `spend` makes it: it takes the fewest units. A cast
+  -- and an activation no longer reach this, because `announce` has settled
+  -- every {2/X} before payment -- what still does is CR 118.13b/c, a cost
+  -- paid during a resolution or for a special action (#373), which is why
+  -- this calls `spend` directly.
+  Spec.it s "CR 118.13b with nothing announced, spend takes a {2/R}'s one-mana half (#373)" $
     let red = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Red, ManaUnit.tags = Set.empty}
         colorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
      in Spec.assertEqWith
@@ -1303,6 +1306,104 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
           "the {R} is spent and both {C} remain -- the other half would spend both {C} and leave the {R}"
           (Mana.spend 0 (ManaCost.MkManaCost [twoOrRed]) (Mana.Type.MkMana [red, colorless, colorless]))
           (Just (Mana.Type.MkMana [colorless, colorless], 0))
+
+  -- CR 601.2b: "If a cost that will be paid as the spell is being cast
+  -- includes hybrid mana symbols, the player announces the nonhybrid
+  -- equivalent cost they intend to pay." CR 118.13a places that as the
+  -- controller PROPOSES the spell.
+  --
+  -- THE proving pair, and both legs are needed: SIX Mountains, so either
+  -- route is payable and "the Javelin was cast" is true under both. What
+  -- discriminates is the mana actually SPENT -- three taps against six.
+  Spec.it s "CR 118.13a Flame Javelin announced as {R}{R}{R} spends three of six Mountains" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
+    let (gs, spellId) = S.handOne flameJavelin (S.landsInPlay mountain 6)
+        (asked, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysTyped) gs spellId
+    Spec.assertEqWith s "one announcement per symbol, all coloured" (hybridAnnouncements asked) (replicate 3 HybridPayment.PaysTyped)
+    Spec.assertEqWith s "the Javelin resolved" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "three Mountains paid for it" (S.tappedCount S.alice resolved) 3
+    Spec.assertEqWith s "with nothing left floating" (poolSize S.alice resolved) 0
+
+  Spec.it s "CR 118.13a the same Javelin announced as {6} spends all six" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
+    let (gs, spellId) = S.handOne flameJavelin (S.landsInPlay mountain 6)
+        (asked, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) gs spellId
+    Spec.assertEqWith s "one announcement per symbol, all generic" (hybridAnnouncements asked) (replicate 3 HybridPayment.PaysGeneric)
+    Spec.assertEqWith s "the Javelin resolved" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "all six Mountains paid for it" (S.tappedCount S.alice resolved) 6
+    Spec.assertEqWith s "with nothing left floating" (poolSize S.alice resolved) 0
+
+  -- CR 601.2f's reduction meeting CR 601.2b's announcement, which is Flame
+  -- Javelin's own ruling: "a generic cost reduction applies to a
+  -- monocolored hybrid spell only if you've chosen a method of paying for
+  -- it that includes generic mana." Baral, Chief of Compliance is the
+  -- reducer -- "Instant and sorcery spells you cast cost {1} less to
+  -- cast" -- and Flame Javelin is an Instant.
+  --
+  -- The announcement is what makes the ruling expressible: CR 118.7a's
+  -- reduction comes off the GENERIC component, and a symbol still spelled
+  -- {2/R} has none. Announced as {2}{2}{2} it is {6}, which Baral takes to
+  -- {5}; announced as {R}{R}{R} there is nothing generic for Baral to
+  -- bite, and the ruling says so.
+  Spec.it s "CR 118.7a Baral takes the announced {6} to {5}, and leaves {R}{R}{R} alone" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
+    let (_, board) = S.addCreature baral S.alice (S.landsInPlay mountain 6)
+        (gs, spellId) = S.handOne flameJavelin board
+        (askedGeneric, afterGeneric) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) gs spellId
+        (askedTyped, afterTyped) = castAndResolve (announcesHybrid HybridPayment.PaysTyped) gs spellId
+    Spec.assertEqWith s "the generic route was announced three times" (hybridAnnouncements askedGeneric) (replicate 3 HybridPayment.PaysGeneric)
+    Spec.assertEqWith s "and cost FIVE Mountains, not six" (S.tappedCount S.alice afterGeneric) 5
+    Spec.assertEqWith s "the coloured route was announced three times" (hybridAnnouncements askedTyped) (replicate 3 HybridPayment.PaysTyped)
+    Spec.assertEqWith s "and still cost three -- Baral has nothing generic to reduce" (S.tappedCount S.alice afterTyped) 3
+    Spec.assertEqWith s "both resolved" (length (GameState.stack afterGeneric), length (GameState.stack afterTyped)) (0, 0)
+
+  -- The elision, both directions. Where only ONE route is payable there is
+  -- nothing to ask, and the interpreter asking for the other route does
+  -- not get it -- CR 601.2b's "previously made choices ... may restrict
+  -- the player's options" arriving as a board that offers one option.
+  Spec.it s "CR 118.13a six Islands offer no coloured route, so nothing is asked" $ do
+    island <- S.printingOf s registry "Island"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
+    let (gs, spellId) = S.handOne flameJavelin (S.landsInPlay island 6)
+        (asked, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysTyped) gs spellId
+    Spec.assertEqWith s "no choice existed, so none was asked" (hybridAnnouncements asked) []
+    Spec.assertEqWith s "the Javelin resolved" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "off all six Islands" (S.tappedCount S.alice resolved) 6
+
+  Spec.it s "CR 118.13a three Mountains cannot afford any {2} half, so nothing is asked" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
+    let (gs, spellId) = S.handOne flameJavelin (S.landsInPlay mountain 3)
+        (asked, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) gs spellId
+    Spec.assertEqWith s "no choice existed, so none was asked" (hybridAnnouncements asked) []
+    Spec.assertEqWith s "the Javelin resolved" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "off all three Mountains" (S.tappedCount S.alice resolved) 3
+
+  -- The remaining gap, made visible rather than left implied. CR 601.2f's
+  -- reduction reaches the cost that is PAID, because the announcement
+  -- names a {2} for CR 118.7a to come off -- but castability is measured
+  -- one step earlier, on the printed cost, where the symbol is still
+  -- {2/R} and CR 118.7a has nothing to bite. So a Javelin payable only
+  -- through the reduced generic route is never offered (#730).
+  Spec.it s "CR 601.2f Baral's reduction does not reach the castability gate for a {2/R} (#730)" $ do
+    island <- S.printingOf s registry "Island"
+    baral <- S.printingOf s registry "Baral, Chief of Compliance"
+    flameJavelin <- S.printingOf s registry "Flame Javelin"
+    let withBaral n = S.handOne flameJavelin (snd (S.addCreature baral S.alice (S.landsInPlay island n)))
+        (five, fiveId) = withBaral 5
+        (six, sixId) = withBaral 6
+    Spec.assertBool s (not (S.castable S.alice fiveId five)) "five Islands: not offered, though CR 601.2f's total is {5}"
+    -- The control, and it is what makes the leg above about the gate
+    -- rather than about the board: one more Island and the cast happens,
+    -- and it happens for FIVE -- the reduction the gate could not see is
+    -- the one the payment takes.
+    Spec.assertBool s (S.castable S.alice sixId six) "six Islands: offered"
+    let (_, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) six sixId
+    Spec.assertEqWith s "and only five of the six are tapped" (S.tappedCount S.alice resolved) 5
 
   -- CR 107.4e's last sentence, as CR 202.2d restates it for the whole
   -- object: a monocolored hybrid's other component is generic mana, which
@@ -1329,6 +1430,27 @@ announces way p = case p of
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers ->
     if elem way (NonEmpty.toList offers) then way else NonEmpty.head offers
   _ -> S.identityAnswer p
+
+-- The `announces` shape for CR 107.4e's monocolored hybrid: answers
+-- Prompt.AnnounceHybridPayment with `way` whenever it is on offer, and defers
+-- everything else to S.identityAnswer. The "whenever it is on offer" is what
+-- makes the elision cases discriminating -- an interpreter asking for a route the
+-- board does not offer must not get it.
+announcesHybrid :: HybridPayment.HybridPayment -> Prompt.Prompt r -> r
+announcesHybrid way p = case p of
+  Prompt.AnnounceHybridPayment _ _ _ _ offers ->
+    if elem way (NonEmpty.toList offers) then way else NonEmpty.head offers
+  _ -> S.identityAnswer p
+
+-- Every monocolored hybrid announcement the engine asked for, in the order it
+-- asked -- CR 601.2b's "for each of those symbols", so the LENGTH is how many of
+-- a cost's {2/X} symbols were a real choice and how many were forced.
+hybridAnnouncements :: [Response.Response] -> [HybridPayment.HybridPayment]
+hybridAnnouncements responses =
+  let announcement r = case r of
+        Response.AnnouncedHybridPayment way -> Just way
+        _ -> Nothing
+   in Maybe.mapMaybe announcement responses
 
 -- Was CR 118.13a's announcement actually asked for, or did the engine decide?
 wasAskedHowToPayPhyrexian :: [Response.Response] -> Bool
@@ -1560,8 +1682,8 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- life and taps it -- and when the player names blue instead, the mana way
   -- is gone and CR 107.4f's 2 life is all that is left. pawl pays it rather
   -- than failing the payment, which is the same MORE PERMISSIVE posture
-  -- Mana.payCost's haddock takes towards a mis-tapped colour (#261). Reached
-  -- only because this calls payCost directly, with nothing announced (#373).
+  -- Mana.payCost's haddock takes towards a mis-tapped colour. Reached only
+  -- because this calls payCost directly, with nothing announced (#373).
   Spec.it s "CR 107.4f a Birds tapped for blue still pays a {G/P}, out of life" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
     let (_, gs) = S.addCreature birds S.alice (Setup.emptyGame S.bothPlayers)

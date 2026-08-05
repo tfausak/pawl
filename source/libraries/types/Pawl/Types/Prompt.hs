@@ -17,13 +17,16 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
@@ -118,6 +121,23 @@ data Prompt r where
   -- Deliberately not elided for a single candidate, unlike ChooseManaSource: "any
   -- number" includes none, so even one candidate is a real yes or no.
   ChooseProliferate :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [PlayerId.PlayerId] -> Prompt (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
+  -- | CR 701.54a: which creature a tempted player controls becomes their
+  -- Ring-bearer. The NonEmpty is the creatures they control; the answer is the ONE
+  -- that takes the designation.
+  --
+  -- CHOOSE, not target: rule 701.54a says "choose a creature you control", so no
+  -- target spec is declared and nothing is re-checked at resolution (CR 608.2b).
+  --
+  -- Raised only for TWO OR MORE candidates, ChooseLegend's shape. One creature is
+  -- not a choice: the action is mandatory and has exactly one legal answer, so
+  -- performing it is not the engine deciding anything. It is emphatically not an
+  -- elision of ChooseProliferate's kind, whose "any number" makes even a lone
+  -- candidate a real yes or no.
+  --
+  -- NOT raised at all for zero candidates, and that is CR 701.54d rather than an
+  -- omission: the player is tempted anyway, so Pawl.Engine.Ring.tempt still counts
+  -- the temptation and still gives them the emblem.
+  ChooseRingBearer :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
   -- | CR 704.5j: which of two or more same-named legendary permanents its
   -- controller keeps. The NonEmpty is the whole same-named group; the answer is the
   -- ONE that survives.
@@ -558,6 +578,34 @@ data Prompt r where
   -- all single-mode; a modal payload mixing a live mode with a dead optional one
   -- would reach this prompt with nothing to decide (#336).
   ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 118.12 / 118.12a: whether this player pays a cost a RESOLVING spell or
+  -- ability offers them -- Mana Leak's "unless its controller pays {3}", which CR
+  -- 118.12a rewrites as "its controller may pay {3}. If they don't, counter it."
+  -- The ObjectId is the object resolving and the ModeIndex is which of its chosen
+  -- modes is asking, both for Prompt.ChooseOptional's reasons; the Cost is what
+  -- is being offered, which is the information the answer turns on.
+  --
+  -- The PlayerId is emphatically NOT the resolving controller, which is what
+  -- separates this from every other resolution-time prompt: CR 118.12's clause
+  -- names a player, and for this card family that player is the one the effects
+  -- would be aimed AT. Routed through Decide.deciderFor like every other
+  -- player-facing prompt, so a player controlled under CR 723.1 has their
+  -- controller answer.
+  --
+  -- Asked at CR 118.12's own moment, when the spell or ability RESOLVES, so a
+  -- countered Mana Leak never asks -- observably different from an announcement
+  -- at CR 601.2f-h, where the cost of a spell being cast is paid.
+  --
+  -- NEVER elided for a payable cost: CR 118.12a's rewriting makes the cost a
+  -- "may", and both answers reach different boards. The one case not asked is
+  -- where the rules leave nothing to ask -- CR 118.3's "a player can't pay a cost
+  -- without having the necessary resources to pay it fully", which leaves
+  -- declining as the only possible answer. CR 118.12's clause covers that case in
+  -- as many words ("does, doesn't, or CAN'T"). Its Standstill example is NOT this
+  -- one: that cost is mandatory ("sacrifice this enchantment. If you do"), so its
+  -- "can't" is 118.12's "started to pay a mandatory cost" limb, which is the
+  -- positive shape pawl cannot represent at all (#701).
+  ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: the player announces whether they intend to pay 2 life or a
   -- coloured mana cost for each Phyrexian symbol. CR 118.13a puts the choice HERE
   -- rather than at payment. The ObjectId is the spell or the permanent whose
@@ -577,3 +625,25 @@ data Prompt r where
   -- Elided when only one route is payable -- no source of the symbol's colour, or a
   -- life total below CR 119.4's floor.
   AnnouncePhyrexianPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Color.Color -> NonEmpty.NonEmpty PhyrexianPayment.PhyrexianPayment -> Prompt PhyrexianPayment.PhyrexianPayment
+  -- | CR 601.2b: "If a cost that will be paid as the spell is being cast includes
+  -- hybrid mana symbols, the player announces the nonhybrid equivalent cost they
+  -- intend to pay." CR 118.13a puts that choice HERE rather than at payment. The
+  -- ObjectId is the spell or the permanent whose ability is being activated (CR
+  -- 602.2b); the ManaType is the symbol's own stated type, so a {2/R} and a {2/G}
+  -- in one cost put DISTINGUISHABLE questions on the wire.
+  --
+  -- CR 107.4e's MONOCOLORED half only ({2/R}), which is the half whose two ways
+  -- spend a different NUMBER of mana. A colour/colour hybrid ({W/U}) is still not
+  -- announced and could not be answered with a HybridPayment anyway (#729).
+  --
+  -- One prompt per symbol, in printed order, and the NonEmpty is the routes
+  -- actually payable given the announcements already made -- the
+  -- AnnouncePhyrexianPayment contract, for the same CR 601.2b last sentence, and
+  -- payable is measured at CR 601.2f's TOTAL for the same reason. Two {2/R}s in
+  -- one cost ask two identical questions, which is sound here because the answers
+  -- are interchangeable: both demand the same one mana or the same {2}, so which
+  -- prompt got which is not observable.
+  --
+  -- Elided when only one route is payable -- no source of the symbol's type, or
+  -- too few mana on the board for the {2}.
+  AnnounceHybridPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaType.ManaType -> NonEmpty.NonEmpty HybridPayment.HybridPayment -> Prompt HybridPayment.HybridPayment

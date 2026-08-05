@@ -35,6 +35,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -45,6 +46,7 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Prompt as Prompt
@@ -70,6 +72,8 @@ combatReplaySpec s =
       attackPrompt = Prompt.DeclareAttackers decider S.alice [oid]
       blockPrompt = Prompt.DeclareBlockers decider S.bob [oid] [oid]
       damagePrompt = Prompt.AssignCombatDamage decider S.alice oid (Map.singleton (Recipient.ToCreature oid) 0) 2
+      -- CR 118.12a: Mana Leak's {3}, the cost Prompt.ChooseToPay carries.
+      genericThree = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]), Cost.Type.components = []}
       -- CR 725.2's own pair, one borne and one sourceless: the crown steal hung
       -- on an object and the inherent end-step draw hung on nothing.
       orderEntries =
@@ -267,6 +271,21 @@ combatReplaySpec s =
             "declines"
             (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)))
             OptionalDecision.Declines
+        -- CR 118.12a: both answers to a resolution-time cost, so the transcript
+        -- is proved to distinguish them -- a codec that collapsed them would
+        -- replay a paid Mana Leak as a refused one, which is the whole card.
+        Spec.it s "ChooseToPay records and replays both answers" $ do
+          let p = Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) genericThree
+          Spec.assertEqWith s "paid" (Replay.decode p (Replay.encode p PaymentDecision.Pays)) (Just PaymentDecision.Pays)
+          Spec.assertEqWith s "declined" (Replay.decode p (Replay.encode p PaymentDecision.Declines)) (Just PaymentDecision.Declines)
+        -- CR 118.12a: a transcript that runs short must not spend a player's
+        -- mana on a payment its author never announced.
+        Spec.it s "defaultAnswer declines a resolution-time cost" $
+          Spec.assertEqWith
+            s
+            "declines"
+            (Replay.defaultAnswer (Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) genericThree))
+            PaymentDecision.Declines
         Spec.it s "a mismatched response does not decode as a may" $
           Spec.assertEqWith
             s
@@ -458,6 +477,24 @@ combatReplaySpec s =
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseBoundToken decider S.alice oid (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
             (ObjectId.MkObjectId 7)
+        -- CR 701.54a: which creature a tempted player made their Ring-bearer is a
+        -- decision, so it has to survive a transcript like any other.
+        Spec.it s "ChooseRingBearer round-trips through the transcript" $ do
+          let a = ObjectId.MkObjectId 7
+              b = ObjectId.MkObjectId 9
+              p = Prompt.ChooseRingBearer decider S.alice (a NonEmpty.:| [b])
+          Spec.assertEqWith s "designating the second round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          -- Discriminating: a decode that ignored the response and returned the
+          -- head would pass one leg by accident.
+          Spec.assertEqWith s "designating the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+        Spec.it s "a Ring-bearer choice does not decode as a legend choice" $ do
+          -- Discriminating: fails if ChooseRingBearer reuses ChoseLegend rather
+          -- than getting its own ObjectId-shaped constructor. The two are the same
+          -- SHAPE -- a Prompt over one ObjectId, answered from a NonEmpty of them --
+          -- so nothing but a distinct constructor keeps a transcript of one from
+          -- replaying as the other.
+          let p = Prompt.ChooseRingBearer decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseLegend (ObjectId.MkObjectId 7))) Nothing
         -- CR 508.1b: what each attacking creature was announced as attacking is
         -- a decision, so it has to survive a transcript like any other -- and
         -- both arms of AttackTarget have to survive it, since a transcript that
@@ -521,6 +558,67 @@ combatReplaySpec s =
                   Color.Green
                   (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
           Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 118.13a again, for CR 107.4e's monocolored hybrid: which half a
+        -- {2/R} was announced as decides how much mana the spell cost, so it
+        -- has to survive a transcript.
+        Spec.it s "AnnounceHybridPayment round-trips through the transcript" $ do
+          let p =
+                Prompt.AnnounceHybridPayment
+                  decider
+                  S.alice
+                  oid
+                  (ManaType.Colored Color.Red)
+                  (HybridPayment.PaysTyped NonEmpty.:| [HybridPayment.PaysGeneric])
+          Spec.assertEqWith
+            s
+            "the generic route round trips"
+            (Replay.decode p (Replay.encode p HybridPayment.PaysGeneric))
+            (Just HybridPayment.PaysGeneric)
+          -- Discriminating for the same reason the pairs above are: a decode
+          -- that ignored the response and returned the head would pass one leg
+          -- by accident.
+          Spec.assertEqWith
+            s
+            "the coloured route round trips"
+            (Replay.decode p (Replay.encode p HybridPayment.PaysTyped))
+            (Just HybridPayment.PaysTyped)
+        Spec.it s "a Phyrexian announcement does not decode as a hybrid one" $ do
+          -- Discriminating: fails if AnnounceHybridPayment reuses another
+          -- two-valued response rather than getting its own constructor -- and
+          -- AnnouncedPhyrexianPayment is the nearest miss, the other CR 118.13a
+          -- announcement, recorded by the other arm of the same function.
+          let p =
+                Prompt.AnnounceHybridPayment
+                  decider
+                  S.alice
+                  oid
+                  (ManaType.Colored Color.Red)
+                  (HybridPayment.PaysTyped NonEmpty.:| [HybridPayment.PaysGeneric])
+              phyrexian =
+                Prompt.AnnouncePhyrexianPayment
+                  decider
+                  S.alice
+                  oid
+                  Color.Green
+                  (PhyrexianPayment.PaysMana NonEmpty.:| [PhyrexianPayment.PaysLife])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Replay.encode phyrexian PhyrexianPayment.PaysMana)) Nothing
+          Spec.assertEqWith s "nor the other way round" (Replay.decode phyrexian (Replay.encode p HybridPayment.PaysTyped)) Nothing
+        Spec.it s "a short transcript announces the first offered hybrid route" $
+          -- Every offered route is payable (the prompt is raised only with two
+          -- payable routes), so the head is a legal answer.
+          Spec.assertEqWith
+            s
+            "the head"
+            ( Replay.defaultAnswer
+                ( Prompt.AnnounceHybridPayment
+                    decider
+                    S.alice
+                    oid
+                    (ManaType.Colored Color.Red)
+                    (HybridPayment.PaysGeneric NonEmpty.:| [HybridPayment.PaysTyped])
+                )
+            )
+            HybridPayment.PaysGeneric
         Spec.it s "a short transcript announces the first offered Phyrexian route" $
           -- Every offered route is payable (the prompt is raised only with two
           -- payable routes), so the head is a legal answer.

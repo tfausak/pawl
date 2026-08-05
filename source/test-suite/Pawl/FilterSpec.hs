@@ -6,6 +6,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost
 -- Aliased Filter.Type, not Type, because the evaluator module Pawl.Engine.Filter
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
@@ -15,6 +16,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 
 -- A projected black creature controlled by player 0.
 blackCreature :: Filter.View
@@ -245,6 +247,81 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
         "card type untouched"
         (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasCardType CardType.Creature))
         (Filter.Type.HasCardType CardType.Creature)
+
+    -- CR 702.14a: landwalk "appears within an object's rules text as
+    -- '[type]walk'", so "creature with islandwalk" holds a land-type word one
+    -- level down. No card in the pool filters by a landwalk yet; the
+    -- gameplay-level proof of the same descent is CombatSpec's
+    -- TextChangedLandwalk, which reaches rewriteKeyword through a GRANT.
+    Spec.it s "descends into a keyword's own land type" $ do
+      Spec.assertEqWith
+        s
+        "islandwalk became forestwalk"
+        (Filter.rewrite [(Subtype.Island, Subtype.Forest)] (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Island))))
+        (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Forest)))
+
+    -- CR 702.14a's second clause: the [type] "can also be the card type land
+    -- plus any combination of land types, card types, and/or supertypes". Two
+    -- of CR 702.14c's four shapes carry no subtype word at all, and one carries
+    -- a subtype beside a supertype -- so the swap must reach the Swamp in snow
+    -- swampwalk and nothing in nonbasic landwalk.
+    Spec.it s "leaves a landwalk criterion that names no land type alone" $ do
+      Spec.assertEqWith
+        s
+        "nonbasic landwalk untouched"
+        (Filter.rewrite [(Subtype.Swamp, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.Not (Filter.Type.HasSupertype Supertype.Basic)))))
+        (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.Not (Filter.Type.HasSupertype Supertype.Basic))))
+    Spec.it s "swaps only the land type of a snow swampwalk" $ do
+      Spec.assertEqWith
+        s
+        "snow islandwalk"
+        (Filter.rewrite [(Subtype.Swamp, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.And [Filter.Type.HasSupertype Supertype.Snow, Filter.Type.HasSubtype Subtype.Swamp]))))
+        (Filter.Type.HasKeyword (Keyword.Landwalk (Filter.Type.And [Filter.Type.HasSupertype Supertype.Snow, Filter.Type.HasSubtype Subtype.Island])))
+
+    -- CR 702.29e's "[Type]cycling" is rule 702's OTHER "[type]", and the rule's
+    -- own example is a basic land type: "usually a subtype (as in
+    -- 'mountaincycling')". Nothing in the pool prints typecycling; the arm
+    -- exists because rewriteKeyword classifies every keyword by whether it holds
+    -- a word rather than naming landwalk.
+    Spec.it s "descends into a typecycling criterion too" $ do
+      let cost = Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
+      Spec.assertEqWith
+        s
+        "mountaincycling became islandcycling"
+        (Filter.rewrite [(Subtype.Mountain, Subtype.Island)] (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Mountain)))))
+        (Filter.Type.HasKeyword (Keyword.Cycling cost (Just (Filter.Type.HasSubtype Subtype.Island))))
+
+    -- CR 702.11d's "[quality]" is rule 702's THIRD carrier of a word, and CR
+    -- 612.2 reaches it on the same terms as the two above: the rule changes "a
+    -- creature type word used as a creature type", and a quality naming a
+    -- creature type is one. The pool's one hexproof (Slippery Bogle) carries no
+    -- quality at all, so nothing here changes an answer a card can ask for
+    -- today; the arm exists because rewriteKeyword classifies a keyword by
+    -- whether it holds a word, and after #726 this one does (#733).
+    Spec.it s "descends into a hexproof quality" $ do
+      Spec.assertEqWith
+        s
+        "hexproof from Goblins became hexproof from Zombies"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype Subtype.Goblin)))))
+        (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasSubtype Subtype.Zombie))))
+
+    -- Elenda, Saint of Dusk's "hexproof from instants": a card type is not a
+    -- subtype word, so the swap reaches nothing inside it.
+    Spec.it s "leaves a hexproof quality that names no subtype alone" $ do
+      Spec.assertEqWith
+        s
+        "hexproof from instants untouched"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasCardType CardType.Instant)))))
+        (Filter.Type.HasKeyword (Keyword.Hexproof (Just (Filter.Type.HasCardType CardType.Instant))))
+
+    -- CR 702.11b's plain hexproof carries no quality at all, which is the
+    -- Nothing the descent has to leave standing rather than invent a filter for.
+    Spec.it s "leaves an unqualified hexproof alone" $ do
+      Spec.assertEqWith
+        s
+        "plain hexproof untouched"
+        (Filter.rewrite [(Subtype.Goblin, Subtype.Zombie)] (Filter.Type.HasKeyword (Keyword.Hexproof Nothing)))
+        (Filter.Type.HasKeyword (Keyword.Hexproof Nothing))
 
   Spec.describe s "AttackedThisTurn" $ do
     Spec.it s "matches a view whose history says so" $ do

@@ -1,7 +1,6 @@
 module Pawl.Engine.Mana where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -24,6 +23,7 @@ import qualified Pawl.Types.Color as Color
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HybridPayment as HybridPayment
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import Pawl.Types.ManaCost (ManaCost)
@@ -42,7 +42,6 @@ import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProductionTag as ProductionTag
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Subtype (Subtype)
@@ -322,7 +321,7 @@ chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty Mana -> GameState -
 chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
   _ -> do
-    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid candidates))
+    answer <- Game.choose (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid candidates)
     pure $
       if List.elem answer (NonEmpty.toList candidates)
         then answer
@@ -410,10 +409,13 @@ everyManaType =
 -- CR 202.3g values the symbol at 1 rather than 2), and it is no typed demand
 -- because it consumes no supply. Zero for every other symbol.
 --
--- CR 107.4f's ways are collapsed to ONE before payment, by announcePhyrexian,
--- which is what CR 118.13a and CR 601.2b call for -- so this enumeration reaches
--- payment only where nothing announced. CR 107.4e's hybrid ways do survive to
--- payment, which is the elision that remains (#261).
+-- CR 107.4f's ways, and CR 107.4e's monocolored hybrid ways, are collapsed to ONE
+-- before payment by `announce`, which is what CR 118.13a and CR 601.2b call for --
+-- so those enumerations reach payment only where nothing announced (a cost paid
+-- during a resolution or for a special action, CR 118.13b/c, #373). CR 107.4e's
+-- COLOUR/COLOUR hybrid is the one still settled at payment (#729), and its single
+-- way here is why: both halves are one mana of a stated type, so they are one
+-- demand over two types rather than two ways.
 waysOf :: ManaSymbol -> [(Maybe Demand, Natural, Natural)]
 waysOf symbol = case symbol of
   ManaSymbol.OfType t -> [(Just (ofTypes (Set.singleton t)), 0, 0)]
@@ -421,7 +423,7 @@ waysOf symbol = case symbol of
   -- either way, so it contributes nothing to the generic count.
   ManaSymbol.Hybrid a b -> [(Just (ofTypes (Set.fromList [a, b])), 0, 0)]
   -- CR 107.4e's two ways, and the one-mana way is FIRST -- see resolutions.
-  ManaSymbol.MonocoloredHybrid t -> [(Just (ofTypes (Set.singleton t)), 0, 0), (Nothing, 2, 0)]
+  ManaSymbol.MonocoloredHybrid t -> [(Just (ofTypes (Set.singleton t)), 0, 0), (Nothing, monocoloredHybridGeneric, 0)]
   -- CR 107.4f's two ways: one mana of its colour, or 2 life. The colour is a
   -- ManaType here because that is what a demand is made of; CR 107.4f admits no
   -- colourless Phyrexian symbol, so ManaType.Colored is total rather than a case.
@@ -463,11 +465,14 @@ waysOf symbol = case symbol of
 --   1. LEAST LIFE first, by the sort. CR 107.4f's life is the resource that does
 --      not come back: an unspent pool empties every step (CR 500.5) and a land
 --      untaps. Conservative, and still pawl choosing -- which is why a cast or an
---      activation announces first (announcePhyrexian, CR 118.13a) and reaches
---      this sort with no Phyrexian symbol left to order. A cost paid during a
---      resolution or for a special action has no such announcement (#373).
+--      activation announces first (`announce`, CR 118.13a) and reaches this sort
+--      with no Phyrexian symbol left to order. A cost paid during a resolution or
+--      for a special action has no such announcement (#373).
 --   2. Among equal life, FEWEST UNITS, which waysOf's per-symbol order already
---      gives and a STABLE sort preserves (#261).
+--      gives and a STABLE sort preserves. Pawl choosing again, and reached on the
+--      same terms: a cast or an activation announces its monocolored hybrids away
+--      first, so only CR 118.13b/c's costs arrive here with a {2/X} to order
+--      (#373).
 --
 -- The sort is what makes rule 1 hold across symbols rather than within one: for
 -- {2/R}{G/P} the product alone would offer a 2-life way before a 0-life one.
@@ -569,8 +574,8 @@ spend budget cost (Mana.MkMana units) =
 -- second is made knowing the first.
 --
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for: a cast (CR
--- 601.2b) and an activation (CR 602.2b) both run announcePhyrexian first, so the
--- cost arriving here holds no Phyrexian symbol and the budget is 0. What is left
+-- 601.2b) and an activation (CR 602.2b) both run `announce` first, so the cost
+-- arriving here holds no Phyrexian symbol and the budget is 0. What is left
 -- under it is CR 118.13b/c, a cost paid during a resolution or for a special
 -- action, where pawl still chooses (#373).
 --
@@ -579,7 +584,8 @@ spend budget cost (Mana.MkMana units) =
 -- unannounced {G/P} off the board, and the cost is then payable only by CR
 -- 107.4f's 2 life. Recomputing means pawl pays it, rather than failing the
 -- payment the way the paragraph above lets a mis-tapped {B} fail -- the same MORE
--- PERMISSIVE posture #261 records. Zero when the cost is unpayable outright.
+-- PERMISSIVE posture, and reachable only where nothing announced (#373). Zero
+-- when the cost is unpayable outright.
 payCost :: PlayerId -> ManaCost -> Game Bool
 payCost pid cost = do
   before <- State.get
@@ -624,7 +630,7 @@ chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game Obje
 chooseSource pid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
   _ -> do
-    answer <- Trans.lift (Program.prompt (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates))
+    answer <- Game.choose (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates)
     pure $
       if List.elem answer (NonEmpty.toList candidates)
         then answer
@@ -634,16 +640,31 @@ chooseSource pid candidates gs = case candidates of
 phyrexianLife :: Natural
 phyrexianLife = 2
 
--- CR 601.2b: if a cost that will be paid as the spell is cast includes Phyrexian
--- mana symbols, the player announces for each whether they intend to pay 2 life
--- or the corresponding coloured mana. CR 118.13a places that announcement as the
--- controller PROPOSES the spell or ability, NOT when the cost is paid; CR 602.2b
--- sends an activated ability's cost through the same rule.
+-- CR 107.4e's {2/X} half: the generic mana its OTHER way costs. The one place
+-- that number is written, and it is fixed rather than carried for the reason
+-- Pawl.Types.ManaSymbol.MonocoloredHybrid gives -- of CR 107.4's monocolored
+-- hybrid symbols that constructor says only the five {2/W}..{2/G}, and every one
+-- of those is a two.
+monocoloredHybridGeneric :: Natural
+monocoloredHybridGeneric = 2
+
+-- CR 601.2b: a cost paid as a spell is cast has its Phyrexian and its hybrid
+-- symbols announced -- "the player announces whether they intend to pay 2 life or
+-- a corresponding colored mana cost for each of those symbols" for CR 107.4f's,
+-- and "the player announces the nonhybrid equivalent cost they intend to pay" for
+-- CR 107.4e's. CR 118.13a places both announcements as the controller PROPOSES
+-- the spell or ability, NOT when the cost is paid; CR 602.2b sends an activated
+-- ability's cost through the same rule.
 --
 -- Returns CR 601.2b's own phrase -- the "nonhybrid equivalent cost", a mana cost
--- with no Phyrexian symbol left in it -- and the life the announcement committed.
--- Pawl.Engine.Cost.announce turns that life into CR 119.4's payment, so nothing
--- below this function ever sees a mana symbol that spends no mana.
+-- with no Phyrexian and no monocolored hybrid symbol left in it -- and the life
+-- the announcement committed. Pawl.Engine.Cost.announce turns that life into CR
+-- 119.4's payment, so nothing below this function ever sees a mana symbol that
+-- spends no mana.
+--
+-- CR 107.4e's COLOUR/COLOUR hybrid is the one "paid in multiple ways" symbol
+-- still not announced here, so it rides through and is settled by
+-- Pawl.Engine.Mana.spend's search at payment time (#729).
 --
 -- ONE SYMBOL AT A TIME, in printed order, each question asked knowing the answers
 -- before it. What makes that sound is the OFFER: a route is offered only if the
@@ -656,10 +677,14 @@ phyrexianLife = 2
 -- not the printed one. CR 601.2b comes first and 601.2f second, so the
 -- ANNOUNCEMENT stays here; only the payability probe reaches forward. Get that
 -- wrong and a cost reduction hides a route the player was entitled to and this
--- function elides the prompt, which is the engine choosing. Every remaining
--- announcement is COMPLETED before totalling (`completions`), because CR 601.2f
--- is defined over a nonhybrid equivalent cost: leaving the tail's symbols
--- Phyrexian would silently withhold reductions a later answer is entitled to.
+-- function elides the prompt, which is the engine choosing. That matters most for
+-- CR 107.4e's monocolored hybrid, whose generic half IS the component CR 118.7a's
+-- reductions come off: Flame Javelin's own ruling is that a generic cost
+-- reduction applies to it only where the announced payment includes generic mana.
+-- Every remaining announcement is COMPLETED before totalling (`completions`),
+-- because CR 601.2f is defined over a nonhybrid equivalent cost: leaving the
+-- tail's symbols unannounced would silently withhold reductions a later answer is
+-- entitled to.
 --
 -- Measured against the BOARD and not the pool: canPayCommitting counts an
 -- untapped source as the mana it could make (payableResolutions), so a Forest
@@ -668,65 +693,94 @@ phyrexianLife = 2
 -- business and not this function's -- announcing is not producing.
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announcePhyrexian :: PlayerId -> ObjectId -> (ManaCost -> ManaCost) -> ManaCost -> Game (ManaCost, Natural)
-announcePhyrexian pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
+announce :: PlayerId -> ObjectId -> (ManaCost -> ManaCost) -> ManaCost -> Game (ManaCost, Natural)
+announce pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
+    -- "Payable" here means SOME completion of the remaining announcements pays
+    -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
+    -- here rather than left to canPay's own `resolutions` so that each completion
+    -- is an announcement-free cost by the time `total` sees it.
+    --
+    -- `done` is the reversed prefix already announced, `ways` the symbols this
+    -- route would leave in place of the one being asked about, and `extra` the
+    -- life it would commit on top of what is committed already.
+    stillPayable done rest gs extra ways =
+      let candidate (tail_, life) =
+            canPayCommitting pid (extra + life) (total (ManaCost.MkManaCost (reverse done <> ways <> tail_))) gs
+       in any candidate (completions rest)
+    -- One symbol's announcement. Asked only where two routes are payable, and
+    -- FILTERED, NOT TRUSTED where it is asked.
+    --
+    -- With NO payable route the cost is unpayable and there is nothing to
+    -- announce: the payment fails (CR 118.6, CR 601.2h). `fallback` is returned
+    -- only because this must return SOMETHING; it is not a choice, because there
+    -- is no payable option for it to choose between.
+    --
+    -- UNREACHABLE from a caller that gated on payability first, and it is `total`
+    -- above that makes that true rather than merely plausible: the gate and this
+    -- offer measure payability through the same totalling, so no completion
+    -- payable here can be one the gate refused. The gate is the STRICTER of the
+    -- two for a monocolored hybrid, because it measures a cost whose {2/X} symbols
+    -- CR 118.7a's reductions cannot see into (#730) -- which is the safe
+    -- direction: it can only refuse a cast this function would have had an offer
+    -- for. {X} used to be a wedge in that -- a gate at X=0 while this runs on the
+    -- value the player named -- and BOTH callers now close it the same way, by
+    -- re-asking their own payability predicate at the announced value before
+    -- calling Cost.announce at all: Cast.castSpell (#417) and
+    -- Activate.activateAbility (#544).
+    choose :: (Eq a) => a -> [a] -> (NonEmpty.NonEmpty a -> Prompt.Prompt a) -> Game a
+    choose fallback offers mkPrompt = case offers of
+      [] -> pure fallback
+      [only] -> pure only
+      first : others -> do
+        answer <- Game.choose (mkPrompt (first NonEmpty.:| others))
+        pure (if List.elem answer offers then answer else first)
     go done committed remaining = case remaining of
       [] -> pure (ManaCost.MkManaCost (reverse done), committed)
       ManaSymbol.Phyrexian color : rest -> do
         gs <- State.get
         let asMana = ManaSymbol.OfType (ManaType.Colored color)
-            -- "Payable" here means SOME completion of the remaining
-            -- announcements pays it, which is what CR 601.2b's last sentence
-            -- makes the question. Enumerated here rather than left to canPay's own
-            -- `resolutions` so that each completion is a Phyrexian-free cost by
-            -- the time `total` sees it.
-            stillPayable extra ways =
-              let candidate (tail_, life) =
-                    canPayCommitting pid (extra + life) (total (ManaCost.MkManaCost (reverse done <> ways <> tail_))) gs
-               in any candidate (completions rest)
             offers =
-              [PhyrexianPayment.PaysMana | stillPayable committed [asMana]]
-                <> [PhyrexianPayment.PaysLife | stillPayable (committed + phyrexianLife) []]
-        announced <- case offers of
-          -- Neither route pays, so the cost is unpayable and there is nothing to
-          -- announce: the payment fails (CR 118.6, CR 601.2h). PaysMana is
-          -- returned only because this function must return SOMETHING; it is not
-          -- a choice, because there is no payable option for it to choose
-          -- between.
-          --
-          -- UNREACHABLE from a caller that gated on payability first, and it is
-          -- `total` above that makes that true rather than merely plausible: the
-          -- gate and this offer measure payability through the same totalling, so
-          -- no completion payable here can be one the gate refused, and none it
-          -- admitted can be missing here. {X} used to be the one wedge in that --
-          -- a gate at X=0 while this runs on the value the player named -- and
-          -- BOTH callers now close it the same way, by re-asking their own
-          -- payability predicate at the announced value before calling
-          -- Cost.announce at all: Cast.castSpell (#417) and
-          -- Activate.activateAbility (#544).
-          [] -> pure PhyrexianPayment.PaysMana
-          [only] -> pure only
-          first : others -> do
-            let prompt = Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid color (first NonEmpty.:| others)
-            answer <- Trans.lift (Program.prompt prompt)
-            pure (if List.elem answer offers then answer else first)
+              [PhyrexianPayment.PaysMana | stillPayable done rest gs committed [asMana]]
+                <> [PhyrexianPayment.PaysLife | stillPayable done rest gs (committed + phyrexianLife) []]
+        announced <-
+          choose PhyrexianPayment.PaysMana offers $
+            Prompt.AnnouncePhyrexianPayment (Decide.deciderFor pid gs) pid oid color
         case announced of
           PhyrexianPayment.PaysMana -> go (asMana : done) committed rest
           PhyrexianPayment.PaysLife -> go done (committed + phyrexianLife) rest
+      -- CR 107.4e: "a monocolored hybrid symbol such as {2/B} can be paid with
+      -- either one black mana or two mana of any type." Neither way commits life,
+      -- so both are measured at the life already committed; what they differ in is
+      -- the NUMBER of mana demanded, which is what makes this a real choice rather
+      -- than a relabelling -- and what makes the {2} route reducible.
+      ManaSymbol.MonocoloredHybrid manaType : rest -> do
+        gs <- State.get
+        let asTyped = ManaSymbol.OfType manaType
+            asGeneric = ManaSymbol.Generic monocoloredHybridGeneric
+            offers =
+              [HybridPayment.PaysTyped | stillPayable done rest gs committed [asTyped]]
+                <> [HybridPayment.PaysGeneric | stillPayable done rest gs committed [asGeneric]]
+        announced <-
+          choose HybridPayment.PaysTyped offers $
+            Prompt.AnnounceHybridPayment (Decide.deciderFor pid gs) pid oid manaType
+        case announced of
+          HybridPayment.PaysTyped -> go (asTyped : done) committed rest
+          HybridPayment.PaysGeneric -> go (asGeneric : done) committed rest
       other : rest -> go (other : done) committed rest
 
--- Every way the Phyrexian symbols of a cost's UNANNOUNCED tail could go, as the
+-- Every way the announcements of a cost's UNANNOUNCED tail could go, as the
 -- symbols that leaves and the life those choices commit -- CR 601.2b's own
 -- "nonhybrid equivalent cost", one entry per combination. Exactly the product
--- `resolutions` takes over CR 107.4f's ways, lifted to the SYMBOL level so that a
--- caller can hand each completion to CR 601.2f's totalling before asking whether
--- it is payable.
+-- `resolutions` takes over CR 107.4e's and CR 107.4f's ways, lifted to the SYMBOL
+-- level so that a caller can hand each completion to CR 601.2f's totalling before
+-- asking whether it is payable.
 --
--- One entry for a Phyrexian-free tail, so this is the identity case for every cost
--- announcePhyrexian leaves untouched, and 2^(number of Phyrexian symbols)
--- otherwise. Non-Phyrexian symbols ride through in place, which is what keeps a
--- completion a cost and not merely a set of choices.
+-- One entry for a tail with nothing to announce, so this is the identity case for
+-- every cost `announce` leaves untouched, and 2^(number of Phyrexian and
+-- monocolored hybrid symbols) otherwise. Other symbols ride through in place --
+-- CR 107.4e's colour/colour hybrid among them, since it is not announced (#729)
+-- -- which is what keeps a completion a cost and not merely a set of choices.
 completions :: [ManaSymbol] -> [([ManaSymbol], Natural)]
 completions symbols = case symbols of
   [] -> [([], 0)]
@@ -734,6 +788,14 @@ completions symbols = case symbols of
     let asMana = ManaSymbol.OfType (ManaType.Colored color)
      in [(asMana : tail_, life) | (tail_, life) <- completions rest]
           <> [(tail_, life + phyrexianLife) | (tail_, life) <- completions rest]
+  -- CR 107.4e's two ways, neither of which commits life. The {2} is a Generic
+  -- symbol and not a demand for two mana of the stated type: CR 107.4e says "two
+  -- mana of any type", and CR 107.4b says a numerical symbol represents generic
+  -- mana, which "can be paid with any type of mana" -- the same permission, which
+  -- is why the substitution loses nothing.
+  ManaSymbol.MonocoloredHybrid manaType : rest ->
+    [(ManaSymbol.OfType manaType : tail_, life) | (tail_, life) <- completions rest]
+      <> [(ManaSymbol.Generic monocoloredHybridGeneric : tail_, life) | (tail_, life) <- completions rest]
   other : rest -> [(other : tail_, life) | (tail_, life) <- completions rest]
 
 -- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
@@ -831,7 +893,7 @@ sourceOptions yields =
 --      and
 --   3. CR 119.4's floor admits the life -- this resolution's own, PLUS whatever
 --      an announcement in progress has already committed (`committed`, zero for
---      every caller but announcePhyrexian). The clause that reads the PLAYER
+--      every caller but `announce`). The clause that reads the PLAYER
 --      rather than the board, and the only one a Phyrexian-free cost can never
 --      fail: every resolution of such a cost costs 0 life, and CR 119.4b lets
 --      anyone pay that -- see canPayLife.
@@ -902,8 +964,8 @@ payableResolutions pid committed cost gs =
 -- keeps that order, so the head is the minimum.
 --
 -- This is the budget payCost pays under. A cast or an activation has already
--- announced its Phyrexian symbols away (announcePhyrexian, CR 118.13a), so this
--- answers 0 for them; it decides anything only where nothing announced (#373).
+-- announced its Phyrexian symbols away (`announce`, CR 118.13a), so this answers
+-- 0 for them; it decides anything only where nothing announced (#373).
 lifeNeeded :: PlayerId -> ManaCost -> GameState -> Maybe Natural
 lifeNeeded pid cost gs = case payableResolutions pid 0 cost gs of
   (_, _, life) : _ -> Just life

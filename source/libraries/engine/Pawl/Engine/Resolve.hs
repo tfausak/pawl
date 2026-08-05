@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -26,6 +27,7 @@ import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
@@ -69,6 +71,8 @@ import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Payment as Payment
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
@@ -87,11 +91,11 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotName (SlotName)
-import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -133,6 +137,7 @@ slotsOf effect = case effect of
   Effect.Search _ _ -> Set.empty
   Effect.ExileAllGraveyards -> Set.empty
   Effect.Proliferate -> Set.empty
+  Effect.TemptWithTheRing -> Set.empty
   Effect.ExileHandThenDraw -> Set.empty
   Effect.PlayerSacrifices slot _ quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.RestartGame -> Set.empty
@@ -161,6 +166,8 @@ slotsOf effect = case effect of
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
   Effect.PreventNextDamage duration ref quantity ->
     Set.unions [durationSlots duration, objectRefSlots ref, Quantity.slots quantity]
+  -- The same two reads, minus the shield size this opcode does not carry.
+  Effect.PreventAllDamage duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
@@ -192,6 +199,18 @@ durationSlots duration = case duration of
   Duration.ForAsLongAs condition -> conditionSlots condition
   Duration.UntilEndOfCombat -> Set.empty
 
+-- Every slot a whole MODE reads: its effect list's, plus the one CR 118.12a's
+-- "unless [a player] pays" names its payer by. What the D4 dataflow lint asks,
+-- since a payer slot no effect ALSO reads would otherwise dangle unnoticed. Mana
+-- Leak's Counter happens to read the very slot its "unless" names, so the lint's
+-- answer is the same either way for the one card in the pool; a card whose payer
+-- and target differ is what this exists for.
+modeSlots :: Mode.Mode Card.Type.Card -> Set SlotName
+modeSlots mode =
+  Set.union
+    (foldMap slotsOf (Mode.effects mode))
+    (maybe Set.empty (Set.singleton . UnlessPaid.payer) (Mode.unlessPaid mode))
+
 -- Both sides of a Condition are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Set SlotName
 conditionSlots condition =
@@ -219,6 +238,7 @@ readsX = any effectReadsX
       Effect.Search _ _ -> False
       Effect.ExileAllGraveyards -> False
       Effect.Proliferate -> False
+      Effect.TemptWithTheRing -> False
       Effect.ExileHandThenDraw -> False
       Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.X
       Effect.RestartGame -> False
@@ -236,6 +256,7 @@ readsX = any effectReadsX
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.X
+      Effect.PreventAllDamage {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.X
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.X
@@ -261,6 +282,7 @@ searchesLibrary :: Effect Card.Type.Card -> Bool
 searchesLibrary effect = case effect of
   Effect.Search _ _ -> True
   Effect.Proliferate -> False
+  Effect.TemptWithTheRing -> False
   Effect.PlayerSacrifices {} -> False
   Effect.DealDamage _ _ -> False
   Effect.ModifyTarget {} -> False
@@ -283,6 +305,7 @@ searchesLibrary effect = case effect of
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   Effect.PreventNextDamage {} -> False
+  Effect.PreventAllDamage {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
@@ -439,6 +462,21 @@ resolveSpellWith runSubgame oid = do
                   -- CR 603.5 / 608.2d: a printed "may" is answered here, between
                   -- the preceding mode's instructions and this one's.
                   taken <- exercises oid effectController idx mode
+                  -- CR 118.12a: and then this mode's "unless [a player] pays",
+                  -- offered only for a mode that is happening at all. The
+                  -- legality and the targets are the START-of-resolution ones,
+                  -- matching CR 608.2b's single re-validation; the per-effect
+                  -- re-read below adds only slots this resolution DEFINES, and
+                  -- an "unless" is offered before any of THIS mode's effects have
+                  -- run. A later mode's gate is asked after an earlier mode's
+                  -- effects, which no card reaches: the pool's one unlessPaid is
+                  -- a single-mode spell.
+                  gatePaid <-
+                    if taken
+                      then
+                        let chosenAtStart = Binding.targetsOf (Object.bindings obj)
+                         in paid oid oid idx (Map.mapWithKey legalSlot chosenAtStart) chosenAtStart mode
+                      else pure False
                   let applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
                         -- PlaySubgame may have bound its loser slot.
@@ -446,7 +484,7 @@ resolveSpellWith runSubgame oid = do
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalityNow = Map.mapWithKey legalSlot chosenNow
                         applyEffectWith runSubgame oid oid effectController legalityNow chosenNow eff
-                  Monad.when taken (Monad.forM_ (Mode.effects mode) applyOne)
+                  Monad.when (taken && not gatePaid) (Monad.forM_ (Mode.effects mode) applyOne)
                 finishSpell oid face effectController
 
 -- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution.
@@ -525,7 +563,10 @@ resolveModes stackId srcId modes = do
             -- instructions are applied. Run only when `fizzles` is False, so the
             -- question is never asked about an ability that never resolves.
             taken <- exercises stackId effectController idx mode
-            Monad.when taken (Monad.mapM_ (applyEffect stackId srcId effectController legality chosen) (Mode.effects mode))
+            -- CR 118.12a: then the "unless [a player] pays", against the same
+            -- slots -- see the spell path for why it follows the "may".
+            gatePaid <- if taken then paid stackId srcId idx legality chosen mode else pure False
+            Monad.when (taken && not gatePaid) (Monad.mapM_ (applyEffect stackId srcId effectController legality chosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
@@ -545,10 +586,91 @@ exercises resolving controller idx mode = case Mode.optionality mode of
   Optionality.Optional -> do
     gs <- State.get
     let decider = Decide.deciderFor controller gs
-    decision <- Trans.lift (Program.prompt (Prompt.ChooseOptional decider controller resolving idx))
+    decision <- Game.choose (Prompt.ChooseOptional decider controller resolving idx)
     pure $ case decision of
       OptionalDecision.Exercises -> True
       OptionalDecision.Declines -> False
+
+-- CR 118.12a: does this mode's instruction list happen, given the "unless [a
+-- player] pays" it may state? A mode stating none always does. One that states
+-- one offers the cost to the player its `payer` slot names, and the instructions
+-- are the OTHER branch -- that rule reads "'[Do something] unless [a player does
+-- something else]' ... means the same thing as '[A player may do something
+-- else]. If [that player doesn't], [do something]'", so a refusal is not a
+-- failure and the resolution continues either way.
+--
+-- The branch is keyed on the ANSWER and never on the board afterwards, which is
+-- CR 118.12 in as many words: the clause "checks whether the player chose to pay
+-- an optional cost or started to pay a mandatory cost, regardless of what events
+-- actually occurred". That rule's Dermoplasm example is what a re-check of the
+-- world would get wrong -- the payment's intended consequence was replaced and
+-- the branch still ran. Nothing here looks at the target, at the payer's board or
+-- at the mana that moved; it reads Prompt.ChooseToPay's answer.
+--
+-- FIVE outcomes. Exactly one skips the instructions -- the payer chose to pay
+-- and the payment went through -- and the other four run them:
+--
+--   * no payer. The slot is unfilled, has become an illegal target (CR 608.2b),
+--     or names an object that is gone, so there is nobody to offer the cost to
+--     and nobody has paid. Unreachable for Mana Leak, whose single target slot
+--     sends the whole spell through CR 608.2b's fizzle before this is asked.
+--   * the payer CANNOT pay. CR 118.12a has made this cost a "may", and CR 118.3
+--     says "a player can't pay a cost without having the necessary resources to
+--     pay it fully" -- so declining is the only possible answer and there is
+--     nothing to ask. Not asked; see Prompt.ChooseToPay.
+--   * the payer declines.
+--   * the payer chose to pay and the payment did not go through.
+--
+-- A payment that was chosen and then did not go through is read as not paid,
+-- which is the branch that leaves the game where it started: Pawl.Engine.Cost.pay
+-- restores the entry state, so an Unpaid result is a complete no-op and no cost
+-- was paid to read a choice off. Nothing in the pool reaches it, and the reason
+-- is Mana Leak's cost specifically: {3} is GENERIC, so every tap pays it. A
+-- coloured resolution cost would reach it the way Pawl.Engine.Mana.payCost's own
+-- haddock describes -- failure there is reachable, because a player who taps
+-- their only Birds of Paradise for green cannot then pay {B} (#417, #56).
+--
+-- The cost is paid AGAINST `source` rather than the resolving stack object: CR
+-- 113.7a keeps the source on the permanent, which is what a component naming
+-- "this" must reach. The two are the same object for a spell.
+--
+-- CR 118.13b's announcement -- how a symbol payable in multiple ways is being
+-- paid, chosen immediately before this payment -- is not made (#702).
+paid :: ObjectId -> ObjectId -> ModeIndex -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Mode.Mode Card.Type.Card -> Game Bool
+paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
+  Nothing -> pure False
+  Just gate -> do
+    gs <- State.get
+    let cost = UnlessPaid.cost gate
+    case payerOf (UnlessPaid.payer gate) legality chosen gs of
+      Nothing -> pure False
+      Just payer ->
+        if not (Cost.canPay payer source cost gs)
+          then pure False
+          else do
+            decision <- Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cost)
+            case decision of
+              PaymentDecision.Declines -> pure False
+              PaymentDecision.Pays -> do
+                outcome <- Cost.pay payer source cost
+                pure (outcome == Payment.Paid)
+
+-- Which player a resolution cost is offered to. ONE slot read answering in two
+-- ways, since a slot may hold either kind of recipient: a slot bound to a PLAYER
+-- names that player, and one bound to an OBJECT names whoever controls it -- CR
+-- 109.4, "only objects on the stack or on the battlefield have a controller",
+-- and CR 405.4 for a spell in particular. Mana Leak's "its controller", read off
+-- the targeted spell. NOT CR 109.5, which is the rule for the words "you" and
+-- "your" on an object; this card says "its controller" instead.
+--
+-- Legality is asked as every other slot read asks it (CR 608.2b): a slot filled
+-- by targeting that has since become illegal names nobody, and a reserved slot
+-- has no target spec, so legalSlot already answered True.
+payerOf :: SlotName -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> GameState -> Maybe PlayerId
+payerOf slot legality chosen gs = case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+  (Just (Recipient.ToPlayer pid), True) -> Just pid
+  (Just recipient, True) -> Recipient.objectOf recipient >>= \oid -> Projection.controllerOf oid gs
+  _ -> Nothing
 
 -- CR 608: resolve an activated ability. The effect SOURCE is the source permanent
 -- (CR 113.7a), not the ability object. Reads only the ability's CHOSEN modes (CR
@@ -735,6 +857,66 @@ objectRefRecipients legality chosen controller source gs ref = case ref of
     _ -> []
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legality chosen controller source gs ref)
 
+-- CR 615.3: install one floating prevention shield over `recipient`, for a
+-- duration. The shared body of Effect.PreventNextDamage's and
+-- Effect.PreventAllDamage's arms, which differ only in the DamageRewrite they
+-- hand it -- CR 615.7's countdown or CR 615.1's unbounded one.
+--
+-- The row's other fields are Replace's: CR 113.7's source, CR 109.5's controller
+-- baked at installation, and a fresh timestamp for its CR 614.5 identity.
+--
+-- One shield PER RECIPIENT, which is why both arms fold this over the set their
+-- ObjectRef names rather than installing a single row: CR 615.11 says an effect
+-- covering several recipients "creates a prevention shield for each applicable
+-- creature when the spell or ability that generates that effect resolves". Every
+-- producer in the pool names exactly one, so the fold is over a singleton today.
+--
+-- Not implemented: CR 615.5's additional effect. The row carries a
+-- ReplacementEffect and no payload, so a prevention that also does something --
+-- Test of Faith's "for each 1 damage prevented this way, put a +1/+1 counter on
+-- that creature" -- cannot be written (#689).
+installShield :: PlayerId -> ObjectId -> Duration.Duration -> DamageRewrite.DamageRewrite -> GameState -> Recipient -> GameState
+installShield controller source duration rewrite g recipient = case Expiry.arm controller source duration g of
+  -- CR 611.2b: the duration never started, so no shield is installed.
+  Nothing -> g
+  Just expiry ->
+    let (ts, g1) = Game.freshTimestamp g
+        active =
+          ActiveReplacement.MkActiveReplacement
+            { ActiveReplacement.effect =
+                ReplacementEffect.DamageR
+                  DamagePattern.MkDamagePattern
+                    { -- Both producers say "damage that would be dealt", naming
+                      -- no kind, so the shield takes combat and noncombat alike.
+                      DamagePattern.whichKind = Nothing,
+                      -- Nor does either name a source, which is CR 615.7's own
+                      -- "the number of events or sources dealing it doesn't
+                      -- matter". CR 615.9's shields against a source of a chosen
+                      -- quality are a different rule, and have no producer
+                      -- (#588).
+                      DamagePattern.whichSource = SourceRelation.AnySource,
+                      DamagePattern.whichRecipient = Just recipient
+                    }
+                  rewrite,
+              ActiveReplacement.source = source,
+              -- CR 109.5, baked as Replace's is: nothing reads it on a shield
+              -- today (the pattern names its recipient outright and has no
+              -- ControllerRelation to resolve), but the row cannot be built
+              -- without one.
+              ActiveReplacement.controller = controller,
+              ActiveReplacement.timestamp = ts,
+              ActiveReplacement.expiry = expiry,
+              -- CR 615.7's shield is spent in DAMAGE, not in applications, so
+              -- the use count is not what ends it (see Pawl.Types.Uses); a
+              -- PreventAll shield has nothing to spend at all.
+              ActiveReplacement.uses = Uses.Unlimited,
+              -- CR 614.15: a prevention shield replaces damage from any source,
+              -- including one this resolution is not itself dealing, so it is
+              -- not a self-replacement.
+              ActiveReplacement.origin = ReplacementOrigin.Other
+            }
+     in g1 {GameState.replacements = active : GameState.replacements g1}
+
 -- One effect, applied. The case on the constructor is this module's charter.
 -- `runSubgame` is the injected nested-game runner; only the PlaySubgame arm
 -- consults it, and the bare applyEffect below passes noSubgame.
@@ -875,7 +1057,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             ask = case family of
               SubtypeFamily.BasicLandType -> Prompt.ChooseLandTypeSwap decider controller resolving slot forbidden
               SubtypeFamily.CreatureType -> Prompt.ChooseCreatureTypeSwap decider controller resolving slot forbidden
-        (from, to) <- Trans.lift (Program.prompt ask)
+        (from, to) <- Game.choose ask
         State.modify' $ \gs ->
           -- CR 611.2a: the opcode states no duration, so the effect "lasts
           -- until the end of the game" -- Duration.Indefinite, armed through
@@ -925,7 +1107,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           gs <- State.get
           let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
               decider = Decide.deciderFor controller gs
-          answer <- Trans.lift (Program.prompt (Prompt.SearchLibrary decider controller matches))
+          answer <- Game.choose (Prompt.SearchLibrary decider controller matches)
           -- CR 701.23a: the card found is one the search's own filter admits.
           -- Filtered, not trusted (#222): naming a card the filter excluded, or one
           -- that is not in the library at all, finds nothing rather than fetching
@@ -1256,7 +1438,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   else do
                     -- CR 701.9b: the discarding player chooses which cards.
                     let decider = Decide.deciderFor target gs
-                    choices <- Trans.lift (Program.prompt (Prompt.ChooseDiscard decider target held count))
+                    choices <- Game.choose (Prompt.ChooseDiscard decider target held count)
                     -- FILTERED AND COMPLETED, the posture PlayerSacrifices takes
                     -- below. Dropping the invalid picks is not enough: this branch
                     -- is reached only when the hand is LARGER than the count, so CR
@@ -1369,7 +1551,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 picked <-
                   if Natural.length candidates <= count
                     then pure (Set.fromList candidates)
-                    else Trans.lift (Program.prompt (Prompt.ChooseSacrifices decider victim source candidates count))
+                    else Game.choose (Prompt.ChooseSacrifices decider victim source candidates count)
                 -- FILTERED AND COMPLETED, not merely filtered. Dropping the
                 -- invalid picks is not enough: Diabolic Edict is not "may", so an
                 -- interpreter answering with too few -- or with nothing -- would
@@ -1440,7 +1622,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 gs1 <- State.get
                 let candidates = first NonEmpty.:| (second : rest)
                     decider = Decide.deciderFor controller gs1
-                answer <- Trans.lift (Program.prompt (Prompt.ChooseBoundToken decider controller source candidates))
+                answer <- Game.choose (Prompt.ChooseBoundToken decider controller source candidates)
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot resolving slot named)
       _ -> pure ()
@@ -1490,7 +1672,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- CR 614.3 / 615.3: install the floating replacement; Pawl.Engine.Replacement
     -- consults it at every funnel until cleanup drops it (CR 514.2) or its use is
     -- spent. Targetless and unprompted. CR 113.7: the SOURCE is this effect's
-    -- source, which is what CR 615.13's "prevented" triggers will read (#612).
+    -- source, which together with the timestamp is the row's CR 614.5 identity --
+    -- what a "prevented this way" trigger would have to be keyed on (#687).
     --
     -- CR 614.15: the ORIGIN travels with the row rather than being re-derived,
     -- because it is a fact about the ability that wrote it and nothing on the
@@ -1558,49 +1741,19 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- the same state `setShield` leaves a spent one in.
         Monad.when (n > 0) . State.modify' $ \g0 ->
           let amount = Integer.toNaturalSaturating n
-              install g recipient = case Expiry.arm controller source duration g of
-                -- CR 611.2b: the duration never started, so no shield is installed.
-                Nothing -> g
-                Just expiry ->
-                  let (ts, g1) = Game.freshTimestamp g
-                      active =
-                        ActiveReplacement.MkActiveReplacement
-                          { ActiveReplacement.effect =
-                              ReplacementEffect.DamageR
-                                DamagePattern.MkDamagePattern
-                                  { -- Mending Hands says "damage that would be
-                                    -- dealt", naming no kind, so the shield
-                                    -- takes combat and noncombat alike.
-                                    DamagePattern.whichKind = Nothing,
-                                    -- Nor does it name a source, which is CR
-                                    -- 615.7's own "the number of events or
-                                    -- sources dealing it doesn't matter". CR
-                                    -- 615.9's shields against a source of a
-                                    -- chosen quality are a different rule, and
-                                    -- have no producer (#588).
-                                    DamagePattern.whichSource = SourceRelation.AnySource,
-                                    DamagePattern.whichRecipient = Just recipient
-                                  }
-                                (DamageRewrite.PreventNext amount),
-                            ActiveReplacement.source = source,
-                            -- CR 109.5, baked as Replace's is: nothing reads it
-                            -- on a shield today (the pattern names its recipient
-                            -- outright and has no ControllerRelation to resolve),
-                            -- but the row cannot be built without one.
-                            ActiveReplacement.controller = controller,
-                            ActiveReplacement.timestamp = ts,
-                            ActiveReplacement.expiry = expiry,
-                            -- CR 615.7's shield is spent in DAMAGE, not in
-                            -- applications, so the use count is not what ends it
-                            -- (see Pawl.Types.Uses).
-                            ActiveReplacement.uses = Uses.Unlimited,
-                            -- CR 614.15: a prevention shield replaces damage from
-                            -- any source, including one this resolution is not
-                            -- itself dealing, so it is not a self-replacement.
-                            ActiveReplacement.origin = ReplacementOrigin.Other
-                          }
-                   in g1 {GameState.replacements = active : GameState.replacements g1}
-           in List.foldl' install g0 recipients
+           in List.foldl' (installShield controller source duration (DamageRewrite.PreventNext amount)) g0 recipients
+  Effect.PreventAllDamage duration ref -> do
+    -- CR 615.1 / 615.3: install one floating prevention shield per recipient the
+    -- ref names, with no amount to count down -- "prevent all damage that would
+    -- be dealt to you this turn" (Selfless Squire). The row is
+    -- PreventNextDamage's above in every respect but its rewrite, which is why
+    -- both go through `installShield`; what differs is that CR 615.7's "reduced
+    -- to 0" terminator does not exist here, so only the duration ends it.
+    --
+    -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
+    gs <- State.get
+    let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen controller source gs ref)
+    State.modify' $ \g0 -> List.foldl' (installShield controller source duration DamageRewrite.PreventAll) g0 recipients
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the
@@ -1673,30 +1826,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 }
          in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
   Effect.CreateEmblem card -> do
-    -- CR 114.2 / 613.7a: the emblem enters the command zone under the resolving
-    -- controller; its entry timestamp is what the projection reads when ordering
-    -- its static ability's continuous effect. Inert per-incarnation fields (it is
-    -- never tapped/damaged/countered): harmless, nothing reads them here.
-    let mkObj ts =
-          Object.MkObject
-            { Object.owner = controller,
-              Object.enteredUnder = Nothing,
-              Object.source = Source.OfEmblem card,
-              Object.zone = Zone.Command,
-              Object.tapped = TapState.Untapped,
-              Object.damage = 0,
-              Object.sickness = Sickness.Settled controller,
-              Object.bindings = Map.empty,
-              Object.counters = Map.empty,
-              Object.attachedTo = Nothing,
-              Object.chosenColor = Nothing,
-              Object.chosenSubtype = Nothing,
-              Object.chosenNames = Set.empty,
-              Object.timestamp = ts,
-              Object.face = Nothing,
-              Object.playableFromExileBy = Nothing
-            }
-    _ <- Event.placeObject controller mkObj Zone.Command
+    -- CR 114.2: the resolving controller gets the emblem. The whole minting is
+    -- Event.createEmblem's, shared with CR 701.54c's Ring emblem.
+    _ <- Event.createEmblem controller card
     pure ()
   Effect.BecomeMonarch target -> do
     gs <- State.get
@@ -1809,7 +1941,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   -- answer naming something that was never offered falls back to
                   -- the first candidate, since the effect is mandatory and must
                   -- pick something.
-                  answer <- Trans.lift (Program.prompt (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered))
+                  answer <- Game.choose (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
                   pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
               gs1 <- State.get
               -- CR 303.4j, for an Aura -- "the Aura doesn't move" -- and CR
@@ -1925,7 +2057,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         players = filter (not . null . kindsFor) everyone
     Monad.unless (null permanents && null players) $ do
       (pickedPermanents, pickedPlayers) <-
-        Trans.lift (Program.prompt (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players))
+        Game.choose (Prompt.ChooseProliferate (Decide.deciderFor controller gs) controller permanents players)
       -- FILTERED, NOT TRUSTED, the posture every other prompt reader takes: an
       -- answer naming something that was not offered is dropped rather than
       -- honoured, so a bogus id cannot mint a counter on a permanent that had
@@ -1951,6 +2083,11 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                         (GameState.players g)
                   }
             )
+  -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
+  -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
+  -- this arm knows only that some effect asked for it, exactly as the arms around
+  -- it know only that some effect asked for a counter or a card.
+  Effect.TemptWithTheRing -> Ring.tempt controller
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

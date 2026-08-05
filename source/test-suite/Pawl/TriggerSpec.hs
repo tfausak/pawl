@@ -912,7 +912,7 @@ delayedSpec s registry =
         -- direction (`Map.union captured placementTime`) the captured {7} would
         -- win instead, and this assertion would fail.
         Spec.it s "CR 603.7c placement-time's own chosen mode wins a collision with the captured environment" $ do
-          let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty, Mode.optionality = Optionality.Mandatory}
+          let onlyMode = Mode.MkMode {Mode.effects = Seq.empty, Mode.targetSpecs = Map.empty, Mode.optionality = Optionality.Mandatory, Mode.unlessPaid = Nothing}
               ability =
                 TriggeredAbility.MkTriggeredAbility
                   { TriggeredAbility.condition = TriggerCondition.SelfEnters,
@@ -2992,6 +2992,10 @@ representativeEvents cond =
           moved Zone.Battlefield Zone.Graveyard NonEmpty.:| [moved Zone.Battlefield Zone.Hand]
         TriggerCondition.SpellOrAbilityCounters _ ->
           one (GameEvent.SpellCountered (Countering.MkCountering departed arrived S.alice))
+        -- CR 615.13: the recipient has to be a PLAYER, this condition being
+        -- scoped to damage that would be dealt to one -- an event naming a
+        -- creature matches nothing and would pin the floor at empty.
+        TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (Recipient.ToPlayer S.bob) 2)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3012,7 +3016,8 @@ everyTriggerCondition =
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
-    TriggerCondition.SpellOrAbilityCounters PlayerRelation.You
+    TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
+    TriggerCondition.DamageToPlayerPrevented PlayerRelation.You
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something

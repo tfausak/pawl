@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -58,6 +59,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
@@ -955,10 +957,11 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   -- CR 702.14c's SECOND clause: "with the specified type or supertype (as in
-  -- 'artifact landwalk')". Vectis Gloves is the only paper source, and it is the
-  -- pool's first GRANTED landwalk -- every other printing carries the keyword on
-  -- its own type line -- so this is also the first case where the criterion
-  -- arrives through a CR 613.1f layer-6 GainKeyword rather than off the card.
+  -- 'artifact landwalk')". Vectis Gloves is the only paper source of artifact
+  -- landwalk, and it GRANTS the keyword rather than printing it on a creature --
+  -- so the criterion arrives through a CR 613.1f layer-6 GainKeyword rather than
+  -- off the card, which is the other way to have one (Lord of Atlantis is the
+  -- pool's second grant, in TextChangedLandwalk below).
   Spec.it s "CR 702.14c an artifact landwalker granted by Vectis Gloves walks on an artifact land" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     gloves <- S.printingOf s registry "Vectis Gloves"
@@ -1010,6 +1013,165 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
+-- CR 612.1's word swap, cast for real: alice pays {U} out of her own Island and
+-- resolves a Magical Hack aimed at `target`, replacing `from` with `to`.
+--
+-- Her OWN Island, deliberately. CR 702.14c reads the DEFENDING player's lands,
+-- so mana on alice's side of the board cannot satisfy the landwalk this Hack is
+-- about to rewrite, and every land bob controls in these cases is there to be
+-- read rather than tapped.
+castHackAt :: ObjectId.ObjectId -> ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> GameState.GameState -> GameState.GameState
+castHackAt hackId target from to gs =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject target)) sets
+        Prompt.ChooseLandTypeSwap {} -> (from, to)
+        _ -> S.identityAnswer p
+   in S.runPure answer (gs {GameState.priority = Just S.alice}) (do S.cast S.alice hackId; Stack.resolveTop)
+
+-- The board both landwalk text-change groups attack from: alice attacks with
+-- everything she has, bob defends with a Goblin Piker and one land of
+-- `landName`, and alice holds a Magical Hack plus the Island that pays for it.
+-- With `hacked`, she casts it at `hackTarget` (chosen from her permanents by the
+-- caller) before attackers are declared.
+--
+-- Returns the post-declaration state, the attacker of interest and the blocker.
+hackedLandwalkBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [Printing.Printing] ->
+  ([ObjectId.ObjectId] -> Maybe ObjectId.ObjectId) ->
+  Bool ->
+  Subtype.Subtype ->
+  Subtype.Subtype ->
+  Printing.Printing ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+hackedLandwalkBoard s registry mine hackTarget hacked from to defendersLand = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  island <- S.printingOf s registry "Island"
+  magicalHack <- S.printingOf s registry "Magical Hack"
+  let (gs0, ours, theirs) = S.combatBoardOf mine [piker]
+      (_, gs1) = S.addCreature island S.alice gs0
+      (_, gs2) = S.addCreature defendersLand S.bob gs1
+      (hackId, gs3) = S.addHandCard magicalHack S.alice gs2
+      board = case (hacked, hackTarget ours) of
+        (True, Just t) -> castHackAt hackId t from to gs3
+        _ -> gs3
+      attacked = snd (Engine.runGamePure S.aggressiveAnswer board (Combat.declareAttackers S.alice))
+  case (ours, theirs) of
+    (a : _, b : _) -> pure (attacked, a, b)
+    _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+-- CR 612.1 reaching a keyword's own land type, end to end through the real
+-- engine, in both of the two ways a creature can have one.
+--
+-- CR 702.14a: landwalk "appears within an object's rules
+-- text as '[type]walk'". CR 612.1: a text change reaches
+-- "any words or symbols printed on that object". So the land type in swampwalk
+-- is a word a Magical Hack swaps -- which is the example Magical Hack's own
+-- reminder text gives, "you may change 'swampwalk' to 'plainswalk'".
+--
+-- Each half is a 2x2: hacked or not, crossed with the OLD land and the NEW one
+-- on bob's side. The diagonal is what discriminates -- "the Merfolk was blocked"
+-- is equally true of a landwalk that never applied for some unrelated reason, so
+-- the unhacked pair is asserted alongside as the paired control.
+textChangedLandwalkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
+  -- The GRANTED half. Lord of Atlantis {U}{U} Creature -- Merfolk 2/2, "Other
+  -- Merfolk get +1/+1 and have islandwalk." (checked against Scryfall,
+  -- 2026-08-05) and Tidal Warrior, the pool's other Merfolk, are the whole
+  -- board.
+  --
+  -- Which creature the Hack NAMES is the whole of CR 612.3: "any abilities that
+  -- are granted to an object can't be modified by text-changing effects that
+  -- affect that object". Naming the Lord rewrites the grant; naming the Warrior
+  -- that RECEIVED islandwalk must not, and the case below asserts exactly that.
+  --
+  -- Two mechanisms give it, and the first is the one that scopes the rewrite:
+  -- gatherStatic is called with the SOURCE's own changes, so a Hack on the
+  -- Warrior never reaches the Lord's GainKeyword at all. The layer order (the
+  -- swap at 3, the grant at 6) is the second and weaker one.
+  let -- combatBoardOf returns the ids in printing order, so the Warrior is the
+      -- head and the Lord is the second. Which of the two the Hack names is the
+      -- parameter, since that is the whole difference between CR 612.1's case
+      -- and CR 612.3's.
+      theWarrior = Maybe.listToMaybe
+      theLord = Maybe.listToMaybe . drop 1
+      lordBoardAt hackTarget hacked land = do
+        lord <- S.printingOf s registry "Lord of Atlantis"
+        tidalWarrior <- S.printingOf s registry "Tidal Warrior"
+        landP <- S.printingOf s registry land
+        hackedLandwalkBoard s registry [tidalWarrior, lord] hackTarget hacked Subtype.Island Subtype.Swamp landP
+      lordBoard = lordBoardAt theLord
+  Spec.it s "CR 702.14c an unhacked Lord of Atlantis grants ISLANDwalk" $ do
+    -- The premise, and the control the two hacked cases are read against: with
+    -- the Lord's text as printed, bob's Island stops the block and his Swamp
+    -- does not.
+    (onIsland, warrior, blocker) <- lordBoard False "Island"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland)) "an Island stops the block"
+    -- The Lord's OTHER modification, which the swap must leave alone: a Tidal
+    -- Warrior is a printed 1/1, so a 2/2 is the +1/+1 half still applying.
+    Spec.assertEqWith s "and the Warrior is a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
+    (onSwamp, warrior', blocker') <- lordBoard False "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp) "a Swamp does not"
+  Spec.it s "CR 612.1 a hacked Lord of Atlantis grants SWAMPwalk instead" $ do
+    -- THE CASE. Island -> Swamp on the Lord, and bob's board never moves: the
+    -- Island that used to stop the block no longer does, and the Swamp that
+    -- used to allow it no longer does either. Both halves fail against a
+    -- rewrite that walks past a Modification.GainKeyword.
+    (onIsland, warrior, blocker) <- lordBoard True "Island"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland) "an Island no longer stops the block"
+    let after = S.runPure S.aggressiveAnswer onIsland Combat.declareBlockers
+    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf warrior after) (Set.singleton blocker)
+    Spec.assertEqWith s "the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
+    (onSwamp, warrior', blocker') <- lordBoard True "Swamp"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp)) "a Swamp stops it now"
+  Spec.it s "CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing" $ do
+    -- CR 612.3 itself, and the case the two above are read against a THIRD
+    -- time: the same Island -> Swamp swap, aimed at the WARRIOR. Its islandwalk
+    -- is the Lord's text and not its own, so the swap cannot reach it and the
+    -- board answers exactly as the unhacked one does.
+    --
+    -- The Warrior is a legal and non-vacuous target: its own printed text says
+    -- "target land becomes an Island until end of turn", so the Hack really does
+    -- have an Island of its own to rewrite there. What it must not rewrite is
+    -- the keyword, which arrived from somewhere else.
+    (onIsland, warrior, blocker) <- lordBoardAt theWarrior True "Island"
+    -- THE ANTI-VACUITY CHECK, and it has to come first: every assertion below
+    -- also holds of a Hack that was never cast at all. This one says the swap
+    -- really did land, and on the Warrior.
+    Spec.assertEqWith s "the Hack resolved onto the Warrior" (Projection.textChangesAffecting warrior onIsland) [(Subtype.Island, Subtype.Swamp)]
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland)) "an Island still stops the block"
+    Spec.assertEqWith s "and the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
+    -- The half that keeps this from passing by the landwalk simply vanishing: a
+    -- Warrior that had wrongly picked up swampwalk would make this one illegal.
+    (onSwamp, warrior', blocker') <- lordBoardAt theWarrior True "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp) "and a Swamp still does not"
+    let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
+    Spec.assertEqWith s "the block sticks" (Combat.blockersOf warrior' after) (Set.singleton blocker')
+  -- The PRINTED half, one carrier over: Bog Wraith ("Creature -- Wraith 3/3,
+  -- Swampwalk" and nothing else) has the keyword on its own type line rather
+  -- than from a grant, so the swap has to reach the projection's keyword map at
+  -- CR 613.1c layer 3 instead of a static ability's modification. Same rule,
+  -- different site -- and the pair below is what tells the two apart.
+  let wraithBoard hacked land = do
+        bogWraith <- S.printingOf s registry "Bog Wraith"
+        landP <- S.printingOf s registry land
+        hackedLandwalkBoard s registry [bogWraith] Maybe.listToMaybe hacked Subtype.Swamp Subtype.Island landP
+  Spec.it s "CR 702.14c an unhacked Bog Wraith walks on SWAMPS" $ do
+    (onSwamp, wraith, blocker) <- wraithBoard False "Swamp"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker wraith) onSwamp)) "a Swamp stops the block"
+    (onIsland, wraith', blocker') <- wraithBoard False "Island"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' wraith') onIsland) "an Island does not"
+  Spec.it s "CR 612.1 a hacked Bog Wraith walks on ISLANDS" $ do
+    (onSwamp, wraith, blocker) <- wraithBoard True "Swamp"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker wraith) onSwamp) "a Swamp no longer stops the block"
+    let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
+    Spec.assertEqWith s "and the block sticks" (Combat.blockersOf wraith after) (Set.singleton blocker)
+    (onIsland, wraith', blocker') <- wraithBoard True "Island"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' wraith') onIsland)) "an Island stops it now"
+
 -- CR 702.111: grant menace to `oid` with a stored continuous effect, withFear's
 -- twin. Used only by the CR 509.1b "after a legal block has been declared" case
 -- below, which needs menace to ARRIVE mid-combat; every other case here reads
@@ -1028,16 +1190,16 @@ withMenace oid gs =
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
 -- CR 702.111b, proved by Boggart Brute ("Creature -- Goblin Warrior 3/2,
--- Menace") -- the first restriction of the SET shape #533 named, and the first
--- evasion ability that is not a question about a (blocker, attacker) pair. Only
--- the blocking side of that issue; its attacking side has no card and no gate
--- (see attackCeiling).
+-- Menace") -- the blocking side's SET-SHAPED combat restriction, and the first
+-- evasion ability that is not a question about a (blocker, attacker) pair. Its
+-- attacking counterpart is Bonded Construct's "can't attack alone"
+-- (attacksAloneSpec below).
 --
 -- The whole group turns on the difference between "two or more creatures block
 -- it" and "each creature blocking it passes some test". Flying, reach, fear and
 -- landwalk are all the second kind, so they are checked in
 -- Pawl.Engine.Combat.pairAllowed; menace is the first of the first kind, and is
--- checked in declarationAllowed, which sees the whole map at once. The
+-- checked in blockDeclarationAllowed, which sees the whole map at once. The
 -- zero-blockers case below is what separates 702.111b's "can't be blocked EXCEPT
 -- BY two or more" from the naive "at least two creatures must block it".
 menaceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1844,6 +2006,149 @@ conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional Comba
         Spec.assertEqWith s "without it, bob takes nothing" (S.lifeOf S.bob control) (Just 20)
         Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
       _ -> Spec.assertFailure s "fixture should have two creatures"
+
+-- CR 508.1c read through CR 506.5, proved by Bonded Construct ("{1} Artifact
+-- Creature -- Construct 2/1, This creature can't attack alone") -- the attacking
+-- side's SET-SHAPED restriction, and menaceSpec's twin across the combat phase.
+--
+-- What makes it a different KIND of restriction from Pacifism's, and not merely a
+-- narrower one: there is no answer to "may this creature attack?" at all. The
+-- Construct may attack in some declarations and not in others, so it stays on CR
+-- 508.1a's candidate list and the illegality is a property of the declaration.
+-- The first assertion of every case below is that it is still offered, because
+-- "the attack was refused" is also what a bug that drops it from the candidate
+-- list produces -- and that bug would pass every negative assertion here.
+--
+-- The requirement cases are the subtle half. CR 508.1d's maximum is "the maximum
+-- possible number of requirements that could be obeyed WITHOUT DISOBEYING ANY
+-- RESTRICTIONS", and before this card no attacking restriction could take a
+-- required creature's declaration away, so the maximum was always every
+-- requirement at once. Under a Curse of the Nightly Hunt a lone Construct is
+-- required to attack and forbidden to attack alone, and the maximum is zero.
+attacksAloneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
+  Spec.it s "CR 506.5 a lone Bonded Construct is a legal CANDIDATE that may not be the whole declaration" $ do
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    let (gs, mine, _) = S.combatBoardOf [bondedConstruct] []
+    case mine of
+      [construct] -> do
+        Spec.assertBool s (Combat.canAttack S.alice construct gs) "the Construct can attack"
+        Spec.assertEqWith s "and is offered" (Combat.legalAttackers S.alice gs) [construct]
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "but attacking alone is illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "and declining stays legal"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 506.5 a Goblin Piker beside it makes the same Construct's attack legal" $ do
+    -- The permitted case on the SAME board as the refused one, which is what
+    -- separates this restriction from summoning sickness, a tap, or a defender:
+    -- none of those changes its answer when a second creature is declared.
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [bondedConstruct, piker] []
+    case mine of
+      [construct, other] -> do
+        Spec.assertEqWith s "both are offered" (Combat.legalAttackers S.alice gs) [construct, other]
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone is still illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] gs) "the two together are legal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [other] gs) "and the Piker alone is legal, so nothing blanket-refused"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1c two Bonded Constructs may attack together, which is that rule's own Example" $ do
+    -- Verbatim: "A player controls two creatures, each with a restriction that
+    -- states 'This creature can't attack alone.' It's legal to declare both as
+    -- attackers." The reading it falsifies is "each restricted creature needs an
+    -- UNRESTRICTED companion", which passes every other case in this group.
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    let (gs, mine, _) = S.combatBoardOf [bondedConstruct, bondedConstruct] []
+    case mine of
+      [first, second] -> do
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] gs) "declaring both is legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first] gs)) "either one alone is illegal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [second] gs)) "in both directions"
+      _ -> Spec.assertFailure s "fixture should have two Constructs"
+  Spec.it s "CR 508.1d a required creature that can't attack alone makes the maximum ZERO" $ do
+    -- The board CR 508.1d's closed form got wrong: the Curse requires the
+    -- Construct to attack if able, the Construct may not attack alone, and there
+    -- is nobody to attack with -- so no legal declaration obeys the requirement
+    -- and declining attains the maximum. A ceiling that assumed "every required
+    -- creature at once is legal" answers this by forcing an illegal attack.
+    --
+    -- The lone Piker under the same Curse is the control, and it is the case that
+    -- makes this one non-vacuous: there declining IS illegal, so the Curse is
+    -- live and it is the Construct's restriction that moved the maximum.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [bondedConstruct] []
+        (control, _, _) = cursing curse S.alice [piker] []
+    case mine of
+      [construct] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] control)) "a required Piker may not decline"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "but a required Construct with no company may"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "and attacking alone stays illegal, requirement or no requirement"
+      _ -> Spec.assertFailure s "fixture should have one creature"
+  Spec.it s "CR 508.1d with company the maximum is BOTH, and the Piker alone no longer attains it" $ do
+    -- The other side of the same interaction. One Curse over two able creatures
+    -- is two requirements, both obeyable at once because attacking together is
+    -- legal -- so the restriction bounds the maximum here without zeroing it, and
+    -- the declaration that obeys only the Piker's is now illegal.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [bondedConstruct, piker] []
+    case mine of
+      [construct, other] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "declining is illegal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [other] gs)) "the Piker alone obeys one of two"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] gs)) "the Construct alone is illegal twice over, on the restriction and on the count"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] gs) "only both together is legal"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 508.1d a Ghostly Prison excuses the whole maximum even where attacking together is legal" $ do
+    -- The cost clause reaching the ENUMERATION, which is the one path of
+    -- attackCeiling the cases above leave untested: the restriction is in force,
+    -- so the closed form is not taken, and the search still has to be over the
+    -- creatures that attack FREELY. With the Prison out and no Forests, neither
+    -- creature does, so the maximum is zero even though attacking together would
+    -- obey both requirements and disobey nothing.
+    --
+    -- An enumeration that ranged over every candidate would answer two here and
+    -- make declining illegal, which is CR 508.1d's third sentence exactly
+    -- backwards: a player is never required to pay a cost to attack.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    prison <- S.printingOf s registry "Ghostly Prison"
+    forest <- S.printingOf s registry "Forest"
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, mine, _) = imprisoning prison forest S.bob [bondedConstruct, piker] 0
+        taxed = cursingBoard curse S.alice board
+        (plain, _, _) = cursing curse S.alice [bondedConstruct, piker] []
+    case mine of
+      [construct, other] -> do
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] plain)) "without the Prison, declining is illegal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] taxed) "with it, declining is legal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [construct, other] taxed) "and attacking together anyway is still legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [construct] taxed)) "while the Construct alone stays illegal, cost or no cost"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 506.5 whole cards: a lone Construct sits out a real declare attackers step" $ do
+    -- The gameplay-level case, through the priority loop and CR 703.4i's
+    -- turn-based action rather than a direct call, with the interpreter that
+    -- attacks with everything it is offered.
+    --
+    -- THREE boards, because two would not be enough. The Construct with a Piker
+    -- connects for 4; the Construct alone is refused and bob takes nothing; the
+    -- PIKER alone connects for 2, which is what rules out "a lone attacker never
+    -- gets through" as the explanation of the middle board.
+    bondedConstruct <- S.printingOf s registry "Bonded Construct"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pair, mine, _) = S.combatBoardOf [bondedConstruct, piker] []
+        (lone, _, _) = S.combatBoardOf [bondedConstruct] []
+        (lonePiker, _, _) = S.combatBoardOf [piker] []
+        after = S.runCombat S.aggressiveAnswer pair
+        refused = S.runCombat S.aggressiveAnswer lone
+        control = S.runCombat S.aggressiveAnswer lonePiker
+    Spec.assertEqWith s "with company, bob takes four" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertEqWith s "and both were declared" (S.attackerDeclarationsOf after) mine
+    Spec.assertEqWith s "alone, bob takes nothing" (S.lifeOf S.bob refused) (Just 20)
+    Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf refused) []
+    Spec.assertEqWith s "while a lone PIKER connects for two" (S.lifeOf S.bob control) (Just 18)
 
 vigilanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
@@ -3367,11 +3672,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   vigilanceSpec s registry
   hasteSpec s registry
   evasionSpec s registry
+  textChangedLandwalkSpec s registry
   menaceSpec s registry
   blockRequirementSpec s registry
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
   conditionalCombatRestrictionSpec s registry
+  attacksAloneSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry
