@@ -433,17 +433,7 @@ applyDamage events = do
                 if DamageEvent.dealtByInfect ev
                   then givePoison (DamageEvent.amount ev + toxic) player
                   else givePoison toxic (drain player)
-              -- CR 119.2: damage dealt to a player CAUSES that player to lose
-              -- that much life, so this event is recorded here and not by
-              -- Pawl.Engine.Resolve's LoseLife arm, which never runs for damage.
-              -- Only where life was actually lost: CR 120.3b's infect diversion
-              -- replaces the life loss with poison counters, and zero damage
-              -- loses no life at all.
-              lost =
-                if DamageEvent.dealtByInfect ev || DamageEvent.amount ev == 0
-                  then id
-                  else Event.recordEvent (GameEvent.LifeLost pid (DamageEvent.amount ev))
-           in lost g {GameState.players = Map.adjust hit pid (GameState.players g)}
+           in g {GameState.players = Map.adjust hit pid (GameState.players g)}
         -- CR 120.1a, and defensive: combat never builds this shape (CR 510.1b-d
         -- name a creature, a player or a planeswalker), and the one producer that
         -- can -- Resolve's DealDamage arm, naming a permanent generically -- runs
@@ -472,6 +462,26 @@ applyDamage events = do
         Just pid ->
           let gain player = player {Player.life = Player.life player + toInteger (DamageEvent.amount ev)}
            in g {GameState.players = Map.adjust gain pid (GameState.players g)}
+      -- CR 119.2: damage dealt to a player CAUSES that player to lose that much
+      -- life, so the loss is recorded here and never by Pawl.Engine.Resolve's
+      -- LoseLife arm, which no damage runs through.
+      --
+      -- A separate pass rather than a line inside markOne, for the reason the
+      -- recording block below gives: markOne runs BEFORE either record is
+      -- appended, so a life loss written there would be logged ahead of the
+      -- damage that caused it and would move CR 603.3a's control sample onto a
+      -- pre-lifelink board.
+      --
+      -- Only where life was actually lost. CR 120.3b's infect diversion replaces
+      -- the life loss with poison counters, and a 0-damage event loses nothing --
+      -- neither is a life loss event for CR 702.179d to see. Only players: CR
+      -- 120.3c and CR 120.3d take a permanent's damage somewhere else entirely.
+      lifeLostBy ev = case DamageEvent.target ev of
+        Recipient.ToPlayer pid
+          | not (DamageEvent.dealtByInfect ev),
+            DamageEvent.amount ev > 0 ->
+              [GameEvent.LifeLost pid (DamageEvent.amount ev)]
+        _ -> []
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
   --
@@ -486,7 +496,14 @@ applyDamage events = do
         let marked = List.foldl' markOne gs survivors
             gained = List.foldl' gainOne marked survivors
             noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) gained prevented
-         in List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
+            dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
+         in -- CR 119.2's life loss is recorded AFTER the damage that caused it,
+            -- which is the same reasoning the prevention/damage order above
+            -- follows: both land inside one CR 117.5 boundary, so the triggers are
+            -- gathered together either way, and this fixes only the canonical
+            -- order. Simultaneous with the damage under CR 119.2, and logged after
+            -- it because a cause reads before its consequence.
+            List.foldl' (flip Event.recordEvent) dealt (concatMap lifeLostBy survivors)
     )
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --

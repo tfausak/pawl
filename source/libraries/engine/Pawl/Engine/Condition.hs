@@ -10,18 +10,22 @@
 -- rule scoped to a characteristic-defining ability, which a condition is not.
 --
 -- The VIEW is the caller's, and picking it is a rules decision rather than a
--- detail: CR 603.4's intervening "if" on a leaves-the-battlefield ability asks
--- about a source that no longer exists, so its two callers
--- (Event.interveningHolds and Pawl.Engine.Stack's CR 608.2a re-check) pass
--- Projection.viewWithLastKnown and not Projection.fullView. Nothing here can
--- compensate for the wrong one -- a source read as an empty object simply
--- answers False.
+-- detail. Three answers, one per kind of question:
 --
--- CR 604.7 settles it for the fourth caller, and settles it the other way: a
--- static ability "can't use an object's last known information", so
--- Projection.conditionHolds passes a live Projection.viewUpTo for a CR 604.2 "as
--- long as" clause -- bounded rather than full, which is a layer question rather
--- than a last-known one.
+--   * CR 603.4's intervening "if" on a leaves-the-battlefield ability asks about
+--     a source that no longer exists, so Event.interveningHolds and both arms of
+--     Pawl.Engine.Stack's CR 608.2a re-check (the object-borne one and the
+--     inherent one) pass Projection.viewWithLastKnown, never
+--     Projection.fullView. Nothing here can compensate for the wrong one -- a
+--     source read as an empty object simply answers False.
+--   * CR 604.7 settles a static ability's "as long as" clause the other way: it
+--     "can't use an object's last known information", so
+--     Projection.conditionHolds passes a live Projection.viewUpTo -- bounded
+--     rather than full, which is a layer question rather than a last-known one.
+--   * CR 702.178a's max speed gate is the same static-ability genre and gets a
+--     different answer again: Projection.abilitiesGiven asks it OVER the finished
+--     projection rather than inside the fold, so there is no layer to bound
+--     against and it passes Projection.fullView.
 module Pawl.Engine.Condition where
 
 import qualified Pawl.Engine.Count as Count

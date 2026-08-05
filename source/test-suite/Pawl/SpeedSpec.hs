@@ -10,10 +10,14 @@
 -- Gameplay-level throughout. Muraganda Raceway is the whole fixture: a Land
 -- printing "Start your engines!", "{T}: Add {C}" and "Max speed — {T}: Add
 -- {C}{C}", so one card supplies both halves -- the resource and something whose
--- presence depends on it. Speed is never poked onto a player record by hand; it
--- is started by the state-based action and raised by an opponent losing life to a
--- Sign in Blood or a Lightning Bolt cast through the stack, which is what makes
--- these cases evidence about the engine rather than about the fixture.
+-- presence depends on it.
+--
+-- Every case about how speed CHANGES gets there through the rules: started by the
+-- state-based action, raised by an opponent losing life to a Sign in Blood or a
+-- Lightning Bolt cast through the stack. The `atSpeed` helper at the foot of this
+-- module writes a speed directly, and only cases about what READS speed use it --
+-- rule 702.179d admits one increase a turn, so a board at 4 is four turns of
+-- setup that would prove nothing the increase cases have not already proved.
 module Pawl.SpeedSpec where
 
 import qualified Data.Map.Strict as Map
@@ -23,6 +27,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -155,14 +160,21 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
     Spec.assertEqWith s "one activated ability" (length (Projection.abilitiesOf racewayId gs)) 1
     Spec.assertEqWith s "and tapping it makes one mana" (pooledBy biggestYield racewayId gs) 1
   -- CR 702.179f: a player who has NO speed at all reads as speed 0 for anything
-  -- that asks, so the max speed clause is false rather than unanswered. Settling
-  -- is deliberately skipped, which is the only way to see a controller of a
-  -- Raceway with no speed.
+  -- that asks. Settling is deliberately skipped, which is the only way to see a
+  -- controller of a Raceway with no speed.
+  --
+  -- TWO assertions, because the gate alone cannot say this. An unanswered
+  -- quantity and a 0 both fail "exactly 4" -- Condition.holds collapses the
+  -- undeterminable case to False -- so the ability count below rules out a
+  -- stand-in of 4 and nothing finer. Speed.speedOf is the reading CR 702.179f
+  -- actually fixes, and Just 0 against the field's Nothing is what tells the two
+  -- apart.
   Spec.it s "CR 702.179f a controller with no speed reads as 0, not as unanswered" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     let (racewayId, gs) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
-    Spec.assertEqWith s "no speed" (speedOf S.alice gs) (Just Nothing)
-    Spec.assertEqWith s "still one activated ability" (length (Projection.abilitiesOf racewayId gs)) 1
+    Spec.assertEqWith s "the field holds no speed at all (CR 702.179b)" (speedOf S.alice gs) (Just Nothing)
+    Spec.assertEqWith s "but every reader sees 0 (CR 702.179f)" (Speed.speedOf S.alice gs) (Just 0)
+    Spec.assertEqWith s "so the max speed ability is absent" (length (Projection.abilitiesOf racewayId gs)) 1
   -- CR 702.178a's other side, and the case the whole gate exists for: at speed 4
   -- the object HAS the granted ability, and tapping it makes two mana.
   Spec.it s "CR 702.178a at max speed the Raceway gains its second mana ability" $ do

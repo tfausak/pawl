@@ -130,6 +130,14 @@ resolveTopWith runSubgame = do
           -- your speed is less than 4" is one, and eliding it would let a
           -- trigger that waited on the stack raise a speed already at max.
           --
+          -- No board reaches the removal today, and the branch is here because
+          -- CR 608.2a says so rather than because anything observes it: rule
+          -- 702.179d admits one trigger a turn and nothing else in the pool moves
+          -- a player's speed, so the answer cannot change between the CR 603.4
+          -- check in Pawl.Engine.Speed and this one. The two are mutually
+          -- redundant, not jointly redundant -- Pawl.SpeedSpec's "speed stops at
+          -- 4" case fails when BOTH are removed.
+          --
           -- The view is `oid`'s own, which has no characteristics to speak of --
           -- sound because an inherent ability's condition reads a PLAYER (CR
           -- 702.179d's "your speed"), never the object it hangs on, there being

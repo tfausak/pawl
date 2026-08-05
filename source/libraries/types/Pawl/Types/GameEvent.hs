@@ -141,9 +141,11 @@ data GameEvent
     -- returns before this is recorded, which CR 603.2g makes mandatory.
     SpellCountered Countering.Countering
   | -- | CR 119.3: a player LOST LIFE, and how much. Greater than 0 by
-    -- construction -- every producer already guards its own zero, and CR 119.9's
-    -- ruling that gaining 0 life is no life gain event at all is the same shape
-    -- read the other way.
+    -- construction: every producer guards its own zero. The rules state that
+    -- explicitly only for the other direction -- CR 119.9's "if a player gains 0
+    -- life, no life gain event has occurred" -- so reading it back onto loss is an
+    -- inference, not a citation; what makes the guard safe here is that nothing
+    -- reads this constructor except CR 702.179d, which a zero must not fire.
     --
     -- Recorded at all three places life leaves a player, which is a fact about the
     -- RULES and not about the engine's plumbing: CR 119.3 for a loss an effect
@@ -155,8 +157,9 @@ data GameEvent
     -- and so no site here.
     --
     -- LIFE GAIN gets no sibling constructor: nothing reads one (#768). Not one
-    -- "life total changed" constructor covering both, because CR 119.3 states the
-    -- two directions separately and every card that cares says which.
+    -- "life total changed" constructor covering both, though CR 119.3 does state
+    -- the two directions in a single sentence: they are distinct EVENTS for
+    -- triggers, and every card that cares says which.
     LifeLost PlayerId.PlayerId Natural.Natural
   | -- | CR 606.3: a LOYALTY ability of this permanent was activated -- the record
     -- that rule's once-per-permanent-per-turn limit is read out of.

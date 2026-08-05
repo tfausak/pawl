@@ -475,6 +475,14 @@ effectCounts effect = case effect of
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
 -- intervening "if" clause, and its modes' effects.
+-- CR 702.178a's "as long as" gate is a Condition like any other, so it reaches a
+-- Count and through it a Filter -- triggeredAbilityCounts' treatment of CR 603.4's
+-- intervening "if", one field over.
+activatedAbilityCounts :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
+activatedAbilityCounts ability =
+  foldMap conditionCounts (ActivatedAbility.condition ability)
+    <> concatMap effectCounts (Modal.allEffects (ActivatedAbility.modal ability))
+
 triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 triggeredAbilityCounts ability =
   triggerConditionCounts (TriggeredAbility.condition ability)
@@ -484,8 +492,9 @@ triggeredAbilityCounts ability =
 -- Every Count reachable from a card: every site a Pawl.Types.Count can be
 -- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
 -- effect/modification quantity), Condition (a trigger's own condition, a
--- triggered ability's intervening clause, a ForAsLongAs duration, and CR
--- 508.1c's / CR 509.1b's "unless some condition is met"), and every effect
+-- triggered ability's intervening clause, an activated ability's CR 702.178a
+-- gate, a ForAsLongAs duration, and CR 508.1c's / CR 509.1b's "unless some
+-- condition is met"), and every effect
 -- (spell, activated, triggered, delayed), recursing into a minted token or
 -- emblem.
 --
@@ -536,7 +545,7 @@ cardCounts card =
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
     <> concatMap staticAbilityCounts (Face.staticAbilities card)
     <> concatMap effectCounts (Card.allEffects card)
-    <> concatMap (concatMap effectCounts . Modal.allEffects . ActivatedAbility.modal) (Face.activatedAbilities card)
+    <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
@@ -1488,7 +1497,12 @@ triggeredAbilityFilters ability =
 
 activatedAbilityFilters :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
 activatedAbilityFilters ability =
-  unframed (costFilters (ActivatedAbility.cost ability))
+  unframed
+    ( costFilters (ActivatedAbility.cost ability)
+        -- CR 702.178a's "as long as" gate, the triggeredAbilityFilters
+        -- treatment of CR 603.4's intervening "if" one field over.
+        <> concatMap conditionFilters (Maybe.maybeToList (ActivatedAbility.condition ability))
+    )
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach

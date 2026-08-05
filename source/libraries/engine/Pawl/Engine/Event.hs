@@ -2579,12 +2579,15 @@ gatherTriggers events gs =
 -- because "doesn't trigger" must be indistinguishable from "no ability existed",
 -- including to the CR 117.5 settle loop's re-run flag.
 --
--- A SOURCELESS pending trigger (CR 725.2) never reaches this -- gatherTriggers is
--- the only caller and all three gatherers hang their triggers on an object, the
--- monarch's inherent pair being merged in afterwards. The arm answers True anyway
--- rather than failing: CR 725.2 fixes the text of both inherent abilities and
--- neither has an intervening "if". One that DID carry one would have no subject
--- object for Condition.holds, and is the case that must revisit this.
+-- A SOURCELESS pending trigger never reaches this -- gatherTriggers is the only
+-- caller and all three gatherers hang their triggers on an object, the inherent
+-- ones being merged in afterwards by Pawl.Engine.Engine. The arm answers True
+-- rather than failing because an inherent ability's own gatherer owns CR 603.4:
+-- rule 725.2's pair has no intervening "if" at all, and CR 702.179d's does,
+-- checked inside Pawl.Engine.Speed.inherentPending. A fourth gatherer must do the
+-- same; there is no subject object to hand this function, so routing one here
+-- would mean giving Condition.holds the ability object Pawl.Engine.Stack's CR
+-- 608.2a re-check uses, which does not exist until placement.
 --
 -- CR 608.2h supplies the view rather than fullView, which for a look-back trigger
 -- is the difference between reading the clause and reading nothing: CR 603.10a

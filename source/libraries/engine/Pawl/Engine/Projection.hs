@@ -1152,11 +1152,18 @@ rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.cre
   _ -> name
 
 -- CR 612.1: the same word swap over an ACTIVATED ability printed on a permanent,
--- whose text box the rule reaches. The modal payload only. Not implemented: the
--- ability's activation cost is left unrewritten (#635).
+-- whose text box the rule reaches. Two parts, the payload and CR 702.178a's "as
+-- long as" gate -- which shares rewriteCondition with CR 603.4's intervening "if"
+-- one function down, for that function's reason: a rewrite reaching only
+-- Mode.effects would leave the ability gated on the printed word.
+--
+-- Not implemented: the ability's activation cost is left unrewritten (#635).
 rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ActivatedAbility.ActivatedAbility Card.Type.Card
 rewriteActivatedAbility pairs ability =
-  ability {ActivatedAbility.modal = rewriteModal pairs (ActivatedAbility.modal ability)}
+  ability
+    { ActivatedAbility.modal = rewriteModal pairs (ActivatedAbility.modal ability),
+      ActivatedAbility.condition = fmap (rewriteCondition pairs) (ActivatedAbility.condition ability)
+    }
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not just
 -- the payload: the CR 603.8 condition is where the pool's word actually is, so a

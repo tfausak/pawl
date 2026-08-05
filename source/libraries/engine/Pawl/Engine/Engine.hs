@@ -363,10 +363,12 @@ runTurnBasedActions phase = do
 -- stack, in APNAP order (CR 603.3b): active player's triggers first, then each
 -- other player's in turn order (apnapPlayers). Within one controller's own set,
 -- that player chooses the order (orderPending), asked only when they control two
--- or more. The abilities that fired include CR 725.2's sourceless inherent
--- monarch pair: gathered apart (see `inherent` below), but ordered and placed
--- with everything else, in ONE batch, because CR 603.3b gives the choice to a
--- controller over every triggered ability they control, not over some subset.
+-- or more. The abilities that fired include the sourceless inherent ones the
+-- rulebook states without a card -- CR 725.2's monarch pair and CR 702.179d's
+-- speed increase, gathered apart (see `inherent` and `revving` below) but ordered
+-- and placed with everything else, in ONE batch, because CR 603.3b gives the
+-- choice to a controller over every triggered ability they control, not over some
+-- subset.
 --
 -- CR 603.3b's other half -- first place the triggers whose condition ISN'T
 -- another ability triggering, then the rest, as a separate pass -- is not
@@ -421,9 +423,9 @@ placePendingTriggers = do
       -- (Monarch.reassignOnDeparture) keeps the crown off a departed seat, so
       -- CR 800.4d has nothing to catch here; apnapPlayers filters them anyway.
       inherent = Monarch.inherentMonarchPending evs gs
-      -- CR 702.179d, the second inherent ability in the rulebook and gathered for
-      -- exactly the reason above: it hangs on no object either. At most one entry,
-      -- and only for the active player.
+      -- CR 702.179d, the rulebook's third inherent ability after CR 725.2's two,
+      -- and gathered for exactly the reason above: it hangs on no object either.
+      -- At most one entry, and only for the active player.
       revving = Speed.inherentPending evs gs
   State.put
     gs
