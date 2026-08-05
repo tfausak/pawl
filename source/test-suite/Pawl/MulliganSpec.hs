@@ -33,7 +33,6 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Zone as Zone
@@ -443,7 +442,7 @@ spec s registry =
       powder <- S.printingOf s registry "Serum Powder"
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = powderGame powder mountain 20
-          ((_, _after), offered) = State.runState (Program.foldProgramM recordWindow (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+          ((_, _after), offered) = State.runState (Engine.runGame recordWindow gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
       Spec.assertEqWith s "exactly one offer -- alice's, in the one round she declares" (length offered) 1
       Spec.assertEqWith s "and it offered exactly her Powder" (fmap length offered) [1]
     Spec.it s "CR 103.5b: taking the action exiles the whole hand and redraws that many" $ do
@@ -485,7 +484,7 @@ spec s registry =
       powder <- S.printingOf s registry "Serum Powder"
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = powderUnder powder mountain 7
-          ((_, _after), (_, offers)) = State.runState (Program.foldProgramM recordWindowRound (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) (0, [])
+          ((_, _after), (_, offers)) = State.runState (Engine.runGame recordWindowRound gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) (0, [])
       Spec.assertEqWith s "exactly one offer, and it came after both first-round declarations" offers [2]
     Spec.it s "CR 103.5b: the action may be taken more than once in one window" $ do
       -- Using the first Powder draws the second; the loop offers again and
@@ -500,7 +499,7 @@ spec s registry =
       -- Where the rules leave nothing to ask, don't prompt.
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20
-          ((_, _after), offered) = State.runState (Program.foldProgramM recordWindow (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+          ((_, _after), offered) = State.runState (Engine.runGame recordWindow gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
       Spec.assertEqWith s "no window prompt at all" offered []
     Spec.it s "CR 103.5b: a player who has kept is never offered the window again" $ do
       -- alice keeps in round 1 and leaves the pool; bob keeps the loop alive
@@ -509,7 +508,7 @@ spec s registry =
       powder <- S.printingOf s registry "Serum Powder"
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = powderGame powder mountain 20
-          ((_, _after), offers) = State.runState (Program.foldProgramM recordWindowPlayers (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+          ((_, _after), offers) = State.runState (Engine.runGame recordWindowPlayers gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
       Spec.assertEqWith s "offered in her one declaration round and never again" (length (filter (== S.alice) offers)) 1
     Spec.it s "CR 103.5b: a game with a mulligan action replays deterministically" $ do
       powder <- S.printingOf s registry "Serum Powder"
@@ -586,7 +585,7 @@ spec s registry =
     Spec.it s "CR 103.5: keeping is terminal -- a kept player is not asked again" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20
-          ((_, _after), asked) = State.runState (Program.foldProgramM recordAsks (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+          ((_, _after), asked) = State.runState (Engine.runGame recordAsks gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
       Spec.assertEqWith s "alice kept round 1, so was asked exactly once" (length (filter (== S.alice) asked)) 1
       Spec.assertBool s (length (filter (== S.bob) asked) > 1) "bob mulliganed twice then kept, so was asked more than once"
     Spec.it s "CR 103.5: a game with mulligans replays deterministically" $ do
@@ -646,7 +645,7 @@ spec s registry =
       -- first is free, so 7,6,5,4,3,2,1,0 -- eight asks. Today both give
       -- seven, because the free allowance does not exist.
       mountain <- S.printingOf s registry "Mountain"
-      let asksIn owners gs0 = snd (State.runState (Program.foldProgramM recordAlwaysMulligan (State.runStateT (Mulligan.openingHands S.performer owners) gs0)) [])
+      let asksIn owners gs0 = snd (State.runState (Engine.runGame recordAlwaysMulligan gs0 (Mulligan.openingHands S.performer owners)) [])
           three = asksIn [S.alice, S.bob, S.carol] (libraryGame3 mountain 20)
           two = asksIn [S.alice, S.bob] (libraryGame mountain 20)
       Spec.assertEqWith s "three seats: alice may take eight mulligans" (length (filter (== S.alice) three)) 8
@@ -658,7 +657,7 @@ spec s registry =
       -- two-player game offers (taken 0, bottom 1). An answerer holding only
       -- the raw count cannot tell those apart, which is what #176 was about.
       mountain <- S.printingOf s registry "Mountain"
-      let offersIn owners gs0 = reverse (snd (State.runState (Program.foldProgramM recordOffers (State.runStateT (Mulligan.openingHands S.performer owners) gs0)) []))
+      let offersIn owners gs0 = reverse (snd (State.runState (Engine.runGame recordOffers gs0 (Mulligan.openingHands S.performer owners)) []))
       Spec.assertEqWith
         s
         "three seats: the first mulligan is free, so it bottoms nothing"
@@ -673,7 +672,7 @@ spec s registry =
       leyline <- S.printingOf s registry "Leyline of the Void"
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = leylineGame leyline mountain 20
-          (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+          (_, tags) = State.runState (Engine.runGame recordOpeningOrder gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
       Spec.assertEqWith
         s
         "both declarations, then alice's opening-hand window"
@@ -695,7 +694,7 @@ spec s registry =
       leyline <- S.printingOf s registry "Leyline of the Void"
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = leylineBothGame leyline mountain 20
-          (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+          (_, tags) = State.runState (Engine.runGame recordOpeningOrder gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
           openings = reverse (fmap snd (filter (\(tag, _) -> tag == Text.pack "opening") tags))
       Spec.assertEqWith s "alice first, then bob" openings [S.alice, S.bob]
     Spec.it s "CR 103.6: 'any such actions in any order' -- the window re-offers until declined" $ do
@@ -707,7 +706,7 @@ spec s registry =
     Spec.it s "CR 103.6: no granting card means no prompt" $ do
       mountain <- S.printingOf s registry "Mountain"
       let gs0 = libraryGame mountain 20
-          (_, tags) = State.runState (Program.foldProgramM recordOpeningOrder (State.runStateT (Mulligan.openingHands S.performer [S.alice, S.bob]) gs0)) []
+          (_, tags) = State.runState (Engine.runGame recordOpeningOrder gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
       Spec.assertEqWith s "no opening-hand prompt at all" (filter (\(tag, _) -> tag == Text.pack "opening") tags) []
     Spec.it s "CR 103.6: a game with an opening-hand action replays deterministically" $ do
       leyline <- S.printingOf s registry "Leyline of the Void"

@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
@@ -373,6 +374,11 @@ defaultAnswer p = case p of
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Run a game under a base interpreter, keeping every answer in order.
+--
+-- The game each question came from (Asked, #153) is dropped here, and both
+-- halves drop it: a transcript is a positional list of ANSWERS, and a subgame's
+-- questions are answered from the same list in the order they are asked -- which
+-- is exactly what lets one transcript replay a game containing a CR 729 subgame.
 record :: (forall r. Prompt r -> r) -> GameState -> Game a -> ((a, GameState), [Response])
 record answer gs game =
   let step :: Prompt r -> State.State [Response] r
@@ -381,7 +387,7 @@ record answer gs game =
         State.modify' (encode p value :)
         pure value
       (outcome, logged) =
-        State.runState (Program.foldProgramM step (State.runStateT game gs)) []
+        State.runState (Program.foldProgramM (step . Asked.prompt) (State.runStateT game gs)) []
    in (outcome, reverse logged)
 
 -- Re-run a game against a recorded transcript. Because the engine is pure and
@@ -417,5 +423,5 @@ replay responses gs game =
               stall (Desync.Mismatched asked h)
               pure (defaultAnswer p)
       (outcome, (_, _, reported)) =
-        State.runState (Program.foldProgramM step (State.runStateT game gs)) (0, responses, Nothing)
+        State.runState (Program.foldProgramM (step . Asked.prompt) (State.runStateT game gs)) (0, responses, Nothing)
    in (outcome, reported)

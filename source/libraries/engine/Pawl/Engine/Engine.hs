@@ -41,6 +41,7 @@ import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
@@ -76,11 +77,25 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 -- The interpreter seam: every decision the engine suspends on is answered here.
+--
+-- The PRIMITIVE form, and the only one that sees which game asked (#153): an
+-- Asked carries the asking game's state and the games it is nested inside (CR
+-- 729.1a). An interface answering here can show a subgame's question as a
+-- subgame's, which is what CR 723.4's visibility split needs.
+runGameAsked :: (Monad m) => (forall r. Asked.Asked r -> m r) -> GameState -> Game a -> m (a, GameState)
+runGameAsked answer gs game = Program.foldProgramM answer (State.runStateT game gs)
+
+runGameAskedPure :: (forall r. Asked.Asked r -> r) -> GameState -> Game a -> (a, GameState)
+runGameAskedPure answer gs game = Program.foldProgram answer (State.runStateT game gs)
+
+-- The seam for an answerer that does not care which game it is in: the question
+-- alone, with the tag dropped. Every answerer in the test suite and the
+-- benchmark is one of these.
 runGame :: (Monad m) => (forall r. Prompt r -> m r) -> GameState -> Game a -> m (a, GameState)
-runGame answer gs game = Program.foldProgramM answer (State.runStateT game gs)
+runGame answer = runGameAsked (answer . Asked.prompt)
 
 runGamePure :: (forall r. Prompt r -> r) -> GameState -> Game a -> (a, GameState)
-runGamePure answer gs game = Program.foldProgram answer (State.runStateT game gs)
+runGamePure answer = runGameAskedPure (answer . Asked.prompt)
 
 -- One entry point from matchup to played game: the player list is DERIVED from
 -- the matchup, so a matchup player without a Player record is unrepresentable
@@ -724,7 +739,7 @@ priorityLoop = do
                         -- no Decider precisely so this cannot be got wrong (CR 723.6): a
                         -- controller may not concede for the player they control, though
                         -- that player may still concede themselves.
-                        concession <- Trans.lift (Program.prompt (Prompt.Concede p))
+                        concession <- Game.ask (Prompt.Concede p)
                         case concession of
                           Concession.Concedes -> do
                             -- CR 104.3a: leaves the game IMMEDIATELY. Not a state-based
@@ -775,7 +790,7 @@ priorityLoop = do
                             answered <-
                               if offersAChoice
                                 then Game.choose (Prompt.ChooseAction decider p actions)
-                                else Trans.lift (Program.prompt (Prompt.ChooseAction decider p actions))
+                                else Game.ask (Prompt.ChooseAction decider p actions)
                             -- FILTERED, NOT TRUSTED. Everything Action.legalActions
                             -- computed -- the controller check, CR 302.6's
                             -- tap-sickness gate, CR 307.5 timing, cost payability,
@@ -1317,11 +1332,15 @@ playGame =
 -- CR 729: play a subgame as a FUNCTION CALL. Construct the subgame from the
 -- parent's library cards (CR 729.2, subgameStateFrom), then run its setup and
 -- whole game LIFTED into the parent's StateT -- so the subgame's prompts flow
--- through the SAME Program interpreter and Replay fold (untagged; the design).
--- The parent GameState sits untouched in the outer frame while the subgame runs
--- (CR 729.1a). At the end, funnel each owner's cards back to their main-game
--- library (CR 729.5) and reshuffle. A subgame within a subgame (CR 729.6) is
--- free: the nested playGame's own priorityLoop re-supplies playSubgame.
+-- through the SAME Program interpreter and Replay fold, which is what keeps a
+-- transcript replayable across one. They are not indistinguishable from the
+-- parent's for all that: Asked.under below stamps every one of them with the
+-- parent game, so an answerer can tell a subgame's question from a main-game
+-- one (#153). The parent GameState sits untouched in the outer frame while the
+-- subgame runs (CR 729.1a). At the end, funnel each owner's cards back to
+-- their main-game library (CR 729.5) and reshuffle. A subgame within a subgame
+-- (CR 729.6) is free: the nested playGame's own priorityLoop re-supplies
+-- playSubgame.
 --
 -- Nesting terminates: subgameStateFrom draws each level's library from the
 -- PARENT level's library zone at cast time (CR 729.2), already reduced by the
@@ -1344,12 +1363,26 @@ playSubgame = do
     Just order -> case order of
       only NonEmpty.:| [] -> pure only
       _ -> do
-        answer <- Trans.lift (Program.prompt (Prompt.RandomFirstPlayer order))
+        answer <- Game.ask (Prompt.RandomFirstPlayer order)
         -- Filtered, not trusted (#222): a subgame cannot start with a player who
         -- is not seated in it.
         pure (if List.elem answer (NonEmpty.toList order) then answer else NonEmpty.head order)
   let sub0 = Setup.subgameStateFrom starter parent
-  (result, finalSub) <- Trans.lift (State.runStateT (Setup.startGameFromCards Resolve.performHandAction >> playGame) sub0)
+  -- CR 729.1a: every question the subgame raises passes outward through this
+  -- frame, which is the one place that knows both games -- so this is where the
+  -- parent is pushed onto the tag (#153). One pass over the whole subgame
+  -- program, so a question from a nested subgame (CR 729.6) is wrapped once per
+  -- level it climbs and arrives naming every game it is inside.
+  --
+  -- The CR 729.2 roll above is deliberately NOT wrapped: it is asked before the
+  -- subgame's state exists, in the main game, which is the game whose player is
+  -- being asked to roll.
+  (result, finalSub) <-
+    Trans.lift
+      ( Program.mapProgram
+          (Asked.under parent)
+          (State.runStateT (Setup.startGameFromCards Resolve.performHandAction >> playGame) sub0)
+      )
   State.modify' (Setup.funnelBack finalSub)
   -- CR 729.5: each player takes the traditional cards they own that are in the
   -- subgame, puts them into their main-game library and shuffles. Each player who

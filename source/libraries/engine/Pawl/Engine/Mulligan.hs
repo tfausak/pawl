@@ -1,7 +1,6 @@
 module Pawl.Engine.Mulligan where
 
 import qualified Control.Monad as Monad
-import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -23,7 +22,6 @@ import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
-import qualified Pawl.Types.Program as Program
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Zone as Zone
 
@@ -38,7 +36,7 @@ shuffleLibrary :: PlayerId -> Game ()
 shuffleLibrary pid = do
   gs <- State.get
   let ids = Game.zoneMembers Zone.Library pid gs
-  answer <- Trans.lift (Program.prompt (Prompt.Shuffle ids))
+  answer <- Game.ask (Prompt.Shuffle ids)
   let shuffled = Game.honourShuffle ids answer
   -- modify' rather than putting `gs` back: it was read before the prompt, and a
   -- prompt may write state -- Game.choose writes GameState.lastChoice. This one
@@ -78,9 +76,9 @@ actionsFor field pid gs =
    in Maybe.mapMaybe withAction (Game.zoneMembers Zone.Hand pid gs)
 
 -- The shared CR 103.5b / CR 103.6 loop: offer this player every action their
--- hand grants through `field`, on the `ask` channel, until they decline or none
--- is left. Performing one is never a mulligan and never a cost. Both rules let
--- a player act more than once, which is why this recurses rather than asking
+-- hand grants through `field`, on the `question` channel, until they decline or
+-- none is left. Performing one is never a mulligan and never a cost. Both rules
+-- let a player act more than once, which is why this recurses rather than asking
 -- once.
 --
 -- Terminates even against an interpreter that never declines: every action in
@@ -92,14 +90,14 @@ handWindow ::
   HandActionPerformer ->
   PlayerId ->
   Game ()
-handWindow field ask perform pid = do
+handWindow field question perform pid = do
   candidates <- State.gets (actionsFor field pid)
   case candidates of
     -- Where the rules leave nothing to ask, don't prompt.
     [] -> pure ()
     _ -> do
       decider <- State.gets (Decide.deciderFor pid)
-      answer <- Game.choose (ask decider pid (fmap fst candidates))
+      answer <- Game.choose (question decider pid (fmap fst candidates))
       case answer of
         Nothing -> pure ()
         Just oid -> case lookup oid candidates of
@@ -109,7 +107,7 @@ handWindow field ask perform pid = do
           Nothing -> pure ()
           Just effects -> do
             perform oid pid effects
-            handWindow field ask perform pid
+            handWindow field question perform pid
 
 -- CR 103.6: the starting player acts first, then each other player in turn
 -- order, which is exactly the order `owners` arrives in. A player who has left
