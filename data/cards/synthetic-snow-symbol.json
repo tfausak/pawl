@@ -1,0 +1,46 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "SnowSymbol"
+                    }
+                  },
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "SnowSymbol"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "name": "Synthetic Snow Symbol",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}
