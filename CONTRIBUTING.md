@@ -14,18 +14,6 @@ cabal configure \
 
 Use all the normal Cabal commands like `cabal build`.
 
-That `cabal configure` writes `cabal.project.local`, which is gitignored. A
-fresh `git worktree` therefore starts without it and builds without
-`pedantic`, so GHC warnings stay warnings there while CI, which configures with
-`--flags=pedantic`, fails on them. Copy the file in from the primary checkout,
-or re-run the command above, before the first build in a new worktree. If a
-non-pedantic build already happened, copying it in is not enough: `cabal build`
-reports `Up to date` and never revisits objects compiled under the old flags,
-even after `touch`, so delete the package's directory under
-`dist-newstyle/build/`. And `-Werror` stops at the first failing module, so a
-build is clean only once it completes; fixing one warning routinely uncovers
-the next.
-
 Prefer clarity over cleverness: code that is easy to read, debug, and modify.
 See the [style guide][3] for specifics.
 
