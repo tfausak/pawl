@@ -733,8 +733,10 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
 
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
--- Spider-Man 92), set against the pool's one prevention shield, Mending Hands
+-- Spider-Man 92), set against the pool's one COUNTDOWN shield, Mending Hands
 -- ("Prevent the next 4 damage that would be dealt to any target this turn").
+-- Fog and Selfless Squire install prevention rows too, but CR 615.7's remaining
+-- amount is what clause 3 is about, and Mending Hands is its one producer.
 --
 -- Two of the rule's three clauses, which are the two that are reachable: the
 -- damage is dealt in full though an applicable shield is there, and "existing
@@ -742,22 +744,26 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
 -- The middle clause -- the applied effect's additional effect still happening --
 -- has no producer, since no prevention row can carry one (#689).
 --
--- EVERY case runs the SAME script over two boards that differ in Spider-Punk and
--- in nothing else, so no assertion here can pass because the damage would have
--- got through anyway: the control board's shield genuinely prevents it.
+-- EVERY case here has a CONTROL on a board that differs in Spider-Punk and in
+-- nothing else, so no assertion can pass because the damage would have got
+-- through anyway: the control board's shield genuinely prevents it. The first
+-- two cases are the two halves of one comparison, one board each; the third runs
+-- literally the same script over both.
 --
 -- The DAMAGE BATCHES are hand-built and the SPELL is not, for mendingHandsSpec's
 -- reason: casting Mending Hands for real is what proves the card, while reaching
--- a two-source batch would mean driving a whole combat phase to produce a
--- fixture these assertions read straight off.
+-- a real two-attacker combat batch would mean driving a whole combat phase to
+-- produce a fixture these assertions read straight off.
 spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   let hit src recipient n =
         DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
-      -- What each prevention shield on the board has left (CR 615.7), read off
+      -- What each COUNTDOWN shield on the board has left (CR 615.7), read off
       -- the rows themselves. An empty list is a shield spent to 0 and dropped,
-      -- which is why the count of rows would not say the same thing.
+      -- which is why the count of rows would not say the same thing. A Fog-shaped
+      -- row would not appear here at all -- shieldRemaining answers Nothing for
+      -- one -- and none of these boards has one.
       shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
       wasAskedToOrderDamage responses =
         let isOrder r = case r of
@@ -765,9 +771,14 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
               _ -> False
          in any isOrder responses
       -- alice's Piker is shielded by a Mending Hands she really casts on it;
-      -- bob's Piker is the source of every hand-built event. The Spider-Punks
-      -- ride out as a LIST -- singleton or empty -- so both boards can be driven
-      -- by one script, and destroying "the Punks" is a no-op on the control.
+      -- bob's TWO Pikers are the sources of the hand-built events. Two of them
+      -- rather than one because CR 615.7's choice clause is conditioned on
+      -- "damage ... by two or more applicable sources at the same time", which
+      -- one source repeated does not satisfy on the rule's letter.
+      --
+      -- The Spider-Punks ride out as a LIST -- singleton or empty -- so both
+      -- boards can be driven by one script, and destroying "the Punks" is a
+      -- no-op on the control.
       withBoard act = do
         plains <- S.printingOf s registry "Plains"
         pikerPrinting <- S.printingOf s registry "Goblin Piker"
@@ -777,10 +788,11 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
               let base = S.landsInPlay plains 1
                   (victim, g1) = S.addCreature pikerPrinting S.alice base
                   (attacker, g2) = S.addCreature pikerPrinting S.bob g1
-                  (punk, g3) = S.addCreature punkPrinting S.alice g2
-                  (punks, g4) = if withPunk then ([punk], g3) else ([], g2)
-                  (g5, spellId) = S.handOne mendingHands g4
-               in (victim, attacker, punks, castAndResolve (aimCreature victim) g5 spellId)
+                  (other, g3) = S.addCreature pikerPrinting S.bob g2
+                  (punk, g4) = S.addCreature punkPrinting S.alice g3
+                  (punks, g5) = if withPunk then ([punk], g4) else ([], g3)
+                  (g6, spellId) = S.handOne mendingHands g5
+               in (victim, attacker, other, punks, castAndResolve (aimCreature victim) g6 spellId)
         act build
   -- THE CONTROL. Without Spider-Punk the shield does its ordinary CR 615.7 job:
   -- the whole 3 is prevented, the event never happens (CR 615.6), and 1 of the
@@ -789,7 +801,7 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   Spec.it s "CR 615.7 without Spider-Punk the shield prevents the whole 3"
     . withBoard
     $ \build -> do
-      let (victim, attacker, _, shielded) = build False
+      let (victim, attacker, _, _, shielded) = build False
           after = settleDamage S.identityAnswer shielded [hit attacker (Recipient.ToCreature victim) 3]
       Spec.assertEqWith s "setup: the shield is a floating replacement" (shieldsLeft shielded) [4]
       Spec.assertEqWith s "nothing is marked on the shielded creature" (S.damageOf victim after) (Just 0)
@@ -802,7 +814,7 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   Spec.it s "CR 615.12 with Spider-Punk the same 3 lands in full, and the shield is not reduced"
     . withBoard
     $ \build -> do
-      let (victim, attacker, _, shielded) = build True
+      let (victim, attacker, _, _, shielded) = build True
           after = settleDamage S.identityAnswer shielded [hit attacker (Recipient.ToCreature victim) 3]
       Spec.assertEqWith s "setup: the same shield is on the same creature" (shieldsLeft shielded) [4]
       Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim after) (Just 3)
@@ -815,28 +827,29 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   Spec.it s "CR 615.12 the unreduced shield still covers the next 2 once Spider-Punk is gone"
     . withBoard
     $ \build -> do
-      let script (victim, attacker, punks, shielded) =
+      let script (victim, attacker, _, punks, shielded) =
             let first_ = settleDamage S.identityAnswer shielded [hit attacker (Recipient.ToCreature victim) 3]
                 gone = S.runPure S.identityAnswer first_ (Event.destroy Regenerability.Regenerable punks)
              in settleDamage S.identityAnswer gone [hit attacker (Recipient.ToCreature victim) 2]
-          punkBoard@(punkVictim, _, _, _) = build True
-          control@(controlVictim, _, _, _) = build False
+          punkBoard@(punkVictim, _, _, _, _) = build True
+          control@(controlVictim, _, _, _, _) = build False
       Spec.assertEqWith s "with Spider-Punk only the first 3 is marked: the 2 is prevented whole" (S.damageOf punkVictim (script punkBoard)) (Just 3)
       Spec.assertEqWith s "and 2 of the shield's untouched 4 are left" (shieldsLeft (script punkBoard)) [2]
       Spec.assertEqWith s "without it the first 3 was prevented, so only 1 of the 2 is" (S.damageOf controlVictim (script control)) (Just 1)
       Spec.assertEqWith s "and that shield is spent to 0 and gone" (shieldsLeft (script control)) []
-  -- The ELISION half, and the CR 615.7 prompt's other gate: the shielded player
-  -- is asked which of several simultaneous damages the shield prevents only when
-  -- that choice can change the board. It cannot here -- an unpreventable batch
-  -- costs the shield nothing in any order -- so nothing is asked, and the whole
-  -- 8 lands either way.
-  Spec.it s "CR 615.12 / 615.7 an unpreventable batch asks the shielded player nothing"
+  -- The ELISION half, and the CR 615.7 prompt's other gate: two applicable
+  -- sources deal damage to the shielded creature at the same time, and the rule
+  -- gives its controller the choice of which the shield prevents -- but only
+  -- when that choice can change the board. It cannot here, since an
+  -- unpreventable batch costs the shield nothing in any order, so nothing is
+  -- asked and the whole 8 lands either way.
+  Spec.it s "CR 615.12 / 615.7 an unpreventable batch asks the shielded creature's controller nothing"
     . withBoard
     $ \build -> do
-      let (victim, attacker, _, shielded) = build True
-          (controlVictim, controlAttacker, _, controlShielded) = build False
-          batch = [hit attacker (Recipient.ToCreature victim) 5, hit attacker (Recipient.ToCreature victim) 3]
-          controlBatch = [hit controlAttacker (Recipient.ToCreature controlVictim) 5, hit controlAttacker (Recipient.ToCreature controlVictim) 3]
+      let (victim, attacker, other, _, shielded) = build True
+          (controlVictim, controlAttacker, controlOther, _, controlShielded) = build False
+          batch = [hit attacker (Recipient.ToCreature victim) 5, hit other (Recipient.ToCreature victim) 3]
+          controlBatch = [hit controlAttacker (Recipient.ToCreature controlVictim) 5, hit controlOther (Recipient.ToCreature controlVictim) 3]
       Spec.assertBool
         s
         (wasAskedToOrderDamage (answersFor S.identityAnswer controlShielded (Damage.applyDamage controlBatch)))

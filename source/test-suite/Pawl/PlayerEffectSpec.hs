@@ -2796,10 +2796,11 @@ abilityRun srcId ability stifleId gs =
 --
 -- All four of the card's printed clauses are in its file now, and only this one
 -- is read here: nothing on this board prevents damage, no other Spider enters,
--- and Spider-Punk is put onto the battlefield rather than cast, so riot never
--- fires. CR 615.12's clause is proved in Pawl.ReplacementSpec's "Spider-Punk (CR
--- 615.12)" group instead, where a Mending Hands shield gives it something to
--- defeat.
+-- and S.addCreature inserts Spider-Punk into the battlefield directly rather
+-- than raising an entry event, so CR 702.136a's riot has no CR 614.1c
+-- replacement to be. CR 615.12's clause is proved in Pawl.ReplacementSpec's
+-- "Spider-Punk (CR 615.12)" group instead, where a Mending Hands shield gives it
+-- something to defeat.
 spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spiderPunkSpec s registry =
   let withAbility act = do

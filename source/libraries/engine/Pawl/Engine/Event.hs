@@ -377,7 +377,7 @@ loop asOf batch applied prevented event = do
           -- records it as applied, which is CR 615.12a's "just once" and the
           -- reason this does not spin.
           --
-          -- CR 614.3's use count is skipped too, which no card notices: every
+          -- CR 615.3's use count is skipped too, which no card notices: every
           -- prevention row pawl installs is Uses.Unlimited (Resolve.installShield
           -- says why, and Fog's authored row says Unlimited as well), so the
           -- `consume` this bypasses would have been a no-op anyway.
