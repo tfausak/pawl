@@ -1,0 +1,46 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Phyrexian Discount",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceSpellCost",
+            "value": [
+              {
+                "type": "HasColor",
+                "value": {
+                  "type": "Green"
+                }
+              },
+              [
+                {
+                  "type": "Phyrexian",
+                  "value": {
+                    "type": "Green"
+                  }
+                }
+              ]
+            ]
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
