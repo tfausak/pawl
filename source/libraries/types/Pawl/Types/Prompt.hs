@@ -17,6 +17,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
@@ -553,8 +554,10 @@ data Prompt r where
   -- where the rules leave nothing to ask, don't prompt.
   Bottom :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 103.5b: an action a card lets a player take "any time they could
-  -- mulligan". The [ObjectId] is the cards in hand granting one; the answer is
-  -- which to use, or Nothing to decline.
+  -- mulligan". Each entry is one action a card in hand grants -- the card, and
+  -- WHICH of its actions (Pawl.Types.HandActionIndex), since a face may print
+  -- more than one and the two are different offers. The answer is which to take,
+  -- or Nothing to decline.
   --
   -- Offered immediately BEFORE each DeclareMulligan and again after each action
   -- taken -- that rule makes the declaration follow, and nothing in it limits a
@@ -565,10 +568,11 @@ data Prompt r where
   -- bottomed, so it feeds neither the bottom count nor CR 103.5c's free allowance.
   --
   -- Not asked when the list is empty.
-  MulliganAction :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  MulliganAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   -- | CR 103.6 / 103.6a: an action a card in this player's opening hand lets them
-  -- take once the mulligan process is complete. The [ObjectId] is the cards in hand
-  -- offering one; the answer is which to take, or Nothing to decline.
+  -- take once the mulligan process is complete. The entries are shaped exactly as
+  -- MulliganAction's -- the card and which of its actions; the answer is which to
+  -- take, or Nothing to decline.
   --
   -- Offered in turn order, starting player first, and repeatedly to the same player
   -- until they decline: CR 103.6 lets them take any such actions in any order.
@@ -576,7 +580,7 @@ data Prompt r where
   -- A SEPARATE channel from MulliganAction rather than a reuse: that window sits AT
   -- a mulligan declaration and this one opens once the process is complete, so an
   -- interpreter that could not tell them apart could not answer either well.
-  OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   -- | CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
   -- exercises a printed "may". The ObjectId is the object RESOLVING (the spell,
   -- or the ability object on the stack -- not its source, since two triggers off

@@ -36,10 +36,12 @@
           "value": 3
         }
       ],
-      "mulliganAction": [
-        {
-          "type": "ExileHandThenDraw"
-        }
+      "mulliganActions": [
+        [
+          {
+            "type": "ExileHandThenDraw"
+          }
+        ]
       ],
       "name": "Serum Powder",
       "typeLine": {

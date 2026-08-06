@@ -236,24 +236,26 @@ data Face card = MkFace
     -- attack, so it must stay on CR 508.1a's candidate list, where a
     -- CombatRestriction takes its subject off.
     attackCosts :: [AttackCost.AttackCost],
-    -- | CR 103.5b: the effects of this face's "any time you could mulligan"
-    -- action, in written order (Serum Powder). Read directly from the card, the
-    -- castingPermissions precedent: the ability functions in the HAND (CR 113.6),
-    -- which pawl's projection does not reach (#160).
+    -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed
+    -- order, each one its own list of effects in written order (Serum Powder).
+    -- Read directly from the card, the castingPermissions precedent: the ability
+    -- functions in the HAND (CR 113.6), which pawl's projection does not reach
+    -- (#160).
     --
-    -- An empty list means NO action, not an action that does nothing: the two are
-    -- indistinguishable in play. One action per card; a printing declaring two is
-    -- unrepresentable (#183).
-    mulliganAction :: [Effect.Effect card],
-    -- | CR 103.6 / 103.6a: the effects of this face's opening-hand action, in
-    -- written order (Leyline of the Void). Read directly from the card, the
-    -- mulliganAction precedent (CR 113.6, #160).
+    -- A LIST OF ACTIONS and not one action's effects: nothing in CR 103 caps how
+    -- many such actions a face may grant, and two are two separate offers a
+    -- player picks between, which is why Pawl.Types.HandActionIndex exists.
+    -- An empty OUTER list means the face grants no such action at all, which is
+    -- how a card that says nothing about this window is never offered one.
+    mulliganActions :: [[Effect.Effect card]],
+    -- | CR 103.6 / 103.6a: this face's opening-hand actions, shaped exactly like
+    -- mulliganActions above and read the same way (CR 113.6, #160).
     --
-    -- The SIBLING of mulliganAction, not a reuse: the two windows are at different
+    -- The SIBLING of mulliganActions, not a reuse: the two windows are at different
     -- times (CR 103.5b sits AT a declaration, CR 103.6 opens once the whole
     -- mulligan process is complete), and a card that acts at one must not be
-    -- offered at the other. One action per card, the same caveat (#183).
-    openingHandAction :: [Effect.Effect card]
+    -- offered at the other.
+    openingHandActions :: [[Effect.Effect card]]
   }
   deriving (Eq, Ord, Show)
 

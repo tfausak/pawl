@@ -26,16 +26,18 @@
         }
       ],
       "name": "Leyline of the Void",
-      "openingHandAction": [
-        {
-          "type": "MoveToZone",
-          "value": [
-            "self",
-            {
-              "type": "Battlefield"
-            }
-          ]
-        }
+      "openingHandActions": [
+        [
+          {
+            "type": "MoveToZone",
+            "value": [
+              "self",
+              {
+                "type": "Battlefield"
+              }
+            ]
+          }
+        ]
       ],
       "replacementEffects": [
         {
