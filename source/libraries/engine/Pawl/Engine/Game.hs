@@ -267,7 +267,8 @@ resolveFace mName card = case mName of
   -- lint holds that of every loadable card, which is what makes faceNamed's
   -- answer unique whenever the name IS one of the card's own faces, and all
   -- three writers of this field (Event.changeZoneAttaching's mkObj, which CR
-  -- 709.3a's chosen half rides in on; Cast.asProposed, the gate's speculative
+  -- 709.3a's chosen half and CR 712.13's carried face both ride in on;
+  -- Cast.asProposed, the gate's speculative
   -- stamp; and Resolve's CR 701.27a Transform arm) store a name they read from
   -- that same card's faces -- so this arm has no case that reaches it, short of
   -- a bug in one of them.

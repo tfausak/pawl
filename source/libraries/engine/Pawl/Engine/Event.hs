@@ -1136,8 +1136,13 @@ changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing 
 -- being cast, which the rule makes "before putting it onto the stack", so the
 -- move is what carries it. CR 712.11b words the modal double-faced card's
 -- version of the same choice identically, and CR 712.11c its version of CR
--- 709.3a, so this door is the shape both layouts ask for even though only the
--- split one ships.
+-- 709.3a, so both layouts come through this door.
+--
+-- The face is a MAYBE, because the third rule asking for this door does not
+-- always have one to name: CR 712.13 carries a resolving double-faced spell's
+-- face onto the battlefield, and Pawl.Engine.Stack asks that of every permanent
+-- spell it resolves, most of which show nothing (Pawl.Engine.Card.enteringFace).
+-- Nothing here is exactly changeZoneReturning.
 --
 -- A separate door rather than a seventh parameter on changeZone, as
 -- changeZoneEntering is: the ~30 callers moving an object that shows whatever its
@@ -1151,8 +1156,8 @@ changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing 
 -- CR 616.1 redirect to another zone drops the face instead of carrying it there.
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
-changeZoneShowing :: ObjectId -> Zone -> CardName.CardName -> Game (Maybe ObjectId)
-changeZoneShowing oid requestedDest name = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing (Just name)
+changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
+changeZoneShowing oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -1186,7 +1191,8 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- 110.2a's entry controller, Nothing for every door but changeZoneEntering --
 -- and Nothing there too for a move whose effect names no player, which by CR
 -- 110.2 and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
--- half, Nothing for every door but changeZoneShowing.
+-- half or CR 712.13's carried face, Nothing for every door but
+-- changeZoneShowing.
 changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Maybe CardName.CardName -> Game (Maybe ObjectId)
 changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
   gs <- State.get
@@ -1302,16 +1308,14 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
               -- The SETTLED destination against the REQUESTED one rather than
               -- against Zone.Stack: the rule is that the face describes the move
               -- the caller asked for, not that a face is only ever a stack half.
-              -- CR 712.13's face carried out of the stack (#657) is the same
-              -- shape with Battlefield in both slots.
-              --
-              -- What is still dropped is the face a move OUT of the stack should
-              -- carry -- CR 712.13: "a resolving double-faced spell that becomes
-              -- a permanent is put onto the battlefield with the same face up
-              -- that was face up on the stack". Not implemented; the caller that
-              -- would pass it is Pawl.Engine.Stack's permanent branch, and no
-              -- printing in the pool makes the dropped face differ from the one
-              -- the destination resolves anyway (#657).
+              -- CR 712.13's face carried OUT of the stack is that same shape with
+              -- Battlefield in both slots -- "a resolving double-faced spell that
+              -- becomes a permanent is put onto the battlefield with the same face
+              -- up that was face up on the stack" -- and Pawl.Engine.Stack's
+              -- permanent branch is what passes it, through
+              -- Pawl.Engine.Card.enteringFace. Pawl.ModalDoubleFacedSpec's
+              -- "casting the back face puts the artifact onto the battlefield" is
+              -- what proves it.
               mkObj ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,

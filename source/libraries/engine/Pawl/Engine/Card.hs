@@ -41,8 +41,7 @@ import qualified Pawl.Types.TypeLine as TypeLine
 -- CR 709.4 gives a split card its two halves COMBINED, CR 712.8a gives a
 -- double-faced card its FRONT face alone, CR 715.4 gives an adventurer card its
 -- NORMAL characteristics alone. Under Normal there is one face and all three name
--- it; the layouts that make them differ each have their arm below. CR 712.3's
--- modal double-faced kind is the one still to land (#697).
+-- it; the layouts that make them differ each have their arm below.
 --
 -- TOTAL, which is what Card.faces being NonEmpty buys: every characteristic read
 -- in the engine funnels through here, and a Maybe would spread to all of them.
@@ -76,6 +75,17 @@ combined card = case Card.layout card of
   --
   -- The BACK face is reached only through Object.face, which CR 701.27a writes.
   Layout.Transforming -> NonEmpty.head (Card.faces card)
+  -- CR 712.8a again, whose scope is every double-faced card and not just the
+  -- nonmodal one above: a modal double-faced card in a hand, a graveyard or a
+  -- library has only its front face's characteristics. So this is one card that
+  -- offers two casts (castableFaces below) while showing exactly one set of
+  -- characteristics where it sits -- which is what makes it neither Split nor
+  -- Adventure.
+  --
+  -- The BACK face is reached only through Object.face, which CR 712.11b's choice
+  -- writes as the spell is put onto the stack and CR 712.13 carries onto the
+  -- permanent (enteringFace below).
+  Layout.ModalDoubleFaced -> NonEmpty.head (Card.faces card)
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
@@ -215,6 +225,21 @@ castableFaces card = case Card.layout card of
   -- already on the stack, CR 712.14a for a card put there without being cast
   -- (#70).
   Layout.Transforming -> [NonEmpty.head (Card.faces card)]
+  -- CR 712.11b: "A player casting a modal double-faced card or a copy of a modal
+  -- double-faced card as a spell chooses which face they are casting before
+  -- putting it onto the stack." EVERY face, for Split's and Adventure's reason:
+  -- the choice is the player's, and offering each as its own legal action is how
+  -- the engine avoids making it. CR 712.11c is what makes each offer stand on
+  -- its own -- "Only the face that will be face up on the stack is evaluated to
+  -- determine if it can be cast" -- which is exactly how Pawl.Engine.Cast prices
+  -- and gates a proposal.
+  --
+  -- A LAND face is among them, and needs no arm of its own to stay uncastable:
+  -- CR 202.1b gives it no mana cost, which CR 118.6 makes an unpayable one, so
+  -- Pawl.Engine.Cost.canPay drops it at the affordability gate the way it drops
+  -- any other land (see Cost.costsFor's own note). CR 712.12's other half -- a
+  -- player PLAYING such a face as a land -- is not implemented (#891).
+  Layout.ModalDoubleFaced -> NonEmpty.toList (Card.faces card)
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is
 -- up." WHICH face that leaves up, by NAME -- the form Object.face stores, and
@@ -226,8 +251,14 @@ castableFaces card = case Card.layout card of
 --
 --   * CR 701.27c / 712.9: "If a spell or ability instructs a player to transform
 --     ... any permanent that isn't represented by a double-faced token or a
---     double-faced card, nothing happens" -- every layout but Transforming. A
---     Clone that copied a double-faced permanent is one of those (CR 712.9's own
+--     double-faced card, nothing happens" -- every layout that is not a
+--     double-faced card, which here is every one but Transforming and
+--     ModalDoubleFaced. CR 712.9's first sentence is what puts the modal kind on
+--     the permitted side: "Only permanents represented by double-faced tokens and
+--     double-faced cards that are not meld cards can transform or convert", and
+--     CR 712.3 says the same from the card's side ("they may have an ability that
+--     allows them to 'transform' or 'convert' on either face"). A Clone that
+--     copied a double-faced permanent is one of the forbidden ones (CR 712.9's own
 --     first Example), and falls out of the layout being read off the object's
 --     stored card rather than off the projection.
 --   * CR 701.27d / 712.10: "the face that permanent would transform into is an
@@ -251,16 +282,57 @@ turnedOver mName card = case Card.layout card of
   Layout.Normal -> Nothing
   Layout.Split -> Nothing
   Layout.Adventure -> Nothing
-  Layout.Transforming ->
-    let faces = NonEmpty.toList (Card.faces card)
-        -- Nothing, and a name that resolves to no face, both mean the front face
-        -- -- Game.resolveFace's own fallback, so the two agree about which face
-        -- the permanent is being turned FROM.
-        showing = Maybe.fromMaybe 0 (mName >>= \n -> List.findIndex ((== n) . Face.name) faces)
-        after = drop (showing + 1) faces <> take (showing + 1) faces
-     in case after of
-          [] -> Nothing
-          next : _ -> if isInstant next || isSorcery next then Nothing else Just (Face.name next)
+  Layout.Transforming -> nextFace mName card
+  Layout.ModalDoubleFaced -> nextFace mName card
+
+-- turnedOver's rotation, for the two layouts CR 712.9 lets a permanent turn
+-- over. Shared rather than written twice because the two differ about which
+-- face is live and about which faces may be cast, and about this not at all:
+-- "its other face" is one sentence (CR 701.27a) and reads the same whichever
+-- kind of double-faced card is turning.
+nextFace :: Maybe CardName.CardName -> Card.Card -> Maybe CardName.CardName
+nextFace mName card =
+  let faces = NonEmpty.toList (Card.faces card)
+      -- Nothing, and a name that resolves to no face, both mean the front face
+      -- -- Game.resolveFace's own fallback, so the two agree about which face
+      -- the permanent is being turned FROM.
+      showing = Maybe.fromMaybe 0 (mName >>= \n -> List.findIndex ((== n) . Face.name) faces)
+      after = drop (showing + 1) faces <> take (showing + 1) faces
+   in case after of
+        [] -> Nothing
+        next : _ -> if isInstant next || isSorcery next then Nothing else Just (Face.name next)
+
+-- CR 712.13: "By default, a resolving double-faced spell that becomes a
+-- permanent is put onto the battlefield with the same face up that was face up
+-- on the stack." Takes the face the SPELL showed on the stack (Object.face) and
+-- answers the one the permanent enters showing.
+--
+-- Nothing for every layout the rule does not name, and that is a claim rather
+-- than a shrug: CR 400.7 makes the resolving spell a new object, so the default
+-- is that nothing about the stack incarnation survives, and CR 709.4 and CR
+-- 715.4 say outright that a split card and an adventurer card have their
+-- combined and normal characteristics respectively in every zone but the stack.
+-- Dropping the face is what gives them that.
+--
+-- CR 709.5d asks for the same carry-through the other rule does -- a permanent
+-- with a shared type line is unlocked on the half that was cast -- and is NOT
+-- implemented here: Rooms have no Layout arm at all (#892).
+enteringFace :: Card.Card -> Maybe CardName.CardName -> Maybe CardName.CardName
+enteringFace card shown = case Card.layout card of
+  Layout.Normal -> Nothing
+  Layout.Split -> Nothing
+  Layout.Adventure -> Nothing
+  -- Indistinguishable from Nothing for every nonmodal card pawl can build today,
+  -- and written as the rule reads anyway: CR 712.11 casts one with its front
+  -- face up, so `shown` IS the front face, and CR 712.8a resolves Nothing to
+  -- that same face. The two answers part only once a card can be cast
+  -- "transformed" (CR 712.11a), which is #698's wording plus #70's.
+  Layout.Transforming -> shown
+  -- The arm CR 712.13 is written for in this pool: CR 712.11b let the caster
+  -- choose either face, so the face that was up on the stack is genuinely a
+  -- choice and dropping it would put the OTHER face's permanent onto the
+  -- battlefield.
+  Layout.ModalDoubleFaced -> shown
 
 -- CR 202.3b / 712.8e: the face a MANA VALUE is read from, which is not always
 -- the face whose other characteristics are live. "While a nonmodal double-faced
@@ -283,6 +355,13 @@ manaCostFace card live = case Card.layout card of
   Layout.Split -> live
   Layout.Adventure -> live
   Layout.Transforming -> NonEmpty.head (Card.faces card)
+  -- The live face, and NOT the front one: CR 712.8e's mana-value exception is
+  -- written about a nonmodal double-faced permanent alone, and CR 712.8f states
+  -- the modal rule with no exception at all -- "While a modal double-faced spell
+  -- is on the stack or a modal double-faced permanent is on the battlefield, it
+  -- has only the characteristics of the face that's up." Mana value is a
+  -- characteristic (CR 109.3), so the face that's up is where it is read from.
+  Layout.ModalDoubleFaced -> live
 
 -- The face of this card with the given name, if it has one. CR 709.4a: a card's
 -- faces are referred to BY NAME, which is what a player names in paper and what
