@@ -171,9 +171,11 @@ became = SlotName.MkSlotName (Text.pack "became")
 --
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
 -- "no card's targetSpecs may name it" sweep as `you`, `thatPlayer` and `became`.
--- Not swept: the SlotName an effect BINDS into (Destroy's count, MoveToZone's
--- incarnation), so a card naming this one there would shadow the event's amount
--- on the source, which InSlot reads first (#691).
+-- Swept on the BINDING side too, which matters here more than for any of those
+-- three: a card naming this one in an effect's bound SlotName -- Destroy's
+-- count, MoveToZone's incarnation -- would write it to the source, which
+-- evaluateFor's InSlot arm reads FIRST, shadowing the event's amount with the
+-- card's own. Pawl.CardSpec's reservedBindings is that sweep.
 eventAmount :: SlotName
 eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 

@@ -146,7 +146,7 @@ slotsOf effect = case effect of
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
-  -- so it belongs to definedSlots below and must not appear here -- Create's and
+  -- so it belongs to boundSlots below and must not appear here -- Create's and
   -- PlaySubgame's slots take the same posture.
   Effect.Destroy ref _ _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
@@ -361,19 +361,86 @@ onsetGatedAbilities effects =
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
--- The slots an effect list DEFINES rather than reads: a Create that names what
--- it mints -- one token, or every one of them -- a MoveToZone that names the incarnation CR
--- 400.7 minted at the destination, a PlaySubgame that names its loser, a Destroy
--- that names how many it destroyed. The write half of the same lint.
+-- boundSlots over a whole effect list: the write half of the dataflow lint,
+-- against which Quantity.slots and slotsOf are the read half.
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
-definedSlots effects =
-  let bound effect = case effect of
-        Effect.Create _ _ _ mSlot -> mSlot
-        Effect.MoveToZone _ _ _ mSlot _ -> mSlot
-        Effect.PlaySubgame slot -> Just slot
-        Effect.Destroy _ _ mSlot -> mSlot
-        _ -> Nothing
-   in Set.fromList (Maybe.mapMaybe bound effects)
+definedSlots = foldMap boundSlots
+
+-- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads -- a
+-- Create that names what it mints, one token or every one of them, a MoveToZone
+-- that names the incarnation CR 400.7 minted at the destination, a PlaySubgame
+-- that names its loser, a Destroy that names how many it destroyed. Every
+-- position in the DSL at which a card AUTHORS a name the engine will later
+-- write a binding to, which is what makes it the set Pawl.CardSpec's
+-- reserved-name sweep ranges over.
+--
+-- EXHAUSTIVE, and deliberately so, where this was a four-arm case under a
+-- wildcard. The wildcard filed every opcode it had not been told about under
+-- "binds nothing", which is silent in both directions: a new bind position
+-- would drop out of the dataflow lint's write half AND out of that sweep, the
+-- second being how a card could name CR 615.13's `thatMuch` in a Destroy and
+-- shadow the amount the event supplied. Spelling every arm makes adding an
+-- opcode a compile error until an author decides which half it belongs to.
+--
+-- An arm that both READS and BINDS appears in both functions with different
+-- fields -- MoveToZone reads what it moves and binds what arrived. slotsOf's
+-- comments at those arms say which field is which.
+boundSlots :: Effect Card.Type.Card -> Set SlotName
+boundSlots effect = case effect of
+  -- CR 400.7: the incarnation minted at the destination, named so a later
+  -- effect can reach the object the move created rather than the one it ended.
+  Effect.MoveToZone _ _ _ mSlot _ -> foldMap Set.singleton mSlot
+  -- The token or tokens this Create minted, named so a later effect can refer
+  -- back to them -- CR 603.7c's delayed trigger "that refers to a particular
+  -- object" is the case that needs the name to survive the resolution.
+  Effect.Create _ _ _ mSlot -> foldMap Set.singleton mSlot
+  -- CR 729.1b: the subgame's loser, derived rather than chosen.
+  Effect.PlaySubgame slot -> Set.singleton slot
+  -- How many permanents this destruction ACTUALLY destroyed, for a later "for
+  -- each ... destroyed this way" to read as a Quantity.
+  Effect.Destroy _ _ mSlot -> foldMap Set.singleton mSlot
+  Effect.DealDamage {} -> Set.empty
+  Effect.ModifyTarget {} -> Set.empty
+  Effect.ChangeText {} -> Set.empty
+  Effect.AddMana _ -> Set.empty
+  Effect.Search _ _ -> Set.empty
+  Effect.ExileAllGraveyards -> Set.empty
+  Effect.Proliferate -> Set.empty
+  Effect.TemptWithTheRing -> Set.empty
+  Effect.ExileHandThenDraw -> Set.empty
+  Effect.PlayerSacrifices {} -> Set.empty
+  Effect.RestartGame -> Set.empty
+  Effect.ControlPlayerNextTurn _ -> Set.empty
+  Effect.Sacrifice _ -> Set.empty
+  Effect.RemoveFromCombat _ -> Set.empty
+  Effect.Draw {} -> Set.empty
+  Effect.Mill {} -> Set.empty
+  Effect.Discard {} -> Set.empty
+  Effect.LoseLife {} -> Set.empty
+  Effect.GainLife {} -> Set.empty
+  Effect.IncreaseSpeed {} -> Set.empty
+  Effect.Replace {} -> Set.empty
+  Effect.SkipNextPhase {} -> Set.empty
+  Effect.PreventNextDamage {} -> Set.empty
+  Effect.PreventAllDamage {} -> Set.empty
+  Effect.Counter _ -> Set.empty
+  Effect.PutCounters {} -> Set.empty
+  Effect.GainPlayerCounters {} -> Set.empty
+  Effect.Tap _ -> Set.empty
+  Effect.Untap _ -> Set.empty
+  Effect.Transform _ -> Set.empty
+  Effect.AddPhases _ -> Set.empty
+  Effect.GainControl _ _ -> Set.empty
+  Effect.ArmDelayedTrigger {} -> Set.empty
+  Effect.AffectPlayers {} -> Set.empty
+  Effect.CreateEmblem {} -> Set.empty
+  Effect.BecomeMonarch {} -> Set.empty
+  Effect.ItBecomes _ -> Set.empty
+  Effect.ExileUntilMonarch _ -> Set.empty
+  Effect.Attach _ -> Set.empty
+  Effect.AttachTarget {} -> Set.empty
+  Effect.TakeExtraTurn {} -> Set.empty
+  Effect.ShuffleIntoLibrary _ -> Set.empty
 
 -- Does a Create's slot name EVERY token it minted ("those tokens") rather than
 -- one particular one (CR 603.7c's "it")? Which of the two a card means is its own

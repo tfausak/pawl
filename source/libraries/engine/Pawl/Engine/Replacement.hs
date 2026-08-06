@@ -200,15 +200,11 @@ applies gs event candidate =
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
-        -- CR 615.1: a pattern naming no kind admits every damage event. CR
-        -- 614.15: one naming TheSource admits only the damage its own source is
-        -- dealing. CR 615.7: one naming a RECIPIENT admits only the damage
-        -- addressed to the permanent or player it shields.
+        -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
+        -- plus the one fact about the ROW rather than the event -- a shield
+        -- spent to nothing is no longer a prevention effect.
         (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) ->
-          maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
-            && matchesDamageSource src (DamagePattern.whichSource pat) de
-            && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
-            && unspent rewrite
+          matchesDamagePattern (Just src) pat de && unspent rewrite
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only.
         -- DestructionR carries no pattern because the only producer in the
@@ -289,11 +285,40 @@ matchesController gs src rel oid = case rel of
 -- characteristic one, like matchesZoneSubject.
 --
 -- Not implemented: CR 615.1's shields that name a source by CHARACTERISTIC
--- (Circle of Protection: Red) rather than by identity (#588).
-matchesDamageSource :: ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
+-- (Circle of Protection: Red, Questing Beast's "creatures you control") rather
+-- than by identity (#588).
+--
+-- The source is a MAYBE because CR 615.12's carrier has one: a "damage can't be
+-- prevented" effect stored by a resolution has no permanent behind it. Nothing
+-- names no object, so TheSource -- which is the "THIS creature" of a printed
+-- clause -- cannot be satisfied by it, and no printing writes that pair anyway.
+matchesDamageSource :: Maybe ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
 matchesDamageSource src relation de = case relation of
   SourceRelation.AnySource -> True
-  SourceRelation.TheSource -> src == DamageEvent.source de
+  SourceRelation.TheSource -> src == Just (DamageEvent.source de)
+
+-- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
+-- names? Three of them, and they are the three a printed clause narrows by: a
+-- pattern naming no KIND admits combat and noncombat alike (CR 510.2's dealing
+-- versus CR 608's), one naming TheSource admits only the damage its own source
+-- is dealing (CR 120.1's "an object that deals damage is the source of that
+-- damage", keyed as CR 614.15 keys it), and one naming a RECIPIENT admits only
+-- the damage addressed to the permanent or player it names (CR 615.7).
+--
+-- ONE reading of what a DamagePattern means, shared by the two questions that
+-- ask it: `applies` above, for CR 615.1's shields and CR 614.1a's replacements,
+-- and `preventable` below, for CR 615.12's narrowed "can't be prevented"
+-- (Excruciator). A second reading would let Excruciator's clause and Fog's
+-- disagree about what "combat damage from this source" means.
+--
+-- The rewrite is NOT asked about here, though `applies` asks `unspent` right
+-- after: a spent shield is a row that no longer exists as a prevention effect,
+-- which is a fact about the ROW and not about which events the pattern admits.
+matchesDamagePattern :: Maybe ObjectId -> DamagePattern.DamagePattern -> DamageEvent.DamageEvent -> Bool
+matchesDamagePattern src pat de =
+  maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
+    && matchesDamageSource src (DamagePattern.whichSource pat) de
+    && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
 
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
 --
@@ -599,9 +624,11 @@ at xs i fallback = case List.genericDrop i xs of
 -- CR 616.1 / 108.4: who decides. Projection.controllerOf already falls back to
 -- the owner, so CR 616.1's owner clause is free.
 --
--- CR 616.1's APNAP clause has no producer here: one proposed event has exactly
--- one affected object and therefore one chooser, and the damage batch runs each
--- event's loop independently (#71).
+-- One answer per event, because one proposed event has exactly one affected
+-- object. CR 616.1's APNAP clause therefore has nothing to say at this scale and
+-- is honoured a level up, where a whole batch of simultaneous events can present
+-- choices to two players at once: `orderBatch` sorts the batch by this
+-- function's answer before any of it is asked.
 chooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 chooserOf gs event = case event of
   ProposedEvent.WouldChangeZone zc -> Projection.controllerOf (ZoneChange.object zc) gs
@@ -734,15 +761,23 @@ prevents rewrite = case rewrite of
 -- nothing and the shield is not spent ("existing damage prevention shields won't
 -- be reduced by damage that can't be prevented").
 --
--- Takes the EVENT, though the one producer reads nothing off it, because that is
--- the axis the rest of the family varies on: Excruciator's clause names its own
--- source and Frenzied Baloth's names a damage kind, and both would answer this
--- per event rather than per board (#835).
+-- Asked per EVENT, because that is what the rule's own subject is and what the
+-- printed clauses narrow: Spider-Punk's sentence admits every event, and
+-- Excruciator's admits only the ones its own 7/7 is the source of, on the same
+-- board and in the same batch.
 --
--- Delegated whole to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11
--- axis this lives on, so this module never sees a PlayerEffect constructor.
+-- A DISJUNCTION over the standing effects, for CR 101.2's reason and the shape
+-- every prohibition takes: one applicable "can't" is enough and nothing outvotes
+-- it. `any` rather than a count because EachPlayer puts one effect on the list
+-- once per seat.
+--
+-- Delegated to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11 axis
+-- this lives on, so this module never sees a PlayerEffect constructor -- it
+-- reads only the DamagePattern each effect hands back, with the same
+-- matchesDamagePattern that reads a shield's.
 preventable :: GameState -> DamageEvent.DamageEvent -> Bool
-preventable gs _de = not (PlayerEffect.damageCantBePrevented gs)
+preventable gs de =
+  not (any (\(src, pat) -> matchesDamagePattern src pat de) (PlayerEffect.unpreventable gs))
 
 -- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
 -- chosen against damage that CAN'T BE PREVENTED? True means the application
@@ -826,13 +861,50 @@ groupPreventions ps =
 -- as the shield has left and no more, which nobody may decline or divide, so the
 -- only freedom the rule grants is which event the shield reaches first.
 --
--- CR 616.1's APNAP clause is honoured across choosers here, which is the one
--- place in this module that can honour it: a lone ProposedEvent has exactly one
--- affected object and therefore one chooser (#71).
-orderForShields :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
-orderForShields events = do
+-- CR 616.1's APNAP clause is honoured here too, and over the WHOLE batch rather
+-- than only over the shield questions: `byApnap` groups the batch by chooser
+-- before anything is asked, so every question one player is owed -- CR 615.7's
+-- allocation and each of their events' CR 616.1 choices alike -- is asked before
+-- the next player's. A lone ProposedEvent still has exactly one affected object
+-- and therefore one chooser, which is why the batch is the only place the clause
+-- can be honoured at all.
+--
+-- The two rules order DIFFERENT LEVELS and so cannot contend for this list. CR
+-- 615.7's freedom is entirely within one chooser: a shield names one recipient,
+-- so every event it contests is addressed to one player's object, and that is
+-- the same player CR 616.1 asks about those events -- `contested` and `choose`
+-- both read the chooser off the recipient through `chooserOf`. `askOne` then
+-- permutes only within that player's own positions. CR 101.4c is the rule that
+-- licenses it: a player making several simultaneous choices makes them in the
+-- order specified, or chooses the order themselves.
+orderBatch :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+orderBatch events = do
   gs <- State.get
-  Monad.foldM askOne events (contested gs events)
+  -- Sorted FIRST: `contested` reports batch positions, so it has to see the list
+  -- `askOne` will splice into.
+  let sorted = byApnap gs events
+  Monad.foldM askOne sorted (contested gs sorted)
+
+-- CR 616.1 / 101.4: group a batch by whose CR 616.1 choice each event is, active
+-- player first. A stable sort, so events sharing a chooser keep their gather
+-- order and CR 615.7's within-chooser permutation is left to `askOne`.
+--
+-- An event with no chooser -- its affected object has left -- sorts last with
+-- the unseated, since `choose` will not prompt for it either.
+byApnap :: GameState -> [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
+byApnap gs =
+  let rank de = maybe (unseated gs) (seatOf gs) (chooserOf gs (ProposedEvent.WouldDealDamage de))
+   in List.sortOn rank
+
+-- CR 101.4: how far down APNAP order a player sits. A player off the seating
+-- roster sorts last, the fallback Resolve.objectRefObjects takes for the same
+-- lookup.
+seatOf :: GameState -> PlayerId -> Int
+seatOf gs pid = Maybe.fromMaybe (unseated gs) (List.elemIndex pid (Game.apnapOrder gs))
+
+-- The seat index that sorts after every real one.
+unseated :: GameState -> Int
+unseated = length . Game.apnapOrder
 
 -- Ask one chooser for the order of the positions their shields are contested
 -- over, and splice the answer back into the batch.
@@ -871,6 +943,11 @@ askOne batch (pid, positions) = do
 -- unit is the amount. A shield large enough to cover the lot prevents all of it
 -- whatever the order, so there is nothing to ask.
 --
+-- Not implemented: a shield is the only contested resource this asks about, so a
+-- limited replacement of any other shape that two of one chooser's simultaneous
+-- events could each spend is spent by whichever is settled first, rather than by
+-- CR 101.4c's answer from that chooser (#839).
+--
 -- Several shields contribute ONE question per CHOOSER, over the union of what
 -- they contest: the order the batch is settled in is a single fact about the
 -- batch, and asking twice would ask the same player to state it twice.
@@ -887,8 +964,8 @@ askOne batch (pid, positions) = do
 -- them leads to the same board and there is nothing for the shielded player to
 -- decide. Filtered per EVENT rather than per batch, so a batch mixing
 -- preventable and unpreventable damage still asks about the part the shield can
--- reach -- unreachable while the one producer is board-wide (#835), and the
--- shape the rule describes.
+-- reach -- which a narrowed clause reaches: an Excruciator and an ordinary
+-- creature hitting one shielded permanent at once is exactly that batch.
 contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
 contested gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]
@@ -909,12 +986,8 @@ contested gs events =
           _ -> Nothing
       groups = Maybe.mapMaybe contestedBy (collect gs (GameState.replacements gs))
       merged = Map.fromListWith (<>) groups
-      order = Game.apnapOrder gs
-      -- A chooser off the seating roster sorts last, the fallback
-      -- Resolve.objectRefObjects takes for the same lookup.
-      seated pid = Maybe.fromMaybe (length order) (List.elemIndex pid order)
    in [ (pid, List.sort (List.nub positions))
-      | (pid, positions) <- List.sortOn (seated . fst) (Map.toList merged)
+      | (pid, positions) <- List.sortOn (seatOf gs . fst) (Map.toList merged)
       ]
 
 -- CR 615.7: how much of a prevention shield is left, or Nothing for an effect

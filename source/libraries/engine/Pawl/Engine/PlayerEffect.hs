@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import Pawl.Types.CardName (CardName)
+import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
@@ -224,7 +225,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.NoMaximumHandSize -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
-  PlayerEffect.DamageCantBePrevented -> effect
+  PlayerEffect.DamageCantBePrevented _ -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -318,7 +319,7 @@ prohibitsCasting pid name gs =
         PlayerEffect.CantBeCountered _ -> False
         -- CR 615.12 edits what CR 615.1's shields do to a damage event. Nobody
         -- is more or less allowed to cast a spell for it.
-        PlayerEffect.DamageCantBePrevented -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -362,7 +363,7 @@ prohibitsPlayingLand pid name gs =
         -- CR 305.1 again: a land is never put on the stack, so nothing about
         -- countering reaches a land play.
         PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -426,7 +427,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -440,7 +441,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
       effects = fmap snd (applying pid gs)
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 
@@ -491,7 +492,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -540,7 +541,7 @@ protectedFromTargeting caster pid gs =
         -- says the same about CR 113.6g, and a Cancel at a spell Spider-Punk
         -- protects still targets it legally and still resolves.
         PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -587,7 +588,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -615,7 +616,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.DamageCantBePrevented -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in if any (removes . snd) (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
@@ -659,7 +660,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
-        PlayerEffect.DamageCantBePrevented -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -712,55 +713,63 @@ cantBeCountered pid oid gs =
         -- Spider-Punk's OTHER sentence, and no part of this answer: CR 615.12
         -- is about a damage event and CR 701.6a about an object on the stack.
         -- The two travel together on one card and share nothing.
-        PlayerEffect.DamageCantBePrevented -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any (stops . snd) (applying pid gs)
 
--- CR 615.12 / 613.11: does any effect say damage can't be prevented
--- (Spider-Punk)? The typed question Pawl.Engine.Replacement.preventable asks, so
+-- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
+-- now (Spider-Punk, Excruciator), each paired with the SOURCE of the ability
+-- that says it. The typed question Pawl.Engine.Replacement.preventable asks, so
 -- neither that module nor Pawl.Engine.Event ever sees a PlayerEffect
 -- constructor.
 --
--- Takes NO player and NO damage event, which is the whole of what the one arm
--- behind it says: CR 615.12's sentence names no source, no recipient and no
--- amount, so the only question is whether such an effect exists at all.
+-- Hands back the PATTERNS rather than a yes/no, because CR 615.12's sentence is
+-- about a damage EVENT and the printed narrowings name a quality of one:
+-- Excruciator's names its own source. Reading a pattern against an event is CR
+-- 615.1's own arithmetic, which Pawl.Engine.Replacement.matchesDamagePattern
+-- owns for the shields, and one reading of what a DamagePattern means is worth
+-- more than a boolean asked here.
 --
--- Asked of EVERY still-playing player rather than of one, because `applying` is
--- indexed by player and this effect is not. That reading is EXACT for
--- PlayerScope.EachPlayer, the scope Spider-Punk's possessive-free sentence
+-- The SOURCE rides out because SourceRelation.TheSource is resolved against it
+-- -- Excruciator's clause names the permanent that prints it -- and it is the
+-- Maybe `applying` already carries: Nothing for a stored CR 611.2c effect, which
+-- has no permanent behind it, and no printing pairs one with a self-naming
+-- pattern.
+--
+-- Gathered from EVERY still-playing player rather than from one, because
+-- `applying` is indexed by player and this effect is not. That reading is EXACT
+-- for PlayerScope.EachPlayer, the scope Spider-Punk's possessive-free sentence
 -- writes: EachPlayer is in scope for everybody, so "some player has it applying"
--- and "it applies" are the same fact.
+-- and "it applies" are the same fact. Duplicated rows are why the caller folds
+-- with `any` and not with a count.
 --
 -- A narrower scope would make them come apart, and no card may write one:
 -- Pawl.CardSpec's "no card narrows CR 615.12" lint sweeps both carriers
 -- `applying` folds together -- the printed static ability and the stored
 -- Effect.AffectPlayers -- and rejects any that pairs this effect with another
 -- scope. There is nothing for a scope to select here anyway: CR 615.12's
--- sentence is about a damage EVENT, and the narrowings that are printed narrow
--- the event rather than the table (#835).
+-- sentence names a damage event, and its narrowings narrow the event rather
+-- than the table.
 --
 -- CR 102.1's departed seats are already excluded, since Game.stillPlaying is
 -- what `applying`'s own scope resolution folds over.
 --
--- A DISJUNCTION for CR 101.2's reason, the shape every prohibition here takes:
--- one applicable "can't" is enough and nothing outvotes it.
---
--- Read LIVE through `applying`, like every other question in this module, so a
--- Spider-Punk destroyed earlier in the turn simply stops being found and the
+-- Read LIVE through `applying`, like every other question in this module, so an
+-- Excruciator destroyed earlier in the turn simply stops being found and the
 -- shields on the board go back to working (CR 604.2).
-damageCantBePrevented :: GameState -> Bool
-damageCantBePrevented gs =
-  let says effect = case effect of
-        PlayerEffect.DamageCantBePrevented -> True
-        PlayerEffect.CantBeCountered _ -> False
-        PlayerEffect.CantCastSpells -> False
-        PlayerEffect.CantCastMoreThan _ -> False
-        PlayerEffect.CantCastChosenName -> False
-        PlayerEffect.CantPlayLandChosenName -> False
-        PlayerEffect.IncreaseSpellCost _ _ -> False
-        PlayerEffect.ReduceSpellCost _ _ -> False
-        PlayerEffect.PlayAdditionalLands _ -> False
-        PlayerEffect.NoMaximumHandSize -> False
-        PlayerEffect.DontLoseUnspentMana _ -> False
-        PlayerEffect.CantBeTargetedBy _ -> False
-        PlayerEffect.CastAsThoughItHadFlash _ -> False
-   in any (\pid -> any (says . snd) (applying pid gs)) (Game.stillPlaying gs)
+unpreventable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]
+unpreventable gs =
+  let says (src, effect) = case effect of
+        PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost _ _ -> Nothing
+        PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+   in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)

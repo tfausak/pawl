@@ -1,6 +1,7 @@
 module Pawl.Types.PlayerEffect where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -216,18 +217,29 @@ data PlayerEffect
     -- characteristics, and "damage can't be prevented" is not a characteristic
     -- of anything -- it is a standing edit to what CR 615.1's shields do.
     --
-    -- NULLARY, naming neither a source nor a recipient nor a damage kind,
-    -- because Spider-Punk's sentence names none of them: every damage event in
-    -- the game is unpreventable while it stands. Leyline of Punishment,
-    -- Everlasting Torment and Sunspine Lynx print the same unqualified sentence,
-    -- so this is a family rather than one card's quirk. The NARROWED family is
-    -- large and is not reachable by a payload here -- Excruciator's "damage that
-    -- would be dealt by this creature", Questing Beast's "combat damage that
-    -- would be dealt by creatures you control" and Frenzied Baloth's "combat
-    -- damage" each name a quality of the damage EVENT, which is the axis
-    -- Pawl.Types.DamagePattern already speaks and this type does not (#835).
+    -- WHICH damage is a Pawl.Types.DamagePattern, the same type CR 615.1's
+    -- shields and CR 614.1a's damage replacements are patterned by, because the
+    -- printed narrowings of this sentence narrow exactly what that type speaks:
+    -- Excruciator's "damage that would be dealt by this creature" is a SOURCE,
+    -- Frenzied Baloth's "combat damage" is a KIND, and Whippoorwill's "damage
+    -- that would be dealt to that creature" is a RECIPIENT. Spider-Punk's
+    -- sentence names none of the three and so carries the pattern that admits
+    -- everything, which Leyline of Punishment, Everlasting Torment and Sunspine
+    -- Lynx print too.
     --
-    -- A DURATION is not carried either, and needs nothing new: Skullcrack's
+    -- Pattern rather than an arm per printed clause, so this stays a
+    -- CLASSIFICATION: the engine asks the pattern whether it admits the event
+    -- and never asks which card wrote it.
+    --
+    -- Not implemented: Questing Beast's "combat damage that would be dealt by
+    -- CREATURES YOU CONTROL" narrows the source by a characteristic rather than
+    -- by identity, which is the same gap CR 615.1's shields have on that axis
+    -- (#588). Whippoorwill's recipient limb has no site to bake a recipient into
+    -- this pattern (#845). Banefire's "the damage can't be prevented" is a
+    -- different carrier again -- a self-referential clause of one resolution,
+    -- the shape Pawl.Types.Counterability takes (#844).
+    --
+    -- A DURATION is not carried, and needs nothing new: Skullcrack's
     -- "damage can't be prevented this turn" is this same effect on the CR 611.2c
     -- stored carrier (Pawl.Types.ActivePlayerEffect), whose expiry is the
     -- duration, exactly as Silence's is.
@@ -239,7 +251,8 @@ data PlayerEffect
     -- possessive-free sentence accordingly writes PlayerScope.EachPlayer, and no
     -- card may write another: Pawl.CardSpec lints the pool for a narrowed
     -- carrier and rejects one, which is what makes
-    -- Pawl.Engine.PlayerEffect.damageCantBePrevented's board-wide reading exact
-    -- rather than approximate.
-    DamageCantBePrevented
+    -- Pawl.Engine.PlayerEffect.unpreventable's board-wide fold exact rather than
+    -- approximate. The narrowing rides in the pattern above instead, where CR
+    -- 615.12's own subject is.
+    DamageCantBePrevented DamagePattern.DamagePattern
   deriving (Eq, Ord, Show)
