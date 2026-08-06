@@ -40,7 +40,10 @@
 -- -- `lookBackInterveningSpec`. CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
--- and Khabál Ghoul -- `bystanderSpec`. The same CR 400.7e slot read from the ENTRY
+-- and Khabál Ghoul -- `bystanderSpec`, and CR 113.6m read off that same
+-- bystander, so a graveyard-functioning trigger does not fire from the
+-- battlefield it just left, with Squee, Goblin Nabob against a Bitterblossom
+-- leaving beside it -- `bystanderZoneSpec`. The same CR 400.7e slot read from the ENTRY
 -- direction, where the entrant is a different card from the bearer, with Aether
 -- Flash -- `aetherFlashSpec`. CR 308's kindred card type, whose one observable
 -- consequence (CR 308.2: a noncreature card carrying creature types) is read
@@ -3704,6 +3707,85 @@ bystanderSpec s registry =
       Spec.assertEqWith s "the Ghoul is gone" (Game.lookupObject ghoul began) Nothing
       Spec.assertEqWith s "and nothing triggered" (fmap PendingTrigger.source triggers) []
 
+-- CR 113.6m read off a BYSTANDER: the half of CR 603.10's first sentence
+-- `bystanderSpec` above recovers, asked of a permanent whose ability functions
+-- only in a graveyard.
+--
+-- The rule the recovery is not allowed to lose: "an ability whose cost or effect
+-- specifies that it moves the object it's on out of a particular zone functions
+-- only in that zone". A bystander is recovered from CR 608.2h last known
+-- information, but what it is recovered AS is a permanent that was ON THE
+-- BATTLEFIELD when the event happened -- so one of its abilities that functions
+-- only in a graveyard was no more watching then than it would be now.
+--
+-- CR 603.10a is deliberately NOT this case. There the rule's own "unless its
+-- trigger condition ... specifies that the object is put into that zone" arm
+-- decides, and it is unimplemented (#819); a bystander carries any condition at
+-- all, so nothing about that arm reaches here.
+--
+-- The pair, chosen so that ONE derivation is the only difference between them:
+--
+--   * Squee, Goblin Nabob ({2}{R} Legendary Creature -- Goblin 1/1, "At the
+--     beginning of your upkeep, you may return this card from your graveyard to
+--     your hand"). CR 113.6k cannot reach it -- an upkeep condition triggers
+--     perfectly well from the battlefield -- so only the effect's own words say
+--     graveyard.
+--   * Bitterblossom ({1}{B} Kindred Enchantment -- Faerie, "At the beginning of
+--     your upkeep, create a 1/1 black Faerie Rogue creature token with flying and
+--     you lose 1 life") as the control: the SAME trigger condition, on the same
+--     battlefield, leaving in the same batch, with an effect that names no zone.
+--     CR 113.6's default keeps it functioning on the battlefield.
+--
+-- (Both names, costs, type lines, P/T and oracle texts checked against Scryfall.)
+--
+-- Both leave the battlefield AFTER the upkeep begins and inside one unscanned
+-- batch, which is `bystanderSpec`'s Khabál Ghoul shape: the step event comes
+-- first, so nothing about either permanent's own departure event can be what
+-- offers it.
+bystanderZoneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bystanderZoneSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- alice's upkeep begins with Squee and Bitterblossom on her battlefield;
+      -- `remove` then takes both off inside the same batch. Answers with the two
+      -- battlefield ids and the sources the gather produced.
+      board remove = do
+        squee <- S.printingOf s registry "Squee, Goblin Nabob"
+        bitterblossom <- S.printingOf s registry "Bitterblossom"
+        let (squeeId, g1) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
+            (blossomId, g2) = S.addCreature bitterblossom S.alice g1
+            began =
+              S.withEvents
+                [GameEvent.StepBegan upkeep S.alice]
+                (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+            after = S.runPure S.identityAnswer began (remove [squeeId, blossomId])
+        pure (squeeId, blossomId, after, fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents after) after)))
+   in Spec.describe s "BystanderZone" $ do
+        -- The proving leg. EXILE rather than a graveyard on purpose: it leaves
+        -- the bystander reading as the only source that could offer Squee's
+        -- ability at all, so the assertion cannot pass on the strength of the
+        -- graveyard filtering that already landed with CR 113.6m's trigger half.
+        Spec.it s "CR 113.6m a bystander's graveyard-functioning trigger does not fire from the battlefield it just left" $ do
+          (squeeId, blossomId, after, sources) <- board (mapM_ (\oid -> Event.changeZone oid Zone.Exile))
+          Spec.assertEqWith s "Squee really left the battlefield" (Game.lookupObject squeeId after) Nothing
+          Spec.assertEqWith s "and so did the Bitterblossom" (Game.lookupObject blossomId after) Nothing
+          Spec.assertBool s (null (Game.zoneMembers Zone.Graveyard S.alice after)) "neither card is in a graveyard, so no graveyard reading can be doing this"
+          Spec.assertEqWith
+            s
+            "only the Bitterblossom, whose effect names no zone, is recovered as a bystander"
+            sources
+            [TriggerSource.OfObject blossomId]
+        -- The same board with the ordinary destination. The battlefield
+        -- incarnation still gets nothing, which is what this change is; the
+        -- graveyard incarnation CR 400.7 mints is a different object under a
+        -- different id, and whether IT should be offered to an event that
+        -- predates its arrival is a separate question this says nothing about
+        -- (#824).
+        Spec.it s "CR 113.6m the same holds when the bystander dies to a graveyard" $ do
+          (squeeId, blossomId, after, sources) <- board (Event.destroy Regenerability.Regenerable)
+          Spec.assertEqWith s "Squee really left the battlefield" (Game.lookupObject squeeId after) Nothing
+          Spec.assertBool s (TriggerSource.OfObject squeeId `notElem` sources) "the battlefield incarnation triggered nothing"
+          Spec.assertBool s (TriggerSource.OfObject blossomId `elem` sources) "and the control still did"
+
 -- CR 400.7e's slot read from the OTHER direction of a zone change: an entry.
 -- "Abilities that trigger when an object moves from one zone to another ... can
 -- find the new object that it became in the zone it moved to when the ability
@@ -4305,6 +4387,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lookBackInterveningSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
+  bystanderZoneSpec s registry
   aetherFlashSpec s registry
   kindredSpec s registry
   discardTriggerSpec s registry

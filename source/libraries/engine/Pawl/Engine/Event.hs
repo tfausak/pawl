@@ -2236,22 +2236,28 @@ eventTriggers events gs =
       -- away and a layer-6 grant adds them without special-casing. Shared by both
       -- candidate sources, so a live and a last-known permanent read alike.
       abilitiesOf pc = PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc)
-      -- CR 113.6m's "functions ONLY in that zone", applied to the LIVE
-      -- battlefield reading: a Squee, Goblin Nabob standing on the battlefield
-      -- does not see its own upkeep, because the ability that watches for it
-      -- functions in the graveyard. The mirror of the filter
+      -- CR 113.6m's "functions ONLY in that zone", asked of a permanent read AS
+      -- BEING ON THE BATTLEFIELD: a Squee, Goblin Nabob standing there does not
+      -- see its own upkeep, because the ability that watches for it functions in
+      -- the graveyard. The mirror of the filter
       -- Pawl.Engine.Activate.abilitiesForGiven puts on its battlefield arm.
       --
-      -- NOT applied to the LAST-KNOWN readings below -- `leftBattlefield`, and
-      -- the `bystanders` suffix union built out of it -- because those are two
-      -- questions wearing one shape and CR 113.6m answers them differently. For
-      -- CR 603.10a's look-back at the permanent this event removed, the rule's
-      -- own "unless its trigger condition ... specifies that the object is put
-      -- into that zone" exempts the dies triggers it serves, and that clause is
-      -- not implemented (#819), so filtering there would read the rule's first
-      -- half without its second. For CR 603.10's first sentence -- a BYSTANDER,
-      -- which carries any condition at all -- the filter does belong (#822).
-      onBattlefieldAbilitiesOf pc = filter (functionsIn Zone.Battlefield) (abilitiesOf pc)
+      -- Applied to BOTH readings that say "this permanent was on the
+      -- battlefield": the live `onBattlefield` set, and the `bystanders` suffix
+      -- union, which is CR 603.10's first sentence recovering a permanent that
+      -- WAS on the battlefield at this event and has left by the CR 117.5
+      -- boundary. Last known information (CR 608.2h) is how that permanent is
+      -- read, not a statement about which zone it is being read IN, so the zone
+      -- CR 113.6m compares against is the battlefield either way.
+      --
+      -- NOT applied to `leftBattlefield` -- CR 603.10a's look-back at the
+      -- permanent THIS event removed. That is the same shape asking a different
+      -- question, and CR 113.6m answers it differently: the rule's own "unless
+      -- its trigger condition ... specifies that the object is put into that
+      -- zone" exempts the dies triggers that arm serves, and that clause is not
+      -- implemented (#819), so filtering there would read the rule's first half
+      -- without its second.
+      battlefieldAbilitiesOf pc = filter (functionsIn Zone.Battlefield) (abilitiesOf pc)
       onBattlefield =
         Map.fromList
           ( Maybe.mapMaybe
@@ -2277,7 +2283,7 @@ eventTriggers events gs =
                   -- 603.10's first sentence asks for.
                   Just pc ->
                     fmap
-                      (\ctrl -> (oid, (ctrl, onBattlefieldAbilitiesOf pc)))
+                      (\ctrl -> (oid, (ctrl, battlefieldAbilitiesOf pc)))
                       ( case Map.lookup oid (GameState.controlWhenTriggered gs) of
                           Just who -> Just who
                           Nothing -> Projection.controllerOfGiven grants Set.empty oid gs
@@ -2285,7 +2291,7 @@ eventTriggers events gs =
               )
               (Set.toAscList (GameState.battlefield gs))
           )
-      -- CR 603.10a: the permanent this event took OFF the battlefield, read from
+      -- The permanent this event took OFF the battlefield, read from
       -- CR 608.2h last known information -- both the abilities and the objects'
       -- appearance immediately prior to the event, which is what CR 603.10 says
       -- looking back means. Both live in the single `lastKnown` record, written
@@ -2315,7 +2321,13 @@ eventTriggers events gs =
       --
       -- Empty for a permanent that ceased without a zone change running over it,
       -- which files no last known information. That hole is `bystanders`' too.
-      leftBattlefield event = case event of
+      --
+      -- Parameterized by which of the departed permanent's abilities to offer,
+      -- because the two callers below want different sets out of one recovery:
+      -- `leftBattlefield` is CR 603.10a and takes them all, `bystanders` is CR
+      -- 603.10's first sentence and takes only the ones CR 113.6m leaves
+      -- functioning on the battlefield.
+      departedFrom pick event = case event of
         GameEvent.Moved zc _
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
               case Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs) of
@@ -2323,7 +2335,7 @@ eventTriggers events gs =
                 Just lk ->
                   Map.singleton
                     (ZoneChange.departed zc)
-                    (LastKnown.controller lk, abilitiesOf (LastKnown.characteristics lk))
+                    (LastKnown.controller lk, pick (LastKnown.characteristics lk))
         GameEvent.Moved _ _ -> Map.empty
         GameEvent.DamageDealt _ -> Map.empty
         GameEvent.DamagePrevented _ _ -> Map.empty
@@ -2337,6 +2349,10 @@ eventTriggers events gs =
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
+      -- CR 603.10a's look-back at the permanent this event removed: every
+      -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
+      -- above gives.
+      leftBattlefield = departedFrom abilitiesOf
       -- CR 603.10's first sentence, per EVENT: the permanents still on the
       -- battlefield when each event happened that have left by the CR 117.5
       -- boundary. Entry i is the union of `leftBattlefield` over the events AFTER
@@ -2355,7 +2371,14 @@ eventTriggers events gs =
       -- The controller and abilities are the ones the permanent had as it LEFT --
       -- one moment after the event that triggered them, not at it (#603). Nothing
       -- in this pool moves control or grants an ability in that window.
-      bystanders = drop 1 (List.scanr (\event acc -> Map.union (leftBattlefield event) acc) Map.empty events)
+      --
+      -- CR 113.6m applies here and not to `leftBattlefield`: this permanent WAS
+      -- on the battlefield when the event happened, so one of its abilities that
+      -- functions only in a graveyard was no more watching then than it is now.
+      -- The proving case is Squee, Goblin Nabob leaving the battlefield after an
+      -- upkeep began in the same batch, in Pawl.TriggerSpec's
+      -- `bystanderZoneSpec`.
+      bystanders = drop 1 (List.scanr (\event acc -> Map.union (departedFrom battlefieldAbilitiesOf event) acc) Map.empty events)
       -- CR 702.29c: the card that was just cycled, wherever it landed. The
       -- candidate source that is neither on the battlefield nor a permanent that
       -- left it -- which is exactly what that rule asks for:
