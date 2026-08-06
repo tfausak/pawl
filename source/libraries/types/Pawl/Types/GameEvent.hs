@@ -135,10 +135,11 @@ data GameEvent
     -- a discard or a mill lands a card in a graveyard too. What happened is not
     -- derivable from where the card went, so it is recorded.
     --
-    -- Emitted ONLY where a countering actually happened. CR 113.6g's "can't be
-    -- countered" functions on the stack and CR 101.2 makes the "can't" win, so a
-    -- spell printing that clause is never countered at all -- Event.counter
-    -- returns before this is recorded, which CR 603.2g makes mandatory.
+    -- Emitted ONLY where a countering actually happened. Both of Event.counter's
+    -- "can't be countered" gates -- CR 113.6g's, printed on the spell, and CR
+    -- 613.11's, handed out by a permanent's static ability -- return before this
+    -- is recorded, since CR 101.2 makes either "can't" win and CR 603.2g makes
+    -- the silence mandatory rather than tidy.
     SpellCountered Countering.Countering
   | -- | CR 119.3: a player LOST LIFE, and how much. Greater than 0 by
     -- construction: every producer guards its own zero. The rules state that

@@ -167,6 +167,11 @@ data Face card = MkFace
     -- battlefield permanents and every dynamic affected set is battlefield-gated
     -- (#160). CR 613 itself does reach the stack; this is a fact about the engine,
     -- not about the rules.
+    --
+    -- CR 113.6g's SELF-referential clause only. A permanent's static ability
+    -- about OTHER objects being uncounterable (Spider-Punk) rides
+    -- playerAbilities below instead; Pawl.Types.Counterability argues why the two
+    -- carriers cannot be merged.
     counterability :: Counterability.Counterability,
     -- | CR 118.8: this face's printed additional costs, paid at the same time as
     -- the spell's mana cost (Village Rites). Read directly from the card, the

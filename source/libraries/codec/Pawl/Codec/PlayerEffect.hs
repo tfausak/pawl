@@ -24,6 +24,7 @@ toJson e = case e of
   PlayerEffect.DontLoseUnspentMana f -> Common.tagged "DontLoseUnspentMana" . Just $ ManaFilter.toJson f
   PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ PlayerScope.toJson sc
   PlayerEffect.CastAsThoughItHadFlash c -> Common.tagged "CastAsThoughItHadFlash" . Just $ Filter.toJson Keyword.toJson c
+  PlayerEffect.CantBeCountered -> Common.nullary "CantBeCountered"
 
 fromJson :: Value.Value -> Either Text.Text PlayerEffect.PlayerEffect
 fromJson value = do
@@ -40,4 +41,5 @@ fromJson value = do
     ("DontLoseUnspentMana", Just v) -> PlayerEffect.DontLoseUnspentMana <$> ManaFilter.fromJson v
     ("CantBeTargetedBy", Just v) -> PlayerEffect.CantBeTargetedBy <$> PlayerScope.fromJson v
     ("CastAsThoughItHadFlash", Just v) -> PlayerEffect.CastAsThoughItHadFlash <$> Filter.fromJson Keyword.fromJson v
+    ("CantBeCountered", _) -> Right PlayerEffect.CantBeCountered
     _ -> Left . Text.pack $ "unknown PlayerEffect: " <> t

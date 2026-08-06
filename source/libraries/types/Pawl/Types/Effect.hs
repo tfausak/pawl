@@ -374,9 +374,9 @@ data Effect card
     -- 113.9 keeps the two apart where it belongs, in the target pool.
     --
     -- Distinct from MoveToZone slot Graveyard the way Destroy is: a keyword action
-    -- on rule 701's list, carrying the CR 113.6g can't-be-countered gate, and
-    -- recording for a SPELL a distinct "was countered" event the zone change alone
-    -- could not be told apart from.
+    -- on rule 701's list, carrying both of the funnel's can't-be-countered gates
+    -- (CR 113.6g's and CR 613.11's), and recording for a SPELL a distinct "was
+    -- countered" event the zone change alone could not be told apart from.
     Counter SlotName.SlotName
   | -- | CR 122.6: put this many counters of this kind on the slot's target
     -- permanent. A counter is persistent object state, NOT a zone change --
