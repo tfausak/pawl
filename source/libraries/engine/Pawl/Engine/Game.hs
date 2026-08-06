@@ -265,10 +265,12 @@ resolveFace mName card = case mName of
   -- A name that does not resolve falls back to the combined view rather than
   -- failing. Pawl.CardSpec's "a card's face names are pairwise distinct" corpus
   -- lint holds that of every loadable card, which is what makes faceNamed's
-  -- answer unique whenever the name IS one of the card's own faces, and both
-  -- writers of this field (Cast.asProposed and Resolve's CR 701.27a Transform
-  -- arm) store a name they read from that same card's faces -- so this arm has
-  -- no case that reaches it, short of a bug in one of them.
+  -- answer unique whenever the name IS one of the card's own faces, and all
+  -- three writers of this field (Event.changeZoneAttaching's mkObj, which CR
+  -- 709.3a's chosen half rides in on; Cast.asProposed, the gate's speculative
+  -- stamp; and Resolve's CR 701.27a Transform arm) store a name they read from
+  -- that same card's faces -- so this arm has no case that reaches it, short of
+  -- a bug in one of them.
   Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
 
 -- The face of the card an object is showing. Nothing when the id is unknown or

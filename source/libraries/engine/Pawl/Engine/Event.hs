@@ -956,9 +956,11 @@ changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing 
 --
 -- Handed to the funnel rather than written onto the object the move returned,
 -- for the reason CR 709.3a states: "only that half is considered to be put onto
--- the stack", so the CR 400.7 incarnation must never exist without it. See the
--- `face` note in changeZoneAttaching's mkObj for what can and cannot observe the
--- difference today.
+-- the stack", so the CR 400.7 incarnation must never exist without it -- and,
+-- since only a writer inside the move knows where the move actually landed, a
+-- CR 616.1 redirect to another zone drops the face instead of carrying it there.
+-- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
+-- redirected off the stack keeps both halves" for the case that proves it.
 changeZoneShowing :: ObjectId -> Zone -> CardName.CardName -> Game (Maybe ObjectId)
 changeZoneShowing oid requestedDest name = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing (Just name)
 
@@ -1095,18 +1097,23 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
               -- that no reader inside the move can see the CR 400.7 object
               -- without its half.
               --
-              -- Nothing today can tell setting it here from setting it on the
-              -- object the move returns, and the reason is the CARD POOL rather
-              -- than a claim about Magic. A CR 616.1 zone-change candidate can
-              -- now read the half -- ZoneChangePattern.whatObject is a Filter --
-              -- but no printing pairs the two: the pool's one split card is
-              -- Wax // Wane, whose halves are both instants, so CR 709.3a's
-              -- single-half view and CR 709.4's combined view agree on every
-              -- characteristic the redirect in the pool asks about (#659). The
-              -- CR 614.1c-d entry loop runs only for a battlefield destination,
-              -- and the CR 117.5 trigger scan reads the live board, by which time
-              -- either writer has landed. So this buys the ordering rather than a
-              -- passing test, as `seed` above does.
+              -- Gated on the move ARRIVING where it was headed, which is the
+              -- reading only a writer inside the move can have: CR 709.3a's half
+              -- is "considered to be put onto the stack", so a CR 616.1 redirect
+              -- that settles on another destination (CR 614.6: the modified event
+              -- is what happens) means the card was never put onto the stack at
+              -- all, and CR 709.4 gives it its two halves combined wherever it
+              -- did land. Pawl.CastSpec's "a cast redirected off the stack keeps
+              -- both halves" is the proof, and fails under the pre-#781 ordering
+              -- -- a stamp applied to whatever the move handed back cannot ask
+              -- this question, because the caller named a destination the move
+              -- was free to overrule.
+              --
+              -- The SETTLED destination against the REQUESTED one rather than
+              -- against Zone.Stack: the rule is that the face describes the move
+              -- the caller asked for, not that a face is only ever a stack half.
+              -- CR 712.13's face carried out of the stack (#657) is the same
+              -- shape with Battlefield in both slots.
               --
               -- What is still dropped is the face a move OUT of the stack should
               -- carry -- CR 712.13: "a resolving double-faced spell that becomes
@@ -1122,7 +1129,7 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
                     Object.tapped = tapped,
                     Object.attachedTo = seed,
                     Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing,
-                    Object.face = shown
+                    Object.face = if dest == requestedDest then shown else Nothing
                   }
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
