@@ -1917,6 +1917,57 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     -- indistinguishable from "the first face wins": with both halves payable,
     -- both are offered and CR 709.3's choice is left to the player.
     Spec.assertEqWith s "a Forest and a Plains: both halves" (namesOffered both) [waxName, waneName]
+  -- The observer for CR 709.3a's half being part of the CR 601.2a MOVE rather
+  -- than a stamp applied once the move has landed.
+  --
+  -- Synthetic Stack Interdiction is "If a green card would be put onto the stack,
+  -- exile it instead" -- a CR 614.1a replacement of the one zone change CR 601.2a
+  -- makes. Nothing printed watches that event: a sweep of Scryfall's oracle bulk
+  -- data (38,542 cards) for "onto the stack" returns two, and neither replaces
+  -- anything -- Grip of Chaos is a TRIGGER on the same moment, and Ertai's
+  -- Meddling only says where a delayed card goes. So the redirect is synthetic
+  -- while the split card it reads is a printing.
+  --
+  -- Two readings of the same card, one case:
+  --
+  --   * BEFORE the move, CR 616.1 asks the pattern about the card as it still
+  --     sits in the hand, where CR 709.4 gives it both halves combined. The half
+  --     being cast is WANE, which is white; the pattern names GREEN, which only
+  --     Wax is. An engine reading CR 709.3b's chosen half here would find no
+  --     green card, decline the redirect, and leave Wane on the stack.
+  --   * AFTER it, the card is in EXILE and was never put onto the stack at all,
+  --     so CR 709.3a ("only that half is considered to be put onto the stack")
+  --     has nothing to say about it and CR 709.4's combined view is what it
+  --     shows -- both names, and the colours of the combined mana cost (CR
+  --     709.4b).
+  --
+  -- CR 614.6 is what makes the second reading follow from the first: the
+  -- modified event is the event that happens, so the destination the CR 616.1
+  -- loop settled on is the destination the move must answer for. Only a writer
+  -- INSIDE the move can, which is what this proves -- restoring the pre-#781
+  -- ordering (Event.changeZoneAttaching setting no face, Cast.castSpell stamping
+  -- the chosen half onto whatever the move handed back) exiles a card named
+  -- "Wane" whose only colour is white, and fails this case.
+  Spec.it s "CR 709.4 a cast redirected off the stack keeps both halves" $ do
+    plains <- S.printingOf s registry "Plains"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    interdiction <- S.printingOf s registry "Synthetic Stack Interdiction"
+    waxWane <- S.printingOf s registry "Wax"
+    -- The Prison is Wane's target (CR 601.2c), so the cast does not rewind for
+    -- want of one before it ever reaches the move.
+    let (_, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
+        (_, withInterdiction) = S.addCreature interdiction S.alice withPrison
+        (gs, oid) = S.handOne waxWane withInterdiction
+        after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))
+    -- Not asserted: what CR 601.2b-i do afterwards. castSpell announces, prices
+    -- and pays for a spell the redirect has already moved off the stack, and
+    -- which of the two defensible readings is right is not implemented (#816).
+    Spec.assertEqWith s "the redirect fired, so nothing reached the stack" (length (GameState.stack after)) 0
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiled] -> do
+        Spec.assertEqWith s "in exile, CR 709.4's combined view" (Projection.nameOf exiled after) (CardName.MkCardName (Text.pack "Wax//Wane"))
+        Spec.assertEqWith s "and CR 709.4b's combined colours" (Projection.colorsOf exiled after) (Set.fromList [Color.Green, Color.White])
+      _ -> Spec.assertFailure s "expected the redirected card in exile"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
