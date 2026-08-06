@@ -486,8 +486,8 @@ honourShuffle offered answer =
 -- only because of the import graph: its one caller is
 -- Pawl.Engine.PlayerEffect.castsThisTurn, and Pawl.Engine.Event now asks that
 -- module CR 701.6a's counterability question -- so an Event.castOf would put
--- the two modules in a cycle. Nothing about GameEvent is owned by Event; CR
--- 613's projection and CR 704's sweep already case on it too.
+-- the two modules in a cycle. Nothing about GameEvent is owned by Event --
+-- Pawl.Engine.Projection and Pawl.Engine.Count already case on it too.
 castOf :: GameEvent -> Maybe PlayerId
 castOf event = case event of
   GameEvent.SpellCast pid -> Just pid

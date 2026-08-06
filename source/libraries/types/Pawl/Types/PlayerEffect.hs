@@ -172,7 +172,7 @@ data PlayerEffect
     -- countered.
     --
     -- NOT Pawl.Types.Counterability, and the two are not redundant. That one is
-    -- CR 113.6g -- "an object's ability that states IT can't be countered
+    -- CR 113.6g -- "an object's ability that states IT can't be countered ...
     -- functions on the stack" -- a self-referential ability of the spell itself,
     -- which is why it rides the card (Rending Volley). This one is an ability of
     -- a BATTLEFIELD permanent about OTHER objects, so CR 113.6 leaves it

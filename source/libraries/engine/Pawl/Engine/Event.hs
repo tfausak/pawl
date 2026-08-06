@@ -1270,8 +1270,8 @@ destroyIn asOf regenerability oids = do
 --     one is an ability of a BATTLEFIELD PERMANENT about other objects, so it is
 --     gathered from the battlefield like any other player effect and reaches BOTH
 --     of CR 701.6a's subjects -- which is why it, unlike the gate above, is asked
---     on both branches. It is asked of the VICTIM's controller: CR 113.8 for an
---     ability, CR 601.2a for a spell.
+--     ahead of the branch split rather than inside one branch. It is asked of the
+--     VICTIM's controller: CR 113.8 for an ability, CR 601.2a for a spell.
 --
 -- On the spell branch, records a SpellCountered ALONGSIDE the zone change's Moved
 -- event, never instead of it: the Moved event is the CR 400.7 change and this one
@@ -1294,11 +1294,13 @@ counter source controller oid = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure ()
+    -- CR 613.11's gate first, ahead of the branch split, because it is the one
+    -- that reaches both of CR 701.6a's subjects.
+    Just _ | protectedFromCountering oid gs -> pure ()
     -- CR 608.2n, reached before the CR 113.6g gate because that gate asks about a
     -- spell's own card and an ability has none -- Game.faceOf answers Nothing for
     -- one, so asking first would fall through to the graveyard move by accident.
-    Just _ | Game.isAbility oid gs -> if protectedFromCountering oid gs then pure () else State.modify' (Game.cease oid)
-    Just _ | protectedFromCountering oid gs -> pure ()
+    Just _ | Game.isAbility oid gs -> State.modify' (Game.cease oid)
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure ()
       _ -> do
