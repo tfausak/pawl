@@ -11,6 +11,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Engine.AttackCost as AttackCost
 import qualified Pawl.Engine.AttackRequirement as AttackRequirement
+import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
 import qualified Pawl.Engine.Decide as Decide
@@ -120,12 +121,9 @@ attackableOpponents gs = filter (/= GameState.activePlayer gs) (Game.stillPlayin
 -- every attack in a battle-less, planeswalker-less pool used to get, and
 -- Replay.defaultAnswer's fallback is the same one for the same reason.
 --
--- Battles are absent because no battle can be attacked: AttackTarget has no
--- OfBattle arm and nothing designates the CR 310.8 protector an attack on one
--- would go through (#302). CR 802's
--- attack-multiple-players option would put a SECOND player on this list, and
--- pawl has no options concept to read it from (#175) -- the defending player is
--- the argument, so this function needs no change when it arrives.
+-- CR 802's attack-multiple-players option would put a SECOND player on this
+-- list, and pawl has no options concept to read it from (#175) -- the defending
+-- player is the argument, so this function needs no change when it arrives.
 --
 -- Read at DECLARATION and again at damage assignment (stillAttacked below), and
 -- both readings are derived rather than stored on purpose: every clause of CR
@@ -135,6 +133,7 @@ attackTargets :: PlayerId -> GameState -> NonEmpty.NonEmpty AttackTarget.AttackT
 attackTargets defender gs =
   AttackTarget.OfPlayer defender
     NonEmpty.:| fmap AttackTarget.OfPlaneswalker (attackablePlaneswalkers defender gs)
+      <> fmap AttackTarget.OfBattle (attackableBattles defender gs)
 
 -- CR 306.6 / CR 508.1b: the planeswalkers a defending player controls, in
 -- ascending id order (Projection.controls walks the battlefield, which is a Set).
@@ -146,16 +145,76 @@ attackablePlaneswalkers :: PlayerId -> GameState -> [ObjectId]
 attackablePlaneswalkers defender gs =
   filter (\oid -> Projection.isPlaneswalkerOf oid gs) (Projection.controls defender gs)
 
+-- CR 310.5 / CR 508.1b: the battles a defending player PROTECTS, in ascending id
+-- order.
+--
+-- Protects, not controls -- and that is the whole rule rather than a nicety. CR
+-- 310.8b: "A battle can be attacked by any attacking player for whom its protector
+-- is a defending player. Notably, a Siege battle can be attacked by its own
+-- controller." Since CR 310.11a puts a Siege's protector among its controller's
+-- opponents, filtering by the protector is what admits the active player's OWN
+-- battle to this list, which filtering by the controller (attackablePlaneswalkers'
+-- rule, CR 306.6) would never do. So this walks the whole battlefield rather than
+-- Projection.controls' one player's slice.
+--
+-- CR 310.8b's first sentence -- "a battle's protector can never attack it" -- needs
+-- no check of its own here: the argument is the DEFENDING player, whom CR 506.2a
+-- draws from the active player's opponents, so a battle on this list is protected
+-- by someone the attacking player is not.
+--
+-- PROJECTED card types (Battle.isBattle) for attackablePlaneswalkers' reason: CR
+-- 613.1d puts card types in layer 4, so a permanent that became a battle is one and
+-- a battle that stopped being one is not. The protector survives that (CR 310.8g),
+-- which is exactly why the type has to be re-asked rather than assumed from the
+-- designation being present.
+--
+-- The designation is asked FIRST and the projection only of what survives it,
+-- which is what keeps this off the hot path: Object.protector is Nothing for every
+-- permanent that is not a battle, so on a board with no battle nothing is
+-- projected at all and this costs one Map lookup per permanent (#200).
+attackableBattles :: PlayerId -> GameState -> [ObjectId]
+attackableBattles defender gs =
+  let protects oid = Battle.protectorOf oid gs == Just defender
+      isOne oid = Battle.isBattle (Projection.project oid gs)
+   in filter (\oid -> protects oid && isOne oid) (Set.toAscList (GameState.battlefield gs))
+
+-- CR 508.5: the defending player an attacking creature's ability refers to --
+-- "the player that creature is attacking, the controller of the planeswalker that
+-- creature is attacking, or the protector of the battle that creature is
+-- attacking". One arm per AttackTarget arm, because that rule's case split IS this
+-- type's.
+--
+-- CR 310.8d is the battle arm's other half, and it is wider than CR 508.5: while a
+-- battle is being attacked, EVERY rule and effect that refers to the defending
+-- player relative to it means the protector. Reading it off the protector here
+-- rather than off Combat.defender is what makes that true of a battle whose
+-- controller is the attacking player -- the case CR 310.8b's "notably" creates.
+--
+-- Nothing means the target names no player: a planeswalker or battle that has left
+-- the battlefield, or a battle mid-repair with no designation (CR 310.10).
+--
+-- CR 508.5's second sentence -- the defending player of a creature that is no
+-- longer attacking, read off what it WAS attacking before it left combat -- is last
+-- known information, and this reads live instead. Unreachable in the pool, which
+-- has no card that can remove an attacked permanent from combat and change who
+-- defends through it (#537), and unobservable besides.
+defendingPlayerOf :: [Projection.ControlGrant] -> AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
+defendingPlayerOf grants target gs = case target of
+  AttackTarget.OfPlayer pid -> Just pid
+  AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
+  AttackTarget.OfBattle oid -> Battle.protectorOf oid gs
+
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
 --
 -- Asked where the answer is USED rather than sampled into the combat record the
 -- way removeChanged samples its two clauses, and the difference is invisible: an
--- attack target is read in exactly two places, and both re-ask --
+-- attack target is read in exactly three places, and all three re-ask --
 -- Damage.combatRecipient at CR 510.1's assignment, whose own CR 510.1b is
--- phrased for precisely this case, and landwalkAllowsGiven for CR 508.5's
--- defending player, which reads the planeswalker's controller and never whether
--- it is still attacked.
+-- phrased for precisely this case, defendingPlayerOf for CR 508.5's defending
+-- player, which reads the planeswalker's controller and never whether it is
+-- still attacked, and Battle.isBeingAttacked for CR 704.5w's rider, which asks
+-- only whether a battle is named at all.
 --
 -- Every other reader of Combat.attackers takes its KEYS (Projection's
 -- Filter.IsAttacking, blockCeiling, declareBlockers, Damage.dealCombatDamage),
@@ -195,6 +254,10 @@ isCreatureObjectGiven = Projection.isCreatureGiven
 -- calls legal. So CR 508.1c is answered in two places, one per shape -- the
 -- split canBlockGiven describes for CR 509.1b, without its middle PAIRWISE case,
 -- which on the attacking side is the missing object axis (#620).
+--
+-- NOT IMPLEMENTED: CR 508.1a's "they can't also be battles". The creature test
+-- below already excludes every battle in the pool, since none is also a creature
+-- (#898).
 --
 -- canAttackGiven is the half a LOOP wants: `grants`, `pcs` and `restricted` are
 -- each one battlefield-wide walk, taken once per declaration pass by
@@ -557,24 +620,14 @@ landwalkAllowsGiven grants pcs attacker gs =
         Keyword.Landwalk criterion -> Just criterion
         _ -> Nothing
       walked = Maybe.mapMaybe landCriterionOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
-      -- CR 508.5: an attacking creature's "defending player" is the player it is
-      -- attacking, or the controller of the planeswalker it is attacking.
-      -- Landwalk is exactly such an ability, so this is that rule's own case
-      -- split, read off the attack itself rather than off the blocker's
-      -- controller -- those two coincide only while there is exactly one
-      -- defending player (CR 802, #175). Nothing means the object is not
-      -- attacking, so no landwalk of its can restrict anything.
-      --
-      -- CR 508.5's second sentence -- the defending player of a creature that is
-      -- no longer attacking, read off what it was attacking before it left combat
-      -- -- is last known information, and this reads the controller LIVE instead.
-      -- Unreachable in the pool, which has no card that can remove an attacked
-      -- planeswalker from combat and change who controlled it (#537), and
-      -- unobservable besides.
-      defenderOf target = case target of
-        AttackTarget.OfPlayer pid -> Just pid
-        AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
-      defendingPlayer = defenderOf =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
+      -- CR 508.5, in defendingPlayerOf above: landwalk is exactly an ability of an
+      -- attacking creature that refers to a defending player, so the player is
+      -- read off the ATTACK rather than off the blocker's controller -- those two
+      -- coincide only while there is exactly one defending player (CR 802, #175),
+      -- and CR 310.8d breaks them apart at two seats as soon as a battle is
+      -- attacked. Nothing means the object is not attacking, so no landwalk of its
+      -- can restrict anything.
+      defendingPlayer = (\t -> defendingPlayerOf grants t gs) =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
       -- CR 702.14c's lands of the defending player. Lazy, and load-bearing: this
       -- walks the whole battlefield, and `any` below never forces it for an
       -- attacker without landwalk, which is every attacker in almost every combat
@@ -1198,7 +1251,7 @@ declareAttackers pid = do
 -- Towershell's rulings say it must be -- the tokens need not all attack the same
 -- thing, and a returning creature need not attack whom it attacked before. Elided
 -- at one candidate, which is every board with no planeswalker on the defending
--- player's side.
+-- player's side and no battle they protect.
 --
 -- CR 508.4a's remaining clauses need no check of their own: attackTargets derives
 -- the offer from the board AT THIS MOMENT, so a candidate it lists satisfies all
@@ -1250,6 +1303,17 @@ putOntoBattlefieldAttacking oid = do
 -- in APNAP order, and CR 802.4a restricts each to blocking creatures attacking
 -- them. Both need the attack-multiple-players option, which pawl has no options
 -- concept to read (#175).
+--
+-- CR 310.8c -- "a battle's protector may block creatures attacking that battle
+-- with creatures they control; creatures controlled by other players can't block
+-- those attackers" -- needs no clause of its own, and the proof is two rules
+-- meeting rather than an accident. This function asks the defending player and
+-- nobody else, and attackableBattles admits a battle only when the defending
+-- player is its protector, so every creature attacking a battle is being blocked
+-- by that battle's protector or by nobody. Proved by Pawl.BattleSpec's pair of CR
+-- 310.8c cases, which move one Piker between two opponents' sides. That equality
+-- of "defending player" and "protector" is a fact about a single defending
+-- player, and CR 802's option is again what would break it (#175).
 --
 -- No still-playing guard: at three or more seats, a defending player who left the
 -- game has had every object they owned removed by CR 800.4a, so legalBlockers

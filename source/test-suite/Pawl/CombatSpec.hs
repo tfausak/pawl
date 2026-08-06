@@ -3357,6 +3357,7 @@ isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
   AttackTarget.OfPlaneswalker _ -> True
   AttackTarget.OfPlayer _ -> False
+  AttackTarget.OfBattle _ -> False
 
 -- Announce every attack at the first planeswalker offered, and answer everything
 -- else aggressively. The counterpart of S.aggressiveAnswer, which takes the head
