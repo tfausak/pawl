@@ -42,6 +42,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import Pawl.Types.Subtype (Subtype)
 
 -- CR 109.5: "you" on an object is its controller, and for a static ability the
 -- CURRENT controller. `pid` is the player being asked about; `controller` is the
@@ -141,7 +142,18 @@ applying pid gs =
               -- started to apply before layer 6 and the cut is unconditional.
               if (null setEffs || Projection.liveGiven setEffs Set.empty oid gs)
                 && not (removed oid)
-                then fmap (\ability -> (Just oid, controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
+                then
+                  -- CR 612.1's word swap over the permanent's own text, computed
+                  -- HERE rather than hoisted beside setEffs above, exactly as
+                  -- Pawl.Engine.CombatRestriction.restricted computes it:
+                  -- textChangesAffecting folds the whole continuous-effect list,
+                  -- and the empty case above has already turned away every
+                  -- permanent that prints no player ability, so the fold runs
+                  -- once per ability-bearing permanent instead of once per
+                  -- permanent on the battlefield.
+                  let changes = Projection.textChangesAffecting oid gs
+                      readAs = if null changes then id else rewritePlayerEffect changes
+                   in fmap (\ability -> (Just oid, controller, PlayerStaticAbility.scope ability, readAs (PlayerStaticAbility.effect ability))) abilities
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
@@ -151,6 +163,12 @@ applying pid gs =
       -- Neither gate above touches it, because it is not an ability for CR 613.1f
       -- to remove: CR 611.2a gives a resolved spell's continuous effect a duration
       -- of its own. Humility cannot take back a Silence that has already resolved.
+      --
+      -- No CR 612.1 rewrite either, and for the same reason read the other way: a
+      -- text-changing effect changes the words printed on an OBJECT, and this
+      -- carrier has none behind it. The words a stored effect holds were fixed by
+      -- the spell that made it, whose own text a swap reaches while it is still on
+      -- the stack (Pawl.Engine.Projection.rewriteEffect).
       storedOne active =
         ( Nothing,
           ActivePlayerEffect.controller active,
@@ -161,6 +179,50 @@ applying pid gs =
       keep (_, controller, scope, _) = inScope pid controller scope
       effectOf (source, _, _, effect) = (source, effect)
    in fmap effectOf (filter keep (printed <> stored))
+
+-- CR 612.1's subtype word swap over a PlayerEffect, the CR 613.10/613.11 axis's
+-- answer to Pawl.Engine.Projection.rewriteModification. An Artificial Evolution
+-- resolved at an Edgewalker moves "Cleric spells you cast cost {W}{B} less to
+-- cast" onto the new word, because the word naming which spells the ability
+-- discounts is text printed on the permanent like any other.
+--
+-- HERE and not beside rewriteModification, which is where the printed-text
+-- rewrites for objects live: this module is the only one that may case on
+-- PlayerEffect, and Pawl.Engine.Projection never sees the type at all. The
+-- shape Pawl.Engine.CombatRestriction takes for a restriction -- destructure the
+-- module's own type, hand each inner value to the module that owns it -- is the
+-- one taken here, with Pawl.Engine.Filter.rewrite doing the descent.
+--
+-- Exhaustive rather than a catch-all, for rewriteModification's stated reason: a
+-- later arm that can hold a word must break this build instead of silently
+-- keeping the printed one.
+--
+-- CR 612.2's family gate is not restated at the Filter descent, for the reason
+-- Filter.rewrite's own comment gives: a HasSubtype atom may name a word of any
+-- family, so the family the word is used AS is the family it belongs to, and the
+-- exact lookup already asks CR 612.2's question. A Magical Hack's land-type pair
+-- therefore leaves Edgewalker's Cleric alone.
+rewritePlayerEffect :: [(Subtype, Subtype)] -> PlayerEffect -> PlayerEffect
+rewritePlayerEffect pairs effect = case effect of
+  -- The three arms carrying a Filter, which is the only place in this type a
+  -- subtype word can hide. Thalia's "noncreature spells" and Vedalken Orrery's
+  -- "spells" name none today; Edgewalker's "Cleric spells" does.
+  PlayerEffect.IncreaseSpellCost f n -> PlayerEffect.IncreaseSpellCost (Filter.rewrite pairs f) n
+  PlayerEffect.ReduceSpellCost f cost -> PlayerEffect.ReduceSpellCost (Filter.rewrite pairs f) cost
+  PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
+  -- The rest name no word a subtype pair could reach. The two chosen-name arms
+  -- carry nothing at all -- CR 201.4's names are read off the source's
+  -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap
+  -- could not touch a card name even if they did. A count, a mana filter and a
+  -- player scope are not words either.
+  PlayerEffect.CantCastSpells -> effect
+  PlayerEffect.CantCastMoreThan _ -> effect
+  PlayerEffect.CantCastChosenName -> effect
+  PlayerEffect.CantPlayLandChosenName -> effect
+  PlayerEffect.PlayAdditionalLands _ -> effect
+  PlayerEffect.NoMaximumHandSize -> effect
+  PlayerEffect.DontLoseUnspentMana _ -> effect
+  PlayerEffect.CantBeTargetedBy _ -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
