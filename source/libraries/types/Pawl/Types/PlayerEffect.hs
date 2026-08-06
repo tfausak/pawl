@@ -183,16 +183,28 @@ data PlayerEffect
     --
     -- BOTH subjects of CR 701.6a at once -- "to counter a spell or ability" --
     -- and one constructor rather than two, because Spider-Punk's one sentence
-    -- says both and no gate downstream needs to tell them apart: CR 113.9 keeps
-    -- an ability from being a spell for the COUNTERER's sake (a Stifle must not
-    -- reach a spell), and this is read on the victim's side, where the
-    -- distinction has nothing to decide.
+    -- says both and the Filter below already tells them apart where a card
+    -- narrows. CR 113.9 keeps an ability from being a spell for the COUNTERER's
+    -- sake (a Stifle must not reach a spell), which is the other side of the
+    -- question and is not what this constructor answers.
     --
-    -- Payload-free. WHOSE spells is the carrier's scope, exactly as it is for
-    -- every other arm here -- Spider-Punk says "spells and abilities" with no
-    -- possessive, which is PlayerScope.EachPlayer. A card narrowing by the
-    -- spell's own qualities ("creature spells you control can't be countered")
-    -- would want the Filter that IncreaseSpellCost carries, and none is in the
-    -- pool (#788).
-    CantBeCountered
+    -- WHOSE spells is the carrier's scope and not this constructor's, exactly as
+    -- it is for every other arm here: Spider-Punk says "spells and abilities"
+    -- with no possessive (PlayerScope.EachPlayer), while Prowling Serpopard says
+    -- "you control" (PlayerScope.You).
+    --
+    -- WHICH spells is the Filter, the same shape IncreaseSpellCost and
+    -- CastAsThoughItHadFlash carry and read through the same
+    -- Pawl.Engine.PlayerEffect.matchesSpell. Spider-Punk narrows by nothing and
+    -- so writes `And []`; Prowling Serpopard's "creature spells" writes
+    -- HasCardType Creature.
+    --
+    -- The filter is read against BOTH of CR 701.6a's subjects and gets to decide
+    -- for itself whether it reaches an ability, because an ability on the stack
+    -- has no card behind it and so no characteristics: `And []` matches it, and
+    -- any atom naming a quality does not. That is why Spider-Punk still stops a
+    -- Stifle and Prowling Serpopard does not -- neither the type nor the engine
+    -- states a rule about abilities, the empty predicate simply happens to be
+    -- true of one.
+    CantBeCountered (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

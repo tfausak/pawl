@@ -33,7 +33,9 @@
 --
 -- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
 -- counterers it has to stop -- the one place this file reaches
--- Pawl.Engine.Event's countering funnel.
+-- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
+-- counterpart, and the pair is the point: one board, one Cancel, and the filter
+-- alone deciding whether the victim spell survives.
 module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -62,8 +64,12 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.BeginningStep as BeginningStep
+-- Aliased Card.Type, per the project-wide convention (CardSpec): the logic
+-- module Pawl.Engine.Card may later be imported and must not collide.
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -2704,23 +2710,19 @@ vedalkenOrrerySpec s registry =
       Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "still not offered"
       Spec.assertBool s (any (isActivateOf onOwnTurn) (Action.legalActions S.alice ownBoard)) "and still offered on her own turn"
 
--- Spider-Punk {1}{R} Legendary Creature -- Spider Human Hero 2/1 (Marvel's
--- Spider-Man, 92), "Spells and abilities can't be countered". ONE board for
--- both halves of CR 701.6a's "a spell or ability", run four ways: alice has a
--- Goblin Piker SPELL on the stack and a settled Prodigal Sorcerer whose {T}
--- ABILITY can join it, and bob holds a Cancel for the first and a Stifle for
--- the second. `punks` is the only difference between a run that counters and a
--- run that does not.
+-- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
+-- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
+-- whose {T} ABILITY can join it, and bob holds a Cancel for the first and a
+-- Stifle for the second. `permanents` is the only difference between a run that
+-- counters and a run that does not.
 --
--- Three of the card's four printed clauses are NOT in its file: riot, "other
--- Spiders you control have riot" and "damage can't be prevented" (#789, #690).
--- They are inert rather than wrong here -- a file that declares no keyword and
--- no static ability produces no continuous effect -- and no assertion below
--- reads anything but the clause the file does declare.
+-- Shared by the Spider-Punk and Prowling Serpopard groups below, which is why
+-- both the protecting permanents and the victim spell are parameters: the
+-- unfiltered arm and the filtered one differ only in which victim survives.
 --
 -- bob's three Islands pay for whichever of the two he casts; the runs branch
 -- from this state and never share mana.
-spiderPunkBoard ::
+counteringBoard ::
   Printing.Printing ->
   Printing.Printing ->
   Printing.Printing ->
@@ -2728,22 +2730,22 @@ spiderPunkBoard ::
   Printing.Printing ->
   [(PlayerId.PlayerId, Printing.Printing)] ->
   (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
-spiderPunkBoard island cancel stifle sorcerer piker punks =
+counteringBoard island cancel stifle sorcerer victim permanents =
   let withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) (Setup.emptyGame S.bothPlayers) [1 .. (3 :: Int)]
       (srcId, withSorcerer) = S.addCreature sorcerer S.alice withLands
       -- CR 302.6: settled, so the Sorcerer's {T} may be activated at all.
       settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
-      addPunk (ids, g) (who, p) = let (oid, g') = S.addCreature p who g in (oid : ids, g')
-      (punkIds, withPunks) = List.foldl' addPunk ([], settled) punks
-      (victimId, onStack) = S.spellOnStack piker S.alice withPunks
+      addPermanent (ids, g) (who, p) = let (oid, g') = S.addCreature p who g in (oid : ids, g')
+      (permanentIds, withPermanents) = List.foldl' addPermanent ([], settled) permanents
+      (victimId, onStack) = S.spellOnStack victim S.alice withPermanents
       (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
       (stifleId, gs) = S.addHandCard stifle S.bob withCancel
-   in (victimId, srcId, cancelId, stifleId, punkIds, gs)
+   in (victimId, srcId, cancelId, stifleId, permanentIds, gs)
 
 -- Every target prompt answers with this object, and CR 603.5's "may" is always
 -- exercised -- so a silence below is the rule and never a declined option.
-spiderPunkAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
-spiderPunkAnswer oid p = case p of
+counteringAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+counteringAnswer oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
@@ -2751,35 +2753,55 @@ spiderPunkAnswer oid p = case p of
 -- Prodigal Sorcerer's "any target" is aimed at ALICE, so the effect that must
 -- not occur when the ability is countered is her own life total; Stifle's only
 -- legal target is the ability, which the default interpreter picks.
-spiderPunkAtAlice :: Prompt.Prompt r -> r
-spiderPunkAtAlice p = case p of
+counteringAtAlice :: Prompt.Prompt r -> r
+counteringAtAlice p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
 
-spiderPunkAtAbility :: Prompt.Prompt r -> r
-spiderPunkAtAbility p = case p of
+counteringAtAbility :: Prompt.Prompt r -> r
+counteringAtAbility p = case p of
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
 
+-- bob casts his Cancel at alice's spell and lets it resolve.
+cancelRun :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+cancelRun victimId cancelId gs =
+  let answer :: Prompt.Prompt r -> r
+      answer = counteringAnswer victimId
+      cast = S.runPure answer gs (S.cast S.bob cancelId)
+      resolved = S.runPure answer cast Stack.resolveTop
+   in S.runPure answer resolved Engine.settleForPriority
+
+-- alice activates her Sorcerer at herself, bob casts his Stifle at the ability,
+-- and the stack is emptied down to the spell underneath. The first component is
+-- the state once the Stifle has resolved, the second once the ability under it
+-- has had its chance to resolve too.
+abilityRun ::
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  (GameState.GameState, GameState.GameState)
+abilityRun srcId ability stifleId gs =
+  let activated = S.runPure counteringAtAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
+      cast = S.runPure counteringAtAbility activated (S.cast S.bob stifleId)
+      stifleResolved = S.runPure counteringAtAbility cast Stack.resolveTop
+      placed = S.runPure counteringAtAbility stifleResolved Engine.settleForPriority
+   in (placed, S.runPure counteringAtAlice placed Stack.resolveTop)
+
+-- Spider-Punk {1}{R} Legendary Creature -- Spider Human Hero 2/1 (Marvel's
+-- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
+-- counteringBoard above, with a Goblin Piker as the victim spell.
+--
+-- Three of the card's four printed clauses are NOT in its file: riot, "other
+-- Spiders you control have riot" and "damage can't be prevented" (#789, #690).
+-- They are inert rather than wrong here -- a file that declares no keyword and
+-- no static ability produces no continuous effect -- and no assertion below
+-- reads anything but the clause the file does declare.
 spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spiderPunkSpec s registry =
-  let -- bob casts his Cancel at alice's spell and lets it resolve.
-      cancelRun victimId cancelId gs =
-        let answer :: Prompt.Prompt r -> r
-            answer = spiderPunkAnswer victimId
-            cast = S.runPure answer gs (S.cast S.bob cancelId)
-            resolved = S.runPure answer cast Stack.resolveTop
-         in S.runPure answer resolved Engine.settleForPriority
-      -- alice activates her Sorcerer at herself, bob casts his Stifle at the
-      -- ability, and the stack is emptied down to the Piker spell.
-      abilityRun srcId ability stifleId gs =
-        let activated = S.runPure spiderPunkAtAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
-            cast = S.runPure spiderPunkAtAbility activated (S.cast S.bob stifleId)
-            stifleResolved = S.runPure spiderPunkAtAbility cast Stack.resolveTop
-            placed = S.runPure spiderPunkAtAbility stifleResolved Engine.settleForPriority
-         in (placed, S.runPure spiderPunkAtAlice placed Stack.resolveTop)
-      withAbility act = do
+  let withAbility act = do
         island <- S.printingOf s registry "Island"
         cancel <- S.printingOf s registry "Cancel"
         stifle <- S.printingOf s registry "Stifle"
@@ -2788,7 +2810,7 @@ spiderPunkSpec s registry =
         punk <- S.printingOf s registry "Spider-Punk"
         case Face.activatedAbilities (S.combinedFace sorcerer) of
           [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
-          ability : _ -> act (spiderPunkBoard island cancel stifle sorcerer piker) punk piker ability
+          ability : _ -> act (counteringBoard island cancel stifle sorcerer piker) punk piker ability
    in Spec.describe s "SpiderPunk" $ do
         -- The CONTROL for the spell half. Without it every refusal below would
         -- also be true of a board where the Cancel never resolved at all.
@@ -2862,9 +2884,9 @@ spiderPunkSpec s registry =
           $ \board punk _ _ -> do
             let (victimId, _, cancelId, _, punkIds, gs) = board [(S.alice, punk)]
                 gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable punkIds)
-            Spec.assertBool s (PlayerEffect.cantBeCountered S.alice gs) "protected while it stands"
+            Spec.assertBool s (PlayerEffect.cantBeCountered S.alice victimId gs) "protected while it stands"
             Spec.assertEqWith s "so the same Cancel counters nothing while it stands" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
-            Spec.assertBool s (not (PlayerEffect.cantBeCountered S.alice gone)) "not protected once it is gone"
+            Spec.assertBool s (not (PlayerEffect.cantBeCountered S.alice victimId gone)) "not protected once it is gone"
             -- The stack is the readout, not the graveyard's size: the destroyed
             -- Spider-Punk is in that graveyard too, so a bare count could not
             -- tell a countered spell from an uncountered one.
@@ -2877,6 +2899,114 @@ spiderPunkSpec s registry =
         Spec.it s "CR 113.6g Spider-Punk's own card field is Counterable" $ do
           punk <- S.printingOf s registry "Spider-Punk"
           Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace punk)) Counterability.Counterable
+
+-- Prowling Serpopard {1}{G}{G} Creature -- Cat Snake 4/3 (Amonkhet, 180),
+-- "This spell can't be countered. Creature spells you control can't be
+-- countered." BOTH of the card's sentences, on the two different carriers the
+-- rules give them:
+--
+--   * "This spell can't be countered" is CR 113.6g's self-referential ability,
+--     which functions on the stack and rides the card as
+--     Pawl.Types.Counterability.
+--   * "Creature spells you control can't be countered" is an ability of a
+--     BATTLEFIELD PERMANENT about OTHER objects, so CR 611.1's third clause
+--     makes it a rules-modifying continuous effect on the CR 613.11 player
+--     axis.
+--
+-- The second sentence is why the card is in THIS file and not only among the CR
+-- 113.6g cards: it NARROWS by the victim spell's own qualities, which
+-- Spider-Punk's unfiltered "Spells and abilities can't be countered" does not.
+-- The whole group therefore turns on the same Cancel counting differently for a
+-- CREATURE spell and a NONCREATURE one on one board -- an assertion no
+-- unfiltered arm can pass.
+prowlingSerpopardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowlingSerpopardSpec s registry =
+  let withVictim name act = do
+        island <- S.printingOf s registry "Island"
+        cancel <- S.printingOf s registry "Cancel"
+        stifle <- S.printingOf s registry "Stifle"
+        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+        victim <- S.printingOf s registry name
+        cat <- S.printingOf s registry "Prowling Serpopard"
+        case Face.activatedAbilities (S.combinedFace sorcerer) of
+          [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+          ability : _ -> act (counteringBoard island cancel stifle sorcerer victim) cat ability
+   in Spec.describe s "ProwlingSerpopard" $ do
+        -- The CONTROL for the creature half.
+        Spec.it s "CR 701.6a without Prowling Serpopard bob's Cancel counters alice's creature spell"
+          . withVictim "Goblin Piker"
+          $ \board _ _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board []
+            Spec.assertEqWith s "the stack is empty" (GameState.stack (cancelRun victimId cancelId gs)) []
+
+        -- The clause the card is in the pool for, in the direction the filter
+        -- ADMITS: a creature spell alice controls matches CR 613.11's effect and
+        -- CR 101.2 makes its "can't" win.
+        Spec.it s "CR 701.6a / 613.11 with Prowling Serpopard alice's creature spell survives"
+          . withVictim "Goblin Piker"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, cat)]
+                after = cancelRun victimId cancelId gs
+            Spec.assertEqWith s "alice's creature spell is still on the stack, alone" (GameState.stack after) [victimId]
+            Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+        -- The CONTROL for the noncreature half, so the refusal below is a
+        -- statement about the FILTER rather than about a Cancel that never
+        -- resolved.
+        Spec.it s "CR 701.6a without Prowling Serpopard bob's Cancel counters alice's noncreature spell"
+          . withVictim "Lightning Bolt"
+          $ \board _ _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board []
+            Spec.assertEqWith s "the stack is empty" (GameState.stack (cancelRun victimId cancelId gs)) []
+
+        -- THE case #788 is about, and the one an unfiltered arm CANNOT pass:
+        -- the very same Serpopard, on the very same board, leaves alice's
+        -- noncreature spell counterable, because CR 613.11's effect names only
+        -- creature spells.
+        Spec.it s "CR 701.6a / 613.11 the same Serpopard leaves alice's noncreature spell counterable"
+          . withVictim "Lightning Bolt"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, cat)]
+                after = cancelRun victimId cancelId gs
+            Spec.assertEqWith s "the Cancel counters it, emptying the stack" (GameState.stack after) []
+            -- The stack is the readout and the graveyard only corroborates it:
+            -- alice's graveyard holds the countered spell and nothing else, so
+            -- the Serpopard on the battlefield is not being counted here.
+            Spec.assertEqWith s "leaving the countered spell in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+        -- PlayerScope.You, and the case that tells it from Spider-Punk's
+        -- EachPlayer: "creature spells YOU control", so BOB's copy protects
+        -- nothing of alice's.
+        Spec.it s "CR 109.5 You: bob's own Prowling Serpopard does not protect alice's creature spell"
+          . withVictim "Goblin Piker"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.bob, cat)]
+            Spec.assertEqWith s "the Cancel still counters, emptying the stack" (GameState.stack (cancelRun victimId cancelId gs)) []
+
+        -- CR 113.9 / 701.6a's OTHER subject. An ability on the stack has no
+        -- card behind it -- Game.faceOf answers Nothing for one -- so a Filter
+        -- naming a CARD TYPE can never match it, and alice's Prodigal Sorcerer
+        -- ability is Stifled with the Serpopard standing. That is the whole of
+        -- the answer to the wrinkle a filtered arm has and the unfiltered one
+        -- does not: this card's protection reaches spells only.
+        Spec.it s "CR 113.9 with Prowling Serpopard alice's activated ability is still counterable"
+          . withVictim "Goblin Piker"
+          $ \board cat ability -> do
+            let (victimId, srcId, _, stifleId, _, gs) = board [(S.alice, cat)]
+                (placed, after) = abilityRun srcId ability stifleId gs
+            Spec.assertEqWith s "the ability is gone, leaving only the creature spell" (GameState.stack placed) [victimId]
+            Spec.assertEqWith s "alice took no damage, so it never resolved" (S.lifeOf S.alice after) (Just 20)
+
+        -- CR 113.6g, the card's FIRST sentence, on the carrier that is not the
+        -- player axis at all: a Prowling Serpopard SPELL is uncounterable with
+        -- NO Serpopard on the battlefield, which no CR 613.11 effect could
+        -- explain.
+        Spec.it s "CR 113.6g a Prowling Serpopard spell can't be countered with none on the battlefield"
+          . withVictim "Prowling Serpopard"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board []
+            Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace cat)) Counterability.CantBeCountered
+            Spec.assertEqWith s "and the spell is still on the stack" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
@@ -2900,3 +3030,4 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   matchesSpellSpec s registry
   vedalkenOrrerySpec s registry
   spiderPunkSpec s registry
+  prowlingSerpopardSpec s registry

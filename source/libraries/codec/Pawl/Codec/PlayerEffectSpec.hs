@@ -156,13 +156,21 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.CastAsThoughItHadFlash (Filter.And [Filter.HasColor Color.Green, Filter.HasCardType CardType.Creature]))
       """ {"type":"CastAsThoughItHadFlash","value":{"type":"And","value":[{"type":"HasColor","value":{"type":"Green"}},{"type":"HasCardType","value":{"type":"Creature"}}]}} """
-  -- CR 701.6a / Spider-Punk: payload-free, so the tag is the whole encoding.
-  -- Whose spells is the CARRIER's scope (Pawl.Codec.PlayerStaticAbility), which
-  -- is why nothing rides here.
-  Spec.it s "CantBeCountered" $
+  -- CR 701.6a, twice for CastAsThoughItHadFlash's reason: Spider-Punk narrows by
+  -- nothing and Prowling Serpopard narrows by a card type, so a codec that
+  -- dropped the payload would round-trip one of these and not both. WHOSE spells
+  -- is the CARRIER's scope (Pawl.Codec.PlayerStaticAbility) and never rides here.
+  Spec.it s "CantBeCountered, an empty filter" $
     Common.assertJsonCodec
       s
       PlayerEffect.toJson
       PlayerEffect.fromJson
-      PlayerEffect.CantBeCountered
-      """ {"type":"CantBeCountered"} """
+      (PlayerEffect.CantBeCountered (Filter.And []))
+      """ {"type":"CantBeCountered","value":{"type":"And","value":[]}} """
+  Spec.it s "CantBeCountered, a filter that names qualities" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.CantBeCountered (Filter.HasCardType CardType.Creature))
+      """ {"type":"CantBeCountered","value":{"type":"HasCardType","value":{"type":"Creature"}}} """

@@ -34,6 +34,13 @@ module Pawl.Types.Counterability where
 -- card: Pawl.Engine.PlayerEffect.applying walks the battlefield, where a spell
 -- on the stack is not, and this field is read off a card, which an ability on
 -- the stack has none of. Pawl.Engine.Event.counter asks both.
+--
+-- Prowling Serpopard prints one sentence of each and so declares both, which is
+-- the clearest demonstration that they are two carriers rather than one written
+-- two ways: "This spell can't be countered" is this field, and "Creature spells
+-- you control can't be countered" is the player-axis constructor. The proof is
+-- in Pawl.PlayerEffectSpec's ProwlingSerpopard group, where a Serpopard SPELL
+-- survives a Cancel with no Serpopard on the battlefield at all.
 data Counterability
   = Counterable
   | CantBeCountered

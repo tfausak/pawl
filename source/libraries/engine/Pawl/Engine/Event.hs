@@ -1330,10 +1330,12 @@ counter source controller oid = do
                   }
 
 -- CR 611.1 / 613.11: does a rules-modifying continuous effect stop this spell or
--- ability from being countered (Spider-Punk)? The victim's controller is the
--- player the effect is anchored against -- CR 113.8 for an ability on the stack,
--- CR 601.2a for a spell -- and an object with no controller is protected by
--- nothing.
+-- ability from being countered (Spider-Punk, Prowling Serpopard)? The victim's
+-- controller is the player the effect is anchored against -- CR 113.8 for an
+-- ability on the stack, CR 601.2a for a spell -- and an object with no
+-- controller is protected by nothing. The victim's own id rides along too, since
+-- a narrowed effect names the victim's characteristics ("creature spells you
+-- control can't be countered") and not only its controller.
 --
 -- The typed question, so this module never sees a PlayerEffect constructor;
 -- Pawl.Engine.PlayerEffect.cantBeCountered is where the casing lives.
@@ -1345,7 +1347,7 @@ counter source controller oid = do
 -- not hold would therefore be read against the wrong player here.
 protectedFromCountering :: ObjectId -> GameState -> Bool
 protectedFromCountering oid gs =
-  maybe False (\pid -> PlayerEffect.cantBeCountered pid gs) (Projection.controllerOf oid gs)
+  maybe False (\pid -> PlayerEffect.cantBeCountered pid oid gs) (Projection.controllerOf oid gs)
 
 -- CR 701.21/701.21a: the single sacrifice funnel. The permanent goes to its
 -- OWNER's graveyard through changeZone, and -- unlike destroy -- with no
