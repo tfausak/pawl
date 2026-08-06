@@ -444,11 +444,16 @@ enchantSpecs face = case enchantSpec face of
 -- one -- which keeps a lone bare "enchant creature" folding to ITSELF, and that
 -- matters: Sba.stillLegalEnchant's fast arm matches on exactly that shape.
 --
--- The POOL is taken from the first instance. CR 702.5c would have the candidate
--- satisfy every instance's pool as well, and pawl has no intersection of two
--- Pools (they carry different Recipient tags, and Creatures against Players is
--- empty outright). No card can reach that: the CardSpec lint rejects a face whose
--- enchant abilities disagree about their pool (#797).
+-- The POOL is taken from the first instance. CR 702.5c's last sentence conjoins
+-- the pools too -- "The Aura can enchant only objects or players that match all
+-- of its enchant abilities" -- and what that asks for is their INTERSECTION,
+-- which Pool is not closed under: only a NESTED pair has a Pool naming it
+-- (Creatures against Permanents is Creatures), Creatures against Players is
+-- empty, and AnyTarget against Permanents is creatures-and-planeswalkers. So
+-- taking the first instance is not merely inexact, it is ORDER-DEPENDENT even
+-- where the answer could be written down. No card can reach it: the CardSpec lint
+-- rejects a face whose enchant abilities disagree about their pool, and states
+-- the rule (#797).
 enchantSpec :: Face.Face card -> Maybe TargetSpec
 enchantSpec face = case Face.enchant face of
   [] -> Nothing

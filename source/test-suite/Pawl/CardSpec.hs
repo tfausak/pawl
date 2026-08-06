@@ -2263,18 +2263,41 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends c = Card.isAura c /= not (null (Face.enchant c))
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "Aura iff enchant" (fmap (S.nameOf . Printing.card) offenders) []
-  -- CR 702.5c makes every instance of enchant apply at once, and
-  -- Pawl.Engine.Card.enchantSpec conjoins them into ONE spec by Anding their
-  -- Filters and keeping the first instance's Pool. That fold is faithful only
-  -- while the instances agree about the pool: pawl has no intersection of two
-  -- Pools, and CR 115's pools carry different Recipient tags besides. A card
-  -- whose enchant abilities disagreed would be silently judged by the first
-  -- one's pool, so it is rejected here instead (#797).
+  -- CR 702.5c makes every instance of enchant apply at once, and its last
+  -- sentence -- "The Aura can enchant only objects or players that match all of
+  -- its enchant abilities" -- conjoins the POOLS exactly as it does the Filters.
+  -- Pawl.Engine.Card.enchantSpec folds the instances into ONE spec by Anding
+  -- their Filters and keeping the FIRST instance's Pool. This lint is what makes
+  -- that fold exact, and the rule it enforces is that CR 115's Pool enum is not
+  -- closed under intersection. Three shapes, one expressible: a NESTED pair has a
+  -- Pool naming the intersection (Creatures against Permanents is Creatures); a
+  -- DISJOINT pair intersects to nothing (Creatures against Players, which is CR
+  -- 702.5d keeping an enchant-player Aura off permanents), and no Pool names the
+  -- empty set; and an OVERLAPPING pair can name a set the enum simply lacks
+  -- (AnyTarget against Permanents is creatures-and-planeswalkers). Taking the
+  -- first instance is order-dependent even in the expressible case, so a card
+  -- whose enchant abilities disagreed would be silently judged by whichever pool
+  -- was written down first.
+  --
+  -- The disjoint case is INCOHERENT rather than merely unrepresentable, and the
+  -- CR says what becomes of such an Aura without needing a pool for it: CR 303.4a
+  -- makes its spell require a target and CR 601.2c has no appropriate object or
+  -- player to announce for it, so it cannot be cast; an effect putting it onto the
+  -- battlefield leaves it where it is, or bins it if that zone is the stack (CR
+  -- 303.4g); and one that arrived anyway is put into its owner's graveyard on the
+  -- next state-based check (CR 704.5m). A card in that shape is dead text.
+  --
+  -- Unprinted rather than impossible, which is why this lives here rather than
+  -- being ruled out: nothing in CR 702.5 requires the instances to agree, and
+  -- Animate Dead prints both pools on one card ("enchant creature card in a
+  -- graveyard", then "enchant creature put onto the battlefield with this Aura")
+  -- -- only its lose-as-it-gains clause keeps the two from applying at once
+  -- (#797).
   Spec.it s "every enchant ability on a card draws from the same pool" $ do
     ps <- S.allPrintings s
     let offends c = length (List.nub (fmap TargetSpec.pool (Face.enchant c))) > 1
         offenders = filter (anyFace offends . Printing.card) ps
-    Spec.assertEqWith s "no card mixes enchant pools" (fmap (S.nameOf . Printing.card) offenders) []
+    Spec.assertEqWith s "no card mixes enchant pools, since CR 702.5c intersects them and Pool is not closed under intersection" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
   -- mode declaring it would be silently shadowed.
   -- #199: no card authors a layer-2 control modification into an effect that
