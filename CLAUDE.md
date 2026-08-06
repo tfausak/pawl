@@ -89,13 +89,15 @@ to agents as written. What it doesn't say:
 
 - When no printing can reach the rule, write a synthetic card as
   `data/cards/synthetic-*.json`. A real card wins whenever one exists, and "I
-  could not find one" is not the test --- search first. Digital-only printings
-  are real cards: Arena and Alchemy are in scope (`docs/design.md` section 6),
-  so an issue whose only producer is one of them is ordinary card-driven work.
-  Legitimate when you can cite the rule it exercises and nothing in the CR
-  forbids such a card existing (two lands that both set land subtypes); an
-  issue in that position waits under `expires:synthetic` until someone writes
-  the card. Illegitimate when the absence is rules-*enforced*, because then the
+  could not find one" is not the test --- search first. All five sources are
+  acceptable, in the preference order regular > Arena > playtest > un-set >
+  synthetic (`docs/design.md` section 6), and a better-ranked card replaces a
+  worse-ranked one whenever it turns up; an issue whose only producer is a
+  digital-only printing is ordinary card-driven work. Legitimate when you can
+  cite the rule it exercises and nothing in the CR forbids such a card
+  existing (two lands that both set land subtypes); an issue in that
+  position waits under `expires:synthetic` until someone writes the card.
+  Illegitimate when the absence is rules-*enforced*, because then the
   elision is provably sound (half a battle: CR 310 makes the first battle need
   the whole subsystem) --- close that issue as wontfix.
 
