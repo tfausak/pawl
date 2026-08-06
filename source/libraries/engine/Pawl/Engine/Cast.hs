@@ -100,18 +100,6 @@ timingOk pid oid name gs = case proposedFace oid name gs of
 proposedFace :: ObjectId -> CardName.CardName -> GameState -> Maybe (Face.Face Card.Type.Card)
 proposedFace oid name gs = fmap (Game.resolveFace (Just name)) (Game.cardOf oid gs)
 
--- The one half a card offers to cast, where it offers exactly one. Nothing for
--- a card with several -- CR 709.3's choice is the player's, and this makes it
--- for nobody.
---
--- Only castWhileSearching needs it, because Prompt.CastWhileSearching carries a
--- bare object id with no room for a face; the offer a MULTI-face card would
--- make from a library is therefore not made at all (#655).
-soleCastableFace :: ObjectId -> GameState -> Maybe (Face.Face Card.Type.Card)
-soleCastableFace oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
-  Just [face] -> Just face
-  _ -> Nothing
-
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
 -- and they are two because one is a CARD TYPE and the other is a KEYWORD.
@@ -529,44 +517,41 @@ permissionsOf face =
 -- with two halves, and the Panglacial permission excepts only the timing one, so
 -- a Rule of Law still stops a cast from the library, and so does a Null Chamber
 -- that named the Wurm. CR 205.4e's restriction rides along for the same reason,
--- and THAT one is unobservable in this pool -- Panglacial Wurm is a creature and
--- never a legendary sorcery -- and is written anyway, because the alternative is
--- a cast the rules forbid.
+-- and THAT one is unobservable in this pool -- every card holding the permission
+-- is a creature and none is a legendary sorcery -- and is written anyway,
+-- because the alternative is a cast the rules forbid.
 --
 -- printedRestrictionsOk rides along too, and it is the closest call of the three:
 -- a "Cast this spell only during the declare attackers step" IS about timing, so
 -- the ruling's "except for timing" could be read to lift it. pawl takes the
 -- narrower reading -- the ruling excepts the RULES' own timing window (CR 302.1 /
--- 307.1), not a prohibition the card prints on itself. Unobservable: Panglacial
--- Wurm is the only card with the permission and it prints no restriction.
+-- 307.1), not a prohibition the card prints on itself. Unobservable: no card
+-- holding the permission prints a restriction alongside it.
 --
--- A card with several castable halves is not offered here at all, and that is
--- soleCastableFace's restriction rather than a rule: Prompt.CastWhileSearching
--- carries a bare object id, so two halves of one card would arrive at the
--- prompt indistinguishable (#655). No card in the pool holds the permission on
--- a multi-face card.
-castableWhileSearching :: PlayerId -> GameState -> [ObjectId]
+-- ONE ENTRY PER CASTABLE HALF, exactly as castableSpells offers a hand's split
+-- card twice: CR 709.3's "A player chooses which half of a split card they are
+-- casting" is a choice CR 601.3 does not take away, so a split card printing
+-- the permission on both halves reaches the prompt as two options and the
+-- player picks. Each half is gated on its own, which is CR 709.3a.
+castableWhileSearching :: PlayerId -> GameState -> [(ObjectId, CardName.CardName)]
 castableWhileSearching pid gs =
-  let allowed oid = case soleCastableFace oid gs of
-        Nothing -> False
-        Just face ->
-          let name = Face.name face
-              -- The same stamped state `castable` gates on, for the same rule:
-              -- CR 601.3's exception is about TIMING, so the half a library cast
-              -- is evaluated against is still CR 709.3a's chosen one.
-              -- Unobservable today: soleCastableFace admits only single-face
-              -- cards, for which the stamp resolves to the face it already had.
-              proposed = asProposed oid name gs
-           in permitsCastWhileSearching face
-                -- CR 601.3's prohibit half, moved inside `allowed` when it grew
-                -- a name: a quality-bearing prohibition stops one card without
-                -- stopping the search's other candidates.
-                && not (PlayerEffect.prohibitsCasting pid name proposed)
-                && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
-                && printedRestrictionsOk pid oid name proposed
-                && legendaryRestrictionOk pid oid name proposed
-                && targetable pid oid name proposed
-   in filter allowed (Game.zoneMembers Zone.Library pid gs)
+  let allowed oid face =
+        let name = Face.name face
+            -- The same stamped state `castable` gates on, for the same rule:
+            -- CR 601.3's exception is about TIMING, so the half a library cast
+            -- is evaluated against is still CR 709.3a's chosen one.
+            proposed = asProposed oid name gs
+         in permitsCastWhileSearching face
+              -- CR 601.3's prohibit half, moved inside `allowed` when it grew
+              -- a name: a quality-bearing prohibition stops one card without
+              -- stopping the search's other candidates.
+              && not (PlayerEffect.prohibitsCasting pid name proposed)
+              && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
+              && printedRestrictionsOk pid oid name proposed
+              && legendaryRestrictionOk pid oid name proposed
+              && targetable pid oid name proposed
+      proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (foldMap Card.castableFaces (Game.cardOf oid gs)))
+   in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them
 -- the chance to cast a castable-while-searching card from it, before any card is
@@ -584,16 +569,14 @@ castWhileSearching pid = do
       choice <- Game.choose (Prompt.CastWhileSearching decider pid options)
       case choice of
         Nothing -> pure ()
-        Just oid ->
+        Just (oid, name) ->
           -- Reject-not-repair: an option not in the offered set is a no-op that
-          -- ends the loop, never a repair.
-          Monad.when (elem oid options) $ case soleCastableFace oid gs of
-            -- Unreachable: castableWhileSearching offered only ids that have
-            -- one, and nothing has moved since. Total rather than partial.
-            Nothing -> pure ()
-            Just face -> do
-              castSpell pid oid (Face.name face)
-              castWhileSearching pid
+          -- ends the loop, never a repair. The PAIR is what is checked, so a
+          -- half the offer did not include is rejected even when the card's
+          -- other half was offered (CR 709.3a).
+          Monad.when (elem (oid, name) options) $ do
+            castSpell pid oid name
+            castWhileSearching pid
 
 -- CR 601.2's own order, walked in it: 601.2a moves the card to the stack FIRST,
 -- then 601.2b chooses the modes and the cost and announces X and the Phyrexian
