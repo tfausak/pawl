@@ -2913,12 +2913,12 @@ spiderPunkSpec s registry =
 --     makes it a rules-modifying continuous effect on the CR 613.11 player
 --     axis.
 --
--- The second sentence is why this card is here rather than beside Blurred
--- Mongoose: it NARROWS by the victim spell's own qualities, which Spider-Punk's
--- unfiltered "Spells and abilities can't be countered" does not. The whole
--- group therefore turns on the same Cancel counting differently for a CREATURE
--- spell and a NONCREATURE one on one board -- an assertion no unfiltered arm
--- can pass.
+-- The second sentence is why the card is in THIS file and not only among the CR
+-- 113.6g cards: it NARROWS by the victim spell's own qualities, which
+-- Spider-Punk's unfiltered "Spells and abilities can't be countered" does not.
+-- The whole group therefore turns on the same Cancel counting differently for a
+-- CREATURE spell and a NONCREATURE one on one board -- an assertion no
+-- unfiltered arm can pass.
 prowlingSerpopardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 prowlingSerpopardSpec s registry =
   let withVictim name act = do
