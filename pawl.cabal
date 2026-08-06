@@ -353,6 +353,7 @@ library engine
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
     Pawl.Engine.Ring
+    Pawl.Engine.Saga
     Pawl.Engine.Sba
     Pawl.Engine.Setup
     Pawl.Engine.Speed
@@ -523,6 +524,7 @@ library types
     Pawl.Types.CostComponent
     Pawl.Types.Count
     Pawl.Types.Counterability
+    Pawl.Types.CounterCause
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern
@@ -720,6 +722,7 @@ test-suite pawl-test-suite
     Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.RingSpec
+    Pawl.SagaSpec
     Pawl.SetupSpec
     Pawl.SpeedSpec
     Pawl.Support

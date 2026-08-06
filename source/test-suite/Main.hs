@@ -166,6 +166,7 @@ import qualified Pawl.ReplacementSpec
 import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
 import qualified Pawl.RingSpec
+import qualified Pawl.SagaSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
@@ -383,6 +384,7 @@ spec s registry = do
   Pawl.RingSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.SagaSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TransformSpec.spec s registry

@@ -42,6 +42,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -2288,7 +2289,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
-          Just n -> Monad.when (n > 0) (Event.putCounters target kind (Integer.toNaturalSaturating n))
+          Just n -> Monad.when (n > 0) (Event.putCounters CounterCause.ByEffect target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
       -- CR 701.34a: "choose any number of permanents and/or players that have a
       -- counter, then give each one additional counter of each kind that permanent or
@@ -2342,7 +2343,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- counter replacements (Hardened Scales, Doubling Season) apply to a
       -- proliferated counter exactly as they do to a placed one.
       Monad.forM_ keptPermanents $ \oid ->
-        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters oid kind 1
+        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters CounterCause.ByEffect oid kind 1
       -- Player counters are added directly, with no CR 614 opportunity, matching
       -- GainPlayerCounters below and gapped for the same reason (#122).
       Monad.forM_ keptPlayers $ \pid ->

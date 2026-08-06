@@ -505,3 +505,4 @@ castOf event = case event of
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.CountersPut {} -> Nothing

@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Phase as Phase
@@ -217,3 +218,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent)
       """ {"type":"PlayerLosesLife","value":{"type":"Opponent"}} """
+  -- CR 714.2b. The payload is the counter KIND then the chapter number, in that
+  -- order, since a Saga's chapters are told apart by the number alone.
+  Spec.it s "SelfCountersReached round-trips its kind and its chapter number" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfCountersReached CounterKind.Lore 3)
+      """ {"type":"SelfCountersReached","value":[{"type":"Lore"},3]} """
