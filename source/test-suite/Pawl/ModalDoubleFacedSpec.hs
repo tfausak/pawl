@@ -2,9 +2,11 @@
 -- ModalDoubleFaced arm and the seven Pawl.Engine.Card functions that read it (CR
 -- 712.8a's combined view, CR 712.11b's castable faces, CR 712.12's land faces,
 -- CR 712.13's entering face, CR 712.14b's stays-in-its-zone test, CR 712.8f's
--- mana-value face, CR 712.9's turned-over face), plus the carry-through in
--- Pawl.Engine.Stack that puts CR 712.13's face onto the permanent and the land
--- play in Pawl.Engine.Action and Pawl.Engine.Engine that CR 712.12 writes.
+-- mana-value face, CR 712.9's turned-over face). Three other modules read those
+-- classifications and are covered here through them: Pawl.Engine.Stack puts CR
+-- 712.13's face onto a resolving permanent, Pawl.Engine.Action and
+-- Pawl.Engine.Engine offer and carry out CR 712.12's land play, and
+-- Pawl.Engine.Event.changeZoneEntering is where CR 712.14b turns a card away.
 --
 -- TWO printed cards, because one card cannot reach both halves of the rule.
 --
@@ -85,10 +87,10 @@ birgiReadings = (birgiName, Set.singleton CardType.Creature, Just (3, 3))
 harnfelReadings = (harnfelName, Set.singleton CardType.Artifact, Nothing)
 bloodbogReadings = (bloodbogName, Set.singleton CardType.Land, Nothing)
 
--- The play-side card's two names. Its front face is a SORCERY, which is what
--- makes it the producer for CR 712.14b as well as for CR 712.12.
-zofName, bloodbogName :: CardName.CardName
-zofName = CardName.MkCardName (Text.pack "Zof Consumption")
+-- The play-side card's LAND face, the only one of its two names any case here
+-- asserts. Its other face is a SORCERY, which is what makes the card the
+-- producer for CR 712.14b as well as for CR 712.12.
+bloodbogName :: CardName.CardName
 bloodbogName = CardName.MkCardName (Text.pack "Zof Bloodbog")
 
 -- alice's precombat main phase with the stack empty -- CR 305.1's window, so a
@@ -118,8 +120,8 @@ handBoardOne printing =
   let (oid, gs) = S.addHandCard printing S.alice (Setup.emptyGame S.bothPlayers)
    in (oid, readyForMain gs)
 
--- Every land play on offer, as the pair CR 712.12 makes it: the card, and the
--- face chosen to be played as a land.
+-- Every land play on offer, as the pair CR 712.12 makes of one: the card, and
+-- the face chosen to be played as a land.
 landPlays :: [A.Action] -> [(ObjectId.ObjectId, Maybe CardName.CardName)]
 landPlays actions =
   let playOf action = case action of
@@ -301,7 +303,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
   -- See rule 305, 'Lands.'" -- and CR 305.2a's tally, through the real priority
   -- loop rather than a direct call to the funnel.
   --
-  -- THE proving case for the play side. Three separate falsifiers fail it: a
+  -- THE proving case for the play side. Three separate wrong answers fail it: a
   -- play that never reached the battlefield leaves the hand full; a play that
   -- dropped the chosen face puts a SORCERY named Zof Consumption onto the
   -- battlefield (CR 712.8a's front face, which every reader would then answer
