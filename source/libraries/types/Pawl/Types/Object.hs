@@ -254,7 +254,7 @@ data Object = MkObject
     -- dies and returns is a different creature, and no longer designated.
     ringBearerFor :: Maybe PlayerId.PlayerId,
     -- | CR 310.8: the player designated as this battle's protector. Chosen as the
-    -- battle enters (CR 310.8a) by the CR 614.12 as-enters route every other
+    -- battle enters (CR 310.8a) by the CR 614.12a as-enters route every other
     -- choice-on-entry takes, which is why it is an Object field and not a
     -- projection: CR 310.8g keeps the designation across the permanent ceasing to
     -- be a battle or becoming a copy of another one, so nothing a layer computes
@@ -263,9 +263,9 @@ data Object = MkObject
     -- A Maybe rather than a bare PlayerId for two reasons the rules give, not for
     -- convenience. CR 704.5w names the state "no player in the game designated as
     -- its protector" outright and makes recovering from it a state-based action,
-    -- so it is a state the rules expect to observe. And every non-battle object
-    -- has one -- CR 310.8's designation is battle-only, and the field is Nothing
-    -- for the rest of the board.
+    -- so it is a state the rules expect to observe. And no non-battle object has a
+    -- protector at all -- CR 310.8's designation is battle-only, so the field is
+    -- Nothing for the rest of the board.
     --
     -- Nothing is NOT "the controller by default". CR 310.8a's fallback to the
     -- controller applies only to a battle with no battle types, and every printed

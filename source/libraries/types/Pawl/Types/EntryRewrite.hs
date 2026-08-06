@@ -155,7 +155,7 @@ data EntryRewrite
     -- of this type does.
     --
     -- NULLARY, where WithCounters carries its payload: CR 310.8a fixes the
-    -- chooser (the controller) and rule 310.11 fixes the candidate set from the
+    -- chooser (the controller) and rule 310.11a fixes the candidate set from the
     -- battle's own battle types, so there is nothing for a card to vary. Which
     -- players are eligible is therefore asked at apply time --
     -- Pawl.Engine.Battle.protectorCandidates -- off the projected subtypes rather

@@ -16,10 +16,15 @@
 -- Projection.intrinsicReplacementsOf from this module, so a dependency the other
 -- way would be a cycle. Callers pass the projection in.
 --
--- NOT here, and all of it still #302: CR 310.5's attackable battle, CR 310.6's
--- damage removing defense counters, CR 704.5v's defense-0 state-based action, and
+-- NOT here, and all of it still #302. What a protector is FOR is the larger half:
+-- CR 310.8b (its protector can never attack it, and a Siege can be attacked by its
+-- own controller), CR 310.8c (only its protector may block those attackers) and CR
+-- 310.8d with CR 508.5 (while it is attacked, the protector SUBSTITUTES for the
+-- defending player in every rule and effect) all need CR 310.5's attackable battle
+-- first, and AttackTarget has no OfBattle arm. Beside them: CR 310.6's damage
+-- removing defense counters, CR 310.7 / 704.5v's defense-0 state-based action, and
 -- CR 310.11b's "when the last defense counter is removed, exile it, then you may
--- cast it transformed". The last three are only jointly observable -- a battle
+-- cast it transformed". Those last three are only jointly observable -- a battle
 -- driven to defense 0 belongs in EXILE via CR 310.11b, not in the graveyard CR
 -- 704.5v alone would send it to -- so none of them is built.
 module Pawl.Engine.Battle where
@@ -48,9 +53,10 @@ isBattle = Set.member CardType.Battle . PC.cardTypes
 -- which subtypes it has -- a permanent that is a battle and a creature has
 -- creature types too, and CR 310.8a asks only about the battle ones.
 --
--- Siege is the whole list because CR 205.3q's is: rule 310.11 says so outright
--- ("all currently existing battles have the subtype Siege"). A second battle type
--- is a rulebook change, and lands here.
+-- Siege is the whole list because CR 205.3q's list of battle types is ("that
+-- battle type is Siege"); CR 310.11 says the different and weaker thing that every
+-- battle currently existing HAS that subtype. A second battle type is a rulebook
+-- change to 205.3q, and lands here.
 battleTypes :: PC.ProjectedCharacteristics -> Set.Set Subtype.Subtype
 battleTypes = Set.intersection (Set.singleton Subtype.Siege) . PC.subtypes
 
@@ -62,7 +68,7 @@ battleTypes = Set.intersection (Set.singleton Subtype.Siege) . PC.subtypes
 -- must take an opponent of its controller (CR 310.11a, "only an opponent of a
 -- Siege's controller can be its protector").
 --
--- `playing` is CR 102.1's players still in the game, which the caller supplies as
+-- `playing` is the players still in the game, which the caller supplies as
 -- Game.stillPlaying -- CR 704.5w asks for "no player IN THE GAME designated as its
 -- protector", so a departed protector is not a candidate and not a legal one to
 -- keep. The controller is filtered against it too, so a battle whose controller
@@ -71,8 +77,8 @@ battleTypes = Set.intersection (Set.singleton Subtype.Siege) . PC.subtypes
 -- Order is the caller's seating order, and the head is what an interpreter that
 -- declines to answer gets (Replay.defaultAnswer). Nothing here is a choice the
 -- engine makes: an empty list means the rules leave no legal protector, which CR
--- 704.5w and CR 704.5x both answer by putting the battle into its owner's
--- graveyard.
+-- 310.10, CR 704.5w and CR 704.5x all answer by putting the battle into its
+-- owner's graveyard.
 protectorCandidates ::
   PC.ProjectedCharacteristics ->
   PlayerId.PlayerId ->
@@ -82,21 +88,26 @@ protectorCandidates pc controller playing
   | Set.null (battleTypes pc) = filter (== controller) playing
   | otherwise = filter (/= controller) playing
 
--- CR 704.5w / 704.5x: does this battle's protector designation need repairing?
+-- CR 310.10: does this battle's protector designation need repairing?
 --
--- ONE predicate for two state-based actions, because the two rules name the same
--- condition from opposite ends and prescribe the same remedy. CR 704.5w fires when
--- the battle has "no player in the game designated as its protector"; CR 704.5x
--- fires when "a Siege's controller is also its designated protector". Both are
--- exactly "the designated player is not among protectorCandidates", and both then
--- have the controller choose an appropriate player, or put the battle into its
--- owner's graveyard if none can be chosen.
+-- ONE predicate, and rule 310.10 is why it can be one: "if a battle that isn't
+-- being attacked has no player designated as its protector, OR ITS PROTECTOR IS A
+-- PLAYER WHO CAN'T BE ITS PROTECTOR BASED ON ITS BATTLE TYPE, its controller
+-- chooses an appropriate player to be its protector. If no player can be chosen
+-- this way, the battle is put into its owner's graveyard." That is exactly "the
+-- designated player is not among protectorCandidates".
 --
--- NOT IMPLEMENTED: CR 704.5w's "and no attacking creatures are currently attacking
--- that battle" rider, which would suspend the re-choice for the duration of an
--- attack. Nothing can attack a battle, so the rider is vacuously true at every
--- call (#853). CR 704.5x has no such rider, so that half is exact -- but no card
--- can reach it either (#853).
+-- CR 704.5w and CR 704.5x are the same condition split across rule 704's list --
+-- 704.5w takes the no-player-designated half and 704.5x the Siege-controller case
+-- of the second half -- so they are what Pawl.Engine.Sba cites at the call, and
+-- rule 310.10 is what this module states. Between them 310.10 is the wider one:
+-- its second clause covers an illegal protector who is neither absent nor the
+-- controller, which 704.5x does not name and which this predicate answers.
+--
+-- NOT IMPLEMENTED: the "isn't being attacked" rider CR 310.10 and CR 704.5w share,
+-- which would suspend the re-choice for the duration of an attack. Nothing can
+-- attack a battle, so the rider is vacuously true at every call (#853). CR 704.5x
+-- has no such rider, so that half is exact -- but no card can reach it (#853).
 needsProtector ::
   PC.ProjectedCharacteristics ->
   PlayerId.PlayerId ->

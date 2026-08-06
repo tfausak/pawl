@@ -796,9 +796,9 @@ apply batch candidate event =
                               }
                        in gs3 {GameState.continuousEffects = eff : GameState.continuousEffects gs3}
             pure (Just event)
-      -- CR 310.8a via CR 614.12: as a battle enters, its controller chooses its
+      -- CR 310.8a via CR 614.12a: as a battle enters, its controller chooses its
       -- protector. The projection is re-read here rather than carried on the arm
-      -- so CR 310.11's candidate rule is answered off the object as it actually
+      -- so CR 310.11a's candidate rule is answered off the object as it actually
       -- entered -- see EntryRewrite.ChooseProtector.
       EntryRewrite.ChooseProtector -> do
         Replacement.consume (ReplacementCandidate.identity candidate)

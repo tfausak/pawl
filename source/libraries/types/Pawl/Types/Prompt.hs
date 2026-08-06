@@ -413,10 +413,11 @@ data Prompt r where
   -- Siege, CR 310.11a's opponents of its controller.
   --
   -- Asked from TWO places, which is why it carries the battle rather than
-  -- assuming an entry. CR 310.8a asks as the battle enters, through the CR 614.12
-  -- as-enters route (EntryRewrite.ChooseProtector); CR 704.5w and CR 704.5x ask
-  -- again as a state-based action when the designation has become illegal, on a
-  -- battle that has been on the battlefield for turns.
+  -- assuming an entry. CR 310.8a asks as the battle enters, through the CR 614.12a
+  -- as-enters route (EntryRewrite.ChooseProtector); CR 310.10 -- listed as CR
+  -- 704.5w and CR 704.5x -- asks again as a state-based action when the
+  -- designation has become illegal, on a battle that has been on the battlefield
+  -- for turns.
   --
   -- Its own prompt rather than a reuse of ChooseOpponent, by that arm's own
   -- argument: a responder that knows which prompt it is answering knows which

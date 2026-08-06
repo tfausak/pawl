@@ -2705,7 +2705,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends c = isPlaneswalker c /= Maybe.isJust (Face.loyalty c)
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "planeswalker iff loyalty" (fmap (S.nameOf . Printing.card) offenders) []
-  -- CR 310.4 / 310.4a: the same biconditional one rule number over. "Defense is a
+  -- CR 310.4 / 210.1: the same biconditional one rule number over. "Defense is a
   -- characteristic that battles have", so a battle without one has nothing for CR
   -- 310.4b's intrinsic replacement to place and would enter with no defense
   -- counters at all; a non-battle with a printed defense carries a number no rule

@@ -1,11 +1,11 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Engine.Battle, rule 310: the defense a battle prints (CR 310.4a),
--- the defense counters CR 310.4b makes it enter with, the protector CR 310.8a has
--- its controller choose as it enters, CR 310.11a's restriction of that choice to
--- an opponent, and the state-based actions CR 704.5w and CR 704.5x use to repair
--- the designation.
+-- Covers Pawl.Engine.Battle, rule 310: the defense a battle prints (CR 210.1 /
+-- 310.4a), the defense counters CR 310.4b makes it enter with, the protector CR
+-- 310.8a has its controller choose as it enters, CR 310.11a's restriction of that
+-- choice to an opponent, and CR 310.10's state-based action -- listed as CR 704.5w
+-- and CR 704.5x -- repairing the designation once it is illegal.
 --
 -- Also the pieces rule 310 needed underneath it, exercised here because this is
 -- where a card reaches them: Pawl.Types.Defense, CounterKind.Defense,
@@ -22,10 +22,11 @@
 -- honestly. Serra Faithkeeper is two printed keywords, so every line of this card
 -- is representable and these cases exercise rule 310 rather than the card.
 --
--- NOT COVERED, because none of it is built (#302): CR 310.5's attackable battle,
--- CR 310.6's damage removing defense counters, CR 704.5v's defense-0 state-based
--- action, and CR 310.11b's "when the last defense counter is removed, exile it,
--- then you may cast it transformed".
+-- NOT COVERED, because none of it is built (#302): CR 310.5's attackable battle
+-- and everything a protector is FOR that depends on it -- CR 310.8b, CR 310.8c and
+-- CR 310.8d with CR 508.5 -- plus CR 310.6's damage removing defense counters, CR
+-- 310.7 / 704.5v's defense-0 state-based action, and CR 310.11b's "when the last
+-- defense counter is removed, exile it, then you may cast it transformed".
 module Pawl.BattleSpec where
 
 import qualified Data.List as List
@@ -68,7 +69,7 @@ entrySpec s registry = Spec.describe s "Entry" $ do
   Spec.it s "CR 310.4b Invasion of Dominaria enters with five defense counters" $ do
     (after, oid) <- castInvasion s registry
     Spec.assertEqWith s "five defense counters" (S.counterOf CounterKind.Defense oid after) 5
-  Spec.it s "CR 310.4a that five is the PRINTED number, and it is projected" $ do
+  Spec.it s "CR 210.1 that five is the PRINTED number, and it is projected" $ do
     (after, oid) <- castInvasion s registry
     Spec.assertEqWith
       s
@@ -139,8 +140,9 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
       "carol alone, bob having left"
       (Battle.protectorCandidates siege S.alice [S.alice, S.carol])
       [S.carol]
-  -- CR 704.5w's and CR 704.5x's last sentence, the branch that puts the battle
-  -- into its owner's graveyard. Held HERE and not at the game level because it is
+  -- CR 310.10's second sentence, listed as CR 704.5w's and CR 704.5x's: the branch
+  -- that puts the battle into its owner's graveyard. Held HERE rather than at the
+  -- game level because it is
   -- unreachable there: a Siege's candidates are its controller's opponents still
   -- in the game, and a game in which its controller has no opponent left has
   -- already ended under CR 104.2a. Pawl.Engine.Sba routes an empty answer into
@@ -154,7 +156,7 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
       s
       (Battle.needsProtector siege S.alice [S.alice, S.bob] (Just S.alice))
       "the controller is not a legal protector of their own Siege"
-  Spec.it s "CR 310.8a a legal designation needs no repair" $ do
+  Spec.it s "CR 310.10 a legal designation needs no repair" $ do
     siege <- siegePC s registry
     Spec.assertBool
       s
@@ -221,8 +223,9 @@ castInvasion s registry = do
       after = S.runPure S.identityAnswer cast Stack.resolveTop
   named s after
 
--- castInvasion's three-seat twin, under a given answerer. CR 800.1: alice is
--- active with the Siege, and bob and carol are both legal protectors.
+-- castInvasion's three-seat twin, under a given answerer. Three seats make this a
+-- multiplayer game (CR 800.1), which is what leaves alice's Siege two legal
+-- protectors instead of one.
 castInvasionThreeSeated ::
   (Monad m) =>
   Spec.Spec m n ->

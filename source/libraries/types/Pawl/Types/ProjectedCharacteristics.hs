@@ -68,9 +68,10 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- counters -- so this field answers only CR 306.5a's question, and the one
     -- reader is CR 306.5b's intrinsic enters-with replacement.
     loyalty :: Maybe Loyalty.Loyalty,
-    -- | CR 310.4 / 109.3: the object's PRINTED defense, copiable (CR 707.2) -- so
-    -- a Clone entering as a copy of a battle has the copy's defense here. The
-    -- loyalty field above in every respect, one rule number over.
+    -- | CR 310.4 / 109.3: the object's PRINTED defense -- so a Clone entering as a
+    -- copy of a battle has the copy's defense here. The loyalty field above in
+    -- every respect except its authority: CR 707.2's list of copiable values names
+    -- loyalty and not defense (see Pawl.Types.Defense).
     --
     -- Seeded from the card and touched by NO layer: the CR 613 layer system has
     -- no sublayer for defense either. What a permanent's defense actually is comes

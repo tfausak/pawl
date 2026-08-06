@@ -529,8 +529,8 @@ performStateBasedActions = do
       told = Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs
       -- CR 704.5w / 704.5x: the battles whose protector designation has become
       -- illegal, paired with the projection and controller the re-choice needs.
-      -- What "illegal" means lives in Pawl.Engine.Battle with the rest of rule
-      -- 310, the way CR 704.5s lives in Pawl.Engine.Saga.
+      -- What "illegal" means is CR 310.10, and it lives in Pawl.Engine.Battle with
+      -- the rest of rule 310, the way CR 704.5s lives in Pawl.Engine.Saga.
       --
       -- Computed from the SAME pre-pass pcs/gs as every classification above, so
       -- a battle whose protector is a player this pass is about to remove is
@@ -550,7 +550,8 @@ performStateBasedActions = do
   -- CR 704.5w / 704.5x: the second state-based action that ASKS, and it asks in
   -- the same window and for the same reason -- every choice made against the state
   -- this pass began in. A battle for which no player can be chosen joins the
-  -- put-into-graveyard batch below, which is what both rules' last sentence says.
+  -- put-into-graveyard batch below, which is what the second sentence of each of
+  -- those rules, and of CR 310.10, says.
   redesignated <- Monad.mapM (\(oid, pc, controller) -> fmap ((,) oid) (Battle.designateProtector pc controller oid)) undefended
   -- The chosen protectors are stamped BEFORE the batch below moves anything, so a
   -- battle that found one is not also read as one that did not. Not a zone change

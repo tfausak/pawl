@@ -534,7 +534,7 @@ readsApplier re = case re of
   -- first is not a board difference.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> False
   -- CR 310.8a: the chooser is the ENTERING battle's controller, read live off the
-  -- board for AsCopy's reason, and the rewrite carries no payload -- rule 310.11
+  -- board for AsCopy's reason, and the rewrite carries no payload -- rule 310.11a
   -- fixes the candidate set from the battle's own type line. Two such rows are
   -- always on the same object, for riot's reason, and offer that battle's
   -- controller the same players.
