@@ -42,6 +42,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 
@@ -516,9 +517,17 @@ permitsCastFromGraveyard face =
 -- card and never through the projection: these permissions function in the
 -- library and the graveyard (CR 113.6), which pawl's projection does not reach
 -- (#160).
+--
+-- The face's own type line is what answers rule 702.34a's "if the resulting
+-- spell is an instant or sorcery spell", and it is the PROPOSED face's because
+-- the caller has already narrowed to one (proposedFace). CR 601.3e's Melek
+-- example is that same reading one zone over: under "you may cast instant and
+-- sorcery spells from the top of your library", an adventurer card offers its
+-- instant Adventure half and not its creature half.
 permissionsOf :: Face.Face Card.Type.Card -> [CastingPermission.CastingPermission]
 permissionsOf face =
-  Face.castingPermissions face <> Keyword.castingPermissionsOf (Face.keywords face)
+  Face.castingPermissions face
+    <> Keyword.castingPermissionsOf (TypeLine.types (Face.typeLine face)) (Face.keywords face)
 
 -- The library cards this player may cast while searching their own library:
 -- permitted, not prohibited, affordable, and with a fillable target set.

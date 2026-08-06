@@ -226,18 +226,33 @@ cycling cost searchFor =
 -- Taken over the card's PRINTED keywords rather than a projection's post-layer
 -- ones: this permission functions in the GRAVEYARD (CR 113.6), which pawl's
 -- projection does not reach (#160).
-castingPermissionsOf :: Set Keyword -> [CastingPermission]
-castingPermissionsOf = concatMap permissionsFor . Set.toAscList
+--
+-- The card types come along because rule 702.34a's permission is CONDITIONAL on
+-- them. They are the types of the one FACE being proposed, which is the caller's
+-- doing -- see Pawl.Engine.Cast.permissionsOf for why that is the right face.
+castingPermissionsOf :: Set CardType.CardType -> Set Keyword -> [CastingPermission]
+castingPermissionsOf cardTypes = concatMap (permissionsFor cardTypes) . Set.toAscList
 
 -- Exhaustive, exactly as abilitiesFor is, and for the same reason: rule 702 is
 -- full of keywords that grant a zone permission (madness, retrace, escape,
 -- disturb), so the next one added must break this build rather than silently
 -- grant nothing.
-permissionsFor :: Keyword -> [CastingPermission]
-permissionsFor keyword = case keyword of
-  -- CR 702.34a. Its "if the resulting spell is an instant or sorcery spell"
-  -- clause is not checked (#295).
-  Keyword.Flashback _ -> [CastingPermission.CastFromGraveyard]
+permissionsFor :: Set CardType.CardType -> Keyword -> [CastingPermission]
+permissionsFor cardTypes keyword = case keyword of
+  -- CR 702.34a: "You may cast this card from your graveyard IF THE RESULTING
+  -- SPELL IS AN INSTANT OR SORCERY SPELL by paying [cost] rather than paying its
+  -- mana cost." The clause gates the permission itself, so a card that fails it
+  -- gets no permission at all rather than a permission it cannot use --
+  -- Pawl.CastSpec's "FlashbackCardType" group proves both directions.
+  --
+  -- Gated HERE rather than in Pawl.Engine.Cast.permitsCastFromGraveyard because
+  -- the condition belongs to rule 702.34a, not to CastFromGraveyard: a card that
+  -- PRINTS the same permission need not restrict itself to instants and
+  -- sorceries, and must not inherit flashback's clause.
+  Keyword.Flashback _
+    | Set.member CardType.Instant cardTypes || Set.member CardType.Sorcery cardTypes ->
+        [CastingPermission.CastFromGraveyard]
+    | otherwise -> []
   -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling
   -- discards the card, it never casts it. See handAbilitiesOf above.
   Keyword.Cycling _ _ -> []
