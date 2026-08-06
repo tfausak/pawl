@@ -1969,6 +1969,48 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+  -- A player the relation admits LOST life -- Exquisite Blood's "whenever an
+  -- opponent loses life". The losing player comes from the event; CR 109.5 /
+  -- 603.3a fix "you" as the ability's controller, exactly as PlayerGainsLife
+  -- above does.
+  --
+  -- The bearer is NOT part of the match: Exquisite Blood is an enchantment
+  -- watching somebody else's life total, and nothing about the condition names
+  -- the object the ability is on.
+  --
+  -- Which life-total movements are a loss is settled at the RECORDING sites and
+  -- not here, since the rules print no CR 119.9 for this direction: CR 119.3's
+  -- instructed loss, CR 119.2 / 120.3a's damage, and CR 119.4's paid life all
+  -- write GameEvent.LifeLost, while CR 120.3b's infect diversion, CR 615.6's
+  -- prevented damage and damage taken by a permanent write none. See
+  -- Pawl.Types.TriggerCondition.PlayerLosesLife.
+  --
+  -- No zero check either, for the reason the gain arm gives: every producer
+  -- guards its own zero, so a GameEvent.LifeLost in the log is by construction a
+  -- loss of more than 0.
+  --
+  -- GAINING life is a different event, not a signed version of this one: one
+  -- damage event can record a loss and a lifelink gain together, and only the
+  -- loss fires this.
+  TriggerCondition.PlayerLosesLife relation -> case event of
+    GameEvent.LifeLost pid _ -> case relation of
+      -- No producer today -- a card watching its OWN controller lose life.
+      PlayerRelation.You -> pid == you
+      -- Exquisite Blood's half. CR 102.2 is what makes "not you" the right test
+      -- on a two-player board, as it is for Megrim under PlayerDiscards.
+      PlayerRelation.Opponent -> pid /= you
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeGained _ _ -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is read.
@@ -2070,6 +2112,21 @@ eventBindings cond event = case (cond, event) of
   -- eventBindingSlots' arm gives: under the one relation a card in the pool uses
   -- that player is CR 109.5's "you", whom Binding.setYou already names.
   (TriggerCondition.PlayerGainsLife _, GameEvent.LifeGained _ amount) ->
+    Binding.setEventAmount amount Map.empty
+  -- The other direction's "that much" -- Exquisite Blood's "you gain that much
+  -- life". The same slot and the same reading as the gain arm above, off an
+  -- event CR 603.2 makes the number part of.
+  --
+  -- The AMOUNT the event recorded, never the loser's life total. Under the one
+  -- relation a card in the pool uses the two are not even the same player's
+  -- number: Exquisite Blood's controller is bound as "you" while the loss is an
+  -- opponent's.
+  --
+  -- The LOSING player is not bound alongside it, though under that relation the
+  -- loser is genuinely somebody else -- which is what separates this from the
+  -- gain arm. Exquisite Blood's payload names only "you", so the card that says
+  -- "that player" is the one that must add it (#829).
+  (TriggerCondition.PlayerLosesLife _, GameEvent.LifeLost _ amount) ->
     Binding.setEventAmount amount Map.empty
   _ -> Map.empty
 
@@ -2180,6 +2237,16 @@ eventBindingSlots cond = case cond of
   -- Megrim's "that player" is somebody else's; a card watching an OPPONENT gain
   -- life is what would want the same here (#826).
   TriggerCondition.PlayerGainsLife _ -> Set.singleton Binding.eventAmount
+  -- The loss condition's amount, guaranteed for the same reason:
+  -- GameEvent.LifeLost carries a Natural unconditionally. Exquisite Blood's "you
+  -- gain that much life" is what reads it.
+  --
+  -- The LOSING player gets no slot, though under Exquisite Blood's Opponent
+  -- relation that player is NOT the "you" Binding.setYou names -- which is what
+  -- separates this from the gain arm above. It stays empty because binding a slot
+  -- nothing reads is speculative construction (PermanentDies' reasoning), so a
+  -- card printing "that player" here is what must add it (#829).
+  TriggerCondition.PlayerLosesLife _ -> Set.singleton Binding.eventAmount
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -2592,6 +2659,9 @@ functionsInGraveyard cond = case cond of
   -- CR 113.6's default once more: Ajani's Pridemate has to be on the battlefield
   -- to receive the counter its own ability puts on it.
   TriggerCondition.PlayerGainsLife _ -> False
+  -- And once more: Exquisite Blood is an enchantment, and CR 113.6 leaves its
+  -- ability functioning only where the permanent is.
+  TriggerCondition.PlayerLosesLife _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -2645,6 +2715,12 @@ controllerTurnScoped cond = case cond of
   -- "during your turn" and this one does not, which is the two rules' own
   -- difference rather than an omission here.
   TriggerCondition.PlayerGainsLife _ -> False
+  -- And life can be LOST on anybody's turn. This is the arm where CR 702.179d's
+  -- condition is closest to being duplicated and is not: that one reads the very
+  -- same GameEvent.LifeLost but only during its controller's turn, which is the
+  -- printed speed rule rather than anything a card's "whenever an opponent loses
+  -- life" says.
+  TriggerCondition.PlayerLosesLife _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -2721,6 +2797,7 @@ stateTriggers gs
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False
               TriggerCondition.PlayerGainsLife _ -> False
+              TriggerCondition.PlayerLosesLife _ -> False
             lives = filter live (Projection.triggeredAbilitiesOf oid gs)
             -- Each live copy against the copies of itself that came earlier in
             -- the list, which gives it a 1-based ordinal among its equals: the

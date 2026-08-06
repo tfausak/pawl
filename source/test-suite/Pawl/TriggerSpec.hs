@@ -67,7 +67,10 @@
 -- controls that keep it from being a "life total moved" trigger, with Ajani's
 -- Pridemate -- `lifeGainTriggerSpec`. That event read for its NUMBER, which CR
 -- 603.2 makes part of it and Sanguine Bond's "that much" is the pool's first
--- reader of -- `lifeGainAmountSpec`.
+-- reader of -- `lifeGainAmountSpec`. That event's mirror, a player LOSING life,
+-- from all three recording sites (CR 119.3's instructed loss, CR 119.2's damage
+-- and CR 119.4's paid life) with the controls that keep it from being a "life
+-- total moved" trigger, with Exquisite Blood -- `lifeLossTriggerSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -3356,6 +3359,9 @@ representativeEvents cond =
         -- CR 119.9's own event, and the only one this condition admits: the
         -- payload is a player and an amount, and the amount is the floor.
         TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained S.bob 2)
+        -- The loss condition's own event, and the only one it admits, on the
+        -- gain arm's reasoning: same payload shape, same amount floor.
+        TriggerCondition.PlayerLosesLife _ -> one (GameEvent.LifeLost S.bob 2)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3379,7 +3385,8 @@ everyTriggerCondition =
     TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
-    TriggerCondition.PlayerGainsLife PlayerRelation.You
+    TriggerCondition.PlayerGainsLife PlayerRelation.You,
+    TriggerCondition.PlayerLosesLife PlayerRelation.Opponent
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -4374,6 +4381,142 @@ lifeGainAmountSpec s registry =
             (Event.eventBindings (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained S.alice 7))
             (Map.singleton Binding.eventAmount (Binding.toAmount 7))
 
+-- The life-GAIN group's mirror: "whenever an opponent loses life", which the
+-- rules give no CR 119.9 of its own. What counts as a loss is therefore fixed by
+-- the three sites that RECORD one, and this group walks all three:
+--
+--   * CR 119.3, an effect that causes a player to lose life -- Sign in Blood's
+--     "target player draws two cards and loses 2 life".
+--   * CR 119.2 / 120.3a, damage dealt to a player by a source without infect --
+--     Hill Giant's three.
+--   * CR 119.4, life paid as a cost: "in other words, the player loses that much
+--     life" -- Greed's "{B}, Pay 2 life: Draw a card".
+--
+-- Exquisite Blood, {4}{B} Enchantment, "Whenever an opponent loses life, you gain
+-- that much life", is the card that proves it, and the first LIFE condition in the
+-- pool whose relation is Opponent rather than You (Megrim's discard trigger is the
+-- other one) -- so the loser and CR 109.5's "you" are never the same player, and a
+-- matcher that ignored the relation would gain alice life off her own losses.
+--
+-- What makes the group a proof rather than a demonstration:
+--
+--   * the amounts DIFFER between the damage case (3) and the two others (2), and
+--     no life total on any of these boards is 3 or 2 -- so a constant binding
+--     fails one case and a total-reading binding fails all of them.
+--   * the CR 109.5 control changes only WHO lost the life, on the same card, the
+--     same spell and the same amount.
+--   * the CR 120.3b control is on the SAME board and the SAME attack as the
+--     damage case: Glistener Elf's infect damage gives poison counters INSTEAD of
+--     causing life loss, so alice gains the Hill Giant's 3 and not the Elf's 1.
+lifeLossTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lifeLossTriggerSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- Sign in Blood's one target slot, answered with `who` rather than left to
+      -- identityAnswer's lowest-sorting candidate -- which is alice, and so is
+      -- the control case rather than the positive one.
+      aimAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        _ -> S.identityAnswer p
+      -- alice: two Swamps for the {B}{B}, an Exquisite Blood, and Sign in Blood
+      -- in hand.
+      --
+      -- BOTH players get two library cards, not only the one the positive case
+      -- aims at, and this is load-bearing rather than tidy: Sign in Blood draws
+      -- its target two cards as well as costing them the life, so a target with
+      -- an empty library loses the game to CR 104.3c the next time a player would
+      -- get priority -- before any trigger could resolve. The CR 109.5 control
+      -- below would then be silent for THAT reason instead of the relation's, and
+      -- would pass however the matcher read the relation. With a library on each
+      -- side the two cases differ in the target and in nothing else.
+      signInBloodBoard swamp blood signInBlood =
+        let (_, withBlood) = S.addCreature blood S.alice (S.landsInPlay swamp 2)
+            stock pid gs =
+              let (_, one) = S.addLibraryCard swamp pid gs
+                  (_, two) = S.addLibraryCard swamp pid one
+               in two
+         in S.handOne signInBlood (stock S.bob (stock S.alice withBlood))
+   in Spec.describe s "PlayerLosesLife" $ do
+        -- The gameplay-level proof, cast to resolution. bob loses 2 (CR 119.3),
+        -- Exquisite Blood matches THAT event and gains alice the 2 it carried.
+        Spec.it s "CR 119.3 whole cards: Sign in Blood costs bob 2 life and Exquisite Blood gains alice that much" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          signInBlood <- S.printingOf s registry "Sign in Blood"
+          let (gs, spellId) = signInBloodBoard swamp blood signInBlood
+              cast = snd (Engine.runGamePure (aimAt S.bob) gs (S.cast S.alice spellId))
+              settled = resolveAll cast
+          Spec.assertEqWith s "bob lost exactly 2" (S.lifeOf S.bob settled) (Just 18)
+          Spec.assertEqWith s "and alice gained exactly that much" (S.lifeOf S.alice settled) (Just 22)
+        -- The control twin, differing in ONE thing: the spell targets ALICE, so
+        -- alice is the one who loses. The same card, the same 2 life, the same
+        -- GameEvent.LifeLost written -- and "an opponent" is bob, so Exquisite
+        -- Blood stays silent.
+        --
+        -- alice's loss is asserted too, or the case would pass for the wrong
+        -- reason: an engine that recorded no loss at all would also show no gain.
+        Spec.it s "CR 109.5/603.3a the control: ALICE loses the life, and her own Exquisite Blood stays silent" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          signInBlood <- S.printingOf s registry "Sign in Blood"
+          let (gs, spellId) = signInBloodBoard swamp blood signInBlood
+              cast = snd (Engine.runGamePure (aimAt S.alice) gs (S.cast S.alice spellId))
+              settled = resolveAll cast
+          Spec.assertEqWith s "alice really lost the 2" (S.lifeOf S.alice settled) (Just 18)
+          Spec.assertEqWith s "bob lost nothing" (S.lifeOf S.bob settled) (Just 20)
+        -- CR 119.2 / 120.3a: "damage dealt to a player by a source without infect
+        -- causes that player to lose that much life". The second producer, and
+        -- the one no effect says the words for -- combat did.
+        --
+        -- ONE board carries the control. Both of alice's creatures connect, and
+        -- CR 120.3b sends Glistener Elf's damage to poison counters INSTEAD of a
+        -- life loss, so the 3 alice gains is the Hill Giant's alone. An engine
+        -- that read "a life total moved" would gain her 4.
+        Spec.it s "CR 119.2 damage loses life and CR 120.3b infect does not, on one attack" $ do
+          blood <- S.printingOf s registry "Exquisite Blood"
+          hillGiant <- S.printingOf s registry "Hill Giant"
+          glistenerElf <- S.printingOf s registry "Glistener Elf"
+          let (gs0, _, _) = S.combatBoardOf [hillGiant, glistenerElf] []
+              (_, gs1) = S.addCreature blood S.alice gs0
+              settled = resolveAll (S.fightWith S.aggressiveAnswer gs1)
+          Spec.assertEqWith s "bob lost the Giant's 3 and none of the Elf's 1" (S.lifeOf S.bob settled) (Just 17)
+          Spec.assertEqWith s "the Elf really connected" (S.playerCounterOf PlayerCounterKind.Poison S.bob settled) 1
+          Spec.assertEqWith s "so alice gained 3, not 4" (S.lifeOf S.alice settled) (Just 23)
+        -- CR 119.4's "in other words, the player loses that much life". The third
+        -- producer, and the only one that happens while paying a COST rather than
+        -- while an effect resolves -- so the record is written outside resolution
+        -- and the CR 117.5 trigger scan still has to find it.
+        Spec.it s "CR 119.4 bob pays 2 life for Greed and Exquisite Blood gains alice that much" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          greed <- S.printingOf s registry "Greed"
+          case Face.activatedAbilities (S.combinedFace greed) of
+            [] -> Spec.assertFailure s "Greed should carry an activated ability"
+            ability : _ -> do
+              let (_, withBlood) = S.addCreature blood S.alice (Setup.emptyGame S.bothPlayers)
+                  (_, withSwamp) = S.addCreature swamp S.bob withBlood
+                  (greedId, withGreed) = S.addCreature greed S.bob withSwamp
+                  (_, gs1) = S.addLibraryCard swamp S.bob withGreed
+                  gs =
+                    gs1
+                      { GameState.phase = Phase.PrecombatMain,
+                        GameState.activePlayer = S.alice,
+                        GameState.priority = Just S.alice
+                      }
+                  activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.bob greedId ability)
+                  settled = resolveAll activated
+              Spec.assertEqWith s "bob paid exactly 2" (S.lifeOf S.bob settled) (Just 18)
+              Spec.assertEqWith s "and alice gained exactly that much" (S.lifeOf S.alice settled) (Just 22)
+        -- eventBindings in isolation, so the binding is pinned to the RULE rather
+        -- than to one card's payload -- the gain group's last case, mirrored. The
+        -- 7 is no life total and no other number in reach, so an arm binding
+        -- anything but the event's own amount fails here.
+        Spec.it s "CR 603.2 eventBindings binds the amount the loss event carries" $
+          Spec.assertEqWith
+            s
+            "thatMuch is the loss"
+            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost S.bob 7))
+            (Map.singleton Binding.eventAmount (Binding.toAmount 7))
+
 -- CR 508.3a / 603.3d: Anafenza, the Foremost's OTHER ability -- "whenever this
 -- creature attacks, put a +1/+1 counter on another target tapped creature you
 -- control". Here because the card was added for its CR 614.1a redirect
@@ -4466,4 +4609,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   counterTriggerSpec s registry
   lifeGainTriggerSpec s registry
   lifeGainAmountSpec s registry
+  lifeLossTriggerSpec s registry
   anafenzaAttackSpec s registry

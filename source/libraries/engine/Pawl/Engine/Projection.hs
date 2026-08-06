@@ -1211,6 +1211,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SpellOrAbilityCounters _ -> condition
   TriggerCondition.DamageToPlayerPrevented _ -> condition
   TriggerCondition.PlayerGainsLife _ -> condition
+  TriggerCondition.PlayerLosesLife _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

@@ -201,3 +201,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PlayerGainsLife PlayerRelation.Opponent)
       """ {"type":"PlayerGainsLife","value":{"type":"Opponent"}} """
+  -- The life-LOSS trigger. A DIFFERENT tag from PlayerGainsLife above and the
+  -- same payload shape, so the two must never decode to each other -- the same
+  -- hazard GameEvent's LifeLost/LifeGained pair carries.
+  Spec.it s "PlayerLosesLife round-trips both relations" $ do
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerLosesLife PlayerRelation.You)
+      """ {"type":"PlayerLosesLife","value":{"type":"You"}} """
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent)
+      """ {"type":"PlayerLosesLife","value":{"type":"Opponent"}} """
