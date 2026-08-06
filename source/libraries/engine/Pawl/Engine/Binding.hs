@@ -149,16 +149,18 @@ became = SlotName.MkSlotName (Text.pack "became")
 -- ONE slot for every event that supplies a number, the way `became` is one slot
 -- for both directions of a zone change, and for the same reason: the printed word
 -- is the same word, and which rule produced the number is a fact about the
--- CONDITION rather than about the slot. Two conditions stamp it today:
+-- CONDITION rather than about the slot. Three conditions stamp it today:
 --
 --   * CR 615.13's prevention -- "put that many +1/+1 counters" on Selfless
 --     Squire, "you gain that much life" on the same family's other cards.
 --   * CR 119.9's life gain -- Sanguine Bond's "target opponent loses that much
 --     life".
+--   * Its mirror, a player losing life -- Exquisite Blood's "you gain that much
+--     life".
 --
--- No ability bears two conditions, so the two can never collide on one object,
--- and Pawl.Engine.Event.eventBindingSlots is what tells the card lint which of
--- them makes the slot available.
+-- No ability bears two conditions, so they can never collide on one object, and
+-- Pawl.Engine.Event.eventBindingSlots is what tells the card lint which of them
+-- makes the slot available.
 --
 -- A NUMBER, where triggerPlayer and became are references, so this is the first
 -- reserved slot read through Quantity rather than through a Ref. That is why

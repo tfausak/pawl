@@ -145,8 +145,11 @@ data GameEvent
     -- construction: every producer guards its own zero. The rules state that
     -- explicitly only for the other direction -- CR 119.9's "if a player gains 0
     -- life, no life gain event has occurred" -- so reading it back onto loss is an
-    -- inference, not a citation; what makes the guard safe here is that nothing
-    -- reads this constructor except CR 702.179d, which a zero must not fire.
+    -- inference, not a citation; what makes the guard safe is that both of this
+    -- constructor's readers want a zero to be silent. CR 702.179d's speed
+    -- increase must not fire on one, and neither must a card's "whenever an
+    -- opponent loses life" (TriggerCondition.PlayerLosesLife), whose payload
+    -- would otherwise read a 0 out of the amount slot.
     --
     -- Recorded at all three places life leaves a player, which is a fact about the
     -- RULES and not about the engine's plumbing: CR 119.3 for a loss an effect
