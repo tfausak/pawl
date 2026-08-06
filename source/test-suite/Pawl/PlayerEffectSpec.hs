@@ -20,6 +20,11 @@
 -- Null Chamber also brings CR 201.4's card-name choice and CR 614.1c's entry
 -- replacement in with it, so the group covers Pawl.Engine.Replacement's
 -- EntryRewrite.ChooseCardNames arm and Pawl.Engine.Action.playableLands as well.
+--
+-- Artificial Evolution and Magical Hack join Edgewalker for CR 612.1, the second
+-- rule reaching this axis from outside it: the word naming which spells a player
+-- static ability discounts is printed text like any other, so a text change moves
+-- the discount off it.
 module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -36,6 +41,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator Pawl.Engine.Filter already claims the alias Filter.
 
@@ -68,7 +74,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
 
@@ -909,6 +917,159 @@ edgewalkerSpec s registry =
         "bob pays full price"
         (totalManaCost S.bob bobEdgewalker (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) withBob)
         (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+
+-- Aims the text changer's one target slot at `oid` -- the SpellsAndPermanents
+-- pool's recipient shape, which both changers below print -- and answers whichever
+-- family's swap prompt the changer asks with (from, to). BOTH prompts are
+-- answered because the group casts an Artificial Evolution in one case and a
+-- Magical Hack in another; a changer asks only its own.
+swapAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+swapAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (from, to)
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- alice controls one Edgewalker, one untapped Plains and one untapped Island;
+-- her hand holds a second Edgewalker ({1}{W}{B} Human Cleric), a Whipstitched
+-- Zombie ({1}{B} Zombie) and the text changer `changerName`. With `swap`, she
+-- casts that changer at the Edgewalker ON THE BATTLEFIELD -- the Island pays the
+-- {U} -- and it resolves before anything is measured; without it the board is
+-- otherwise identical, which is what makes the two comparable.
+--
+-- Returns the state, the Edgewalker printing the discount, the Cleric spell and
+-- the Zombie spell. Loaded fresh inside each case that needs it -- equivalent
+-- because loading is deterministic and cached (batch-recipe.md).
+textChangedEdgewalkerBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  Maybe (Subtype.Subtype, Subtype.Subtype) ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+textChangedEdgewalkerBoard s registry changerName swap = do
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  edgewalker <- S.printingOf s registry "Edgewalker"
+  zombie <- S.printingOf s registry "Whipstitched Zombie"
+  changer <- S.printingOf s registry changerName
+  let (_, g1) = S.addCreature island S.alice (S.landsInPlay plains 1)
+      (walkerId, g2) = S.addCreature edgewalker S.alice g1
+      (clericSpell, g3) = S.addHandCard edgewalker S.alice g2
+      (zombieSpell, g4) = S.addHandCard zombie S.alice g3
+      (changerId, g5) = S.addHandCard changer S.alice g4
+      ready =
+        g5
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      after = case swap of
+        Nothing -> ready
+        Just (from, to) ->
+          S.runPure (swapAt walkerId from to) ready $ do
+            S.cast S.alice changerId
+            Stack.resolveTop
+  pure (after, walkerId, clericSpell, zombieSpell)
+
+-- CR 612.1 reaching the FILTER a player static ability's effect carries.
+--
+-- Edgewalker's "Cleric spells you cast cost {W}{B} less to cast" names which
+-- spells it discounts with a creature type word, and CR 612.1 gives a
+-- text-changing effect "any words or symbols printed on that object" -- so an
+-- Artificial Evolution ({U} Instant, "Change the text of target spell or
+-- permanent by replacing all instances of one creature type with another. The
+-- new creature type can't be Wall." -- checked against Scryfall, 2026-08-05)
+-- resolved at the Edgewalker moves the discount off Clerics and onto the new
+-- word.
+--
+-- Cleric -> Zombie rather than Cleric -> Wizard, which is the same swap with a
+-- word the discount cannot be seen through: Edgewalker reduces by {W}{B}, and
+-- pawl drops a stranded coloured reduction rather than spilling it onto the
+-- generic component (#309), so only a white or black spell shows the difference
+-- at all. Every Wizard in the pool is mono-blue; Whipstitched Zombie ({1}{B}
+-- Creature -- Zombie 2/2, "At the beginning of your upkeep, sacrifice this
+-- creature unless you pay {B}." -- checked against Scryfall, 2026-08-05) is the
+-- black Zombie that makes the new word observable, and its upkeep trigger never
+-- fires here because nothing in the group reaches an upkeep.
+--
+-- BOTH HALVES are asserted every time. "The Zombie spell is discounted" passes
+-- vacuously against a reader that discounts everything, and "the Cleric spell is
+-- not" passes vacuously against one that discounts nothing.
+textChangedEdgewalkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedEdgewalkerSpec s registry = Spec.describe s "TextChangedEdgewalker" $ do
+  -- The premise the two changed cases are read against: with no text changer the
+  -- printed word stands, so the Cleric spell is discounted and the Zombie is not.
+  Spec.it s "CR 118.7 the printed filter discounts Clerics and not Zombies" $ do
+    (gs, _, clericSpell, zombieSpell) <- textChangedEdgewalkerBoard s registry "Artificial Evolution" Nothing
+    Spec.assertEqWith
+      s
+      "the Cleric spell's {1}{W}{B} becomes {1}"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Zombie spell's {1}{B} is untouched"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]))
+
+  Spec.it s "CR 612.1 an evolved Edgewalker discounts Zombies and no longer discounts Clerics" $ do
+    (gs, walkerId, clericSpell, zombieSpell) <-
+      textChangedEdgewalkerBoard s registry "Artificial Evolution" (Just (Subtype.Cleric, Subtype.Zombie))
+    -- The anti-vacuity check, first: every assertion below would also hold of an
+    -- Evolution that never resolved onto the Edgewalker at all.
+    Spec.assertEqWith s "the Evolution resolved onto the Edgewalker" (Projection.textChangesAffecting walkerId gs) [(Subtype.Cleric, Subtype.Zombie)]
+    Spec.assertEqWith
+      s
+      "the Zombie spell's {1}{B} becomes {1}"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Cleric spell pays its printed {1}{W}{B}"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+
+  -- CR 612.2's family gate, at this read point: a text-changing effect "changes
+  -- only those words that are used in the correct way", and the rule's own
+  -- examples are "a land type word used as a land type" and "a creature type word
+  -- used as a creature type". Magical Hack ({U} Instant, "Change the
+  -- text of target spell or permanent by replacing all instances of one basic
+  -- land type with another." -- checked against Scryfall, 2026-08-05) can only
+  -- name a basic land type, so the pair it imposes reaches no creature type
+  -- position and the discount stays on Clerics.
+  Spec.it s "CR 612.2 a land-type pair leaves the creature-type filter alone" $ do
+    (gs, walkerId, clericSpell, zombieSpell) <-
+      textChangedEdgewalkerBoard s registry "Magical Hack" (Just (Subtype.Swamp, Subtype.Island))
+    Spec.assertEqWith s "the Hack resolved onto the Edgewalker" (Projection.textChangesAffecting walkerId gs) [(Subtype.Swamp, Subtype.Island)]
+    Spec.assertEqWith
+      s
+      "the Cleric spell is discounted exactly as printed"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Zombie spell is still no business of the Edgewalker's"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]))
+
+  -- The whole-card case: CR 601.2f measures castability and payment against the
+  -- TOTAL cost, so the rewritten filter decides which spell alice can actually
+  -- cast. One Plains is her only untapped mana once the Evolution has tapped the
+  -- Island, and a Plains can never pay a {B}: what makes the Zombie castable is
+  -- that the reduction removed the black SYMBOL.
+  Spec.it s "CR 601.2f whole cards: the rewritten filter decides a real cast" $ do
+    (evolved, _, evolvedCleric, evolvedZombie) <-
+      textChangedEdgewalkerBoard s registry "Artificial Evolution" (Just (Subtype.Cleric, Subtype.Zombie))
+    (printed, _, printedCleric, printedZombie) <- textChangedEdgewalkerBoard s registry "Artificial Evolution" Nothing
+    Spec.assertBool s (not (S.castable S.alice printedZombie printed)) "unevolved, the Zombie spell's {B} cannot be paid"
+    Spec.assertBool s (S.castable S.alice evolvedZombie evolved) "evolved, the discounted Zombie spell can be cast"
+    Spec.assertBool s (S.castable S.alice printedCleric printed) "unevolved, the discounted Cleric spell can be cast"
+    Spec.assertBool s (not (S.castable S.alice evolvedCleric evolved)) "evolved, the Cleric spell's {W}{B} cannot be paid"
+    -- And the payment really is the reduced one: the Island the Evolution tapped,
+    -- plus the single Plains that pays the discounted {1}.
+    let paid = S.runPure S.identityAnswer evolved (S.cast S.alice evolvedZombie)
+    Spec.assertEqWith s "one Plains tapped on top of the Evolution's Island" (S.tappedCount S.alice paid) 2
 
 -- alice holds nine Plains cards; the board is otherwise empty unless a
 -- printing is named. Loaded fresh inside each case that needs it --
@@ -2024,6 +2185,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   humilitySpec s registry
   titaniasSongSpec s registry
   edgewalkerSpec s registry
+  textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   storedSpec s registry
   silenceSpec s registry
