@@ -57,10 +57,9 @@ resolveTopWith runSubgame = do
           -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
           -- OTHER characteristic read of a stack object already does
           -- (Cost.costsFor resolves the same way, through Game.resolveFace).
-          -- Action.playableLands stays on Card.combined: Action.Play carries no
-          -- face, and the layout that makes a land's faces differ is CR 712.12's
-          -- modal double-faced card, whose land face is not offered as a land
-          -- play at all (#891).
+          -- Action.playableLands asks the same question of a land play through
+          -- Card.landFaces, which CR 712.12 gives the same shape: a chosen face
+          -- where the layout has one, and the combined view where it does not.
           --
           -- Falls back to the combined view for parity with faceOf's own
           -- fallback; unreachable here since `obj` already resolved via this

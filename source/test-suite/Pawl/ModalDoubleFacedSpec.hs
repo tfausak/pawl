@@ -1,25 +1,38 @@
 -- Covers CR 712.3's modal double-faced cards end to end: Pawl.Types.Layout's
--- ModalDoubleFaced arm and the five Pawl.Engine.Card functions that read it (CR
--- 712.8a's combined view, CR 712.11b's castable faces, CR 712.13's entering
--- face, CR 712.8f's mana-value face, CR 712.9's turned-over face), plus the
--- carry-through in Pawl.Engine.Stack that puts CR 712.13's face onto the
--- permanent.
+-- ModalDoubleFaced arm and the seven Pawl.Engine.Card functions that read it (CR
+-- 712.8a's combined view, CR 712.11b's castable faces, CR 712.12's land faces,
+-- CR 712.13's entering face, CR 712.14b's stays-in-its-zone test, CR 712.8f's
+-- mana-value face, CR 712.9's turned-over face), plus the carry-through in
+-- Pawl.Engine.Stack that puts CR 712.13's face onto the permanent and the land
+-- play in Pawl.Engine.Action and Pawl.Engine.Engine that CR 712.12 writes.
 --
--- Every case runs against the printed Birgi, God of Storytelling // Harnfel,
--- Horn of Bounty: a {2}{R} 3/3 Legendary Creature -- God over a {4}{R} Legendary
--- Artifact. It was picked because the two faces share nothing a reader can see
--- -- different name, different cost, different card type, and only one of them
--- has a power and toughness -- so a permanent that entered showing the wrong
--- face is visible in every assertion here rather than in one narrow one.
+-- TWO printed cards, because one card cannot reach both halves of the rule.
+--
+-- Birgi, God of Storytelling // Harnfel, Horn of Bounty -- a {2}{R} 3/3
+-- Legendary Creature -- God over a {4}{R} Legendary Artifact -- carries every
+-- CAST-side case. It was picked because the two faces share nothing a reader
+-- can see -- different name, different cost, different card type, and only one
+-- of them has a power and toughness -- so a permanent that entered showing the
+-- wrong face is visible in every assertion here rather than in one narrow one.
+--
+-- Zof Consumption // Zof Bloodbog -- a {4}{B}{B} Sorcery over a Land -- carries
+-- the PLAY-side ones, and is the shape CR 712.12 and CR 712.14b are both about:
+-- a face that is a land where the front face is not a permanent card at all.
+-- The land face's printed "This land enters tapped" is not transcribed, so the
+-- permanent these cases watch enter is untapped (#894).
 module Pawl.ModalDoubleFacedSpec where
 
+import qualified Control.Monad as Monad
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -40,7 +53,10 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.Zone as Zone
 
 -- The two names the card prints, plus the basic land every case pays with. CR
 -- 712.8a gives the card only its front face's characteristics in a hand, so
@@ -64,9 +80,54 @@ faceReadings oid gs =
     S.powerToughnessOf oid gs
   )
 
-birgiReadings, harnfelReadings :: (CardName.CardName, Set.Set CardType.CardType, Maybe (Integer, Integer))
+birgiReadings, harnfelReadings, bloodbogReadings :: (CardName.CardName, Set.Set CardType.CardType, Maybe (Integer, Integer))
 birgiReadings = (birgiName, Set.singleton CardType.Creature, Just (3, 3))
 harnfelReadings = (harnfelName, Set.singleton CardType.Artifact, Nothing)
+bloodbogReadings = (bloodbogName, Set.singleton CardType.Land, Nothing)
+
+-- The play-side card's two names. Its front face is a SORCERY, which is what
+-- makes it the producer for CR 712.14b as well as for CR 712.12.
+zofName, bloodbogName :: CardName.CardName
+zofName = CardName.MkCardName (Text.pack "Zof Consumption")
+bloodbogName = CardName.MkCardName (Text.pack "Zof Bloodbog")
+
+-- alice's precombat main phase with the stack empty -- CR 305.1's window, so a
+-- land play is refused on these boards only by a rule and never by the timing.
+readyForMain :: GameState.GameState -> GameState.GameState
+readyForMain gs =
+  gs
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = S.alice,
+      GameState.priority = Just S.alice
+    }
+
+-- readyForMain with the given cards in alice's hand, returning their ids in the
+-- order the cards were handed over.
+handBoard :: [Printing.Printing] -> ([ObjectId.ObjectId], GameState.GameState)
+handBoard printings =
+  let put (ids, gs) printing =
+        let (oid, gs') = S.addHandCard printing S.alice gs
+         in (ids <> [oid], gs')
+      (oids, filled) = List.foldl' put ([], Setup.emptyGame S.bothPlayers) printings
+   in (oids, readyForMain filled)
+
+-- handBoard for the one-card case, which the cases that follow an id through a
+-- move want without a list pattern in the way.
+handBoardOne :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+handBoardOne printing =
+  let (oid, gs) = S.addHandCard printing S.alice (Setup.emptyGame S.bothPlayers)
+   in (oid, readyForMain gs)
+
+-- Every land play on offer, as the pair CR 712.12 makes it: the card, and the
+-- face chosen to be played as a land.
+landPlays :: [A.Action] -> [(ObjectId.ObjectId, Maybe CardName.CardName)]
+landPlays actions =
+  let playOf action = case action of
+        A.Play oid mName -> Just (oid, mName)
+        A.Pass -> Nothing
+        A.Cast {} -> Nothing
+        A.Activate _ _ -> Nothing
+   in Maybe.mapMaybe playOf actions
 
 -- Every permanent on the battlefield that is not one of alice's Mountains --
 -- one, in every case here, which is what each caller matches on. Found by name
@@ -209,3 +270,93 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
         Spec.assertEqWith s "before: the creature face" (faceReadings permId resolved) birgiReadings
         Spec.assertEqWith s "after: the artifact face" (faceReadings permId turned) harnfelReadings
       other -> Spec.assertFailure s ("expected one nonland permanent, got " <> show (length other))
+  -- CR 712.12: "A player playing a modal double-faced card or a copy of a modal
+  -- double-faced card as a land chooses one of its faces that's a land before
+  -- putting it onto the battlefield."
+  --
+  -- The OFFER half. Zof Consumption's front face is a sorcery, so CR 712.8a's
+  -- combined view of the card in hand is not a land at all -- which is exactly
+  -- the reading this falsifies: under it the card would be missing from the list
+  -- entirely.
+  --
+  -- The Mountain is in the hand so the assertion cannot pass vacuously. It fixes
+  -- what a land play looks like for a card with one face (no chosen face at all),
+  -- and it makes an empty list a failure rather than the expected answer -- the
+  -- shape a negative assertion here would have had.
+  Spec.it s "CR 712.12 the land face is offered as a land play" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    zof <- S.printingOf s registry "Zof Consumption"
+    let (oids, board) = handBoard [mountain, zof]
+    case oids of
+      [mountainId, zofId] ->
+        Spec.assertEqWith
+          s
+          "the Mountain plays as itself, the modal card as its land FACE"
+          -- SORTED, because the order a hand is walked in is not what this
+          -- asserts and CR 305.1 gives it no meaning.
+          (List.sort (landPlays (Action.legalActions S.alice board)))
+          [(mountainId, Nothing), (zofId, Just bloodbogName)]
+      other -> Spec.assertFailure s ("expected two hand cards, got " <> show (length other))
+  -- CR 712.12's second sentence -- "It enters the battlefield with that face up.
+  -- See rule 305, 'Lands.'" -- and CR 305.2a's tally, through the real priority
+  -- loop rather than a direct call to the funnel.
+  --
+  -- THE proving case for the play side. Three separate falsifiers fail it: a
+  -- play that never reached the battlefield leaves the hand full; a play that
+  -- dropped the chosen face puts a SORCERY named Zof Consumption onto the
+  -- battlefield (CR 712.8a's front face, which every reader would then answer
+  -- with); and a play the engine did not tally leaves CR 305.2's allowance
+  -- unspent.
+  --
+  -- The mana ability is asserted because it is the only thing the entering
+  -- permanent has that the front face does not: the sorcery face prints no
+  -- activated ability, and "{T}: Add {B}" is the whole of the land face's text
+  -- pawl can express.
+  Spec.it s "CR 712.12 playing the land face puts THAT face onto the battlefield" $ do
+    zof <- S.printingOf s registry "Zof Consumption"
+    let (_, board) = handBoardOne zof
+        after = S.runPure S.playLandAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "CR 305.2a's one land play is spent" (GameState.landsPlayed after) (Map.singleton S.alice 1)
+    Spec.assertEqWith s "and the hand is empty" (S.handSize S.alice after) 0
+    case Set.toList (GameState.battlefield after) of
+      [permId] -> do
+        Spec.assertEqWith s "the permanent is the LAND face" (faceReadings permId after) bloodbogReadings
+        Spec.assertEqWith
+          s
+          "which is the face it records (CR 712.12)"
+          (fmap Object.face (Game.lookupObject permId after))
+          (Just (Just bloodbogName))
+        Spec.assertEqWith s "and it has the land face's mana ability" (length (Projection.abilitiesOf permId after)) 1
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  -- CR 712.14b: "If a player is instructed to put a modal double-faced card onto
+  -- the battlefield and its front face isn't a permanent card, the card stays in
+  -- its current zone."
+  --
+  -- Zof Consumption's front face is a sorcery, so the instruction does nothing.
+  -- Birgi's is a creature, so the same instruction moves it -- which is what
+  -- keeps this from passing for the reason "nothing is ever put onto the
+  -- battlefield this way". The two run the SAME call against the same board
+  -- shape, so the layout's front face is the only thing they differ by.
+  --
+  -- The surviving object is looked up by its ORIGINAL id, which is the sharper
+  -- half of "stays in its current zone": CR 400.7 would have minted a new
+  -- incarnation, so an id that still resolves is a card that never moved.
+  Spec.it s "CR 712.14b a card whose front face is not a permanent stays in its zone" $ do
+    zof <- S.printingOf s registry "Zof Consumption"
+    birgi <- S.printingOf s registry "Birgi, God of Storytelling"
+    let moveTo zone printing =
+          let (oid, board) = handBoardOne printing
+           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid zone TapState.Untapped (Just S.alice))))
+        (zofId, zofAfter) = moveTo Zone.Battlefield zof
+        (_, birgiAfter) = moveTo Zone.Battlefield birgi
+        (buriedId, buried) = moveTo Zone.Graveyard zof
+    Spec.assertEqWith s "the sorcery-fronted card is the same object, still in hand" (fmap Object.zone (Game.lookupObject zofId zofAfter)) (Just Zone.Hand)
+    Spec.assertEqWith s "so nothing entered the battlefield" (Set.toList (GameState.battlefield zofAfter)) []
+    Spec.assertEqWith s "the creature-fronted card DOES enter" (length (Set.toList (GameState.battlefield birgiAfter))) 1
+    Spec.assertEqWith s "and leaves the hand behind it" (S.handSize S.alice birgiAfter) 0
+    -- CR 712.14b names ONE destination, so the very same card moved anywhere
+    -- else is untouched by it. Without this the battlefield conjunct could be
+    -- dropped and every assertion above would still hold, leaving a rule that
+    -- pinned a modal double-faced card in its zone forever.
+    Spec.assertEqWith s "and the same card moved to a GRAVEYARD is not refused" (fmap Object.zone (Game.lookupObject buriedId buried)) Nothing
+    Spec.assertEqWith s "it left the hand for it" (S.handSize S.alice buried) 0

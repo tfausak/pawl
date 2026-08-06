@@ -238,8 +238,72 @@ castableFaces card = case Card.layout card of
   -- CR 202.1b gives it no mana cost, which CR 118.6 makes an unpayable one, so
   -- Pawl.Engine.Cost.canPay drops it at the affordability gate the way it drops
   -- any other land (see Cost.costsFor's own note). CR 712.12's other half -- a
-  -- player PLAYING such a face as a land -- is not implemented (#891).
+  -- player PLAYING such a face as a land -- is landFaces below.
   Layout.ModalDoubleFaced -> NonEmpty.toList (Card.faces card)
+
+-- CR 305.1 / 712.12: the faces of this card a player may PLAY as a land, each
+-- paired with the name the play carries -- the castableFaces of the special
+-- action rather than of the cast, and the same shape for the same reason. A
+-- LIST of options and never a choice: CR 712.12 has the player choose "one of
+-- its faces that's a land", and offering each as its own legal action is how
+-- the engine avoids choosing for them.
+--
+-- The pairing is with a MAYBE name because the two halves of the answer are not
+-- the same kind of thing. A chosen face is named, which is what CR 712.12's
+-- "with that face up" needs written onto the permanent; the default view is not
+-- a chosen face at all, and for CR 709.4's split card it is not any single
+-- face's name either. See Pawl.Types.Action's Play.
+--
+-- FILTERED to lands here rather than by the caller, so CR 305.1's "land card"
+-- and CR 712.12's "faces that's a land" are asked once. What is NOT asked here
+-- is anything about the player or the board -- prohibitions and CR 305.2's
+-- allowance are Pawl.Engine.Action's, which is what keeps this a fact about a
+-- card.
+landFaces :: Card.Card -> [(Maybe CardName.CardName, Face.Face Card.Card)]
+landFaces card =
+  let -- CR 712.8a's default view, which every layout but the modal one plays as:
+      -- a card with one face plays as that face, and CR 709.4's split card has no
+      -- printing whose halves are lands, so nothing here can tell the combined
+      -- view from a chosen half.
+      byDefault = [(Nothing, combined card)]
+      named face = (Just (Face.name face), face)
+      offered = case Card.layout card of
+        Layout.Normal -> byDefault
+        Layout.Split -> byDefault
+        Layout.Adventure -> byDefault
+        -- CR 712.8a again, and CR 712.12 names the MODAL kind alone: a nonmodal
+        -- double-faced card in a hand is only its front face, so a back face that
+        -- is a land is not something its controller may elect to play. Westvale
+        -- Abbey // Ormendahl, Profane Prince is the shape that makes the arm say
+        -- something -- a land front over a creature back, played as the front
+        -- face like any other land.
+        Layout.Transforming -> byDefault
+        Layout.ModalDoubleFaced -> fmap named (NonEmpty.toList (Card.faces card))
+   in filter (isLand . snd) offered
+
+-- CR 712.14b: "If a player is instructed to put a modal double-faced card onto
+-- the battlefield and its front face isn't a permanent card, the card stays in
+-- its current zone." True when this card is one the instruction does nothing to.
+--
+-- A layout classification, like every other function here, and NOT a question
+-- about the effect doing the instructing: the rule turns on the card's front
+-- face alone. Pawl.Engine.Event.changeZoneEntering is the one door it gates,
+-- since that is the door an effect that puts an object onto the battlefield goes
+-- through. CR 712.12's land play deliberately does not: playing a land is a
+-- special action the player takes (CR 305.1), not an instruction to put a card
+-- onto the battlefield, and CR 712.12 permits it in as many words.
+--
+-- False for every other layout, and that is the rule rather than a gap. CR
+-- 712.14b names the modal double-faced card and nothing else; a nonmodal one is
+-- covered by CR 712.14's default (front face up) and by CR 712.14a's
+-- "transformed" wording, which pawl has no producer for (#70).
+staysWhenPutOntoBattlefield :: Card.Card -> Bool
+staysWhenPutOntoBattlefield card = case Card.layout card of
+  Layout.Normal -> False
+  Layout.Split -> False
+  Layout.Adventure -> False
+  Layout.Transforming -> False
+  Layout.ModalDoubleFaced -> not (isPermanent (NonEmpty.head (Card.faces card)))
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is
 -- up." WHICH face that leaves up, by NAME -- the form Object.face stores, and

@@ -46,7 +46,7 @@ castElsePlay actions =
         Action.Cast {} -> True
         _ -> False
       isPlay a = case a of
-        Action.Play _ -> True
+        Action.Play {} -> True
         _ -> False
    in case filter isCast actions of
         h : _ -> h
