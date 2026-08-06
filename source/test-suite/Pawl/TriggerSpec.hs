@@ -2675,8 +2675,9 @@ graveyardEffectZoneTriggerSpec s registry =
       settle answer gs = S.runPure answer gs Engine.settleForPriority
       namesIn zone pid gs =
         Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
-      -- Takes every "may". Squee's is the only one on either board, so this is
-      -- not a blanket yes standing in for a specific answer.
+      -- Takes every "may". Squee's is the only one `buriedBoard` can raise --
+      -- Bitterblossom's mode is mandatory -- so this is not a blanket yes
+      -- standing in for a specific answer.
       takeOptional :: Prompt.Prompt r -> r
       takeOptional p = case p of
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
