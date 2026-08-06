@@ -42,8 +42,11 @@ data ActivatedAbility card = MkActivatedAbility
     -- on the battlefield with the ability -- is the fold's job, which this only
     -- narrows.
     --
-    -- Not implemented: CR 702.178b's zone clause, which lets a max speed ability
-    -- function from whatever zones the ability it grants functions from (#767).
+    -- CR 702.178b's zone clause is why abilitiesGiven is not the only reader: "if
+    -- an ability granted by a max speed ability states which zones it functions
+    -- from, the max speed ability that grants that ability functions from those
+    -- zones". Pawl.Engine.Activate.graveyardAbilitiesOf asks the same gate of a
+    -- card in a GRAVEYARD, for an ability whose cost names that zone (CR 113.6m).
     condition :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

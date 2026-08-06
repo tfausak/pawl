@@ -1239,6 +1239,7 @@ costComponentFilters component = case component of
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
+  CostComponent.ExileThisFromGraveyard -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSpec too.

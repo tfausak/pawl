@@ -6,7 +6,9 @@ import qualified Pawl.Types.Filter as Filter
 -- | One component of a Pawl.Types.Cost's non-mana part, alongside its mana part
 -- (CR 601.2f).
 --
--- No component exiles a card from a zone (#108).
+-- No component exiles a CHOSEN card from a zone (#108). ExileThisFromGraveyard
+-- below names one card and prompts for nothing, so it is the "This" half of that
+-- axis rather than its general form -- exactly as DiscardThis is to DiscardCards.
 --
 -- Open-half card data. Pawl.Engine.Cost is the ONLY module that may case on it:
 -- the rules core reads the classification (can this be paid? does it require the
@@ -98,4 +100,24 @@ data CostComponent keyword
     -- which Pawl.Engine.Cost.canPayComponent answers by counting
     -- CounterKind.Loyalty on the source.
     RemoveLoyaltyFromThis Natural.Natural
+  | -- | CR 406.2 as a cost: exile the card the cost is on, from the graveyard it
+    -- is in. Loxodon Surveyor's "{3}, Exile this card from your graveyard: Draw a
+    -- card" is the printing. CR 601.2f's list of what a cost may include ends in
+    -- "and so on", so exiling is a cost by CR 118.1's general reading -- "an
+    -- action or payment necessary to take another action" -- and not by being
+    -- named.
+    --
+    -- DiscardThis's sibling in every respect -- it names ONE card and offers
+    -- nothing to choose, so it is not the prompting form #108 is about, and its
+    -- payability asks about a ZONE rather than about control, since CR 108.4
+    -- leaves a card in a graveyard with no controller to ask about.
+    --
+    -- The ZONE is in the constructor rather than a field, and that is what makes
+    -- CR 113.6m answerable off the cost alone: "an ability whose cost or effect
+    -- specifies that it moves the object it's on out of a particular zone
+    -- functions only in that zone" is the rule that puts the Surveyor's ability in
+    -- the graveyard, and Pawl.Engine.Cost.zoneFunctionedFrom reads it here. A
+    -- second zone would be a second constructor rather than a parameter, so no arm
+    -- of that reading is ever unreachable.
+    ExileThisFromGraveyard
   deriving (Eq, Ord, Show)
