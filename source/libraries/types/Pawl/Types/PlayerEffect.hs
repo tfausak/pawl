@@ -232,9 +232,14 @@ data PlayerEffect
     -- stored carrier (Pawl.Types.ActivePlayerEffect), whose expiry is the
     -- duration, exactly as Silence's is.
     --
-    -- WHOSE damage is the carrier's PlayerScope, as it is for every arm here,
-    -- and Spider-Punk's possessive-free sentence writes PlayerScope.EachPlayer.
-    -- Pawl.Engine.PlayerEffect.damageCantBePrevented reads it as "does this
-    -- apply to anybody", which is exact for that scope and for no other (#836).
+    -- WHOSE damage is not a question this arm's carrier answers, and it is the
+    -- one arm here of which that is true: CR 615.12's sentence is about a damage
+    -- EVENT, which may run between two creatures and involve no player at all,
+    -- so there is nobody for a PlayerScope to select. Spider-Punk's
+    -- possessive-free sentence accordingly writes PlayerScope.EachPlayer, and no
+    -- card may write another: Pawl.CardSpec lints the pool for a narrowed
+    -- carrier and rejects one, which is what makes
+    -- Pawl.Engine.PlayerEffect.damageCantBePrevented's board-wide reading exact
+    -- rather than approximate.
     DamageCantBePrevented
   deriving (Eq, Ord, Show)
