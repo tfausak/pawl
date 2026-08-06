@@ -981,6 +981,83 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     Spec.assertEqWith s "all three sources tapped" (S.tappedCount S.alice resolved) 3
     Spec.assertEqWith s "and nothing was left over" (poolSize S.alice resolved) 0
 
+-- CR 700.2's SELECTION on a mana ability. Synthetic Prismatic Wellspring
+-- (Land, "{T}: Choose two -- * Add {R}. * Add {G}. * Add {W}.") is the pool's
+-- first mana ability whose selection is not "choose exactly one", and it is
+-- what separates "which mode" from "which COMBINATION of modes" (#449). A
+-- choose-two ability read one mode at a time under-counts its supply by half,
+-- so a cost it can afford is refused.
+--
+-- SYNTHETIC, and legitimate on the rules: CR 700.2 makes an object modal by a
+-- bulleted list plus an instruction to choose a NUMBER of those options, CR
+-- 700.2a names activated abilities explicitly, CR 700.2d covers a selection of
+-- more than one mode, and CR 605.1a admits any activated ability that doesn't
+-- target, isn't a loyalty ability, and could add mana. Nothing there bounds a
+-- mana ability's selection to one. Every component is printed separately -- a
+-- modal activated ability (Bow of Nylea), "Choose two --" (Kozilek's Command),
+-- a mana-adding mode inside a modal ability (Jeska's Will) -- and only the
+-- composite is missing. A Scryfall search across paper, Arena, MTGO, playtest
+-- and un-set printings finds no modal mana ability at all: a bulleted mode
+-- beginning "Add" matches five cards, every one a spell or a non-mana triggered
+-- ability, and a "{T}: Choose one/two/three" activated ability matches nine,
+-- none of which adds mana.
+wellspringSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
+  -- THE case, and it is taken with the pool EMPTY and the ability unactivated,
+  -- which is what makes it about the supply model rather than about the pool:
+  -- CR 118.3 counts an untapped source as the mana it could make, and one
+  -- activation of this one makes TWO. Activating first and asking afterwards
+  -- would pass either way, since by then the mana is really in the pool.
+  --
+  -- {3} is the falsifier for a model that simply credited a modal source with
+  -- all of its modes: three modes, but the selection demands two.
+  Spec.it s "CR 118.3 a lone untapped Wellspring pays {2}, though it is not activated" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    let gs = S.landsInPlay wellspring 1
+    Spec.assertEqWith s "nothing is floating" (poolSize S.alice gs) 0
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
+    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
+
+  -- CR 700.2d: "If a player is allowed to choose more than one mode ... that
+  -- player normally can't choose the same mode more than once." So the
+  -- combinations are the size-two subsets and not the size-two sequences --
+  -- {R}{G} is on offer, {R}{R} never is. This is what a model enumerating
+  -- repetitions would fail, and it fails nothing else.
+  Spec.it s "CR 700.2d two DIFFERENT modes, so a Wellspring pays {R}{G} but not {R}{R}" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    let gs = S.landsInPlay wellspring 1
+        red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [red, green]) gs) "{R}{G} is affordable"
+    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
+
+  -- What one activation actually PUTS in the pool, which is the same
+  -- enumeration read through the other door: CR 106.12's tap-for-mana adds a
+  -- whole yield, and a chosen pair of modes is one yield of two mana (CR
+  -- 608.2c orders them by mode). S.identityAnswer takes the first candidate,
+  -- which is the first two modes.
+  Spec.it s "CR 605.3b tapping a Wellspring adds two mana, one per chosen mode" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    let (wellspringId, gs) = S.addCreature wellspring S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith
+      s
+      "{R} and {G}, from one activation"
+      (tappedFor S.identityAnswer wellspringId gs)
+      [ManaType.Colored Color.Red, ManaType.Colored Color.Green]
+
+  -- The gameplay-level proof (design.md section 4): a real spell cast end to
+  -- end off the one synthetic permanent. Liquimetal Coating is a plain {2}
+  -- Artifact -- no colour in the cost and nothing to target -- so quantity is
+  -- the only thing the payment can turn on.
+  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Wellspring" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
+    let resolved = castOffBoard S.identityAnswer [wellspring] liquimetalCoating
+    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
+    Spec.assertEqWith s "the Wellspring is tapped" (S.tappedCount S.alice resolved) 1
+    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
@@ -998,6 +1075,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   upwellingSpec s registry
   omnathSpec s registry
   snowSpec s registry
+  wellspringSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against
