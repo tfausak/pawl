@@ -574,16 +574,22 @@ payComponent pid oid component = case component of
 --    {W}{B} reduction takes one white and one black out of a Cleric's cost). CR
 --    118.7f puts a PHYREXIAN symbol on that typed side as well -- a reduction
 --    written {G/P} takes one green mana, and needs no announcement to do it --
---    which is where the two sides of the cancellation stop agreeing.
+--    which is where the two sides of the cancellation stop agreeing. CR 118.7g
+--    sends a SNOW symbol the other way: an {S} in a reduction is that much
+--    generic mana, even though an {S} in a cost is no part of the generic
+--    component at all (CR 107.4h). Both readings of both symbols depend on which
+--    SIDE the symbol is on, which is why each of the two questions this function
+--    asks is asked by two functions.
 -- 3. An EXCESS typed symbol -- one whose type the cost has already run out of --
 --    is DROPPED, not spilled onto the generic component. That is the card text
 --    CR 101.1 lets override the rules, not CR 118.7b-d: every PRINTED reducer
 --    that names a type reduces only coloured mana, and Edgewalker's reminder
 --    text settles what that means -- a {1}{W} Cleric spell costs {1}, so the
 --    stranded {B} leaves the {1} alone. CR 118.7b-d's spill has no printed
---    producer (#309). The pool's one reducer WITHOUT that sentence is the
---    synthetic that CR 118.7f needed, and no test aims it at a cost the spill
---    would reach.
+--    producer (#309). The pool's two reducers WITHOUT that sentence are the
+--    synthetics CR 118.7f and CR 118.7g needed; no test aims the first at a cost
+--    the spill would reach, and the second names no type for the spill to strand
+--    in the first place.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
 --
@@ -604,7 +610,7 @@ applyAdjustments :: ([Natural], [ManaCost.ManaCost]) -> ManaCost.ManaCost -> Man
 applyAdjustments adjustments cost =
   let (increases, reductions) = adjustments
       ManaCost.MkManaCost symbols = cost
-      genericOf symbol = case symbol of
+      costGenericOf symbol = case symbol of
         ManaSymbol.Generic n -> n
         ManaSymbol.OfType _ -> 0
         -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated
@@ -627,22 +633,51 @@ applyAdjustments adjustments cost =
         -- for CR 118.7a's reduction to come off either way.
         ManaSymbol.Phyrexian _ -> 0
         -- CR 107.4h says outright that generic reductions don't affect {S} costs,
-        -- which is the whole reason it is not spelled Generic 1.
-        --
-        -- Right for the COST and wrong for a REDUCTION, and unlike the Phyrexian
-        -- symbol below this function is NOT split to say so: CR 118.7g makes an
-        -- {S} in a reduction reduce the cost by that much generic mana, so this
-        -- arm owes 1 there and gives 0 (#516).
+        -- which is the whole reason it is not spelled Generic 1. The one arm
+        -- where this function and reducingGenericOf part company, and the
+        -- Adjustments case "CR 107.4h a generic reduction does not affect an {S}
+        -- in the cost" is what proves this side of it.
         ManaSymbol.Snow -> 0
         -- Unreachable: CR 601.2b precedes 601.2f, so Mana.substituteX has
         -- already replaced every Variable before a total cost is computed. The
         -- match must be total, so a bare {X} contributes 0 generic.
         ManaSymbol.Variable -> 0
+      -- The REDUCTION's generic amount, and two functions rather than one for
+      -- the reason costManaTypeOf and reducingManaTypeOf are two: CR 118.7g
+      -- makes the two sides read an {S} differently. Every other arm agrees with
+      -- costGenericOf's, and agreeing is not sharing -- which side a symbol is
+      -- on is not a property of the symbol.
+      reducingGenericOf symbol = case symbol of
+        -- CR 118.7a's amount of generic mana, which is what this whole side is.
+        ManaSymbol.Generic n -> n
+        -- CR 118.7b-d would turn a typed reduction the cost cannot use into
+        -- generic mana; pawl drops it instead, for the reason the header gives
+        -- (#309). Either way it is the typed side, not this one, that reads an
+        -- OfType.
+        ManaSymbol.OfType _ -> 0
+        -- CR 118.7e: choosing the generic half of a hybrid would make it a
+        -- generic reduction, and the choice belongs to the player paying the
+        -- cost. Not asked, so neither half applies (#783).
+        ManaSymbol.Hybrid _ _ -> 0
+        -- CR 118.7e's other half, unapplied for the same reason and by the same
+        -- issue: {2/R}'s {2} is exactly the generic half that rule names (#783).
+        ManaSymbol.MonocoloredHybrid _ -> 0
+        -- CR 118.7f gives a Phyrexian reduction to the typed side whole --
+        -- "one mana of that symbol's color" -- so it takes no generic mana.
+        ManaSymbol.Phyrexian _ -> 0
+        -- CR 118.7g: "If a cost is reduced by an amount of mana represented by
+        -- one or more snow mana symbols, the cost is reduced by that much
+        -- generic mana." THE arm this side exists for. CR 107.4h's sentence
+        -- about {S} costs is about the other side and does not reach here.
+        ManaSymbol.Snow -> 1
+        -- Unreachable for the reason costGenericOf's Variable arm gives; {X} is
+        -- no amount of mana until CR 601.2b names one.
+        ManaSymbol.Variable -> 0
       -- "Typed" for this function's purpose means "not generic": everything but
       -- Generic survives the filter and keeps its printed position, which is what
       -- "the SURVIVING printed typed symbols in their original order" above
       -- promises and the only way an unreducible symbol reaches Mana.spend
-      -- intact. Variable is unreachable for the reason genericOf's arm gives, and
+      -- intact. Variable is unreachable for the reason costGenericOf's arm gives, and
       -- is kept rather than stripped so that it would still survive if it were.
       isTyped symbol = case symbol of
         ManaSymbol.Generic _ -> False
@@ -660,12 +695,14 @@ applyAdjustments adjustments cost =
       -- Which side a symbol is on is not a property of the symbol, so nothing
       -- here can be shared: {G/P} names green when a reduction says it and names
       -- nothing yet when a cost does, and the group SyntheticPhyrexianDiscount
-      -- in Pawl.PlayerEffectSpec proves both halves against cards.
+      -- in Pawl.PlayerEffectSpec proves both halves against cards. The
+      -- costGenericOf/reducingGenericOf pair above splits the generic question
+      -- the same way, for CR 118.7g's sake.
       costManaTypeOf symbol = case symbol of
         ManaSymbol.Generic _ -> Nothing
         ManaSymbol.OfType manaType -> Just manaType
         -- CR 107.4e names TWO types, so no one type can be read off it. The same
-        -- elision genericOf's MonocoloredHybrid arm makes -- pawl announces no
+        -- elision costGenericOf's MonocoloredHybrid arm makes -- pawl announces no
         -- choice of half for a colour/colour hybrid (#729) -- and Edgewalker's
         -- ruling is what the elision costs.
         ManaSymbol.Hybrid _ _ -> Nothing
@@ -686,11 +723,12 @@ applyAdjustments adjustments cost =
         -- type. Exact rather than an elision too: a reduction of one white mana
         -- cannot single out an {S} the way it singles out a {W}.
         ManaSymbol.Snow -> Nothing
-        -- Unreachable for the reason genericOf's Variable arm gives; {X} names
+        -- Unreachable for the reason costGenericOf's Variable arm gives; {X} names
         -- no mana type.
         ManaSymbol.Variable -> Nothing
       reducingManaTypeOf symbol = case symbol of
-        -- CR 118.7a's half of a reduction, which genericOf above already counted.
+        -- CR 118.7a's half of a reduction, which reducingGenericOf above already
+        -- counted.
         ManaSymbol.Generic _ -> Nothing
         ManaSymbol.OfType manaType -> Just manaType
         -- CR 118.7e: the choice of half belongs to the PLAYER PAYING the cost,
@@ -698,8 +736,8 @@ applyAdjustments adjustments cost =
         -- neither half is applied (#783).
         ManaSymbol.Hybrid _ _ -> Nothing
         -- CR 118.7e's other half, and unapplied for the same reason: choosing
-        -- the {2} makes it a generic reduction, which genericOf would owe, and
-        -- choosing the colour makes it this one (#783).
+        -- the {2} makes it a generic reduction, which reducingGenericOf would
+        -- owe, and choosing the colour makes it this one (#783).
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- CR 118.7f: "If a cost is reduced by an amount of mana represented by a
         -- Phyrexian mana symbol, the cost is reduced by one mana of that symbol's
@@ -708,16 +746,15 @@ applyAdjustments adjustments cost =
         -- exactly one colour and the life half is no part of a reduction.
         ManaSymbol.Phyrexian color -> Just (ManaType.Colored color)
         -- CR 118.7g turns an {S} reduction into that much GENERIC mana, so it is
-        -- no part of the typed cancellation and Nothing is right here. What is
-        -- not implemented is the generic side: genericOf's Snow arm is where an
-        -- {S} reduction would land, and it answers 0 rather than 1 (#516).
+        -- no part of the typed cancellation: reducingGenericOf's Snow arm is
+        -- where such a reduction lands.
         ManaSymbol.Snow -> Nothing
-        -- Unreachable for the reason genericOf's Variable arm gives; {X} is no
+        -- Unreachable for the reason costGenericOf's Variable arm gives; {X} is no
         -- amount of mana until CR 601.2b names one.
         ManaSymbol.Variable -> Nothing
       reducingSymbols = concatMap (\(ManaCost.MkManaCost xs) -> xs) reductions
-      raised = sum (fmap genericOf symbols) + sum increases
-      taken = sum (fmap genericOf reducingSymbols)
+      raised = sum (fmap costGenericOf symbols) + sum increases
+      taken = sum (fmap reducingGenericOf reducingSymbols)
       -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
       -- 601.2f floor is also what keeps this total.
       lowered = if raised >= taken then raised - taken else 0
