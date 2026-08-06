@@ -643,7 +643,7 @@ Two different reasons. Worth separating, because the second list might get rever
 
 **Digital-only cards are in scope.** Arena and Alchemy printings are real cards; there is no reason not to support them, and the formats that exclude them do it through `legalities`, the same door as everything above. So a rule whose only producer is a digital-only card is reachable by a real printing, not a candidate for a synthetic one.
 
-**Prefer card sources in this order: regular, Arena, playtest, un-set, synthetic.** All five are acceptable — Mystery Booster playtest cards (Slivdrazi Monstrosity and friends) are ordinary gate cards — this ranks the candidates when more than one card could prove a rule rather than banning the tail. Synthetic stays the last resort, and if a better-ranked printing turns up for a rule a worse-ranked one already proves, swap it in. This is about which card proves a rule, not about which rules are worth doing: the leverage argument below picks *what* to implement and is untouched by it.
+**Prefer card sources in this order: regular, Arena, playtest, un-set, synthetic.** All five are acceptable; Mystery Booster playtest cards (Slivdrazi Monstrosity and friends) are ordinary gate cards. The order ranks candidates when more than one card could prove a rule, rather than banning the tail. Synthetic stays the last resort, and if a better-ranked printing turns up for a rule a worse-ranked one already proves, swap it in. This is about which card proves a rule, not about which rules are worth doing: the leverage argument below picks *what* to implement and is untouched by it.
 
 ### Silver border: canaries, not flexes
 
