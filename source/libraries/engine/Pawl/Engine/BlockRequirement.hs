@@ -71,20 +71,34 @@ instances able candidates attackers gs =
             -- hold together. The cut is unconditional.
             if (null setEffs || Projection.liveGiven setEffs Set.empty source gs)
               && not (removed source)
-              then concatMap (fromRequirement source) requirements
+              then
+                -- CR 612.1's word swap over the source's own text, computed HERE
+                -- rather than hoisted beside setEffs, the placement
+                -- CombatRestriction.restricted argues for: textChangesAffecting
+                -- folds the whole continuous-effect list, and the empty case above
+                -- already turned away every permanent that prints no requirement.
+                --
+                -- The SOURCE's changes and not the attacker's: CR 612.1 changes the
+                -- words printed on THAT object, and the attacker clause below is
+                -- printed on the card stating the requirement.
+                concatMap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements
               else []
       -- CR 613.11 puts these effects after every layer, so the affected set is
       -- read against the FULL projection -- the opposite of
       -- Projection.affects's callers inside the layer fold, which read
       -- characteristics as of their own layer.
-      named source requirement attacker =
+      named source clause attacker =
         Projection.affects
           source
           attacker
-          (BlockRequirement.attacker requirement)
+          clause
           (Projection.project attacker gs)
           gs
-      fromRequirement source requirement =
-        let pairsFor attacker = fmap (\blocker -> (blocker, attacker)) (filter (\blocker -> able blocker attacker) candidates)
-         in concatMap pairsFor (filter (named source requirement) attackers)
+      -- CR 612.1: a hacked "all creatures able to block Swamps do so" lures
+      -- blockers onto Islands.
+      fromRequirement source changes requirement =
+        let clause = BlockRequirement.attacker requirement
+            rewritten = if null changes then clause else Projection.rewriteAffected changes clause
+            pairsFor attacker = fmap (\blocker -> (blocker, attacker)) (filter (\blocker -> able blocker attacker) candidates)
+         in concatMap pairsFor (filter (named source rewritten) attackers)
    in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))

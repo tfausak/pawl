@@ -168,12 +168,15 @@ restricted select candidates gs =
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)
-      -- Not implemented: the AFFECTED set beside the gate is passed through
-      -- unrewritten, so a text change reaches only half of one printed sentence
-      -- (#584).
+      -- CR 612.1 again, on the other half of the same printed sentence: the
+      -- AFFECTED set is rewritten before it is asked, so a hacked "Swamps can't
+      -- attack" reads Islands. Same descent gatherStatic applies to a static
+      -- ability's affected clause, and the same `changes` the gate above uses --
+      -- both clauses are words printed on the SOURCE's card, so one text change
+      -- reaches both or neither.
       fromRestriction source changes restriction = case select restriction of
         Nothing -> []
         Just affected
           | lifted source changes restriction -> []
-          | otherwise -> filter (named source affected) candidates
+          | otherwise -> filter (named source (if null changes then affected else Projection.rewriteAffected changes affected)) candidates
    in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
