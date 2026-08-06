@@ -1,0 +1,40 @@
+{
+  "faces": [
+    {
+      "name": "Synthetic Volcanic Estuary",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "HasSubtype",
+              "value": {
+                "type": "Forest"
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "SetLandSubtype",
+              "value": {
+                "type": "Swamp"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Mountain"
+          }
+        ],
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

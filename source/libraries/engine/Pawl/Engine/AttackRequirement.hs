@@ -65,18 +65,31 @@ instances candidates gs =
             -- requirement that has started to apply is argued there.
             if (null setEffs || Projection.liveGiven setEffs Set.empty source gs)
               && not (removed source)
-              then concatMap (fromRequirement source) requirements
+              then
+                -- CR 612.1's word swap over the source's own text, computed HERE
+                -- rather than hoisted beside setEffs, the placement
+                -- CombatRestriction.restricted argues for: textChangesAffecting
+                -- folds the whole continuous-effect list, and the empty case above
+                -- already turned away every permanent that prints no requirement.
+                --
+                -- The SOURCE's changes and not the required creature's: CR 612.1
+                -- changes the words printed on THAT object, and the subject clause
+                -- below is printed on the card stating the requirement.
+                concatMap (fromRequirement source (Projection.textChangesAffecting source gs)) requirements
               else []
       -- CR 613.11 puts these effects after every layer, so the affected set is
       -- read against the FULL projection -- the opposite of
       -- Projection.affects's callers inside the layer fold, which read
       -- characteristics as of their own layer.
-      named source requirement creature =
+      named source subject creature =
         Projection.affects
           source
           creature
-          (AttackRequirement.subject requirement)
+          subject
           (Projection.project creature gs)
           gs
-      fromRequirement source requirement = filter (named source requirement) candidates
+      -- CR 612.1: a hacked "Swamps attack each combat if able" requires Islands.
+      fromRequirement source changes requirement =
+        let subject = AttackRequirement.subject requirement
+         in filter (named source (if null changes then subject else Projection.rewriteAffected changes subject)) candidates
    in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
