@@ -560,9 +560,10 @@ performStateBasedActions = do
   let undefendable = [oid | (oid, Nothing) <- redesignated]
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
-  -- rule's losers), CR 704.5k (the world rule's) and CR 704.5m (an Aura attached
-  -- to nothing). None of the five is a destruction, so none consults
-  -- indestructible or a regeneration shield.
+  -- rule's losers), CR 704.5k (the world rule's), CR 704.5m (an Aura attached to
+  -- nothing) and CR 704.5w/704.5x (a battle no player can protect). None of the
+  -- six is a destruction, so none consults indestructible or a regeneration
+  -- shield.
   --
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
   -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
@@ -656,7 +657,7 @@ performStateBasedActions = do
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

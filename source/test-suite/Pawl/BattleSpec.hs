@@ -186,6 +186,15 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     -- the only candidate either way.
     let checked = S.runPure (protectTo S.bob) entered Sba.checkStateBasedActions
     Spec.assertEqWith s "carol still protects it" (protectorOf oid checked) (Just S.carol)
+  Spec.it s "CR 704.5w the repair reports that an action was performed" $ do
+    (entered, _) <- castInvasionThreeSeated s registry (protectTo S.carol)
+    -- CR 704.3: the check repeats until no state-based action is performed, so a
+    -- pass that repaired a designation must SAY it acted. Read off
+    -- performStateBasedActions' own answer, which is the value that loop reads;
+    -- nothing else about the repair is visible to it.
+    let gone = Departure.depart Departure.Type.Conceded S.carol entered
+        (acted, _) = S.runPureWith S.identityAnswer gone Sba.performStateBasedActions
+    Spec.assertBool s acted "the pass reports the repair"
   Spec.it s "CR 704.5w an unrelated departure leaves the designation alone" $ do
     (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
     -- bob leaving touches nothing: carol is still a legal protector, so the
