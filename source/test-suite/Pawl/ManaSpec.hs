@@ -993,6 +993,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianSpec s registry
   totalCostSpec s registry
   dismemberSpec s registry
+  phyrexianTollSpec s registry
   moltensteelSpec s registry
   upwellingSpec s registry
   omnathSpec s registry
@@ -1499,9 +1500,12 @@ castAndResolve answer gs oid =
 
 -- alice at `n` life and nothing else on the board.
 aliceAt :: Integer -> GameState.GameState
-aliceAt n =
-  let gs = Setup.emptyGame S.bothPlayers
-   in gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.alice (GameState.players gs)}
+aliceAt n = atLife n (Setup.emptyGame S.bothPlayers)
+
+-- alice at `n` life on a board that already has permanents on it, which aliceAt
+-- cannot build.
+atLife :: Integer -> GameState.GameState -> GameState.GameState
+atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.alice (GameState.players gs)}
 
 -- CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid either
 -- with one mana of its color or by paying 2 life."
@@ -1762,7 +1766,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     growth <- S.printingOf s registry "Mutagenic Growth"
     elves <- S.printingOf s registry "Llanowar Elves"
     let (growthId, _, board) = phyrexianBoard forest piker growth elves
-        gs = board {GameState.players = Map.adjust (\p -> p {Player.life = 1}) S.alice (GameState.players board)}
+        gs = atLife 1 board
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs growthId
     Spec.assertBool s (not (wasAskedHowToPayPhyrexian asked)) "no choice existed, so none was asked"
     Spec.assertEqWith s "the Growth resolved" (length (GameState.stack resolved)) 0
@@ -1980,6 +1984,91 @@ pikerOn gs =
    in case filter isPiker (Set.toAscList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> ObjectId.MkObjectId 0
+
+-- Synthetic Phyrexian Toll ({G/P} Instant, "As an additional cost to cast this
+-- spell, pay 2 life. Target creature gets +2/+2 until end of turn.") -- Mutagenic
+-- Growth with CR 118.8's additional cost bolted on, and the card CR 118.3 was
+-- waiting for.
+--
+-- CR 107.4f's Phyrexian symbol is the only MANA symbol that spends life, so it is
+-- the only way one cost can demand life TWICE: once through the mana part and
+-- once through a component. CR 118.3 measures the demand whole -- "a player can't
+-- pay a cost without having the necessary resources to pay it fully" -- so the
+-- question this card asks, and no other card in the pool can, is whether pawl
+-- adds the two before comparing them to a life total.
+--
+-- SYNTHETIC, since no printing pairs them on one card, and legitimate because
+-- nothing in the CR keeps them apart: CR 118.8's additional cost and CR 107.4f's
+-- symbol are independent, and the Defiler cycle already puts a 2-life additional
+-- cost onto spells that may carry the symbol -- Defiler of Vigor onto Birthing
+-- Pod ({3}{G/P}, a green permanent spell by CR 202.2d). What keeps that pairing
+-- out of this spec is that the Defiler's cost is OPTIONAL (CR 118.8b, #102) and
+-- its reduction is conditional on having paid it (#101).
+--
+-- The board is phyrexianSpec's throughout -- a Goblin Piker to target, and the
+-- Toll in hand -- so the only thing that varies between these cases is alice's
+-- life total and whether a Forest is out.
+phyrexianTollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianTollSpec s registry = Spec.describe s "SyntheticPhyrexianToll" $ do
+  -- THE case. With no green source the symbol costs 2 life and the additional
+  -- cost costs 2 more, so CR 118.3's "fully" is 4 -- and 3 is not 4, however
+  -- comfortably it covers each half on its own.
+  --
+  -- 4 life is the control, and it is what makes this about the SUM rather than
+  -- about the board: one more life and the same card off the same empty
+  -- battlefield casts. It is also CR 119.4's boundary, where the payment takes
+  -- alice to exactly 0 -- legal, with CR 704.5a's loss a state-based action
+  -- afterwards rather than a bar on the payment.
+  Spec.it s "CR 118.3 a {G/P} beside an additional 2 life costs 4, so 3 life is not enough" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
+    let inHandAt n =
+          let (_, withPiker) = S.addCreature piker S.alice (aliceAt n)
+           in S.handOne toll withPiker
+        castableAt n = let (g, tollId) = inHandAt n in S.castable S.alice tollId g
+        castsAt n =
+          let (g, tollId) = inHandAt n
+           in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice tollId))))
+    Spec.assertBool s (not (castableAt 3)) "at 3 life it is not castable, though either half alone would be payable"
+    Spec.assertEqWith s "and it does not cast" (castsAt 3) 0
+    Spec.assertBool s (castableAt 4) "at 4 life it is"
+    Spec.assertEqWith s "and it does cast" (castsAt 4) 1
+
+  -- The same sum reaching CR 601.2b's announcement. A Forest opens the mana
+  -- route, so at 3 life the cast is legal -- but only that way, because the life
+  -- route would still want 2 on top of the component's 2. The interpreter asks
+  -- for the life route and must not be given it, exactly as the CR 119.4 floor
+  -- case in phyrexianSpec does with a bare {G/P} at 1 life.
+  Spec.it s "CR 601.2b at 3 life the additional cost closes the life route, and nothing is asked" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
+    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+        (gs, tollId) = S.handOne toll (atLife 3 withPiker)
+    Spec.assertBool s (S.castable S.alice tollId gs) "castable, by the mana route alone"
+    let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs tollId
+    Spec.assertEqWith s "no choice existed, so none was asked" (phyrexianAnnouncements asked) []
+    Spec.assertEqWith s "the Forest paid the symbol" (S.tappedCount S.alice resolved) 1
+    Spec.assertEqWith s "so only the additional cost's 2 life was paid" (S.lifeOf S.alice resolved) (Just 1)
+    Spec.assertEqWith s "the Toll resolved" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "and the Piker really was pumped" (Projection.powerOf (pikerOn resolved) resolved) (Just 4)
+
+  -- The control for the case above, and the guard against a floor that simply
+  -- refuses: two more life is enough for BOTH routes, so the choice comes back
+  -- and the engine asks. Answering life leaves the Forest untapped, which is the
+  -- discriminator -- a life total alone could be produced by paying life on TOP
+  -- of the mana.
+  Spec.it s "CR 118.13a at 5 life both routes are payable again, and the player is asked" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
+    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+        (gs, tollId) = S.handOne toll (atLife 5 withPiker)
+        (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs tollId
+    Spec.assertEqWith s "the engine asked rather than deciding" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysLife]
+    Spec.assertEqWith s "the Forest is untapped" (S.tappedCount S.alice resolved) 0
+    Spec.assertEqWith s "and 4 life paid the whole cost" (S.lifeOf S.alice resolved) (Just 1)
+    Spec.assertEqWith s "the Toll resolved" (length (GameState.stack resolved)) 0
 
 -- Moltensteel Dragon ({4}{R/P}{R/P}, with "{R/P}: This creature gets +1/+0 until
 -- end of turn") -- the first card in the pool with a Phyrexian mana symbol

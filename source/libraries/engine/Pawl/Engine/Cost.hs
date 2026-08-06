@@ -215,9 +215,16 @@ greatestPayableX payableAt cost =
 -- symbol and CR 119.4 governs paying life wherever it comes from. That makes the
 -- returned cost CR 601.2b's "nonhybrid equivalent cost" in full. Omitted entirely
 -- at zero, so a cost with no Phyrexian symbol comes back untouched. APPENDED
--- rather than merged into a PayLife the cost already carries, so #365 survives
--- unaltered: Cost.canPay measures each component separately, and two PayLife
--- components of one cost can together outrun a life total admitting each.
+-- rather than merged into a PayLife the cost already carries, which costs nothing
+-- now that both are measured against one life total: `lifeOwedBy` sums them, and
+-- CR 118.3 is asked of the sum.
+--
+-- That sum is also what goes IN, as the life this cost owes OUTSIDE its mana
+-- part. Without it CR 601.2b's offer is measured against a cost half as
+-- expensive as the one that will be paid, and a route the player cannot afford
+-- gets offered -- the same failure the `total` parameter below exists to prevent,
+-- one resource over. It is the components as they arrive that are summed, since
+-- the PayLife appended above is precisely the announcement being measured.
 --
 -- `total` is CR 601.2f's totalling, the CALLER's to supply because the two
 -- callers genuinely differ. Pawl.Engine.Cast passes `totalMana`, so a spell's
@@ -235,7 +242,7 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announce pid oid total_ manaCost
+    (announced, life) <- Mana.announce pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -312,16 +319,51 @@ discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid g
 --
 -- CR 118.6: an unpayable cost is never payable.
 --
--- The mana part and the components are measured SEPARATELY, so a resource both
--- could claim is counted twice. CR 107.4f's Phyrexian symbol is the first mana
--- symbol that spends life, so a cost holding one alongside a PayLife component
--- can read as payable when CR 118.3 says it is not (#365).
+-- LIFE is the one resource measured across the two halves rather than within
+-- each, and CR 107.4f's Phyrexian symbol is why it has to be: it is the only MANA
+-- symbol that spends life, so it is the only way one cost can demand life twice.
+-- Measured separately, a cost of {G/P} plus "pay 2 life" reads as payable at 3
+-- life, because 3 covers each 2 -- and CR 118.3's "fully" is about the whole cost,
+-- not about its parts. So the components' life is handed to the mana side as
+-- already committed, which is exactly what CR 119.4's floor is then asked of. It
+-- subsumes the per-component check the loop below still makes, and two PayLife
+-- components of one cost are added the same way.
+--
+-- Every OTHER resource is still counted twice over, and no card in the pool makes
+-- that observable: the mana part spends nothing but mana and life, so what would
+-- have to exist is a component that spends mana -- which is not one of them --
+-- or two components claiming one permanent, which is CR 118.10's own business
+-- (#104).
 canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
-    Mana.canPay pid manaCost gs
+    Mana.canPayCommitting pid (lifeOwedBy (Cost.components cost)) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
+
+-- CR 119.4's payments a cost owes OUTSIDE its mana part, added up -- what CR
+-- 118.3 makes the mana part's own life share a total with. A cost with no PayLife
+-- component owes 0, which is what leaves every such cost's answer exactly as it
+-- was.
+--
+-- The only component that spends life: this module is the one place that matches
+-- a CostComponent constructor, and the match is total so a new life-spending
+-- component cannot be added without answering here.
+lifeOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
+lifeOwedBy = sum . fmap lifeOwedByComponent
+
+lifeOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
+lifeOwedByComponent component = case component of
+  CostComponent.PayLife n -> n
+  CostComponent.TapThis -> 0
+  CostComponent.UntapThis -> 0
+  CostComponent.SacrificeThis -> 0
+  CostComponent.Sacrifice _ _ -> 0
+  CostComponent.DiscardCards _ -> 0
+  CostComponent.DiscardThis -> 0
+  CostComponent.PayEnergy _ -> 0
+  CostComponent.AddLoyaltyToThis _ -> 0
+  CostComponent.RemoveLoyaltyFromThis _ -> 0
 
 canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent pid oid component gs = case component of
@@ -341,6 +383,12 @@ canPayComponent pid oid component gs = case component of
   -- CR 119.4: payable only if the life total is at least the amount. Shared with
   -- CR 107.4f's Phyrexian mana symbol, which pays life for a MANA symbol and so
   -- reads the same floor from inside Pawl.Engine.Mana.
+  --
+  -- This component ALONE, which is not CR 118.3's question and is not what
+  -- decides it: canPay above hands `lifeOwedBy`'s sum to the mana side, where the
+  -- same floor is read of the whole cost's life at once. Kept because a component
+  -- is asked about on its own terms here, and it can only ever be the weaker of
+  -- the two.
   CostComponent.PayLife n -> Mana.canPayLife pid n gs
   -- CR 701.21a: this player must control at least `n` matching permanents.
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
