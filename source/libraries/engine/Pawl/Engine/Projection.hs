@@ -1209,12 +1209,13 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SpellOrAbilityCounters _ -> condition
   TriggerCondition.DamageToPlayerPrevented _ -> condition
 
--- CR 612.1 through Condition's predicate vocabulary, at the three clauses a
+-- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger
--- and its CR 603.4 intervening "if", plus a static ability's CR 604.2 "as long
--- as" clause (gatherStatic). A CR 611.2b duration is stored rather than printed,
--- so no text change reaches it here. Both sides are rewritten, both being full
--- Quantities.
+-- and its CR 603.4 intervening "if", a static ability's CR 604.2 "as long as"
+-- clause (gatherStatic), and CR 508.1c / CR 509.1b's "unless some condition is
+-- met" gate on a combat restriction (Pawl.Engine.CombatRestriction.restricted).
+-- A CR 611.2b duration is stored rather than printed, so no text change reaches
+-- it here. Both sides are rewritten, both being full Quantities.
 rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
 rewriteCondition pairs condition =
   condition

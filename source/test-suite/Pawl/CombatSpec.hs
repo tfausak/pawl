@@ -2012,7 +2012,7 @@ conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional Comba
 -- pool's first restriction whose CR 508.1c "unless" clause names a basic land
 -- type, so it is the first card a Magical Hack can aim at this read-point.
 --
--- Why this card and not one of the twenty "can't attack unless defending player
+-- Why this card and not one of the two dozen "can't attack unless defending player
 -- controls an Island" printings, which are the same sentence in a commoner shape:
 -- their condition is about the player being attacked, which a Condition cannot
 -- name (#620). Glacial Crasher asks the same question of the WHOLE battlefield,
