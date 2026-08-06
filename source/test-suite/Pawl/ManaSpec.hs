@@ -1221,7 +1221,9 @@ plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, Ma
 snowSymbolSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
   -- The rewrite itself, read off the pool: two symbols, two mana, colorless, and
-  -- untagged. Every one of those four is a separate way to get CR 106.11 wrong.
+  -- untagged. The first three are CR 106.11 and each is a separate way to get it
+  -- wrong; the fourth is CR 107.4h, and is here because the pool is the only
+  -- place a tag stamped by mistake would show.
   Spec.it s "CR 106.11 tapping it adds two colorless mana, neither of them snow" $ do
     snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
     let board = S.landsInPlay snowSymbol 1
@@ -1232,8 +1234,10 @@ snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
 
   -- CR 107.4h from the other side, and THE case this card exists for: the symbol
   -- that produced the mana says nothing about whether the mana is snow. The
-  -- control is a Snow-Covered Mountain, which differs only in CR 205.4g's
-  -- supertype and pays {S} with mana that was never written {S} at all.
+  -- control inverts both halves at once -- a Snow-Covered Mountain is a snow
+  -- source whose mana was never written {S}, and it is the one that pays. So the
+  -- negative here cannot be passing merely because the board is short of mana:
+  -- the same board casts a {2} spell (the Liquimetal Coating case below).
   Spec.it s "CR 107.4h {S}-produced mana from a nonsnow source does not pay {S}" $ do
     snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
     snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
