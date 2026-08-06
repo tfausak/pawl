@@ -343,14 +343,15 @@ turnFaceOver now gs oid objects
         Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
       _ -> objects
 
--- CR 712.8a: is this object showing the FRONT face of its card? The question CR
+-- CR 712.11: is this object showing the FRONT face of its card? The question CR
 -- 702.145c asks of a daybound permanent and CR 702.145f asks (inverted) of a
 -- nightbound one.
 --
--- Nothing in Object.face IS the front face, not an unknown one: resolveFace
--- above reads it as the layout's own view, which CR 712.8a makes the front face
--- alone for a double-faced card. Card.faces is a NonEmpty, so the head is total
--- and a card with no front face cannot arise.
+-- Nothing in Object.face IS the front face, not an unknown one: CR 712.11 casts a
+-- double-faced spell with its front face up by default, so a permanent nothing
+-- has singled a face out for is showing its front, and resolveFace above answers
+-- with the layout's own view for the same reason. Card.faces is a NonEmpty, so
+-- the head is total and a card with no front face cannot arise.
 --
 -- An object with no card behind it (CR 113.7a: an ability on the stack) answers
 -- True as well, which is the same answer as "nothing has turned it over" and is
