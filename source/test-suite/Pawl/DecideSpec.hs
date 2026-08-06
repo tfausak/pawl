@@ -10,7 +10,7 @@ import qualified Pawl.Types.GameState as GameState
 
 spec :: (Applicative m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Engine.Decide" $ do
-  Spec.it s "CR 722: with no control, a player decides for themselves" $ do
+  Spec.it s "CR 723.1: with no control, a player decides for themselves" $ do
     let gs = Setup.emptyGame S.bothPlayers
     Spec.assertEq s (Decide.deciderFor S.alice gs) $ Decider.MkDecider S.alice
 
