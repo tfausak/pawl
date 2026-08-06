@@ -1,8 +1,9 @@
 -- Covers CR 712.3's modal double-faced cards end to end: Pawl.Types.Layout's
--- ModalDoubleFaced arm and the four Pawl.Engine.Card functions that read it (CR
+-- ModalDoubleFaced arm and the five Pawl.Engine.Card functions that read it (CR
 -- 712.8a's combined view, CR 712.11b's castable faces, CR 712.13's entering
--- face, CR 712.8f's mana-value face), plus the carry-through in
--- Pawl.Engine.Stack that puts CR 712.13's face onto the permanent.
+-- face, CR 712.8f's mana-value face, CR 712.9's turned-over face), plus the
+-- carry-through in Pawl.Engine.Stack that puts CR 712.13's face onto the
+-- permanent.
 --
 -- Every case runs against the printed Birgi, God of Storytelling // Harnfel,
 -- Horn of Bounty: a {2}{R} 3/3 Legendary Creature -- God over a {4}{R} Legendary
@@ -41,9 +42,10 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Printing as Printing
 
--- The two names the card prints. CR 712.8a gives the card only its front face's
--- characteristics in a hand, so the second names a face rather than the card --
--- and CR 201.4d is what lets a player name it all the same.
+-- The two names the card prints, plus the basic land every case pays with. CR
+-- 712.8a gives the card only its front face's characteristics in a hand, so
+-- harnfelName names a face rather than the card -- and CR 201.4d is what lets a
+-- player name it all the same.
 birgiName, harnfelName, mountainName :: CardName.CardName
 birgiName = CardName.MkCardName (Text.pack "Birgi, God of Storytelling")
 harnfelName = CardName.MkCardName (Text.pack "Harnfel, Horn of Bounty")
@@ -66,9 +68,10 @@ birgiReadings, harnfelReadings :: (CardName.CardName, Set.Set CardType.CardType,
 birgiReadings = (birgiName, Set.singleton CardType.Creature, Just (3, 3))
 harnfelReadings = (harnfelName, Set.singleton CardType.Artifact, Nothing)
 
--- The one permanent alice controls that is not one of her Mountains. The cast
--- spell arrives on the battlefield as a NEW object (CR 400.7), so a case that
--- resolved one cannot follow the id it started with.
+-- Every permanent on the battlefield that is not one of alice's Mountains --
+-- one, in every case here, which is what each caller matches on. Found by name
+-- rather than followed by id: the cast spell arrives on the battlefield as a NEW
+-- object (CR 400.7), so the id a case started with is gone by then.
 nonLand :: GameState.GameState -> [ObjectId.ObjectId]
 nonLand gs = [o | o <- Set.toList (GameState.battlefield gs), Projection.nameOf o gs /= mountainName]
 
