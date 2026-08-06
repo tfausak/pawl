@@ -9,9 +9,10 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The seven gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. An eighth,
--- Synthetic Phyrexian Discount, is the file's one SYNTHETIC card and exists
--- only because CR 118.7f's reduction has no printing. Humility,
+-- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Two more,
+-- Synthetic Phyrexian Discount and Synthetic Snow Discount, are the file's
+-- SYNTHETIC cards: neither CR 118.7f's reduction nor CR 118.7g's has a
+-- printing. Humility,
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
 --
@@ -376,6 +377,31 @@ adjustmentSpec s =
         "{G/P} reduced by {G} is still {G/P}"
         (Cost.applyAdjustments ([], [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
         (ManaCost.MkManaCost [phyrexianGreen])
+
+    -- CR 118.7g, in the small, and the other arm where the two sides part
+    -- company. A reduction written {S} is an amount of GENERIC mana, so it
+    -- comes off the generic component exactly as a {1} would.
+    Spec.it s "CR 118.7g an {S} reduction takes that much generic mana" $
+      Spec.assertEqWith
+        s
+        "{2}{U} reduced by {S} is {1}{U}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [ManaSymbol.Snow]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
+
+    -- CR 107.4h's half of the same split: "Effects that reduce the amount of
+    -- generic mana you pay don't affect {S} costs." So an {S} in a COST is no
+    -- part of the generic component a reduction comes off -- were it counted
+    -- there, the {1} below would survive the reduction and re-emit as generic.
+    -- {1}{S} is Adarkar Windform's activation cost, not a printed mana cost:
+    -- Magic's three {S} mana costs are Arcum's Astrolabe's {S}, Icehide Golem's
+    -- {S} and Wowzer, the Aspirational's {C}{W}{U}{B}{R}{G}{S}, and none of them
+    -- carries the generic component that makes the two readings differ.
+    Spec.it s "CR 107.4h a generic reduction does not affect an {S} in the cost" $
+      Spec.assertEqWith
+        s
+        "{1}{S} reduced by {1} is {S}"
+        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.Snow]))
+        (ManaCost.MkManaCost [ManaSymbol.Snow])
 
     -- The two halves of ONE reduction, on the two halves of one cost: CR
     -- 118.7a routes the {1} to the generic component and the {U} takes the
@@ -1063,6 +1089,116 @@ phyrexianDiscountSpec s registry =
       cub <- S.printingOf s registry "Longtusk Cub"
       growth <- S.printingOf s registry "Mutagenic Growth"
       let (cubId, _, gs) = phyrexianDiscountBoard forest discount cub growth 1 2
+          paid = S.runPure S.identityAnswer gs (S.cast S.alice cubId)
+      Spec.assertEqWith s "one Forest tapped, not two" (S.tappedCount S.alice paid) 1
+
+-- alice controls `copies` Synthetic Snow Discounts and `n` untapped Forests; her
+-- hand holds one Longtusk Cub ({1}{G} green Cat) and one Goblin Piker ({1}{R}
+-- red Goblin). Loaded fresh inside each case that needs it -- equivalent because
+-- loading is deterministic and cached (batch-recipe.md).
+snowDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+snowDiscountBoard forest discount cub piker copies n =
+  let base = S.landsInPlay forest n
+      put g _ = snd (S.addCreature discount S.alice g)
+      withCopies = List.foldl' put base [1 .. copies]
+      (cubId, gs1) = S.addHandCard cub S.alice withCopies
+      (pikerId, gs2) = S.addHandCard piker S.alice gs1
+   in ( cubId,
+        pikerId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Synthetic Snow Discount {2} Artifact: "Green spells you cast cost {S} less to
+-- cast."
+--
+-- SYNTHETIC, and the file's second. CR 118.7g exists to say what a reduction
+-- written with snow mana symbols does, so nothing in the rules forbids the
+-- printing -- the pool merely lacks one. All 46 cards whose oracle text carries
+-- an {S} (Scryfall, 2026-08-05, digital-only printings included) spend it in a
+-- cost or measure how much of it was spent, never as the amount of a reduction,
+-- and no card's text contains "{S} less".
+--
+-- The criterion is green, and which criterion it is does not matter to CR
+-- 118.7g: what the rule turns the {S} into is GENERIC mana, which is no more
+-- particular about the spell than about the cost. What DOES matter is the spell
+-- the reduction is aimed at, and green puts Longtusk Cub's {1}{G} in hand -- a
+-- cost with a generic component, where 0-vs-1 is directly visible. Aim the same
+-- reduction at a cost without one and both readings agree, which is the trap
+-- this group's cases are shaped to avoid.
+snowDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+snowDiscountSpec s registry =
+  Spec.describe s "SyntheticSnowDiscount" $ do
+    -- THE HEADLINE FALSIFIER. CR 118.7g reduces the cost by one GENERIC mana,
+    -- so {1}{G} loses its {1} and keeps its {G}. Reading the {S} as nothing at
+    -- all -- what the arm did before -- leaves {1}{G} untouched, and reading it
+    -- as a typed symbol would have to name a type CR 107.4h says it has not
+    -- got.
+    Spec.it s "CR 118.7g a reduction written {S} takes one generic mana off the cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (cubId, _, gs) = snowDiscountBoard forest discount cub piker 1 2
+      Spec.assertEqWith
+        s
+        "{1}{G} becomes {G}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [green]))
+
+    -- The control the case above needs: without the artifact the same spell is
+    -- full price, so the {1} really did leave because of the reduction.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (cubId, _, gs) = snowDiscountBoard forest discount cub piker 0 2
+      Spec.assertEqWith
+        s
+        "{1}{G} stays {1}{G}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+
+    -- The colour criterion, and unlike the Phyrexian group's it DISCRIMINATES:
+    -- a generic reduction does not care what the cost prints, so {1}{R} would
+    -- lose its {1} just as {1}{G} does if the Filter let the reduction reach
+    -- it. Flipping this card's HasColor Green to Red breaks this case and the
+    -- headline both.
+    Spec.it s "a red spell fails the effect's criterion, so its generic component survives" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (_, pikerId, gs) = snowDiscountBoard forest discount cub piker 1 2
+      Spec.assertEqWith
+        s
+        "{1}{R} stays {1}{R}"
+        (totalManaCost S.alice pikerId (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+
+    -- BOTH cost sites, one scenario, exactly as the Edgewalker and Phyrexian
+    -- groups test them. One Forest is the amount that tells {G} apart from
+    -- {1}{G}.
+    Spec.it s "CR 601.2f castability is measured against the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (discounted, _, withDiscount) = snowDiscountBoard forest discount cub piker 1 1
+          (undiscounted, _, bare) = snowDiscountBoard forest discount cub piker 0 1
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "one Forest cannot pay a printed {1}{G}"
+      Spec.assertBool s (S.castable S.alice discounted withDiscount) "but it can pay the discounted {G}"
+
+    Spec.it s "CR 601.2f payment spends the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (cubId, _, gs) = snowDiscountBoard forest discount cub piker 1 2
           paid = S.runPure S.identityAnswer gs (S.cast S.alice cubId)
       Spec.assertEqWith s "one Forest tapped, not two" (S.tappedCount S.alice paid) 1
 
@@ -2334,6 +2470,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   titaniasSongSpec s registry
   edgewalkerSpec s registry
   phyrexianDiscountSpec s registry
+  snowDiscountSpec s registry
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   storedSpec s registry
