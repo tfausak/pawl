@@ -688,9 +688,11 @@ definesColorless = Set.member Keyword.Devoid
 -- empties it), and layer 6 has not applied yet. So the rule holds by construction.
 -- Humility cannot remove it either, LoseAllAbilities being layer 6.
 --
--- Not implemented: a devoid granted by a layer-6 effect does nothing to colour.
--- Per CR 604.3a(2) such a grant is an ordinary layer-5 colour effect timestamped
--- when granted (CR 613.7a), which this does not build (#675).
+-- A devoid GRANTED by another object's static ability deliberately never reaches
+-- here: CR 604.3a denies it CDA status, so grantedDevoidParts routes it into layer
+-- 5 as a timestamped colour effect instead. Pawl.ColorSpec's "CR 613.7a a granted
+-- devoid clears an OLDER 'in addition' colour" is what holds the two routes apart:
+-- widening this fold to reach a granted instance answers that case blue.
 applyColorDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applyColorDefining pc =
   if definesColorless (Map.keysSet (PC.keywords pc))
@@ -1482,6 +1484,41 @@ abilitiesRemoved cands gs oid =
          in any (\c -> affects (gSource c) oid (gAffected c) partial gs) cs
    in any removesAt (Map.toList byLowest)
 
+-- CR 702.114a: devoid is the static ability "This object is colorless". PRINTED,
+-- it is a characteristic-defining ability and applyColorDefining folds it at the
+-- start of layer 5 (CR 613.3). GRANTED by another object's static ability, it is
+-- not one: CR 604.3a's clause (2) limits CDA status to an ability printed on the
+-- card it affects, granted to a token by the effect that created the token, or
+-- acquired by a copy or text-changing effect, and clauses (3) and (4) exclude an
+-- ability that directly affects other objects and one an object grants to itself.
+-- So the granted instance's colourless is an ORDINARY colour-changing effect,
+-- applied in layer 5 (CR 613.1e) in timestamp order -- and "this object is
+-- colorless" is exactly SetColor with no colours (CR 105.3).
+--
+-- Emitted as a second PART of the granting ability rather than as an effect of its
+-- own, which is what CR 613.6 and CR 613.7a ask for: one ability, so one affected
+-- set decided once, and one timestamp -- the granting permanent's. An effect of its
+-- own would have neither, since there is no second ability to hang them on.
+--
+-- The colour half is not the last word on the object's colour. It applies in
+-- timestamp order like any other layer-5 effect, so a NEWER colour-changing effect
+-- lands on top of it and the object ends up with the devoid keyword and a colour.
+-- That is CR 613.7, not a leak.
+--
+-- Casing on a KEYWORD, which rule 702 makes part of the rulebook -- the same act
+-- as reading Keyword.StartYourEngines off a projection. It is not a case on an
+-- effect's identity: the caller still routes by `layer`, and the modification this
+-- produces is the one Moonlace already stores.
+--
+-- Only a static ability's grant is expanded. A devoid granted by the resolution of
+-- a spell or ability is not (#793). counterGathered's grants need no arm at all:
+-- CR 122.1b enumerates the keywords a keyword counter can be and devoid is not
+-- among them, so no board can put one there.
+grantedDevoidParts :: Modification -> NonEmpty.NonEmpty Modification
+grantedDevoidParts m = case m of
+  Modification.GainKeyword Keyword.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]
+  _ -> m NonEmpty.:| []
+
 -- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the ability's
 -- index on its source, and (src, n) is the key every part of a MULTI-part ability
 -- carries, so projectWith can tell that a layer-4 part and a layer-7b part are one
@@ -1509,7 +1546,10 @@ abilitiesRemoved cands gs oid =
 -- the effect start to apply at all.
 gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic functioning src ts changes stripped n sa =
-  let ms = fmap (rewriteModification changes) (StaticAbility.modifications sa)
+  let -- CR 612 rewrites each printed modification, and grantedDevoidParts then
+      -- expands what the rewrite produced -- in that order, since the expansion
+      -- emits an engine-minted part that is not card text for CR 612 to reach.
+      ms = StaticAbility.modifications sa >>= grantedDevoidParts . rewriteModification changes
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
