@@ -1510,8 +1510,10 @@ abilitiesRemoved cands gs oid =
 -- effect's identity: the caller still routes by `layer`, and the modification this
 -- produces is the one Moonlace already stores.
 --
--- Only a static ability's grant is expanded. A devoid granted by a resolved spell
--- or ability, or by a keyword counter (CR 122.1b), is not (#793).
+-- Only a static ability's grant is expanded. A devoid granted by the resolution of
+-- a spell or ability is not (#793). counterGathered's grants need no arm at all:
+-- CR 122.1b enumerates the keywords a keyword counter can be and devoid is not
+-- among them, so no board can put one there.
 grantedDevoidParts :: Modification -> NonEmpty.NonEmpty Modification
 grantedDevoidParts m = case m of
   Modification.GainKeyword Keyword.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]
