@@ -134,6 +134,8 @@ library codec
     Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.Daytime
     Pawl.Codec.DaytimeSpec
+    Pawl.Codec.Defense
+    Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DelayedTriggerSpec
     Pawl.Codec.DestructionRewrite
@@ -319,6 +321,7 @@ library engine
     Pawl.Engine.Activate
     Pawl.Engine.AttackCost
     Pawl.Engine.AttackRequirement
+    Pawl.Engine.Battle
     Pawl.Engine.Binding
     Pawl.Engine.BlockRequirement
     Pawl.Engine.Card
@@ -536,6 +539,7 @@ library types
     Pawl.Types.Decider
     Pawl.Types.DecisionLog
     Pawl.Types.Deck
+    Pawl.Types.Defense
     Pawl.Types.DelayedTrigger
     Pawl.Types.Departure
     Pawl.Types.DestructionRewrite
@@ -687,6 +691,7 @@ test-suite pawl-test-suite
     Pawl.ActivateSpec
     Pawl.AdventureSpec
     Pawl.AuraSpec
+    Pawl.BattleSpec
     Pawl.BindingSpec
     Pawl.Cards
     Pawl.CardSpec

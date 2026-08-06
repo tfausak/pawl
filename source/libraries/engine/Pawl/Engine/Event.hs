@@ -29,6 +29,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
@@ -252,7 +253,8 @@ createEmblem pid card =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in placeObject pid mkObj Zone.Command
 
@@ -925,7 +927,51 @@ apply batch candidate event =
 -- board each collects from. That a contained event keeps its own footing is this
 -- engine's reading, resting on CR 614.12; no rule states it outright.
 runEntry :: Set ObjectId -> ObjectId -> Game ()
-runEntry batch oid = Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
+runEntry batch oid = do
+  Monad.void (applyReplacementsIn Nothing batch (ProposedEvent.WouldEnter oid))
+  designateProtector oid
+
+-- CR 310.8a: "as a battle enters the battlefield, its controller chooses a player
+-- to be its protector." Run for every entering object, and a no-op for all but a
+-- battle.
+--
+-- NOT a replacement effect, and the contrast with the defense counters it enters
+-- beside is the rules' own. CR 310.4b says outright that a battle "has the
+-- intrinsic ability 'This permanent enters with a number of defense counters on it
+-- equal to its printed defense number'" and that "this ability creates a
+-- replacement effect (see rule 614.1c)"; CR 310.8a says none of that. It names no
+-- ability, cites no rule 614, and reads as a bare instruction about entering. So
+-- the counters go through the CR 616.1 loop above and this does not.
+--
+-- Modelling it as an EntryRewrite anyway was the first cut here, and the rules
+-- were right: two intrinsic rows on one entering battle both land in
+-- ReplacementBucket.Other, and CR 616.1e then has the controller ORDER them --
+-- a prompt on every battle entry whose two answers reach the same board, which is
+-- the engine inventing a decision the rules never offer.
+--
+-- After the loop rather than before it, which is the whole difference between the
+-- two positions and is unobservable: nothing between them can see the object (see
+-- runEntry's own note -- no Moved event yet, so no trigger scan and no
+-- state-based action), and no replacement effect reads a protector. Doing it
+-- second also means CR 614.12's "characteristics as it would exist on the
+-- battlefield" have already settled, so a permanent that entered AS a copy of a
+-- Siege (CR 707.5) designates by the copy's battle types rather than the card's.
+designateProtector :: ObjectId -> Game ()
+designateProtector oid = do
+  gs <- State.get
+  let pc = Projection.project oid gs
+  Monad.when (Battle.isBattle pc) $ case Projection.controllerOf oid gs of
+    -- Unreachable, and defensive for the entry rewrites' reason: the object is
+    -- materialized on the battlefield before this runs, so controllerOf falls
+    -- back to its owner. Designates NOBODY rather than conjuring a player -- CR
+    -- 310.10 is exactly the rule for a battle with no protector, and repairs this
+    -- at the next state-based action check.
+    Nothing -> pure ()
+    Just controller -> do
+      picked <- Battle.designateProtector pc controller oid
+      State.modify' $ \g ->
+        let stamp o = o {Object.protector = picked}
+         in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
 
 -- CR 615: settle one proposed damage event. Nothing means it does not happen;
 -- the second answer is CR 615.13's, one entry per prevention effect that applied
@@ -1591,7 +1637,8 @@ createTokens controller card n tapped = do
                     Object.face = Nothing,
                     Object.turnedOverAt = Nothing,
                     Object.playableFromExileBy = Nothing,
-                    Object.ringBearerFor = Nothing
+                    Object.ringBearerFor = Nothing,
+                    Object.protector = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (runEntry (Set.fromList ids)) ids

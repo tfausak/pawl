@@ -3,6 +3,7 @@ import qualified Data.List as List
 import qualified Pawl.ActivateSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AuraSpec
+import qualified Pawl.BattleSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
@@ -40,6 +41,7 @@ import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DaytimeSpec
+import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
@@ -222,6 +224,7 @@ spec s registry = do
   Pawl.ActivateSpec.spec s registry
   Pawl.AdventureSpec.spec s registry
   Pawl.AuraSpec.spec s registry
+  Pawl.BattleSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardSpec.spec s registry
   Pawl.CardsSpec.spec s
@@ -259,6 +262,7 @@ spec s registry = do
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DaytimeSpec.spec s
+  Pawl.Codec.DefenseSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
