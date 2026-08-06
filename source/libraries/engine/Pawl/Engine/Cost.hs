@@ -11,8 +11,9 @@
 --
 -- The SOLE casing home for Pawl.Types.CostComponent. Pawl.Engine.Cast,
 -- Pawl.Engine.Activate and Pawl.Engine.Resolve learn nothing about which
--- components exist: they ask "can this be paid" and "pay it", and read one
--- classification (requiresSicknessCheck) for CR 302.6.
+-- components exist: they ask "can this be paid" and "pay it", and read the
+-- classifications this module derives -- requiresSicknessCheck for CR 302.6,
+-- isLoyaltyCost for CR 606.2/606.3, and zoneFunctionedFrom for CR 113.6m.
 module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
@@ -292,6 +293,47 @@ isLoyaltyComponent component = case component of
   CostComponent.DiscardCards _ -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
+  CostComponent.ExileThisFromGraveyard -> False
+
+-- CR 113.6m: "an ability whose cost or effect specifies that it moves the object
+-- it's on out of a particular zone functions only in that zone". The
+-- CLASSIFICATION Pawl.Engine.Activate reads to decide WHERE an ability may be
+-- activated from, the requiresSicknessCheck shape -- so that module still learns
+-- nothing about which components exist.
+--
+-- Nothing means the cost names no zone, which leaves CR 113.6's own default in
+-- place: the ability functions on the battlefield. That is the answer for
+-- SacrificeThis too, and deliberately -- CR 701.21a moves the object off the
+-- battlefield, which is where CR 113.6 already had it, so naming it here would
+-- change no reader's answer while claiming a rule this cost does not need.
+--
+-- Not implemented: CR 113.6m's "or effect" half, which names a zone the same way
+-- when it is the ability's EFFECT that moves the object out of one (#811).
+--
+-- One zone and never a set: every component that names a zone names exactly one,
+-- and CR 113.6m is about "a particular zone". Two components naming DIFFERENT
+-- zones would make the ability unpayable in either, so the FIRST one found is the
+-- answer and a disagreement is a card-data error rather than a rules question.
+zoneFunctionedFrom :: Cost Keyword.Type.Keyword -> Maybe Zone.Zone
+zoneFunctionedFrom cost = Maybe.listToMaybe (Maybe.mapMaybe zoneOfComponent (Cost.components cost))
+
+zoneOfComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Zone.Zone
+zoneOfComponent component = case component of
+  -- CR 702.29a's "Discard this card": the hand, which is where cycling functions.
+  -- Not read by anything today -- Pawl.Engine.Keyword.handAbilitiesOf mints the
+  -- cycling ability into the hand from rule 702.29a directly, which is the same
+  -- answer by a shorter route -- and written because CR 113.6m says it.
+  CostComponent.DiscardThis -> Just Zone.Hand
+  CostComponent.ExileThisFromGraveyard -> Just Zone.Graveyard
+  CostComponent.TapThis -> Nothing
+  CostComponent.UntapThis -> Nothing
+  CostComponent.SacrificeThis -> Nothing
+  CostComponent.PayLife _ -> Nothing
+  CostComponent.Sacrifice _ _ -> Nothing
+  CostComponent.DiscardCards _ -> Nothing
+  CostComponent.PayEnergy _ -> Nothing
+  CostComponent.AddLoyaltyToThis _ -> Nothing
+  CostComponent.RemoveLoyaltyFromThis _ -> Nothing
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i then reads as loyalty 0 -- so
@@ -370,6 +412,7 @@ lifeOwedByComponent component = case component of
   CostComponent.PayEnergy _ -> 0
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
+  CostComponent.ExileThisFromGraveyard -> 0
 
 canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent pid oid component gs = case component of
@@ -422,6 +465,18 @@ canPayComponent pid oid component gs = case component of
   CostComponent.DiscardThis -> case Game.lookupObject oid gs of
     Nothing -> False
     Just obj -> Object.zone obj == Zone.Hand && Object.owner obj == pid
+  -- CR 406.2: payable only while the card is in the paying player's graveyard.
+  -- DiscardThis's shape verbatim, and for its reason: CR 108.4 gives a card in a
+  -- graveyard no controller, and CR 400.3 puts it in its OWNER's graveyard, so the
+  -- pair of facts to ask about is the zone and the owner.
+  --
+  -- This is the whole of CR 113.6m's enforcement for the COST: an ability whose
+  -- cost names the graveyard is unpayable anywhere else, so the zone gate
+  -- Pawl.Engine.Activate applies to the OFFER cannot be the only thing standing
+  -- between a Loxodon Surveyor on the battlefield and a free draw.
+  CostComponent.ExileThisFromGraveyard -> case Game.lookupObject oid gs of
+    Nothing -> False
+    Just obj -> Object.zone obj == Zone.Graveyard && Object.owner obj == pid
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters. GainPlayerCounters (#37) adds them; this spends them.
   CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
@@ -615,6 +670,17 @@ payComponent pid oid component = case component of
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
   CostComponent.RemoveLoyaltyFromThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (removeLoyalty n) oid (GameState.objects gs)})
+    pure Payment.Paid
+  -- CR 406.2's move, through Event.changeZone -- the shared zone-change funnel, so
+  -- the card gets a CR 400.7 incarnation and anything watching a graveyard-to-exile
+  -- move sees it. No prompt: the cost names this card, exactly as DiscardThis does.
+  --
+  -- The card is in EXILE by the time the ability resolves, which is what makes CR
+  -- 113.7a's "once activated, an ability exists on the stack independently of its
+  -- source" load-bearing here: Loxodon Surveyor's draw resolves off a source that
+  -- has already left the graveyard the cost read.
+  CostComponent.ExileThisFromGraveyard -> do
+    Event.changeZone oid Zone.Exile
     pure Payment.Paid
 
 -- The arithmetic half, pure and board-free.

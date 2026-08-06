@@ -77,9 +77,11 @@ legalActions pid gs =
       spells = fmap (uncurry Action.Cast) (Cast.castableSpells pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
-      -- hand. Which abilities an
-      -- object offers from where is Activate.abilitiesFor's question; this list
-      -- only says where to look, and the two zones are disjoint.
+      -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
+      -- this card from your graveyard: Draw a card" functions only there. Which
+      -- abilities an object offers from where is Activate.abilitiesFor's
+      -- question; this list only says where to look, and the three zones are
+      -- pairwise disjoint.
       --
       -- ONE control-grant walk and ONE whole-board projection for the whole
       -- enumeration, threaded into both halves of the loop. Each object would
@@ -96,5 +98,5 @@ legalActions pid gs =
             pcs = Projection.projectAll gs
             forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
-         in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs)
+         in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
    in Action.Pass : lands <> spells <> activations
