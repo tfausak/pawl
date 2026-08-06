@@ -1075,6 +1075,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   upwellingSpec s registry
   omnathSpec s registry
   snowSpec s registry
+  snowSymbolSpec s registry
   wellspringSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
@@ -1195,6 +1196,84 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     icehideGolem <- S.printingOf s registry "Icehide Golem"
     let (oid, gs) = S.addCreature icehideGolem S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "colorless" (Projection.colorsOf oid gs) Set.empty
+
+-- One colorless mana carrying no production tag: what CR 106.11 turns an "add
+-- {S}" into when the source is not snow, and the unit every assertion below
+-- compares against.
+plainColorless :: ManaUnit.ManaUnit
+plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
+
+-- CR 106.11: "If an effect would add mana represented by one or more snow mana
+-- symbols to a player's mana pool, that much colorless mana is added to that
+-- player's mana pool."
+--
+-- A rewrite rule, and the two halves of the rewrite are separable. The AMOUNT
+-- and the TYPE come from this rule -- one colorless mana per symbol. Whether
+-- that mana is SNOW does not: CR 107.4h and CR 106.3 make that a fact about the
+-- source, so it is exactly as true of an "add {S}" as of an "add {C}".
+--
+-- Synthetic Snow Symbol is deliberately a NONSNOW land (search of Scryfall on
+-- 2026-08-06 with include_extras, for o:"add {S}", o:"adds {S}" and
+-- oracle:"{S}" oracle:add, finds no printing that adds {S} at all, snow or
+-- otherwise). Nonsnow is what makes these tests about CR 106.11 rather than
+-- about snow sources: a snow printing would let productionTagsGiven, which
+-- snowSpec already covers, carry the {S} assertions on its own.
+snowSymbolSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
+  -- The rewrite itself, read off the pool: two symbols, two mana, colorless, and
+  -- untagged. The first three are CR 106.11 and each is a separate way to get it
+  -- wrong; the fourth is CR 107.4h, and is here because the pool is the only
+  -- place a tag stamped by mistake would show.
+  Spec.it s "CR 106.11 tapping it adds two colorless mana, neither of them snow" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    let board = S.landsInPlay snowSymbol 1
+        tapped = case Game.zoneMembers Zone.Battlefield S.alice board of
+          [] -> []
+          oid : _ -> poolUnits (S.runPure S.identityAnswer board (Mana.tapForMana oid))
+    Spec.assertEqWith s "two untagged colorless mana" tapped [plainColorless, plainColorless]
+
+  -- CR 107.4h from the other side, and THE case this card exists for: the symbol
+  -- that produced the mana says nothing about whether the mana is snow. The
+  -- control inverts both halves at once -- a Snow-Covered Mountain is a snow
+  -- source whose mana was never written {S}, and it is the one that pays. So the
+  -- negative here cannot be passing merely because the board is short of mana:
+  -- the same board casts a {2} spell (the Liquimetal Coating case below).
+  Spec.it s "CR 107.4h {S}-produced mana from a nonsnow source does not pay {S}" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    icehideGolem <- S.printingOf s registry "Icehide Golem"
+    let board = S.landsInPlay snowSymbol 1
+        (g, spellId) = S.handOne icehideGolem board
+        control = S.landsInPlay snowMountain 1
+        (cg, controlSpellId) = S.handOne icehideGolem control
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) board) "it pays {2}"
+    Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "but it does not pay {S}"
+    Spec.assertBool s (not (S.castable S.alice spellId g)) "so the Golem cannot be cast off it"
+    Spec.assertBool s (S.castable S.alice controlSpellId cg) "though it can off a Snow-Covered Mountain"
+
+  -- CR 106.11's "colorless", pinned where a colour would show: an {S} rewritten
+  -- to a coloured mana would pay a coloured symbol, and this board pays none.
+  Spec.it s "CR 106.11 the mana is colorless, so it pays no coloured symbol" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    let board = S.landsInPlay snowSymbol 1
+        pays color = Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored color)]) board
+    Spec.assertBool s (not (any pays [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])) "no colour is payable"
+    Spec.assertBool
+      s
+      (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType ManaType.Colorless]) board)
+      "but {C} is"
+
+  -- The gameplay-level proof (design.md section 4): a real spell cast end to end
+  -- off the one synthetic permanent. Liquimetal Coating is a plain {2} Artifact,
+  -- so the two mana CR 106.11 produced are the whole of what pays for it.
+  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Synthetic Snow Symbol" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
+    let resolved = castOffBoard S.identityAnswer [snowSymbol] liquimetalCoating
+    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
+    Spec.assertEqWith s "the land is tapped" (S.tappedCount S.alice resolved) 1
+    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
 
 -- alice controls `n` copies of `first` and `m` copies of `second`, and nothing
 -- else. Both are lands in every caller, but nothing here requires it.

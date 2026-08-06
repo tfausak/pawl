@@ -69,6 +69,12 @@ subtypeMana subtype = case subtype of
 -- Written out rather than derived from a Bounded Color: the five are CR 105.1's
 -- closed enumeration, and spelling them here keeps the rule citation next to the
 -- list.
+--
+-- CR 106.11 is a rewrite and this is where it happens: an effect that would add
+-- mana represented by a snow mana symbol adds colorless mana instead, one per
+-- symbol. ONE option and not a choice, so nothing here prompts -- and no snow
+-- tag, because CR 107.4h reads the SOURCE (productionTagsGiven) and never the
+-- symbol the effect was written with.
 producedTypes :: ManaProduction -> [ManaType]
 producedTypes production = case production of
   ManaProduction.OfType manaType -> [manaType]
@@ -76,6 +82,7 @@ producedTypes production = case production of
     fmap
       ManaType.Colored
       [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
+  ManaProduction.SnowSymbol -> [ManaType.Colorless]
 
 -- Every ROUTE by which this object could be activated for mana, as the mana ONE
 -- activation of it adds: its intrinsic subtype mana (CR 305.6), one route per
