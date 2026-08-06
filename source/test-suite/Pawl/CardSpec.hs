@@ -151,8 +151,8 @@ vanillaFace name typeLine =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.attackCosts = [],
-      Face.mulliganAction = [],
-      Face.openingHandAction = [],
+      Face.mulliganActions = [],
+      Face.openingHandActions = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
       Face.enchant = [],
@@ -1533,7 +1533,7 @@ activatedAbilityFilters ability =
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target specs and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
---   * `mulliganAction` (CR 103.5b) and `openingHandAction` (CR 103.6) -- the two
+--   * `mulliganActions` (CR 103.5b) and `openingHandActions` (CR 103.6) -- the two
 --     pregame actions, which `cardResolutionEffects` above does not reach.
 --
 -- The other eight fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
@@ -1573,8 +1573,8 @@ cardFilters card =
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
-    <> concatMap effectFilters (Face.mulliganAction card)
-    <> concatMap effectFilters (Face.openingHandAction card)
+    <> concatMap (concatMap effectFilters) (Face.mulliganActions card)
+    <> concatMap (concatMap effectFilters) (Face.openingHandActions card)
 
 -- How many CR 701.3a atoms this card carries in an Effect.AttachTarget's
 -- destination filter, and how many anywhere else. The second number is the
@@ -2542,7 +2542,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganAction = [Effect.Search buried SearchDestination.RevealThenHand]}
+              base {Face.mulliganActions = [[Effect.Search buried SearchDestination.RevealThenHand]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)

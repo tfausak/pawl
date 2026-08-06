@@ -75,8 +75,10 @@ toJson encodeCard f =
       Common.optionalPair "attackCosts" [] (Common.encodeList AttackCost.toJson) (Face.attackCosts f),
       Common.optionalPair "additionalCosts" [] (Common.encodeList (CostComponent.toJson Keyword.toJson)) (Face.additionalCosts f),
       Common.optionalPair "alternativeCosts" [] (Common.encodeList (Cost.toJson Keyword.toJson)) (Face.alternativeCosts f),
-      Common.optionalPair "mulliganAction" [] (Common.encodeList (Effect.toJson encodeCard)) (Face.mulliganAction f),
-      Common.optionalPair "openingHandAction" [] (Common.encodeList (Effect.toJson encodeCard)) (Face.openingHandAction f),
+      -- CR 103.5b / CR 103.6: an array of ACTIONS, each an array of effects, so a
+      -- face granting two of them is writable (Pawl.Types.Face).
+      Common.optionalPair "mulliganActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.mulliganActions f),
+      Common.optionalPair "openingHandActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.openingHandActions f),
       -- CR 113.6g: Counterable is the absence of a card stating it can't be
       -- countered.
       Common.optionalPair "counterability" Counterability.Counterable Counterability.toJson (Face.counterability f)
@@ -109,8 +111,8 @@ fromJson decodeCard value = do
   attackCosts <- Common.defaultedField "attackCosts" [] (Common.decodeList AttackCost.fromJson) ps
   additionalCosts <- Common.defaultedField "additionalCosts" [] (Common.decodeList (CostComponent.fromJson Keyword.fromJson)) ps
   alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList (Cost.fromJson Keyword.fromJson)) ps
-  mulliganAction <- Common.defaultedField "mulliganAction" [] (Common.decodeList (Effect.fromJson decodeCard)) ps
-  openingHandAction <- Common.defaultedField "openingHandAction" [] (Common.decodeList (Effect.fromJson decodeCard)) ps
+  mulliganActions <- Common.defaultedField "mulliganActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
+  openingHandActions <- Common.defaultedField "openingHandActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   enchant <- Common.defaultedField "enchant" [] (Common.decodeList TargetSpec.fromJson) ps
   counterability <- Common.defaultedField "counterability" Counterability.Counterable Counterability.fromJson ps
   pure
@@ -139,8 +141,8 @@ fromJson decodeCard value = do
         Face.attackCosts = attackCosts,
         Face.additionalCosts = additionalCosts,
         Face.alternativeCosts = alternativeCosts,
-        Face.mulliganAction = mulliganAction,
-        Face.openingHandAction = openingHandAction,
+        Face.mulliganActions = mulliganActions,
+        Face.openingHandActions = openingHandActions,
         Face.enchant = enchant,
         Face.counterability = counterability
       }

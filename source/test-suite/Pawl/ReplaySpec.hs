@@ -35,6 +35,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -248,13 +249,18 @@ combatReplaySpec s =
           let p = Prompt.Bottom decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8] 1
               answer = [ObjectId.MkObjectId 8]
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
-        Spec.it s "MulliganAction records and replays a Maybe ObjectId" $ do
-          let p = Prompt.MulliganAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
-              answer = Just (ObjectId.MkObjectId 8)
+        -- CR 103.5b: the two offers are the SAME card's first and second action,
+        -- so a transcript that recorded only the card would replay the wrong one.
+        Spec.it s "MulliganAction records and replays which action of which card" $ do
+          let first = (ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 0)
+              second = (ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 1)
+              p = Prompt.MulliganAction decider S.alice [first, second]
+              answer = Just second
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
-        Spec.it s "OpeningHandAction records and replays a Maybe ObjectId" $ do
-          let p = Prompt.OpeningHandAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
-              answer = Just (ObjectId.MkObjectId 7)
+          Spec.assertEqWith s "and the same card's other action replays as itself" (Replay.decode p (Replay.encode p (Just first))) (Just (Just first))
+        Spec.it s "OpeningHandAction records and replays which action of which card" $ do
+          let p = Prompt.OpeningHandAction decider S.alice [(ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 0), (ObjectId.MkObjectId 8, HandActionIndex.MkHandActionIndex 0)]
+              answer = Just (ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 0)
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         -- CR 603.5: both answers to a printed "may", so the transcript is
         -- proved to distinguish them -- a codec that collapsed them would

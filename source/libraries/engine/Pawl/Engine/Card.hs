@@ -121,8 +121,8 @@ merge2 l r =
       Face.attackRequirements = Face.attackRequirements l <> Face.attackRequirements r,
       Face.combatRestrictions = Face.combatRestrictions l <> Face.combatRestrictions r,
       Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
-      Face.mulliganAction = Face.mulliganAction l <> Face.mulliganAction r,
-      Face.openingHandAction = Face.openingHandAction l <> Face.openingHandAction r,
+      Face.mulliganActions = Face.mulliganActions l <> Face.mulliganActions r,
+      Face.openingHandActions = Face.openingHandActions l <> Face.openingHandActions r,
       -- CR 709.4c again, and CR 702.5a: an enchant ability IS an ability in a
       -- half's text box, so both halves' survive here -- and CR 702.5c says what
       -- a combined view carrying two of them means, which is Card.enchantSpec's
@@ -302,7 +302,7 @@ faceNamed n card = List.find (\f -> Face.name f == n) (NonEmpty.toList (Card.fac
 -- dataflow lint and the text-change scan range over all of them regardless of
 -- what is chosen.
 --
--- Face.mulliganAction is deliberately NOT included: it is not part of the
+-- Face.mulliganActions is deliberately NOT included: it is not part of the
 -- spell, and CR 103.5b's action is performed from the hand rather than cast
 -- (#184).
 allEffects :: Face.Face Card.Card -> [Effect Card.Card]
