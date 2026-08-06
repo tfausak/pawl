@@ -419,11 +419,12 @@ attackedThisStep pid gs =
 -- (CR 709.3b / 715.3b) rather than to the unnamed fallback -- CR 709.4's combined
 -- view for a split card, CR 715.4's normal half for an adventurer card.
 --
--- ONE writer, two callers, which is the point. castSpell stamps the CR 400.7
--- incarnation CR 601.2a has just put on the stack and keeps the result; castable
--- stamps a state it only READS, since the card has not moved and nothing here
--- moves it. What a gate measures and what the incarnation shows therefore cannot
--- name different halves.
+-- The GATE's writer, and only the gate's: `castable` and
+-- `castableWhileSearching` stamp a state they only READ, since the card has not
+-- moved and nothing here moves it. The CR 400.7 incarnation on the stack is
+-- stamped by the CR 601.2a move itself (Event.changeZoneShowing), from the same
+-- `name` the gate was asked about -- so what a gate measures and what the
+-- incarnation shows cannot name different halves.
 --
 -- NOT a simulation of CR 601.2a's move, and it does not need to be: both rules
 -- say outright that castability is evaluated against the chosen half -- CR 709.3a
@@ -640,33 +641,24 @@ castSpell pid oid name = do
     Just face -> do
       let castFrom = fmap Object.zone (Game.lookupObject oid before)
           candidates = Cost.costsFor name oid before
-      -- CR 601.2a. Nothing means the id was unknown or the CR 616.1 replacement
-      -- loop cancelled the move, and a proposal whose first step did not happen
-      -- is one the game returns from (CR 601.2).
-      moved <- Event.changeZoneReturning oid Zone.Stack
+      -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
+      -- onto the stack": the chosen half is part of the move rather than a
+      -- stamp applied once it has landed, so the CR 400.7 incarnation never
+      -- exists without it and every read of it -- inside the move as much as in
+      -- CR 601.2b's announcements below -- sees that half alone (CR 709.3b)
+      -- rather than CR 709.4's combined view. Event.changeZoneShowing says what
+      -- it costs and what can observe it.
+      --
+      -- `name` is the same name castable's gate stamped through asProposed, so
+      -- the offer and the announcement cannot name different halves.
+      --
+      -- Nothing means the id was unknown or the CR 616.1 replacement loop
+      -- cancelled the move, and a proposal whose first step did not happen is
+      -- one the game returns from (CR 601.2).
+      moved <- Event.changeZoneShowing oid Zone.Stack name
       case moved of
         Nothing -> State.put before
-        Just sid -> do
-          -- CR 709.3a: "Only that half is considered to be put onto the stack."
-          -- Stamped the instant the CR 601.2a move lands and before any of CR
-          -- 601.2b's announcements, so every read of the stack incarnation from
-          -- here on sees the chosen half alone (CR 709.3b) rather than CR
-          -- 709.4's combined view -- entwineOffer's keywords and the CR 613
-          -- projection included. Event.changeZone cleared the field on the way
-          -- in (CR 400.7), so this is a write onto a fresh object.
-          --
-          -- Through asProposed, the same function castable's gate builds its
-          -- state with, so the offer and the announcement cannot name different
-          -- halves.
-          --
-          -- JUST AFTER the move, not during it: anything that runs inside CR
-          -- 601.2a -- a CR 616.1 entry replacement, or a trigger the move fires
-          -- -- reads the stack object before this stamp lands, and so sees CR
-          -- 709.4's combined view instead of the chosen half. Not implemented;
-          -- no card in the pool replaces or triggers on a cast card's move to
-          -- the stack (#659).
-          State.modify' (asProposed sid name)
-          castProposed pid sid face castFrom candidates before
+        Just sid -> castProposed pid sid face castFrom candidates before
 
 -- CR 601.2b-i for a spell already on the stack -- castSpell's body once its CR
 -- 601.2a move has happened. `sid` is the stack incarnation (CR 400.7), the object
