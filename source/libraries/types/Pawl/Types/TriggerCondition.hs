@@ -256,13 +256,16 @@ data TriggerCondition
     -- Pawl.Engine.Damage recording one event per damage event rather than by
     -- anything here counting.
     --
-    -- Carries no AMOUNT slot. Ajani's Pridemate's payload names none, and CR
-    -- 119.9 does not make the number part of the event's identity; a card
-    -- printing "that much" is what must bind it (#806).
+    -- The amount is not part of the CONDITION -- CR 119.9 makes any gain greater
+    -- than 0 match, whatever its size -- but it is part of the EVENT, which is why
+    -- Pawl.Engine.Event.eventBindings binds it under
+    -- Pawl.Engine.Binding.eventAmount for Sanguine Bond's "that much" to read.
+    -- Ajani's Pridemate names no number and simply ignores the slot.
     --
     -- LOSING life is not the negative of this condition but a different event
     -- entirely (GameEvent.LifeLost), so a card bearing this stays silent for a
     -- loss, for prevented damage (CR 615.6 -- the life never left), and for a
-    -- gain by anyone the relation excludes.
+    -- gain by anyone the relation excludes. No condition matches that event at
+    -- all, so Exquisite Blood's mirror of Sanguine Bond cannot be written (#827).
     PlayerGainsLife PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)
