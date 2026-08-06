@@ -10,6 +10,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Action (Action)
 import qualified Pawl.Types.Action as Action
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -20,34 +21,47 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Zone as Zone
 
--- The hand cards this player may play as a land right now: CR 305.1's land
--- cards, minus the ones an effect prohibits.
+-- The land plays this player may make right now: CR 305.1's land cards in their
+-- hand, minus the ones an effect prohibits, each paired with CR 712.12's chosen
+-- face (Nothing where no face is chosen -- see Pawl.Engine.Card.landFaces).
+--
+-- ONE CARD MAY APPEAR TWICE, in principle: CR 712.12 has the player choose among
+-- "its faces that's a land", so a modal double-faced card with two land faces
+-- would offer both. That shape falls out of landFaces returning a list; no
+-- printing reaches it.
 --
 -- The PROHIBITION is asked here and not in legalActions' `canPlayLand` gate,
 -- because it is per-CARD rather than per-turn: CR 305.2/305.3's limits are about
 -- the player and settle the whole list at once, while Null Chamber's is about
 -- the land's name and stops one card while leaving the rest playable.
-playableLands :: PlayerId -> GameState -> [ObjectId]
+--
+-- Asked against the name of the CARD IN THE HAND, which is where the special
+-- action is taken from, and not against the face chosen to be played: CR 712.8a
+-- gives a double-faced card in a hand "only the characteristics of its front
+-- face", so the land a player is playing is named by that face while they play
+-- it. CR 712.19 does let the chooser name the OTHER face -- "the player may
+-- choose the name of either face of a double-faced card but not both" -- and
+-- naming it prohibits nothing here, which is the same reading from the other
+-- side rather than a second decision. A land with several names would want a set
+-- here rather than one name (#650).
+playableLands :: PlayerId -> GameState -> [(ObjectId, Maybe CardName.CardName)]
 playableLands pid gs =
-  let -- The hand card's COMBINED face (CR 709.4), which answers both questions
-      -- this asks: whether it is a land at all (CR 305.1) and what it is named
-      -- (CR 201.1). Combined and not a chosen half, because Action.Play carries
-      -- no face. CR 712.12's choice of which face of a modal double-faced card
-      -- is played as a land is not implemented (#891). A land with several names
-      -- would want a set here rather than one name (#650).
-      faceOfHandCard oid = case Game.lookupObject oid gs of
+  let cardOfHandCard oid = case Game.lookupObject oid gs of
         Just obj -> case Object.source obj of
-          Source.OfCard printing -> Just (Card.combined (Printing.card printing))
-          Source.OfToken card -> Just (Card.combined card)
+          Source.OfCard printing -> Just (Printing.card printing)
+          Source.OfToken card -> Just card
           Source.OfAbility _ _ -> Nothing
           Source.OfTrigger _ _ -> Nothing
           Source.OfEmblem _ -> Nothing
           Source.OfInherentTrigger _ _ -> Nothing
         Nothing -> Nothing
-      playable oid = case faceOfHandCard oid of
-        Nothing -> False
-        Just face -> Card.isLand face && not (PlayerEffect.prohibitsPlayingLand pid (Face.name face) gs)
-   in filter playable (Game.zoneMembers Zone.Hand pid gs)
+      playable oid = case cardOfHandCard oid of
+        Nothing -> []
+        Just card ->
+          if PlayerEffect.prohibitsPlayingLand pid (Face.name (Card.combined card)) gs
+            then []
+            else fmap (\(mName, _) -> (oid, mName)) (Card.landFaces card)
+   in concatMap playable (Game.zoneMembers Zone.Hand pid gs)
 
 legalActions :: PlayerId -> GameState -> [Action]
 legalActions pid gs =
@@ -71,7 +85,7 @@ legalActions pid gs =
           -- reachable -- Exploration destroyed after the second land leaves an
           -- allowance of one against a tally of two.
           && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
-      lands = if canPlayLand then fmap Action.Play (playableLands pid gs) else []
+      lands = if canPlayLand then fmap (uncurry Action.Play) (playableLands pid gs) else []
       -- CR 709.3: one action per castable HALF, so choosing a half is choosing
       -- an action and the engine never asks which one.
       spells = fmap (uncurry Action.Cast) (Cast.castableSpells pid gs)

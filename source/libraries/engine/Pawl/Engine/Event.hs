@@ -31,6 +31,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
@@ -1128,8 +1129,29 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- tapped is never untapped for an instant, and so a permanent an effect says
 -- enters under someone's control never belongs to its owner for an instant --
 -- CR 614.1c's entry replacements run inside this call and read both.
+--
+-- The one door CR 712.14b applies to, and that is what the rule's own wording
+-- picks out: "If a player is INSTRUCTED to put a modal double-faced card onto
+-- the battlefield and its front face isn't a permanent card, the card stays in
+-- its current zone." An instruction to put an object onto the battlefield is
+-- exactly the move that names how it enters, so the other doors are out of the
+-- rule's scope rather than exempted from it -- a permanent spell RESOLVING (CR
+-- 712.13, Pawl.Engine.Stack) and a land PLAYED (CR 712.12, Pawl.Engine.Engine)
+-- both reach the battlefield without any instruction to put them there.
+--
+-- Nothing, the same answer a CR 616.1 replacement that cancelled the move gives,
+-- so every caller already handles it: "the card stays in its current zone" and
+-- "nothing entered" are the same fact. Asked BEFORE the funnel, because CR
+-- 712.14b is not a replacement effect -- there is no event for CR 616.1 to
+-- choose among, and running the entry loop first would fire CR 614.1c's
+-- as-enters abilities for a card that never enters.
 changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
-changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing oid requestedDest Nothing tapped under Nothing
+changeZoneEntering oid requestedDest tapped under = do
+  gs <- State.get
+  let refused = requestedDest == Zone.Battlefield && maybe False Card.staysWhenPutOntoBattlefield (Game.cardOf oid gs)
+  if refused
+    then pure Nothing
+    else changeZoneAttaching Nothing oid requestedDest Nothing tapped under Nothing
 
 -- changeZoneReturning for a move that puts the object into its destination
 -- SHOWING one named face: CR 709.3's choice of which half of a split card is

@@ -22,6 +22,11 @@ import qualified Pawl.Types.Keyword as Keyword
 -- 614.12b's combined-affordability check across permanents entering
 -- simultaneously is still not implemented -- the entry loop has no budget to
 -- measure a batch against (#72).
+--
+-- A permanent whose OWN text says it enters TAPPED ("This land enters tapped")
+-- has no arm here: the tap state an entering incarnation gets is written only by
+-- an effect's rider (Pawl.Types.EntryRiders), never by a replacement the card
+-- itself prints (#894).
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption.EntryOption]

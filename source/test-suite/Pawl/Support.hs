@@ -335,7 +335,7 @@ castAnswer p = case p of
           A.Cast {} -> True
           _ -> False
         isPlay a = case a of
-          A.Play _ -> True
+          A.Play {} -> True
           _ -> False
      in case filter isCast actions of
           h : _ -> h
@@ -517,7 +517,7 @@ playLandAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
-          A.Play _ -> True
+          A.Play {} -> True
           A.Pass -> False
           A.Cast {} -> False
           A.Activate _ _ -> False
@@ -1644,7 +1644,7 @@ isCastOf :: ObjectId.ObjectId -> A.Action -> Bool
 isCastOf oid action = case action of
   A.Cast o _ -> o == oid
   A.Pass -> False
-  A.Play _ -> False
+  A.Play {} -> False
   A.Activate _ _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer

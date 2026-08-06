@@ -249,7 +249,7 @@ ruleOfLawSpec s registry =
 isCast :: Action.Type.Action -> Bool
 isCast action = case action of
   Action.Type.Cast {} -> True
-  Action.Type.Play _ -> False
+  Action.Type.Play {} -> False
   Action.Type.Activate _ _ -> False
   Action.Type.Pass -> False
 
@@ -1853,7 +1853,7 @@ isSilenceActivate :: Action.Type.Action -> Bool
 isSilenceActivate action = case action of
   Action.Type.Activate _ _ -> True
   Action.Type.Cast {} -> False
-  Action.Type.Play _ -> False
+  Action.Type.Play {} -> False
   Action.Type.Pass -> False
 
 -- Silence {W} Instant: "Your opponents can't cast spells this turn."
@@ -1909,7 +1909,7 @@ silenceSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, landId, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (elem (Action.Type.Play landId) (Action.legalActions S.bob after)) "bob may still play a land"
+      Spec.assertBool s (elem (Action.Type.Play landId Nothing) (Action.legalActions S.bob after)) "bob may still play a land"
       Spec.assertBool s (any isSilenceActivate (Action.legalActions S.bob after)) "and still activate an ability"
 
     Spec.it s "CR 514.2 the prohibition ends at cleanup" $ do
@@ -2198,8 +2198,8 @@ nullChamberSpec s registry =
       Spec.assertBool s (elem (Action.Type.Cast bobsBolt (S.printingName lightningBolt)) (casts before)) "bob may cast his Bolt before the Chamber lands"
       Spec.assertBool s (notElem (Action.Type.Cast bobsBolt (S.printingName lightningBolt)) (casts after)) "and may not once it has"
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob (S.printingName lightningBolt) after) "bob is prohibited by alice's name"
-      Spec.assertBool s (elem bobsBarrens (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
-      Spec.assertBool s (notElem bobsBarrens (Action.playableLands S.bob after)) "and not once it has"
+      Spec.assertBool s (elem (bobsBarrens, Nothing) (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
+      Spec.assertBool s (notElem (bobsBarrens, Nothing) (Action.playableLands S.bob after)) "and not once it has"
 
     -- CR 601.3's prohibit half, now carrying a QUALITY: "no rule or effect
     -- prohibits" is asked of one named spell rather than of casting in general.
@@ -2259,10 +2259,10 @@ nullChamberSpec s registry =
           (barrensId, withBarrens) = S.addHandCard ashBarrens S.alice after
           (plainsId, gs) = S.addHandCard plains S.alice withBarrens
           playable = Action.playableLands S.alice gs
-      Spec.assertBool s (notElem barrensId playable) "the named Ash Barrens is not playable"
-      Spec.assertBool s (elem plainsId playable) "the Plains still is"
-      Spec.assertBool s (elem (Action.Type.Play plainsId) (Action.legalActions S.alice gs)) "and the Plains is offered"
-      Spec.assertBool s (notElem (Action.Type.Play barrensId) (Action.legalActions S.alice gs)) "while the Barrens is not"
+      Spec.assertBool s (notElem (barrensId, Nothing) playable) "the named Ash Barrens is not playable"
+      Spec.assertBool s (elem (plainsId, Nothing) playable) "the Plains still is"
+      Spec.assertBool s (elem (Action.Type.Play plainsId Nothing) (Action.legalActions S.alice gs)) "and the Plains is offered"
+      Spec.assertBool s (notElem (Action.Type.Play barrensId Nothing) (Action.legalActions S.alice gs)) "while the Barrens is not"
 
     -- CR 604.2: the effect is re-derived from the battlefield on every read, so
     -- destroying the Chamber lifts both halves with nothing to unwind.
@@ -2290,7 +2290,7 @@ nullChamberSpec s registry =
           Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "prohibited while it stands"
           Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gone)) "not prohibited once it is gone"
           Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.alice gone)) "and the cast is offered again"
-          Spec.assertBool s (elem barrensId (Action.playableLands S.alice gone)) "and the land may be played again"
+          Spec.assertBool s (elem (barrensId, Nothing) (Action.playableLands S.alice gone)) "and the land may be played again"
 
     -- REJECT-NOT-REPAIR on the opponent answer, which only a three-seat board
     -- can reach: an answer naming somebody who is not an opponent -- here the
@@ -2465,12 +2465,12 @@ isActivateOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
 isActivateOf oid action = case action of
   Action.Type.Activate o _ -> o == oid
   Action.Type.Cast {} -> False
-  Action.Type.Play _ -> False
+  Action.Type.Play {} -> False
   Action.Type.Pass -> False
 
 isPlay :: Action.Type.Action -> Bool
 isPlay action = case action of
-  Action.Type.Play _ -> True
+  Action.Type.Play {} -> True
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
   Action.Type.Pass -> False
