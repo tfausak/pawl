@@ -207,4 +207,34 @@ data PlayerEffect
     -- states a rule about abilities, the empty predicate simply happens to be
     -- true of one.
     CantBeCountered (Filter.Filter Keyword.Keyword)
+  | -- | CR 615.12 / 613.11 / Spider-Punk: damage can't be prevented.
+    --
+    -- CR 611.1's third clause in its purest form -- a continuous effect that
+    -- modifies the RULES OF THE GAME and no player's or object's
+    -- characteristics. That is why it sits here beside the player-axis arms
+    -- rather than in Pawl.Types.Modification: CR 613.1 computes an object's
+    -- characteristics, and "damage can't be prevented" is not a characteristic
+    -- of anything -- it is a standing edit to what CR 615.1's shields do.
+    --
+    -- NULLARY, naming neither a source nor a recipient nor a damage kind,
+    -- because Spider-Punk's sentence names none of them: every damage event in
+    -- the game is unpreventable while it stands. Leyline of Punishment,
+    -- Everlasting Torment and Sunspine Lynx print the same unqualified sentence,
+    -- so this is a family rather than one card's quirk. The NARROWED family is
+    -- large and is not reachable by a payload here -- Excruciator's "damage that
+    -- would be dealt by this creature", Questing Beast's "combat damage that
+    -- would be dealt by creatures you control" and Frenzied Baloth's "combat
+    -- damage" each name a quality of the damage EVENT, which is the axis
+    -- Pawl.Types.DamagePattern already speaks and this type does not (#835).
+    --
+    -- A DURATION is not carried either, and needs nothing new: Skullcrack's
+    -- "damage can't be prevented this turn" is this same effect on the CR 611.2c
+    -- stored carrier (Pawl.Types.ActivePlayerEffect), whose expiry is the
+    -- duration, exactly as Silence's is.
+    --
+    -- WHOSE damage is the carrier's PlayerScope, as it is for every arm here,
+    -- and Spider-Punk's possessive-free sentence writes PlayerScope.EachPlayer.
+    -- Pawl.Engine.PlayerEffect.damageCantBePrevented reads it as "does this
+    -- apply to anybody", which is exact for that scope and for no other (#836).
+    DamageCantBePrevented
   deriving (Eq, Ord, Show)

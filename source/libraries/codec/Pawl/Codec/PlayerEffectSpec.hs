@@ -174,3 +174,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.CantBeCountered (Filter.HasCardType CardType.Creature))
       """ {"type":"CantBeCountered","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  -- CR 615.12 / Spider-Punk. Payload-free: the sentence names no source, no
+  -- recipient and no amount, and WHOSE damage is the carrier's scope
+  -- (Pawl.Codec.PlayerStaticAbility) rather than anything riding here.
+  Spec.it s "DamageCantBePrevented" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.DamageCantBePrevented
+      """ {"type":"DamageCantBePrevented"} """

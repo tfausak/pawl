@@ -1369,6 +1369,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
   -- Serpopard's is HasCardType Creature).
   PlayerEffect.CantBeCountered f -> [f]
+  -- CR 615.12 carries nothing at all: the sentence names no spell, no source and
+  -- no recipient (Spider-Punk's "damage can't be prevented").
+  PlayerEffect.DamageCantBePrevented -> []
 
 -- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null

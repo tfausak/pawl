@@ -34,6 +34,14 @@
           "scope": {
             "type": "EachPlayer"
           }
+        },
+        {
+          "effect": {
+            "type": "DamageCantBePrevented"
+          },
+          "scope": {
+            "type": "EachPlayer"
+          }
         }
       ],
       "power": {

@@ -369,7 +369,33 @@ loop asOf batch applied prevented event = do
         -- is non-empty and `choose` always picks. Total rather than partial.
         Nothing -> pure (Just event, prevented)
         Just candidate -> do
-          outcome <- apply batch candidate event
+          -- CR 615.12: the chosen effect is a prevention effect and this damage
+          -- can't be prevented (Spider-Punk), so it is APPLIED and prevents none
+          -- of it. The event comes back untouched and no shield is written down
+          -- -- "existing damage prevention shields won't be reduced by damage
+          -- that can't be prevented" -- while the recursive call below still
+          -- records it as applied, which is CR 615.12a's "just once" and the
+          -- reason this does not spin.
+          --
+          -- CR 614.3's use count is skipped too, which no card notices: every
+          -- prevention row pawl installs is Uses.Unlimited (Resolve.installShield
+          -- says why, and Fog's authored row says Unlimited as well), so the
+          -- `consume` this bypasses would have been a no-op anyway.
+          --
+          -- HERE rather than inside `apply`, because CR 615.12 is a fact about
+          -- the (effect, event) PAIR and not about any one rewrite: `apply`'s
+          -- arms answer "what does this rewrite do", and the answer is unchanged
+          -- -- the rule stops the application from reaching them at all. CR
+          -- 614.1a's replacements are untouched, so a Furnace of Rath still
+          -- doubles unpreventable damage.
+          --
+          -- Not implemented: CR 615.12's middle clause, "any additional effects
+          -- they have will take place". No prevention row can carry one, so
+          -- there is nothing here to run (#689).
+          outcome <-
+            if Replacement.inertPrevention gs candidate event
+              then pure (Just event)
+              else apply batch candidate event
           -- CR 615.13: read OUTSIDE `apply`, from the event before and after, so
           -- no arm of that fold has to report anything and none can forget to.
           -- What makes it exact rather than a guess is Replacement.prevents: only a
