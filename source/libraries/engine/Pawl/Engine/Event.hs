@@ -50,6 +50,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
@@ -618,7 +619,7 @@ apply batch candidate event =
       -- iteration from placing them twice.
       EntryRewrite.WithCounters kind n -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        putCounters oid kind n
+        putCounters CounterCause.ByEffect oid kind n
         pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -726,7 +727,7 @@ apply batch candidate event =
             State.modify' $ \gs2 ->
               let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
-            Monad.mapM_ (\k -> putCounters oid k many) kind
+            Monad.mapM_ (\k -> putCounters CounterCause.ByEffect oid k many) kind
             pure (Just event)
       -- CR 702.136a: riot. "You may have this permanent enter with an additional
       -- +1/+1 counter on it. If you don't, it gains haste."
@@ -768,7 +769,7 @@ apply batch candidate event =
             let decider = Decide.deciderFor controller gs
             answer <- Game.choose (Prompt.ChooseRiot decider controller oid)
             case answer of
-              OptionalDecision.Exercises -> putCounters oid CounterKind.PlusOnePlusOne 1
+              OptionalDecision.Exercises -> putCounters CounterCause.ByEffect oid CounterKind.PlusOnePlusOne 1
               OptionalDecision.Declines ->
                 State.modify' $ \gs2 ->
                   -- CR 611.2a: "gains haste" with no stated end lasts until the
@@ -979,40 +980,60 @@ resolveDestruction asOf regenerability oid = do
 -- EntryRewrite arms call it directly for CR 122.6's as-it-enters clause. A copy
 -- of the body anywhere else would be a second funnel, which is the one thing a
 -- funnel must not have.
-putCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game ()
-putCounters oid kind n = do
-  resolved <- resolveCounters oid kind n
+--
+-- The CounterCause is CR 614.16's question and nothing else: it decides whether
+-- the CR 616.1 loop runs at all. See resolveCounters.
+putCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind -> Natural -> Game ()
+putCounters cause oid kind n = do
+  resolved <- resolveCounters cause oid kind n
   case resolved of
     Nothing -> pure ()
     Just (target, settledKind, settledCount) ->
       Monad.when (settledCount > 0)
         . State.modify'
         $ \gs ->
-          let before = maybe 0 (Map.findWithDefault 0 settledKind . Object.counters) (Game.lookupObject target gs)
-              bump obj = obj {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters obj)}
-              bumped = gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
-           in -- CR 122.6's event, recorded AFTER the write and from the SETTLED
-              -- count, so a Doubling Season that turned one counter into two
-              -- records the crossing the board actually saw. The before/after pair
-              -- is what CR 714.2b's chapter ability reads.
-              --
-              -- Guarded by the same `settledCount > 0` the write is: an event
-              -- recorded for a placement that did not happen would fire a chapter
-              -- ability off nothing.
-              --
-              -- No event for an object that is not there. Map.adjust on a missing
-              -- id is a silent no-op, so recording unconditionally would log a
-              -- placement the state does not show; `before` reads Nothing for the
-              -- same id, which is what this tests.
-              case Game.lookupObject target gs of
-                Nothing -> gs
-                Just _ -> recordEvent (GameEvent.CountersPut target settledKind before (before + settledCount)) bumped
+          -- No write and no event for an object that is not there. Map.adjust on a
+          -- missing id is a silent no-op, so proceeding would record a placement
+          -- the state does not show. ONE lookup answers both questions -- whether
+          -- the object exists, and how many counters of the kind it already had.
+          case Game.lookupObject target gs of
+            Nothing -> gs
+            Just obj ->
+              let before = Map.findWithDefault 0 settledKind (Object.counters obj)
+                  bump o = o {Object.counters = Map.insertWith (+) settledKind settledCount (Object.counters o)}
+                  bumped = gs {GameState.objects = Map.adjust bump target (GameState.objects gs)}
+               in -- CR 122.6's placement, recorded AFTER the write and from the
+                  -- SETTLED count, so a Doubling Season that turned one counter into
+                  -- two records the crossing the board actually saw. The before/after
+                  -- pair is what CR 714.2b's chapter ability reads.
+                  --
+                  -- Guarded by the same `settledCount > 0` the write is: an event
+                  -- recorded for a placement that did not happen would fire a chapter
+                  -- ability off nothing.
+                  recordEvent (GameEvent.CountersPut target settledKind before (before + settledCount)) bumped
 
 -- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
-resolveCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind, Natural))
-resolveCounters oid kind n = do
-  outcome <- applyReplacements (ProposedEvent.WouldPutCounters oid kind n)
-  pure (outcome >>= Replacement.asCounters)
+--
+-- CR 614.16 is the gate. Its replacement effects -- "if an effect would put one or
+-- more counters on a permanent" -- reach a placement made by a resolving spell or
+-- ability, or by another replacement or prevention effect, and nothing else; CR
+-- 609.1 makes a turn-based action none of those. So a ByRule placement skips the
+-- CR 616.1 loop and stands as proposed.
+--
+-- Skipping the WHOLE loop, rather than filtering CR 614.16's rows out of it, is an
+-- equivalence that rests on a capability pawl lacks and not on a claim about
+-- Magic: ReplacementEffect.CounterR is the only class `Replacement.matches` pairs
+-- with a WouldPutCounters, and every CounterR is one of CR 614.16's two shapes (a
+-- Scaling -- see Replacement.scale). A counter replacement OUTSIDE rule 614.16 --
+-- Solemnity's "if one or more counters would be put on a permanent or player, they
+-- aren't" -- has no representation and no printing in the pool, and the card that
+-- brings one must move this gate from the loop's door into the row filter (#847).
+resolveCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind, Natural))
+resolveCounters cause oid kind n = case cause of
+  CounterCause.ByRule -> pure (Just (oid, kind, n))
+  CounterCause.ByEffect -> do
+    outcome <- applyReplacements (ProposedEvent.WouldPutCounters oid kind n)
+    pure (outcome >>= Replacement.asCounters)
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
 resolveTokens :: PlayerId -> Card -> Natural -> Game (Maybe (PlayerId, Card, Natural))

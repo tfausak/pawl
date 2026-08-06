@@ -48,6 +48,7 @@ import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
@@ -393,9 +394,15 @@ runTurnBasedActions phase = do
 -- Sagas advance but cannot call the CR 122.6 placement funnel. Pawl.Engine.Speed
 -- and Pawl.Engine.Sba are split the same way.
 --
--- Through Event.putCounters, so CR 614.16's scaling applies -- Doubling Season
--- advances a Saga two chapters a turn -- and so the placement records the CR 122.6
--- event CR 714.2b's chapter abilities are gathered from.
+-- Through Event.putCounters, so the placement records the CR 122.6 event CR
+-- 714.2b's chapter abilities are gathered from.
+--
+-- ByRule, which is CR 614.16's answer and not a shortcut: that rule's replacement
+-- effects reach a placement made by a resolving spell or ability, or by another
+-- replacement or prevention effect, and CR 609.1 makes a turn-based action neither.
+-- So Doubling Season does NOT advance a Saga two chapters a turn, though it DOES
+-- double the lore counter CR 714.3a's replacement gives it as it enters -- and that
+-- asymmetry is the whole reason Pawl.Types.CounterCause exists.
 --
 -- The Sagas are fixed from ONE projection taken before any counter goes on, which
 -- is CR 703.4f's own reading: the whole placement is a single turn-based action,
@@ -406,7 +413,7 @@ advanceSagas :: PlayerId -> Game ()
 advanceSagas pid = do
   gs <- State.get
   let pcs = Projection.projectAll gs
-  Monad.mapM_ (\oid -> Event.putCounters oid CounterKind.Lore 1) (Saga.advancing (\oid -> Projection.controllerOf oid gs) pid pcs gs)
+  Monad.mapM_ (\oid -> Event.putCounters CounterCause.ByRule oid CounterKind.Lore 1) (Saga.advancing (\oid -> Projection.controllerOf oid gs) pid pcs gs)
 
 -- CR 603.3: put each triggered ability that fired since the last placement on the
 -- stack, in APNAP order (CR 603.3b): active player's triggers first, then each

@@ -18,8 +18,10 @@
 module Pawl.SagaSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -33,9 +35,11 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
 
@@ -122,6 +126,18 @@ chapterSpec s registry = Spec.describe s "Chapters" $ do
 -- CR 505.4 / 703.4f / 714.3c: the turn-based action.
 advanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
+  -- Driven through Engine.runStep rather than by calling runTurnBasedActions,
+  -- which is what proves the arm is actually WIRED: every other case in this
+  -- group calls the action directly, and an arm the step machinery stopped
+  -- reaching would leave all of them green.
+  Spec.it s "CR 505.4 the turn machinery itself runs the action as the step begins" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        withCounter = S.addCounter CounterKind.Lore 1 oid base
+        gs = precombatMainOf S.alice withCounter
+        after = S.runPure S.identityAnswer gs Engine.runStep
+    Spec.assertEqWith s "the step put the second lore counter on" (S.counterOf CounterKind.Lore oid after) 2
+    Spec.assertEqWith s "and the step really was the precombat main phase" (GameState.phase gs) Phase.PrecombatMain
   Spec.it s "CR 714.3c the active player puts a lore counter on each Saga they control" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
@@ -140,6 +156,31 @@ advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
     -- whole content of CR 714.2b's "was less than N": the count went 1 -> 2, and
     -- one is not less than one.
     Spec.assertEqWith s "exactly one Knight token" (S.countOnBattlefieldByName knightToken S.alice after) 1
+  -- CR 614.16 decides which of the two placements Doubling Season reaches, and
+  -- they differ: the ENTRY counter comes from CR 714.3a's replacement effect, which
+  -- CR 614.16 admits by name ("they also apply if another replacement or prevention
+  -- effect does so"), while the turn-based action is the result of no spell or
+  -- ability at all (CR 609.1) and so is reached by nothing.
+  --
+  -- The FALSIFIER for putting every counter placement through the CR 616.1 loop,
+  -- which is what Pawl.Types.CounterCause exists to prevent.
+  Spec.it s "CR 614.16 Doubling Season doubles the entering lore counter but NOT the turn-based one" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    plains <- S.printingOf s registry "Plains"
+    let (_, withSeason) = S.addCreature doublingSeason S.alice (S.landsInPlay plains 3)
+        (gs, spellId) = S.handOne benalia withSeason
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+        entered = S.runPure S.identityAnswer cast Stack.resolveTop
+    case sagaOf entered of
+      Nothing -> Spec.assertFailure s "History of Benalia did not reach the battlefield"
+      Just oid -> do
+        -- CR 714.3a's one counter, doubled: chapters I and II both cross at once.
+        Spec.assertEqWith s "two lore counters on entry" (S.counterOf CounterKind.Lore oid entered) 2
+        let advanced = S.runPure S.identityAnswer (precombatMainOf S.alice entered) (Engine.runTurnBasedActions Phase.PrecombatMain)
+        -- Three, not four. A doubled turn-based action would land on four and take
+        -- the Saga straight past its final chapter.
+        Spec.assertEqWith s "and the turn-based action adds ONE, not two" (S.counterOf CounterKind.Lore oid advanced) 3
   Spec.it s "CR 714.3c a Saga its controller does not control the turn of stays put" $ do
     benalia <- S.printingOf s registry "History of Benalia"
     let (oid, base) = S.addCreature benalia S.bob (Setup.emptyGame S.bothPlayers)
@@ -173,7 +214,9 @@ sacrificeSpec s registry = Spec.describe s "The final chapter" $ do
         advanced = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
         settled = S.runPure S.identityAnswer advanced Engine.settleForPriority
     Spec.assertEqWith s "three lore counters" (S.counterOf CounterKind.Lore oid settled) 3
-    Spec.assertBool s (not (null (GameState.stack settled))) "chapter III really reached the stack"
+    -- Not merely "the stack is non-empty": the object on it must be a chapter
+    -- ability OF THIS SAGA, which is the only thing CR 704.5s's exemption excuses.
+    Spec.assertEqWith s "this Saga's chapter III is what is on the stack" (chaptersOnStackFrom oid settled) [3]
     Spec.assertBool s (S.onBattlefield oid settled) "and the Saga is still on the battlefield under it"
     -- THE FALSIFIER for dropping either half of Saga.awaitingChapter: without the
     -- unscanned-event half the Saga is gone before this line, and without the
@@ -215,6 +258,16 @@ sagaOf gs =
    in case sagas of
         [oid] -> Just oid
         _ -> Nothing
+
+-- The chapter numbers of `oid`'s own chapter abilities currently on the stack --
+-- CR 704.5s's "the source of a chapter ability that has triggered but not yet left
+-- the stack", read back so a test can name WHICH chapter is waiting.
+chaptersOnStackFrom :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
+chaptersOnStackFrom oid gs =
+  let from sid = case fmap Object.source (Game.lookupObject sid gs) of
+        Just (Source.OfTrigger srcId ability) | srcId == oid -> Saga.chapterOf ability
+        _ -> Nothing
+   in Maybe.mapMaybe from (GameState.stack gs)
 
 -- A board sitting in `pid`'s precombat main phase, which is the moment CR 505.4
 -- names.

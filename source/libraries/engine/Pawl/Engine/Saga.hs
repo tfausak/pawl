@@ -205,6 +205,13 @@ awaitingChapter pcs events gs oid =
       -- On the stack: an ability object whose source is this permanent and whose
       -- condition is a chapter symbol. Read off Object.source, the same shape
       -- Pawl.Engine.Resolve.alreadyTurnedFor uses for CR 113.7a.
+      --
+      -- The `chapterOf` conjunct is CR 704.5s's own word -- it exempts a Saga
+      -- owed a CHAPTER ability, not one owed any ability at all -- and has NO
+      -- falsifier in the pool: History of Benalia's only triggered abilities are
+      -- its chapters, so dropping the conjunct changes no game. CR 714.1a's Saga
+      -- creature, whose second text box holds abilities independent of its chapter
+      -- symbols, is the shape that would tell them apart.
       onStack sid = case fmap Object.source (Game.lookupObject sid gs) of
         Just (Source.OfTrigger srcId ability) -> srcId == oid && Maybe.isJust (chapterOf ability)
         _ -> False

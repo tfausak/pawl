@@ -524,6 +524,7 @@ library types
     Pawl.Types.CostComponent
     Pawl.Types.Count
     Pawl.Types.Counterability
+    Pawl.Types.CounterCause
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern

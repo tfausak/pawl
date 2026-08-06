@@ -6,7 +6,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- Its KIND is a closed-half classification, the same posture as Keyword: the
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
--- loyalty; the rest of CR 122.1c-i are future.
+-- loyalty, and rule 714 for lore -- which rule 122.1 never lists at all. The rest
+-- of CR 122.1c-i are future.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 data CounterKind
   = PlusOnePlusOne -- CR 122.1a: +1/+1
