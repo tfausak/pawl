@@ -41,6 +41,7 @@ import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
@@ -950,7 +951,28 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- enters under someone's control never belongs to its owner for an instant --
 -- CR 614.1c's entry replacements run inside this call and read both.
 changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
-changeZoneEntering oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing
+changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing oid requestedDest Nothing tapped under Nothing
+
+-- changeZoneReturning for a move that puts the object into its destination
+-- SHOWING one named face: CR 709.3's choice of which half of a split card is
+-- being cast, which the rule makes "before putting it onto the stack", so the
+-- move is what carries it. CR 712.11b words the modal double-faced card's
+-- version of the same choice identically, and CR 712.11c its version of CR
+-- 709.3a, so this door is the shape both layouts ask for even though only the
+-- split one ships.
+--
+-- A separate door rather than a seventh parameter on changeZoneReturning, as
+-- changeZoneEntering is: the ~30 callers moving an object that shows whatever its
+-- layout gives it (CR 709.4's combined view, a single-face card's one face) have
+-- no face to name.
+--
+-- Handed to the funnel rather than written onto the object the move returned,
+-- for the reason CR 709.3a states: "only that half is considered to be put onto
+-- the stack", so the CR 400.7 incarnation must never exist without it. See the
+-- `face` note in changeZoneAttaching's mkObj for what can and cannot observe the
+-- difference today.
+changeZoneShowing :: ObjectId -> Zone -> CardName.CardName -> Game (Maybe ObjectId)
+changeZoneShowing oid requestedDest name = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing (Just name)
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -960,14 +982,14 @@ changeZoneEntering oid requestedDest = changeZoneAttaching Nothing oid requested
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped Nothing)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped Nothing Nothing)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing Nothing
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -983,9 +1005,10 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- 110.5b's status, Untapped for every door but changeZoneEntering. `under` is CR
 -- 110.2a's entry controller, Nothing for every door but changeZoneEntering --
 -- and Nothing there too for a move whose effect names no player, which by CR
--- 110.2 and CR 108.4a leaves the owner answering.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest seed tapped under = do
+-- 110.2 and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
+-- half, Nothing for every door but changeZoneShowing.
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Maybe CardName.CardName -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -1070,29 +1093,46 @@ changeZoneAttaching asOf oid requestedDest seed tapped under = do
               -- what this MOVE decides: the destination, CR 613.7d's moment of
               -- entry, CR 110.5b's "enters tapped" (meaningful only for a
               -- battlefield destination, CR 110.5a), CR 110.2a's entry
-              -- controller, and CR 701.3's attach-on-entry seed.
+              -- controller, CR 701.3's attach-on-entry seed, and CR 709.3a's
+              -- chosen half.
               --
-              -- `face` is among what newIncarnation clears, which is right for
-              -- the one layout that ships: whichever half CR 709.3b singled out
-              -- belonged only to the incarnation that left, and CR 709.4 gives
-              -- the split card its two halves combined everywhere but the stack.
-              -- It is NOT right in general -- CR 712.13: "a resolving
-              -- double-faced spell that becomes a permanent is put onto the
-              -- battlefield with the same face up that was face up on the
-              -- stack", so a stack-to-battlefield move must CARRY the face
-              -- rather than drop it. Not implemented, and unreachable for a
-              -- narrower reason than an empty pool now that one double-faced card
-              -- ships: CR 712.11 lets a transforming card be cast only with its
-              -- front face up, so the face this drops resolves back to the face it
-              -- had. A card cast transformed (CR 712.8c) or a modal double-faced
-              -- card would expose it (#657).
+              -- `face` is among what newIncarnation clears, which is right by
+              -- default: whichever half CR 709.3b singled out belonged only to
+              -- the incarnation that left, and CR 709.4 gives a split card its
+              -- two halves combined everywhere but the stack. `shown` is the
+              -- exception the rules name -- CR 709.3, where the choice of half
+              -- is made BEFORE the card is put onto the stack, and CR 709.3a,
+              -- where "only that half is considered to be put onto the stack".
+              -- Set HERE rather than written onto the returned incarnation, so
+              -- that no reader inside the move can see the CR 400.7 object
+              -- without its half.
+              --
+              -- Nothing today can tell setting it here from setting it on the
+              -- object the move returns, and the reason is capabilities pawl
+              -- lacks rather than a claim about Magic: ZoneChangePattern narrows
+              -- by destination, owner and identity and carries no characteristic
+              -- filter (#780), so no CR 616.1 candidate can read the half; the
+              -- CR 614.1c-d entry loop, which is the one in-move reader that
+              -- DOES match on characteristics, runs only for a battlefield
+              -- destination; and the CR 117.5 trigger scan reads the live board,
+              -- by which time either writer has landed. So this buys the
+              -- ordering rather than a passing test, as `seed` above does.
+              --
+              -- What is still dropped is the face a move OUT of the stack should
+              -- carry -- CR 712.13: "a resolving double-faced spell that becomes
+              -- a permanent is put onto the battlefield with the same face up
+              -- that was face up on the stack". Not implemented; the caller that
+              -- would pass it is Pawl.Engine.Stack's permanent branch, and no
+              -- printing in the pool makes the dropped face differ from the one
+              -- the destination resolves anyway (#657).
               mkObj ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,
                     Object.timestamp = ts,
                     Object.tapped = tapped,
                     Object.attachedTo = seed,
-                    Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing
+                    Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing,
+                    Object.face = shown
                   }
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
