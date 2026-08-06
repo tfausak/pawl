@@ -1,0 +1,109 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "The Master, Transcendent",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "GainPlayerCounters",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Rad"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "Players"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Mutant"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

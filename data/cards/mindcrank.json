@@ -23,7 +23,10 @@
                   {
                     "type": "Mill",
                     "value": [
-                      "thatPlayer",
+                      {
+                        "type": "InSlot",
+                        "value": "thatPlayer"
+                      },
                       {
                         "type": "InSlot",
                         "value": "thatMuch"

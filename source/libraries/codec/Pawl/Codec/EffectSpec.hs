@@ -30,6 +30,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -286,8 +287,25 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.Mill (SlotName.MkSlotName (Text.pack "target")) (Quantity.Literal 2))
-      """ {"type":"Mill","value":["target",{"type":"Literal","value":2}]} """
+      (Effect.Mill (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 2) Nothing)
+      """ {"type":"Mill","value":[{"type":"InSlot","value":"target"},{"type":"Literal","value":2}]} """
+  -- CR 728.1's mill, which counts the nonland cards it put in the graveyard.
+  Spec.it s "Mill, with a tally" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.Mill
+          (PlayerRef.Relative PlayerRelation.You)
+          (Quantity.Literal 2)
+          ( Just
+              MillTally.MkMillTally
+                { MillTally.slot = SlotName.MkSlotName (Text.pack "milled"),
+                  MillTally.filter = Filter.Not (Filter.HasCardType CardType.Land)
+                }
+          )
+      )
+      """ {"type":"Mill","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":2},{"slot":"milled","filter":{"type":"Not","value":{"type":"HasCardType","value":{"type":"Land"}}}}]} """
   Spec.it s "Discard" $
     Common.assertJsonCodec
       s
@@ -435,6 +453,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GainPlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "thatPlayer"))) PlayerCounterKind.Poison (Quantity.Literal 3))
       """ {"type":"GainPlayerCounters","value":[{"type":"InSlot","value":"thatPlayer"},{"type":"Poison"},{"type":"Literal","value":3}]} """
+  -- The mirror opcode, on the same wire shape and a DIFFERENT tag: CR 728.1's
+  -- removal must never decode as a gain.
+  Spec.it s "RemovePlayerCounters" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RemovePlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad (Quantity.InSlot (SlotName.MkSlotName (Text.pack "milled"))))
+      """ {"type":"RemovePlayerCounters","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Rad"},{"type":"InSlot","value":"milled"}]} """
   -- CR 701.26a's Tap is Untap's mirror and shares its wire shape, so the two
   -- must not collapse into one tag.
   Spec.it s "Tap round-trips, and is not Untap" $ do

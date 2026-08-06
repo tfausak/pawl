@@ -31,6 +31,7 @@ import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Rad as Rad
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Ring as Ring
@@ -483,6 +484,10 @@ placePendingTriggers = do
       -- and gathered for exactly the reason above: it hangs on no object either.
       -- At most one entry, and only for the active player.
       revving = Speed.inherentPending evs gs
+      -- CR 728.1, the rulebook's fourth inherent ability, gathered for the same
+      -- reason as the three above. At most one entry, and only for the active
+      -- player, who is the only one with a precombat main phase this turn.
+      irradiated = Rad.inherentPending evs gs
   State.put
     gs
       { GameState.scannedThrough = Natural.length (GameState.events gs),
@@ -498,7 +503,7 @@ placePendingTriggers = do
         GameState.controlWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
-  ordered <- orderPending (pending <> inherent <> revving)
+  ordered <- orderPending (pending <> inherent <> revving <> irradiated)
   Monad.mapM_ placeOne ordered
   pure (not (null ordered))
 

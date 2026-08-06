@@ -11,12 +11,17 @@ module Pawl.Types.PlayerCounterKind where
 --
 -- Ord is load-bearing: PlayerCounterKind is a Map key on Player.counters.
 -- Constructors are ordered by rule number so the type stays diffable against the
--- rules. Rad counters (CR 122.1i) are not yet a constructor, and would arrive
--- with a rules attachment rather than alone, since that rule hands them to rule
--- 728's inherent triggered ability (#123).
+-- rules.
 data PlayerCounterKind
   = Energy -- CR 107.14
   | Poison -- CR 122.1f
+  | -- | CR 122.1i. The one player counter the rules attach a whole ABILITY to:
+    -- "one or more rad counters on a player cause a triggered ability to trigger
+    -- at the beginning of that player's precombat main phase", whose text rule
+    -- 728.1 writes out and Pawl.Engine.Rad mints. So unlike Experience below,
+    -- this constructor is not vocabulary alone -- the closed half reads it,
+    -- exactly as it reads Poison for CR 704.5c.
+    Rad
   | -- | CR 122.1's bare first sentence and nothing else. The word "experience"
     -- does not appear in docs/rules.txt, and that ABSENCE is the citation: every
     -- other player counter is named by a rule that attaches behaviour to it, so

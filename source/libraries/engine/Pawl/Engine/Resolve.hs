@@ -61,6 +61,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
+import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
 import qualified Pawl.Types.Modification as Modification
@@ -153,7 +154,10 @@ slotsOf effect = case effect of
   Effect.RemoveFromCombat slot -> Set.singleton slot
   Effect.MoveToZone slot _ _ _ _ -> Set.singleton slot
   Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
-  Effect.Mill slot quantity -> Set.insert slot (Quantity.slots quantity)
+  -- The tally's slot is a DEFINITION (how many of them counted), not a read, so
+  -- it belongs to boundSlots below -- Destroy's third field takes the same
+  -- posture, for the same reason.
+  Effect.Mill ref quantity _ -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.LoseLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.GainLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
@@ -175,6 +179,7 @@ slotsOf effect = case effect of
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.RemovePlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Tap ref -> objectRefSlots ref
   Effect.Untap ref -> objectRefSlots ref
   Effect.Transform ref -> objectRefSlots ref
@@ -254,7 +259,7 @@ readsX = any effectReadsX
       Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.Mill _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Mill _ quantity _ -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Discard _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.LoseLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.GainLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
@@ -267,6 +272,7 @@ readsX = any effectReadsX
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.RemovePlayerCounters _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Transform _ -> False
@@ -319,6 +325,7 @@ searchesLibrary effect = case effect of
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.GainPlayerCounters {} -> False
+  Effect.RemovePlayerCounters {} -> False
   Effect.Tap _ -> False
   Effect.Untap _ -> False
   Effect.Transform _ -> False
@@ -399,6 +406,9 @@ boundSlots effect = case effect of
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
   -- each ... destroyed this way" to read as a Quantity.
   Effect.Destroy _ _ mSlot -> foldMap Set.singleton mSlot
+  -- How many of the cards this mill put in the graveyard matched the tally's
+  -- filter, for CR 728.1's "for each nonland card milled this way" to read.
+  Effect.Mill _ _ mTally -> foldMap (Set.singleton . MillTally.slot) mTally
   Effect.DealDamage {} -> Set.empty
   Effect.ModifyTarget {} -> Set.empty
   Effect.ChangeText {} -> Set.empty
@@ -414,7 +424,6 @@ boundSlots effect = case effect of
   Effect.Sacrifice _ -> Set.empty
   Effect.RemoveFromCombat _ -> Set.empty
   Effect.Draw {} -> Set.empty
-  Effect.Mill {} -> Set.empty
   Effect.Discard {} -> Set.empty
   Effect.LoseLife {} -> Set.empty
   Effect.GainLife {} -> Set.empty
@@ -426,6 +435,7 @@ boundSlots effect = case effect of
   Effect.Counter _ -> Set.empty
   Effect.PutCounters {} -> Set.empty
   Effect.GainPlayerCounters {} -> Set.empty
+  Effect.RemovePlayerCounters {} -> Set.empty
   Effect.Tap _ -> Set.empty
   Effect.Untap _ -> Set.empty
   Effect.Transform _ -> Set.empty
@@ -1612,22 +1622,40 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             Monad.forM_ drawers $ \pid ->
               Monad.replicateM_ (Integer.toIntSaturating n) (Event.drawCard pid)
       _ -> pure ()
-  Effect.Mill slot quantity -> do
+  Effect.Mill ref quantity mTally -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just (Recipient.ToPlayer target), True) ->
-        case Quantity.evaluateFor viewOf context gs resolving source quantity of
-          Just n
-            | n > 0 ->
-                -- CR 701.17/701.17b: top min(n, library) of the target's library to
-                -- their graveyard, funnelled so each move mints a new incarnation.
-                let topN = List.genericTake n (Game.zoneMembers Zone.Library target gs)
-                 in Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) topN
-          _ -> pure ()
-      -- Not a player recipient or an illegal slot (CR 608.2b): no-op.
-      _ -> pure ()
+        -- An illegal slot (CR 608.2b) or a reference naming nobody arrives here
+        -- as the empty list and mills nothing, the posture every PlayerRef arm
+        -- takes.
+        millers = playerRefPlayers chosen legality controller gs ref
+        -- CR 701.17/701.17b: top min(n, library) of each miller's library. A
+        -- short library mills what there is, which is why the tally below counts
+        -- THESE cards rather than the number the quantity asked for.
+        milled = case Quantity.evaluateFor viewOf context gs resolving source quantity of
+          Just n | n > 0 -> concatMap (\pid -> List.genericTake n (Game.zoneMembers Zone.Library pid gs)) millers
+          _ -> []
+    -- Funnelled so each move mints a new incarnation.
+    Monad.mapM_ (\c -> Event.changeZone c Zone.Graveyard) milled
+    -- The tally, counted off the PRINTED card the way Effect.Search's filter is
+    -- (CR 701.23a's reason: a card in a library has no projection), and read
+    -- from the pre-move state because CR 400.7 has since minted new ids. Rule
+    -- 728.1's "nonland" is a card-type question, which the printed face answers.
+    --
+    -- Bound onto this effect's SOURCE, so a later effect of the same resolution
+    -- reads it as Quantity.InSlot -- Destroy's "destroyed this way" binding
+    -- exactly. Bound even at zero, for that arm's reason: zero is an answer,
+    -- where an unbound slot leaves the reader unevaluable.
+    --
+    -- ONE number across every miller. Rule 728.1's mill names one player, and a
+    -- per-player tally would need a per-player reader, which no Quantity has.
+    Monad.forM_ mTally $ \tally ->
+      let tallyContext = Filter.MkContext Nothing Nothing
+          counted oid = case Game.faceOf oid gs of
+            Nothing -> False
+            Just face -> Filter.matches tallyContext (Projection.viewOfCard face) (MillTally.filter tally)
+       in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
   Effect.Discard slot quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -2382,6 +2410,32 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                       { GameState.players =
                           Map.adjust
                             (\p -> p {Player.counters = Map.insertWith (+) kind (Integer.toNaturalSaturating n) (Player.counters p)})
+                            pid
+                            (GameState.players g)
+                      }
+                )
+      _ -> pure ()
+  Effect.RemovePlayerCounters ref kind quantity -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = Filter.MkContext (Just controller) (Just source)
+        recipients = playerRefPlayers chosen legality controller gs ref
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Just n
+        | n > 0 ->
+            -- CR 122: the mirror of GainPlayerCounters above, off the player
+            -- record directly and with the same missing CR 614 opportunity
+            -- (#122). Natural subtraction would underflow, so the floor is
+            -- explicit: a player with fewer counters than the effect removes
+            -- ends at none, which is what "removes one rad counter from
+            -- themselves" of a player who has none means.
+            Monad.forM_ recipients $ \pid ->
+              State.modify'
+                ( \g ->
+                    g
+                      { GameState.players =
+                          Map.adjust
+                            (\p -> p {Player.counters = Map.adjust (\held -> held - min held (Integer.toNaturalSaturating n)) kind (Player.counters p)})
                             pid
                             (GameState.players g)
                       }

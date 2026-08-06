@@ -92,7 +92,10 @@
                   {
                     "type": "Mill",
                     "value": [
-                      "target",
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
                       {
                         "type": "Literal",
                         "value": 20.0

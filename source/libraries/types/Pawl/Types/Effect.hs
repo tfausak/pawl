@@ -11,6 +11,7 @@ import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaProduction as ManaProduction
+import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -219,9 +220,21 @@ data Effect card
     -- PlayerRef rather than a `Draw SlotName Quantity` sibling: the sibling leaves
     -- two draw opcodes to keep in step, which the effect DSL otherwise avoids.
     Draw PlayerRef.PlayerRef Quantity.Quantity
-  | -- | CR 701.17: the slot's target player mills this many. A short or empty
-    -- library mills fewer, no penalty (CR 701.17b) -- unlike Draw, which loses.
-    Mill SlotName.SlotName Quantity.Quantity
+  | -- | CR 701.17: the players the PlayerRef names each mill this many. A short or
+    -- empty library mills fewer, no penalty (CR 701.17b) -- unlike Draw, which
+    -- loses.
+    --
+    -- A PlayerRef and not a SlotName, for the reason Draw's comment gives: Tome
+    -- Scour's "target player" is `InSlot`, reading a slot TARGETING filled (CR
+    -- 601.2c), while CR 728.1's rules-minted mill has no target at all and says
+    -- `Relative You`. One opcode covers both, where a slot-only spelling would
+    -- force a sibling.
+    --
+    -- The MillTally is "and remember how many of them counted", for a later
+    -- effect of the same resolution to read as Quantity.InSlot -- CR 728.1's
+    -- "for each nonland card milled this way". Nothing for a mill nothing looks
+    -- back at, which is every mill in the pool but rule 728.1's.
+    Mill PlayerRef.PlayerRef Quantity.Quantity (Maybe MillTally.MillTally)
   | -- | CR 701.9: the slot's target player discards this many. The DISCARDING
     -- player chooses which (CR 701.9b) via Prompt.ChooseDiscard, routed through
     -- Decide.deciderFor. A hand smaller than the count discards all of it (CR
@@ -416,9 +429,24 @@ data Effect card
     -- PlayerRef and not PlayerScope, since only PlayerRef can name a binding slot.
     --
     -- Still targetless in itself: a slot this reads may have been filled by
-    -- TARGETING (CR 601.2c), which is how a future "target player gets two poison
-    -- counters" is written, but nothing here demands it (#120).
+    -- TARGETING (CR 601.2c), which is how The Master, Transcendent's "target
+    -- player gets two rad counters" is written -- but nothing here demands it,
+    -- and no card in the pool aims POISON counters that way (#120).
     GainPlayerCounters PlayerRef.PlayerRef PlayerCounterKind.PlayerCounterKind Quantity.Quantity
+  | -- | CR 122: the players the PlayerRef names each LOSE N counters of a
+    -- player-counter kind -- CR 728.1's "removes one rad counter from
+    -- themselves", and what Survivor's Med Kit's "target player loses all rad
+    -- counters" asks for.
+    --
+    -- GainPlayerCounters' mirror, and separate from it for the reason LoseLife
+    -- and GainLife are separate: a signed amount would fuse two events one day
+    -- told apart by "whenever you get a counter" text, and a Quantity that went
+    -- negative would have to answer what a negative COUNT of counters means.
+    --
+    -- Removing more than the player has removes what they have and no more --
+    -- the count is a Natural and CR 122 knows no negative counter -- rather than
+    -- being an error or a no-op.
+    RemovePlayerCounters PlayerRef.PlayerRef PlayerCounterKind.PlayerCounterKind Quantity.Quantity
   | -- | CR 701.26a: tap the permanents the ObjectRef names -- Untap's exact mirror,
     -- down to the ObjectRef. A permanent that is ALREADY tapped is left alone
     -- rather than being an error, which is that rule's own second sentence and

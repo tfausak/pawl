@@ -47,6 +47,7 @@ import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.Modification (Modification)
@@ -1047,7 +1048,10 @@ rewriteEffect pairs effect = case effect of
   Effect.RemoveFromCombat _ -> effect
   Effect.MoveToZone {} -> effect
   Effect.Draw {} -> effect
-  Effect.Mill {} -> effect
+  -- The tally's Filter is text like the Search arm's above (CR 612.1), so a
+  -- swap reaches it; the slot it binds to is a name no card prints.
+  Effect.Mill ref quantity mTally ->
+    Effect.Mill ref quantity (fmap (\t -> t {MillTally.filter = Filter.rewrite pairs (MillTally.filter t)}) mTally)
   Effect.Discard {} -> effect
   Effect.LoseLife {} -> effect
   Effect.GainLife {} -> effect
@@ -1063,6 +1067,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
   Effect.GainPlayerCounters {} -> effect
+  Effect.RemovePlayerCounters {} -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
   Effect.Untap ref -> Effect.Untap (rewriteObjectRef pairs ref)
   Effect.Transform ref -> Effect.Transform (rewriteObjectRef pairs ref)
@@ -1253,6 +1258,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
+  Quantity.Type.PlayerCounters _ _ -> quantity
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.
