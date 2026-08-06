@@ -144,7 +144,7 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
   -- unreachable there: a Siege's candidates are its controller's opponents still
   -- in the game, and a game in which its controller has no opponent left has
   -- already ended under CR 104.2a. Pawl.Engine.Sba routes an empty answer into
-  -- the put-into-graveyard batch whether or not a game can reach it (#302).
+  -- the put-into-graveyard batch whether or not a game can reach it (#853).
   Spec.it s "CR 704.5w a Siege whose controller is alone has no candidate" $ do
     siege <- siegePC s registry
     Spec.assertEqWith s "nobody" (Battle.protectorCandidates siege S.alice [S.alice]) []

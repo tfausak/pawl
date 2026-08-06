@@ -95,7 +95,8 @@ protectorCandidates pc controller playing
 -- NOT IMPLEMENTED: CR 704.5w's "and no attacking creatures are currently attacking
 -- that battle" rider, which would suspend the re-choice for the duration of an
 -- attack. Nothing can attack a battle, so the rider is vacuously true at every
--- call (#302). CR 704.5x has no such rider, so that half is exact.
+-- call (#853). CR 704.5x has no such rider, so that half is exact -- but no card
+-- can reach it either (#853).
 needsProtector ::
   PC.ProjectedCharacteristics ->
   PlayerId.PlayerId ->
