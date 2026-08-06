@@ -588,6 +588,47 @@ combatReplaySpec s =
             "the coloured route round trips"
             (Replay.decode p (Replay.encode p HybridPayment.PaysTyped))
             (Just HybridPayment.PaysTyped)
+        -- CR 118.7e: which half of a hybrid REDUCTION its payer took decides how
+        -- much came off the cost, so it has to survive a transcript too.
+        Spec.it s "ChooseReductionHalf round-trips through the transcript" $ do
+          let p =
+                Prompt.ChooseReductionHalf
+                  decider
+                  S.alice
+                  oid
+                  (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black))
+                  (ManaSymbol.OfType (ManaType.Colored Color.Black) NonEmpty.:| [ManaSymbol.Generic 2])
+          Spec.assertEqWith
+            s
+            "the generic half round trips"
+            (Replay.decode p (Replay.encode p (ManaSymbol.Generic 2)))
+            (Just (ManaSymbol.Generic 2))
+          Spec.assertEqWith
+            s
+            "the coloured half round trips"
+            (Replay.decode p (Replay.encode p (ManaSymbol.OfType (ManaType.Colored Color.Black))))
+            (Just (ManaSymbol.OfType (ManaType.Colored Color.Black)))
+        -- Discriminating: fails if CR 118.7e's choice rides CR 601.2b's
+        -- announcement response rather than getting its own constructor, which
+        -- is the nearest miss -- both are a two-way question about a hybrid
+        -- symbol, asked of the same player about the same object.
+        Spec.it s "a hybrid announcement does not decode as a reduction half" $ do
+          let p =
+                Prompt.ChooseReductionHalf
+                  decider
+                  S.alice
+                  oid
+                  (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black))
+                  (ManaSymbol.OfType (ManaType.Colored Color.Black) NonEmpty.:| [ManaSymbol.Generic 2])
+              announcement =
+                Prompt.AnnounceHybridPayment
+                  decider
+                  S.alice
+                  oid
+                  (ManaType.Colored Color.Red)
+                  (HybridPayment.PaysTyped NonEmpty.:| [HybridPayment.PaysGeneric])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Replay.encode announcement HybridPayment.PaysGeneric)) Nothing
+          Spec.assertEqWith s "nor the other way round" (Replay.decode announcement (Replay.encode p (ManaSymbol.Generic 2))) Nothing
         Spec.it s "a Phyrexian announcement does not decode as a hybrid one" $ do
           -- Discriminating: fails if AnnounceHybridPayment reuses another
           -- two-valued response rather than getting its own constructor -- and

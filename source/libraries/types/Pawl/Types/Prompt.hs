@@ -21,6 +21,7 @@ import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -677,3 +678,34 @@ data Prompt r where
   -- Elided when only one route is payable -- no source of the symbol's type, or
   -- too few mana on the board for the {2}.
   AnnounceHybridPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaType.ManaType -> NonEmpty.NonEmpty HybridPayment.HybridPayment -> Prompt HybridPayment.HybridPayment
+  -- | CR 118.7e: "If a cost is reduced by an amount of mana represented by a
+  -- hybrid mana symbol, the player paying that cost chooses one half of that
+  -- symbol at the time the cost reduction is applied (see rule 601.2f)."
+  --
+  -- A DIFFERENT QUESTION from AnnounceHybridPayment above, and that is why it is
+  -- a different constructor rather than a reuse. That one is CR 601.2b's
+  -- announcement about a symbol in the cost being PAID, made before CR 601.2f
+  -- totals anything; this one is about a symbol in a REDUCTION, made as CR
+  -- 601.2f applies it, and nothing about the answer constrains what the spell's
+  -- own symbols may still be announced as. Sharing a constructor would also
+  -- leave Pawl.Engine.Replay unable to tell a transcript's two answers apart.
+  --
+  -- The ManaSymbol payload is the hybrid symbol being reduced BY, so a {2/B} and
+  -- a {W/U} in one player's reductions put distinguishable questions on the
+  -- wire; the NonEmpty is that symbol's two halves written as CR 118.7e's own
+  -- outcomes -- an OfType for "one mana of that type", a Generic for "an amount
+  -- of generic mana equal to that half's number". Answering with the resulting
+  -- SYMBOL rather than with a left/right flag is what lets both of CR 107.4e's
+  -- shapes use one prompt: {W/U}'s halves are two types, {2/B}'s are a type and
+  -- a number, and neither fits the other's payload.
+  --
+  -- One prompt per symbol, in the order the reductions are read. Two identical
+  -- reductions ask two identical questions, which is sound because the answers
+  -- are interchangeable: the pooled bag applyAdjustments cancels against does not
+  -- record which prompt contributed which symbol.
+  --
+  -- NOT filtered by payability, unlike the two announcements above. CR 118.7e
+  -- puts no such condition on the choice -- a player may take the half that
+  -- reduces nothing -- and CR 601.2f's own floor is what keeps that legal.
+  -- Elided only for the degenerate `Hybrid t t`, whose halves are one symbol.
+  ChooseReductionHalf :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaSymbol.ManaSymbol -> NonEmpty.NonEmpty ManaSymbol.ManaSymbol -> Prompt ManaSymbol.ManaSymbol

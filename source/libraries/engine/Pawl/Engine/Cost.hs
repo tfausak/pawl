@@ -19,6 +19,7 @@ module Pawl.Engine.Cost where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -136,7 +137,16 @@ costsFor name oid gs = case Game.lookupObject oid gs of
 -- CR 118.6a's first sentence needs no special case: fmap over the Maybe leaves
 -- Nothing as Nothing.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
-total pid oid cost gs = cost {Cost.mana = fmap (totalMana pid oid gs) (Cost.mana cost)}
+total pid oid cost gs = totalWith (PlayerEffect.costAdjustments pid oid gs) cost
+
+-- The same totalling over adjustments the CALLER already has, which is what CR
+-- 118.7e's prompt needs: `announceReductions` asks the payer which half of each
+-- hybrid symbol in a reduction it takes, and the answers have to reach
+-- applyAdjustments rather than being read out of the game state a second time.
+-- `total` above is this over the adjustments as they stand unannounced, which is
+-- the CASTABILITY GATE's reading of them (#813).
+totalWith :: ([Natural], [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustments) (Cost.mana cost)}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
 -- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;
@@ -256,6 +266,86 @@ announce pid oid total_ cost = case Cost.mana cost of
           Cost.components =
             Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
         }
+
+-- CR 118.7e: "If a cost is reduced by an amount of mana represented by a hybrid
+-- mana symbol, the player paying that cost chooses one half of that symbol at
+-- the time the cost reduction is applied (see rule 601.2f)." This is that
+-- choice, made for every hybrid symbol in every reduction that applies to `oid`,
+-- and the answers come back as the adjustments `totalWith` then applies.
+--
+-- A SECOND SEAM rather than part of `announce` above, because the two are two
+-- rules at two moments. CR 601.2b's announcement is about the symbols of the
+-- cost being paid and happens before the total exists; this is about the symbols
+-- of a REDUCTION and happens as CR 601.2f applies it, which the rule says
+-- outright. Pawl.Engine.Cast calls them in that order.
+--
+-- The answer is the nonhybrid symbol the chosen half resolves to, so what
+-- reaches applyAdjustments is a reduction with no hybrid symbol left in it --
+-- the same posture Mana.announce takes toward a cost, leaving an OfType behind
+-- where a {2/R} stood. That is why applyAdjustments' own Hybrid arms still take
+-- nothing: by the time a cost is PAID there is nothing there for them to read,
+-- and what still arrives spelled {2/B} is the castability gate's reduction,
+-- which no announcement precedes (#813).
+--
+-- NOT FILTERED BY PAYABILITY, unlike `announce`. CR 118.7e attaches no condition
+-- to the choice -- a player may take the half that reduces nothing -- and none
+-- is needed: a reduction only ever lowers a cost the gate already priced without
+-- it, so no answer here can strand a payment.
+--
+-- The INCREASES ride through untouched. CR 118.7e is a rule about reductions,
+-- and pawl's increases are amounts of generic mana with no symbol to choose
+-- halves of.
+announceReductions :: PlayerId -> ObjectId -> GameState -> Game ([Natural], [ManaCost.ManaCost])
+announceReductions pid oid gs =
+  let (increases, reductions) = PlayerEffect.costAdjustments pid oid gs
+      chooseOne symbol = case reductionHalvesOf symbol of
+        -- Not a hybrid symbol, so CR 118.7e has nothing to ask about it.
+        Nothing -> pure symbol
+        -- Unreachable: reductionHalvesOf answers Just only where it has halves
+        -- to offer. Left rather than made partial, and the symbol survives.
+        Just [] -> pure symbol
+        -- One half, which is the degenerate `Hybrid t t` no card prints. Both
+        -- halves are the same symbol, so the answer cannot be observed and
+        -- asking would be a prompt with one button.
+        Just [only] -> pure only
+        Just halves@(first : others) -> do
+          answer <-
+            Game.choose
+              (Prompt.ChooseReductionHalf (Decide.deciderFor pid gs) pid oid symbol (first NonEmpty.:| others))
+          -- FILTERED, NOT TRUSTED, the Mana.announce posture: an answer that is
+          -- not one of the offered halves falls back to the first.
+          pure (if elem answer halves then answer else first)
+      chooseAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse chooseOne symbols)
+   in fmap ((,) increases) (traverse chooseAll reductions)
+
+-- CR 118.7e's "one half of that symbol", written as the reduction each half
+-- would be: "if a colored or colorless half is chosen, the cost is reduced by
+-- one mana of that type" is an OfType, and "if a generic half is chosen, the
+-- cost is reduced by an amount of generic mana equal to that half's number" is a
+-- Generic. Nothing for a symbol with no halves to choose between, which is every
+-- symbol CR 107.4e does not call hybrid.
+--
+-- DEDUPLICATED, so `Hybrid t t` -- degenerate rather than illegal, per
+-- Pawl.Types.ManaSymbol -- offers one half instead of the same one twice.
+--
+-- CR 107.4f's Phyrexian symbol is NOT here, and needs no issue for it: CR 118.7f
+-- gives such a reduction one mana of the symbol's colour with no choice at all,
+-- which reducingManaTypeOf reads directly. The ten HYBRID Phyrexian symbols that
+-- rule also names would have a half to choose, and Pawl.Types.ManaSymbol cannot
+-- say one: its Phyrexian carries a single Color.
+reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
+reductionHalvesOf symbol = case symbol of
+  ManaSymbol.Generic _ -> Nothing
+  ManaSymbol.OfType _ -> Nothing
+  ManaSymbol.Hybrid a b -> Just (List.nub [ManaSymbol.OfType a, ManaSymbol.OfType b])
+  ManaSymbol.MonocoloredHybrid manaType ->
+    Just [ManaSymbol.OfType manaType, ManaSymbol.Generic Mana.monocoloredHybridGeneric]
+  ManaSymbol.Phyrexian _ -> Nothing
+  ManaSymbol.Snow -> Nothing
+  -- Unreachable for the reason applyAdjustments' Variable arms give: CR 601.2b
+  -- precedes CR 601.2f, so no {X} survives into a total cost. It names no halves
+  -- either way.
+  ManaSymbol.Variable -> Nothing
 
 -- CR 302.6: does paying this cost put the object's ability behind the
 -- summoning-sickness gate? The CLASSIFICATION Pawl.Engine.Activate reads, so that
@@ -706,10 +796,11 @@ payComponent pid oid component = case component of
 --    that names a type reduces only coloured mana, and Edgewalker's reminder
 --    text settles what that means -- a {1}{W} Cleric spell costs {1}, so the
 --    stranded {B} leaves the {1} alone. CR 118.7b-d's spill has no printed
---    producer (#309). The pool's two reducers WITHOUT that sentence are the
---    synthetics CR 118.7f and CR 118.7g needed; no test aims the first at a cost
---    the spill would reach, and the second names no type for the spill to strand
---    in the first place.
+--    producer (#309). The pool's reducers WITHOUT that sentence are the four
+--    synthetics CR 118.7e-g needed, and no test aims a TYPED one at a cost the
+--    spill would reach: the {S} and {2/B} reductions name no type for the spill
+--    to strand, and the {G/P} and {W/B} ones are aimed at costs with no generic
+--    component for CR 118.7b-c to move the stranded mana onto.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
 --
@@ -775,12 +866,15 @@ applyAdjustments adjustments cost =
         -- (#309). Either way it is the typed side, not this one, that reads an
         -- OfType.
         ManaSymbol.OfType _ -> 0
-        -- CR 118.7e: choosing the generic half of a hybrid would make it a
-        -- generic reduction, and the choice belongs to the player paying the
-        -- cost. Not asked, so neither half applies (#783).
+        -- CR 107.4e's colour/colour hybrid has no generic half at all, so
+        -- whichever way CR 118.7e's choice went it is the typed side below that
+        -- reads the answer.
         ManaSymbol.Hybrid _ _ -> 0
-        -- CR 118.7e's other half, unapplied for the same reason and by the same
-        -- issue: {2/R}'s {2} is exactly the generic half that rule names (#783).
+        -- A symbol still spelled {2/R} HERE is one CR 118.7e's choice has not
+        -- been made for -- announceReductions leaves a Generic behind when the
+        -- {2} half is taken, which the arm above reads. What reaches this arm is
+        -- the castability gate's reduction, which no announcement precedes
+        -- (#813).
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 118.7f gives a Phyrexian reduction to the typed side whole --
         -- "one mana of that symbol's color" -- so it takes no generic mana.
@@ -852,12 +946,16 @@ applyAdjustments adjustments cost =
         ManaSymbol.Generic _ -> Nothing
         ManaSymbol.OfType manaType -> Just manaType
         -- CR 118.7e: the choice of half belongs to the PLAYER PAYING the cost,
-        -- and answering it here would be the engine making it. Not asked, so
-        -- neither half is applied (#783).
+        -- so answering it here would be the engine making it. A symbol still
+        -- spelled {W/U} at this point is one nobody has been asked about --
+        -- announceReductions leaves the chosen half's OfType behind when they
+        -- have -- and what reaches this arm is the castability gate's reduction,
+        -- which no announcement precedes (#813).
         ManaSymbol.Hybrid _ _ -> Nothing
-        -- CR 118.7e's other half, and unapplied for the same reason: choosing
-        -- the {2} makes it a generic reduction, which reducingGenericOf would
-        -- owe, and choosing the colour makes it this one (#783).
+        -- CR 118.7e's other shape, unread here for the same reason. Whichever
+        -- half of a {2/R} the payer takes, announceReductions leaves behind the
+        -- symbol that half is -- an OfType this arm reads, or a Generic
+        -- reducingGenericOf does (#813).
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- CR 118.7f: "If a cost is reduced by an amount of mana represented by a
         -- Phyrexian mana symbol, the cost is reduced by one mana of that symbol's

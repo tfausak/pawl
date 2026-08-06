@@ -1,0 +1,49 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Monocolored Hybrid Discount",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceSpellCost",
+            "value": [
+              {
+                "type": "HasColor",
+                "value": {
+                  "type": "Black"
+                }
+              },
+              [
+                {
+                  "type": "MonocoloredHybrid",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Black"
+                    }
+                  }
+                }
+              ]
+            ]
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
