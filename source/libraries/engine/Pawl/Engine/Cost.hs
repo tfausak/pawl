@@ -632,8 +632,7 @@ applyAdjustments adjustments cost =
         -- Right for the COST and wrong for a REDUCTION, and unlike the Phyrexian
         -- symbol below this function is NOT split to say so: CR 118.7g makes an
         -- {S} in a reduction reduce the cost by that much generic mana, so this
-        -- arm owes 1 there and gives 0. Deliberately left -- #516 was closed as
-        -- inert rather than fixed, no printed card stating such a reduction.
+        -- arm owes 1 there and gives 0 (#516).
         ManaSymbol.Snow -> 0
         -- Unreachable: CR 601.2b precedes 601.2f, so Mana.substituteX has
         -- already replaced every Variable before a total cost is computed. The
@@ -709,10 +708,9 @@ applyAdjustments adjustments cost =
         -- exactly one colour and the life half is no part of a reduction.
         ManaSymbol.Phyrexian color -> Just (ManaType.Colored color)
         -- CR 118.7g turns an {S} reduction into that much GENERIC mana, so it is
-        -- no part of the typed cancellation. genericOf's Snow arm is where it
-        -- would land, and that arm answers 0 -- deliberately unimplemented: no
-        -- printed card states a reduction in {S} (Scryfall, all 44 cards carrying
-        -- {S} in oracle text state a cost), and #516 was closed as inert.
+        -- no part of the typed cancellation and Nothing is right here. What is
+        -- not implemented is the generic side: genericOf's Snow arm is where an
+        -- {S} reduction would land, and it answers 0 rather than 1 (#516).
         ManaSymbol.Snow -> Nothing
         -- Unreachable for the reason genericOf's Variable arm gives; {X} is no
         -- amount of mana until CR 601.2b names one.
