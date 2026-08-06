@@ -155,7 +155,7 @@ vanillaFace name typeLine =
       Face.openingHandAction = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
-      Face.enchant = Nothing,
+      Face.enchant = [],
       Face.counterability = Counterability.Counterable
     }
 
@@ -1560,7 +1560,7 @@ cardFilters card =
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap staticAbilityFilters (Face.staticAbilities card)
         <> concatMap replacementEffectFilters (Face.replacementEffects card)
-        <> concatMap targetSpecFilters (Maybe.maybeToList (Face.enchant card))
+        <> concatMap targetSpecFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
         <> concatMap costFilters (Face.alternativeCosts card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
@@ -2240,18 +2240,33 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let card = S.combinedFace piker
-    Spec.assertEqWith s "no enchant spec" (Face.enchant card) Nothing
+    Spec.assertEqWith s "no enchant spec" (Face.enchant card) []
     Spec.assertBool s (not (Card.isAura card)) "not an Aura"
     Spec.assertEqWith s "no enchant slot" (Card.enchantSpecs card) Map.empty
   -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
   -- target and could never be cast; a non-Aura with enchant declares a restriction
   -- nothing reads. The D4 lint cannot see either, because it walks
   -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
+  --
+  -- "AT LEAST one", since CR 702.5c lets an Aura have several -- the count is not
+  -- what makes a card an Aura, only the presence.
   Spec.it s "a card is an Aura iff it declares an enchant ability" $ do
     ps <- S.allPrintings s
-    let offends c = Card.isAura c /= Maybe.isJust (Face.enchant c)
+    let offends c = Card.isAura c /= not (null (Face.enchant c))
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "Aura iff enchant" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 702.5c makes every instance of enchant apply at once, and
+  -- Pawl.Engine.Card.enchantSpec conjoins them into ONE spec by Anding their
+  -- Filters and keeping the first instance's Pool. That fold is faithful only
+  -- while the instances agree about the pool: pawl has no intersection of two
+  -- Pools, and CR 115's pools carry different Recipient tags besides. A card
+  -- whose enchant abilities disagreed would be silently judged by the first
+  -- one's pool, so it is rejected here instead (#797).
+  Spec.it s "every enchant ability on a card draws from the same pool" $ do
+    ps <- S.allPrintings s
+    let offends c = length (List.nub (fmap TargetSpec.pool (Face.enchant c))) > 1
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card mixes enchant pools" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
   -- mode declaring it would be silently shadowed.
   -- #199: no card authors a layer-2 control modification into an effect that
@@ -2447,7 +2462,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.spell = spellOf [] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just buried)))}
             ),
             ( "CR 303.4a's enchant ability",
-              base {Face.enchant = Just (TargetSpec.MkTargetSpec Pool.Permanents (Just buried))}
+              base {Face.enchant = [TargetSpec.MkTargetSpec Pool.Permanents (Just buried)]}
             ),
             ( "a static ability's affected set",
               base

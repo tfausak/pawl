@@ -151,15 +151,16 @@ data Face card = MkFace
     -- axis (playerAbilities / Effect.AffectPlayers); every entry here is a card
     -- restricting only itself.
     castingRestrictions :: [CastingRestriction.CastingRestriction],
-    -- | CR 702.5a: this face's `enchant` ability, restricting what an Aura spell
-    -- can target and what an Aura can enchant. Nothing for every card that is not
-    -- an Aura; the CardSpec lint family holds the biconditional both ways.
+    -- | CR 702.5a: this face's `enchant` abilities, restricting what an Aura spell
+    -- can target and what an Aura can enchant. Empty for every card that is not an
+    -- Aura; the CardSpec lint family holds the biconditional both ways.
     --
-    -- A TargetSpec, not a Filter, because CR 702.5d's enchant-player Auras need
-    -- the Pool axis and TargetSpec already is {pool, filter}. SINGULAR: CR 702.5c's
-    -- multiple applying instances are unrepresentable, and no card in this pool
-    -- prints two (#189).
-    enchant :: Maybe TargetSpec.TargetSpec,
+    -- TargetSpecs, not Filters, because CR 702.5d's enchant-player Auras need the
+    -- Pool axis and TargetSpec already is {pool, filter}. A LIST, because CR 702.5c
+    -- makes multiple instances of enchant all apply -- printed order, the order the
+    -- other ability lists on this record keep. Pawl.Engine.Card.enchantSpec is the
+    -- conjunction every reader goes through, and the one place that rule is applied.
+    enchant :: [TargetSpec.TargetSpec],
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the
     -- projection -- the castingPermissions precedent: a spell on the stack gets no
