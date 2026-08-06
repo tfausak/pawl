@@ -417,6 +417,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SpellOrAbilityCounters _ -> []
   -- CR 615.13's prevention condition is a PlayerRelation too.
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  TriggerCondition.PlayerGainsLife _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -1331,6 +1332,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  TriggerCondition.PlayerGainsLife _ -> []
 
 -- CR 613.11: which spells a player effect names -- a cost modifier's (CR
 -- 601.2f) or a timing permission's (CR 601.3b).

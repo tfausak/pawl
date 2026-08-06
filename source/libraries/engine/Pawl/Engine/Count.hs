@@ -221,3 +221,4 @@ snapshotView shape event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
+  GameEvent.LifeGained _ _ -> Nothing

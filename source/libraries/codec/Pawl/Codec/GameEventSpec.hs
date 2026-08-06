@@ -120,3 +120,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.LifeLost (PlayerId.MkPlayerId 1) 2)
       """ {"type":"LifeLost","value":[1,2]} """
+  -- CR 119.3's other direction. A DIFFERENT tag from LifeLost above and the same
+  -- payload shape, so the two must never decode to each other.
+  Spec.it s "LifeGained" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.LifeGained (PlayerId.MkPlayerId 1) 2)
+      """ {"type":"LifeGained","value":[1,2]} """

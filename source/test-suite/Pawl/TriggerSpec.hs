@@ -56,7 +56,10 @@
 -- BYSTANDER -- "whenever another creature you control dies", where the bearer
 -- watches a permanent other than itself leave the battlefield -- with Meren of
 -- Clan Nel Toth, which is also the pool's producer for CR 122's experience
--- counters -- `permanentDiesSpec`.
+-- counters -- `permanentDiesSpec`. CR 119.9's life-gain trigger, from both
+-- producers (CR 119.3's instructed gain and CR 120.3f's lifelink) with the
+-- controls that keep it from being a "life total moved" trigger, with Ajani's
+-- Pridemate -- `lifeGainTriggerSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -75,6 +78,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -3252,6 +3256,9 @@ representativeEvents cond =
         -- scoped to damage that would be dealt to one -- an event naming a
         -- creature matches nothing and would pin the floor at empty.
         TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (Recipient.ToPlayer S.bob) 2)
+        -- CR 119.9's own event, and the only one this condition admits: the
+        -- payload is a player and an amount, and the floor is empty for both.
+        TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained S.bob 2)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3274,7 +3281,8 @@ everyTriggerCondition =
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
-    TriggerCondition.DamageToPlayerPrevented PlayerRelation.You
+    TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
+    TriggerCondition.PlayerGainsLife PlayerRelation.You
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -3997,6 +4005,130 @@ runToTurnStep turn phase answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 64 gs0
 
+-- CR 119.9: "Some triggered abilities are written, 'Whenever [a player] gains
+-- life, . . . .' Such abilities are treated as though they are written, 'Whenever
+-- a source causes [a player] to gain life, . . . .' If a player gains 0 life, no
+-- life gain event has occurred, and these abilities won't trigger."
+--
+-- Ajani's Pridemate, {1}{W} Creature -- Cat Soldier 2/2, "Whenever you gain life,
+-- put a +1/+1 counter on this creature", the card that proves it. Its payload
+-- names only its own source, so every case here isolates the CONDITION.
+--
+-- What makes the group a proof rather than a demonstration is that each positive
+-- has a control differing in ONE thing:
+--
+--   * the same Soul Warden, the same entering creature, the same 1 life gained --
+--     and the Warden under the OTHER player. Only the GAINER differs, and the
+--     Pridemate is silent (CR 109.5 / 603.3a's "you").
+--   * one combat damage event, two life totals moving in opposite directions, and
+--     a Pridemate on each side. Only the DIRECTION differs, and only the gainer's
+--     fires: CR 120.3f's lifelink gain is a life gain event and CR 119.2's damage
+--     loss is not (GameEvent.LifeLost is a different constructor entirely).
+--
+-- The zero case is CR 119.9's own last sentence, asserted on the CR 608.2i record
+-- rather than through a counter: a 0-damage lifelink event is a real damage event
+-- that gains 0 life, so the log must hold no life gain for it to match.
+lifeGainTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lifeGainTriggerSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- A Maybe rather than a defaulted 0, so a Pridemate that is no longer
+      -- there reads as Nothing and cannot be mistaken for one that took no
+      -- counter.
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- alice always holds the Pridemate and casts the creature; `wardenOwner`
+      -- decides who gains the life the entering creature causes. That is the only
+      -- difference between the two cases below.
+      wardenBoard plains pridemate soulWarden wardenOwner =
+        let (_, b0) = S.addCreature soulWarden wardenOwner (S.landsInPlay plains 1)
+            (mateId, b1) = S.addCreature pridemate S.alice b0
+            (gs, spellId) = S.handOne soulWarden b1
+            cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+         in (mateId, resolveAll cast)
+      -- Only `attacker` attacks, and nobody blocks, so the life totals move by
+      -- exactly the one damage event under test. Declining the block is what puts
+      -- the damage on the PLAYER: bob's own Pridemate would otherwise block, and
+      -- CR 120.3e's marked damage would leave his life total alone -- costing the
+      -- lifelink case its "and bob lost two" control.
+      attacksWith attacker p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+   in Spec.describe s "PlayerGainsLife" $ do
+        -- The gameplay-level proof, cast to resolution. alice's Soul Warden sees
+        -- the second Warden enter (CR 603.6a), gains her 1 life on resolution (CR
+        -- 119.3), and THAT is the event the Pridemate matches -- a second CR 117.5
+        -- boundary later, off GameEvent.LifeGained.
+        --
+        -- Exactly one counter, not two: the newcomer's own "another" declines its
+        -- own entry, so exactly one life gain event happened.
+        Spec.it s "CR 119.9 whole cards: alice gains 1 life from Soul Warden and her Pridemate grows" $ do
+          plains <- S.printingOf s registry "Plains"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          let (mateId, settled) = wardenBoard plains pridemate soulWarden S.alice
+          Spec.assertEqWith s "alice gained exactly 1" (S.lifeOf S.alice settled) (Just 21)
+          Spec.assertEqWith s "the Pridemate took exactly one +1/+1 counter" (countersOn mateId settled) (Just 1)
+        -- The control twin, differing in ONE thing: bob controls the Soul Warden,
+        -- so bob is the one who gains. The same creature enters, the same 1 life
+        -- is gained, the same log entry is written -- and CR 109.5's "you" is
+        -- alice, so her Pridemate stays silent.
+        --
+        -- bob's gain is asserted too, or the case would pass for the wrong reason:
+        -- an engine that recorded no event at all would also show no counter.
+        Spec.it s "CR 109.5/603.3a the control: BOB gains the life, and alice's Pridemate stays silent" $ do
+          plains <- S.printingOf s registry "Plains"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          let (mateId, settled) = wardenBoard plains pridemate soulWarden S.bob
+          Spec.assertEqWith s "bob really gained the life" (S.lifeOf S.bob settled) (Just 21)
+          Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice settled) (Just 20)
+          Spec.assertEqWith s "so the Pridemate took no counter" (countersOn mateId settled) (Just 0)
+        -- CR 120.3f: "damage dealt by a source with lifelink causes that source's
+        -- controller to gain that much life, in addition to the damage's other
+        -- results". The second producer, and the one CR 119.9's rewriting is aimed
+        -- at -- no effect said "gain life"; a keyword did.
+        --
+        -- ONE board carries the control. bob has a Pridemate too, and the single
+        -- combat damage event moves both life totals: alice's UP by 2 (CR 120.3f)
+        -- and bob's DOWN by 2 (CR 119.2 / 120.3a). Only alice's fires, so the
+        -- trigger is keyed on gaining life rather than on a life total moving.
+        Spec.it s "CR 120.3f lifelink gains life, so the attacker's Pridemate grows and the defender's does not" $ do
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          childOfNight <- S.printingOf s registry "Child of Night"
+          let (gs0, mine, _) = S.combatBoardOf [childOfNight] []
+              (aliceMate, gs1) = S.addCreature pridemate S.alice gs0
+              (bobMate, gs2) = S.addCreature pridemate S.bob gs1
+          case mine of
+            [] -> Spec.assertFailure s "fixture should have given alice a Child of Night"
+            vampire : _ -> do
+              let settled = resolveAll (S.fightWith (attacksWith vampire) gs2)
+              Spec.assertEqWith s "alice gained two" (S.lifeOf S.alice settled) (Just 22)
+              Spec.assertEqWith s "and bob lost two" (S.lifeOf S.bob settled) (Just 18)
+              Spec.assertEqWith s "alice's Pridemate grew" (countersOn aliceMate settled) (Just 1)
+              Spec.assertEqWith s "bob's Pridemate did not -- losing life is not gaining it" (countersOn bobMate settled) (Just 0)
+        -- CR 119.9's last sentence: "if a player gains 0 life, no life gain event
+        -- has occurred".
+        --
+        -- Hand-built, and honestly so: no card in the pool can hand applyDamage a
+        -- 0-amount event, CR 510.1a dropping a creature that assigns 0 or less and
+        -- Resolve's DealDamage arm guarding its own quantity. What this pins is
+        -- therefore applyDamage's own contract -- the door a future producer would
+        -- come through -- rather than a board a player could sit at.
+        --
+        -- Asserted on the LOG rather than through a counter, because the claim is
+        -- about the RECORD: a counter assertion would also pass for an engine that
+        -- recorded the zero and then declined to match it, which is not what the
+        -- rule says. The 2-damage half is the paired control, so an empty answer
+        -- cannot pass for the wrong reason.
+        Spec.it s "CR 119.9 a 0-damage lifelink event records no life gain at all" $ do
+          childOfNight <- S.printingOf s registry "Child of Night"
+          let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
+              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False 0 (Just S.alice) DamageKind.Combat
+              gainsIn gs = [p | GameEvent.LifeGained p _ <- Foldable.toList (GameState.events gs)]
+              after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
+          Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
+          Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -4031,3 +4163,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   discardTriggerSpec s registry
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
+  lifeGainTriggerSpec s registry
