@@ -1,8 +1,9 @@
 -- CR 113.6m's "or effect" half, asked of an EFFECT: does it move the object the
 -- ability is on out of a particular zone, and which zone? The ABILITY-level
--- reading that rule defines is Pawl.Engine.Activate.zoneFunctionedFrom, which
--- folds this over an ability's effects and takes the cost half
--- (Pawl.Engine.Cost.zoneFunctionedFrom) alongside it.
+-- readings that rule defines fold this over an ability's effects, one per kind
+-- of ability: Pawl.Engine.Activate.zoneFunctionedFrom takes the cost half
+-- (Pawl.Engine.Cost.zoneFunctionedFrom) alongside it, and
+-- Pawl.Engine.Event.zoneFunctionedFrom has no cost half to take.
 --
 -- Here rather than in Pawl.Engine.Cost because it is a classification of an
 -- EFFECT and that module's whole contract is to be the sole casing home for a

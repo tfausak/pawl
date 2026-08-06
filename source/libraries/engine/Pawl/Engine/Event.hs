@@ -32,9 +32,11 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.EffectZone as EffectZone
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
@@ -2234,6 +2236,22 @@ eventTriggers events gs =
       -- away and a layer-6 grant adds them without special-casing. Shared by both
       -- candidate sources, so a live and a last-known permanent read alike.
       abilitiesOf pc = PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc)
+      -- CR 113.6m's "functions ONLY in that zone", applied to the LIVE
+      -- battlefield reading: a Squee, Goblin Nabob standing on the battlefield
+      -- does not see its own upkeep, because the ability that watches for it
+      -- functions in the graveyard. The mirror of the filter
+      -- Pawl.Engine.Activate.abilitiesForGiven puts on its battlefield arm.
+      --
+      -- NOT applied to the LAST-KNOWN readings below -- `leftBattlefield`, and
+      -- the `bystanders` suffix union built out of it -- because those are two
+      -- questions wearing one shape and CR 113.6m answers them differently. For
+      -- CR 603.10a's look-back at the permanent this event removed, the rule's
+      -- own "unless its trigger condition ... specifies that the object is put
+      -- into that zone" exempts the dies triggers it serves, and that clause is
+      -- not implemented (#819), so filtering there would read the rule's first
+      -- half without its second. For CR 603.10's first sentence -- a BYSTANDER,
+      -- which carries any condition at all -- the filter does belong (#822).
+      onBattlefieldAbilitiesOf pc = filter (functionsIn Zone.Battlefield) (abilitiesOf pc)
       onBattlefield =
         Map.fromList
           ( Maybe.mapMaybe
@@ -2259,7 +2277,7 @@ eventTriggers events gs =
                   -- 603.10's first sentence asks for.
                   Just pc ->
                     fmap
-                      (\ctrl -> (oid, (ctrl, abilitiesOf pc)))
+                      (\ctrl -> (oid, (ctrl, onBattlefieldAbilitiesOf pc)))
                       ( case Map.lookup oid (GameState.controlWhenTriggered gs) of
                           Just who -> Just who
                           Nothing -> Projection.controllerOfGiven grants Set.empty oid gs
@@ -2375,15 +2393,15 @@ eventTriggers events gs =
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
-      -- CR 113.6k: every card in every graveyard carrying at least one ability that
-      -- rule puts there. The one source that widens the SCANNED ZONE rather than
-      -- recovering an object an event names, which is why it is computed once
-      -- outside the event loop, as `onBattlefield` is.
+      -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
+      -- one ability those rules put there. The one source that widens the SCANNED
+      -- ZONE rather than recovering an object an event names, which is why it is
+      -- computed once outside the event loop, as `onBattlefield` is.
       --
       -- Narrow by construction, which keeps a large graveyard cheap: membership is
-      -- decided by `functionsInGraveyard` over each printed condition -- a total
-      -- case over a closed type, no projection, no board walk. Cards contributing
-      -- nothing are dropped rather than carried as empty entries.
+      -- decided by `functionsIn` -- a total case over a closed condition type and a
+      -- walk of the ability's own effects, no projection and no board walk. Cards
+      -- contributing nothing are dropped rather than carried as empty entries.
       --
       -- Abilities come from the PRINTED card and the controller is the OWNER, for
       -- `cycledCard`'s reasons.
@@ -2395,7 +2413,7 @@ eventTriggers events gs =
       -- (#349).
       graveyardCandidate oid = case (Game.lookupObject oid gs, Game.faceOf oid gs) of
         (Just obj, Just face) ->
-          case filter (functionsInGraveyard . TriggeredAbility.condition) (Face.triggeredAbilities face) of
+          case filter (functionsIn Zone.Graveyard) (Face.triggeredAbilities face) of
             [] -> Nothing
             abilities -> Just (oid, (Object.owner obj, abilities))
         _ -> Nothing
@@ -2418,9 +2436,64 @@ eventTriggers events gs =
       scanOne (event, gone) = concatMap (forOne event) (candidates event gone)
    in concatMap scanOne (zip events bystanders)
 
+-- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
+-- specifies that it moves the object it's on out of a particular zone functions
+-- only in that zone". The rule says "an ability" -- Pawl.Engine.Activate's
+-- namesake is the same sentence read off an activated one, and this is the
+-- triggered half.
+--
+-- The EFFECT half alone. CR 602.1 gives an activated ability "a cost and an
+-- effect"; CR 603.1 gives a triggered one "a trigger condition and an effect",
+-- and no cost at all -- so Pawl.Engine.Cost, the other half of
+-- Activate.zoneFunctionedFrom, has nothing to be asked here.
+--
+-- ALL MODES, in printed order, for Activate.zoneFunctionedFrom's reason: CR
+-- 700.2 makes a modal ability's modes alternatives, so a zone stated by any of
+-- them is a zone the ability can move its object out of.
+--
+-- Not a case on an effect's identity: Pawl.Engine.EffectZone answers the one
+-- question, and this folds its answer.
+--
+-- Not implemented: CR 113.6m's "unless" clause, its Aura half, and its
+-- delayed-triggered-ability sentence (#819).
+zoneFunctionedFrom :: TriggeredAbility.TriggeredAbility Card -> Maybe Zone
+zoneFunctionedFrom ability =
+  Maybe.listToMaybe
+    (Maybe.mapMaybe EffectZone.zoneFunctionedFrom (Modal.allEffects (TriggeredAbility.modal ability)))
+
+-- CR 113.6, asked of one zone and one triggered ability: does it function from
+-- there? Three sentences of that rule in precedence order.
+--
+-- CR 113.6m first, because it is the only one that can name a zone the condition
+-- knows nothing about -- Squee, Goblin Nabob's "at the beginning of your upkeep"
+-- triggers perfectly well from the battlefield, and only "return this card from
+-- your graveyard" says otherwise. "Functions ONLY in that zone" is what makes
+-- this an override rather than an addition.
+--
+-- CR 113.6k next, for a condition that cannot trigger from the battlefield at
+-- all -- Narcomoeba's "put into your graveyard from your library".
+--
+-- CR 113.6's own default last: "abilities of all other objects usually function
+-- only while that object is on the battlefield".
+--
+-- The two rules cannot presently disagree: no printing states an origin zone on
+-- an ability whose condition already answers CR 113.6k, and if one did they
+-- would both say graveyard. The order is written down so a future card meets a
+-- decision rather than an accident.
+functionsIn :: Zone -> TriggeredAbility.TriggeredAbility Card -> Bool
+functionsIn zone ability = case zoneFunctionedFrom ability of
+  Just named -> zone == named
+  Nothing
+    | functionsInGraveyard (TriggeredAbility.condition ability) -> zone == Zone.Graveyard
+    | otherwise -> zone == Zone.Battlefield
+
 -- CR 113.6k: a trigger condition that can't trigger from the battlefield functions
 -- in all zones it can trigger from. Answered for one zone, the graveyard, the only
 -- non-battlefield zone eventTriggers scans (#348).
+--
+-- One of the three sentences `functionsIn` above reads, and the only one that
+-- looks at the CONDITION -- so an ability whose effect already names its zone
+-- never reaches this, and no arm below has to think about CR 113.6m.
 --
 -- A CLASSIFICATION of a trigger condition rather than an effect: it asks which
 -- zone a rule 603 condition functions in and never reaches the ability's payload.
