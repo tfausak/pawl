@@ -68,6 +68,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
@@ -106,6 +107,7 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -1369,17 +1371,19 @@ playerEffectFilters playerEffect = case playerEffect of
   -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
   -- Serpopard's is HasCardType Creature).
   PlayerEffect.CantBeCountered f -> [f]
-  -- CR 615.12 carries nothing at all: the sentence names no spell, no source and
-  -- no recipient (Spider-Punk's "damage can't be prevented").
-  PlayerEffect.DamageCantBePrevented -> []
+  -- CR 615.12 carries no Filter: what it narrows by is a DamagePattern, whose
+  -- own axes are a kind, a source relation and a recipient rather than a
+  -- predicate over an object (Excruciator's "by this creature"). The pattern's
+  -- authorability is linted by unpreventablePatternOffends below.
+  PlayerEffect.DamageCantBePrevented _ -> []
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
 --
--- Pawl.Engine.PlayerEffect.damageCantBePrevented asks no player, because CR
--- 615.12's sentence is about a damage EVENT and names no player to ask about.
--- It folds the board instead -- "does any seat have such an effect applying?"
--- -- which is the same fact as "does it apply" exactly when the scope is
+-- Pawl.Engine.PlayerEffect.unpreventable asks no player, because CR 615.12's
+-- sentence is about a damage EVENT and names no player to ask about. It gathers
+-- from the whole board instead -- "which seats have such an effect applying?" --
+-- which admits the same events as "it applies" exactly when the scope is
 -- PlayerScope.EachPlayer, and reads a narrower one as board-wide. This lint is
 -- what makes that exactness a property of the pool rather than a hope: no card
 -- may author the scope the fold cannot see.
@@ -1387,16 +1391,16 @@ playerEffectFilters playerEffect = case playerEffect of
 -- The rule, not just the engine, is what backs the ban. Every printed narrowing
 -- of CR 615.12 narrows by a quality of the damage EVENT and not by a player:
 -- Excruciator's source, Frenzied Baloth's kind, Questing Beast's source
--- relation, Whippoorwill's recipient. That axis is Pawl.Types.DamagePattern's
--- and lands as a payload on the constructor (#835), never as a carrier scope --
--- a scope names which players an effect applies TO, and a damage event between
--- two creatures applies to no player at all.
+-- relation, Whippoorwill's recipient. That axis is the DamagePattern the
+-- constructor now carries, never a carrier scope -- a scope names which players
+-- an effect applies TO, and a damage event between two creatures applies to no
+-- player at all.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
 -- player effect whose reading depends on its scope must break this build.
 unpreventableScopeOffends :: PlayerScope.PlayerScope -> PlayerEffect.PlayerEffect -> Bool
 unpreventableScopeOffends scope playerEffect = case playerEffect of
-  PlayerEffect.DamageCantBePrevented -> scope /= PlayerScope.EachPlayer
+  PlayerEffect.DamageCantBePrevented _ -> scope /= PlayerScope.EachPlayer
   -- Every other arm IS asked about a player, so its scope is read exactly as
   -- written and any of the three is legitimate: Rule of Law and Thalia say
   -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
@@ -1413,6 +1417,55 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.CantBeTargetedBy _ -> False
   PlayerEffect.CastAsThoughItHadFlash _ -> False
   PlayerEffect.CantBeCountered _ -> False
+
+-- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
+-- DamagePattern: does this card author a field of that pattern the engine bakes?
+--
+-- `whichRecipient` is the one, and for damagePatternOffends' reason -- a card
+-- cannot name an ObjectId or a PlayerId. Whippoorwill's "damage that would be
+-- dealt to THAT CREATURE" does name a recipient, but the creature is the one its
+-- resolution chose, so the pattern is the engine's to bake and never the card
+-- file's to write. `whichKind` and `whichSource` are both authorable here and
+-- are exactly what Frenzied Baloth and Excruciator print.
+--
+-- Not implemented: no resolution bakes a recipient into THIS pattern, the way
+-- Resolve's prevention arms bake one into a shield's, so the field has no
+-- producer on either side yet (#845).
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum.
+unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
+unpreventablePatternOffends playerEffect = case playerEffect of
+  PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_)
+  PlayerEffect.IncreaseSpellCost _ _ -> False
+  PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.CantCastSpells -> False
+  PlayerEffect.CantCastMoreThan _ -> False
+  PlayerEffect.CantCastChosenName -> False
+  PlayerEffect.CantPlayLandChosenName -> False
+  PlayerEffect.PlayAdditionalLands _ -> False
+  PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.CantBeTargetedBy _ -> False
+  PlayerEffect.CastAsThoughItHadFlash _ -> False
+  PlayerEffect.CantBeCountered _ -> False
+
+-- The non-vacuity half of both lints above: is this CR 615.12's effect at all?
+-- A wildcard is right here, where it is not above -- this asks "did the sweep
+-- have anything to look at", not "is it well-formed". isPhaseR's shape.
+isUnpreventable :: PlayerEffect.PlayerEffect -> Bool
+isUnpreventable playerEffect = case playerEffect of
+  PlayerEffect.DamageCantBePrevented _ -> True
+  _ -> False
+
+-- The pattern that narrows nothing: Spider-Punk's, and what a fixture below
+-- restates a card's effect to when the pattern is not the axis under test.
+anyDamage :: DamagePattern.DamagePattern
+anyDamage =
+  DamagePattern.MkDamagePattern
+    { DamagePattern.whichKind = Nothing,
+      DamagePattern.whichSource = SourceRelation.AnySource,
+      DamagePattern.whichRecipient = Nothing
+    }
 
 -- Every (scope, player effect) pair a card authors, on BOTH of the carriers
 -- Pawl.Engine.PlayerEffect.applying folds together: the printed static ability
@@ -2456,15 +2509,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any (damagePatternOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
     Spec.assertBool s (any (damagePatternOffends . bakeShield) printed) "and so is one counting a shield down"
   -- The same shape one axis over, and the thing that makes
-  -- Pawl.Engine.PlayerEffect.damageCantBePrevented's board fold EXACT rather
-  -- than approximate. See unpreventableScopeOffends.
+  -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
+  -- approximate. See unpreventableScopeOffends.
   Spec.it s "no card narrows CR 615.12's \"damage can't be prevented\" by player" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace (any (uncurry unpreventableScopeOffends) . cardPlayerScopes) . Printing.card) ps
     -- Guards against a vacuous sweep: with no such effect in the pool at all
     -- this would pass whatever the classification said. Spider-Punk is the card
     -- that prints one.
-    Spec.assertBool s (any (anyFace (any ((==) PlayerEffect.DamageCantBePrevented . snd) . cardPlayerScopes) . Printing.card) ps) "the pool has a card printing unpreventable damage"
+    Spec.assertBool s (any (anyFace (any (isUnpreventable . snd) . cardPlayerScopes) . Printing.card) ps) "the pool has a card printing unpreventable damage"
     Spec.assertEqWith s "CR 615.12 names no player, so its carrier is scoped to every player" (fmap (S.nameOf . Printing.card) offenders) []
   -- The rejecting direction, proven against Spider-Punk rescoped rather than
   -- against a card file, exactly as the two cases above are.
@@ -2487,7 +2540,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- shape real, and this is what keeps the sweep honest until it lands.
     silence <- S.printingOf s registry "Silence"
     let unpreventable effect = case effect of
-          Effect.AffectPlayers duration scope _ -> Effect.AffectPlayers duration scope PlayerEffect.DamageCantBePrevented
+          Effect.AffectPlayers duration scope _ -> Effect.AffectPlayers duration scope (PlayerEffect.DamageCantBePrevented anyDamage)
           other -> other
         widen effect = case effect of
           Effect.AffectPlayers duration _ playerEffect -> Effect.AffectPlayers duration PlayerScope.EachPlayer playerEffect
@@ -2503,6 +2556,41 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (offends silenced)) "the real Silence, whose stored effect is scoped to its opponents, is accepted"
     Spec.assertBool s (offends (overSpell unpreventable silenced)) "a stored CR 615.12 effect scoped to opponents is rejected"
     Spec.assertBool s (not (offends (overSpell (widen . unpreventable) silenced))) "and the same stored effect scoped to every player is accepted"
+  -- The pattern axis of the same carrier, and damagePatternOffends' twin: a card
+  -- may narrow CR 615.12 by kind or by source, and may not name the RECIPIENT,
+  -- which only Resolve can bake. See unpreventablePatternOffends.
+  Spec.it s "no card authors a recipient into CR 615.12's damage pattern" $ do
+    ps <- S.allPrintings s
+    let patterns = concatMap (overFaces (fmap snd . cardPlayerScopes) . Printing.card) ps
+        offenders = filter (anyFace (any (unpreventablePatternOffends . snd) . cardPlayerScopes) . Printing.card) ps
+    -- The non-vacuity guard, and the guard that the AUTHORABLE axes really are
+    -- authored: Spider-Punk narrows nothing and Excruciator names TheSource, so
+    -- the sweep has both a permissive and a narrowed pattern to look at.
+    Spec.assertBool s (any isUnpreventable patterns) "the pool has a card printing unpreventable damage"
+    Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage) patterns) "Spider-Punk's pattern narrows nothing"
+    Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage {DamagePattern.whichSource = SourceRelation.TheSource}) patterns) "Excruciator's names its own source"
+    Spec.assertEqWith s "CR 615.7's recipient is baked, never printed" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against Excruciator restated rather than
+  -- against a card file, exactly as the cases above are.
+  Spec.it s "the lint itself catches a printed recipient on CR 615.12" $ do
+    excruciator <- S.printingOf s registry "Excruciator"
+    let card = S.combinedFace excruciator
+        bake playerEffect = case playerEffect of
+          PlayerEffect.DamageCantBePrevented pattern_ ->
+            PlayerEffect.DamageCantBePrevented pattern_ {DamagePattern.whichRecipient = Just (Recipient.ToPlayer S.alice)}
+          other -> other
+        restate f ability = ability {PlayerStaticAbility.effect = f (PlayerStaticAbility.effect ability)}
+        over f = card {Face.playerAbilities = fmap (restate f) (Face.playerAbilities card)}
+        offends = any (unpreventablePatternOffends . snd) . cardPlayerScopes
+        kind playerEffect = case playerEffect of
+          PlayerEffect.DamageCantBePrevented pattern_ ->
+            PlayerEffect.DamageCantBePrevented pattern_ {DamagePattern.whichKind = Just DamageKind.Combat}
+          other -> other
+    Spec.assertBool s (not (offends card)) "the real Excruciator names a source and no recipient, and is accepted"
+    Spec.assertBool s (offends (over bake)) "and the same clause naming a shielded player is rejected"
+    -- Frenzied Baloth's axis, which is authorable and must stay so: narrowing by
+    -- KIND is not what this lint bans.
+    Spec.assertBool s (not (offends (over kind))) "narrowing the same clause to combat damage is accepted"
   -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
   -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
   -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement

@@ -200,15 +200,11 @@ applies gs event candidate =
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
             && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
-        -- CR 615.1: a pattern naming no kind admits every damage event. CR
-        -- 614.15: one naming TheSource admits only the damage its own source is
-        -- dealing. CR 615.7: one naming a RECIPIENT admits only the damage
-        -- addressed to the permanent or player it shields.
+        -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
+        -- plus the one fact about the ROW rather than the event -- a shield
+        -- spent to nothing is no longer a prevention effect.
         (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) ->
-          maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
-            && matchesDamageSource src (DamagePattern.whichSource pat) de
-            && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
-            && unspent rewrite
+          matchesDamagePattern (Just src) pat de && unspent rewrite
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only.
         -- DestructionR carries no pattern because the only producer in the
@@ -289,11 +285,40 @@ matchesController gs src rel oid = case rel of
 -- characteristic one, like matchesZoneSubject.
 --
 -- Not implemented: CR 615.1's shields that name a source by CHARACTERISTIC
--- (Circle of Protection: Red) rather than by identity (#588).
-matchesDamageSource :: ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
+-- (Circle of Protection: Red, Questing Beast's "creatures you control") rather
+-- than by identity (#588).
+--
+-- The source is a MAYBE because CR 615.12's carrier has one: a "damage can't be
+-- prevented" effect stored by a resolution has no permanent behind it. Nothing
+-- names no object, so TheSource -- which is the "THIS creature" of a printed
+-- clause -- cannot be satisfied by it, and no printing writes that pair anyway.
+matchesDamageSource :: Maybe ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
 matchesDamageSource src relation de = case relation of
   SourceRelation.AnySource -> True
-  SourceRelation.TheSource -> src == DamageEvent.source de
+  SourceRelation.TheSource -> src == Just (DamageEvent.source de)
+
+-- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
+-- names? Three of them, and they are the three a printed clause narrows by: a
+-- pattern naming no KIND admits combat and noncombat alike (CR 510.2's dealing
+-- versus CR 608's), one naming TheSource admits only the damage its own source
+-- is dealing (CR 120.1's "an object that deals damage is the source of that
+-- damage", keyed as CR 614.15 keys it), and one naming a RECIPIENT admits only
+-- the damage addressed to the permanent or player it names (CR 615.7).
+--
+-- ONE reading of what a DamagePattern means, shared by the two questions that
+-- ask it: `applies` above, for CR 615.1's shields and CR 614.1a's replacements,
+-- and `preventable` below, for CR 615.12's narrowed "can't be prevented"
+-- (Excruciator). A second reading would let Excruciator's clause and Fog's
+-- disagree about what "combat damage from this source" means.
+--
+-- The rewrite is NOT asked about here, though `applies` asks `unspent` right
+-- after: a spent shield is a row that no longer exists as a prevention effect,
+-- which is a fact about the ROW and not about which events the pattern admits.
+matchesDamagePattern :: Maybe ObjectId -> DamagePattern.DamagePattern -> DamageEvent.DamageEvent -> Bool
+matchesDamagePattern src pat de =
+  maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
+    && matchesDamageSource src (DamagePattern.whichSource pat) de
+    && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
 
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
 --
@@ -736,15 +761,23 @@ prevents rewrite = case rewrite of
 -- nothing and the shield is not spent ("existing damage prevention shields won't
 -- be reduced by damage that can't be prevented").
 --
--- Takes the EVENT, though the one producer reads nothing off it, because that is
--- the axis the rest of the family varies on: Excruciator's clause names its own
--- source and Frenzied Baloth's names a damage kind, and both would answer this
--- per event rather than per board (#835).
+-- Asked per EVENT, because that is what the rule's own subject is and what the
+-- printed clauses narrow: Spider-Punk's sentence admits every event, and
+-- Excruciator's admits only the ones its own 7/7 is the source of, on the same
+-- board and in the same batch.
 --
--- Delegated whole to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11
--- axis this lives on, so this module never sees a PlayerEffect constructor.
+-- A DISJUNCTION over the standing effects, for CR 101.2's reason and the shape
+-- every prohibition takes: one applicable "can't" is enough and nothing outvotes
+-- it. `any` rather than a count because EachPlayer puts one effect on the list
+-- once per seat.
+--
+-- Delegated to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11 axis
+-- this lives on, so this module never sees a PlayerEffect constructor -- it
+-- reads only the DamagePattern each effect hands back, with the same
+-- matchesDamagePattern that reads a shield's.
 preventable :: GameState -> DamageEvent.DamageEvent -> Bool
-preventable gs _de = not (PlayerEffect.damageCantBePrevented gs)
+preventable gs de =
+  not (any (\(src, pat) -> matchesDamagePattern src pat de) (PlayerEffect.unpreventable gs))
 
 -- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
 -- chosen against damage that CAN'T BE PREVENTED? True means the application
@@ -931,8 +964,8 @@ askOne batch (pid, positions) = do
 -- them leads to the same board and there is nothing for the shielded player to
 -- decide. Filtered per EVENT rather than per batch, so a batch mixing
 -- preventable and unpreventable damage still asks about the part the shield can
--- reach -- unreachable while the one producer is board-wide (#835), and the
--- shape the rule describes.
+-- reach -- which a narrowed clause reaches: an Excruciator and an ordinary
+-- creature hitting one shielded permanent at once is exactly that batch.
 contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
 contested gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]

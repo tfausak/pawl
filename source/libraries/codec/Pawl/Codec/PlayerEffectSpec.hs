@@ -7,6 +7,7 @@ import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaFilter as ManaFilter
@@ -14,6 +15,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -174,13 +176,24 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.CantBeCountered (Filter.HasCardType CardType.Creature))
       """ {"type":"CantBeCountered","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
-  -- CR 615.12 / Spider-Punk. Payload-free: the sentence names no source, no
-  -- recipient and no amount, and WHOSE damage is the carrier's scope
-  -- (Pawl.Codec.PlayerStaticAbility) rather than anything riding here.
-  Spec.it s "DamageCantBePrevented" $
+  -- CR 615.12 / Spider-Punk, whose sentence names no quality of the damage: the
+  -- pattern that admits everything, whose every field is its default, so the
+  -- payload is an empty object rather than absent. WHOSE damage is the carrier's
+  -- scope (Pawl.Codec.PlayerStaticAbility) rather than anything riding here.
+  Spec.it s "DamageCantBePrevented, naming no quality of the damage" $
     Common.assertJsonCodec
       s
       PlayerEffect.toJson
       PlayerEffect.fromJson
-      PlayerEffect.DamageCantBePrevented
-      """ {"type":"DamageCantBePrevented"} """
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing SourceRelation.AnySource Nothing))
+      """ {"type":"DamageCantBePrevented","value":{}} """
+  -- CR 615.12 narrowed / Excruciator, "damage that would be dealt by this
+  -- creature": the same effect keyed to its own source (CR 614.15's relation),
+  -- which is what makes the payload worth carrying.
+  Spec.it s "DamageCantBePrevented, naming its own source" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing))
+      """ {"type":"DamageCantBePrevented","value":{"whichSource":{"type":"TheSource"}}} """

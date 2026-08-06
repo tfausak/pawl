@@ -1056,6 +1056,80 @@ apnapSpec s registry = Spec.describe s "APNAP (CR 616.1)" $ do
       (survivors (settleDamage (allocateShield theFurnace big) shielded batch))
       [small, hers]
 
+-- CR 615.12 NARROWED, whose producer is Excruciator ({6}{R}{R} Creature --
+-- Avatar 7/7, Ravnica: City of Guilds 121, "Damage that would be dealt by this
+-- creature can't be prevented"). Spider-Punk's sentence names no quality of the
+-- damage and this one names its SOURCE -- CR 120.1's "an object that deals
+-- damage is the source of that damage", which is Pawl.Types.DamagePattern's
+-- `whichSource`.
+--
+-- ONE board carries both directions, and that is the whole point of the group:
+-- alice's Goblin Piker is shielded by a Mending Hands she really casts on it,
+-- and bob controls Excruciator AND a Goblin Piker. The first two cases send the
+-- same 3 from each of them into that one shield -- the Excruciator's lands whole
+-- and costs the shield nothing, the Piker's is prevented whole and spends 3 of
+-- the shield's 4 -- so nothing but the damage's SOURCE differs between them, and
+-- neither can pass because the damage would have got through anyway. The third
+-- puts both in one batch.
+--
+-- The DAMAGE BATCHES are hand-built and the SPELL is not, for spiderPunkSpec's
+-- reason.
+excruciatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
+      withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        mendingHands <- S.printingOf s registry "Mending Hands"
+        excruciator <- S.printingOf s registry "Excruciator"
+        let base = S.landsInPlay plains 1
+            (victim, g1) = S.addCreature pikerPrinting S.alice base
+            (piker, g2) = S.addCreature pikerPrinting S.bob g1
+            (avatar, g3) = S.addCreature excruciator S.bob g2
+            (g4, spellId) = S.handOne mendingHands g3
+        act victim piker avatar (castAndResolve (aimCreature victim) g4 spellId)
+  -- THE CONTROL, and it shares its board with the case below rather than
+  -- standing on a second one: the shield is applicable to the Piker's damage and
+  -- prevents the whole of it, though an Excruciator is on the battlefield the
+  -- entire time. A pattern that admitted every source would fail here.
+  Spec.it s "CR 615.7 the shield still prevents the Goblin Piker's 3 whole"
+    . withBoard
+    $ \victim piker _ shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit piker (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the shield is a floating replacement" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "nothing is marked on the shielded creature" (S.damageOf victim after) (Just 0)
+      Spec.assertEqWith s "and no damage event happened at all" (amounts after) []
+      Spec.assertEqWith s "3 of the shield's 4 were spent, so 1 remains" (shieldsLeft after) [1]
+  -- CR 615.12 for the source the clause names: the same shield, on the same
+  -- creature, on the same board, prevents none of the Excruciator's 3 and is not
+  -- reduced by it.
+  Spec.it s "CR 615.12 the Excruciator's 3 lands in full, and the shield is not reduced"
+    . withBoard
+    $ \victim _ avatar shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit avatar (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the same shield is on the same creature" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim after) (Just 3)
+      Spec.assertEqWith s "and the event happened, at its full amount" (amounts after) [3]
+      Spec.assertEqWith s "the shield still holds all 4" (shieldsLeft after) [4]
+  -- Both directions in ONE batch, which is what makes the narrowing a per-EVENT
+  -- fact rather than a per-board one: CR 615.12's clause reaches the
+  -- Excruciator's event and leaves the Piker's alone, in a batch the engine
+  -- settles together.
+  --
+  -- The two amounts DIFFER, and that is what makes the case discriminate: with
+  -- 3 and 3 an engine that had the two events exactly backwards would leave the
+  -- same board, and every assertion here would pass on it.
+  Spec.it s "CR 615.12 one batch: the Excruciator's 3 lands and the Piker's 2 is prevented"
+    . withBoard
+    $ \victim piker avatar shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit avatar (Recipient.ToCreature victim) 3, hit piker (Recipient.ToCreature victim) 2]
+      Spec.assertEqWith s "only the Excruciator's event happened" (amounts after) [3]
+      Spec.assertEqWith s "so only its 3 is marked" (S.damageOf victim after) (Just 3)
+      Spec.assertEqWith s "and only the Piker's 2 came off the shield" (shieldsLeft after) [2]
+
 -- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
 -- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
 -- damage that would be dealt to you this turn. Whenever damage that would be
@@ -1837,6 +1911,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   mendingHandsSpec s registry
   spiderPunkSpec s registry
   apnapSpec s registry
+  excruciatorSpec s registry
   selflessSquireSpec s registry
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
