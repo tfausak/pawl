@@ -1046,7 +1046,7 @@ reservedSlots =
       Binding.you,
       Binding.triggerPlayer,
       Binding.became,
-      Binding.preventedAmount,
+      Binding.eventAmount,
       Binding.sacrificedCount
     ]
 

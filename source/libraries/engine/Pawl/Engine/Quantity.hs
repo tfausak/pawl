@@ -89,7 +89,7 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- The source is asked first so the existing reading is untouched, and the two
   -- cannot collide over one name: a mid-resolution bind names a slot the CARD
   -- declared, and an event-supplied one names a reserved slot no card may declare
-  -- (see Pawl.Engine.Binding.preventedAmount).
+  -- (see Pawl.Engine.Binding.eventAmount).
   --
   -- CR 601.2b's X arrives here too, since #14 retired its dedicated arm. That arm
   -- read `announcedOn` ALONE, where this reads the source first and falls back --

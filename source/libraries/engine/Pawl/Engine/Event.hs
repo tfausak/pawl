@@ -2050,13 +2050,27 @@ eventBindings cond event = case (cond, event) of
   -- CR 615.13's "that many": how much this prevention effect prevented, which is
   -- the whole reason the event carries a number. The first reserved slot holding
   -- an AMOUNT rather than a reference, read back by Quantity.InSlot off the stack
-  -- object these bindings are stamped on (see Binding.preventedAmount).
+  -- object these bindings are stamped on (see Binding.eventAmount).
   --
   -- The recipient is NOT bound alongside it. Every payload in the pool acts on
   -- the ability's own source (Selfless Squire counters itself), and the player
   -- the recipient names under this condition is CR 109.5's "you", already bound.
   (TriggerCondition.DamageToPlayerPrevented _, GameEvent.DamagePrevented _ amount) ->
-    Binding.setPreventedAmount amount Map.empty
+    Binding.setEventAmount amount Map.empty
+  -- CR 119.9's "that much": how much life the gain was, which CR 603.2 makes part
+  -- of the event that fired the trigger -- Sanguine Bond's "target opponent loses
+  -- that much life". The SAME slot the prevention arm above stamps, one printed
+  -- phrase and one number (see Binding.eventAmount).
+  --
+  -- The AMOUNT the event recorded, never the gainer's life total: CR 119.3
+  -- adjusts a total by the gain, so the two coincide only on a board that started
+  -- at nothing, and the printed word means the gain.
+  --
+  -- The gaining PLAYER is not bound alongside it, for the reason
+  -- eventBindingSlots' arm gives: under the one relation a card in the pool uses
+  -- that player is CR 109.5's "you", whom Binding.setYou already names.
+  (TriggerCondition.PlayerGainsLife _, GameEvent.LifeGained _ amount) ->
+    Binding.setEventAmount amount Map.empty
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -2155,18 +2169,17 @@ eventBindingSlots cond = case cond of
   -- CR 615.13's amount, guaranteed given a match: the event carries a Natural
   -- unconditionally, so unlike SelfLeavesTheBattlefield's `became` there is no
   -- shape of the event that withholds it.
-  TriggerCondition.DamageToPlayerPrevented _ -> Set.singleton Binding.preventedAmount
-  -- Empty, and NOT DamageToPlayerPrevented's amount slot, though the event
-  -- carries a Natural just as unconditionally. Ajani's Pridemate's payload names
-  -- no number, and binding a slot nothing reads is speculative construction --
-  -- PermanentDies' reasoning above. Sanguine Bond's "that much" is the card that
-  -- must add it (#806). The gaining PLAYER gets no slot either: under the one
-  -- relation a card in the pool uses, that player is CR 109.5's "you", whom
-  -- Binding.setYou already names, so a slot would be a second name for one
-  -- player. PlayerDiscards binds one because Megrim's "that player" is somebody
-  -- else's; a card watching an OPPONENT gain life is what would want the same
-  -- here.
-  TriggerCondition.PlayerGainsLife _ -> Set.empty
+  TriggerCondition.DamageToPlayerPrevented _ -> Set.singleton Binding.eventAmount
+  -- CR 119.9's amount, guaranteed given a match for the prevention arm's reason:
+  -- GameEvent.LifeGained carries a Natural unconditionally, so no shape of the
+  -- event withholds it. Sanguine Bond's "that much" is what reads it.
+  --
+  -- The gaining PLAYER gets no slot: under the one relation a card in the pool
+  -- uses, that player is CR 109.5's "you", whom Binding.setYou already names, so a
+  -- slot would be a second name for one player. PlayerDiscards binds one because
+  -- Megrim's "that player" is somebody else's; a card watching an OPPONENT gain
+  -- life is what would want the same here (#826).
+  TriggerCondition.PlayerGainsLife _ -> Set.singleton Binding.eventAmount
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.

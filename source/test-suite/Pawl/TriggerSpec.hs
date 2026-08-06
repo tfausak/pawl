@@ -65,7 +65,9 @@
 -- counters -- `permanentDiesSpec`. CR 119.9's life-gain trigger, from both
 -- producers (CR 119.3's instructed gain and CR 120.3f's lifelink) with the
 -- controls that keep it from being a "life total moved" trigger, with Ajani's
--- Pridemate -- `lifeGainTriggerSpec`.
+-- Pridemate -- `lifeGainTriggerSpec`. That event read for its NUMBER, which CR
+-- 603.2 makes part of it and Sanguine Bond's "that much" is the pool's first
+-- reader of -- `lifeGainAmountSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -3352,7 +3354,7 @@ representativeEvents cond =
         -- creature matches nothing and would pin the floor at empty.
         TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (Recipient.ToPlayer S.bob) 2)
         -- CR 119.9's own event, and the only one this condition admits: the
-        -- payload is a player and an amount, and the floor is empty for both.
+        -- payload is a player and an amount, and the amount is the floor.
         TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained S.bob 2)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
@@ -4303,6 +4305,75 @@ lifeGainTriggerSpec s registry =
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
           Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []
 
+-- CR 119.9 read for its NUMBER, which the group above never asks for: Ajani's
+-- Pridemate's payload names no amount, so nothing there could tell a bound amount
+-- from an unbound one.
+--
+-- Sanguine Bond, {3}{B}{B} Enchantment, "Whenever you gain life, target opponent
+-- loses that much life." CR 603.2 makes the amount part of the event that fired
+-- the trigger, and Pawl.Engine.Event.eventBindings stamps it under
+-- Pawl.Engine.Binding.eventAmount, which the card's LoseLife reads as an ordinary
+-- Quantity.InSlot.
+--
+-- What makes this a proof rather than a demonstration is that the two gameplay
+-- cases carry DIFFERENT amounts, from different producers:
+--
+--   * Renewed Faith's "you gain 6 life" -- 6, a number nothing else on that board
+--     is (three Plains, a mana value of 3, two life totals of 20).
+--   * Radiant Fountain's entry trigger -- 2.
+--
+-- One constant bound in place of the real amount therefore fails one of the two,
+-- and a binding that read the gainer's LIFE TOTAL rather than the gain (26 and 22
+-- respectively) fails both.
+lifeGainAmountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lifeGainAmountSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      -- The same staging strippedTriggerSpec's entry fixture uses: the permanent
+      -- is placed, its Moved event recorded, and CR 603.6a's scan run at the next
+      -- settle.
+      entering oid gs =
+        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+         in resolveAll (settle (S.withEvents [GameEvent.Moved moved (Projection.project oid gs)] gs))
+   in Spec.describe s "CR 119.9 that much life" $ do
+        -- The gameplay-level proof, cast to resolution. alice's Renewed Faith
+        -- gains her 6 (CR 119.3), the Bond's trigger matches that event, and its
+        -- payload reads the SIX out of the slot -- bob's 20 becomes 14.
+        --
+        -- alice's own total is asserted too: an engine that made the Bond drain
+        -- its controller would show the same 14 on bob only if it also failed
+        -- here.
+        Spec.it s "CR 603.2 whole cards: alice gains 6 from Renewed Faith and Sanguine Bond drains bob for 6" $ do
+          plains <- S.printingOf s registry "Plains"
+          sanguineBond <- S.printingOf s registry "Sanguine Bond"
+          renewedFaith <- S.printingOf s registry "Renewed Faith"
+          let (_, board) = S.addCreature sanguineBond S.alice (S.landsInPlay plains 3)
+              (gs, spellId) = S.handOne renewedFaith board
+              settled = resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId)))
+          Spec.assertEqWith s "alice gained exactly 6" (S.lifeOf S.alice settled) (Just 26)
+          Spec.assertEqWith s "and bob lost exactly that much" (S.lifeOf S.bob settled) (Just 14)
+        -- The SECOND amount, from the other producer, on a board where nothing is
+        -- 6: a Bond that bound a constant, or bound the amount from the wrong
+        -- event, cannot pass both this and the case above.
+        Spec.it s "CR 603.2 a gain of 2 drains 2, not the previous case's 6" $ do
+          sanguineBond <- S.printingOf s registry "Sanguine Bond"
+          radiantFountain <- S.printingOf s registry "Radiant Fountain"
+          let (_, withBond) = S.addCreature sanguineBond S.alice (Setup.emptyGame S.bothPlayers)
+              (fountainId, gs) = S.addCreature radiantFountain S.alice withBond
+              settled = entering fountainId gs
+          Spec.assertEqWith s "alice gained exactly 2" (S.lifeOf S.alice settled) (Just 22)
+          Spec.assertEqWith s "and bob lost exactly that much" (S.lifeOf S.bob settled) (Just 18)
+        -- eventBindings in isolation, so the binding is pinned to the RULE rather
+        -- than to one card's payload -- becameSlotSpec's shape. The 7 is neither
+        -- life total nor any other number in reach, so an arm binding anything but
+        -- the event's own amount fails here.
+        Spec.it s "CR 603.2 eventBindings binds the amount the event carries" $
+          Spec.assertEqWith
+            s
+            "thatMuch is the gain"
+            (Event.eventBindings (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained S.alice 7))
+            (Map.singleton Binding.eventAmount (Binding.toAmount 7))
+
 -- CR 508.3a / 603.3d: Anafenza, the Foremost's OTHER ability -- "whenever this
 -- creature attacks, put a +1/+1 counter on another target tapped creature you
 -- control". Here because the card was added for its CR 614.1a redirect
@@ -4394,4 +4465,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
   lifeGainTriggerSpec s registry
+  lifeGainAmountSpec s registry
   anafenzaAttackSpec s registry
