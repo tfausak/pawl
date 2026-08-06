@@ -1667,22 +1667,25 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                       }
                 )
       _ -> pure ()
-  -- CR 702.179c: each named player's speed increases by this much. Its one
-  -- producer is Pawl.Engine.Speed's inherent triggered ability (CR 702.179d),
-  -- which is why this arm reads a PlayerRef it will only ever see as
-  -- `Relative You`.
+  -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.
+  -- Speed's inherent triggered ability (CR 702.179d) is one producer and card data
+  -- is the other, so the PlayerRef is genuinely read rather than known --
+  -- Pawl.SpeedSpec's CardIncrease group moves a player who is not the effect's
+  -- controller, which is what proves it.
   --
   -- The two readings CR 702.179c distinguishes -- a player who HAS speed, whose
   -- speed goes up by the value, and a player who has NONE, whose speed BECOMES
   -- the value -- are spelled separately here even though they coincide
   -- arithmetically against a stand-in zero. They are separate in the rule, and
-  -- the day a card decreases speed the stand-in zero would stop being harmless.
+  -- the day a card decreases speed (#808) the stand-in zero would stop being
+  -- harmless. Only a card can reach the second reading at all: rule 702.179d's
+  -- ability exists only for a player who already has 1 or more speed.
   --
-  -- No cap is applied. Nothing in rule 702.179 bounds speed from above; what
-  -- keeps it at 4 is that the only ability which raises it is gated on "if your
-  -- speed is less than 4" (CR 702.179d), checked when it triggers (CR 603.4) and
+  -- No cap is applied. Nothing in rule 702.179 bounds speed from above, and a cap
+  -- here would be a rule pawl invented; what keeps rule 702.179d's own climb at 4
+  -- is its "if your speed is less than 4", checked when it triggers (CR 603.4) and
   -- again as it resolves (CR 608.2a) -- Pawl.Engine.Stack's inherent-trigger arm.
-  -- A cap here would be a rule pawl invented.
+  -- Whether an EFFECT may push past 4, having no such gate, is unsettled (#809).
   Effect.IncreaseSpeed ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs

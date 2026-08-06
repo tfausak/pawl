@@ -18,6 +18,10 @@
 -- module writes a speed directly, and only cases about what READS speed use it --
 -- rule 702.179d admits one increase a turn, so a board at 4 is four turns of
 -- setup that would prove nothing the increase cases have not already proved.
+--
+-- cardIncreaseSpec is the one group whose fixture is NOT Muraganda Raceway's own
+-- text. It proves that a card's printed instruction reaches the same opcode rule
+-- 702.179d's ability does, through Synthetic Speed Boost.
 module Pawl.SpeedSpec where
 
 import qualified Data.Map.Strict as Map
@@ -110,6 +114,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Speed" $ do
   startYourEnginesSpec s registry
   maxSpeedSpec s registry
   increaseSpec s registry
+  cardIncreaseSpec s registry
 
 startYourEnginesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 startYourEnginesSpec s registry = Spec.describe s "StartYourEngines" $ do
@@ -186,8 +191,9 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   -- CR 604.1 makes a static ability "simply true", so CR 702.178a's clause is
   -- re-asked on every read rather than latched: dropping the same player's speed
   -- back takes the ability away again, with no event and no resolution in
-  -- between. Nothing here distinguishes "exactly 4" from "at least 4" -- speed
-  -- cannot exceed 4 (CR 702.179d), so no board tells the two apart.
+  -- between. Nothing here distinguishes "exactly 4" from "at least 4": rule
+  -- 702.179d's own climb cannot exceed 4, and whether an EFFECT may is unsettled
+  -- (#809), so no board tells the two apart.
   Spec.it s "CR 604.1 the grant is re-asked, not latched" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
@@ -316,6 +322,69 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
         twice = castResolveSettle atBob S.alice secondSpell withAnother
     Spec.assertEqWith s "one increase on the first turn" (speedOf S.alice once) (Just (Just 2))
     Spec.assertEqWith s "and another on the second" (speedOf S.alice twice) (Just (Just 3))
+
+-- CR 702.179c read off a CARD rather than off rule 702.179d: "if a player has no
+-- speed and they are instructed to increase their speed by a certain value, their
+-- speed becomes that value". The instruction the rule anticipates has to come from
+-- somewhere, and rule 702.179d is not it -- that ability only exists for a player
+-- who already has 1 or more speed, so its own increase can never reach the branch.
+--
+-- The proving card is a LABELED SYNTHETIC: "Synthetic Speed Boost", a {0} sorcery
+-- reading "Each player's speed increases by 2". No printing raises a speed by its
+-- own text -- a Scryfall sweep of every card whose oracle text contains "speed"
+-- turns up exactly one that changes a speed at all, Spikeshell Harrier, and it
+-- REDUCES one (#808). Nothing in rule 702.179 forbids the card written here:
+-- 702.179c names "a certain value" and no player in particular.
+--
+-- Every number here is chosen to be unreachable any other way. The increase is 2,
+-- so no reading of rule 702.179's own machinery -- CR 704.5z's "becomes 1", CR
+-- 702.179d's "+1" -- produces it; and the effect names EACH PLAYER, so bob, who
+-- controls nothing at all, is moved by the card or by nothing.
+--
+-- Every board here stays below 4. Whether an effect may push a speed past CR
+-- 702.179e's max speed is not settled (#809), and these cases decline to enshrine
+-- an answer.
+cardIncreaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
+  -- CR 702.179c's FIRST reading: a player who already has speed and is instructed
+  -- to increase it by a value goes up by that value. Alice is at 1 from CR 704.5z
+  -- before the spell is cast, so 3 is arithmetic no other rule performs.
+  Spec.it s "CR 702.179c a card's own text raises the speed a player already has" $ do
+    raceway <- S.printingOf s registry "Muraganda Raceway"
+    boost <- S.printingOf s registry "Synthetic Speed Boost"
+    let (_, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+        (withSpell, spellId) = S.handOne boost board
+        gs = S.settleSba withSpell
+        after = castOnce S.alice spellId gs
+    Spec.assertEqWith s "alice starts at 1 (CR 704.5z)" (speedOf S.alice gs) (Just (Just 1))
+    Spec.assertEqWith s "and bob, controlling nothing, has none (CR 702.179b)" (speedOf S.bob gs) (Just Nothing)
+    -- The control that isolates the card. Rule 702.179d's ability fires on an
+    -- opponent losing life, and nothing here loses any -- so the set of players
+    -- whose inherent trigger was spent this turn is empty, and the increases below
+    -- have no other author.
+    Spec.assertEqWith s "no inherent trigger was spent (CR 702.179d)" (foldr (:) [] (GameState.speedIncreasedThisTurn after)) []
+    Spec.assertEqWith s "alice's 1 became 3" (speedOf S.alice after) (Just (Just 3))
+    Spec.assertEqWith s "and bob's none became 2, CR 702.179c's other reading" (speedOf S.bob after) (Just (Just 2))
+  -- CR 702.179c's SECOND reading on its own, with rule 702.179's own machinery
+  -- entirely absent: no permanent with start your engines!, so CR 704.5z never
+  -- acts, and nobody has speed for CR 702.179d's ability to exist on. The speed
+  -- both players end at is the card's value and nothing else.
+  Spec.it s "CR 702.179c a player with no speed instructed to increase becomes that value" $ do
+    boost <- S.printingOf s registry "Synthetic Speed Boost"
+    let (gs, spellId) = S.handOne boost (Setup.emptyGame S.bothPlayers)
+        after = castOnce S.alice spellId gs
+    Spec.assertEqWith s "neither player has speed to begin with (CR 702.179b)" (speedOf S.alice gs) (Just Nothing)
+    Spec.assertEqWith s "nor bob" (speedOf S.bob gs) (Just Nothing)
+    Spec.assertEqWith s "alice's speed BECAME 2 rather than rising to 1 from a stand-in 0" (speedOf S.alice after) (Just (Just 2))
+    Spec.assertEqWith s "and bob's did too, the effect naming every player" (speedOf S.bob after) (Just (Just 2))
+
+-- Cast this spell and resolve it, then settle. One resolveTop and no more: these
+-- cases put nothing else on the stack, which castResolveSettle above relies on
+-- rule 702.179d's trigger to supply.
+castOnce :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castOnce pid spellId gs =
+  let cast = S.runPure S.identityAnswer gs (S.cast pid spellId)
+   in S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
 
 -- Put this player at exactly this speed, bypassing CR 702.179d's climb. Every
 -- case that uses it is about what READS speed (CR 702.178a's gate, CR 702.179e's

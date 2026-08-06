@@ -240,16 +240,20 @@ data Effect card
     -- which is why the rule needs an opcode of its own rather than a plain
     -- addition against a stored zero.
     --
-    -- Its one producer is Pawl.Engine.Speed's inherent triggered ability (CR
-    -- 702.179d), which is minted by the rules core from the rulebook rather than
-    -- read off a card, the way Pawl.Engine.Monarch mints BecomeMonarch. No card in
-    -- the pool prints "your speed increases by" as text of its own (#769), so this
-    -- arm is authored by nothing in data/cards today.
+    -- Two producers, which is what CR 702.179c wants. Pawl.Engine.Speed's inherent
+    -- triggered ability (CR 702.179d) is minted by the rules core from the rulebook
+    -- rather than read off a card, the way Pawl.Engine.Monarch mints BecomeMonarch;
+    -- and card data authors one too, at data/cards/synthetic-speed-boost.json. The
+    -- card matters to the arm's shape rather than to its count: rule 702.179d fixes
+    -- the PlayerRef at `Relative You` and the Quantity at `Literal 1`, and only a
+    -- card reaches any other reading -- or the "has no speed" branch below, which
+    -- that ability can never take, existing as it does only for a player who
+    -- already has speed.
     --
-    -- NOT a "set speed to" opcode: CR 702.179 has both readings, and only the
-    -- increase has a producer. A SET would also have to say what happens to a
-    -- player with no speed, which is exactly the question CR 702.179c answers for
-    -- this one.
+    -- NOT a "set speed to" or "decrease" opcode: CR 702.179 has no "set" reading at
+    -- all, and the decrease a card does want is #808's. A SET would also have to
+    -- say what happens to a player with no speed, which is exactly the question CR
+    -- 702.179c answers for this one.
     IncreaseSpeed PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3). The `card` is the token's text, embedded

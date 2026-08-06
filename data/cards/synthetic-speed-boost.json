@@ -1,0 +1,35 @@
+{
+  "faces": [
+    {
+      "manaCost": [],
+      "name": "Synthetic Speed Boost",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "IncreaseSpeed",
+                "value": [
+                  {
+                    "type": "EachPlayer"
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 2
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
