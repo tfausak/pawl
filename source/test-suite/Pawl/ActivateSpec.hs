@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -107,6 +108,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   variableActivationCostSpec s registry
   youOnActivatedAbilitySpec s registry
   textChangedAbilitySpec s registry
+  graveyardEffectZoneSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -1551,3 +1553,79 @@ tidalWarriorChain s registry hackWhere = do
       pure (forestId, board)
     Just (permId, ability) ->
       pure (forestId, S.runPure S.identityAnswer board (do Activate.activateAbility S.alice permId ability; Stack.resolveTop))
+
+-- Alice with two untapped Swamps and one Reassembling Skeleton in her graveyard,
+-- holding priority. Returns the graveyard card's id.
+--
+-- Two Swamps because the activation cost is {1}{B}; the Skeleton's own {1}{B} is
+-- never paid, since it is in the graveyard rather than being cast.
+skeletonBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+skeletonBoard skeleton swamp =
+  let (gyId, withCard) = S.addGraveyardCard skeleton S.alice (S.landsInPlay swamp 2)
+   in (gyId, withCard {GameState.priority = Just S.alice})
+
+-- Is this object a Reassembling Skeleton? CR 400.7 mints a fresh id when the
+-- card leaves the graveyard, so the returned permanent has to be found by name
+-- rather than by the id the ability was activated from.
+namedSkeleton :: GameState.GameState -> ObjectId.ObjectId -> Bool
+namedSkeleton gs oid = case Game.faceOf oid gs of
+  Nothing -> False
+  Just face -> Face.name face == CardName.MkCardName (Text.pack "Reassembling Skeleton")
+
+-- CR 113.6m's "or effect" half: "an ability whose cost OR EFFECT specifies that
+-- it moves the object it's on out of a particular zone functions only in that
+-- zone."
+--
+-- Reassembling Skeleton {1}{B} Creature -- Skeleton Warrior 1/1, "{1}{B}: Return
+-- this card from your graveyard to the battlefield tapped." (checked against
+-- Scryfall). Its cost is mana and nothing else, so Cost.zoneFunctionedFrom -- the
+-- whole of pawl's CR 113.6m reading before this -- answers Nothing for it, and
+-- the graveyard is named only by what the ability DOES. Loxodon Surveyor proves
+-- the cost half in Pawl.SpeedSpec; this is the other half of the same sentence,
+-- and the two cards divide it cleanly.
+graveyardEffectZoneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graveyardEffectZoneSpec s registry = Spec.describe s "GraveyardEffectZone" $ do
+  Spec.it s "CR 113.6m the Skeleton's ability is offered from the graveyard, on its effect's word alone" $ do
+    skeleton <- S.printingOf s registry "Reassembling Skeleton"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gyId, gs) = skeletonBoard skeleton swamp
+    Spec.assertEqWith s "the card really is in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice gs) [gyId]
+    case Activate.abilitiesFor gyId gs of
+      [ability] ->
+        -- THE control this whole unit turns on: nothing in the cost names a zone,
+        -- so the cost half cannot be what offered the ability. If this ever
+        -- answers Just, the two cases below stop proving the effect half.
+        Spec.assertEqWith s "and its cost names no zone (CR 113.6m's other half)" (Cost.zoneFunctionedFrom (ActivatedAbility.cost ability)) Nothing
+      abilities -> Spec.assertEqWith s "exactly one ability from the graveyard" (length abilities) 1
+    Spec.assertBool s (any (isActivationOf gyId) (Action.legalActions S.alice gs)) "and the activation is a legal action"
+  -- The other direction of "functions ONLY in that zone", and the case the cost
+  -- half got for free: a Loxodon Surveyor on the battlefield is withheld by its
+  -- own unpayable cost, while this ability's {1}{B} is payable anywhere. So the
+  -- zone gate is the only thing that can withhold it, and the board is built to
+  -- make that the sole difference -- the same two Swamps, the same priority.
+  Spec.it s "CR 113.6m the same card on the battlefield offers the ability to nobody" $ do
+    skeleton <- S.printingOf s registry "Reassembling Skeleton"
+    swamp <- S.printingOf s registry "Swamp"
+    let (bfId, board) = S.addCreature skeleton S.alice (S.landsInPlay swamp 2)
+        gs = board {GameState.priority = Just S.alice}
+    Spec.assertEqWith s "the projection does hand it out" (length (Projection.abilitiesOf bfId gs)) 1
+    Spec.assertBool s (not (any (isActivationOf bfId) (Action.legalActions S.alice gs))) "but no activation is offered"
+  -- End to end through the real engine: the activation is announced, the {1}{B}
+  -- is paid off the two Swamps, and CR 400.7's funnel puts the card onto the
+  -- battlefield TAPPED (CR 110.5b, the rider the card prints). The falsifier for
+  -- a gate that offered the action and could not carry it out.
+  Spec.it s "CR 113.6m whole card: activating it returns the Skeleton tapped" $ do
+    skeleton <- S.printingOf s registry "Reassembling Skeleton"
+    swamp <- S.printingOf s registry "Swamp"
+    let (gyId, gs) = skeletonBoard skeleton swamp
+    case Activate.abilitiesFor gyId gs of
+      [ability] -> do
+        let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+            skeletons = filter (namedSkeleton after) (Game.zoneMembers Zone.Battlefield S.alice after)
+        Spec.assertEqWith s "the graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice after) []
+        Spec.assertEqWith s "and a Skeleton is on the battlefield instead" (length skeletons) 1
+        -- CR 110.5b, the rider the card prints: it comes back TAPPED. The two
+        -- Swamps are tapped too, having paid the {1}{B}, which is why this asks
+        -- about the Skeleton by name rather than about the battlefield at large.
+        Spec.assertEqWith s "returned tapped (CR 110.5b)" (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid after)) skeletons) [Just TapState.Tapped]
+      abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1

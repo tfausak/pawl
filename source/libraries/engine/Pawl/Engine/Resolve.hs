@@ -150,7 +150,7 @@ slotsOf effect = case effect of
   Effect.Destroy ref _ _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.RemoveFromCombat slot -> Set.singleton slot
-  Effect.MoveToZone slot _ _ _ -> Set.singleton slot
+  Effect.MoveToZone slot _ _ _ _ -> Set.singleton slot
   Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Mill slot quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
@@ -368,7 +368,7 @@ definedSlots :: [Effect Card.Type.Card] -> Set SlotName
 definedSlots effects =
   let bound effect = case effect of
         Effect.Create _ _ _ mSlot -> mSlot
-        Effect.MoveToZone _ _ _ mSlot -> mSlot
+        Effect.MoveToZone _ _ _ mSlot _ -> mSlot
         Effect.PlaySubgame slot -> Just slot
         Effect.Destroy _ _ mSlot -> mSlot
         _ -> Nothing
@@ -1413,7 +1413,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
         _ -> gs
-  Effect.MoveToZone slot zone entry mSlot ->
+  Effect.MoveToZone slot zone entry mSlot _ ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()

@@ -332,6 +332,7 @@ library engine
     Pawl.Engine.Daytime
     Pawl.Engine.Decide
     Pawl.Engine.Departure
+    Pawl.Engine.EffectZone
     Pawl.Engine.Engine
     Pawl.Engine.Event
     Pawl.Engine.Expiry

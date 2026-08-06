@@ -486,7 +486,7 @@ spec s registry =
       case Game.zoneMembers Zone.Hand S.alice drawn of
         [] -> Spec.assertFailure s "expected a drawn opening hand to act from"
         oid : _ -> do
-          let after = S.runPure S.identityAnswer drawn (Resolve.performHandAction oid S.alice [Effect.MoveToZone Binding.triggerSource Zone.Exile EntryRiders.defaultValue Nothing])
+          let after = S.runPure S.identityAnswer drawn (Resolve.performHandAction oid S.alice [Effect.MoveToZone Binding.triggerSource Zone.Exile EntryRiders.defaultValue Nothing Nothing])
           Spec.assertEqWith s "the named card left the hand" (S.handSize S.alice after) 6
           Spec.assertEqWith s "and is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
     Spec.it s "CR 103.5b: the action is not a mulligan -- it does not add to the bottom count" $ do

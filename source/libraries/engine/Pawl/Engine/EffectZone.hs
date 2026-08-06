@@ -1,0 +1,89 @@
+-- CR 113.6m's "or effect" half, asked of an EFFECT: does it move the object the
+-- ability is on out of a particular zone, and which zone? The ABILITY-level
+-- reading that rule defines is Pawl.Engine.Activate.zoneFunctionedFrom, which
+-- folds this over an ability's effects and takes the cost half
+-- (Pawl.Engine.Cost.zoneFunctionedFrom) alongside it.
+--
+-- Here rather than in Pawl.Engine.Cost because it is a classification of an
+-- EFFECT and that module's whole contract is to be the sole casing home for a
+-- CostComponent; Pawl.Engine.ManaAbility is the precedent for the shape and for
+-- the module boundary.
+--
+-- Casing on Effect here is not a breach of design.md section 1, for the reason
+-- Pawl.Engine.ManaAbility gives: the closed half may depend on a CLASSIFICATION
+-- of effects, and this function is one. What stays forbidden is a case that acts
+-- on WHICH effect it is, and every arm below answers the one question in the
+-- type.
+module Pawl.Engine.EffectZone where
+
+import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Types.Card as Card.Type
+import Pawl.Types.Effect (Effect)
+import qualified Pawl.Types.Effect as Effect
+import Pawl.Types.Zone (Zone)
+
+-- CR 113.6m: "an ability whose cost or effect specifies that it moves the object
+-- it's on out of a particular zone". Nothing for an effect that specifies no
+-- such move, which leaves CR 113.6's own default in place -- the ability
+-- functions on the battlefield.
+--
+-- TWO conditions, and both are the rule's own words. The effect has to name the
+-- zone it moves the object out of, which is the origin Effect.MoveToZone
+-- carries; and the object moved has to be "THE OBJECT IT'S ON", which is the
+-- reserved slot CR 113.7's source is bound under. An effect that moves some
+-- other object out of a graveyard -- Raise Dead's target -- says nothing about
+-- where its own ability functions, and answering Just for it would strand every
+-- such ability in the graveyard.
+--
+-- The origin is only ever consulted here, so a card file that states one on a
+-- move of anything but its own source states something nothing reads. That is a
+-- card-data error rather than a rules question, and it is inert: this function
+-- answers Nothing for it, which is the same answer the effect had before.
+zoneFunctionedFrom :: Effect Card.Type.Card -> Maybe Zone
+zoneFunctionedFrom effect = case effect of
+  Effect.MoveToZone slot _ _ _ origin -> if slot == Binding.triggerSource then origin else Nothing
+  Effect.DealDamage _ _ -> Nothing
+  Effect.ModifyTarget {} -> Nothing
+  Effect.ChangeText {} -> Nothing
+  Effect.AddMana _ -> Nothing
+  Effect.Search _ _ -> Nothing
+  Effect.ExileAllGraveyards -> Nothing
+  Effect.Proliferate -> Nothing
+  Effect.TemptWithTheRing -> Nothing
+  Effect.ExileHandThenDraw -> Nothing
+  Effect.PlayerSacrifices {} -> Nothing
+  Effect.RestartGame -> Nothing
+  Effect.ControlPlayerNextTurn _ -> Nothing
+  Effect.Destroy {} -> Nothing
+  Effect.Sacrifice _ -> Nothing
+  Effect.RemoveFromCombat _ -> Nothing
+  Effect.Draw {} -> Nothing
+  Effect.Mill {} -> Nothing
+  Effect.Discard {} -> Nothing
+  Effect.LoseLife {} -> Nothing
+  Effect.GainLife {} -> Nothing
+  Effect.IncreaseSpeed {} -> Nothing
+  Effect.Create {} -> Nothing
+  Effect.Replace {} -> Nothing
+  Effect.SkipNextPhase {} -> Nothing
+  Effect.PreventNextDamage {} -> Nothing
+  Effect.PreventAllDamage {} -> Nothing
+  Effect.Counter _ -> Nothing
+  Effect.PutCounters {} -> Nothing
+  Effect.GainPlayerCounters {} -> Nothing
+  Effect.Tap _ -> Nothing
+  Effect.Untap _ -> Nothing
+  Effect.Transform _ -> Nothing
+  Effect.AddPhases _ -> Nothing
+  Effect.GainControl _ _ -> Nothing
+  Effect.ArmDelayedTrigger {} -> Nothing
+  Effect.AffectPlayers {} -> Nothing
+  Effect.CreateEmblem {} -> Nothing
+  Effect.BecomeMonarch {} -> Nothing
+  Effect.ItBecomes _ -> Nothing
+  Effect.ExileUntilMonarch _ -> Nothing
+  Effect.Attach _ -> Nothing
+  Effect.AttachTarget {} -> Nothing
+  Effect.PlaySubgame _ -> Nothing
+  Effect.TakeExtraTurn {} -> Nothing
+  Effect.ShuffleIntoLibrary _ -> Nothing
