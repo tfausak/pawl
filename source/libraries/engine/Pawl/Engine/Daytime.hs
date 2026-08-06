@@ -165,6 +165,12 @@ becomes designation = do
 -- nor night", and CR 731.1's last sentence makes that state unreachable
 -- afterwards. So the pair fires at most once per game.
 --
+-- CR 702.145g's own arm is unreachable by the current pool rather than untested
+-- by choice: CR 702.145e puts nightbound on the BACK face of a card whose front
+-- face has daybound, so a battlefield holding a nightbound permanent holds a
+-- daybound one -- the same permanent -- and CR 702.145d has already answered. A
+-- card printing nightbound on a face that can enter first would reach it.
+--
 -- Run in the CR 117.5 settle rather than at each event, on Pawl.Engine.Engine's
 -- standing terms: CR 704.3 makes "whenever a player would get priority" the
 -- coarsest moment at which a continuously-checked condition can be observed, so a
