@@ -206,6 +206,81 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     Spec.assertEqWith s "it was redirected to exile" (length (Game.zoneMembers Zone.Exile S.alice dying)) 1
     Spec.assertEqWith s "after the SBA it has ceased to exist (gone from exile)" (length (Game.zoneMembers Zone.Exile S.alice settled)) 0
 
+  -- CR 614.1a: Anafenza, the Foremost -- "If a nontoken creature an opponent
+  -- owns would die or a creature card not on the battlefield would be put into
+  -- an opponent's graveyard, exile that card instead." The first redirect in the
+  -- pool that narrows by WHAT the moving object is, which is what
+  -- ZoneChangePattern.whatObject carries.
+  --
+  -- Anafenza is ALICE's throughout, so `whoseObject = Opponents` reads bob. Every
+  -- case below moves an object to a graveyard the same way, and they differ only
+  -- in whether the Filter admits it -- which is what makes the negative cases
+  -- controls rather than decoration: a redirect that fired for every zone change
+  -- would pass the first case and fail all three of the last.
+  --
+  -- Nothing here needs CR 608.2h. Pawl.Engine.Event proposes the move BEFORE it
+  -- performs one, so a creature that "would die" is still on the battlefield when
+  -- Replacement.matchesFiltered reads it, which is CR 400.7's "as it last
+  -- existed" reached structurally rather than through last known information.
+  Spec.it s "CR 614.1a Anafenza exiles an opponent's dying nontoken creature" $ do
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+        (theirs, g1) = S.addCreature piker S.bob g0
+        -- The CR 701.8a destroy funnel, so the redirect is read off the
+        -- pre-batch board a CR 608.2f batch supplies.
+        after = S.runPure S.identityAnswer g1 (Event.destroy Regenerability.CantBeRegenerated [theirs])
+    Spec.assertEqWith s "it never reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
+    Spec.assertEqWith s "it was exiled instead" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+
+  -- The second clause: "a creature card not on the battlefield would be put into
+  -- an opponent's graveyard". Off the battlefield there is no projection, so the
+  -- Filter reads the PRINTED type line (Projection.baseCharacteristics), which is
+  -- the other half of the same field.
+  Spec.it s "CR 614.1a Anafenza exiles an opponent's creature card headed for a graveyard from a library" $ do
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+        (theirs, g1) = S.addLibraryCard piker S.bob g0
+        after = S.runPure S.identityAnswer g1 (Event.changeZone theirs Zone.Graveyard)
+    Spec.assertEqWith s "it never reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 0
+    Spec.assertEqWith s "it was exiled instead" (length (Game.zoneMembers Zone.Exile S.bob after)) 1
+
+  -- CONTROL for Filter.Not Filter.IsToken. The same player, the same zone pair,
+  -- the same funnel -- and a token, which Anafenza's "nontoken" excludes (CR
+  -- 111.6). Rest in Peace, whose pattern admits every object, exiles exactly this
+  -- token in the CR 704.5d case above.
+  Spec.it s "CR 614.1a Anafenza does not exile an opponent's dying TOKEN creature" $ do
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+        (theirs, g1) = S.addToken (Printing.card piker) S.bob g0
+        after = S.runPure S.identityAnswer g1 (Event.destroy Regenerability.CantBeRegenerated [theirs])
+    Spec.assertEqWith s "the token reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.bob after)) 0
+
+  -- CONTROL for Filter.HasCardType CardType.Creature. A noncreature card of
+  -- bob's, moved to his graveyard exactly as the creature card above was.
+  Spec.it s "CR 614.1a Anafenza does not exile an opponent's NONCREATURE card" $ do
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    lightningBolt <- S.printingOf s registry "Lightning Bolt"
+    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+        (theirs, g1) = S.addLibraryCard lightningBolt S.bob g0
+        after = S.runPure S.identityAnswer g1 (Event.changeZone theirs Zone.Graveyard)
+    Spec.assertEqWith s "the instant reached bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+    Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.bob after)) 0
+
+  -- CONTROL for ControllerRelation.Opponents, which CR 400.3 makes an OWNER
+  -- test: Anafenza's controller loses her own creatures to her own graveyard.
+  Spec.it s "CR 614.1a Anafenza does not exile her own controller's dying creature" $ do
+    anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature anafenza S.alice (Setup.emptyGame S.bothPlayers)
+        (ours, g1) = S.addCreature piker S.alice g0
+        after = S.runPure S.identityAnswer g1 (Event.destroy Regenerability.CantBeRegenerated [ours])
+    Spec.assertEqWith s "alice's own creature reached her graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+
   Spec.it s "CR 701.19a / 514.2 a regeneration shield is dropped at cleanup (this turn)" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = Setup.emptyGame S.bothPlayers

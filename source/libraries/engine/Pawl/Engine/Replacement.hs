@@ -87,7 +87,6 @@ import qualified Pawl.Types.Uses as Uses
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 asZoneChange :: ProposedEvent -> Maybe ZoneChange
 asZoneChange event = case event of
@@ -193,10 +192,13 @@ applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 applies gs event candidate =
   let src = ReplacementCandidate.source candidate
    in case (ReplacementCandidate.effect candidate, event) of
+        -- CR 614.1a: which zone changes this redirect intercepts -- the
+        -- destination, the moving object's OWNER, and (Anafenza, the Foremost's
+        -- "a nontoken creature") what the moving object IS.
         (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
-            && matchesZoneSubject src (ZoneChangePattern.whichObject pat) (ZoneChange.object zc)
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
+            && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
         -- CR 615.1: a pattern naming no kind admits every damage event. CR
         -- 614.15: one naming TheSource admits only the damage its own source is
         -- dealing. CR 615.7: one naming a RECIPIENT admits only the damage
@@ -251,7 +253,7 @@ applies gs event candidate =
         -- Filter over the entering object (see Pawl.Types.ReplacementEffect).
         -- 614.1c's self-scope is Filter.IsSource; 614.1d's is a characteristic
         -- filter.
-        (ReplacementEffect.EntryR pat _, ProposedEvent.WouldEnter oid) -> matchesEntering gs candidate pat oid
+        (ReplacementEffect.EntryR pat _, ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -292,19 +294,6 @@ matchesDamageSource src relation de = case relation of
   SourceRelation.AnySource -> True
   SourceRelation.TheSource -> src == DamageEvent.source de
 
--- CR 614.1: is this ZONE CHANGE about the object the pattern names? AnyObject
--- always is; TheSource is CR 702.34a's "exile THIS card", the self-scoping EntryR
--- (CR 614.1c) and DestructionR (CR 201.5) carry by having no pattern at all.
---
--- The id compared is the event's own subject, which Pawl.Engine.Event proposes
--- as the PRE-move id -- the id the effect's source still has while it sits on
--- the stack. Board-free, so no GameState: an identity test, not a characteristic
--- one.
-matchesZoneSubject :: ObjectId -> ZoneChangeSubject.ZoneChangeSubject -> ObjectId -> Bool
-matchesZoneSubject src subject oid = case subject of
-  ZoneChangeSubject.AnyObject -> True
-  ZoneChangeSubject.TheSource -> src == oid
-
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
 --
 -- The subject is the object's OWNER, not its controller, and that is a rules
@@ -314,8 +303,12 @@ matchesZoneSubject src subject oid = case subject of
 -- graveyard, which a controller-based test would get backwards.
 --
 -- Split out of matchesController, which stays controller-based for CR 109.5's
--- "you" on a counter or token pattern. No committed card pairs a ZoneChangeR
--- with anything but Anyones, which answers True either way.
+-- "you" on a counter or token pattern. Leyline of the Void and Anafenza, the
+-- Foremost both name Opponents, and Pawl.EventSpec's Anafenza group is what makes
+-- the relation observable: her controller's own dying creature reaches her own
+-- graveyard where an opponent's is exiled. What is NOT exercised is the owner /
+-- controller difference itself -- no test steals a creature and then kills it --
+-- so the argument for reading the owner stays the rules one above.
 matchesZoneOwner :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
 matchesZoneOwner gs src rel oid =
   let ownerOf o = fmap Object.owner (Game.lookupObject o gs)
@@ -355,23 +348,35 @@ sacrificeCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> Ga
 sacrificeCandidates pid filter_ gs =
   List.sort (filter (matchesPermanent gs filter_) (Projection.controls pid gs))
 
--- CR 614.1c-d: does the entering object satisfy this entry replacement's Filter?
+-- CR 614.1a / 614.1c-d: does the event's subject satisfy this replacement's
+-- Filter? Both the ENTERING object of an entry replacement and the MOVING object
+-- of a zone-change redirect, which is one question asked of one candidate --
+-- CR 614.1a puts no restriction on what a replacement may look at, so the two
+-- classes narrow by the same predicate language.
 --
 -- The same evaluator matchesPermanent uses, over the same projected view, but
--- with a FRAMED Context rather than an empty one, because both of the entry
--- filters in the pool read it: CR 614.1c's `IsSource` asks whether the candidate
--- IS the effect's source (Clone, Primal Plasma, CR 306.5b's loyalty), and CR
--- 614.1d's `ControlledBy Opponent` asks who the candidate's controller is
--- relative to CR 109.5's "you" (Gather Specimens). The perspective is the
--- CANDIDATE's controller, which for a floating row is the baked one -- deriving
--- it from `src` here would answer Nothing for every row whose spell has
--- resolved, and a Nothing perspective makes ControlledBy vacuously False.
+-- with a FRAMED Context rather than an empty one, because every filter in the
+-- pool that reaches here reads it: CR 614.1c's `IsSource` asks whether the
+-- candidate IS the effect's source (Clone, Primal Plasma, CR 306.5b's loyalty,
+-- and CR 702.34a's "exile THIS card" on the zone-change side), and CR 614.1d's
+-- `ControlledBy Opponent` asks who the candidate's controller is relative to CR
+-- 109.5's "you" (Gather Specimens). The perspective is the CANDIDATE's
+-- controller, which for a floating row is the baked one -- deriving it from the
+-- source here would answer Nothing for every row whose spell has resolved, and a
+-- Nothing perspective makes ControlledBy vacuously False.
 --
 -- CR 614.12 is why the view is the LIVE projection of the materialized object
 -- rather than of the card it came from: a previous iteration's rewrite has to be
 -- visible to this one, including CR 616.1b's own change to who would control it.
-matchesEntering :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesEntering gs candidate filter_ oid =
+--
+-- CR 608.2h never fires on the zone-change side, and that is why the plain
+-- projection is right for a creature that "would die": Pawl.Engine.Event runs
+-- this loop BEFORE the move, so the dying creature is still on the battlefield in
+-- `gs` and is read as it last existed there rather than as the card it becomes in
+-- the graveyard (CR 400.7). For a CR 608.2f batch `gs` is the pre-batch board
+-- Replacement.applicable passed down, which is that same reading.
+matchesFiltered :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesFiltered gs candidate filter_ oid =
   let context = Filter.MkContext (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
    in Filter.matches context (Projection.viewOfObject oid gs) filter_
 

@@ -867,13 +867,15 @@ armCastFromGraveyard caster face spellId =
             active =
               ActiveReplacement.MkActiveReplacement
                 { ActiveReplacement.effect = re,
-                  -- CR 113.7: the source is the spell itself, which is also what
-                  -- the pattern's TheSource subject is compared against.
+                  -- CR 113.7: the source is the spell itself, which is what the
+                  -- pattern's Filter.IsSource is compared against.
                   ActiveReplacement.source = spellId,
-                  -- CR 109.5: the caster. Nothing reads it -- CR 702.34a's exile
-                  -- is a ZoneChangeR whose subject is TheSource, an identity test
-                  -- with no relation to resolve -- but the row carries it as
-                  -- every other row does.
+                  -- CR 109.5: the caster. Nothing in CR 702.34a's exile reads it
+                  -- -- the pattern is Filter.IsSource under
+                  -- ControllerRelation.Anyones, and neither consults the
+                  -- perspective the row supplies -- but the row carries it as
+                  -- every other row does, and a redirect that named a
+                  -- Filter.ControlledBy would.
                   ActiveReplacement.controller = caster,
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.Never,
