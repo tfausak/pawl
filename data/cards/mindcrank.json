@@ -1,0 +1,48 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Mindcrank",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PlayerLosesLife",
+            "value": {
+              "type": "Opponent"
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Mill",
+                    "value": [
+                      "thatPlayer",
+                      {
+                        "type": "InSlot",
+                        "value": "thatMuch"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}
