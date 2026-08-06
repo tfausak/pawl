@@ -10,6 +10,7 @@
 -- than here.
 module Pawl.ReplacementSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -863,6 +864,198 @@ spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
       Spec.assertEqWith s "the whole 8 is marked" (S.damageOf victim after) (Just 8)
       Spec.assertEqWith s "and the shield is untouched" (shieldsLeft after) [4]
 
+-- The players asked to decide something while a damage batch settles, in the
+-- order they were asked. Both batch-level questions count: CR 616.1's "which
+-- effect applies next" and CR 615.7's "which damage does the shield prevent".
+--
+-- The prompt STREAM rather than the board, because there is no board that can
+-- tell these two apart: the two players choose about DIFFERENT objects -- each
+-- orders the effects hitting their own creature -- so neither answer constrains
+-- the other and the same permanents end up in the same state whoever was asked
+-- first. What CR 616.1's last sentence governs is which player is asked, and
+-- under CR 101.4b that is information the later chooser gets to have.
+--
+-- Not a claim about Magic: an effect reachable from two players' events at once
+-- and spendable only once WOULD make this board-visible, and pawl has no such
+-- effect to build with today. Every replacement the pool can produce is either
+-- unlimited (Furnace of Rath) or names one recipient (Mending Hands).
+choosersAsked :: GameState.GameState -> [DamageEvent.DamageEvent] -> [PlayerId.PlayerId]
+choosersAsked gs batch =
+  let step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      step p = case p of
+        Prompt.ChooseReplacement _ pid _ -> do
+          State.modify' (<> [pid])
+          pure 0
+        Prompt.OrderDamage _ pid events -> do
+          State.modify' (<> [pid])
+          pure (zipWith const [0 ..] events)
+        _ -> pure (S.identityAnswer p)
+   in State.execState (Engine.runGame step gs (Damage.applyDamage batch)) []
+
+-- A Furnace of Rath under alice, one Goblin Piker each side, and a Mending Hands
+-- shield on both creatures -- so every event addressed to either creature has
+-- two applicable effects that differ, and both controllers owe a CR 616.1
+-- choice. Answers the state, alice's creature and bob's.
+doubledAndShielded :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+doubledAndShielded plains piker furnace mendingHands =
+  let base = S.landsInPlay plains 2
+      (_, g1) = S.addCreature furnace S.alice base
+      (hers, g2) = S.addCreature piker S.alice g1
+      (his, g3) = S.addCreature piker S.bob g2
+      (g4, firstShield) = S.handOne mendingHands g3
+      (g5, secondShield) = S.handOne mendingHands g4
+   in (castAndResolve (aimCreature his) (castAndResolve (aimCreature hers) g5 firstShield) secondShield, hers, his)
+
+-- Spend a prevention shield on `src`'s hit first (CR 615.7), and take the shield
+-- over `furnace` whenever both are offered (CR 616.1). The second half is named
+-- as "not the Furnace" because a floating row's `source` is the spell that
+-- installed it -- a CR 608.2n object no fixture holds an id for -- while the
+-- permanent's row is the Furnace itself. Pinning it is what makes the amounts
+-- the rule's rather than an artefact of which candidate is canonical.
+--
+-- Top-level rather than a `where` binding, for settleDamage's reason and one
+-- more: MonoLocalBinds (implied by GADTs, on at the top of this module) declines
+-- to generalize a local binding that closes over a local, which `furnace` is.
+allocateShield :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+allocateShield furnace src p = case p of
+  Prompt.OrderDamage _ _ events ->
+    let key e = (DamageEvent.source e /= src, DamageEvent.source e)
+     in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
+  Prompt.ChooseReplacement _ _ sources ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex (/= furnace) sources)
+  _ -> S.identityAnswer p
+
+-- CR 616.1's last sentence: "If two or more players have to make these choices
+-- at the same time, choices are made in APNAP order (see rule 101.4)."
+--
+-- The board that reaches it needs one batch whose events are addressed to two
+-- players' objects, and TWO DISTINGUISHABLE applicable effects per event --
+-- otherwise `choose` elides the prompt and nobody is asked anything. Furnace of
+-- Rath ({1}{R}{R}{R} Enchantment, "If a source would deal damage to a permanent
+-- or player, it deals double that damage to that permanent or player instead")
+-- is symmetric, so it supplies one candidate to every event in the batch; a
+-- Mending Hands on each creature supplies the second, and a doubler and a shield
+-- differ in `effect`, so neither pair is elided.
+--
+-- Two Furnaces would NOT do it, which is the trap this fixture avoids: two
+-- copies carry the same ReplacementEffect.DamageR, `distinguishing` finds them
+-- interchangeable and the prompt is correctly elided. The rule needs candidates
+-- that differ, not merely candidates that are several.
+--
+-- The DAMAGE BATCH is hand-built and the SPELLS are not, for mendingHandsSpec's
+-- reason -- and here the batch's ORDER is the input under test, which only a
+-- hand-built batch can state.
+apnapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+apnapSpec s registry = Spec.describe s "APNAP (CR 616.1)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+  -- Both batch orders, because only the PAIR discriminates: settling the batch
+  -- in gather order already answers [alice, bob] when alice's event happens to
+  -- come first, and would answer [bob, alice] when it does not.
+  Spec.it s "CR 616.1 two players choosing for one batch are asked in APNAP order" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let (shielded, hers, his) = doubledAndShielded plains pikerPrinting furnace mendingHands
+        toHers = hit his (Recipient.ToCreature hers) 1
+        toHis = hit hers (Recipient.ToCreature his) 1
+    Spec.assertEqWith s "setup: alice is the active player" (Game.apnapOrder shielded) [S.alice, S.bob]
+    Spec.assertEqWith s "setup: both creatures are shielded" (length (GameState.replacements shielded)) 2
+    Spec.assertEqWith
+      s
+      "alice chooses before bob when her event is gathered first"
+      (choosersAsked shielded [toHers, toHis])
+      [S.alice, S.bob]
+    Spec.assertEqWith
+      s
+      "and still before bob when his event is gathered first"
+      (choosersAsked shielded [toHis, toHers])
+      [S.alice, S.bob]
+  -- The reason CR 615.7 and CR 616.1's APNAP clause do not contend for the same
+  -- ordering, stated as a board. They order DIFFERENT LEVELS: APNAP orders the
+  -- choosers, CR 615.7 orders one chooser's own events among themselves, and CR
+  -- 101.4c is what licenses the second ("If a player would make more than one
+  -- choice at the same time, the player makes the choices in the order
+  -- specified"). Nothing forces a pick between them.
+  --
+  -- What makes that structural rather than lucky: a shield names ONE recipient,
+  -- so every event a shield contests is addressed to one player's object -- and
+  -- that is the same player CR 616.1 asks about those events, since `contested`
+  -- and `choose` read the chooser off the recipient through one `chooserOf`. A
+  -- CR 615.7 group can therefore never straddle two CR 616.1 choosers, which is
+  -- exactly the shape a genuine collision would need.
+  --
+  -- Two events at alice's creature and one at bob's, with alice's shield too
+  -- small for both of hers: she is asked to allocate it (CR 615.7) and asked
+  -- twice which effect applies (CR 616.1), and all three of her questions come
+  -- before bob's. That her allocation is then HONOURED is mendingHandsSpec's
+  -- "the shielded PLAYER chooses which of two simultaneous damages the shield
+  -- prevents", which this fixture does not restate.
+  Spec.it s "CR 615.7's order sits INSIDE one chooser's APNAP turn, not across choosers" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let (shielded, hers, his) = doubledAndShielded plains pikerPrinting furnace mendingHands
+        -- 1 and 4 against a shield of 4: their total exceeds it, so CR 615.7 has
+        -- something to ask. The small one first is load-bearing -- doubled by the
+        -- Furnace it still costs the shield at most 2, so the shield is still
+        -- standing for the 4 and alice's SECOND CR 616.1 choice is a real
+        -- question rather than a lone candidate `choose` would elide.
+        batch = [hit hers (Recipient.ToCreature his) 1, hit his (Recipient.ToCreature hers) 1, hit his (Recipient.ToCreature hers) 4]
+    Spec.assertEqWith
+      s
+      "alice allocates her shield and settles both her events before bob is asked anything"
+      (choosersAsked shielded batch)
+      [S.alice, S.alice, S.alice, S.bob]
+  -- The other half of "they compose": alice's CR 615.7 answer must still land on
+  -- the events she was asked about. `contested` reports BATCH POSITIONS and
+  -- `askOne` splices by position, so the sort has to happen before the positions
+  -- are computed -- sorting afterwards would leave alice permuting whatever now
+  -- sits at her old indices, which here includes bob's event.
+  --
+  -- The assertion is which event SURVIVED rather than how much damage landed,
+  -- because the total cannot tell the two answers apart: the shield prevents 4
+  -- either way and the Furnace doubles what is left of 5, so alice takes 2
+  -- whichever event she spends it on. What differs is WHICH source dealt it (CR
+  -- 615.6: a fully prevented event never happens), which is why the two hits at
+  -- her creature come from two different creatures of bob's.
+  Spec.it s "CR 615.7's allocation lands on the events it was asked about, after the sort" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (theFurnace, g1) = S.addCreature furnace S.alice base
+        (hers, g2) = S.addCreature pikerPrinting S.alice g1
+        (small, g3) = S.addCreature pikerPrinting S.bob g2
+        (big, g4) = S.addCreature pikerPrinting S.bob g3
+        (g5, shieldSpell) = S.handOne mendingHands g4
+        shielded = castAndResolve (aimCreature hers) g5 shieldSpell
+        -- Bob's event FIRST, so alice's two sit at positions 1 and 2 before the
+        -- sort and at 0 and 1 after it.
+        batch =
+          [ hit hers (Recipient.ToCreature small) 1,
+            hit small (Recipient.ToCreature hers) 1,
+            hit big (Recipient.ToCreature hers) 4
+          ]
+        survivors gs = fmap DamageEvent.source (S.damageEventsOf gs)
+    Spec.assertEqWith s "setup: alice's creature is the shielded one" (length (GameState.replacements shielded)) 1
+    -- Shield on the 1: it is prevented whole and never happens, and the 4 keeps
+    -- the remaining 3 off, leaving 1 for the Furnace to double.
+    Spec.assertEqWith
+      s
+      "alice spends the shield on the small hit: the big one is what gets through"
+      (survivors (settleDamage (allocateShield theFurnace small) shielded batch))
+      [big, hers]
+    -- Shield on the 4: 4 covers it whole, and the 1 is then unshielded.
+    Spec.assertEqWith
+      s
+      "alice spends it on the big hit instead: the small one gets through"
+      (survivors (settleDamage (allocateShield theFurnace big) shielded batch))
+      [small, hers]
+
 -- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
 -- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
 -- damage that would be dealt to you this turn. Whenever damage that would be
@@ -1643,6 +1836,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   galvanicBlastSpec s registry
   mendingHandsSpec s registry
   spiderPunkSpec s registry
+  apnapSpec s registry
   selflessSquireSpec s registry
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
