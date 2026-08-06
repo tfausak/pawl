@@ -9,7 +9,9 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The seven gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Humility,
+-- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. An eighth,
+-- Synthetic Phyrexian Discount, is the file's one SYNTHETIC card and exists
+-- only because CR 118.7f's reduction has no printing. Humility,
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
 --
@@ -247,6 +249,14 @@ white = ManaSymbol.OfType (ManaType.Colored Color.White)
 black :: ManaSymbol.ManaSymbol
 black = ManaSymbol.OfType (ManaType.Colored Color.Black)
 
+green :: ManaSymbol.ManaSymbol
+green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+
+-- CR 107.4f's {G/P}. A Color rather than a ManaType, since every Phyrexian
+-- symbol is coloured.
+phyrexianGreen :: ManaSymbol.ManaSymbol
+phyrexianGreen = ManaSymbol.Phyrexian Color.Green
+
 -- A reduction by an amount of GENERIC mana (CR 118.7a) -- the Medallion's shape,
 -- and the only shape a reduction had before Edgewalker.
 generic :: Natural -> ManaCost.ManaCost
@@ -347,6 +357,25 @@ adjustmentSpec s =
         "{1}{W}{B} reduced by {W}{B} twice is {1}"
         (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+
+    -- CR 118.7f, in the small: the two SIDES of the cancellation read a
+    -- Phyrexian symbol differently. A reduction written {G/P} names green, and
+    -- a cost written {G/P} names nothing yet -- so the same pair of symbols
+    -- cancels in one direction and not the other. The board-level group below
+    -- is what proves each half against a card.
+    Spec.it s "CR 118.7f a Phyrexian reduction takes one mana of its colour" $
+      Spec.assertEqWith
+        s
+        "{1}{G} reduced by {G/P} is {1}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [phyrexianGreen]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+
+    Spec.it s "a Phyrexian symbol in the COST is not what a reduction of its colour takes" $
+      Spec.assertEqWith
+        s
+        "{G/P} reduced by {G} is still {G/P}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
+        (ManaCost.MkManaCost [phyrexianGreen])
 
     -- The two halves of ONE reduction, on the two halves of one cost: CR
     -- 118.7a routes the {1} to the generic component and the {U} takes the
@@ -474,8 +503,7 @@ thaliaSpec s registry =
       thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
-      let green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-          base = S.landsInPlay forest 7
+      let base = S.landsInPlay forest 7
           (_, withThalia) = S.addCreature thalia S.alice base
           (wurm, withWurm) = S.addLibraryCard panglacialWurm S.alice withThalia
           (rol, gs) = S.addHandCard ruleOfLaw S.alice withWurm
@@ -917,6 +945,126 @@ edgewalkerSpec s registry =
         "bob pays full price"
         (totalManaCost S.bob bobEdgewalker (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) withBob)
         (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+
+-- alice controls `copies` Synthetic Phyrexian Discounts and `n` untapped
+-- Forests; her hand holds one Longtusk Cub ({1}{G} green Cat) and one Mutagenic
+-- Growth ({G/P} green instant). Loaded fresh inside each case that needs it --
+-- equivalent because loading is deterministic and cached (batch-recipe.md).
+phyrexianDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+phyrexianDiscountBoard forest discount cub growth copies n =
+  let base = S.landsInPlay forest n
+      put g _ = snd (S.addCreature discount S.alice g)
+      withCopies = List.foldl' put base [1 .. copies]
+      (cubId, gs1) = S.addHandCard cub S.alice withCopies
+      (growthId, gs2) = S.addHandCard growth S.alice gs1
+   in ( cubId,
+        growthId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Synthetic Phyrexian Discount {2} Artifact: "Green spells you cast cost {G/P}
+-- less to cast."
+--
+-- SYNTHETIC, and the only synthetic in this file. CR 118.7f exists to say what
+-- a reduction written with a Phyrexian mana symbol does, so nothing in the
+-- rules forbids the printing -- the pool merely lacks one. All 41 cards whose
+-- oracle text carries a Phyrexian symbol (Scryfall, 2026-08-05) spend it in a
+-- COST, never as the amount of a reduction, and none of the 539 cards saying
+-- "less to cast" names one.
+--
+-- Green because Mutagenic Growth's {G/P} is the pool's one Phyrexian COST, and
+-- the third case below aims this reduction straight at it: the two sides of the
+-- cancellation read the same symbol differently, and matching the colours is
+-- what makes that visible rather than merely stipulated.
+phyrexianDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianDiscountSpec s registry =
+  Spec.describe s "SyntheticPhyrexianDiscount" $ do
+    -- THE HEADLINE FALSIFIER, and it separates all three readings of the
+    -- reduction at once. CR 118.7f takes "one mana of that symbol's color", so
+    -- {1}{G} loses its {G} and keeps its {1}. Reading the symbol as generic
+    -- would leave {G}; reading it as no type at all -- what the arm did before
+    -- -- would leave {1}{G} untouched.
+    Spec.it s "CR 118.7f a reduction written {G/P} takes one green mana off the cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (cubId, _, gs) = phyrexianDiscountBoard forest discount cub growth 1 2
+      Spec.assertEqWith
+        s
+        "{1}{G} becomes {1}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+
+    -- The control the case above needs: without the artifact the same spell is
+    -- full price, so the {G} really did leave because of the reduction.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (cubId, _, gs) = phyrexianDiscountBoard forest discount cub growth 0 2
+      Spec.assertEqWith
+        s
+        "{1}{G} stays {1}{G}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+
+    -- THE OTHER SIDE of the same symbol, and the reason CR 118.7f is a rule
+    -- about REDUCTIONS only. Mutagenic Growth's printed {G/P} is a symbol its
+    -- controller has not yet announced a route for (CR 601.2b precedes CR
+    -- 601.2f), so there is no green mana in the cost for a green reduction to
+    -- cancel -- Edgewalker's ruling read this way round, "if you choose to pay
+    -- such a cost with {W} or {B}, Edgewalker can reduce that part of the
+    -- cost". The reduction here is spent by nothing and dropped (#309).
+    --
+    -- Not hostage to that gap: CR 118.7b would instead turn the unspent green
+    -- into one GENERIC mana, and this cost has no generic component for CR
+    -- 118.7a to take it off, so {G/P} is the answer under either reading.
+    Spec.it s "an unannounced Phyrexian symbol in the COST offers nothing to cancel" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (_, growthId, gs) = phyrexianDiscountBoard forest discount cub growth 1 2
+      Spec.assertEqWith
+        s
+        "{G/P} stays {G/P}"
+        (totalManaCost S.alice growthId (ManaCost.MkManaCost [phyrexianGreen]) gs)
+        (Just (ManaCost.MkManaCost [phyrexianGreen]))
+
+    -- NO colour-criterion case here, deliberately. A non-green spell prints no
+    -- {G} either, so a {G/P} reduction would take nothing from it whatever the
+    -- Filter said -- the assertion would pass for the wrong reason, and it did
+    -- under mutation. Pawl.Engine.Filter's colour atom is proved by the
+    -- SapphireMedallion group instead, and the mutation that DOES discriminate
+    -- here (this card's HasColor Green flipped to Red) breaks the three cases
+    -- that assert a discount.
+
+    -- BOTH cost sites, one scenario, exactly as the Edgewalker group tests
+    -- them. One Forest is the amount that tells {1} apart from {1}{G}.
+    Spec.it s "CR 601.2f castability is measured against the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (discounted, _, withDiscount) = phyrexianDiscountBoard forest discount cub growth 1 1
+          (undiscounted, _, bare) = phyrexianDiscountBoard forest discount cub growth 0 1
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "one Forest cannot pay a printed {1}{G}"
+      Spec.assertBool s (S.castable S.alice discounted withDiscount) "but it can pay the discounted {1}"
+
+    Spec.it s "CR 601.2f payment spends the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (cubId, _, gs) = phyrexianDiscountBoard forest discount cub growth 1 2
+          paid = S.runPure S.identityAnswer gs (S.cast S.alice cubId)
+      Spec.assertEqWith s "one Forest tapped, not two" (S.tappedCount S.alice paid) 1
 
 -- Aims the text changer's one target slot at `oid` -- the SpellsAndPermanents
 -- pool's recipient shape, which both changers below print -- and answers whichever
@@ -2185,6 +2333,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   humilitySpec s registry
   titaniasSongSpec s registry
   edgewalkerSpec s registry
+  phyrexianDiscountSpec s registry
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   storedSpec s registry
