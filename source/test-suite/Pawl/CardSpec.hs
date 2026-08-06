@@ -1037,8 +1037,8 @@ modalTrigger condition modes =
 
 -- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
 -- STAMPS rather than asks a player for. The whole module's list rather than a
--- hand-picked subset, so a new reserved slot joins the declaration sweep below
--- by being added here and nowhere else.
+-- hand-picked subset, so a new reserved slot joins BOTH sweeps below -- the
+-- declaration one and the binding one -- by being added here and nowhere else.
 reservedSlots :: Set.Set SlotName.SlotName
 reservedSlots =
   Set.fromList
@@ -1102,6 +1102,37 @@ declaredTargetSlots card =
 -- way the engine asked a question it did not use.
 reservedDeclarations :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
+
+-- Every slot a card BINDS: the names its own effects author for a later effect
+-- to read back -- Resolve.boundSlots over every carrier a card can execute an
+-- effect from (cardResolutionEffects), which is the spell modes plus the
+-- activated, triggered and delayed abilities.
+--
+-- declaredTargetSlots' sibling and the other half of the same question. A target
+-- spec is not the only way a card names a slot: MoveToZone and Create name the
+-- incarnation CR 400.7 mints, PlaySubgame names CR 729.1b's loser, and Destroy
+-- names how many it destroyed.
+--
+-- Not covered, as declaredTargetSlots does not cover it either: the abilities
+-- printed on a token or emblem a Create or CreateEmblem MINTS, which arrive as
+-- an effect's payload rather than as a printing (#849).
+boundSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+boundSlots = Resolve.definedSlots . cardResolutionEffects
+
+-- The reserved names a card BINDS -- reservedDeclarations' sibling, and empty
+-- for every card authored correctly for the same reason.
+--
+-- A DIFFERENT failure from declaring one, and the more dangerous of the two,
+-- because nothing about it is a discarded prompt: the card's own write lands on
+-- the very key the engine stamps. Pawl.Engine.Quantity.evaluateFor's InSlot arm
+-- asks the effect's SOURCE before the stack object precisely because
+-- Resolve.bindAmountSlot writes to the source and Event.eventBindings writes
+-- where the trigger's bindings live; a card binding CR 615.13's `thatMuch` from
+-- a Destroy would therefore SHADOW the amount the event supplied with its own
+-- count, and win, silently. The comment there argues the two writers "cannot
+-- collide over one name" -- this sweep is what makes that argument true.
+reservedBindings :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+reservedBindings = Set.intersection reservedSlots . boundSlots
 
 -- CR 111.4: "A spell or ability that creates a token sets both its name and its
 -- subtype(s). If the spell or ability doesn't specify the name of the token, its
@@ -1978,6 +2009,69 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends = not . Set.null . reservedDeclarations
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card declares a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sweep above's other half: declaring a reserved slot as a target is not
+  -- the only way a card names one. Four opcodes carry a SlotName they
+  -- BIND, and a card is free to write a reserved name into any of them, which
+  -- the declaration sweep cannot see because none of the four is a target spec.
+  -- See reservedBindings for why that is the worse of the two failures.
+  Spec.it s "no reserved binding slot is ever bound by a card" $ do
+    ps <- S.allPrintings s
+    let offends = not . Set.null . reservedBindings
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card binds a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Guards the sweep against passing vacuously, in both the ways it could.
+    -- The pool binds slots at all:
+    let poolBinds = Set.unions (concatMap (overFaces (pure . boundSlots) . Printing.card) ps)
+    Spec.assertBool s (not (Set.null poolBinds)) "the pool binds slots"
+    -- and the sweep reaches an ABILITY's binds, not just a spell mode's. Bane
+    -- of Progress binds the count of what it destroyed from a triggered
+    -- ability, so Card.allEffects -- the spell-modes view -- sees nothing.
+    baneOfProgress <- S.printingOf s registry "Bane of Progress"
+    let bane = S.combinedFace baneOfProgress
+    Spec.assertEqWith
+      s
+      "Bane of Progress binds its destroyed count, which the spell-modes view misses"
+      (boundSlots bane, Resolve.definedSlots (Card.allEffects bane))
+      (Set.singleton (SlotName.MkSlotName (Text.pack "destroyed")), Set.empty)
+  -- The sweep above passes VACUOUSLY over the committed pool, exactly as the
+  -- declaration sweep does, so it is proven here against a hand-built offender
+  -- instead -- never a card file, because a misauthored card must not be
+  -- loadable. Bane of Progress already binds a Destroy's count, so renaming
+  -- that one slot to a reserved name is the whole graft.
+  --
+  -- CR 615.13's `thatMuch` is the name chosen because it is the one with teeth:
+  -- Pawl.Engine.Quantity.evaluateFor's InSlot arm asks the effect's SOURCE
+  -- before the stack object, and Resolve.bindAmountSlot writes a Destroy's count
+  -- to the source -- so this graft, under a prevention trigger, would answer
+  -- "that much" with the card's own count and never consult the event's.
+  --
+  -- Asserted TWICE, in the declaration self-test's posture: the new sweep sees
+  -- the offender and reservedDeclarations does NOT. The second half is the hole
+  -- this test exists to close, and it fails if the binding sweep is ever
+  -- narrowed back into the declaration one.
+  Spec.it s "the lint itself catches an effect that binds a reserved slot" $ do
+    baneOfProgress <- S.printingOf s registry "Bane of Progress"
+    let rebind slot effect = case effect of
+          Effect.Destroy ref regenerability (Just _) -> Effect.Destroy ref regenerability (Just slot)
+          other -> other
+        overModal f modal =
+          modal {Modal.modes = fmap (\m -> m {Mode.effects = fmap f (Mode.effects m)}) (Modal.modes modal)}
+        withBind slot card =
+          card
+            { Face.triggeredAbilities =
+                fmap (\t -> t {TriggeredAbility.modal = overModal (rebind slot) (TriggeredAbility.modal t)}) (Face.triggeredAbilities card)
+            }
+        offender = withBind Binding.eventAmount (S.combinedFace baneOfProgress)
+    Spec.assertEqWith
+      s
+      "CR 615.13 thatMuch bound by a Destroy is caught, and the declaration sweep misses it"
+      (reservedBindings offender, reservedDeclarations offender)
+      (Set.singleton Binding.eventAmount, Set.empty)
+    Spec.assertEqWith
+      s
+      "and the real card binds no reserved slot"
+      (reservedBindings (S.combinedFace baneOfProgress))
+      Set.empty
   -- The read half of the same dataflow question, for the one carrier that has no
   -- resolution to bind anything: CR 604.3's characteristic-defining P/T. A CDA is
   -- a static ability, so there is no earlier effect of a resolution to mint its
