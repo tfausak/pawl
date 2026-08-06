@@ -45,7 +45,6 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
@@ -375,8 +374,10 @@ entwineCost keywords =
 
 -- CR 702.34a's SECOND static ability, the one functioning while the card is on
 -- the stack: exile it instead of putting it anywhere else as it leaves.
--- TheSource, because the rule says "this card" -- the spell itself and no other
--- object.
+-- Filter.IsSource, because the rule says "this card" -- the spell itself and no
+-- other object. Evaluated against the spell's own projected view, which exists
+-- for as long as the spell does; Pawl.Engine.Event proposes the move before it
+-- performs one, so the object is still on the stack when this is asked.
 --
 -- The destination is Graveyard rather than "anywhere else": a
 -- Pawl.Types.ZoneChangePattern names ONE destination, and the graveyard is the
@@ -399,7 +400,7 @@ flashbackExile =
     ZoneChangePattern.MkZoneChangePattern
       { ZoneChangePattern.whenDestination = Zone.Graveyard,
         ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-        ZoneChangePattern.whichObject = ZoneChangeSubject.TheSource
+        ZoneChangePattern.whatObject = Filter.IsSource
       }
     Zone.Exile
 

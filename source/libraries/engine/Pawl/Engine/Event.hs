@@ -1096,15 +1096,17 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
               -- without its half.
               --
               -- Nothing today can tell setting it here from setting it on the
-              -- object the move returns, and the reason is capabilities pawl
-              -- lacks rather than a claim about Magic: ZoneChangePattern narrows
-              -- by destination, owner and identity and carries no characteristic
-              -- filter (#780), so no CR 616.1 candidate can read the half; the
-              -- CR 614.1c-d entry loop, which is the one in-move reader that
-              -- DOES match on characteristics, runs only for a battlefield
-              -- destination; and the CR 117.5 trigger scan reads the live board,
-              -- by which time either writer has landed. So this buys the
-              -- ordering rather than a passing test, as `seed` above does.
+              -- object the move returns, and the reason is the CARD POOL rather
+              -- than a claim about Magic. A CR 616.1 zone-change candidate can
+              -- now read the half -- ZoneChangePattern.whatObject is a Filter --
+              -- but no printing pairs the two: the pool's one split card is
+              -- Wax // Wane, whose halves are both instants, so CR 709.3a's
+              -- single-half view and CR 709.4's combined view agree on every
+              -- characteristic the redirect in the pool asks about (#659). The
+              -- CR 614.1c-d entry loop runs only for a battlefield destination,
+              -- and the CR 117.5 trigger scan reads the live board, by which time
+              -- either writer has landed. So this buys the ordering rather than a
+              -- passing test, as `seed` above does.
               --
               -- What is still dropped is the face a move OUT of the stack should
               -- carry -- CR 712.13: "a resolving double-faced spell that becomes

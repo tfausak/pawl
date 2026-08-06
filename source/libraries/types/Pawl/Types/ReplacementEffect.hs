@@ -32,10 +32,14 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- EntryR's pattern is a bare Filter rather than a pattern RECORD, which is CR
 -- 614.1c and CR 614.1d collapsing into one field: 614.1c's "as [this permanent]
 -- enters" is `Filter.IsSource`, an identity test the generic matcher already
--- answers off its Context, and 614.1d's is an ordinary characteristic filter. The
--- sibling patterns carry a ControllerRelation field because their own subjects
--- are not Filter candidates; an entering permanent is one, so CR 109.5's relation
--- rides the Filter here.
+-- answers off its Context, and 614.1d's is an ordinary characteristic filter. CR
+-- 109.5's relation rides that Filter too (Filter.ControlledBy), so EntryR needs no
+-- ControllerRelation field beside it.
+--
+-- ZoneChangePattern spells its subject the same way (see that module) and yet
+-- KEEPS its relation field, which is not an inconsistency: a zone change is
+-- scoped by the moving object's OWNER (CR 400.3), and Filter.ControlledBy asks
+-- who controls it -- a different player for anything stolen.
 --
 -- PhaseR carries a pattern but NO rewrite, which is the rule rather than an
 -- omission: CR 614.1b and CR 614.10 make a skip a replacement with NOTHING, so

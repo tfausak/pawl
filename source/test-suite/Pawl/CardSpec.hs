@@ -116,6 +116,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified System.Directory as Directory
 
 -- Not red-specific despite its first callers: just the Maybe wrapper every
@@ -1396,7 +1397,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
-  ReplacementEffect.ZoneChangeR _ _ -> []
+  ReplacementEffect.ZoneChangeR zoneChangePattern _ -> [ZoneChangePattern.whatObject zoneChangePattern]
   ReplacementEffect.EntryR entryPattern entryRewrite -> entryPattern : entryRewriteFilters entryRewrite
   ReplacementEffect.DamageR _ _ -> []
   ReplacementEffect.DestructionR _ -> []

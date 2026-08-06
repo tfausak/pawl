@@ -72,7 +72,6 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- alice has a Forest for mana, a Piker on the battlefield, and Giant Growth in
 -- hand, in her main phase. Cast Giant Growth (identityAnswer targets the only
@@ -1750,7 +1749,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
       s
       "one redirect replacement"
       (Projection.replacementsOf rip gs)
-      [ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones ZoneChangeSubject.AnyObject) Zone.Exile]
+      [ReplacementEffect.ZoneChangeR (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Anyones (Filter.Type.And [])) Zone.Exile]
 
   Spec.it s "a vanilla creature projects no replacements" $ do
     pikerPrinting <- S.printingOf s registry "Goblin Piker"

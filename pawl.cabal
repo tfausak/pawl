@@ -287,8 +287,6 @@ library codec
     Pawl.Codec.ZoneChangePattern
     Pawl.Codec.ZoneChangePatternSpec
     Pawl.Codec.ZoneChangeSpec
-    Pawl.Codec.ZoneChangeSubject
-    Pawl.Codec.ZoneChangeSubjectSpec
     Pawl.Codec.ZoneSpec
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
@@ -651,7 +649,6 @@ library types
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern
-    Pawl.Types.ZoneChangeSubject
 
 executable pawl
   import: executable

@@ -88,7 +88,6 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- Every answer the engine asked for, in order -- so a test can assert that a
 -- prompt WAS raised (the engine did not decide) or was NOT (the choice was
@@ -211,7 +210,7 @@ leylineShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
         ReplacementEffect.ZoneChangeR
-          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents ZoneChangeSubject.AnyObject)
+          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents (Filter.Type.And []))
           Zone.Exile,
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
@@ -930,7 +929,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
   -- The other side of Replacement.readsApplier, and the reason it exists rather
   -- than a blanket "compare the controller too". Rest in Peace's pattern is
-  -- ZoneChangeSubject.AnyObject under ControllerRelation.Anyones, so alice's copy
+  -- the trivial Filter under ControllerRelation.Anyones, so alice's copy
   -- and bob's are both applicable to bob's dying Piker at once, equal in `effect`
   -- and differing only in who controls the row. Applying either exiles the same
   -- card, so there is nothing to decide and nothing to ask -- where comparing

@@ -116,7 +116,6 @@ import qualified Pawl.Codec.UnlessPaidSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
-import qualified Pawl.Codec.ZoneChangeSubjectSpec
 import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
 import qualified Pawl.ColorSpec
@@ -335,7 +334,6 @@ spec s registry = do
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
-  Pawl.Codec.ZoneChangeSubjectSpec.spec s
   Pawl.Codec.ZoneSpec.spec s
   Pawl.CodecIntegrationSpec.spec s registry
   Pawl.ColorSpec.spec s registry

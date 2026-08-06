@@ -4129,6 +4129,60 @@ lifeGainTriggerSpec s registry =
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
           Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []
 
+-- CR 508.3a / 603.3d: Anafenza, the Foremost's OTHER ability -- "whenever this
+-- creature attacks, put a +1/+1 counter on another target tapped creature you
+-- control". Here because the card was added for its CR 614.1a redirect
+-- (Pawl.EventSpec's Anafenza group), and a card's second ability is not exercised
+-- by the first one's tests.
+--
+-- The target filter is `And [Not IsSource, IsTapped, ControlledBy You]`, and the
+-- board gives each conjunct exactly one thing to reject: Anafenza herself is
+-- tapped and hers, so only "another" keeps her out; the Wall of Stone is hers and
+-- not her, so only being untapped does (CR 702.3b keeps it home, so declaring
+-- attackers never taps it); and bob's Piker is tapped and not her, so only its
+-- controller does. The Piker attacking beside her satisfies all three -- CR
+-- 508.1f taps a declared attacker -- and is the only legal target.
+anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+anafenzaAttackSpec s registry =
+  let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- Records every CR 601.2c legal-recipient set offered, verbatim, and
+      -- answers everything aggressively -- which declares every legal attacker,
+      -- so the declaration really happens.
+      --
+      -- The LEGAL SET is what this asserts on rather than only the outcome, and
+      -- that is the difference between a discriminating test and a passing one:
+      -- with the Piker the lowest-id candidate, an answerer that takes the first
+      -- offer reaches the same board whether or not the filter rejected anything.
+      recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)] r
+      recordTargets p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> do
+          State.modify' (<> [sets])
+          pure (S.aggressiveAnswer p)
+        _ -> pure (S.aggressiveAnswer p)
+   in Spec.describe s "Anafenza attacks" . Spec.it s "CR 508.3a the attack trigger counters another tapped creature its controller controls" $ do
+        anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+        piker <- S.printingOf s registry "Goblin Piker"
+        wallOfStone <- S.printingOf s registry "Wall of Stone"
+        case S.combatBoardOf [anafenza, piker, wallOfStone] [piker] of
+          (gs0, [anafenzaId, pikerId, wallId], [theirs]) -> do
+            -- bob's Piker is TAPPED, so `ControlledBy You` is the only conjunct
+            -- keeping it out of the offer. Left untapped it would be rejected by
+            -- IsTapped instead, and the assertion would hold with the
+            -- controller clause deleted.
+            let gs = S.tapObject theirs gs0
+                ((_, settled), offered) =
+                  State.runState (Engine.runGame recordTargets gs (Engine.runStep >> Engine.priorityLoop)) []
+            Spec.assertEqWith
+              s
+              "the Piker attacking beside her is the only legal target"
+              (fmap Map.elems offered)
+              [[Set.singleton (Recipient.ToCreature pikerId)]]
+            Spec.assertEqWith s "and it took the counter" (countersOn pikerId settled) (Just 1)
+            Spec.assertEqWith s "\"another\" keeps Anafenza off her own trigger" (countersOn anafenzaId settled) (Just 0)
+            Spec.assertEqWith s "an untapped creature is not a legal target" (countersOn wallId settled) (Just 0)
+            Spec.assertEqWith s "and neither is a creature bob controls" (countersOn theirs settled) (Just 0)
+          _ -> Spec.assertFailure s "fixture should give alice Anafenza, a Piker and a Wall, and bob a Piker"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -4164,3 +4218,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
   lifeGainTriggerSpec s registry
+  anafenzaAttackSpec s registry
