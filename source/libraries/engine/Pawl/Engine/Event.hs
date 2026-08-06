@@ -3074,7 +3074,7 @@ stateTriggers gs
          in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
--- that fires is REMOVED from the store (CR 603.7b) unless it carries a stated
+-- that TRIGGERS is REMOVED from the store (CR 603.7b) unless it carries a stated
 -- duration, which is that rule's own exception -- one of Expiry's sweeps ends
 -- those instead. The survivors are returned so the caller can store them back. CR
 -- 603.7d-f: the controller travels with the entry, so a delayed ability resolves
@@ -3087,11 +3087,14 @@ stateTriggers gs
 -- without a stated duration would never leave the store. Not a live gap: no card
 -- in this pool arms a delayed ability with a StateIs condition.
 --
--- The surviving store is computed from the EVENT MATCH alone, before
--- gatherTriggers' CR 603.4 intervening-"if" filter runs -- so an entry whose
--- intervening "if" is false is removed here, spending CR 603.7b's one shot rather
--- than staying armed for the next occurrence (#48). That reaches only an entry
--- with no stated duration; one with a duration is not spent by firing at all.
+-- CR 603.4 is applied HERE rather than in gatherTriggers, because the surviving
+-- store depends on it: "the ability triggers only if [the condition] is [true];
+-- otherwise it does nothing", and CR 603.7b bounds how many times the ability
+-- TRIGGERS, not how many occurrences of its event it watches. So an entry whose
+-- intervening "if" is false at the occurrence has not triggered, nothing is spent
+-- against 603.7b's one shot, and it stays armed for the next occurrence. No other
+-- 603.7 subrule evicts an entry, so triggering and a stated duration remain its
+-- only two exits.
 delayedPending :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 delayedPending events gs =
   let -- CR 603.7a's floor is the watermark's job, and is all an ordinary entry
@@ -3117,9 +3120,12 @@ delayedPending events gs =
           (DelayedTrigger.ability entry)
           (DelayedTrigger.bindings entry)
       store = GameState.delayedTriggers gs
-      -- Firing spends the one shot only for an entry with no stated duration.
-      spent entry = fires entry && Maybe.isNothing (DelayedTrigger.expiry entry)
-   in (fmap pend (Foldable.toList (Seq.filter fires store)), Seq.filter (not . spent) store)
+      -- CR 603.2 plus CR 603.4: the event matched AND the intervening "if" held,
+      -- which together are what "triggered" means.
+      triggers entry = fires entry && interveningHolds gs (pend entry)
+      -- Triggering spends the one shot only for an entry with no stated duration.
+      spent entry = triggers entry && Maybe.isNothing (DelayedTrigger.expiry entry)
+   in (fmap pend (Foldable.toList (Seq.filter triggers store)), Seq.filter (not . spent) store)
 
 -- CR 603.7a: the printed Onset as the game first stores it. The delayed-trigger
 -- twin of Expiry.arm, deliberately blind to the board -- unlike a duration, an
@@ -3154,7 +3160,7 @@ armOnset onset = case onset of
 -- carries this turn's number, and the drop removes only numbers strictly behind.
 --
 -- CR 603.7b's one shot is untouched -- this ends entries by the CALENDAR, and
--- firing still ends them in delayedPending. An entry with a stated duration is
+-- triggering still ends them in delayedPending. An entry with a stated duration is
 -- dropped here too, and rightly: a duration keeps an ability armed for its event's
 -- next occurrence, not for a turn its printed text never named.
 settleOnsets :: GameState -> GameState
@@ -3181,18 +3187,23 @@ settleOnsets gs =
 -- Pawl.Engine.Engine never needs to know how many sources there are.
 gatherTriggers :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
 gatherTriggers events gs =
-  let (fromDelayed, surviving) = delayedPending events gs
-      all_ = eventTriggers events gs <> stateTriggers gs <> fromDelayed
-   in (filter (interveningHolds gs) all_, surviving)
+  let -- Already CR 603.4-filtered: delayedPending has to run the check itself,
+      -- since which entries survive in its second component depends on the
+      -- answer. Running it over these again would be a redundant no-op, the
+      -- GameState being the same one, so only the other two are filtered here.
+      (fromDelayed, surviving) = delayedPending events gs
+      undecided = eventTriggers events gs <> stateTriggers gs
+   in (filter (interveningHolds gs) undecided <> fromDelayed, surviving)
 
 -- CR 603.4: the ability doesn't trigger at all when its intervening "if" is false
 -- as the trigger event occurs. Checked at the gather rather than at placement,
 -- because "doesn't trigger" must be indistinguishable from "no ability existed",
 -- including to the CR 117.5 settle loop's re-run flag.
 --
--- A SOURCELESS pending trigger never reaches this -- gatherTriggers is the only
--- caller and all three gatherers hang their triggers on an object, the inherent
--- ones being merged in afterwards by Pawl.Engine.Engine. The arm answers True
+-- A SOURCELESS pending trigger never reaches this -- gatherTriggers and
+-- delayedPending are the only callers, and all three gatherers hang their
+-- triggers on an object, the inherent ones being merged in afterwards by
+-- Pawl.Engine.Engine. The arm answers True
 -- rather than failing because an inherent ability's own gatherer owns CR 603.4:
 -- rule 725.2's pair has no intervening "if" at all, and CR 702.179d's does,
 -- checked inside Pawl.Engine.Speed.inherentPending. A fourth gatherer must do the
