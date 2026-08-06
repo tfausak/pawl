@@ -255,6 +255,9 @@ data Face card = MkFace
     -- times (CR 103.5b sits AT a declaration, CR 103.6 opens once the whole
     -- mulligan process is complete), and a card that acts at one must not be
     -- offered at the other.
+    --
+    -- No card grants two of these, so the two-action offer is proved on the CR
+    -- 103.5b window only (#803).
     openingHandActions :: [[Effect.Effect card]]
   }
   deriving (Eq, Ord, Show)

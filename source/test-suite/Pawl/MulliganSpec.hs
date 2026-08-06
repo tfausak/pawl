@@ -195,9 +195,9 @@ usePowder p = case p of
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   _ -> S.identityAnswer p
 
--- Takes the CR 103.5b action at index `i` of whichever card offers one, and
--- always keeps. Which index is the whole point: the fixture card grants two
--- actions from one card, so the ObjectId alone does not say what was taken.
+-- Takes the offered CR 103.5b action whose index is `i`, and always keeps.
+-- Answering by INDEX is the whole point: the fixture card grants two actions, so
+-- the ObjectId alone would not say which of them was taken.
 useActionAt :: Natural -> Prompt.Prompt r -> r
 useActionAt i p = case p of
   Prompt.MulliganAction _ _ candidates ->
