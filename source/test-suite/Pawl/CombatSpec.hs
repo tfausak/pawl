@@ -2095,13 +2095,14 @@ textChangedCombatRestrictionSpec s registry = Spec.describe s "TextChangedCombat
     Spec.assertEqWith s "unhacked, it is never declared" (S.attackerDeclarationsOf control) []
     Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob control) (Just 20)
 
--- castHackAt's twin for a board where alice controls a second land, and the
--- reason it exists rather than a second Island: the Swamp the Bell has animated is
--- itself a mana source, so the shared caster's interpreter -- which takes the head
--- of Pawl.Engine.Mana.chooseSource's candidates -- taps the very creature the
--- cases below are about, and CR 508.1a's "must be untapped" then refuses the
--- attack for a reason that has nothing to do with a text change. Naming the Island
--- keeps the payment off the creature under test.
+-- castHackAt's twin for a board where alice controls more than one land, and the
+-- one thing it does differently is NAME THE LAND THAT PAYS. The Swamp the Bell has
+-- animated is itself a mana source, so the shared caster's interpreter -- which
+-- takes the head of Pawl.Engine.Mana.chooseSource's candidates -- taps the very
+-- creature the cases below are about, and CR 508.1a's "must be untapped" then
+-- refuses the attack for a reason that has nothing to do with a text change. That
+-- is not hypothetical: it is how this group's first red run lied about which
+-- assertions were failing.
 castHackPaying :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> GameState.GameState -> GameState.GameState
 castHackPaying island hackId target from to gs =
   let answer :: Prompt.Prompt r -> r
