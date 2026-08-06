@@ -19,9 +19,10 @@
 -- rule 702.179d admits one increase a turn, so a board at 4 is four turns of
 -- setup that would prove nothing the increase cases have not already proved.
 --
--- cardIncreaseSpec is the one group whose fixture is NOT Muraganda Raceway's own
--- text. It proves that a card's printed instruction reaches the same opcode rule
--- 702.179d's ability does, through Synthetic Speed Boost.
+-- cardIncreaseSpec is the one group whose subject is not Muraganda Raceway. It
+-- proves that a CARD's printed instruction reaches the same opcode rule 702.179d's
+-- ability does, through Synthetic Speed Boost -- the Raceway appears there only to
+-- give one player a speed to raise.
 module Pawl.SpeedSpec where
 
 import qualified Data.Map.Strict as Map
@@ -93,6 +94,17 @@ castResolveSettle answer pid spellId gs =
   let cast = S.runPure answer gs (S.cast pid spellId)
       resolved = S.runPure answer cast (Stack.resolveTop >> Engine.settleForPriority)
    in S.runPure answer resolved (Stack.resolveTop >> Engine.settleForPriority)
+
+-- castResolveSettle's shorter sibling: cast, resolve, settle, and stop. The second
+-- resolveTop above is there for the inherent trigger rule 702.179d puts on the
+-- stack, and cardIncreaseSpec's boards make sure nothing triggers at all -- so
+-- there is nothing for it to resolve, and reaching for an empty stack would be the
+-- test doing something its own premise denies. No prompts either: the spell is
+-- non-modal, untargeted and mandatory.
+castOnce :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castOnce pid spellId gs =
+  let cast = S.runPure S.identityAnswer gs (S.cast pid spellId)
+   in S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
 
 -- How many mana ended up in Alice's pool after tapping this source, with every
 -- prompt answered by `answer`.
@@ -377,14 +389,6 @@ cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
     Spec.assertEqWith s "nor bob" (speedOf S.bob gs) (Just Nothing)
     Spec.assertEqWith s "alice's speed BECAME 2 rather than rising to 1 from a stand-in 0" (speedOf S.alice after) (Just (Just 2))
     Spec.assertEqWith s "and bob's did too, the effect naming every player" (speedOf S.bob after) (Just (Just 2))
-
--- Cast this spell and resolve it, then settle. One resolveTop and no more: these
--- cases put nothing else on the stack, which castResolveSettle above relies on
--- rule 702.179d's trigger to supply.
-castOnce :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-castOnce pid spellId gs =
-  let cast = S.runPure S.identityAnswer gs (S.cast pid spellId)
-   in S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
 
 -- Put this player at exactly this speed, bypassing CR 702.179d's climb. Every
 -- case that uses it is about what READS speed (CR 702.178a's gate, CR 702.179e's

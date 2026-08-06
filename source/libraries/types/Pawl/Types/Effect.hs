@@ -240,20 +240,22 @@ data Effect card
     -- which is why the rule needs an opcode of its own rather than a plain
     -- addition against a stored zero.
     --
-    -- Two producers, which is what CR 702.179c wants. Pawl.Engine.Speed's inherent
-    -- triggered ability (CR 702.179d) is minted by the rules core from the rulebook
-    -- rather than read off a card, the way Pawl.Engine.Monarch mints BecomeMonarch;
-    -- and card data authors one too, at data/cards/synthetic-speed-boost.json. The
-    -- card matters to the arm's shape rather than to its count: rule 702.179d fixes
-    -- the PlayerRef at `Relative You` and the Quantity at `Literal 1`, and only a
-    -- card reaches any other reading -- or the "has no speed" branch below, which
-    -- that ability can never take, existing as it does only for a player who
-    -- already has speed.
+    -- Two producers. Pawl.Engine.Speed's inherent triggered ability (CR 702.179d)
+    -- is minted by the rules core from the rulebook rather than read off a card,
+    -- the way Pawl.Engine.Monarch mints BecomeMonarch; card data authors one too,
+    -- at data/cards/synthetic-speed-boost.json. The second one matters for the
+    -- SHAPE it reaches rather than for the count: rule 702.179d fixes the PlayerRef
+    -- at `Relative You` and the Quantity at `Literal 1`, and it can never reach the
+    -- "has no speed" reading at all, existing as it does only for a player who
+    -- already has speed. Only a card gets to any of that.
     --
-    -- NOT a "set speed to" or "decrease" opcode: CR 702.179 has no "set" reading at
-    -- all, and the decrease a card does want is #808's. A SET would also have to
-    -- say what happens to a player with no speed, which is exactly the question CR
-    -- 702.179c answers for this one.
+    -- NOT a "set speed to" or a "decrease" opcode. CR 702.179b does name a set --
+    -- "until a rule or effect sets their speed to a specific value" -- and CR
+    -- 704.5z is one, but that clause is the rules core's own (Pawl.Engine.Speed's
+    -- startEngines) rather than something a card asks for; no printing sets a
+    -- speed. A decrease one does want, and that is #808's. Either would also have
+    -- to say what happens to a player with no speed, which is exactly the question
+    -- CR 702.179c answers for this one.
     IncreaseSpeed PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3). The `card` is the token's text, embedded
