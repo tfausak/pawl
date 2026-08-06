@@ -64,18 +64,16 @@ data ManaSymbol
     -- the first symbol whose payability turns on how a mana was PRODUCED rather
     -- than on what it is -- Pawl.Types.ProductionTag.Snow is that fact.
     --
-    -- Three neighbouring rules are NOT implemented. The first two also appear
-    -- INERT rather than merely unimplemented -- no printed card exercises either
-    -- (checked against Scryfall 2026-08-02) -- and the third is not claimed to be.
+    -- ONE neighbouring rule is not implemented: CR 107.4h's third sentence, {S}
+    -- referring to snow-produced mana SPENT to pay a cost. Real cards do state
+    -- this, none of them in the pool (#515).
     --
-    --   * CR 106.11, adding mana represented by {S}: Pawl.Types.ManaProduction
-    --     cannot say {S} (#514).
-    --   * CR 118.7g, a reduction BY {S} -- which the rule turns back into a plain
-    --     generic reduction, so Pawl.Engine.Cost.applyAdjustments answering one
-    --     question for both sides gets that side wrong (#516).
-    --   * CR 107.4h's third sentence, {S} referring to snow-produced mana SPENT
-    --     to pay a cost. Real cards do state this, none of them in the pool
-    --     (#515).
+    -- The other two neighbours are done, and both are elsewhere. CR 106.11 --
+    -- adding mana represented by {S} -- is Pawl.Types.ManaProduction.SnowSymbol,
+    -- rewritten to colorless mana by Pawl.Engine.Mana.producedTypes. CR 118.7g --
+    -- a reduction BY {S}, which the rule turns back into a plain generic
+    -- reduction -- is why Pawl.Engine.Cost.applyAdjustments asks costGenericOf on
+    -- the cost side and reducingGenericOf on the reduction side.
     Snow
   | -- | CR 107.3 / 601.2b: the {X} symbol in a cost. Contributes the chosen value
     -- of X once chosen (0 before, for the CR 601.2b castability floor and for a
