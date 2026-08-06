@@ -182,10 +182,12 @@ graveyardAbilitiesOf oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs
 -- ability's modes alternatives, so a zone stated by any of them is a zone the
 -- ability can move its object out of. No modal ability in the pool states one.
 --
+-- This is the ACTIVATED reading of a rule that says "an ability";
+-- Pawl.Engine.Event.zoneFunctionedFrom is the triggered one, and has only the
+-- effect half to fold, CR 603.1 giving a triggered ability no cost.
+--
 -- Not implemented: CR 113.6m's "unless" clause, its Aura half, and its
--- delayed-triggered-ability sentence (#819). Asked of ACTIVATED abilities only,
--- so a triggered ability that names a zone the same way does not function from
--- it (#820).
+-- delayed-triggered-ability sentence (#819).
 zoneFunctionedFrom :: ActivatedAbility.ActivatedAbility Card.Card -> Maybe Zone.Zone
 zoneFunctionedFrom ability =
   case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of
