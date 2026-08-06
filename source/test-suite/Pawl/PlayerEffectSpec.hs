@@ -2794,12 +2794,13 @@ abilityRun srcId ability stifleId gs =
 -- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
 -- counteringBoard above, with a Goblin Piker as the victim spell.
 --
--- One of the card's four printed clauses is NOT in its file: "damage can't be
--- prevented" (#690). It is inert rather than wrong here -- nothing on this board
--- prevents damage -- and no assertion below reads anything but the counter
--- clause. Riot and "other Spiders you control have riot" ARE in the file now;
--- neither fires here, since Spider-Punk is put onto the battlefield rather than
--- cast and no other Spider enters.
+-- All four of the card's printed clauses are in its file now, and only this one
+-- is read here: nothing on this board prevents damage, no other Spider enters,
+-- and S.addCreature inserts Spider-Punk into the battlefield directly rather
+-- than raising an entry event, so CR 702.136a's riot has no CR 614.1c
+-- replacement to be. CR 615.12's clause is proved in Pawl.ReplacementSpec's
+-- "Spider-Punk (CR 615.12)" group instead, where a Mending Hands shield gives it
+-- something to defeat.
 spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spiderPunkSpec s registry =
   let withAbility act = do

@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
@@ -709,15 +710,61 @@ setShield identity_ pat left = case identity_ of
 -- One arm per constructor, no wildcard, so a new rewrite that prevents damage
 -- breaks the build here rather than silently going unreported.
 --
--- Not implemented: CR 615.12's damage that "can't be prevented", which asks a
--- second question this predicate cannot -- a prevention still APPLIES to such an
--- event, prevents none of it, and leaves its shield unspent (#690).
+-- A question about the REWRITE alone, and deliberately not about the event: CR
+-- 615.12's unpreventable damage is still met by a prevention effect, which is
+-- still a prevention effect for having prevented nothing of it. `preventable`
+-- below is the other half, and `inertPrevention` asks them together.
 prevents :: DamageRewrite.DamageRewrite -> Bool
 prevents rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventAll -> True
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
+
+-- CR 615.12: could a prevention effect prevent any of this damage event, or is
+-- this damage that "can't be prevented" (Spider-Punk)?
+--
+-- FALSE does not mean the prevention effect is inapplicable, and the rule is
+-- emphatic about the difference: "any applicable prevention effects are STILL
+-- APPLIED to it. Those effects won't prevent any damage, but any additional
+-- effects they have will take place." So `applies` is untouched by this
+-- question, the CR 616.1 loop still offers the row and still marks it applied --
+-- which is CR 615.12a's "just once", falling straight out of the applied-set the
+-- loop already carries -- and what changes is only that the application does
+-- nothing and the shield is not spent ("existing damage prevention shields won't
+-- be reduced by damage that can't be prevented").
+--
+-- Takes the EVENT, though the one producer reads nothing off it, because that is
+-- the axis the rest of the family varies on: Excruciator's clause names its own
+-- source and Frenzied Baloth's names a damage kind, and both would answer this
+-- per event rather than per board (#835).
+--
+-- Delegated whole to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11
+-- axis this lives on, so this module never sees a PlayerEffect constructor.
+preventable :: GameState -> DamageEvent.DamageEvent -> Bool
+preventable gs _de = not (PlayerEffect.damageCantBePrevented gs)
+
+-- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
+-- chosen against damage that CAN'T BE PREVENTED? True means the application
+-- happens and changes nothing: Pawl.Engine.Event's CR 616.1 loop hands the event
+-- back untouched and marks the row applied, spending neither a use nor a point
+-- of shield.
+--
+-- The two halves above, asked together, and asked HERE so that the loop reads
+-- one classification rather than composing two. `prevents` is the effect half
+-- and refuses CR 614.1a's SetAmount and Scale, which prevent nothing and are not
+-- what the rule is about: Furnace of Rath doubles unpreventable damage like any
+-- other.
+--
+-- The wildcard is over (effect, event) PAIRS, where it is the only way to say
+-- "this pair is not a prevention of damage" -- preventionBy's arrangement, for
+-- preventionBy's reason: the per-constructor obligation is discharged by
+-- `prevents`, which this delegates to.
+inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Bool
+inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate, event) of
+  (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de) ->
+    prevents rewrite && not (preventable gs de)
+  _ -> False
 
 -- CR 615.13: how much of this event the candidate just applied PREVENTED, or
 -- Nothing when it prevented nothing.
@@ -833,11 +880,20 @@ askOne batch (pid, positions) = do
 -- WIDER question than either shield needs -- neither shield can reach the
 -- other's events -- but a superset of a question is still the player's answer,
 -- and splitting it would ask the same player twice about one batch.
+--
+-- CR 615.12's damage is left out of the union, and that is an elision the rule
+-- itself licenses rather than a shortcut: a shield prevents none of an
+-- unpreventable event and is not reduced by it, so every order of a batch of
+-- them leads to the same board and there is nothing for the shielded player to
+-- decide. Filtered per EVENT rather than per batch, so a batch mixing
+-- preventable and unpreventable damage still asks about the part the shield can
+-- reach -- unreachable while the one producer is board-wide (#835), and the
+-- shape the rule describes.
 contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
 contested gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]
       indexed = zip [0 ..] events
-      hitsOf candidate = filter (\entry -> applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate) indexed
+      hitsOf candidate = filter (\entry -> preventable gs (snd entry) && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate) indexed
       contestedBy candidate = do
         remaining <- shieldRemaining (ReplacementCandidate.effect candidate)
         case hitsOf candidate of
