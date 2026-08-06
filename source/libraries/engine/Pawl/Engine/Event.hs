@@ -143,6 +143,7 @@ movedOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
+  GameEvent.LifeGained _ _ -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -159,6 +160,7 @@ damageOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
+  GameEvent.LifeGained _ _ -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
@@ -175,6 +177,7 @@ revealOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
+  GameEvent.LifeGained _ _ -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
@@ -1531,6 +1534,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
   -- entered the battlefield. The bearer frames the match rather than being it --
   -- it is the Filter.Context's source (so `Not IsSource` is Soul Warden's
@@ -1571,6 +1575,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -1588,6 +1593,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -1609,6 +1615,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Engine.Monarch.inherentMatch, not here.
@@ -1637,6 +1644,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
   -- ability's controller (CR 603.3a), and Megrim's "an opponent" is every other
@@ -1669,6 +1677,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
   -- declaration event rather than Combat.attackers, which keeps that rule's last
   -- sentence true -- a creature put onto the battlefield attacking is in the
@@ -1695,6 +1704,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 603.6: a zone-change trigger matched on BOTH ends of the move, library to
   -- graveyard. The bearer is the incarnation the card became on arrival per CR
   -- 400.7e, a graveyard being public (CR 400.2). The pair is also what makes CR
@@ -1718,6 +1728,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 603.6 with NO origin zone: the destination is the whole condition, so a
   -- discard, a mill, a countered spell and a death all match. `from` is
   -- deliberately unread, which is the one line separating this from the two
@@ -1744,6 +1755,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 603.6c narrowed by CR 700.4's definition of "dies": the bearer was put into
   -- a graveyard from the battlefield. Both ends are load-bearing -- `from` keeps a
   -- permanent DISCARDED out of a hand silent, and `to` keeps one EXILED off the
@@ -1770,6 +1782,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- The same rule and zone pair as SelfDies, watched by a BYSTANDER. The bearer
   -- frames the match rather than being it, as for PermanentEnters: it is the
   -- Filter.Context's source (so `Not IsSource` is "another"), and its controller
@@ -1809,6 +1822,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 603.6c taken whole. The `from` half matches SelfDies'; the `to` half is
   -- where they part company, this one asking only that the destination be ANOTHER
   -- zone.
@@ -1838,6 +1852,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -1866,6 +1881,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 615.13: a prevention effect was applied and prevented some damage, and the
   -- damage it prevented was addressed to a player the relation admits. CR 109.5 /
   -- 603.3a fix "you" as the ability's controller, exactly as PlayerDiscards and
@@ -1895,6 +1911,42 @@ matchesTrigger gs bearer you cond event = case cond of
       Recipient.ToObject _ -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 119.9: a source caused a player the relation admits to gain life. The
+  -- gaining player comes from the event; CR 109.5 / 603.3a fix "you" as the
+  -- ability's controller, exactly as PlayerDiscards, SpellOrAbilityCounters and
+  -- DamageToPlayerPrevented above do.
+  --
+  -- The bearer is NOT part of the match: Ajani's Pridemate is a creature watching
+  -- its controller's life total, and CR 119.9 says nothing about which object the
+  -- ability is on.
+  --
+  -- No zero check here. CR 119.9's "if a player gains 0 life, no life gain event
+  -- has occurred" is enforced where the event is RECORDED -- Resolve's GainLife
+  -- arm and Damage's lifelink pass both guard their own zero -- so a
+  -- GameEvent.LifeGained in the log is by construction a gain of more than 0, and
+  -- a second guard here would be a second place for that invariant to live.
+  --
+  -- LOSING life is not a near miss but a different event, and the LifeLost arm
+  -- below is where that shows: one damage event can record both, and only the
+  -- gain fires this.
+  TriggerCondition.PlayerGainsLife relation -> case event of
+    GameEvent.LifeGained pid _ -> case relation of
+      PlayerRelation.You -> pid == you
+      -- CR 102.2: no producer today -- a card watching an OPPONENT gain life.
+      PlayerRelation.Opponent -> pid /= you
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
     GameEvent.StepBegan _ _ -> False
     GameEvent.SpellCast _ -> False
     GameEvent.BecameMonarch _ -> False
@@ -2091,6 +2143,17 @@ eventBindingSlots cond = case cond of
   -- unconditionally, so unlike SelfLeavesTheBattlefield's `became` there is no
   -- shape of the event that withholds it.
   TriggerCondition.DamageToPlayerPrevented _ -> Set.singleton Binding.preventedAmount
+  -- Empty, and NOT DamageToPlayerPrevented's amount slot, though the event
+  -- carries a Natural just as unconditionally. Ajani's Pridemate's payload names
+  -- no number, and binding a slot nothing reads is speculative construction --
+  -- PermanentDies' reasoning above. Sanguine Bond's "that much" is the card that
+  -- must add it (#806). The gaining PLAYER gets no slot either: under the one
+  -- relation a card in the pool uses, that player is CR 109.5's "you", whom
+  -- Binding.setYou already names, so a slot would be a second name for one
+  -- player. PlayerDiscards binds one because Megrim's "that player" is somebody
+  -- else's; a card watching an OPPONENT gain life is what would want the same
+  -- here.
+  TriggerCondition.PlayerGainsLife _ -> Set.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -2244,6 +2307,7 @@ eventTriggers events gs =
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
+        GameEvent.LifeGained _ _ -> Map.empty
       -- CR 603.10's first sentence, per EVENT: the permanents still on the
       -- battlefield when each event happened that have left by the CR 117.5
       -- boundary. Entry i is the union of `leftBattlefield` over the events AFTER
@@ -2299,6 +2363,7 @@ eventTriggers events gs =
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
+        GameEvent.LifeGained _ _ -> Map.empty
       -- CR 113.6k: every card in every graveyard carrying at least one ability that
       -- rule puts there. The one source that widens the SCANNED ZONE rather than
       -- recovering an object an event names, which is why it is computed once
@@ -2404,6 +2469,9 @@ functionsInGraveyard cond = case cond of
   -- The same default: Selfless Squire watches damage addressed to its controller from
   -- the battlefield, and a card in a graveyard sees nothing prevented.
   TriggerCondition.DamageToPlayerPrevented _ -> False
+  -- CR 113.6's default once more: Ajani's Pridemate has to be on the battlefield
+  -- to receive the counter its own ability puts on it.
+  TriggerCondition.PlayerGainsLife _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -2453,6 +2521,10 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SpellOrAbilityCounters _ -> False
   -- Damage can be prevented on anybody's turn.
   TriggerCondition.DamageToPlayerPrevented _ -> False
+  -- Life can be gained on anybody's turn. CR 702.179d's loss condition above says
+  -- "during your turn" and this one does not, which is the two rules' own
+  -- difference rather than an omission here.
+  TriggerCondition.PlayerGainsLife _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -2528,6 +2600,7 @@ stateTriggers gs
               TriggerCondition.SelfLeavesTheBattlefield -> False
               TriggerCondition.SpellOrAbilityCounters _ -> False
               TriggerCondition.DamageToPlayerPrevented _ -> False
+              TriggerCondition.PlayerGainsLife _ -> False
             lives = filter live (Projection.triggeredAbilitiesOf oid gs)
             -- Each live copy against the copies of itself that came earlier in
             -- the list, which gives it a 1-based ordinal among its equals: the

@@ -187,3 +187,17 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.DamageToPlayerPrevented PlayerRelation.Opponent)
       """ {"type":"DamageToPlayerPrevented","value":{"type":"Opponent"}} """
+  -- CR 119.9's life-gain trigger. Both relations, for the same reason.
+  Spec.it s "PlayerGainsLife round-trips both relations" $ do
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerGainsLife PlayerRelation.You)
+      """ {"type":"PlayerGainsLife","value":{"type":"You"}} """
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerGainsLife PlayerRelation.Opponent)
+      """ {"type":"PlayerGainsLife","value":{"type":"Opponent"}} """

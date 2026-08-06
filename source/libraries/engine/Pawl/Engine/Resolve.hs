@@ -1644,9 +1644,15 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror in every respect but the sign. The
   -- comments above apply verbatim: same `viewWithLastKnown` reading, same
-  -- unordered adjustment, same direct write to the player record. The one
-  -- difference is that nothing in CR 704.5 follows a gain -- CR 704.5a fires on
-  -- "0 or less life", which a gain cannot reach.
+  -- unordered adjustment, same direct write to the player record, and the same CR
+  -- 608.2i record appended alongside it. The one difference is that nothing in CR
+  -- 704.5 follows a gain -- CR 704.5a fires on "0 or less life", which a gain
+  -- cannot reach.
+  --
+  -- The `n > 0` guard is CR 119.9's in as many words: "if a player gains 0 life,
+  -- no life gain event has occurred". Here it is load-bearing rather than tidy --
+  -- a Quantity that evaluates to 0 (an X of nothing, a count of an empty board)
+  -- must leave the log silent, or "whenever you gain life" would fire on it.
   Effect.GainLife ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -1657,14 +1663,16 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         | n > 0 ->
             Monad.forM_ gainers $ \pid ->
               State.modify'
-                ( \g ->
-                    g
-                      { GameState.players =
-                          Map.adjust
-                            (\p -> p {Player.life = Player.life p + n})
-                            pid
-                            (GameState.players g)
-                      }
+                ( Event.recordEvent (GameEvent.LifeGained pid (Integer.toNaturalSaturating n))
+                    . ( \g ->
+                          g
+                            { GameState.players =
+                                Map.adjust
+                                  (\p -> p {Player.life = Player.life p + n})
+                                  pid
+                                  (GameState.players g)
+                            }
+                      )
                 )
       _ -> pure ()
   -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.

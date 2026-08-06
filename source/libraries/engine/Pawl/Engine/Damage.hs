@@ -482,6 +482,30 @@ applyDamage events = do
             DamageEvent.amount ev > 0 ->
               [GameEvent.LifeLost pid (DamageEvent.amount ev)]
         _ -> []
+      -- CR 120.3f's gain, recorded where `gainOne` above performs it, so that
+      -- "whenever you gain life" sees lifelink (CR 702.15b) and not only an
+      -- effect that says the words.
+      --
+      -- ONE record per damage event, never per player, which is CR 702.15e in as
+      -- many words: "if multiple sources with lifelink deal damage at the same
+      -- time, they cause separate life gain events". Summing them first would be
+      -- one event, and a Pridemate would get one counter where it is owed two.
+      --
+      -- Whom the damage was dealt to is none of this function's business, exactly
+      -- as it is none of `gainOne`'s: CR 702.15b hangs the gain off the SOURCE, so
+      -- damage to a creature or a planeswalker gains life just as damage to a
+      -- player does. `lifeLostBy` above scopes to a player recipient because CR
+      -- 120.3a does; this one must not.
+      --
+      -- CR 119.9's zero guard, stated HERE rather than left to the callers, and
+      -- the same posture `lifeLostBy` above takes. No producer in the pool builds
+      -- a 0-amount event today -- CR 510.1a makes `attackerAssignment` drop a
+      -- creature assigning 0 or less, and Resolve's DealDamage arm guards its own
+      -- quantity -- so this restates the rule at the site that writes the record
+      -- instead of resting on an invariant two modules away.
+      lifeGainedBy ev = case DamageEvent.dealtByLifelink ev of
+        Just pid | DamageEvent.amount ev > 0 -> [GameEvent.LifeGained pid (DamageEvent.amount ev)]
+        _ -> []
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
   --
@@ -497,13 +521,19 @@ applyDamage events = do
             gained = List.foldl' gainOne marked survivors
             noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) gained prevented
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
-         in -- CR 119.2's life loss is recorded AFTER the damage that caused it,
-            -- which is the same reasoning the prevention/damage order above
-            -- follows: both land inside one CR 117.5 boundary, so the triggers are
-            -- gathered together either way, and this fixes only the canonical
-            -- order. Simultaneous with the damage under CR 119.2, and logged after
-            -- it because a cause reads before its consequence.
-            List.foldl' (flip Event.recordEvent) dealt (concatMap lifeLostBy survivors)
+         in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
+            -- the damage that caused them, which is the same reasoning the
+            -- prevention/damage order above follows: both land inside one CR 117.5
+            -- boundary, so the triggers are gathered together either way, and this
+            -- fixes only the canonical order. Simultaneous with the damage under
+            -- CR 119.2 and CR 120.3f's "in addition", and logged after it because
+            -- a cause reads before its consequence.
+            --
+            -- Per SURVIVOR rather than two passes, so one damage event's loss and
+            -- gain sit together: a lifelink attacker's two records describe a
+            -- single event, and CR 702.15e already makes each source's gain its
+            -- own entry.
+            List.foldl' (flip Event.recordEvent) dealt (concatMap (\ev -> lifeLostBy ev <> lifeGainedBy ev) survivors)
     )
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --

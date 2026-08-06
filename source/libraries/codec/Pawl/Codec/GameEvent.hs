@@ -29,6 +29,7 @@ toJson e = case e of
   GameEvent.AttackerDeclared oid -> Common.tagged "AttackerDeclared" . Just $ ObjectId.toJson oid
   GameEvent.SpellCountered c -> Common.tagged "SpellCountered" . Just $ Countering.toJson c
   GameEvent.LifeLost p n -> Common.tagged "LifeLost" . Just $ Common.array [PlayerId.toJson p, Common.encodeNatural n]
+  GameEvent.LifeGained p n -> Common.tagged "LifeGained" . Just $ Common.array [PlayerId.toJson p, Common.encodeNatural n]
   GameEvent.LoyaltyAbilityActivated oid -> Common.tagged "LoyaltyAbilityActivated" . Just $ ObjectId.toJson oid
 
 fromJson :: Value.Value -> Either Text.Text GameEvent.GameEvent
@@ -47,5 +48,6 @@ fromJson value = do
     ("AttackerDeclared", Just v) -> GameEvent.AttackerDeclared <$> ObjectId.fromJson v
     ("SpellCountered", Just v) -> GameEvent.SpellCountered <$> Countering.fromJson v
     ("LifeLost", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeLost <$> PlayerId.fromJson p <*> Common.decodeNatural n
+    ("LifeGained", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeGained <$> PlayerId.fromJson p <*> Common.decodeNatural n
     ("LoyaltyAbilityActivated", Just v) -> GameEvent.LoyaltyAbilityActivated <$> ObjectId.fromJson v
     _ -> Left . Text.pack $ "unknown GameEvent: " <> t

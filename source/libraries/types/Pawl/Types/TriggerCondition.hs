@@ -240,4 +240,29 @@ data TriggerCondition
     -- its own first ability had nothing to do with; a card printing "prevented
     -- this way" is what must add the link (#687).
     DamageToPlayerPrevented PlayerRelation.PlayerRelation
+  | -- | CR 119.9: "whenever [a player] gains life" -- Ajani's Pridemate's. That
+    -- rule rewrites the printed sentence as "whenever a SOURCE causes [a player]
+    -- to gain life", which is why this is matched against GameEvent.LifeGained,
+    -- recorded only where a source caused the gain, rather than against any
+    -- upward movement of a life total. The PlayerRelation reads the gaining
+    -- player against CR 109.5's "you", the ability's controller (CR 603.3a).
+    --
+    -- PlayerDiscards' shape, not a Self- condition's: the bearer is a creature
+    -- watching its own controller's life total, and CR 119.9 says nothing about
+    -- which object the ability is on.
+    --
+    -- ONE fire per recorded event, which is where CR 702.15e's "simultaneous
+    -- lifelink sources cause separate life gain events" is honoured -- by
+    -- Pawl.Engine.Damage recording one event per damage event rather than by
+    -- anything here counting.
+    --
+    -- Carries no AMOUNT slot. Ajani's Pridemate's payload names none, and CR
+    -- 119.9 does not make the number part of the event's identity; a card
+    -- printing "that much" is what must bind it (#806).
+    --
+    -- LOSING life is not the negative of this condition but a different event
+    -- entirely (GameEvent.LifeLost), so a card bearing this stays silent for a
+    -- loss, for prevented damage (CR 615.6 -- the life never left), and for a
+    -- gain by anyone the relation excludes.
+    PlayerGainsLife PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)
