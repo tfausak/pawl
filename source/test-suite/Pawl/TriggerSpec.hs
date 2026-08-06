@@ -836,7 +836,9 @@ historySpec s registry =
 
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
--- delayed ability -- "it" must survive the resolution that armed it.
+-- delayed ability -- "it" must survive the resolution that armed it. Synthetic
+-- Deferred Rally joins it for the one shape Tidal Wave cannot reach: a delayed
+-- ability with an intervening "if".
 delayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 delayedSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
@@ -918,6 +920,38 @@ delayedSpec s registry =
               (fired, survivors) = Event.delayedPending [GameEvent.StepBegan endStep S.alice] armed
           Spec.assertEqWith s "it fired" (length fired) 1
           Spec.assertEqWith s "and was evicted" (Seq.length survivors) 0
+        -- Synthetic Deferred Rally {W} Instant: "At the beginning of the next
+        -- end step, if you control a creature, you gain 2 life." A LABELED
+        -- CRUTCH (#851): every printed delayed ability with an intervening "if"
+        -- asks whether a named card was cast, played or is still in some zone,
+        -- and neither Quantity nor Filter can name a card. CR 603.4 and
+        -- CR 603.7b meeting on one ability: the first end step's event matches,
+        -- but the intervening "if" is false, so the ability does not TRIGGER --
+        -- and CR 603.7b bounds how many times it triggers, not how many events
+        -- it watches, so nothing was spent and it is still waiting for the next
+        -- end step.
+        --
+        -- The STORE is where the difference shows, and the two assertions on it
+        -- are the discriminating pair: still armed after the false occurrence,
+        -- spent after the true one. The life total alone would not discriminate
+        -- in the first half -- an entry that wrongly triggered at the first end
+        -- step still gains nothing, because Pawl.Engine.Stack's CR 608.2a
+        -- re-check removes it from the stack for the same false condition, so
+        -- the one shot would be spent invisibly.
+        Spec.it s "CR 603.4 a false intervening \"if\" leaves the delayed ability armed for the next end step" $ do
+          rally <- S.printingOf s registry "Synthetic Deferred Rally"
+          plains <- S.printingOf s registry "Plains"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (gs0, oid) = S.handOne rally (S.landsInPlay plains 1)
+              armed = resolveAll (snd (Engine.runGamePure S.identityAnswer gs0 (S.cast S.alice oid)))
+              firstEnd = resolveAll (settle (beginEndStep armed))
+              withCreature = snd (S.addCreature piker S.alice firstEnd)
+              secondEnd = resolveAll (settle (beginEndStep withCreature))
+          Spec.assertEqWith s "the resolution armed it" (Seq.length (GameState.delayedTriggers armed)) 1
+          Spec.assertEqWith s "no life gained while the condition is false" (S.lifeOf S.alice firstEnd) (Just 20)
+          Spec.assertEqWith s "and the entry is still armed" (Seq.length (GameState.delayedTriggers firstEnd)) 1
+          Spec.assertEqWith s "the next end step fires it" (S.lifeOf S.alice secondEnd) (Just 22)
+          Spec.assertEqWith s "and that spends it" (Seq.length (GameState.delayedTriggers secondEnd)) 0
         -- CR 514.2: "all 'until end of turn' and 'this turn' effects end"
         -- during the cleanup step -- which is what ends the stated duration,
         -- and the reason an armed entry cannot outlive the turn that made it.
