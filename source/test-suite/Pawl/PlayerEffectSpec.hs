@@ -554,7 +554,7 @@ thaliaSpec s registry =
       Spec.assertEqWith
         s
         "exactly seven Forests still afford it, so castableWhileSearching offers it"
-        (Cast.castableWhileSearching S.alice gs)
+        (fmap fst (Cast.castableWhileSearching S.alice gs))
         [wurm]
 
 -- alice controls a Sapphire Medallion and `n` untapped Islands; her hand

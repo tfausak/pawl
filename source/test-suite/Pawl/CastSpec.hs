@@ -487,6 +487,65 @@ castSpec s registry = Spec.describe s "Cast" $ do
     Spec.assertEqWith s "Panglacial is on the stack" onStack 1
     Spec.assertEqWith s "Panglacial left the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
     Spec.assertEqWith s "seven Forests tapped to pay {5}{G}{G}" (S.tappedCount S.alice after) 7
+  -- CR 709.3 ("A player chooses which half of a split card they are casting
+  -- before putting it onto the stack") does not stop at the library door, and CR
+  -- 601.3 grants a permission to CAST rather than a narrower one: a split card
+  -- printing the Panglacial permission on each half offers TWO options during a
+  -- search, and picking between them is the player's choice.
+  Spec.it s "CR 709.3 a split card offers BOTH halves during a search" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    split <- S.printingOf s registry "Synthetic Glacial Half"
+    let (_, withMountain) = S.addCreature mountain S.alice (S.landsInPlay forest 1)
+        (_, gs) = S.addLibraryCard split S.alice withMountain
+    Spec.assertEqWith s "both halves offered, by name" (fmap snd (Cast.castableWhileSearching S.alice gs)) [glacialHalf, volcanicHalf]
+  -- The control, one Mountain apart from the pair above: CR 709.3a's "Only the
+  -- chosen half is evaluated to see if it can be cast" gates each half on its
+  -- OWN cost, so a lone Forest reaches {G} and not {R}. Without this, "both
+  -- halves offered" is indistinguishable from "the search offers whatever it
+  -- finds".
+  Spec.it s "CR 709.3a a lone Forest reaches only the {G} half" $ do
+    forest <- S.printingOf s registry "Forest"
+    split <- S.printingOf s registry "Synthetic Glacial Half"
+    let (_, gs) = S.addLibraryCard split S.alice (S.landsInPlay forest 1)
+    Spec.assertEqWith s "only the affordable half" (fmap snd (Cast.castableWhileSearching S.alice gs)) [glacialHalf]
+  -- WHICH half the player picked is what reaches the stack, not the first one
+  -- the engine happened to enumerate: the answerer takes the LAST option, and
+  -- the Volcanic half is what lands there. CR 709.3b -- "While on the stack,
+  -- only the characteristics of the half being cast exist" -- is what makes the
+  -- 2/2 an assertion and not a restatement of the name.
+  --
+  -- Gameplay-level: Evolving Wilds is activated and its ability resolves, and
+  -- the cast happens inside that resolution (CR 601.3), where no player has
+  -- priority.
+  Spec.it s "CR 709.3b the half the player chose is the half on the stack" $ do
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    split <- S.printingOf s registry "Synthetic Glacial Half"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (ewId, g1) = S.addCreature evolvingWilds S.alice g0
+        (_, g2) = S.addCreature mountain S.alice (snd (S.addCreature forest S.alice g1))
+        (_, g3) = S.addLibraryCard split S.alice g2
+        g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+    case Projection.abilitiesOf ewId g4 of
+      ewAbility : _ ->
+        let action = do
+              Activate.activateAbility S.alice ewId ewAbility
+              Stack.resolveTop -- the search, with the cast made inside it
+            after = snd (Engine.runGamePure castLastOption g4 action)
+         in do
+              Spec.assertEqWith s "the card left the library" (S.countByName glacialHalf S.alice after) 0
+              -- No assertion on WHICH land paid: castLastOption answers
+              -- ChooseManaSource with the head of the candidates, so it taps the
+              -- Forest for a {G} that {R} cannot use before reaching the
+              -- Mountain. That is the answerer being naive, not the cast.
+              case GameState.stack after of
+                [] -> Spec.assertFailure s "expected the chosen half on the stack"
+                top : _ -> do
+                  Spec.assertEqWith s "the Volcanic half, not the Glacial one" (Projection.nameOf top after) volcanicHalf
+                  Spec.assertEqWith s "and CR 709.3b's 2/2, not the Glacial half's 1/1" (Projection.powerOf top after) (Just 2)
+      [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
   -- CR 601.3's subject is "a spell or ability". The offer used to be made from
   -- Stack's Source.OfAbility arm alone, so a searching SPELL never got it; it now
   -- lives in the Search effect itself, which both paths reach (#57).
@@ -1735,6 +1794,17 @@ waxName, waneName :: CardName.CardName
 waxName = CardName.MkCardName (Text.pack "Wax")
 waneName = CardName.MkCardName (Text.pack "Wane")
 
+-- The two halves of
+-- data/cards/synthetic-glacial-half-synthetic-volcanic-half.json, a split card
+-- printing Panglacial Wurm's permission on each half. Synthetic because no
+-- printing carries that permission on a multi-face card: an api.scryfall.com
+-- sweep with include_extras for o:"searching your library" and
+-- oracle:/you may cast .* from your library/ returns Panglacial Wurm and
+-- Infernal Spawn of Infernal Spawn of Evil, both single-faced.
+glacialHalf, volcanicHalf :: CardName.CardName
+glacialHalf = CardName.MkCardName (Text.pack "Synthetic Glacial Half")
+volcanicHalf = CardName.MkCardName (Text.pack "Synthetic Volcanic Half")
+
 -- The pool's first split card (CR 709.1), and so the first case here that
 -- exercises CR 709.3-709.4 against a printed card rather than a fixture: Wax is
 -- {G} "Target creature gets +2/+2 until end of turn", Wane is {W} "Destroy
@@ -2004,3 +2074,14 @@ castPanglacial p = case p of
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
+
+-- castPanglacial answering the search offer with the LAST option rather than
+-- the first. That difference is the whole point: a test asserting WHICH half of
+-- a split card reached the stack proves nothing if the answerer and the engine
+-- agree on "the first one" by accident (CR 709.3).
+castLastOption :: Prompt.Prompt r -> r
+castLastOption p = case p of
+  Prompt.CastWhileSearching _ _ options -> case reverse options of
+    choice : _ -> Just choice
+    [] -> Nothing
+  _ -> castPanglacial p

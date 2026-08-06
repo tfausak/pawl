@@ -254,12 +254,18 @@ data Prompt r where
   -- | CR 608.2g: the re-entrant cast opportunity during a library search (Panglacial
   -- Wurm) -- an effect that "specifically instructs or allows a player to cast a
   -- spell during resolution", following CR 601.2a-i except that no player receives
-  -- priority after it is cast. The [ObjectId] is the searcher's library cards
-  -- castable-while-searching (the engine pre-filters to permitted, affordable,
-  -- fillable). Nothing = decline / done. Offered in a loop before the search finds
-  -- (per the ruling), so multiple copies may be cast. CR 605.3a permits mana
-  -- activation to pay.
-  CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- priority after it is cast. Nothing = decline / done. Offered in a loop before
+  -- the search finds (per the ruling), so multiple copies may be cast. CR 605.3a
+  -- permits mana activation to pay.
+  --
+  -- ONE ENTRY PER CASTABLE HALF, paired with the name of the half being proposed
+  -- (the engine pre-filters to permitted, affordable, fillable). The name is what
+  -- CR 709.3 needs -- "A player chooses which half of a split card they are
+  -- casting before putting it onto the stack" -- and it is carried here rather
+  -- than derived at the cast, because a bare object id would present a split
+  -- card's two halves as one indistinguishable option and leave the engine to
+  -- pick. Same shape and same reason as Action.Cast.
+  CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, CardName.CardName)] -> Prompt (Maybe (ObjectId.ObjectId, CardName.CardName))
   -- | CR 601.2b: choose the value of X while casting a spell -- or, through CR
   -- 602.2b, while activating an ability, which is the same rule reached by "the
   -- remainder of the process for activating an ability is identical to the

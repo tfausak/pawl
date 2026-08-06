@@ -73,9 +73,11 @@ data Response
     ChoseBasicLandType Subtype.Subtype
   | -- | CR 701.23: the library card a search found (Nothing = failed to find).
     Searched (Maybe ObjectId.ObjectId)
-  | -- | CR 601.3 (Panglacial): the library card cast while searching (Nothing =
-    -- declined).
-    CastWhileSearched (Maybe ObjectId.ObjectId)
+  | -- | CR 601.3 (Panglacial): the library card cast while searching, paired with
+    -- the CR 709.3 half being cast (Nothing = declined). The name is part of the
+    -- answer for ChoseAction's reason: a transcript that recorded only the card
+    -- would replay a split card's other half.
+    CastWhileSearched (Maybe (ObjectId.ObjectId, CardName.CardName))
   | -- | CR 601.2b: the value of X a caster chose.
     ChoseX Natural.Natural
   | -- | CR 601.2b: the mode(s) a caster chose for a modal spell.
