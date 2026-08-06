@@ -727,9 +727,16 @@ cantBeCountered pid oid gs =
 -- Asked of EVERY still-playing player rather than of one, because `applying` is
 -- indexed by player and this effect is not. That reading is EXACT for
 -- PlayerScope.EachPlayer, the scope Spider-Punk's possessive-free sentence
--- writes and the only one with a producer: EachPlayer is in scope for everybody,
--- so "some player has it applying" and "it applies" are the same fact. A
--- narrower scope would make them come apart (#836).
+-- writes: EachPlayer is in scope for everybody, so "some player has it applying"
+-- and "it applies" are the same fact.
+--
+-- A narrower scope would make them come apart, and no card may write one:
+-- Pawl.CardSpec's "no card narrows CR 615.12" lint sweeps both carriers
+-- `applying` folds together -- the printed static ability and the stored
+-- Effect.AffectPlayers -- and rejects any that pairs this effect with another
+-- scope. There is nothing for a scope to select here anyway: CR 615.12's
+-- sentence is about a damage EVENT, and the narrowings that are printed narrow
+-- the event rather than the table (#835).
 --
 -- CR 102.1's departed seats are already excluded, since Game.stillPlaying is
 -- what `applying`'s own scope resolution folds over.

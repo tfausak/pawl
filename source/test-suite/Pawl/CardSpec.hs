@@ -1373,6 +1373,72 @@ playerEffectFilters playerEffect = case playerEffect of
   -- no recipient (Spider-Punk's "damage can't be prevented").
   PlayerEffect.DamageCantBePrevented -> []
 
+-- Does this carrier pair CR 615.12's "damage can't be prevented" with a
+-- scope narrower than the whole table?
+--
+-- Pawl.Engine.PlayerEffect.damageCantBePrevented asks no player, because CR
+-- 615.12's sentence is about a damage EVENT and names no player to ask about.
+-- It folds the board instead -- "does any seat have such an effect applying?"
+-- -- which is the same fact as "does it apply" exactly when the scope is
+-- PlayerScope.EachPlayer, and reads a narrower one as board-wide. This lint is
+-- what makes that exactness a property of the pool rather than a hope: no card
+-- may author the scope the fold cannot see.
+--
+-- The rule, not just the engine, is what backs the ban. Every printed narrowing
+-- of CR 615.12 narrows by a quality of the damage EVENT and not by a player:
+-- Excruciator's source, Frenzied Baloth's kind, Questing Beast's source
+-- relation, Whippoorwill's recipient. That axis is Pawl.Types.DamagePattern's
+-- and lands as a payload on the constructor (#835), never as a carrier scope --
+-- a scope names which players an effect applies TO, and a damage event between
+-- two creatures applies to no player at all.
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
+-- player effect whose reading depends on its scope must break this build.
+unpreventableScopeOffends :: PlayerScope.PlayerScope -> PlayerEffect.PlayerEffect -> Bool
+unpreventableScopeOffends scope playerEffect = case playerEffect of
+  PlayerEffect.DamageCantBePrevented -> scope /= PlayerScope.EachPlayer
+  -- Every other arm IS asked about a player, so its scope is read exactly as
+  -- written and any of the three is legitimate: Rule of Law and Thalia say
+  -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
+  -- Serpopard says You.
+  PlayerEffect.IncreaseSpellCost _ _ -> False
+  PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.CantCastSpells -> False
+  PlayerEffect.CantCastMoreThan _ -> False
+  PlayerEffect.CantCastChosenName -> False
+  PlayerEffect.CantPlayLandChosenName -> False
+  PlayerEffect.PlayAdditionalLands _ -> False
+  PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.CantBeTargetedBy _ -> False
+  PlayerEffect.CastAsThoughItHadFlash _ -> False
+  PlayerEffect.CantBeCountered _ -> False
+
+-- Every (scope, player effect) pair a card authors, on BOTH of the carriers
+-- Pawl.Engine.PlayerEffect.applying folds together: the printed static ability
+-- (CR 604.2, Spider-Punk) and the stored one a resolution installs (CR 611.2c,
+-- Silence -- and Skullcrack's "damage can't be prevented this turn", whenever
+-- the pool gains it).
+cardPlayerScopes :: Face.Face Card.Type.Card -> [(PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)]
+cardPlayerScopes card =
+  fmap printedPlayerScope (Face.playerAbilities card)
+    <> Maybe.mapMaybe storedPlayerScope (cardResolutionEffects card)
+
+-- The printed carrier's pair: the record's two fields, in the order the lint
+-- above reads them.
+printedPlayerScope :: PlayerStaticAbility.PlayerStaticAbility -> (PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)
+printedPlayerScope ability = (PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)
+
+-- The stored carrier's pair, or Nothing for the overwhelming majority of
+-- effects, which install no continuous effect on the player axis at all. A
+-- wildcard here rather than one arm per effect, matching the control lint's own
+-- sweep over this sum: Pawl.Types.Effect is the open half's alphabet, and a new
+-- resolution effect is not a new player carrier.
+storedPlayerScope :: Effect.Effect Card.Type.Card -> Maybe (PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)
+storedPlayerScope effect = case effect of
+  Effect.AffectPlayers _ scope playerEffect -> Just (scope, playerEffect)
+  _ -> Nothing
+
 -- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
 -- Chamber's "other than a basic land card name"), a predicate over a CARD in the
@@ -2389,6 +2455,54 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (any damagePatternOffends printed)) "the real Fog names no recipient and counts nothing"
     Spec.assertBool s (any (damagePatternOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
     Spec.assertBool s (any (damagePatternOffends . bakeShield) printed) "and so is one counting a shield down"
+  -- The same shape one axis over, and the thing that makes
+  -- Pawl.Engine.PlayerEffect.damageCantBePrevented's board fold EXACT rather
+  -- than approximate. See unpreventableScopeOffends.
+  Spec.it s "no card narrows CR 615.12's \"damage can't be prevented\" by player" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (any (uncurry unpreventableScopeOffends) . cardPlayerScopes) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no such effect in the pool at all
+    -- this would pass whatever the classification said. Spider-Punk is the card
+    -- that prints one.
+    Spec.assertBool s (any (anyFace (any ((==) PlayerEffect.DamageCantBePrevented . snd) . cardPlayerScopes) . Printing.card) ps) "the pool has a card printing unpreventable damage"
+    Spec.assertEqWith s "CR 615.12 names no player, so its carrier is scoped to every player" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against Spider-Punk rescoped rather than
+  -- against a card file, exactly as the two cases above are.
+  Spec.it s "the lint itself catches a narrowed unpreventable-damage carrier" $ do
+    spiderPunk <- S.printingOf s registry "Spider-Punk"
+    let card = S.combinedFace spiderPunk
+        narrow ability = ability {PlayerStaticAbility.scope = PlayerScope.You}
+        narrowed = card {Face.playerAbilities = fmap narrow (Face.playerAbilities card)}
+        offends = any (uncurry unpreventableScopeOffends) . cardPlayerScopes
+    Spec.assertBool s (not (offends card)) "the real Spider-Punk names nobody and is accepted"
+    Spec.assertBool s (offends narrowed) "and the same card scoped to its controller is rejected"
+    -- The ban is CR 615.12's alone: rescoping does not condemn a card whose
+    -- effects are all asked about a player. Prowling Serpopard is the printing
+    -- that legitimately says PlayerScope.You.
+    serpopard <- S.printingOf s registry "Prowling Serpopard"
+    Spec.assertBool s (not (offends (S.combinedFace serpopard))) "a You-scoped countering prohibition is accepted"
+    -- And the STORED carrier, which no printing pairs with CR 615.12 yet:
+    -- Silence's own Effect.AffectPlayers, saying "damage can't be prevented"
+    -- instead of what it says. Skullcrack is the printing that would make this
+    -- shape real, and this is what keeps the sweep honest until it lands.
+    silence <- S.printingOf s registry "Silence"
+    let unpreventable effect = case effect of
+          Effect.AffectPlayers duration scope _ -> Effect.AffectPlayers duration scope PlayerEffect.DamageCantBePrevented
+          other -> other
+        widen effect = case effect of
+          Effect.AffectPlayers duration _ playerEffect -> Effect.AffectPlayers duration PlayerScope.EachPlayer playerEffect
+          other -> other
+        overSpell f face =
+          face
+            { Face.spell =
+                (Face.spell face)
+                  { Modal.modes = fmap (\mode -> mode {Mode.effects = fmap f (Mode.effects mode)}) (Modal.modes (Face.spell face))
+                  }
+            }
+        silenced = S.combinedFace silence
+    Spec.assertBool s (not (offends silenced)) "the real Silence, whose stored effect is scoped to its opponents, is accepted"
+    Spec.assertBool s (offends (overSpell unpreventable silenced)) "a stored CR 615.12 effect scoped to opponents is rejected"
+    Spec.assertBool s (not (offends (overSpell (widen . unpreventable) silenced))) "and the same stored effect scoped to every player is accepted"
   -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
   -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
   -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
