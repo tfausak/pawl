@@ -1122,11 +1122,11 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
         (gs, spellId) = S.handOne unholyStrength base
     Spec.assertBool s (not (S.castable S.alice spellId gs)) "not castable with an empty board"
 
--- alice controls `n` untapped Mountains and has one card of `printing` wherever
--- `place` puts it, with priority in her own precombat main phase.
+-- alice controls `n` untapped copies of `land` and has one card of `printing`
+-- wherever `place` puts it, with priority in her own precombat main phase.
 boardWith :: (Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)) -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
-boardWith place mountain printing n =
-  let (oid, gs) = place printing S.alice (S.landsInPlay mountain n)
+boardWith place land printing n =
+  let (oid, gs) = place printing S.alice (S.landsInPlay land n)
    in ( oid,
         gs
           { GameState.phase = Phase.PrecombatMain,
@@ -1261,6 +1261,58 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     Spec.assertBool s (S.castable S.alice inHand handBoard) "castable from hand"
     Spec.assertBool s (not (S.castable S.alice inGraveyard gs)) "not castable from the graveyard"
     Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs))) "and not offered"
+
+-- CR 702.34a's conditional: "You may cast this card from your graveyard IF THE
+-- RESULTING SPELL IS AN INSTANT OR SORCERY SPELL by paying [cost] rather than
+-- paying its mana cost." The clause is a real condition on the CR 601.3
+-- permission, not a restatement of where flashback is printed, and it is the one
+-- half of rule 702.34a no printing can reach.
+--
+-- The proving card is a LABELED SYNTHETIC: "Synthetic Flashback Creature", a
+-- {R} 2/1 creature with "Flashback {4}{R}". Nothing in the CR forbids the
+-- printing -- rule 702.34a's "appears on some instants and sorceries" describes
+-- the pool rather than restricting it, and the clause would be dead text if the
+-- restriction were structural. No real card reaches it: every printed card with
+-- flashback is an instant or a sorcery, every printed effect that GRANTS
+-- flashback restricts itself to instant and sorcery cards (Snapcaster Mage), and
+-- no effect in this pool changes a card's types while it sits in a graveyard.
+--
+-- What makes the negative discriminating is that its costs are Firebolt's
+-- exactly, {R} with flashback {4}{R}, on Firebolt's own six-Mountain board. So
+-- the two directions below differ in the type line and in nothing else, and the
+-- from-hand case rules out mana, timing and the card itself as the reason the
+-- graveyard cast is missing.
+flashbackCardTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
+  Spec.it s "CR 702.34a a creature card with flashback is not castable from the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    creature <- S.printingOf s registry "Synthetic Flashback Creature"
+    let (inGraveyard, graveyardBoard) = inGraveyardWith mountain creature 6
+        (inHand, handBoard) = inHandWith mountain creature 6
+    Spec.assertBool s (not (Card.isInstant (S.combinedFace creature))) "not an instant"
+    Spec.assertBool s (not (Card.isSorcery (S.combinedFace creature))) "not a sorcery"
+    Spec.assertBool s (S.castable S.alice inHand handBoard) "castable from her hand, so the board affords it"
+    Spec.assertBool s (not (S.castable S.alice inGraveyard graveyardBoard)) "not castable from the graveyard"
+    Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice graveyardBoard))) "and not offered"
+  -- The other direction, on the same board: the clause holds for a card that
+  -- meets it, so the check is not simply refusing every flashback cast.
+  Spec.it s "CR 702.34a a sorcery card with the same keyword is castable from the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
+    let (inGraveyard, gs) = inGraveyardWith mountain firebolt 6
+    Spec.assertBool s (Card.isSorcery (S.combinedFace firebolt)) "a sorcery"
+    Spec.assertBool s (S.castable S.alice inGraveyard gs) "castable from the graveyard"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "and offered"
+  -- Rule 702.34a's clause is a DISJUNCTION, and Think Twice is its instant limb:
+  -- {1}{U} "Draw a card." with "Flashback {2}{U}". Without this case a check that
+  -- asked only about sorceries would still pass everything above.
+  Spec.it s "CR 702.34a an instant card with flashback is castable from the graveyard too" $ do
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (inGraveyard, gs) = inGraveyardWith island thinkTwice 3
+    Spec.assertBool s (Card.isInstant (S.combinedFace thinkTwice)) "an instant"
+    Spec.assertBool s (S.castable S.alice inGraveyard gs) "castable from the graveyard"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "and offered"
 
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
@@ -1808,6 +1860,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   entwineSpec s registry
   auraTargetSpec s registry
   fireboltSpec s registry
+  flashbackCardTypeSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry
   flashSpec s registry
