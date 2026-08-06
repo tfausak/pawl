@@ -1,10 +1,12 @@
 {-# LANGUAGE GADTs #-}
 
 -- Covers: Pawl.Engine.Projection (an object's CR 613 layer-5 colour, including CR
--- 702.114a devoid, CR 613.3's characteristic-defining-ability-first ordering
--- within layer 5, and CR 111.3 token colour), Pawl.Engine.Target (the "target
--- nonblack creature" filter below, and Red Elemental Blast's two colour-filtered
--- pools read straight off the card), the P3a colour gates (Doom Blade, Crimson
+-- 702.114a devoid both PRINTED and GRANTED -- CR 604.3a routes the two
+-- differently, and Slivdrazi Monstrosity is the card that separates them -- CR
+-- 613.3's characteristic-defining-ability-first ordering within layer 5, and CR
+-- 111.3 token colour), Pawl.Engine.Target (the "target nonblack creature" filter
+-- below, and Red Elemental Blast's two colour-filtered pools read straight off
+-- the card), the P3a colour gates (Doom Blade, Crimson
 -- Wisps, Aphotic Wisps, Bad Moon, Dragon Fodder) and this phase's own CR 613.3
 -- gates (Indigo Faerie, Painter's Servant, Red Elemental Blast), plus the CR
 -- 608.2b colour-change fizzle and CR 105.3's "become colorless" half (Moonlace,
@@ -62,6 +64,7 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
@@ -474,6 +477,106 @@ spec s registry = Spec.describe s "Pawl.Engine.Color" $ do
         below = Projection.projectUpTo Layer.Color cands droneId gs
     Spec.assertEqWith s "black below layer 5" (PC.colors below) $ Set.singleton Color.Black
     Spec.assertEqWith s "colourless once layer 5 has applied" (Projection.colorsOf droneId gs) Set.empty
+
+  Spec.it s "CR 604.3a a GRANTED devoid makes its own five-colour source colourless" $ do
+    -- Slivdrazi Monstrosity (Mystery Booster Playtest Cards 2021, cmb2 #102) is
+    -- the pool's only card that GRANTS devoid: "Slivers you control have devoid
+    -- and annihilator 1." It is itself a Sliver Eldrazi, so its own ability
+    -- reaches it, and its mana cost is {C}{W}{U}{B}{R}{G} -- five colours for
+    -- the grant to clear.
+    --
+    -- The granted instance is NOT a characteristic-defining ability: CR 604.3a
+    -- requires all five clauses, and this ability fails (2) -- it is not printed
+    -- on the OTHER Slivers it affects -- as well as (3), since it directly
+    -- affects other objects, and (4) for the source itself, an ability an object
+    -- grants to itself. So it is an ordinary colour-changing effect in layer 5
+    -- (CR 613.1e), applied in timestamp order rather than at the start of the
+    -- layer.
+    --
+    -- Not transcribed: the same ability's annihilator 1, CR 702.86a's attack
+    -- trigger, which Pawl.Types.Keyword cannot name (#794).
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (slivId, gs) = S.addCreature slivdrazi S.alice gs0
+        cands = Projection.gather gs
+        below = Projection.projectUpTo Layer.Color cands slivId gs
+    Spec.assertEqWith s "all five colours below layer 5" (PC.colors below) $
+      Set.fromList [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
+    Spec.assertEqWith s "colourless once layer 5 has applied" (Projection.colorsOf slivId gs) Set.empty
+
+  Spec.it s "CR 702.114a Bad Moon does not pump a creature whose devoid was GRANTED" $ do
+    -- The READER half: a granted devoid has to be visible to the rules, not only
+    -- to Projection.colorsOf. Bad Moon's affected set is "black creatures", read
+    -- at layer 7c against a projection that has already applied layer 5, and
+    -- Slivdrazi's mana cost has a {B} in it. Its own granted devoid is what keeps
+    -- the 8/8 an 8/8 instead of a 9/9.
+    badMoon <- S.printingOf s registry "Bad Moon"
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (_, withMoon) = S.addCreature badMoon S.alice gs0
+        (slivId, gs) = S.addCreature slivdrazi S.alice withMoon
+    Spec.assertEqWith s "power unchanged" (Projection.powerOf slivId gs) $ Just 8
+    Spec.assertEqWith s "toughness unchanged" (Projection.toughnessOf slivId gs) $ Just 8
+
+  Spec.it s "CR 613.7a a granted devoid clears an OLDER 'in addition' colour" $ do
+    -- THE ROUTING GATE, and the falsifier for folding a granted devoid in as a
+    -- characteristic-defining ability. Painter's Servant is cast and resolves
+    -- first, naming blue as it enters (CR 614.1c), so its effect carries that
+    -- permanent's timestamp (CR 613.7a) and the drone is blue. Slivdrazi enters
+    -- afterwards, so its grant is NEWER: within layer 5 the blue applies first
+    -- and the grant clears it, leaving the drone COLOURLESS.
+    --
+    -- Fold the grant in as a CDA instead -- at the start of layer 5, the way
+    -- Slaughter Drone's own PRINTED devoid is folded -- and the blue lands on top
+    -- and the drone is blue, which is exactly what "CR 613.3 devoid beats an
+    -- OLDER layer-5 'in addition' effect" below asserts for the printed instance.
+    -- Grant nothing at all, which is what the engine did before this change, and
+    -- it is blue too.
+    --
+    -- Slivdrazi's FIRST ability is load-bearing here: Slaughter Drone is an
+    -- Eldrazi, not a Sliver, and only "Eldrazi you control are Slivers in
+    -- addition to their other types" (layer 4, CR 613.1d) puts it inside the
+    -- second ability's set at layer 5.
+    mountain <- S.printingOf s registry "Mountain"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    -- Two Mountains for the Servant's {2}; nothing else is cast.
+    let base = S.landsInPlay mountain 2
+        (inHand, psId) = S.handOne paintersServant base
+        cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
+        withPainter = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
+        (droneId, withDrone) = S.addCreature slaughterDrone S.alice withPainter
+        (_, gs) = S.addCreature slivdrazi S.alice withDrone
+    Spec.assertEqWith s "blue before Slivdrazi arrives" (Projection.colorsOf droneId withDrone) $ Set.singleton Color.Blue
+    Spec.assertBool
+      s
+      (Set.member Subtype.Sliver (PC.subtypes (Projection.project droneId gs)))
+      "the Eldrazi is a Sliver, so Slivdrazi's second ability reaches it"
+    Spec.assertEqWith s "and the newer granted devoid clears the blue" (Projection.colorsOf droneId gs) Set.empty
+
+  Spec.it s "CR 613.7a a NEWER 'in addition' colour applies after a granted devoid" $ do
+    -- The other direction, and the falsifier for a grant that wins its layer
+    -- unconditionally: same three cards, opposite entry order. Slivdrazi is on
+    -- the battlefield first, so its grant is the OLDER layer-5 effect; Painter's
+    -- Servant resolves afterwards and its blue applies on top. The drone is BLUE.
+    --
+    -- Not a falsifier for the change itself -- the engine answered blue here
+    -- before it too, because the grant did nothing -- but it pins CR 613.7a's
+    -- direction, and it fails if the granted colour part is stamped later than
+    -- the permanent that granted it.
+    mountain <- S.printingOf s registry "Mountain"
+    paintersServant <- S.printingOf s registry "Painter's Servant"
+    slaughterDrone <- S.printingOf s registry "Slaughter Drone"
+    slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+    let base = S.landsInPlay mountain 2
+        (droneId, withDrone) = S.addCreature slaughterDrone S.alice base
+        (_, withSliv) = S.addCreature slivdrazi S.alice withDrone
+        (inHand, psId) = S.handOne paintersServant withSliv
+        cast = snd (Engine.runGamePure choosingBlue inHand (S.cast S.alice psId))
+        gs = snd (Engine.runGamePure choosingBlue cast Stack.resolveTop)
+    Spec.assertEqWith s "colourless before the Servant resolves" (Projection.colorsOf droneId withSliv) Set.empty
+    Spec.assertEqWith s "blue after it does" (Projection.colorsOf droneId gs) $ Set.singleton Color.Blue
 
   Spec.it s "CR 613.3 devoid beats an OLDER layer-5 'in addition' effect" $ do
     -- THE GATE. Painter's Servant is cast and resolves FIRST, naming blue as it
