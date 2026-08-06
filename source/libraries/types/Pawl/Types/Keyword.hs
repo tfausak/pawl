@@ -290,8 +290,11 @@ data Keyword
     StartYourEngines
   deriving (Eq, Ord, Show)
 
--- Devoid is folded as a characteristic-defining ability at the start of layer 5
--- (Projection.applyColorDefining), per CR 613.3. A devoid GRANTED by a layer-6
--- effect still does nothing to colour: CR 604.3a(2) makes such a grant
--- non-characteristic-defining, so it would be an ordinary layer-5 effect, which
--- is not built. No card in the pool grants devoid (#675).
+-- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one
+-- is a characteristic-defining ability and is folded at the start of layer 5
+-- (Projection.applyColorDefining), per CR 613.3. A GRANTED one is not, CR 604.3a
+-- denying CDA status to an ability that is not printed on the card it affects, so
+-- Projection.grantedDevoidParts routes it into layer 5 as an ordinary colour
+-- effect timestamped with the granting permanent (CR 613.7a). Slivdrazi
+-- Monstrosity is the card that separates them, and Pawl.ColorSpec's "CR 613.7a a
+-- granted devoid clears an OLDER 'in addition' colour" is the proof.
