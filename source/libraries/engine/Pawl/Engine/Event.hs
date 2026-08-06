@@ -29,6 +29,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
@@ -252,7 +253,8 @@ createEmblem pid card =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in placeObject pid mkObj Zone.Command
 
@@ -793,6 +795,26 @@ apply batch candidate event =
                                 ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
                               }
                        in gs3 {GameState.continuousEffects = eff : GameState.continuousEffects gs3}
+            pure (Just event)
+      -- CR 310.8a via CR 614.12: as a battle enters, its controller chooses its
+      -- protector. The projection is re-read here rather than carried on the arm
+      -- so CR 310.11's candidate rule is answered off the object as it actually
+      -- entered -- see EntryRewrite.ChooseProtector.
+      EntryRewrite.ChooseProtector -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arms above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner. Designates NOBODY rather than
+          -- conjuring a player -- CR 704.5w is exactly the rule for a battle with
+          -- no protector, and it repairs this on the next check.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            picked <- Battle.designateProtector (Projection.project oid gs) controller oid
+            State.modify' $ \g ->
+              let stamp o = o {Object.protector = picked}
+               in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
             pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
@@ -1591,7 +1613,8 @@ createTokens controller card n tapped = do
                     Object.face = Nothing,
                     Object.turnedOverAt = Nothing,
                     Object.playableFromExileBy = Nothing,
-                    Object.ringBearerFor = Nothing
+                    Object.ringBearerFor = Nothing,
+                    Object.protector = Nothing
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (runEntry (Set.fromList ids)) ids

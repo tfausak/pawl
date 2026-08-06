@@ -27,6 +27,7 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -62,6 +63,15 @@ data Face card = MkFace
     -- the loyalty of the permanent as it WOULD exist on the battlefield (CR
     -- 614.12) rather than the loyalty printed on whatever card is underneath.
     loyalty :: Maybe Loyalty.Loyalty,
+    -- | CR 310.4 / 310.4a: the number in the card's lower right corner. Nothing
+    -- for every card that is not a battle; the CardSpec lint family holds that
+    -- biconditional in both directions, exactly as it does for loyalty above.
+    --
+    -- Read through Pawl.Engine.Projection, never directly, for loyalty's reason:
+    -- CR 707.2 lists defense among the copiable values a Clone acquires. What
+    -- reads it is CR 310.4b's intrinsic enters-with replacement, which needs the
+    -- defense of the permanent as it WOULD exist on the battlefield (CR 614.12).
+    defense :: Maybe Defense.Defense,
     -- | CR 702. A Set because this is PRINTED text: a card names each keyword
     -- ability it has once, so there is no printed multiplicity to lose. Where
     -- multiplicity does arise -- the same ability printed and granted, which CR

@@ -463,6 +463,9 @@ bucketOfEffect re = case re of
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> ReplacementBucket.Other
+  -- CR 310.8a is none of CR 616.1a-d either: designating a protector rewrites
+  -- neither whose the permanent is, what it copies nor which face is up.
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseProtector -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -530,6 +533,12 @@ readsApplier re = case re of
   -- offer that permanent's controller the same two outcomes -- so which applies
   -- first is not a board difference.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> False
+  -- CR 310.8a: the chooser is the ENTERING battle's controller, read live off the
+  -- board for AsCopy's reason, and the rewrite carries no payload -- rule 310.11
+  -- fixes the candidate set from the battle's own type line. Two such rows are
+  -- always on the same object, for riot's reason, and offer that battle's
+  -- controller the same players.
+  ReplacementEffect.EntryR _ EntryRewrite.ChooseProtector -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are

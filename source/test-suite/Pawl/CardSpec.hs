@@ -138,6 +138,7 @@ vanillaFace name typeLine =
       Face.power = Nothing,
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
+      Face.defense = Nothing,
       Face.keywords = Set.empty,
       Face.colorIndicator = Set.empty,
       Face.staticAbilities = [],
@@ -1544,6 +1545,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.WithCounters _ _ -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
+  EntryRewrite.ChooseProtector -> []
   EntryRewrite.SacrificeAnyNumber f _ -> [f]
 
 -- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
@@ -2703,6 +2705,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends c = isPlaneswalker c /= Maybe.isJust (Face.loyalty c)
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "planeswalker iff loyalty" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 310.4 / 310.4a: the same biconditional one rule number over. "Defense is a
+  -- characteristic that battles have", so a battle without one has nothing for CR
+  -- 310.4b's intrinsic replacement to place and would enter with no defense
+  -- counters at all; a non-battle with a printed defense carries a number no rule
+  -- reads.
+  --
+  -- Projection.intrinsicReplacementsOf's own comment leans on this in both
+  -- directions too, which is why it is a lint and not a per-card assertion.
+  Spec.it s "a card is a battle iff it has a printed defense" $ do
+    ps <- S.allPrintings s
+    let isBattle c = Set.member CardType.Battle (TypeLine.types (Face.typeLine c))
+        offends c = isBattle c /= Maybe.isJust (Face.defense c)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "battle iff defense" (fmap (S.nameOf . Printing.card) offenders) []
   -- What makes Pawl.Engine.Card.faceNamed's answer unique, and so what makes
   -- referring to a face BY NAME well-defined (CR 709.4a). Held over the whole
   -- pool rather than by construction, because a card file is data.

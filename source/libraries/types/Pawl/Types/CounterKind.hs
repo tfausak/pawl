@@ -44,4 +44,16 @@ data CounterKind
     -- (TriggerCondition.SelfCountersReached), CR 714.3c's turn-based action and CR
     -- 704.5s's state-based action, all three counting Object.counters directly.
     Lore
+  | -- | CR 122.1g / 310.4c: a battle's defense on the battlefield is this count,
+    -- never a Pawl.Types.Defense -- that type carries only CR 310.4a's PRINTED
+    -- number. The exact twin of Loyalty above, down to the rule that puts the
+    -- permanent into its owner's graveyard when the count reaches 0.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind.
+    --
+    -- Nothing reads the count yet. CR 704.5v's state-based action is what will,
+    -- and it is not implemented: the only way a printed battle's count reaches 0
+    -- is damage, and CR 310.6 needs an attackable battle first (#302).
+    Defense
   deriving (Eq, Ord, Show)

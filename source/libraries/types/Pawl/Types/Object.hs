@@ -252,7 +252,36 @@ data Object = MkObject
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
     -- because CR 400.7 makes the moved object a new one -- a Ring-bearer that
     -- dies and returns is a different creature, and no longer designated.
-    ringBearerFor :: Maybe PlayerId.PlayerId
+    ringBearerFor :: Maybe PlayerId.PlayerId,
+    -- | CR 310.8: the player designated as this battle's protector. Chosen as the
+    -- battle enters (CR 310.8a) by the CR 614.12 as-enters route every other
+    -- choice-on-entry takes, which is why it is an Object field and not a
+    -- projection: CR 310.8g keeps the designation across the permanent ceasing to
+    -- be a battle or becoming a copy of another one, so nothing a layer computes
+    -- may be allowed to move it.
+    --
+    -- A Maybe rather than a bare PlayerId for two reasons the rules give, not for
+    -- convenience. CR 704.5w names the state "no player in the game designated as
+    -- its protector" outright and makes recovering from it a state-based action,
+    -- so it is a state the rules expect to observe. And every non-battle object
+    -- has one -- CR 310.8's designation is battle-only, and the field is Nothing
+    -- for the rest of the board.
+    --
+    -- Nothing is NOT "the controller by default". CR 310.8a's fallback to the
+    -- controller applies only to a battle with no battle types, and every printed
+    -- battle is a Siege (CR 310.11), whose protector CR 310.11a requires to be an
+    -- opponent. Reading Nothing as the controller would therefore invent the one
+    -- designation CR 704.5x exists to undo.
+    --
+    -- NOT a copiable value: CR 707.2 lists characteristics, and CR 310.8g says a
+    -- battle that becomes a copy of another battle keeps its own protector. Falls
+    -- out with nothing to enforce, as ringBearerFor's note above explains.
+    --
+    -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
+    -- because CR 400.7 makes the moved object a new one -- a battle that returns
+    -- to the battlefield is a new battle and chooses a protector afresh (CR
+    -- 310.8a).
+    protector :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)
 
@@ -292,5 +321,6 @@ newIncarnation object =
       face = Nothing,
       turnedOverAt = Nothing,
       playableFromExileBy = Nothing,
-      ringBearerFor = Nothing
+      ringBearerFor = Nothing,
+      protector = Nothing
     }

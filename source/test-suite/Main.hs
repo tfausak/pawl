@@ -3,6 +3,7 @@ import qualified Data.List as List
 import qualified Pawl.ActivateSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AuraSpec
+import qualified Pawl.BattleSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
@@ -222,6 +223,7 @@ spec s registry = do
   Pawl.ActivateSpec.spec s registry
   Pawl.AdventureSpec.spec s registry
   Pawl.AuraSpec.spec s registry
+  Pawl.BattleSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardSpec.spec s registry
   Pawl.CardsSpec.spec s

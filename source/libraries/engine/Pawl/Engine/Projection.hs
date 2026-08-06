@@ -31,6 +31,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -609,6 +610,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.power = Nothing,
         PC.toughness = Nothing,
         PC.loyalty = Nothing,
+        PC.defense = Nothing,
         PC.characteristicPT = Nothing,
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
@@ -649,6 +651,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- CR 306.5a: a literal number, so copied through rather than
             -- evaluated like the two fields above.
             PC.loyalty = Face.loyalty face,
+            -- CR 310.4a: a literal number, copied through for CR 306.5a's reason.
+            PC.defense = Face.defense face,
             PC.characteristicPT = seedCharacteristicPT face,
             PC.cardTypes = TypeLine.types (Face.typeLine face),
             PC.subtypes = TypeLine.subtypes (Face.typeLine face),
@@ -1646,6 +1650,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- state-based action count Object.counters directly, the same way
               -- loyalty's readers do.
               CounterKind.Lore -> []
+              -- CR 122.1g: nor does a defense counter. CR 704.5v counts
+              -- Object.counters directly, as loyalty's and lore's readers do.
+              CounterKind.Defense -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
@@ -2167,7 +2174,8 @@ replacementsOf oid gs =
    in PC.replacementEffects pc <> intrinsicReplacementsOf pc
 
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
--- replacement effect, and rule 702.136a's riot beside it.
+-- replacement effect, CR 310.4b's identically shaped one for a battle's defense,
+-- and rule 702.136a's riot beside them.
 --
 -- Minted from the finished projection rather than stored on the card, the posture
 -- Mana.subtypeMana and Keyword.triggeredAbilitiesOf take. Three consequences, all
@@ -2183,7 +2191,9 @@ replacementsOf oid gs =
 --     what layer 6 would have to remove.
 --
 -- Nothing for a planeswalker with no printed loyalty, which the CardSpec lint
--- makes unrepresentable.
+-- makes unrepresentable. The battle/defense arm leans on that lint's twin the same
+-- way, and all three consequences above read across unchanged -- CR 310.4b is CR
+-- 306.5b with one characteristic swapped for another.
 --
 -- The riot half (CR 702.136a) is minted by Keyword.entryReplacementsOf off the
 -- SAME finished projection, and the third consequence above reads the other way
@@ -2199,6 +2209,22 @@ intrinsicReplacementsOf pc =
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
+    -- CR 310.4b's intrinsic "this permanent enters with a number of defense
+    -- counters on it equal to its printed defense number" -- CR 306.5b's clause
+    -- one rule number over, keyed on the projected card type and reading the
+    -- projected defense for the same three reasons.
+    <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Defense n)
+       | Set.member CardType.Battle (PC.cardTypes pc),
+         Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
+       ]
+    -- CR 310.8a's intrinsic protector choice, minted off the same projection and
+    -- keyed on the card type alone -- unlike the defense clause above, it does not
+    -- also need a printed number, because CR 310.8a gives EVERY battle a
+    -- protector. A battle whose card prints no defense therefore still designates
+    -- one, which is the state CR 704.5v (unbuilt, #302) would then act on.
+    <> [ ReplacementEffect.EntryR Filter.Type.IsSource EntryRewrite.ChooseProtector
+       | Set.member CardType.Battle (PC.cardTypes pc)
+       ]
     <> Keyword.entryReplacementsOf (PC.keywords pc)
     -- CR 714.3a's intrinsic "this Saga enters with a lore counter on it", minted
     -- off the same finished projection for CR 306.5b's reason: a subtype is not an
@@ -2242,6 +2268,9 @@ replacementsAffecting gs =
             -- intrinsic replacement is minted from the projection too, so it
             -- appears in no base face's list either.
             || Set.member Subtype.Type.Saga (TypeLine.subtypes (Face.typeLine face))
+            -- And the battle disjunct is the third of the same shape, for CR
+            -- 310.4b's intrinsic replacement.
+            || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
             || any Keyword.mintsEntryReplacement (Face.keywords face)
             || any (any grantsMintingKeyword . StaticAbility.modifications) (Face.staticAbilities face)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)

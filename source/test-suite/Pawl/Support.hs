@@ -273,6 +273,7 @@ identityAnswer p = case p of
   -- CR 102.2: raised only where there are two or more opponents to pick from,
   -- which no two-player board reaches.
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -353,6 +354,7 @@ castAnswer p = case p of
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -426,6 +428,7 @@ aggressiveAnswer p = case p of
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -533,6 +536,7 @@ playLandAnswer p = case p of
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -592,7 +596,8 @@ addCreature printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -797,7 +802,8 @@ addToken card pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -830,7 +836,8 @@ addLibraryCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -863,7 +870,8 @@ addGraveyardCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -903,7 +911,8 @@ addExiledCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -950,7 +959,8 @@ addHandCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -1000,7 +1010,8 @@ landsInPlay land n =
                   Object.face = Nothing,
                   Object.turnedOverAt = Nothing,
                   Object.playableFromExileBy = Nothing,
-                  Object.ringBearerFor = Nothing
+                  Object.ringBearerFor = Nothing,
+                  Object.protector = Nothing
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1032,7 +1043,8 @@ handOne printing base =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1070,7 +1082,8 @@ pikerInHand land piker n ph =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
       gs3 =
         gs2
@@ -1538,7 +1551,8 @@ oneMountainState mountain ph =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1674,7 +1688,8 @@ spellOnStack printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2

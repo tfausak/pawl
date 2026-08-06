@@ -406,6 +406,32 @@ data Prompt r where
   -- names. Asked only when there are two or more: CR 102.2's two-player game
   -- leaves exactly one opponent and nothing to ask.
   ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | CR 310.8a: which player protects a battle. The PlayerId is the chooser --
+  -- CR 310.8a assigns it to the battle's controller, so this one is the rule's
+  -- and not pawl's reading, unlike ChooseOpponent above. The ObjectId is the
+  -- battle, and the NonEmpty is Pawl.Engine.Battle.protectorCandidates: for a
+  -- Siege, CR 310.11a's opponents of its controller.
+  --
+  -- Asked from TWO places, which is why it carries the battle rather than
+  -- assuming an entry. CR 310.8a asks as the battle enters, through the CR 614.12
+  -- as-enters route (EntryRewrite.ChooseProtector); CR 704.5w and CR 704.5x ask
+  -- again as a state-based action when the designation has become illegal, on a
+  -- battle that has been on the battlefield for turns.
+  --
+  -- Its own prompt rather than a reuse of ChooseOpponent, by that arm's own
+  -- argument: a responder that knows which prompt it is answering knows which
+  -- question it was asked, and "who protects this battle" is not "which opponent
+  -- does this card's text name". Reusing it would also be wrong on candidates --
+  -- a battle with no battle types takes its own controller (CR 310.8a), whom
+  -- ChooseOpponent by construction never offers.
+  --
+  -- Asked only when there are two or more candidates, the elision ChooseDefender
+  -- and ChooseCardNames both take: one candidate is one outcome, so the options
+  -- are indistinguishable and there is nothing to decide. CR 102.2's two-player
+  -- game leaves a Siege exactly one legal protector, so the ask is a multiplayer
+  -- one in practice -- which is what makes Pawl.BattleSpec's protector cases
+  -- three-seated.
+  ChooseProtector :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 603.3b: each player, in APNAP order, puts the triggered abilities they
   -- control on the stack in any order they choose. The [TriggerEntry] is that
   -- player's pending triggers in the engine's canonical order; the answer is a

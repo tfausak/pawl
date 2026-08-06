@@ -9,6 +9,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
@@ -526,10 +527,37 @@ performStateBasedActions = do
       -- Engine.performSettle runs this pass before placePendingTriggers. See
       -- Saga.awaitingChapter.
       told = Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs
+      -- CR 704.5w / 704.5x: the battles whose protector designation has become
+      -- illegal, paired with the projection and controller the re-choice needs.
+      -- What "illegal" means lives in Pawl.Engine.Battle with the rest of rule
+      -- 310, the way CR 704.5s lives in Pawl.Engine.Saga.
+      --
+      -- Computed from the SAME pre-pass pcs/gs as every classification above, so
+      -- a battle whose protector is a player this pass is about to remove is
+      -- judged against the board the pass began in (CR 704.3).
+      undefended =
+        [ (oid, pc, controller)
+        | oid <- onBattlefield,
+          Just pc <- [Map.lookup oid pcs],
+          Battle.isBattle pc,
+          Just controller <- [Projection.controllerOf oid gs],
+          Battle.needsProtector pc controller (Game.stillPlaying gs) (Object.protector =<< Game.lookupObject oid gs)
+        ]
   -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
   -- asks BEFORE anything below moves, so every choice is made against the state
   -- this pass began in -- CR 704.3's simultaneity.
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
+  -- CR 704.5w / 704.5x: the second state-based action that ASKS, and it asks in
+  -- the same window and for the same reason -- every choice made against the state
+  -- this pass began in. A battle for which no player can be chosen joins the
+  -- put-into-graveyard batch below, which is what both rules' last sentence says.
+  redesignated <- Monad.mapM (\(oid, pc, controller) -> fmap ((,) oid) (Battle.designateProtector pc controller oid)) undefended
+  -- The chosen protectors are stamped BEFORE the batch below moves anything, so a
+  -- battle that found one is not also read as one that did not. Not a zone change
+  -- and not an event: CR 310.8a's designation is a mark on the object, and neither
+  -- rule 704.5w nor 704.5x makes it trigger anything.
+  State.modify' (\g -> g {GameState.objects = List.foldl' (\m (oid, picked) -> Map.adjust (\o -> o {Object.protector = picked}) oid m) (GameState.objects g) redesignated})
+  let undefendable = [oid | (oid, Nothing) <- redesignated]
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
   -- rule's losers), CR 704.5k (the world rule's) and CR 704.5m (an Aura attached
@@ -548,7 +576,7 @@ performStateBasedActions = do
   -- from the board the pass began in, so an animated Rest in Peace this pass is
   -- itself burying still exiles the cards the rest of the batch would put into
   -- graveyards. See Pawl.Engine.Replacement's applyReplacementsIn.
-  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras))
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable))
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.

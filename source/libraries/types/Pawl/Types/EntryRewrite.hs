@@ -144,4 +144,24 @@ data EntryRewrite
     -- end means -- neither value is copiable (CR 707.2), so neither may be
     -- written into the snapshot AsCopy and ChoiceOf use.
     Riot
+  | -- | CR 310.8a via CR 614.12: "As a battle enters the battlefield, its
+    -- controller chooses a player to be its protector."
+    --
+    -- NOT written by a card, for Riot's reason one rule further out: this is
+    -- minted from the finished projection by
+    -- Pawl.Engine.Projection.intrinsicReplacementsOf, keyed on the projected card
+    -- type, so a card says only "Battle" on its type line and rule 310.8a says
+    -- what that means. It still round-trips through the codec, because every arm
+    -- of this type does.
+    --
+    -- NULLARY, where WithCounters carries its payload: CR 310.8a fixes the
+    -- chooser (the controller) and rule 310.11 fixes the candidate set from the
+    -- battle's own battle types, so there is nothing for a card to vary. Which
+    -- players are eligible is therefore asked at apply time --
+    -- Pawl.Engine.Battle.protectorCandidates -- off the projected subtypes rather
+    -- than carried here, so a permanent that BECAME a Siege is judged as one.
+    --
+    -- Writes Object.protector and nothing else. Not a copiable value, so it may
+    -- not go into the snapshot AsCopy and ChoiceOf write (CR 310.8g).
+    ChooseProtector
   deriving (Eq, Ord, Show)
