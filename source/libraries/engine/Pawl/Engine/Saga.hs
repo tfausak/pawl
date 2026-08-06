@@ -61,8 +61,8 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 --
 -- "At least N", not "exactly N": one placement can cross several chapters at once,
 -- so a Saga handed two lore counters from nothing fires I and II together. Read
--- ahead (CR 702.155a) is the mechanic that narrows this to an equality, and it is
--- not implemented (#841).
+-- ahead (CR 702.155a) is the mechanic that narrows this to an equality, and only
+-- on the turn the Saga entered the battlefield; it is not implemented (#841).
 crossed :: Natural -> Natural -> Natural -> Bool
 crossed before after n = before < n && n <= after
 
@@ -80,14 +80,18 @@ chapterOf ability = case TriggeredAbility.condition ability of
   TriggerCondition.SelfCountersReached CounterKind.Lore n -> Just n
   _ -> Nothing
 
--- | CR 714.2d: the chapter numbers a permanent's abilities print.
+-- | CR 714.2a: the chapter numbers a permanent's abilities print, read off the
+-- Roman numeral each chapter symbol carries.
 --
 -- Reads the PROJECTED abilities, never the printed ones, for the reason
 -- Pawl.Engine.Speed.startingEngines gives about keywords: the layer system grants
--- and removes abilities, so a Saga under Humility (CR 613.1f) has no chapter
--- abilities and every rule below that asks for "one or more" answers no.
+-- and removes abilities (CR 613.1f), so a Saga an effect has stripped of its
+-- abilities has no chapter abilities, and every rule below that asks for "one or
+-- more" answers no. No printing in the pool strips a noncreature enchantment's
+-- abilities, so this is the layer being read honestly rather than a case a card
+-- reaches.
 --
--- Not gated on the Saga subtype. CR 714.2 puts chapter symbols on Sagas, and each
+-- Not gated on the Saga subtype. CR 714.1 puts chapter symbols on Saga cards, and each
 -- caller below applies that gate where its own rule states it -- CR 714.3c and CR
 -- 704.5s both say "Saga" in so many words.
 chaptersOf :: PC.ProjectedCharacteristics -> [Natural]
@@ -188,7 +192,7 @@ advancing controllerOf pid pcs gs =
 -- placePendingTriggers, so a Saga reaching its final chapter through CR 714.3c's
 -- turn-based action meets this check with its last chapter ability still in the
 -- unscanned event log. Without the second half the Saga would be sacrificed first
--- and the ability would resolve from CR 603.10a's look-back -- observable, and the
+-- and the ability would resolve without it under CR 113.7a -- observable, and the
 -- wrong order.
 --
 -- The stack half compares OBJECT IDS. CR 400.7 mints a fresh id on every zone

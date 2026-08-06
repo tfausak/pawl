@@ -352,7 +352,7 @@ data TriggerCondition
     -- entries in triggeredAbilities with the same modal and different N. The rule
     -- says the shorthand MEANS that, so nothing here has to represent it.
     --
-    -- Not restricted to Sagas, and not restricted to lore counters. CR 714.2 puts
+    -- Not restricted to Sagas, and not restricted to lore counters. CR 714.1 puts
     -- chapter symbols on Sagas, but the shape is the counter kind's rather than the
     -- subtype's, and Pawl.Engine.Saga is where the Saga-only rules (CR 714.2d's
     -- final chapter number, CR 714.3c's turn-based action, CR 704.5s's state-based

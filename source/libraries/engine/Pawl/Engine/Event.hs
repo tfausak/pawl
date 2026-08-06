@@ -2179,7 +2179,7 @@ matchesTrigger gs bearer you cond event = case cond of
   -- thresholds at once (CR 714.2b says "at least N", not "exactly N"): a Saga
   -- given two lore counters while it has none fires chapters I and II together.
   -- Read ahead (CR 702.155a) is the mechanic that wants the equality instead, and
-  -- it is not implemented (#841).
+  -- then only on the turn the Saga entered; it is not implemented (#841).
   TriggerCondition.SelfCountersReached wanted n -> case event of
     GameEvent.CountersPut oid kind before after -> oid == bearer && kind == wanted && Saga.crossed before after n
     GameEvent.Moved _ _ -> False

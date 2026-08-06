@@ -35,8 +35,8 @@ data CounterKind
     Loyalty
   | -- | CR 714.3: the counters a Saga tracks its progress with. Rule 122.1 gives
     -- lore counters no lettered clause of their own -- 122.1a-i never name them --
-    -- so rule 714 is the whole citation, the same way CR 122.1e defers loyalty's
-    -- meaning to rule 306.
+    -- so rule 714 is the whole citation. Contrast CR 122.1e, which does give
+    -- loyalty a clause of its own and cross-refers rule 704 from it.
     --
     -- Contributes nothing to the CR 613 layer system, so
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind either.

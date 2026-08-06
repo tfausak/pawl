@@ -364,7 +364,7 @@ runTurnBasedActions phase = do
     -- already taken a departed player's permanents, so there is no Saga they
     -- control left to advance.
     --
-    -- CR 703.4g's Attraction roll, which rule 703.4f says happens immediately
+    -- CR 703.4g's Attraction roll, which that rule says happens immediately
     -- after this, has no producer in the pool and no site here.
     Phase.PrecombatMain -> Monad.when hasActive (advanceSagas active)
     -- CR 511.1: the end of combat step has no turn-based actions, so it has no

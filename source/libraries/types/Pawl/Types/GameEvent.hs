@@ -231,7 +231,7 @@ data GameEvent
     --
     -- BEFORE is strictly less than AFTER: putCounters returns early on a settled
     -- count of 0, so an event that placed nothing is never recorded. That matches
-    -- CR 122.6's "one or more" and keeps a would-be trigger from firing on a
+    -- CR 714.2b's "one or more" and keeps a would-be trigger from firing on a
     -- replacement that reduced the placement to nothing.
     --
     -- Removal is deliberately NOT recorded. CR 122.6 is about putting counters on,
