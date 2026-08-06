@@ -233,7 +233,8 @@ dirtied pid object =
       Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
       Object.turnedOverAt = Just (Timestamp.MkTimestamp 1),
       Object.playableFromExileBy = Just pid,
-      Object.ringBearerFor = Just pid
+      Object.ringBearerFor = Just pid,
+      Object.protector = Just pid
     }
 
 -- CR 400.7: has this object no memory of a previous existence? Applying the

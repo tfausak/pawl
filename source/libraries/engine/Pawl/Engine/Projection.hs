@@ -1650,8 +1650,10 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- state-based action count Object.counters directly, the same way
               -- loyalty's readers do.
               CounterKind.Lore -> []
-              -- CR 122.1g: nor does a defense counter. CR 704.5v counts
-              -- Object.counters directly, as loyalty's and lore's readers do.
+              -- Nor does a defense counter, for the reason loyalty's and lore's
+              -- arms give: no CR 613 layer reads defense. Unlike those two this
+              -- one has no reader AT ALL yet -- CR 704.5v is what will count
+              -- Object.counters directly, and it is not built (#302).
               CounterKind.Defense -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
@@ -2175,7 +2177,14 @@ replacementsOf oid gs =
 
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
 -- replacement effect, CR 310.4b's identically shaped one for a battle's defense,
--- and rule 702.136a's riot beside them.
+-- and rule 702.136a's riot and CR 714.3a's Saga lore counter beside them. Those
+-- four are the whole list, and each arm below is one of them.
+--
+-- CR 310.8a's protector is NOT here, though it is also chosen as a battle enters:
+-- rule 310.8a names no ability and cites no rule 614, where CR 310.4b says
+-- outright that its ability "creates a replacement effect". It lives in
+-- Pawl.Engine.Event.designateProtector instead, which explains what minting it
+-- here cost.
 --
 -- Minted from the finished projection rather than stored on the card, the posture
 -- Mana.subtypeMana and Keyword.triggeredAbilitiesOf take. Three consequences, all
@@ -2193,7 +2202,8 @@ replacementsOf oid gs =
 -- Nothing for a planeswalker with no printed loyalty, which the CardSpec lint
 -- makes unrepresentable. The battle/defense arm leans on that lint's twin the same
 -- way, and all three consequences above read across unchanged -- CR 310.4b is CR
--- 306.5b with one characteristic swapped for another.
+-- 306.5b with one characteristic swapped for another, down to the projected card
+-- type deciding and the projected number being read.
 --
 -- The riot half (CR 702.136a) is minted by Keyword.entryReplacementsOf off the
 -- SAME finished projection, and the third consequence above reads the other way
@@ -2216,14 +2226,6 @@ intrinsicReplacementsOf pc =
     <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Defense n)
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
-       ]
-    -- CR 310.8a's intrinsic protector choice, minted off the same projection and
-    -- keyed on the card type alone -- unlike the defense clause above, it does not
-    -- also need a printed number, because CR 310.8a gives EVERY battle a
-    -- protector. A battle whose card prints no defense therefore still designates
-    -- one, which is the state CR 704.5v (unbuilt, #302) would then act on.
-    <> [ ReplacementEffect.EntryR Filter.Type.IsSource EntryRewrite.ChooseProtector
-       | Set.member CardType.Battle (PC.cardTypes pc)
        ]
     <> Keyword.entryReplacementsOf (PC.keywords pc)
     -- CR 714.3a's intrinsic "this Saga enters with a lore counter on it", minted

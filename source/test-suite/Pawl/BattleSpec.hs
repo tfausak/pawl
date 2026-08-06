@@ -31,10 +31,12 @@ module Pawl.BattleSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
@@ -52,6 +54,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -82,6 +85,11 @@ entrySpec s registry = Spec.describe s "Entry" $ do
     -- restriction rather than a choice; protectorSpec below is where the choice
     -- is made observable.
     Spec.assertEqWith s "bob protects it" (protectorOf oid after) (Just S.bob)
+  Spec.it s "CR 616.1e entering a battle orders no replacement effects" $ do
+    (after, oid) <- castInvasionRefusingToOrder s registry
+    -- Both halves still landed, so this is not passing by never entering.
+    Spec.assertEqWith s "five defense counters" (S.counterOf CounterKind.Defense oid after) 5
+    Spec.assertEqWith s "and a protector" (protectorOf oid after) (Just S.bob)
   Spec.it s "the printed enters trigger still fires: gain 4 life and draw a card" $ do
     (after, _) <- castInvasion s registry
     let settled = S.runPure S.identityAnswer after Engine.priorityLoop
@@ -197,13 +205,18 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     let gone = Departure.depart Departure.Type.Conceded S.carol entered
         (acted, _) = S.runPureWith S.identityAnswer gone Sba.performStateBasedActions
     Spec.assertBool s acted "the pass reports the repair"
-  Spec.it s "CR 704.5w an unrelated departure leaves the designation alone" $ do
+  Spec.it s "CR 400.7 a battle that leaves the battlefield forgets its protector" $ do
     (entered, oid) <- castInvasionThreeSeated s registry (protectTo S.carol)
-    -- bob leaving touches nothing: carol is still a legal protector, so the
-    -- condition is not met. The mirror of the repair case above.
-    let gone = Departure.depart Departure.Type.Conceded S.bob entered
-        checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
-    Spec.assertEqWith s "carol still protects it" (protectorOf oid checked) (Just S.carol)
+    Spec.assertEqWith s "carol protects it while it is on the battlefield" (protectorOf oid entered) (Just S.carol)
+    -- CR 400.7 makes the object that reaches the graveyard a new one with no
+    -- memory of this existence, so the designation may not ride along; a battle
+    -- that returns chooses afresh (CR 310.8a). Asserted over the WHOLE object map
+    -- rather than over `oid`, because the move mints a new id -- and the old
+    -- incarnation lingering with a stale protector is exactly the failure this
+    -- rules out.
+    let killed = S.runPure S.identityAnswer entered (Event.destroy Regenerability.Regenerable [oid])
+        designations = Maybe.mapMaybe Object.protector (Map.elems (GameState.objects killed))
+    Spec.assertEqWith s "nobody protects anything now" designations []
 
 -- Cast Invasion of Dominaria on the two-seat board and settle the stack, giving
 -- back the state and the battle's id. A Plains sits in the library so the printed
@@ -221,6 +234,22 @@ castInvasion s registry = do
       (gs, spellId) = S.handOne invasion stocked
       cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
       after = S.runPure S.identityAnswer cast Stack.resolveTop
+  named s after
+
+-- castInvasion under an answerer that treats a CR 616.1e ordering prompt as a
+-- failure.
+castInvasionRefusingToOrder ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (GameState.GameState, ObjectId.ObjectId)
+castInvasionRefusingToOrder s registry = do
+  plains <- S.printingOf s registry "Plains"
+  invasion <- S.printingOf s registry "Invasion of Dominaria"
+  let stocked = snd (S.addLibraryCard plains S.alice (S.landsInPlay plains 3))
+      (gs, spellId) = S.handOne invasion stocked
+      cast = S.runPure refusesToOrder gs (S.cast S.alice spellId)
+      after = S.runPure refusesToOrder cast Stack.resolveTop
   named s after
 
 -- castInvasion's three-seat twin, under a given answerer. Three seats make this a
@@ -275,6 +304,16 @@ siegePC s registry = do
 
 -- Name a protector and answer everything else the ordinary way, the shape
 -- S.attackTo takes for CR 507.1's defending player.
+-- CR 310.8a is not a replacement effect (see Event.designateProtector), so nothing
+-- competes with CR 310.4b's counters for a CR 616.1e ordering. An answerer that
+-- refuses to order replacements is how that is asserted rather than assumed: when
+-- the protector choice WAS an EntryRewrite, both rows landed in
+-- ReplacementBucket.Other and entering a battle raised this prompt every time.
+refusesToOrder :: Prompt.Prompt r -> r
+refusesToOrder p = case p of
+  Prompt.ChooseReplacement {} -> error "entering a battle must not ask CR 616.1e to order anything"
+  _ -> S.identityAnswer p
+
 protectTo :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 protectTo who p = case p of
   Prompt.ChooseProtector {} -> who

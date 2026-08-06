@@ -535,30 +535,43 @@ performStateBasedActions = do
       -- Computed from the SAME pre-pass pcs/gs as every classification above, so
       -- a battle whose protector is a player this pass is about to remove is
       -- judged against the board the pass began in (CR 704.3).
-      undefended =
-        [ (oid, pc, controller)
-        | oid <- onBattlefield,
-          Just pc <- [Map.lookup oid pcs],
-          Battle.isBattle pc,
-          Just controller <- [Projection.controllerOf oid gs],
-          Battle.needsProtector pc controller (Game.stillPlaying gs) (Object.protector =<< Game.lookupObject oid gs)
-        ]
-  -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
-  -- asks BEFORE anything below moves, so every choice is made against the state
-  -- this pass began in -- CR 704.3's simultaneity.
+      undefendedOne oid = do
+        pc <- Map.lookup oid pcs
+        Monad.guard (Battle.isBattle pc)
+        controller <- Projection.controllerOf oid gs
+        Monad.guard (Battle.needsProtector pc controller (Game.stillPlaying gs) (Object.protector =<< Game.lookupObject oid gs))
+        pure (oid, pc, controller)
+      undefended = Maybe.mapMaybe undefendedOne onBattlefield
+  -- CR 704.5j: the legend rule is one of the two state-based actions that ASK --
+  -- CR 310.10's protector re-choice below is the other -- and both ask BEFORE
+  -- anything below moves, so every choice is made against the state this pass
+  -- began in (CR 704.3's simultaneity).
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
-  -- CR 704.5w / 704.5x: the second state-based action that ASKS, and it asks in
-  -- the same window and for the same reason -- every choice made against the state
-  -- this pass began in. A battle for which no player can be chosen joins the
-  -- put-into-graveyard batch below, which is what the second sentence of each of
-  -- those rules, and of CR 310.10, says.
+  -- CR 704.5w / 704.5x: the other state-based action that ASKS, in the same window
+  -- and for the same reason as the legend rule above. A battle for which no player
+  -- can be chosen joins the put-into-graveyard batch below, which is what the
+  -- second sentence of each of those rules, and of CR 310.10, says.
+  --
+  -- A battle this pass is ALSO about to move is still asked, which CR 704.3 is
+  -- what settles: the actions are simultaneous, so neither is conditioned on the
+  -- other having been skipped. The stamp is then erased by Object.newIncarnation
+  -- when the move lands, so the cost is a decision-log entry rather than a wrong
+  -- board -- the same posture chooseLegendVictims takes toward a member that CR
+  -- 704.5f is burying anyway.
   redesignated <- Monad.mapM (\(oid, pc, controller) -> fmap ((,) oid) (Battle.designateProtector pc controller oid)) undefended
   -- The chosen protectors are stamped BEFORE the batch below moves anything, so a
   -- battle that found one is not also read as one that did not. Not a zone change
   -- and not an event: CR 310.8a's designation is a mark on the object, and neither
   -- rule 704.5w nor 704.5x makes it trigger anything.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m (oid, picked) -> Map.adjust (\o -> o {Object.protector = picked}) oid m) (GameState.objects g) redesignated})
-  let undefendable = [oid | (oid, Nothing) <- redesignated]
+  -- CR 310.10's second sentence: "if no player can be chosen this way, the battle
+  -- is put into its owner's graveyard". NOT EXERCISED by any test, and not for want
+  -- of trying -- a Siege's candidates are its controller's opponents still in the
+  -- game, so reaching this needs a game whose battle's controller has no opponent
+  -- left, and CR 104.2a ended that game already. Kept because the alternative is a
+  -- battle that sits at no protector forever, re-asked and unanswerable every pass
+  -- (#853).
+  let undefendable = Maybe.mapMaybe (\(oid, picked) -> if Maybe.isNothing picked then Just oid else Nothing) redesignated
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
   -- rule's losers), CR 704.5k (the world rule's), CR 704.5m (an Aura attached to
@@ -601,9 +614,11 @@ performStateBasedActions = do
   -- The funnel's own CR 702.12b gate is judged against that same board too, so it
   -- asks what `destroyedBySba` asked above rather than second-guessing it from a
   -- board the buries have already changed. Only the funnel's existence filter is
-  -- live, which is what keeps a permanent the buries already moved -- CR 704.5m's
-  -- Aura, the one this line does not exclude by name -- from being offered a
-  -- destruction that never happens (CR 614.7).
+  -- live, which is what keeps a permanent the buries already moved from being
+  -- offered a destruction that never happens (CR 614.7). TWO members are left to
+  -- that filter rather than excluded by name here: CR 704.5m's Aura, and CR
+  -- 310.10's undefendable battle -- an animated Siege with lethal damage whose
+  -- protector has just left is in both `toDestroy` and `undefendable`.
   Event.destroyInBatch gs Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
   -- CR 704.5s / 714.4: the Saga's controller SACRIFICES it. Neither a
   -- put-into-graveyard nor a destruction, so it joins neither batch above -- CR

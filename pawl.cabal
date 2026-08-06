@@ -135,6 +135,7 @@ library codec
     Pawl.Codec.Daytime
     Pawl.Codec.DaytimeSpec
     Pawl.Codec.Defense
+    Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DelayedTriggerSpec
     Pawl.Codec.DestructionRewrite

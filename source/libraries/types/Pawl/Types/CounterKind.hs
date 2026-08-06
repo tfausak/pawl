@@ -53,7 +53,8 @@ data CounterKind
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind.
     --
     -- Nothing reads the count yet. CR 704.5v's state-based action is what will,
-    -- and it is not implemented: the only way a printed battle's count reaches 0
-    -- is damage, and CR 310.6 needs an attackable battle first (#302).
+    -- and it is not implemented: the way a battle's count reaches 0 is damage, and
+    -- CR 310.6 needs an attackable battle first (#302). A battle printing defense
+    -- 0 would reach it on entry, and none exists.
     Defense
   deriving (Eq, Ord, Show)

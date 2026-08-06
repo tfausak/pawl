@@ -11,10 +11,13 @@
 -- comprehensive rules as rule 704. Nothing here asks which EFFECT a battle's text
 -- carries -- only which battle type its type line prints.
 --
--- Imports no Pawl.Engine.Projection, deliberately, for Saga's reason: CR 310.4b's
--- and CR 310.8a's intrinsic abilities are minted by
--- Projection.intrinsicReplacementsOf from this module, so a dependency the other
--- way would be a cycle. Callers pass the projection in.
+-- Imports no Pawl.Engine.Projection: every function here takes the projection it
+-- needs as an argument, so a caller that has already projected does not pay for a
+-- second one. NOT Saga's reason -- rule 714's module is imported BY Projection,
+-- which calls Saga.entryReplacementsOf, so a dependency the other way really would
+-- be a cycle there. Nothing in Projection calls this module: CR 310.4b's clause in
+-- intrinsicReplacementsOf tests `Set.member CardType.Battle` inline, exactly as CR
+-- 306.5b's planeswalker clause beside it tests its own card type.
 --
 -- NOT here, and all of it still #302. What a protector is FOR is the larger half:
 -- CR 310.8b (its protector can never attack it, and a Siege can be attacked by its

@@ -103,8 +103,12 @@ data Object = MkObject
     -- Per-incarnation state, like damage and counters: reset by newIncarnation,
     -- because CR 400.7 makes the moved object a new one.
     --
-    -- One of THREE as-enters choice fields; chosenSubtype and chosenNames below
-    -- are the others.
+    -- One of THREE `chosen` fields; chosenSubtype and chosenNames below are the
+    -- others. What makes those three a family is not that the choice is made as
+    -- the object enters -- `protector` below is made then too -- but that each is
+    -- read back by a MODIFICATION off the effect's source. A protector is a
+    -- designation rule 310 reads directly, so it is a sibling of ringBearerFor
+    -- instead.
     chosenColor :: Maybe Color.Color,
     -- | CR 614.1c: a basic land type this object's controller chose as it
     -- entered (Convincing Mirage). Read by Modification.SetLandSubtypeToChosen
@@ -126,12 +130,14 @@ data Object = MkObject
     -- -- Null Chamber). Read by Pawl.Engine.PlayerEffect off the effect's SOURCE,
     -- the same direction Modification.AddChosenColor reads chosenColor.
     --
-    -- The third as-enters choice field, and still a sibling of the two above
-    -- rather than the generalized choice map a third arrival was expected to
-    -- force. A `Map ChoiceKind ChoiceValue` would need a sum over colour,
-    -- subtype and name, which every reader would then have to re-narrow at a
-    -- site where the wrong arm is unrepresentable today; three typed fields keep
-    -- each read total. A fourth would not change that either.
+    -- The third `chosen` field, and still a sibling of the two above rather than
+    -- the generalized choice map a third arrival was expected to force. A
+    -- `Map ChoiceKind ChoiceValue` would need a sum over colour, subtype and
+    -- name, which every reader would then have to re-narrow at a site where the
+    -- wrong arm is unrepresentable today; three typed fields keep each read
+    -- total. A fourth would not change that either -- and CR 310.8a's protector
+    -- is evidence for the prediction rather than against it: it arrived as its
+    -- own field too, for the reason chosenColor's note gives.
     --
     -- A SET rather than one name or a name per chooser. Null Chamber has two
     -- players each name a card, and its prohibition asks only whether a name is
