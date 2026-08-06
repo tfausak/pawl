@@ -577,10 +577,13 @@ payComponent pid oid component = case component of
 --    which is where the two sides of the cancellation stop agreeing.
 -- 3. An EXCESS typed symbol -- one whose type the cost has already run out of --
 --    is DROPPED, not spilled onto the generic component. That is the card text
---    CR 101.1 lets override the rules, not CR 118.7b-d: every reducer that names
---    a type reduces only coloured mana, and Edgewalker's reminder text settles
---    what that means -- a {1}{W} Cleric spell costs {1}, so the stranded {B}
---    leaves the {1} alone. CR 118.7b-d's spill has no producer here (#309).
+--    CR 101.1 lets override the rules, not CR 118.7b-d: every PRINTED reducer
+--    that names a type reduces only coloured mana, and Edgewalker's reminder
+--    text settles what that means -- a {1}{W} Cleric spell costs {1}, so the
+--    stranded {B} leaves the {1} alone. CR 118.7b-d's spill has no printed
+--    producer (#309). The pool's one reducer WITHOUT that sentence is the
+--    synthetic that CR 118.7f needed, and no test aims it at a cost the spill
+--    would reach.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
 --

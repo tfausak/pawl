@@ -9,7 +9,9 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The seven gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Humility,
+-- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. An eighth,
+-- Synthetic Phyrexian Discount, is the file's one SYNTHETIC card and exists
+-- only because CR 118.7f's reduction has no printing. Humility,
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
 --
@@ -975,9 +977,9 @@ phyrexianDiscountBoard forest discount cub growth copies n =
 -- "less to cast" names one.
 --
 -- Green because Mutagenic Growth's {G/P} is the pool's one Phyrexian COST, and
--- the case below aims this reduction at it: the two sides of the cancellation
--- read the same symbol differently, and the same colour is what makes that
--- visible rather than merely stipulated.
+-- the third case below aims this reduction straight at it: the two sides of the
+-- cancellation read the same symbol differently, and matching the colours is
+-- what makes that visible rather than merely stipulated.
 phyrexianDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phyrexianDiscountSpec s registry =
   Spec.describe s "SyntheticPhyrexianDiscount" $ do
