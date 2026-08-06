@@ -18,7 +18,7 @@ That `cabal configure` writes `cabal.project.local`, which is gitignored. A
 fresh `git worktree` therefore starts without it and builds without
 `pedantic`, so GHC warnings stay warnings there while CI, which configures with
 `--flags=pedantic`, fails on them. Copy the file in from the primary checkout,
-or re-run the configure, before the first build in a new worktree. If a
+or re-run the command above, before the first build in a new worktree. If a
 non-pedantic build already happened, copying it in is not enough: `cabal build`
 reports `Up to date` and never revisits objects compiled under the old flags,
 even after `touch`, so delete the package's directory under
