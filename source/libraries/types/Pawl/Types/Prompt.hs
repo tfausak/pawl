@@ -337,6 +337,21 @@ data Prompt r where
   --
   -- Asked only when two or more options are offered; one option is not a choice.
   ChooseEntryOption :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [EntryOption.EntryOption] -> Prompt Natural.Natural
+  -- | CR 702.136a / 614.1c: as a permanent with riot enters, its controller
+  -- decides whether to have it enter with an additional +1/+1 counter; if they
+  -- don't, it gains haste. The ObjectId is the entering object.
+  --
+  -- An OptionalDecision and not a two-option list, because rule 702.136a states
+  -- it as a "may" with a stated consequence for declining rather than as a menu.
+  -- Exercises is the counter and Declines is the haste, which is the rule's own
+  -- reading order.
+  --
+  -- NEVER ELIDED. The two outcomes are as distinguishable as outcomes get -- a
+  -- 3/3 that cannot attack this turn against a 2/2 that can -- so there is no
+  -- indistinguishable-options case here, unlike ChooseEntryOption's single-option
+  -- one. Pawl.Engine.Event's arm has an unreachable no-controller fallback beside
+  -- it, the same shape ChooseEntryOption's carries; see there.
+  ChooseRiot :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 614.1c: as an object enters, its controller chooses a colour
   -- ("As this creature enters, choose a color" -- Painter's Servant). The
   -- ObjectId is the entering object.

@@ -73,6 +73,16 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       (EntryRewrite.WithCounters CounterKind.Loyalty 3)
       """ {"type":"WithCounters","value":[{"type":"Loyalty"},3]} """
+  -- CR 702.136a: riot's rewrite, payload-free because rule 702.136a fixes both
+  -- halves. Minted from a keyword rather than written by a card, and round-tripped
+  -- anyway, because every arm of this type is.
+  Spec.it s "Riot (Zhur-Taa Goblin)" $
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      EntryRewrite.Riot
+      """ {"type":"Riot"} """
   -- CR 616.1b: a control rewrite, payload-free because CR 109.5 derives the
   -- player.
   Spec.it s "UnderSourceControl (Gather Specimens)" $

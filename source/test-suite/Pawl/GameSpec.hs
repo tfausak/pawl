@@ -382,6 +382,7 @@ recordingAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (List.genericTake count (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
+  Prompt.ChooseRiot {} -> pure OptionalDecision.Declines
   Prompt.ChooseColor {} -> pure Color.White
   Prompt.ChooseCardName {} -> pure (CardName.MkCardName mempty)
   Prompt.ChooseOpponent _ _ _ opponents -> pure (NonEmpty.head opponents)
@@ -1805,6 +1806,7 @@ slaveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents

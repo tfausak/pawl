@@ -62,6 +62,7 @@ encode p answer = case p of
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
+  Prompt.ChooseRiot {} -> Response.ChoseRiot answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
   Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
@@ -165,6 +166,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseEntryOption {} -> case response of
     Response.ChoseEntryOption n -> Just n
+    _ -> Nothing
+  Prompt.ChooseRiot {} -> case response of
+    Response.ChoseRiot d -> Just d
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
@@ -321,6 +325,12 @@ defaultAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   -- CR 208.2b: asked only when the list has two or more shapes.
   Prompt.ChooseEntryOption {} -> 0
+  -- CR 702.136a: riot's "may" is a real fork, so there is no answer that changes
+  -- nothing. Declining is what the rule itself treats as the default branch --
+  -- "if you don't, it gains haste" -- and it is the half that puts no counter on
+  -- the board, which keeps a short transcript from conjuring a bigger creature
+  -- than the game had.
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
   -- THE ONE ILLEGAL ANSWER, deliberately. CR 201.4 offers every card in the

@@ -434,6 +434,9 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> ReplacementBucket.Other
+  -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
+  -- enters WITH, never whose it is, what it copies or which face is up.
+  ReplacementEffect.EntryR _ EntryRewrite.Riot -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -494,6 +497,13 @@ readsApplier re = case re of
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
   ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> False
+  -- CR 702.136a: riot's chooser is the ENTERING object's controller, read live
+  -- off the board for AsCopy's reason, and the rewrite carries no payload at all
+  -- -- rule 702.136a fixes both halves. Two riot rows are always on the SAME
+  -- object, since CR 614.1c's ability is the entering permanent's own, and they
+  -- offer that permanent's controller the same two outcomes -- so which applies
+  -- first is not a board difference.
+  ReplacementEffect.EntryR _ EntryRewrite.Riot -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are

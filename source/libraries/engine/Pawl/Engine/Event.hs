@@ -33,6 +33,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
+import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
@@ -41,11 +42,13 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Extra.Natural as Natural
+import qualified Pawl.Types.Affected as Affected
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Countering as Countering
@@ -57,6 +60,7 @@ import Pawl.Types.DelayedTrigger (DelayedTrigger)
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
@@ -66,10 +70,12 @@ import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.Onset (Onset)
 import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import Pawl.Types.PhaseSelector (PhaseSelector)
@@ -691,6 +697,71 @@ apply batch candidate event =
               let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
             Monad.mapM_ (\k -> putCounters oid k many) kind
+            pure (Just event)
+      -- CR 702.136a: riot. "You may have this permanent enter with an additional
+      -- +1/+1 counter on it. If you don't, it gains haste."
+      --
+      -- NEVER ELIDED. A +1/+1 counter and haste are two outcomes a player can
+      -- tell apart on any board -- the whole reason the keyword exists -- so this
+      -- prompt is raised every time the entering object has a controller to ask,
+      -- the posture ChooseColor's arm takes and not ChoiceOf's one-option
+      -- elision.
+      --
+      -- The counter goes through putCounters, CR 122.6's funnel, exactly as the
+      -- WithCounters arm above does, so CR 614.16 applies to it and Doubling
+      -- Season sees riot's counter.
+      --
+      -- The haste is a STORED continuous effect (CR 611.2) rather than a stamp on
+      -- the object: rule 702.136a says the permanent "gains haste" and names no
+      -- end, which is CR 611.2a's rest-of-the-game duration, and a stored effect
+      -- is what puts the grant in CR 613.1f's layer 6 with a timestamp for
+      -- Humility and every other ability-remover to be ordered against. Its
+      -- source is the entering permanent itself, the object whose riot ability
+      -- generated it (CR 113.7).
+      --
+      -- The timestamp is a FRESH one, taken here. CR 613.7a would give a static
+      -- ability's continuous effect the timestamp of the object the ability is
+      -- on, which for this one is the permanent that entered a moment ago and has
+      -- the newest object timestamp on the board -- so the two coincide at every
+      -- ordering question a card in this pool can ask.
+      EntryRewrite.Riot -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arms above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so
+          -- controllerOf falls back to its owner. Neither half is applied rather
+          -- than one being chosen unasked -- the engine makes no player's choice,
+          -- and both halves here are choices.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            answer <- Game.choose (Prompt.ChooseRiot decider controller oid)
+            case answer of
+              OptionalDecision.Exercises -> putCounters oid CounterKind.PlusOnePlusOne 1
+              OptionalDecision.Declines ->
+                State.modify' $ \gs2 ->
+                  -- CR 611.2a: "gains haste" with no stated end lasts until the
+                  -- game does. Armed through Pawl.Engine.Expiry rather than naming
+                  -- Expiry.Never here, the posture Resolve's storing arms take;
+                  -- Indefinite always arms, so the Nothing branch is unreachable
+                  -- and is written out only because arm is total over Duration.
+                  case Expiry.arm controller oid Duration.Indefinite gs2 of
+                    Nothing -> gs2
+                    Just expiry ->
+                      let (ts, gs3) = Game.freshTimestamp gs2
+                          eff =
+                            ContinuousEffect.MkContinuousEffect
+                              { ContinuousEffect.source = oid,
+                                ContinuousEffect.timestamp = ts,
+                                ContinuousEffect.expiry = expiry,
+                                ContinuousEffect.modification = Modification.GainKeyword Keyword.Type.Haste,
+                                -- CR 611.2c: a fixed set of one, settled here --
+                                -- the permanent that entered, not whatever
+                                -- matches a filter later.
+                                ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
+                              }
+                       in gs3 {GameState.continuousEffects = eff : GameState.continuousEffects gs3}
             pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _ _, _) -> pure (Just event)

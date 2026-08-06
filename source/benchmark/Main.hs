@@ -95,6 +95,7 @@ alwaysPass p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
@@ -163,6 +164,7 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
@@ -232,6 +234,7 @@ fightAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents

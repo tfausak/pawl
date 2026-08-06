@@ -1,11 +1,6 @@
 {
   "faces": [
     {
-      "keywords": [
-        {
-          "type": "Riot"
-        }
-      ],
       "manaCost": [
         {
           "type": "Generic",
@@ -19,27 +14,34 @@
               "type": "Red"
             }
           }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
         }
       ],
-      "name": "Spider-Punk",
+      "name": "Rhythm of the Wild",
       "playerAbilities": [
         {
           "effect": {
             "type": "CantBeCountered",
             "value": {
-              "type": "And",
-              "value": []
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
             }
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "You"
           }
         }
       ],
-      "power": {
-        "type": "Literal",
-        "value": 2
-      },
       "staticAbilities": [
         {
           "affected": {
@@ -48,15 +50,15 @@
               "type": "And",
               "value": [
                 {
-                  "type": "HasSubtype",
+                  "type": "HasCardType",
                   "value": {
-                    "type": "Spider"
+                    "type": "Creature"
                   }
                 },
                 {
                   "type": "Not",
                   "value": {
-                    "type": "IsSource"
+                    "type": "IsToken"
                   }
                 },
                 {
@@ -78,30 +80,10 @@
           ]
         }
       ],
-      "toughness": {
-        "type": "Literal",
-        "value": 1
-      },
       "typeLine": {
-        "subtypes": [
-          {
-            "type": "Hero"
-          },
-          {
-            "type": "Human"
-          },
-          {
-            "type": "Spider"
-          }
-        ],
-        "supertypes": [
-          {
-            "type": "Legendary"
-          }
-        ],
         "types": [
           {
-            "type": "Creature"
+            "type": "Enchantment"
           }
         ]
       }

@@ -1219,6 +1219,7 @@ keywordFilters keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.StartYourEngines -> []
@@ -1385,6 +1386,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.WithCounters _ _ -> []
   EntryRewrite.UnderSourceControl -> []
+  EntryRewrite.Riot -> []
   EntryRewrite.SacrificeAnyNumber f _ -> [f]
 
 -- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat

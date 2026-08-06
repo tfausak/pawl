@@ -19,6 +19,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -46,7 +47,8 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -72,6 +74,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -1096,13 +1099,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         -- attack is disproportionate to what this asserts, so seed
         -- GameState.combat's attacker map directly -- the same shortcut
         -- Support.addRegenShield takes for the shield itself.
-        attacking = armed {GameState.combat = (GameState.combat armed) {Combat.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
+        attacking = armed {GameState.combat = (GameState.combat armed) {Combat.Type.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
         once = S.runPure S.identityAnswer attacking (Event.destroy Regenerability.Regenerable [skel])
         twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [skel])
-    Spec.assertBool s (Map.null (Combat.attackers (GameState.combat armed))) "combat started with no attackers"
+    Spec.assertBool s (Map.null (Combat.Type.attackers (GameState.combat armed))) "combat started with no attackers"
     Spec.assertBool s (Set.member skel (GameState.battlefield once)) "survived the first destruction"
     Spec.assertEqWith s "the shield was spent" (GameState.replacements once) []
-    Spec.assertBool s (not (Map.member skel (Combat.attackers (GameState.combat once)))) "removed from combat by the regeneration (CR 701.19a)"
+    Spec.assertBool s (not (Map.member skel (Combat.Type.attackers (GameState.combat once)))) "removed from combat by the regeneration (CR 701.19a)"
     Spec.assertBool s (not (Set.member skel (GameState.battlefield twice))) "the second destruction kills it"
   -- CR 701.19c: "Effects that say that a permanent can't be regenerated
   -- don't preclude such abilities from being activated or such spells from
@@ -1510,6 +1513,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   selflessSquireSpec s registry
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
+  riotSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -2066,3 +2070,216 @@ shimatsuSpec s registry =
         Just shimatsuId -> do
           Spec.assertEqWith s "six counters, one per OTHER permanent" (countersOn CounterKind.PlusOnePlusOne shimatsuId after) 6
           Spec.assertEqWith s "nothing else of alice's is left" (Set.toList (GameState.battlefield after)) [shimatsuId]
+
+-- alice controls `mountains` untapped Mountains and `forests` untapped Forests
+-- in a precombat main phase with priority, holding one card per printing in
+-- `hand`. Returns the state and the hand ids in the order given.
+--
+-- Two land printings rather than blueBoard's one, because riot's producers are
+-- Gruul: Zhur-Taa Goblin is {R}{G}.
+riotBoard :: Printing.Printing -> Int -> Printing.Printing -> Int -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
+riotBoard mountain mountains forest forests hand =
+  let base = S.landsInPlay mountain mountains
+      -- S.addCreature puts one permanent of a printing onto the battlefield,
+      -- settled; nothing in it is creature-specific, which is what lets a second
+      -- land printing join a board S.landsInPlay built from one.
+      addLand g _ = snd (S.addCreature forest S.alice g)
+      withForests = List.foldl' addLand base (replicate forests ())
+      addOne (ids, g) p = let (oid, g1) = S.addHandCard p S.alice g in (ids <> [oid], g1)
+      (held, gs) = List.foldl' addOne ([], withForests) hand
+   in ( gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held
+      )
+
+-- Answer riot's "may" one way, and everything else the way S.aggressiveAnswer
+-- does -- which declares every attacker it is offered, so one answerer carries
+-- both halves of a case that casts a creature and then attacks with it.
+riotChoosing :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+riotChoosing choice p = case p of
+  Prompt.ChooseRiot {} -> choice
+  _ -> S.aggressiveAnswer p
+
+wasAskedForRiot :: [Response.Response] -> Bool
+wasAskedForRiot responses =
+  let isRiot r = case r of
+        Response.ChoseRiot _ -> True
+        _ -> False
+   in any isRiot responses
+
+-- The board moved to alice's declare-attackers step, with bob defending. Stated
+-- rather than played out, exactly as S.combatBoardOf states it: a direct-call
+-- test never runs the turn-based action that would settle CR 506.2's defending
+-- player.
+--
+-- Nothing else is touched, so a creature cast in the main phase is still as new
+-- to the battlefield as CR 302.6 finds it.
+atDeclareAttackers :: GameState.GameState -> GameState.GameState
+atDeclareAttackers gs =
+  gs
+    { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+    }
+
+attackersIn :: GameState.GameState -> [ObjectId.ObjectId]
+attackersIn gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
+
+riotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
+  -- Zhur-Taa Goblin and not Spider-Punk, whose file also carries "spells and
+  -- abilities can't be countered" and a riot-granting static ability: the
+  -- keyword is what is under test, and this printing is nothing but the keyword.
+  Spec.it s "CR 702.136a taking the counter enters a 3/3 with no haste" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+    case held of
+      goblinCard : _ ->
+        let after = S.runPure (riotChoosing OptionalDecision.Exercises) gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> do
+                Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne goblin after) 1
+                -- Printed 2/2, so the counter is visible in the projection (CR
+                -- 613.4d, layer 7d).
+                Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 3)
+                Spec.assertEqWith s "toughness" (Projection.toughnessOf goblin after) (Just 3)
+                -- CR 702.136a's "if you don't" is what grants haste, so taking
+                -- the counter must not.
+                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste goblin after)) "no haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  Spec.it s "CR 702.136a declining the counter grants haste instead" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+    case held of
+      goblinCard : _ ->
+        let after = S.runPure (riotChoosing OptionalDecision.Declines) gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> do
+                Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne goblin after) 0
+                Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 2)
+                Spec.assertBool s (Projection.hasKeyword Keyword.Haste goblin after) "haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- THE PAIR THAT MAKES THE HASTE REAL. CR 302.6 keeps a creature that entered
+  -- this turn from attacking, and CR 702.10b is the exception riot buys.
+  Spec.it s "CR 702.10b the goblin that took haste attacks the turn it entered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      goblinCard : _ ->
+        let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.alice)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> Spec.assertEqWith s "attacks" (attackersIn after) [goblin]
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  Spec.it s "CR 302.6 the goblin that took the counter cannot attack that turn" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+        answer = riotChoosing OptionalDecision.Exercises
+    case held of
+      goblinCard : _ ->
+        let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.alice)
+         in Spec.assertEqWith s "no attackers" (attackersIn after) []
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- THE CHOICE IS THE ANSWERER'S. Both outcomes above are reachable only through
+  -- a prompt, and the prompt is never elided: CR 702.136a's two halves are
+  -- distinguishable on every board.
+  Spec.it s "CR 702.136a the controller is asked, and the engine chooses nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+    case held of
+      goblinCard : _ ->
+        let asked = answersFor S.identityAnswer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+         in Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- The control that keeps the case above from passing for the wrong reason: a
+  -- creature WITHOUT riot enters through the same funnel and is asked nothing.
+  Spec.it s "CR 702.136a a creature without riot raises no riot prompt" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (gs, held) = riotBoard mountain 3 forest 0 [pikerPrinting]
+    case held of
+      pikerCard : _ ->
+        let asked = answersFor S.identityAnswer gs (S.cast S.alice pikerCard >> Stack.resolveTop)
+         in Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- CR 702.136a through a GRANT rather than a printing: Spider-Punk's "other
+  -- Spiders you control have riot". The keyword reaches the entering Giant
+  -- Spider through layer 6 (CR 613.1f), and the replacement is minted off that
+  -- post-layer projection -- which is the whole reason the mint lives there.
+  Spec.it s "CR 702.136a Spider-Punk gives another Spider riot as it enters" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    spiderPunk <- S.printingOf s registry "Spider-Punk"
+    giantSpider <- S.printingOf s registry "Giant Spider"
+    let (gs, held) = riotBoard mountain 3 forest 1 [giantSpider]
+        (_, board) = S.addCreature spiderPunk S.alice gs
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      spiderCard : _ ->
+        let asked = answersFor answer board (S.cast S.alice spiderCard >> Stack.resolveTop)
+            after = S.runPure answer board (S.cast S.alice spiderCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Giant Spider") after of
+              Nothing -> Spec.assertFailure s "Giant Spider did not reach the battlefield"
+              Just spider -> do
+                Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised for the granted riot"
+                Spec.assertBool s (Projection.hasKeyword Keyword.Haste spider after) "haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- The grant from a permanent that has no riot of its own: Rhythm of the Wild
+  -- is an enchantment whose whole riot contribution is "nontoken creatures you
+  -- control have riot", so it is the case Spider-Punk cannot make -- the
+  -- entering creature's base face prints no riot AND the granting permanent's
+  -- prints none either, which is what Projection.grantsMintingKeyword is for.
+  Spec.it s "CR 702.136a Rhythm of the Wild gives an entering creature riot" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    rhythm <- S.printingOf s registry "Rhythm of the Wild"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (gs, held) = riotBoard mountain 2 forest 0 [pikerPrinting]
+        (_, board) = S.addCreature rhythm S.alice gs
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      pikerCard : _ ->
+        let asked = answersFor answer board (S.cast S.alice pikerCard >> Stack.resolveTop)
+            after = S.runPure answer board (S.cast S.alice pikerCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Goblin Piker") after of
+              Nothing -> Spec.assertFailure s "Goblin Piker did not reach the battlefield"
+              Just piker -> do
+                Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised for the granted riot"
+                Spec.assertBool s (Projection.hasKeyword Keyword.Haste piker after) "haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- The control for the grant: the same Spider on the same board with no
+  -- Spider-Punk is asked nothing and gains nothing.
+  Spec.it s "CR 702.136a without Spider-Punk that Spider has no riot" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    giantSpider <- S.printingOf s registry "Giant Spider"
+    let (gs, held) = riotBoard mountain 3 forest 1 [giantSpider]
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      spiderCard : _ ->
+        let asked = answersFor answer gs (S.cast S.alice spiderCard >> Stack.resolveTop)
+            after = S.runPure answer gs (S.cast S.alice spiderCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Giant Spider") after of
+              Nothing -> Spec.assertFailure s "Giant Spider did not reach the battlefield"
+              Just spider -> do
+                Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
+                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste spider after)) "no haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"

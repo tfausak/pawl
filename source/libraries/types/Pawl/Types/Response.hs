@@ -88,6 +88,11 @@ data Response
   | -- | CR 208.2b: the index of the entry shape a player chose as an object
     -- entered.
     ChoseEntryOption Natural.Natural
+  | -- | CR 702.136a: whether a riot permanent's controller took the additional
+    -- +1/+1 counter (Exercises) or the haste (Declines). Distinct from
+    -- ChoseOptional, which records CR 603.5's "may" during a RESOLUTION: this one
+    -- is answered inside a zone change, as the permanent enters.
+    ChoseRiot OptionalDecision.OptionalDecision
   | -- | CR 614.1c: the colour a player chose as an object entered.
     ChoseColor Color.Color
   | -- | CR 201.4 / 614.1c: the card name a player chose as an object entered.
