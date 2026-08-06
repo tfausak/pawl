@@ -22,6 +22,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Keyword (Keyword)
@@ -115,6 +116,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -167,6 +169,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -286,6 +289,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -403,6 +407,83 @@ flashbackExile =
         ZoneChangePattern.whatObject = Filter.IsSource
       }
     Zone.Exile
+
+-- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
+-- riot -- "You may have this permanent enter with an additional +1/+1 counter on
+-- it. If you don't, it gains haste." The same voice the minted triggered
+-- abilities (rule 702.70a), the minted hand ability (rule 702.29a) and
+-- flashback's exile replacement (rule 702.34a) speak in: the card says which
+-- keyword, the rule says what it means.
+--
+-- The FIRST minted replacement that functions on the battlefield, where
+-- flashbackExile's is installed by Pawl.Engine.Cast on a spell -- which is why
+-- this one is gathered by the projection and that one is not.
+--
+-- POST-LAYER keyword COUNTS, like triggeredAbilitiesOf and unlike
+-- handAbilitiesOf's printed set -- rule 702.136a functions on the battlefield, so
+-- Humility takes it away and a static ability that grants riot (Spider-Punk's
+-- "other Spiders you control have riot") adds it, both for free.
+--
+-- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately:
+-- a creature with riot twice should be asked twice, and may take a counter for
+-- one instance and haste for the other.
+--
+-- Not implemented: the two rows are EQUAL VALUES, and CR 614.5's identity here is
+-- (source, effect value), so a second instance gets no second opportunity and the
+-- second ask never happens (#75). The replication is written the rule's way
+-- anyway, so that closing #75 makes rule 702.136b right with no change here.
+--
+-- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's
+-- own.
+entryReplacementsOf :: Map Keyword Natural -> [ReplacementEffect]
+entryReplacementsOf counts = concatMap (uncurry entryReplacementsFor) (Map.toAscList counts)
+
+-- Exhaustive for abilitiesFor's reason: rule 702 keeps adding abilities that
+-- rewrite an entry, and the next one must break this build rather than silently
+-- produce nothing.
+entryReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
+entryReplacementsFor keyword count = case keyword of
+  Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Riot)
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flash -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Hexproof _ -> []
+  Keyword.Indestructible -> []
+  Keyword.Landwalk _ -> []
+  Keyword.Lifelink -> []
+  Keyword.Reach -> []
+  Keyword.Shroud -> []
+  Keyword.Trample -> []
+  Keyword.Vigilance -> []
+  Keyword.Banding -> []
+  Keyword.Fear -> []
+  Keyword.Menace -> []
+  Keyword.Cycling _ _ -> []
+  Keyword.Flashback _ -> []
+  Keyword.Entwine _ -> []
+  Keyword.Poisonous _ -> []
+  Keyword.BattleCry -> []
+  Keyword.Infect -> []
+  Keyword.Devoid -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
+  Keyword.Toxic _ -> []
+  Keyword.StartYourEngines -> []
+
+-- CR 702.136a again, in the SHORT-CIRCUIT's voice:
+-- Pawl.Engine.Projection.replacementsAffecting skips the whole board when no
+-- permanent's BASE card could hold a replacement effect, and a riot row is minted
+-- from the projection rather than printed in a face's list -- so, like the
+-- planeswalker disjunct beside it, the gate has to be told which keywords mint
+-- one.
+--
+-- Membership rather than a count, because the gate asks whether there is any.
+mintsEntryReplacement :: Keyword -> Bool
+mintsEntryReplacement keyword = not (null (entryReplacementsFor keyword 1))
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.

@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -37,7 +38,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
@@ -670,7 +671,7 @@ printedColorsOf face =
 -- CR 702.114a. The one place that decides what devoid means, so the fold and the
 -- off-battlefield card view cannot drift apart on it.
 definesColorless :: Set Keyword -> Bool
-definesColorless = Set.member Keyword.Devoid
+definesColorless = Set.member Keyword.Type.Devoid
 
 -- CR 613.3 / 613.1e: the object's own colour-defining ability, applied at the
 -- start of layer 5.
@@ -1508,7 +1509,7 @@ abilitiesRemoved cands gs oid =
 -- That is CR 613.7, not a leak.
 --
 -- Casing on a KEYWORD, which rule 702 makes part of the rulebook -- the same act
--- as reading Keyword.StartYourEngines off a projection. It is not a case on an
+-- as reading Keyword.Type.StartYourEngines off a projection. It is not a case on an
 -- effect's identity: the caller still routes by `layer`, and the modification this
 -- produces is the one Moonlace already stores.
 --
@@ -1518,7 +1519,7 @@ abilitiesRemoved cands gs oid =
 -- among them, so no board can put one there.
 grantedDevoidParts :: Modification -> NonEmpty.NonEmpty Modification
 grantedDevoidParts m = case m of
-  Modification.GainKeyword Keyword.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]
+  Modification.GainKeyword Keyword.Type.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]
   _ -> m NonEmpty.:| []
 
 -- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the ability's
@@ -1676,7 +1677,7 @@ data Aspect
 -- battle (#302) -- would arrive by one of those same doors; the
 -- attacked-planeswalker clauses are answered where the attack target is read
 -- (Combat.stillAttacked) and never edit the record at all.
-filterReads :: Filter.Type.Filter Keyword.Keyword -> Set Aspect
+filterReads :: Filter.Type.Filter Keyword.Type.Keyword -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
   Filter.Type.HasSupertype _ -> Set.empty
@@ -2156,7 +2157,7 @@ replacementsOf oid gs =
    in PC.replacementEffects pc <> intrinsicReplacementsOf pc
 
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
--- replacement effect.
+-- replacement effect, and rule 702.136a's riot beside it.
 --
 -- Minted from the finished projection rather than stored on the card, the posture
 -- Mana.subtypeMana and Keyword.triggeredAbilitiesOf take. Three consequences, all
@@ -2173,6 +2174,13 @@ replacementsOf oid gs =
 --
 -- Nothing for a planeswalker with no printed loyalty, which the CardSpec lint
 -- makes unrepresentable.
+--
+-- The riot half (CR 702.136a) is minted by Keyword.entryReplacementsOf off the
+-- SAME finished projection, and the third consequence above reads the other way
+-- for it: minting after the layer fold puts riot INSIDE LoseAllAbilities' reach,
+-- because the keyword itself is what layer 6 removes. That is the rule --
+-- Humility'd, a creature has no riot to offer a choice -- where CR 306.5b's
+-- loyalty survives because a card type is not an ability.
 intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
@@ -2181,6 +2189,7 @@ intrinsicReplacementsOf pc =
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
+    <> Keyword.entryReplacementsOf (PC.keywords pc)
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
 -- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
@@ -2191,7 +2200,15 @@ intrinsicReplacementsOf pc =
 -- The short-circuit reads BASE cards while the result reads the PROJECTION, sound
 -- only because the one way to acquire an unprinted replacement effect is
 -- `EntryR AsCopy` -- and a card with that arm is itself a base card with a
--- replacement effect.
+-- replacement effect -- or a minting keyword, which the two riot disjuncts cover:
+-- one for a face that PRINTS such a keyword and one for a face whose static
+-- ability GRANTS it (Spider-Punk's "other Spiders you control have riot"). The
+-- granting card is on the battlefield whenever the grant is, which is what makes
+-- reading base faces enough.
+--
+-- Not implemented: a minting keyword that reaches a permanent through a stored
+-- continuous effect or a keyword counter is on no base face, so this gate does
+-- not see it (#833).
 --
 -- Past the short-circuit this projects per permanent rather than threading one
 -- board, so a board holding any replacement effect pays a fresh gather per
@@ -2207,10 +2224,45 @@ replacementsAffecting gs =
         Just face ->
           not (null (Face.replacementEffects face))
             || Set.member CardType.Planeswalker (TypeLine.types (Face.typeLine face))
+            || any Keyword.mintsEntryReplacement (Face.keywords face)
+            || any (any grantsMintingKeyword . StaticAbility.modifications) (Face.staticAbilities face)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
         else concatMap forOne onBattlefield
+
+-- Does this modification hand its affected objects a keyword the RULES turn into
+-- a replacement effect (rule 702.136a's riot)? Read only by the short-circuit
+-- above, off a BASE face, to answer "could anything on this board have a
+-- replacement effect".
+--
+-- A CLASSIFICATION of a modification's shape, not a case on an effect's identity:
+-- what it asks is "does this grant a keyword, and does rule 702 make that keyword
+-- mint a row", and both halves are the rulebook's.
+--
+-- Exhaustive rather than a catch-all, for the reason `layer` gives above: a
+-- modification added later that also hands out abilities would otherwise answer
+-- False here and take its grantee out of the gathered set, which is a MISSING
+-- replacement rather than a build failure.
+grantsMintingKeyword :: Modification.Modification -> Bool
+grantsMintingKeyword m = case m of
+  Modification.GainKeyword k -> Keyword.mintsEntryReplacement k
+  Modification.LoseAllAbilities -> False
+  Modification.SetBasePowerToughness _ _ -> False
+  Modification.ModifyPowerToughness _ _ -> False
+  Modification.SetLandSubtype _ -> False
+  Modification.SetLandSubtypeToChosen -> False
+  Modification.AddLandSubtype _ -> False
+  Modification.SetCreatureSubtype _ -> False
+  Modification.AddCreatureSubtype _ -> False
+  Modification.AddCardType _ -> False
+  Modification.ChangeSubtypeWord _ _ -> False
+  Modification.SetController _ -> False
+  Modification.SetControllerToSource -> False
+  Modification.SetColor _ -> False
+  Modification.AddColor _ -> False
+  Modification.AddChosenColor -> False
+  Modification.SwitchPowerToughness -> False
 
 -- CR 603 / 613 layer 6: an object's printed-and-granted triggered abilities after
 -- the layer system. A Humility'd creature has none.
@@ -2296,7 +2348,7 @@ totalToxic oid gs = toxicIn (keywordsOf oid gs)
 toxicIn :: Map Keyword Natural -> Natural
 toxicIn keywords =
   let value keyword count = case keyword of
-        Keyword.Toxic n -> n * count
+        Keyword.Type.Toxic n -> n * count
         _ -> 0
    in sum (Map.elems (Map.mapWithKey value keywords))
 

@@ -174,6 +174,21 @@ combatReplaySpec s =
           let options = [EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}]
               p = Prompt.ChooseEntryOption decider S.alice oid options
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 1)) (Just (1 :: Natural.Natural))
+        -- CR 702.136a: riot's "may", answered as a permanent enters. Its payload
+        -- has the same shape as CR 603.5's resolution-time "may", so the
+        -- transcript has to tell the two apart -- a shared Response constructor
+        -- would replay a declined riot into a declined printed "may". Both
+        -- decisions round-trip, because a codec that collapsed them would replay
+        -- a +1/+1 counter as haste.
+        Spec.it s "ChooseRiot records and replays an OptionalDecision, and rejects a resolution-time may" $ do
+          let p = Prompt.ChooseRiot decider S.alice oid
+          Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
+          Spec.assertEqWith s "a printed may is not an answer to it" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 702.136a: a transcript that runs short takes the half that puts no
+        -- counter on the board.
+        Spec.it s "defaultAnswer declines riot's counter" $
+          Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChooseRiot decider S.alice oid)) OptionalDecision.Declines
         -- CR 614.1c / 105.1: a colour chosen as a permanent enters. Every one of
         -- the five is round-tripped, because a codec that collapsed two of them
         -- would replay a Painter's Servant naming blue as one naming white --

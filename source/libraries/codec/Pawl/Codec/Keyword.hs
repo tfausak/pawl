@@ -48,6 +48,7 @@ toJson k = case k of
   Keyword.BattleCry -> Common.nullary "BattleCry"
   Keyword.Menace -> Common.nullary "Menace"
   Keyword.Devoid -> Common.nullary "Devoid"
+  Keyword.Riot -> Common.nullary "Riot"
   Keyword.Daybound -> Common.nullary "Daybound"
   Keyword.Nightbound -> Common.nullary "Nightbound"
   Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
@@ -83,6 +84,7 @@ fromJson value = do
     ("BattleCry", _) -> Right Keyword.BattleCry
     ("Menace", _) -> Right Keyword.Menace
     ("Devoid", _) -> Right Keyword.Devoid
+    ("Riot", _) -> Right Keyword.Riot
     ("Daybound", _) -> Right Keyword.Daybound
     ("Nightbound", _) -> Right Keyword.Nightbound
     ("Toxic", Just v) -> Keyword.Toxic <$> Common.decodeNatural v
