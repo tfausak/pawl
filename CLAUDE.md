@@ -83,17 +83,21 @@ to agents as written. What it doesn't say:
   card turns out not to exercise the thing after all.
 
 - The labels worth knowing are `elision`, `gap`, `rules-correctness` and `bug`,
-  plus the expiry triggers `expires:milestone` and `expires:card-driven`.
-  Priority labels are the owner's: prefer high-priority issues when picking,
-  and never set one yourself.
+  plus the expiry triggers `expires:milestone`, `expires:card-driven`,
+  `expires:subsystem` and `expires:synthetic`. Priority labels are the owner's:
+  prefer high-priority issues when picking, and never set one yourself.
 
 - When no printing can reach the rule, write a synthetic card as
   `data/cards/synthetic-*.json`. A real card wins whenever one exists, and "I
-  could not find one" is not the test --- search first. Legitimate when you can
-  cite the rule it exercises and nothing in the CR forbids such a card existing
-  (two lands that both set land subtypes). Illegitimate when the absence is
-  rules-*enforced*, because then the elision is provably sound (half a battle:
-  CR 310 makes the first battle need the whole subsystem).
+  could not find one" is not the test --- search first. Digital-only printings
+  are real cards: Arena and Alchemy are in scope (`docs/design.md` section 6),
+  so an issue whose only producer is one of them is ordinary card-driven work.
+  Legitimate when you can cite the rule it exercises and nothing in the CR
+  forbids such a card existing (two lands that both set land subtypes); an
+  issue in that position waits under `expires:synthetic` until someone writes
+  the card. Illegitimate when the absence is rules-*enforced*, because then the
+  elision is provably sound (half a battle: CR 310 makes the first battle need
+  the whole subsystem) --- close that issue as wontfix.
 
 - File the issue, cite it inline. When you elide something, open an issue
   carrying the status, rationale and expiry trigger, then leave a comment at
