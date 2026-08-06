@@ -2918,7 +2918,7 @@ stateTriggers gs
          in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
--- that fires is REMOVED from the store (CR 603.7b) unless it carries a stated
+-- that TRIGGERS is REMOVED from the store (CR 603.7b) unless it carries a stated
 -- duration, which is that rule's own exception -- one of Expiry's sweeps ends
 -- those instead. The survivors are returned so the caller can store them back. CR
 -- 603.7d-f: the controller travels with the entry, so a delayed ability resolves
@@ -3004,7 +3004,7 @@ armOnset onset = case onset of
 -- carries this turn's number, and the drop removes only numbers strictly behind.
 --
 -- CR 603.7b's one shot is untouched -- this ends entries by the CALENDAR, and
--- firing still ends them in delayedPending. An entry with a stated duration is
+-- triggering still ends them in delayedPending. An entry with a stated duration is
 -- dropped here too, and rightly: a duration keeps an ability armed for its event's
 -- next occurrence, not for a turn its printed text never named.
 settleOnsets :: GameState -> GameState
