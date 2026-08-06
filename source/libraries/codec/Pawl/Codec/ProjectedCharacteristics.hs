@@ -9,6 +9,7 @@ import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
 import qualified Pawl.Codec.Quantity as Quantity
@@ -29,6 +30,7 @@ toJson pc =
       Common.optionalPair "power" Nothing (Common.encodeMaybe Common.integer) (PC.power pc),
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Common.integer) (PC.toughness pc),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (PC.loyalty pc),
+      Common.optionalPair "defense" Nothing (Common.encodeMaybe Defense.toJson) (PC.defense pc),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe (\(p, t) -> Common.array [Quantity.toJson p, Quantity.toJson t])) (PC.characteristicPT pc),
       Common.requiredPair "cardTypes" (Common.encodeSet CardType.toJson) (PC.cardTypes pc),
       Common.optionalPair "subtypes" Set.empty (Common.encodeSet Subtype.toJson) (PC.subtypes pc),
@@ -47,6 +49,7 @@ fromJson value = do
   pow <- Common.defaultedField "power" Nothing (Common.decodeMaybe Common.asInteger) ps
   tou <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Common.asInteger) ps
   loy <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe Loyalty.fromJson) ps
+  def_ <- Common.defaultedField "defense" Nothing (Common.decodeMaybe Defense.fromJson) ps
   cda <- Common.defaultedField "characteristicPT" Nothing (Common.decodeMaybe Quantity.fromJsonPair) ps
   cts <- Common.field "cardTypes" ps >>= Common.decodeSet CardType.fromJson
   subs <- Common.defaultedField "subtypes" Set.empty (Common.decodeSet Subtype.fromJson) ps
@@ -62,6 +65,7 @@ fromJson value = do
         PC.power = pow,
         PC.toughness = tou,
         PC.loyalty = loy,
+        PC.defense = def_,
         PC.characteristicPT = cda,
         PC.cardTypes = cts,
         PC.subtypes = subs,

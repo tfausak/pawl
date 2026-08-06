@@ -102,6 +102,12 @@ data Response
     -- Unlike ChoseDefender, which also carries an opponent, this answers no
     -- combat question.
     ChoseOpponent PlayerId.PlayerId
+  | -- | CR 310.8a / 704.5w / 704.5x: the player chosen to protect a battle,
+    -- either as it entered or when a state-based action found the standing
+    -- designation illegal. Distinct from ChoseOpponent above for the reason
+    -- Prompt.ChooseProtector gives: a battle with no battle types takes its own
+    -- controller, so this does not always carry an opponent.
+    ChoseProtector PlayerId.PlayerId
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as
     -- a permutation of the offered indices.
     OrderedTriggers [Natural.Natural]

@@ -27,6 +27,7 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Counterability as Counterability
+import qualified Pawl.Codec.Defense as Defense
 import qualified Pawl.Codec.Effect as Effect
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Loyalty as Loyalty
@@ -56,6 +57,7 @@ toJson encodeCard f =
       Common.optionalPair "power" Nothing (Common.encodeMaybe Power.toJson) (Face.power f),
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Toughness.toJson) (Face.toughness f),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (Face.loyalty f),
+      Common.optionalPair "defense" Nothing (Common.encodeMaybe Defense.toJson) (Face.defense f),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe Quantity.toJson) (Face.characteristicPT f),
       Common.optionalPair "enchant" [] (Common.encodeList TargetSpec.toJson) (Face.enchant f),
       Common.optionalPair "keywords" Set.empty (Common.encodeSet Keyword.toJson) (Face.keywords f),
@@ -93,6 +95,7 @@ fromJson decodeCard value = do
   power <- Common.defaultedField "power" Nothing (Common.decodeMaybe Power.fromJson) ps
   toughness <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Toughness.fromJson) ps
   loyalty <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe Loyalty.fromJson) ps
+  defense <- Common.defaultedField "defense" Nothing (Common.decodeMaybe Defense.fromJson) ps
   keywords <- Common.defaultedField "keywords" Set.empty (Common.decodeSet Keyword.fromJson) ps
   statics <- Common.defaultedField "staticAbilities" [] (Common.decodeList StaticAbility.fromJson) ps
   spell <- Common.defaultedField "spell" Face.defaultSpell (Modal.fromJson decodeCard) ps
@@ -123,6 +126,7 @@ fromJson decodeCard value = do
         Face.power = power,
         Face.toughness = toughness,
         Face.loyalty = loyalty,
+        Face.defense = defense,
         Face.keywords = keywords,
         Face.staticAbilities = statics,
         Face.spell = spell,

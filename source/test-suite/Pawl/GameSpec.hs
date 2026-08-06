@@ -180,7 +180,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
               Object.playableFromExileBy = Nothing,
-              Object.ringBearerFor = Nothing
+              Object.ringBearerFor = Nothing,
+              Object.protector = Nothing
             }
       )
 
@@ -386,6 +387,7 @@ recordingAnswer p = case p of
   Prompt.ChooseColor {} -> pure Color.White
   Prompt.ChooseCardName {} -> pure (CardName.MkCardName mempty)
   Prompt.ChooseOpponent _ _ _ opponents -> pure (NonEmpty.head opponents)
+  Prompt.ChooseProtector _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseBasicLandType {} -> pure Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
@@ -1746,7 +1748,8 @@ handBobBolt lightningBolt gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1810,6 +1813,7 @@ slaveAnswer p = case p of
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -2109,7 +2113,8 @@ restartOnStack mountain =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

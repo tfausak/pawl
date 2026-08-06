@@ -130,11 +130,12 @@ merge2 l r =
       -- the four boxes below.
       Face.enchant = Face.enchant l <> Face.enchant r,
       -- The first half that has one. CR 709.4 does not say how two printed
-      -- power/toughness/loyalty boxes combine, and taking the left half's is not
-      -- implemented as anything the rule sanctions (#658).
+      -- power/toughness/loyalty/defense boxes combine, and taking the left half's
+      -- is not implemented as anything the rule sanctions (#658).
       Face.power = firstJust (Face.power l) (Face.power r),
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
+      Face.defense = firstJust (Face.defense l) (Face.defense r),
       Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r)
       -- Face.counterability is NOT listed: record update keeps the left half's,
       -- and writing `Face.counterability l` here would be a no-op. CR 113.6g is
