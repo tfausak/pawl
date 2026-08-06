@@ -1,0 +1,38 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        }
+      ],
+      "mulliganActions": [
+        [
+          {
+            "type": "ExileHandThenDraw"
+          }
+        ],
+        [
+          {
+            "type": "MoveToZone",
+            "value": [
+              "self",
+              {
+                "type": "Battlefield"
+              }
+            ]
+          }
+        ]
+      ],
+      "name": "Synthetic Twofold Powder",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

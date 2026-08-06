@@ -10,6 +10,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
@@ -119,12 +120,12 @@ data Response
   | -- | CR 103.5: the cards a player put on the bottom of their library after a
     -- mulligan, in chosen order.
     PutOnBottom [ObjectId.ObjectId]
-  | -- | CR 103.5b: the hand card whose mulligan-window action a player took
-    -- (Nothing = declined).
-    TookMulliganAction (Maybe ObjectId.ObjectId)
-  | -- | CR 103.6: the hand card whose opening-hand action a player took (Nothing
-    -- = declined).
-    TookOpeningHandAction (Maybe ObjectId.ObjectId)
+  | -- | CR 103.5b: the hand card whose mulligan-window action a player took, and
+    -- WHICH of that card's actions it was (Nothing = declined).
+    TookMulliganAction (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
+  | -- | CR 103.6: the hand card whose opening-hand action a player took, and which
+    -- of that card's actions it was (Nothing = declined).
+    TookOpeningHandAction (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   | -- | CR 603.5: whether the controller of a resolving spell or ability
     -- exercised a printed "may".
     ChoseOptional OptionalDecision.OptionalDecision

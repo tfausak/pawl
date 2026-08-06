@@ -120,8 +120,8 @@ baseFace =
       Face.attackCosts = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
-      Face.mulliganAction = [],
-      Face.openingHandAction = [],
+      Face.mulliganActions = [],
+      Face.openingHandActions = [],
       Face.enchant = [],
       Face.counterability = Counterability.Counterable
     }
@@ -157,8 +157,8 @@ minimalFace =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.attackCosts = [],
-      Face.mulliganAction = [],
-      Face.openingHandAction = []
+      Face.mulliganActions = [],
+      Face.openingHandActions = []
     }
 
 -- The same face the verbose literal below spells out: minimalFace's fields,
@@ -204,8 +204,8 @@ populatedFace =
       Face.additionalCosts = [CostComponent.TapThis],
       Face.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []],
       Face.counterability = Counterability.CantBeCountered,
-      Face.mulliganAction = [Effect.ExileHandThenDraw],
-      Face.openingHandAction = [Effect.ExileHandThenDraw],
+      Face.mulliganActions = [[Effect.ExileHandThenDraw]],
+      Face.openingHandActions = [[Effect.ExileHandThenDraw]],
       Face.enchant = [TargetSpec.MkTargetSpec Pool.Creatures Nothing],
       Face.castingRestrictions = [CastingRestriction.AttackedThisStep]
     }
@@ -234,8 +234,8 @@ populatedFaceJson =
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"alternativeCosts\":[{\"mana\":[]}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
-    <> "\"mulliganAction\":[{\"type\":\"ExileHandThenDraw\"}],"
-    <> "\"openingHandAction\":[{\"type\":\"ExileHandThenDraw\"}],"
+    <> "\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
+    <> "\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}"
 
@@ -295,12 +295,12 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "counterability (CR 113.6g) defaults to Counterable" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.counterability <$> decodeFace v) (Right Counterability.Counterable)
-    Spec.it s "mulliganAction (CR 103.5b) defaults to the empty list" $ do
+    Spec.it s "mulliganActions (CR 103.5b) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
-      Spec.assertEq s (Face.mulliganAction <$> decodeFace v) (Right [])
-    Spec.it s "openingHandAction (CR 103.6) defaults to the empty list" $ do
+      Spec.assertEq s (Face.mulliganActions <$> decodeFace v) (Right [])
+    Spec.it s "openingHandActions (CR 103.6) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
-      Spec.assertEq s (Face.openingHandAction <$> decodeFace v) (Right [])
+      Spec.assertEq s (Face.openingHandActions <$> decodeFace v) (Right [])
     Spec.it s "enchant (CR 702.5a) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.enchant <$> decodeFace v) (Right [])
@@ -398,20 +398,33 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.counterability = Counterability.CantBeCountered}
         (init baseFaceJson <> ",\"counterability\":{\"type\":\"CantBeCountered\"}}")
-    Spec.it s "mulliganAction" $
+    Spec.it s "mulliganActions" $
       Common.assertJsonCodec
         s
         encodeFace
         decodeFace
-        baseFace {Face.mulliganAction = [Effect.ExileHandThenDraw]}
-        (init baseFaceJson <> ",\"mulliganAction\":[{\"type\":\"ExileHandThenDraw\"}]}")
-    Spec.it s "openingHandAction" $
+        baseFace {Face.mulliganActions = [[Effect.ExileHandThenDraw]]}
+        (init baseFaceJson <> ",\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}]]}")
+    -- CR 103.5b caps nothing, so two actions must survive the round trip AS TWO.
+    -- The arms differ in length on purpose: a codec that flattened them would
+    -- read back one action of three effects, which is a different face.
+    Spec.it s "mulliganActions keeps two actions apart" $
       Common.assertJsonCodec
         s
         encodeFace
         decodeFace
-        baseFace {Face.openingHandAction = [Effect.ExileHandThenDraw]}
-        (init baseFaceJson <> ",\"openingHandAction\":[{\"type\":\"ExileHandThenDraw\"}]}")
+        baseFace {Face.mulliganActions = [[Effect.ExileHandThenDraw], [Effect.ExileHandThenDraw, Effect.ExileHandThenDraw]]}
+        ( init baseFaceJson
+            <> ",\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}],"
+            <> "[{\"type\":\"ExileHandThenDraw\"},{\"type\":\"ExileHandThenDraw\"}]]}"
+        )
+    Spec.it s "openingHandActions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.openingHandActions = [[Effect.ExileHandThenDraw]]}
+        (init baseFaceJson <> ",\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]]}")
     Spec.it s "enchant" $
       Common.assertJsonCodec
         s

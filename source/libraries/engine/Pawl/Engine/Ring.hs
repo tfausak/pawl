@@ -99,8 +99,8 @@ theRingEmblem =
               Face.attackRequirements = [],
               Face.combatRestrictions = [],
               Face.attackCosts = [],
-              Face.mulliganAction = [],
-              Face.openingHandAction = []
+              Face.mulliganActions = [],
+              Face.openingHandActions = []
             }
     }
 
