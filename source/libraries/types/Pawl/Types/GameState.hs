@@ -8,6 +8,7 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
@@ -204,6 +205,34 @@ data GameState = MkGameState
     -- one at a time). Nothing until a player becomes the monarch. On GameState,
     -- not Player, because it is one designation, not a per-player counter.
     monarch :: Maybe PlayerId.PlayerId,
+    -- | CR 731.1: the game's day/night designation. Nothing is the rule's own
+    -- third state, "the game starts with neither designation", and it is the only
+    -- state that is not a Daytime -- CR 731.1's last sentence makes it
+    -- unreachable once either designation has been gained, so nothing ever writes
+    -- Nothing back.
+    --
+    -- On GameState and not on Object, for CR 725.1's reason rather than CR
+    -- 701.54b's: "day and night are designations THE GAME ITSELF can have", which
+    -- is the monarch's footing, where the Ring-bearer is a permanent's and rides
+    -- Object.ringBearerFor. Pawl.Engine.Ring's haddock draws that line.
+    --
+    -- Written only by Pawl.Engine.Daytime, because becoming day or night also
+    -- turns daybound and nightbound permanents over (CR 702.145c/f).
+    daytime :: Maybe Daytime.Daytime,
+    -- | CR 502.2 / 731.2: how many spells the PREVIOUS turn's active player cast
+    -- during that turn -- the whole of what the untap step's day/night check asks
+    -- about the turn just ended.
+    --
+    -- A stored snapshot rather than a fold over the event log, which is the one
+    -- thing it cannot be: GameState.events is cleared at the handoff
+    -- (Engine.beginTurnOf), and this is read AFTER that, in the next turn's untap
+    -- step. Written by beginTurnOf from the outgoing turn's log, which is the last
+    -- moment the count exists.
+    --
+    -- ONE number and not a map, because rule 731.2 names exactly one player, "the
+    -- previous turn's active player". CR 731.2a's shared-team-turns variant asks
+    -- about a whole team and would need more, and pawl has no teams (#175).
+    spellsCastLastTurn :: Natural.Natural,
     -- | CR 725 (Palace Jailer): objects exiled "until an opponent becomes the
     -- monarch", keyed by the exiled incarnation id to the watch that ends the
     -- exile -- the effect's controller, plus the monarch as of the last look, so

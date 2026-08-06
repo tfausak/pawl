@@ -132,6 +132,8 @@ library codec
     Pawl.Codec.DamagePatternSpec
     Pawl.Codec.DamageRewrite
     Pawl.Codec.DamageRewriteSpec
+    Pawl.Codec.Daytime
+    Pawl.Codec.DaytimeSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DelayedTriggerSpec
     Pawl.Codec.DestructionRewrite
@@ -329,6 +331,7 @@ library engine
     Pawl.Engine.Cost
     Pawl.Engine.Count
     Pawl.Engine.Damage
+    Pawl.Engine.Daytime
     Pawl.Engine.Decide
     Pawl.Engine.Departure
     Pawl.Engine.Engine
@@ -528,6 +531,7 @@ library types
     Pawl.Types.DamageKind
     Pawl.Types.DamagePattern
     Pawl.Types.DamageRewrite
+    Pawl.Types.Daytime
     Pawl.Types.Decider
     Pawl.Types.DecisionLog
     Pawl.Types.Deck
@@ -696,6 +700,7 @@ test-suite pawl-test-suite
     Pawl.CostSpec
     Pawl.CountSpec
     Pawl.DamageSpec
+    Pawl.DaytimeSpec
     Pawl.DecideSpec
     Pawl.DepartureSpec
     Pawl.EngineSpec

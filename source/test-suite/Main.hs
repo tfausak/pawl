@@ -39,6 +39,7 @@ import qualified Pawl.Codec.DamageEventSpec
 import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
+import qualified Pawl.Codec.DaytimeSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
@@ -126,6 +127,7 @@ import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
 import qualified Pawl.DamageSpec
+import qualified Pawl.DaytimeSpec
 import qualified Pawl.DecideSpec
 import qualified Pawl.DecimalSpec
 import qualified Pawl.DepartureSpec
@@ -256,6 +258,7 @@ spec s registry = do
   Pawl.Codec.DamageKindSpec.spec s
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
+  Pawl.Codec.DaytimeSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
@@ -343,6 +346,7 @@ spec s registry = do
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry
   Pawl.DamageSpec.spec s registry
+  Pawl.DaytimeSpec.spec s registry
   Pawl.DecideSpec.spec s
   Pawl.DecimalSpec.spec s
   Pawl.DepartureSpec.spec s registry

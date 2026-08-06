@@ -1071,6 +1071,7 @@ rewriteEffect pairs effect = case effect of
   -- is its abilities, which nothing here walks (#643).
   Effect.CreateEmblem {} -> effect
   Effect.BecomeMonarch {} -> effect
+  Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
   Effect.AttachTarget slot filter_ -> Effect.AttachTarget slot (Filter.rewrite pairs filter_)

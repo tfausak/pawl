@@ -4,6 +4,7 @@ import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
@@ -497,6 +498,20 @@ data Effect card
     -- by the MonarchTarget (the resolving controller, or the controller of the
     -- ability's bound source). Emits GameEvent.BecameMonarch.
     BecomeMonarch MonarchTarget.MonarchTarget
+  | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that
+    -- designation. Tovolar, Dire Overlord's upkeep trigger is `ItBecomes Night`.
+    --
+    -- Targetless and player-free, unlike BecomeMonarch above: rule 731.1 puts the
+    -- designation on the game itself, so there is nobody to name and nothing to
+    -- prompt. The payload is WHICH designation, and the two are one opcode rather
+    -- than two because the rule states them as one sentence and every reader of
+    -- the outcome (CR 702.145) asks which it is anyway.
+    --
+    -- What it does is NOT just a write: CR 702.145c and CR 702.145f make daybound
+    -- and nightbound permanents transform as the designation arrives, so
+    -- Pawl.Engine.Resolve hands this to Pawl.Engine.Daytime rather than assigning
+    -- GameState.daytime itself.
+    ItBecomes Daytime.Daytime
   | -- | CR 725 (Palace Jailer): exile the slot's target UNTIL an opponent of the
     -- effect's controller becomes the monarch. The DURATION is the novelty -- the
     -- exiled incarnation is registered in GameState.exiledUntilMonarch and

@@ -465,6 +465,7 @@ effectCounts effect = case effect of
   Effect.AffectPlayers duration _ _ -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
+  Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
@@ -670,6 +671,7 @@ effectReplacements effect = case effect of
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
   Effect.BecomeMonarch _ -> []
+  Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
   Effect.AttachTarget {} -> []
@@ -1214,6 +1216,8 @@ keywordFilters keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
   Keyword.StartYourEngines -> []
   Keyword.Toxic _ -> []
 
@@ -1466,6 +1470,7 @@ effectFilters effect = case effect of
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
+  Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and
   -- carries no destination filter at all.

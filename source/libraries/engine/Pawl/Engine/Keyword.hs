@@ -116,6 +116,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 
@@ -166,6 +168,8 @@ handAbilitiesFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 
@@ -268,6 +272,8 @@ permissionsFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 

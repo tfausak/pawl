@@ -291,6 +291,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Devoid
       """ {"type":"Devoid"} """
+  Spec.it s "Daybound" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Daybound
+      """ {"type":"Daybound"} """
+  Spec.it s "Nightbound" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Nightbound
+      """ {"type":"Nightbound"} """
   -- CR 702.164a's N rides the constructor, so this is the first keyword that is
   -- not a bare tag.
   Spec.it s "Toxic carries its N" $ do

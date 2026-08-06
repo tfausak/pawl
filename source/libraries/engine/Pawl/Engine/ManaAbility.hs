@@ -66,6 +66,7 @@ manaProduced effect = case effect of
   Effect.AffectPlayers {} -> Nothing
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
+  Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
   Effect.Attach _ -> Nothing
   Effect.AttachTarget {} -> Nothing

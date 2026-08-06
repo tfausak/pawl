@@ -3,6 +3,7 @@ module Pawl.Engine.Game where
 import qualified Control.Monad.Trans.Class as Trans
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
@@ -10,9 +11,11 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Types.Asked as Asked
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -300,6 +303,66 @@ faceOfWithLastKnown :: ObjectId -> GameState -> Maybe (Face Card)
 faceOfWithLastKnown oid gs = do
   card <- cardOfWithLastKnown oid gs
   Just (resolveFace (lookupObject oid gs >>= Object.face) card)
+
+-- CR 701.27a over ONE object: "turn it over so that its other face is up", or
+-- leave the map exactly as it was. The primitive BOTH transform paths share --
+-- Pawl.Engine.Resolve's CR 701.27a opcode, which adds CR 701.27f's already-turned
+-- gate on top, and Pawl.Engine.Daytime's CR 702.145c/f sweep, which has no such
+-- gate because that rule turns a permanent over from a STATIC ability rather than
+-- from an ability on the stack.
+--
+-- Three ways nothing happens, and none is an error:
+--
+--   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
+--     PERMANENT, which CR 110.1 makes an object on the battlefield.
+--   * the id names nothing at all, or nothing with a card behind it (CR 113.7a).
+--   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
+--     CR 701.27d's instant or sorcery face.
+--
+-- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
+-- "when a double-faced permanent transforms or converts, it doesn't become a new
+-- object. Any effects that applied to that permanent will continue to apply to
+-- it." So no id is minted, no timestamp is reissued, and damage, counters and
+-- attachments ride through untouched. CR 400.7 is the negative half of the same
+-- claim: this is not a zone change, so nothing mints an incarnation.
+--
+-- Reads the object's OWN card (cardOf), never a projected one, which is the
+-- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
+-- being a one-faced card whatever it copied, and that is the same read.
+--
+-- `now` is supplied by the caller rather than minted here, because a caller that
+-- turns SEVERAL permanents over does so simultaneously -- CR 608.2f for one
+-- Moonmist, CR 702.145c for one nightfall -- and a later CR 701.27f comparison
+-- must not be able to tell them apart.
+turnFaceOver :: Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object -> Map.Map ObjectId Object
+turnFaceOver now gs oid objects
+  | not (Set.member oid (GameState.battlefield gs)) = objects
+  | otherwise = case (Map.lookup oid objects, cardOf oid gs) of
+      (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
+        Nothing -> objects
+        Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
+      _ -> objects
+
+-- CR 712.8a: is this object showing the FRONT face of its card? The question CR
+-- 702.145c asks of a daybound permanent and CR 702.145f asks (inverted) of a
+-- nightbound one.
+--
+-- Nothing in Object.face IS the front face, not an unknown one: resolveFace
+-- above reads it as the layout's own view, which CR 712.8a makes the front face
+-- alone for a double-faced card. Card.faces is a NonEmpty, so the head is total
+-- and a card with no front face cannot arise.
+--
+-- An object with no card behind it (CR 113.7a: an ability on the stack) answers
+-- True as well, which is the same answer as "nothing has turned it over" and is
+-- what its only caller wants: Pawl.Engine.Daytime asks this of battlefield
+-- permanents, where CR 110.1 leaves no such object, and reads it beside a
+-- keyword test that such an object fails anyway.
+isFrontFaceUp :: ObjectId -> GameState -> Bool
+isFrontFaceUp oid gs = case lookupObject oid gs >>= Object.face of
+  Nothing -> True
+  Just name -> case cardOf oid gs of
+    Nothing -> True
+    Just card -> Face.name (NonEmpty.head (Card.Type.faces card)) == name
 
 -- CR 112.1: a spell is a card on the stack. Asks the object's zone AND its KIND
 -- (its Source) -- a classification, never the card's identity.
