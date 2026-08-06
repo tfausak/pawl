@@ -961,7 +961,7 @@ changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing 
 -- 709.3a, so this door is the shape both layouts ask for even though only the
 -- split one ships.
 --
--- A separate door rather than a seventh parameter on changeZoneReturning, as
+-- A separate door rather than a seventh parameter on changeZone, as
 -- changeZoneEntering is: the ~30 callers moving an object that shows whatever its
 -- layout gives it (CR 709.4's combined view, a single-face card's one face) have
 -- no face to name.

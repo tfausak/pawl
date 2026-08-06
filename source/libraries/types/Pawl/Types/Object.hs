@@ -170,8 +170,9 @@ data Object = MkObject
     -- permanent over to.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
-    -- because CR 400.7 makes the moved object a new one, and set back only by a
-    -- move that says which face the object arrives showing. That clear is also CR
+    -- because CR 400.7 makes the moved object a new one, and set again by a move
+    -- only where the move itself says which face the object arrives showing
+    -- (CR 709.3a). That clear is also CR
     -- 712.8a -- a transformed permanent that leaves the battlefield is a card
     -- with only its front face's characteristics again -- rather than only a
     -- forgetting.
