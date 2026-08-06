@@ -2454,8 +2454,11 @@ controllerTurnScoped cond = case cond of
   -- Damage can be prevented on anybody's turn.
   TriggerCondition.DamageToPlayerPrevented _ -> False
 
--- CR 603.8: state triggers. Every battlefield permanent whose StateIs condition
--- is currently TRUE and which has no instance already on the stack.
+-- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
+-- it bears whose condition is currently TRUE and which has no instance of ITSELF
+-- already on the stack -- counted, so an object carrying the same state-triggered
+-- ability twice arms both (CR 603.2 makes each of them an ability in its own
+-- right).
 --
 -- Armedness is DERIVED, never stored: CR 603.8's three outcomes are all "no longer
 -- on the stack", so an instance sitting there is the whole suppression rule and
@@ -2467,56 +2470,74 @@ controllerTurnScoped cond = case cond of
 -- would not terminate. No card in the pool can do that, and the first that could
 -- is the one that must revisit this.
 stateTriggers :: GameState -> [PendingTrigger]
-stateTriggers gs =
-  let -- The same hoist eventTriggers' `grants` binding makes.
-      grants = Projection.controlGrants gs
-      -- Suppression is scoped to (source, ability), so two permanents bearing the
-      -- identical triggered ability suppress independently -- one instance per
-      -- source, not one for the whole board.
-      alreadyOnStack srcId ab =
-        let isInstance sid = case Game.lookupObject sid gs of
-              -- A stack id whose object can't be found: fail CLOSED, not open.
-              -- This runs inside the settleForPriority fixpoint, so a lost
-              -- suppression loops forever -- a hang, not a wrong answer -- while
-              -- failing closed costs at most one settle pass. Unreachable:
-              -- Game.cease removes the stack entry and its object together.
-              Nothing -> True
-              -- Source equality, so one source carrying two textually identical
-              -- StateIs abilities would conflate them and suppress the second
-              -- as though it were an instance of the first (#55).
-              Just obj -> Object.source obj == Source.OfTrigger srcId ab
-         in any isInstance (GameState.stack gs)
-      forOne oid = case Projection.controllerOfGiven grants Set.empty oid gs of
-        Nothing -> []
-        -- CR 603.3a / 109.5: the ability's controller is its source's, and that is
-        -- what "you" in the condition means. Outside the layer fold, so the ViewOf
-        -- is the FULL projection rather than the layer-bounded one.
-        Just ctrl ->
-          let live ab = case TriggeredAbility.condition ab of
-                TriggerCondition.StateIs cond ->
-                  Condition.holds (Projection.fullView gs) (Filter.MkContext (Just ctrl) (Just oid)) gs oid cond
-                    && not (alreadyOnStack oid ab)
-                TriggerCondition.SelfEnters -> False
-                -- CR 603.6a is an EVENT trigger, matched against the log; nothing
-                -- about it is a CR 603.8 state.
-                TriggerCondition.PermanentEnters _ -> False
-                TriggerCondition.StepBegins _ _ -> False
-                TriggerCondition.SelfDealsCombatDamageToPlayer -> False
-                TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
-                TriggerCondition.OpponentLostLifeDuringYourTurn -> False
-                TriggerCondition.SelfAttacks _ -> False
-                TriggerCondition.SelfCycled -> False
-                TriggerCondition.PlayerDiscards _ -> False
-                TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
-                TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
-                TriggerCondition.SelfDies -> False
-                TriggerCondition.PermanentDies _ -> False
-                TriggerCondition.SelfLeavesTheBattlefield -> False
-                TriggerCondition.SpellOrAbilityCounters _ -> False
-                TriggerCondition.DamageToPlayerPrevented _ -> False
-              pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
-           in fmap pend (filter live (Projection.triggeredAbilitiesOf oid gs))
-   in concatMap forOne (Set.toAscList (GameState.battlefield gs))
+stateTriggers gs
+  -- A stack id whose object can't be found: fail CLOSED, not open. This runs
+  -- inside the settleForPriority fixpoint, so a lost suppression loops forever
+  -- -- a hang, not a wrong answer -- while failing closed costs at most one
+  -- settle pass. Unreachable: Game.cease removes the stack entry and its object
+  -- together. Hoisted to the whole function because that is what the per-ability
+  -- check it replaces amounted to: one unreadable stack entry suppressed every
+  -- ability of every source.
+  | any (\sid -> Maybe.isNothing (Game.lookupObject sid gs)) (GameState.stack gs) = []
+  | otherwise = concatMap forOne (Set.toAscList (GameState.battlefield gs))
+  where
+    -- The same hoist eventTriggers' `grants` binding makes.
+    grants = Projection.controlGrants gs
+    -- CR 603.8's suppression, COUNTED rather than tested. Scoped to (source,
+    -- ability), so two permanents bearing the identical triggered ability
+    -- suppress independently -- one instance per source, not one for the whole
+    -- board.
+    --
+    -- A count rather than an "is there one?" because CR 603.2 makes each ability
+    -- its own ability: one object may carry two identical state-triggered
+    -- abilities, and CR 603.8 holds each back only until THAT ability's own
+    -- instance leaves the stack. Object.source cannot tell those two instances
+    -- apart -- they are equal values -- but it does not have to. Which of N
+    -- identical abilities a given instance came from is unobservable, so N live
+    -- copies minus K instances already on the stack is the exact answer: it
+    -- reproduces the single-ability behavior at N = 1, and lets one of a twin
+    -- pair re-arm while the other's instance still sits there
+    -- (TriggerSpec, "one instance leaving re-arms ITS ability").
+    instancesOnStack srcId ab =
+      let isInstance sid = fmap Object.source (Game.lookupObject sid gs) == Just (Source.OfTrigger srcId ab)
+       in length (filter isInstance (GameState.stack gs))
+    forOne oid = case Projection.controllerOfGiven grants Set.empty oid gs of
+      Nothing -> []
+      -- CR 603.3a / 109.5: the ability's controller is its source's, and that is
+      -- what "you" in the condition means. Outside the layer fold, so the ViewOf
+      -- is the FULL projection rather than the layer-bounded one.
+      Just ctrl ->
+        let live ab = case TriggeredAbility.condition ab of
+              TriggerCondition.StateIs cond ->
+                Condition.holds (Projection.fullView gs) (Filter.MkContext (Just ctrl) (Just oid)) gs oid cond
+              TriggerCondition.SelfEnters -> False
+              -- CR 603.6a is an EVENT trigger, matched against the log; nothing
+              -- about it is a CR 603.8 state.
+              TriggerCondition.PermanentEnters _ -> False
+              TriggerCondition.StepBegins _ _ -> False
+              TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+              TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+              TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+              TriggerCondition.SelfAttacks _ -> False
+              TriggerCondition.SelfCycled -> False
+              TriggerCondition.PlayerDiscards _ -> False
+              TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+              TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+              TriggerCondition.SelfDies -> False
+              TriggerCondition.PermanentDies _ -> False
+              TriggerCondition.SelfLeavesTheBattlefield -> False
+              TriggerCondition.SpellOrAbilityCounters _ -> False
+              TriggerCondition.DamageToPlayerPrevented _ -> False
+            lives = filter live (Projection.triggeredAbilitiesOf oid gs)
+            -- Each live copy against the copies of itself that came earlier in
+            -- the list, which gives it a 1-based ordinal among its equals: the
+            -- j-th copy is armed exactly when fewer than j instances of it are
+            -- already on the stack. That is the N-minus-K subtraction
+            -- instancesOnStack describes, written without ever needing an Ord on
+            -- a triggered ability.
+            armed (before, ab) = 1 + length (filter (ab ==) before) > instancesOnStack oid ab
+            pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab Map.empty
+         in fmap (pend . snd) (filter armed (zip (List.inits lives) lives))
 
 -- CR 603.7: delayed abilities whose trigger event is among these events. An entry
 -- that fires is REMOVED from the store (CR 603.7b) unless it carries a stated

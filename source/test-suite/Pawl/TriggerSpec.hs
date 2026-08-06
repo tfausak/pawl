@@ -535,9 +535,9 @@ stateTriggerSpec s registry =
                 [] -> settled
               again = settle removed
           Spec.assertEqWith s "a fresh instance" (length (triggerIds again)) 1
-        -- IMPORTANT-2 (review): the suppression check in Event.stateTriggers
-        -- compares BOTH the source object's id and the ability (`Object.source
-        -- obj == Source.OfTrigger srcId ab`). Every test above uses exactly one
+        -- IMPORTANT-2 (review): Event.stateTriggers' instancesOnStack count
+        -- keys on BOTH the source object's id and the ability (`Source.OfTrigger
+        -- srcId ab`). Every test above uses exactly one
         -- Barbarian Outcast, so all of them would still pass a weaker
         -- implementation that compared only the TriggeredAbility and ignored
         -- srcId -- and that weaker version would wrongly suppress a second,
@@ -599,6 +599,58 @@ stateTriggerSpec s registry =
               resolved = snd (Engine.runGamePure S.identityAnswer settled Stack.resolveTop)
           Spec.assertBool s (not (Set.member outcast (GameState.battlefield resolved))) "the Outcast is off the battlefield"
           Spec.assertEqWith s "and in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+        -- CR 603.2 / 603.8: ONE object carrying TWO identical state-triggered
+        -- abilities. Each ability is its own ability, so each triggers, and CR
+        -- 603.8's suppression ("a state-triggered ability doesn't trigger again
+        -- until the ability has resolved...") is scoped to *the* ability -- it
+        -- says nothing about a different ability that happens to read the same.
+        --
+        -- Synthetic Twofold Outcast (synthetic-twofold-outcast.json) is
+        -- Barbarian Outcast with its one line printed twice and a life payment
+        -- bolted on: "When you control no Swamps, you lose 1 life. Sacrifice
+        -- this creature." x2. No printed card has two identical trigger lines
+        -- (checked against Scryfall's whole oracle-cards bulk export, funny and
+        -- alchemy sets included: zero hits), and nothing in CR 603 forbids one.
+        --
+        -- The life payment is what makes this test DISCRIMINATE. Counting stack
+        -- objects alone would be weak; two identical abilities produce two
+        -- indistinguishable trigger objects, so the effect COUNT is the real
+        -- evidence. Alice is at 20; both instances resolving costs 2, one
+        -- instance costs 1. The sacrifice is what makes it terminate: with the
+        -- source off the battlefield the condition can never re-arm, so this is
+        -- not the CR 603.8 loop a bare "lose 1 life" would be.
+        Spec.it s "CR 603.2/603.8 two identical state triggers on ONE permanent each trigger" $ do
+          twofoldOutcast <- S.printingOf s registry "Synthetic Twofold Outcast"
+          swamp <- S.printingOf s registry "Swamp"
+          let (_, gs) = outcastBoard twofoldOutcast swamp 0
+              settled = settle gs
+              resolveTop g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
+              both = resolveTop (resolveTop settled)
+          Spec.assertEqWith s "two instances, one per ability" (length (triggerIds settled)) 2
+          Spec.assertEqWith s "both resolved, so two life paid" (S.lifeOf S.alice both) (Just 18)
+          Spec.assertEqWith s "and the stack is empty again" (length (triggerIds both)) 0
+        -- CR 603.8's second half, on the same two-ability source: "A
+        -- state-triggered ability doesn't trigger again until THE ABILITY has
+        -- resolved, has been countered, or has otherwise left the stack." The
+        -- rule is about the ability whose instance left -- an instance of the
+        -- OTHER, identical ability is not that ability's instance and must not
+        -- hold it back.
+        --
+        -- Game.cease is the "otherwise left the stack" path the sibling
+        -- single-Outcast test above uses, and it is the only one that reaches
+        -- this: resolving an instance sacrifices the source, which takes it off
+        -- the battlefield and out of Event.stateTriggers' scan entirely.
+        Spec.it s "CR 603.8 one instance leaving re-arms ITS ability, not held back by the twin's instance" $ do
+          twofoldOutcast <- S.printingOf s registry "Synthetic Twofold Outcast"
+          swamp <- S.printingOf s registry "Swamp"
+          let (_, gs) = outcastBoard twofoldOutcast swamp 0
+              settled = settle gs
+              removed = case triggerIds settled of
+                abilId : _ -> Game.cease abilId settled
+                [] -> settled
+              again = settle removed
+          Spec.assertEqWith s "one of the two is gone" (length (triggerIds removed)) 1
+          Spec.assertEqWith s "and the freed ability triggers again, alongside the survivor" (length (triggerIds again)) 2
 
 -- Answers the Hack: it targets `oid` and swaps `from` for `to`. Everything else
 -- falls through to the identity answer.
