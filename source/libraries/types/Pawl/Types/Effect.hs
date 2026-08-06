@@ -194,7 +194,23 @@ data Effect card
     -- zone change the old id is gone. Meandering Towershell is the producer, its
     -- two "it"s two incarnations of one card. A DEFINITION, not a read: never a
     -- target, never in targetSpecs.
-    MoveToZone SlotName.SlotName Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName)
+    --
+    -- The trailing Maybe Zone is the zone the effect's own words say the object
+    -- is moved OUT of -- Reassembling Skeleton's "return this card FROM YOUR
+    -- GRAVEYARD to the battlefield". Nothing for every effect that states no
+    -- such zone, which is every targeted move in the pool: "return target
+    -- creature card from a graveyard" states it in the TARGET's filter, where
+    -- choosing the target is what enforces it, and Unsummon's bounce states no
+    -- origin at all.
+    --
+    -- It exists for CR 113.6m, which reads "an ability whose cost or effect
+    -- specifies that it moves the object it's on out of a particular zone
+    -- functions only in that zone": that reading is a CLASSIFICATION of the
+    -- effect (Pawl.Engine.EffectZone), and a classification can only report a
+    -- zone the data states. The resolver ignores it -- for the self-slot shape
+    -- the rule is what guarantees the object is in that zone when the ability is
+    -- activated, so a funnel that moves it from wherever it is cannot disagree.
+    MoveToZone SlotName.SlotName Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName) (Maybe Zone.Zone)
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one at
     -- a time (CR 121.2). Divination is `Relative You`; Ancestral Recall is
     -- `InSlot`, reading a slot TARGETING filled (CR 601.2c). Empty-library draw is

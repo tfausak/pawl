@@ -35,7 +35,13 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Effect as Effect
+-- These type modules share an alias with their codec module, the posture Onset
+-- already took here: the names never collide, since a codec module exports
+-- functions and a type module exports the type moveTail's signature needs.
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Onset as Onset
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Zone as Zone
 
 toJson :: (card -> Value.Value) -> Effect.Effect card -> Value.Value
 toJson codec e = case e of
@@ -61,16 +67,20 @@ toJson codec e = case e of
   Effect.Sacrifice s -> Common.tagged "Sacrifice" (Just (SlotName.toJson s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (SlotName.toJson s))
   Effect.Counter s -> Common.tagged "Counter" (Just (SlotName.toJson s))
-  -- MoveToZone's payload is positional and takes Create's shape, with the same
-  -- two elisions: the EntryRiders are dropped when they are the CR 110.5b
-  -- default, and the bound slot when there is none. The three-element form is
-  -- therefore two shapes, told apart on decode by JSON TYPE -- a slot name is a
-  -- string, riders are an object.
-  Effect.MoveToZone s z riders ms ->
+  -- MoveToZone's payload is the slot and the destination zone, then three
+  -- independently elided extras where Create has two: the EntryRiders are
+  -- dropped when they are the CR 110.5b default, the bound slot when there is
+  -- none, and CR 113.6m's origin zone when the effect states none. Everything
+  -- after the destination is
+  -- therefore optional, and told apart on decode by JSON TYPE rather than by
+  -- position -- a slot name is a string, a zone is a tagged object, and the
+  -- riders are an object that is not one. `moveTail` is the decoding half.
+  Effect.MoveToZone s z riders ms mo ->
     Common.tagged "MoveToZone" . Just . Common.array $
       [SlotName.toJson s, Zone.toJson z]
         <> (if riders == EntryRiders.defaultValue then [] else [EntryRiders.toJson riders])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
+        <> fmap Zone.toJson (Maybe.maybeToList mo)
   Effect.Draw r q -> Common.tagged "Draw" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.Mill s q -> Common.tagged "Mill" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
   Effect.Discard s q -> Common.tagged "Discard" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
@@ -122,6 +132,42 @@ toJson codec e = case e of
   -- slot names (CR 701.24), so there is no second field to write.
   Effect.ShuffleIntoLibrary s -> Common.tagged "ShuffleIntoLibrary" (Just (SlotName.toJson s))
 
+-- Everything a MoveToZone payload may carry after its slot and its destination
+-- zone: the EntryRiders (CR 110.5b), the slot binding the destination
+-- incarnation (CR 400.7), and the origin zone the effect names (CR 113.6m).
+-- Each is optional, so they are read by JSON TYPE rather than by position -- a
+-- string is the slot, and an object is the origin zone if it decodes as one and
+-- the riders otherwise.
+--
+-- ZONE FIRST is what makes that order-independent rather than merely ordered:
+-- EntryRiders.fromJson defaults every field it does not find, so it would accept
+-- a zone object and silently return the default riders, while Zone.fromJson
+-- accepts nothing but its own tagged shape.
+--
+-- A REPEATED element is an error rather than last-one-wins. Two origin zones is
+-- a card file saying something CR 113.6m's "a particular zone" cannot mean, and
+-- two of anything else is as likely a typo.
+moveTail :: [Value.Value] -> Either Text.Text (EntryRiders.EntryRiders, Maybe SlotName.SlotName, Maybe Zone.Zone)
+moveTail = go Nothing Nothing Nothing
+  where
+    go mRiders mSlot mOrigin values = case values of
+      [] -> Right (Maybe.fromMaybe EntryRiders.defaultValue mRiders, mSlot, mOrigin)
+      v : rest -> case v of
+        Value.String _ -> case mSlot of
+          Just _ -> Left . Text.pack $ "MoveToZone names two bound slots"
+          Nothing -> do
+            slot <- SlotName.fromJson v
+            go mRiders (Just slot) mOrigin rest
+        _ -> case Zone.fromJson v of
+          Right zone -> case mOrigin of
+            Just _ -> Left . Text.pack $ "MoveToZone names two origin zones"
+            Nothing -> go mRiders mSlot (Just zone) rest
+          Left _ -> case mRiders of
+            Just _ -> Left . Text.pack $ "MoveToZone names two sets of entry riders"
+            Nothing -> do
+              riders <- EntryRiders.fromJson v
+              go (Just riders) mSlot mOrigin rest
+
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Effect.Effect card)
 fromJson decode value = do
   (t, mv) <- Common.asTagged value
@@ -156,14 +202,14 @@ fromJson decode value = do
     "Sacrifice" -> Common.withValue mv (fmap Effect.Sacrifice . SlotName.fromJson)
     "RemoveFromCombat" -> Common.withValue mv (fmap Effect.RemoveFromCombat . SlotName.fromJson)
     "Counter" -> Common.withValue mv (fmap Effect.Counter . SlotName.fromJson)
-    -- Read exactly as Create's are: an Object in third position is the
-    -- EntryRiders, anything else is the bound slot name.
+    -- Read by JSON TYPE and not by position, which is `moveTail`'s whole job:
+    -- Create's third-position rule would not survive CR 113.6m's origin zone,
+    -- since that zone and the EntryRiders are both objects.
     "MoveToZone" -> case mv of
-      Just (Value.Array (Array.MkArray [s, z])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> pure EntryRiders.defaultValue <*> pure Nothing
-      Just (Value.Array (Array.MkArray [s, z, e@(Value.Object _)])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> EntryRiders.fromJson e <*> pure Nothing
-      Just (Value.Array (Array.MkArray [s, z, b])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> pure EntryRiders.defaultValue <*> (Just <$> SlotName.fromJson b)
-      Just (Value.Array (Array.MkArray [s, z, e, b])) -> Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> EntryRiders.fromJson e <*> (Just <$> SlotName.fromJson b)
-      _ -> Left . Text.pack $ "MoveToZone expects [slot, zone], optionally with EntryRiders and/or a slot"
+      Just (Value.Array (Array.MkArray (s : z : rest))) -> do
+        (riders, mSlot, mOrigin) <- moveTail rest
+        Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> pure riders <*> pure mSlot <*> pure mOrigin
+      _ -> Left . Text.pack $ "MoveToZone expects [slot, zone], optionally with EntryRiders, a slot and/or an origin zone"
     "Draw" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Draw expects [playerRef, quantity]"

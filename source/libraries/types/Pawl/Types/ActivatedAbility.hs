@@ -46,7 +46,8 @@ data ActivatedAbility card = MkActivatedAbility
     -- an ability granted by a max speed ability states which zones it functions
     -- from, the max speed ability that grants that ability functions from those
     -- zones". Pawl.Engine.Activate.graveyardAbilitiesOf asks the same gate of a
-    -- card in a GRAVEYARD, for an ability whose cost names that zone (CR 113.6m).
+    -- card in a GRAVEYARD, for an ability whose cost or effect names that zone
+    -- (CR 113.6m).
     condition :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

@@ -209,10 +209,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature))
       """ {"type":"AttachTarget","value":["target",{"type":"HasCardType","value":{"type":"Creature"}}]} """
-  -- MoveToZone's payload takes Create's shape below: four emitted forms, told
-  -- apart by LENGTH first and then, at three elements, by JSON TYPE (an Object
-  -- is the EntryRiders, anything else is the bound slot).
-  Spec.it s "MoveToZone round-trips all four shapes, and elides the defaults" $ do
+  -- MoveToZone's payload is the slot and the destination zone, then three
+  -- independently elided extras -- the EntryRiders, the bound slot and CR
+  -- 113.6m's origin zone -- so it is told apart by JSON TYPE alone, at every
+  -- length. A string is the bound slot; an object is the origin zone if it
+  -- decodes as a zone and the riders otherwise, which is why the last two cases
+  -- put a zone and a riders object side by side.
+  Spec.it s "MoveToZone round-trips every shape, and elides the defaults" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         bound = SlotName.MkSlotName (Text.pack "exiled")
         attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}
@@ -220,26 +223,50 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing)
+      (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing Nothing)
       """ {"type":"MoveToZone","value":["target",{"type":"Hand"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone slot Zone.Exile EntryRiders.defaultValue (Just bound))
+      (Effect.MoveToZone slot Zone.Exile EntryRiders.defaultValue (Just bound) Nothing)
       """ {"type":"MoveToZone","value":["target",{"type":"Exile"},"exiled"]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone bound Zone.Battlefield attacking Nothing)
+      (Effect.MoveToZone bound Zone.Battlefield attacking Nothing Nothing)
       """ {"type":"MoveToZone","value":["exiled",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone bound Zone.Battlefield attacking (Just bound))
+      (Effect.MoveToZone bound Zone.Battlefield attacking (Just bound) Nothing)
       """ {"type":"MoveToZone","value":["exiled",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled"]} """
+    -- CR 113.6m's origin zone alone, the shape a card states when its effect
+    -- moves its own source out of a named zone with nothing else to say.
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing (Just Zone.Graveyard))
+      """ {"type":"MoveToZone","value":["target",{"type":"Hand"},{"type":"Graveyard"}]} """
+    -- Reassembling Skeleton's own shape: riders AND an origin, two objects in a
+    -- row, which only the type-directed read tells apart.
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MoveToZone slot Zone.Battlefield attacking Nothing (Just Zone.Graveyard))
+      """ {"type":"MoveToZone","value":["target",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},{"type":"Graveyard"}]} """
+    -- All three extras at once, so the encoder's order is pinned and the reader
+    -- is shown to need none of it.
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MoveToZone slot Zone.Battlefield attacking (Just bound) (Just Zone.Exile))
+      """ {"type":"MoveToZone","value":["target",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled",{"type":"Exile"}]} """
   -- Both of Draw's PlayerRef shapes: a controller draw and a targeted one.
   Spec.it s "Draw" $ do
     Common.assertJsonCodec

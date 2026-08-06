@@ -385,20 +385,20 @@ isLoyaltyComponent component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.ExileThisFromGraveyard -> False
 
--- CR 113.6m: "an ability whose cost or effect specifies that it moves the object
--- it's on out of a particular zone functions only in that zone". The
--- CLASSIFICATION Pawl.Engine.Activate reads to decide WHERE an ability may be
--- activated from, the requiresSicknessCheck shape -- so that module still learns
--- nothing about which components exist.
+-- CR 113.6m's COST half: "an ability whose cost or effect specifies that it
+-- moves the object it's on out of a particular zone functions only in that
+-- zone". The CLASSIFICATION Pawl.Engine.Activate reads to decide WHERE an
+-- ability may be activated from, the requiresSicknessCheck shape -- so that
+-- module still learns nothing about which components exist. The "or effect" half
+-- is Pawl.Engine.EffectZone, and Pawl.Engine.Activate.zoneFunctionedFrom is
+-- where the two meet.
 --
--- Nothing means the cost names no zone, which leaves CR 113.6's own default in
--- place: the ability functions on the battlefield. That is the answer for
--- SacrificeThis too, and deliberately -- CR 701.21a moves the object off the
--- battlefield, which is where CR 113.6 already had it, so naming it here would
--- change no reader's answer while claiming a rule this cost does not need.
---
--- Not implemented: CR 113.6m's "or effect" half, which names a zone the same way
--- when it is the ability's EFFECT that moves the object out of one (#811).
+-- Nothing means the cost names no zone, which leaves the effect half to answer
+-- and CR 113.6's own default in place if it does not: the ability functions on
+-- the battlefield. That is the answer for SacrificeThis too, and deliberately --
+-- CR 701.21a moves the object off the battlefield, which is where CR 113.6
+-- already had it, so naming it here would change no reader's answer while
+-- claiming a rule this cost does not need.
 --
 -- One zone and never a set: every component that names a zone names exactly one,
 -- and CR 113.6m is about "a particular zone". Two components naming DIFFERENT
