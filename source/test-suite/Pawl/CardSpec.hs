@@ -1357,6 +1357,9 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.3b's "a spell with certain qualities", which is a Filter over the
   -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
   PlayerEffect.CastAsThoughItHadFlash f -> [f]
+  -- CR 701.6a's arm is payload-free: which spells it names is its carrier's
+  -- PlayerScope, not a Filter (#788).
+  PlayerEffect.CantBeCountered -> []
 
 -- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null

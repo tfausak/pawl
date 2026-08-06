@@ -22,6 +22,18 @@ module Pawl.Types.Counterability where
 -- layers. A prohibition functioning on the stack has no layer, no affected set
 -- and modifies no characteristic. Same reason Face.castingPermissions is a card
 -- field.
+--
+-- SELF-referential, which is the whole of what separates this from
+-- Pawl.Types.PlayerEffect.CantBeCountered. CR 113.6g is about "an object's
+-- ability that states IT can't be countered", so the ability and the object it
+-- protects are the same object and the card is where it can live. Spider-Punk's
+-- "spells and abilities can't be countered" is an ability of a BATTLEFIELD
+-- PERMANENT about OTHER objects, which CR 113.6 leaves functioning from the
+-- battlefield in the ordinary way and CR 611.1's third clause makes a
+-- rules-modifying continuous effect. Neither carrier could hold the other's
+-- card: Pawl.Engine.PlayerEffect.applying walks the battlefield, where a spell
+-- on the stack is not, and this field is read off a card, which an ability on
+-- the stack has none of. Pawl.Engine.Event.counter asks both.
 data Counterability
   = Counterable
   | CantBeCountered

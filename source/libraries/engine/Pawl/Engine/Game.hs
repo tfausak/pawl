@@ -17,6 +17,8 @@ import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
+import Pawl.Types.GameEvent (GameEvent)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -477,3 +479,26 @@ honourShuffle offered answer =
   if List.sort answer == List.sort offered
     then answer
     else offered
+
+-- The caster an event describes, if it is a cast (CR 601.2i).
+--
+-- HERE rather than beside Pawl.Engine.Event's other GameEvent classifiers, and
+-- only because of the import graph: its one caller is
+-- Pawl.Engine.PlayerEffect.castsThisTurn, and Pawl.Engine.Event now asks that
+-- module CR 701.6a's counterability question -- so an Event.castOf would put
+-- the two modules in a cycle. Nothing about GameEvent is owned by Event; CR
+-- 613's projection and CR 704's sweep already case on it too.
+castOf :: GameEvent -> Maybe PlayerId
+castOf event = case event of
+  GameEvent.SpellCast pid -> Just pid
+  GameEvent.Moved _ _ -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented _ _ -> Nothing
+  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Revealed _ _ -> Nothing
+  GameEvent.AttackerDeclared _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost _ _ -> Nothing

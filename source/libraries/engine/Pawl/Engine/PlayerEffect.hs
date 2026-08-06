@@ -19,7 +19,6 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
@@ -223,6 +222,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.NoMaximumHandSize -> effect
   PlayerEffect.DontLoseUnspentMana _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
+  PlayerEffect.CantBeCountered -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -236,7 +236,7 @@ rewritePlayerEffect pairs effect = case effect of
 castsThisTurn :: PlayerId -> GameState -> Natural
 castsThisTurn pid gs =
   let mine caster = caster == pid
-   in Natural.length (filter mine (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs))))
+   in Natural.length (filter mine (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events gs))))
 
 -- CR 601.3: a player can begin to cast a spell only if no rule or effect
 -- prohibits it. The prohibit half. Cast.permitsCastWhileSearching is not the
@@ -310,6 +310,10 @@ prohibitsCasting pid name gs =
         -- prohibition, and CR 101.2 would let a prohibition outvote it anyway.
         -- mayCastAsThoughItHadFlash below is where it is read.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        -- CR 701.6a is about a spell or ability ALREADY on the stack, and CR
+        -- 601.3 is about beginning to cast one: an uncounterable spell is not a
+        -- spell anyone is more or less allowed to cast.
+        PlayerEffect.CantBeCountered -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -350,6 +354,9 @@ prohibitsPlayingLand pid name gs =
         -- CR 305.1 again: a land is never cast, so a permission about the timing
         -- of a CAST has nothing to widen here either.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        -- CR 305.1 again: a land is never put on the stack, so nothing about
+        -- countering reaches a land play.
+        PlayerEffect.CantBeCountered -> False
    in any prohibits (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -405,6 +412,7 @@ costAdjustments pid oid gs =
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -417,6 +425,7 @@ costAdjustments pid oid gs =
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered -> Nothing
       effects = fmap snd (applying pid gs)
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 
@@ -466,6 +475,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CantBeCountered -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -510,6 +520,10 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        -- CR 701.6a grants no targeting immunity: Pawl.Types.Counterability
+        -- says the same about CR 113.6g, and a Cancel at a spell Spider-Punk
+        -- protects still targets it legally and still resolves.
+        PlayerEffect.CantBeCountered -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -555,6 +569,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CantBeCountered -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -581,6 +596,7 @@ maximumHandSize pid gs =
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.CantBeCountered -> False
    in if any (removes . snd) (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
@@ -623,5 +639,39 @@ keepsUnspentMana pid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
+
+-- CR 701.6a / 613.11: can the spells and abilities `pid` controls be countered
+-- (Spider-Punk)? The typed question Pawl.Engine.Event.counter asks at its
+-- funnel, so that module never sees a PlayerEffect constructor.
+--
+-- Takes the player who controls the VICTIM, which CR 113.8 supplies for the
+-- ability half -- "the controller of an activated ability on the stack is the
+-- player who activated it" -- and CR 601.2a for the spell half. Never the
+-- countering spell's controller: the protection is the victim's.
+--
+-- A DISJUNCTION for CR 101.2's reason, the shape every prohibition here takes:
+-- one applicable "can't" is enough and nothing outvotes it. CR 613.11's
+-- timestamp order has nothing to order, since no answer depends on which ran
+-- first.
+--
+-- Read LIVE through `applying`, like every other question in this module, so a
+-- Spider-Punk destroyed earlier in the turn is simply not found (CR 604.2).
+cantBeCountered :: PlayerId -> GameState -> Bool
+cantBeCountered pid gs =
+  let stops effect = case effect of
+        PlayerEffect.CantBeCountered -> True
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+   in any (stops . snd) (applying pid gs)

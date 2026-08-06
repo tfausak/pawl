@@ -35,6 +35,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Extra.Natural as Natural
@@ -151,22 +152,6 @@ damageOf event = case event of
   GameEvent.Moved _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
   GameEvent.SpellCast _ -> Nothing
-  GameEvent.BecameMonarch _ -> Nothing
-  GameEvent.Discarded {} -> Nothing
-  GameEvent.Revealed _ _ -> Nothing
-  GameEvent.AttackerDeclared _ -> Nothing
-  GameEvent.SpellCountered _ -> Nothing
-  GameEvent.LoyaltyAbilityActivated _ -> Nothing
-  GameEvent.LifeLost _ _ -> Nothing
-
--- The caster an event describes, if it is a cast (CR 601.2i).
-castOf :: GameEvent -> Maybe PlayerId
-castOf event = case event of
-  GameEvent.SpellCast pid -> Just pid
-  GameEvent.Moved _ _ -> Nothing
-  GameEvent.DamageDealt _ -> Nothing
-  GameEvent.DamagePrevented _ _ -> Nothing
-  GameEvent.StepBegan _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Revealed _ _ -> Nothing
@@ -1271,11 +1256,22 @@ destroyIn asOf regenerability oids = do
 -- GameEvent.SpellCountered is the wrong direction -- its one reader asks about
 -- countering A SPELL and must stay silent here.
 --
--- Gated on CR 113.6g's "can't be countered", read off the spell's own card since
--- there is no battlefield projection of a spell. CR 101.2 makes the gate the whole
--- story: the countering effect resolves and does nothing. Not targeting immunity
--- -- CR 113.6g grants no shroud -- which is why the gate is here and not in
--- Target. It precedes the zone change for destroy's CR 614.7 reason.
+-- TWO "can't be countered" gates, one per carrier. CR 101.2 makes either the whole
+-- story: the countering effect resolves and does nothing. Neither is targeting
+-- immunity -- neither rule grants shroud -- which is why the gates are here and
+-- not in Target. They precede the zone change for destroy's CR 614.7 reason.
+--
+--   * CR 113.6g's, read off the SPELL's own card (Rending Volley), since there is
+--     no battlefield projection of a spell. Self-referential by that rule's own
+--     wording -- "an object's ability that states IT can't be countered" -- so it
+--     is asked only on the spell branch: an ability on the stack has no card for
+--     it to be printed on, and Game.faceOf answers Nothing for one.
+--   * CR 611.1 / 613.11's, asked of Pawl.Engine.PlayerEffect (Spider-Punk). That
+--     one is an ability of a BATTLEFIELD PERMANENT about other objects, so it is
+--     gathered from the battlefield like any other player effect and reaches BOTH
+--     of CR 701.6a's subjects -- which is why it, unlike the gate above, is asked
+--     on both branches. It is asked of the VICTIM's controller: CR 113.8 for an
+--     ability, CR 601.2a for a spell.
 --
 -- On the spell branch, records a SpellCountered ALONGSIDE the zone change's Moved
 -- event, never instead of it: the Moved event is the CR 400.7 change and this one
@@ -1283,11 +1279,11 @@ destroyIn asOf regenerability oids = do
 -- that RESOLVED into the same graveyard (CR 608.2n), and what survives Rest in
 -- Peace redirecting the destination.
 --
--- Nothing is recorded on any of the three paths that do NOT counter, which CR
--- 603.2g makes mandatory rather than tidy: an id with no object; the CR 113.6g
--- gate, since through CR 101.2 such a spell was never countered; and a move the CR
+-- Nothing is recorded on any of the four paths that do NOT counter, which CR
+-- 603.2g makes mandatory rather than tidy: an id with no object; either gate,
+-- since through CR 101.2 such a spell was never countered; and a move the CR
 -- 616.1 loop cancelled, which leaves the spell on the stack. The ability branch is
--- not a fourth -- that countering really happened, and its silence is #541.
+-- not a fifth -- that countering really happened, and its silence is #541.
 --
 -- `source` and `controller` are the countering spell or ability and its controller
 -- (CR 405.4), taken from the caller rather than re-derived: by the time the CR
@@ -1301,9 +1297,8 @@ counter source controller oid = do
     -- CR 608.2n, reached before the CR 113.6g gate because that gate asks about a
     -- spell's own card and an ability has none -- Game.faceOf answers Nothing for
     -- one, so asking first would fall through to the graveyard move by accident.
-    -- An ability of a source that "can't be countered" is uncovered either way,
-    -- that clause being about the spell (#542).
-    Just _ | Game.isAbility oid gs -> State.modify' (Game.cease oid)
+    Just _ | Game.isAbility oid gs -> if protectedFromCountering oid gs then pure () else State.modify' (Game.cease oid)
+    Just _ | protectedFromCountering oid gs -> pure ()
     Just _ -> case fmap Face.counterability (Game.faceOf oid gs) of
       Just Counterability.CantBeCountered -> pure ()
       _ -> do
@@ -1319,6 +1314,24 @@ counter source controller oid = do
                     Countering.source = source,
                     Countering.controller = controller
                   }
+
+-- CR 611.1 / 613.11: does a rules-modifying continuous effect stop this spell or
+-- ability from being countered (Spider-Punk)? The victim's controller is the
+-- player the effect is anchored against -- CR 113.8 for an ability on the stack,
+-- CR 601.2a for a spell -- and an object with no controller is protected by
+-- nothing.
+--
+-- The typed question, so this module never sees a PlayerEffect constructor;
+-- Pawl.Engine.PlayerEffect.cantBeCountered is where the casing lives.
+--
+-- Projection.controllerOf, which is what every other reader of a stack object's
+-- controller already asks (Replacement.decider, PlayerEffect.matchesSpell). For a
+-- SPELL that is a re-derivation rather than the stored fact CR 405.4 describes,
+-- and it falls back to the owner (#83); a spell cast from a zone its owner does
+-- not hold would therefore be read against the wrong player here.
+protectedFromCountering :: ObjectId -> GameState -> Bool
+protectedFromCountering oid gs =
+  maybe False (\pid -> PlayerEffect.cantBeCountered pid gs) (Projection.controllerOf oid gs)
 
 -- CR 701.21/701.21a: the single sacrifice funnel. The permanent goes to its
 -- OWNER's graveyard through changeZone, and -- unlike destroy -- with no
@@ -1832,9 +1845,10 @@ matchesTrigger gs bearer you cond event = case cond of
   -- any Self- condition's -- since the bearer is a permanent and the countering is
   -- done by a spell somewhere else.
   --
-  -- The CR 113.6g gate needs no clause here: a spell that can't be countered is
-  -- not countered at all (CR 101.2), so `counter` records nothing and there is no
-  -- event for this arm to see.
+  -- Neither "can't be countered" gate needs a clause here -- CR 113.6g's on the
+  -- spell, CR 613.11's on a permanent's static ability: a spell that can't be
+  -- countered is not countered at all (CR 101.2), so `counter` records nothing
+  -- and there is no event for this arm to see.
   TriggerCondition.SpellOrAbilityCounters relation -> case event of
     GameEvent.SpellCountered c -> case relation of
       PlayerRelation.You -> Countering.controller c == you

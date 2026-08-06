@@ -156,3 +156,13 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.CastAsThoughItHadFlash (Filter.And [Filter.HasColor Color.Green, Filter.HasCardType CardType.Creature]))
       """ {"type":"CastAsThoughItHadFlash","value":{"type":"And","value":[{"type":"HasColor","value":{"type":"Green"}},{"type":"HasCardType","value":{"type":"Creature"}}]}} """
+  -- CR 701.6a / Spider-Punk: payload-free, so the tag is the whole encoding.
+  -- Whose spells is the CARRIER's scope (Pawl.Codec.PlayerStaticAbility), which
+  -- is why nothing rides here.
+  Spec.it s "CantBeCountered" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantBeCountered
+      """ {"type":"CantBeCountered"} """

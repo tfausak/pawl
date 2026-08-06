@@ -167,4 +167,32 @@ data PlayerEffect
     -- applicable permission is enough because there is nothing for a second to
     -- outvote.
     CastAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.6a / 613.11 / Spider-Punk: the spells and the abilities on the
+    -- stack controlled by the players this effect's scope names can't be
+    -- countered.
+    --
+    -- NOT Pawl.Types.Counterability, and the two are not redundant. That one is
+    -- CR 113.6g -- "an object's ability that states IT can't be countered
+    -- functions on the stack" -- a self-referential ability of the spell itself,
+    -- which is why it rides the card (Rending Volley). This one is an ability of
+    -- a BATTLEFIELD permanent about OTHER objects, so CR 113.6 leaves it
+    -- functioning from the battlefield in the ordinary way and CR 611.1's third
+    -- clause makes it a rules-modifying continuous effect. Pawl.Engine.PlayerEffect.applying
+    -- walks the battlefield, so it can gather this one and could never gather
+    -- the other: a spell on the stack is not a permanent.
+    --
+    -- BOTH subjects of CR 701.6a at once -- "to counter a spell or ability" --
+    -- and one constructor rather than two, because Spider-Punk's one sentence
+    -- says both and no gate downstream needs to tell them apart: CR 113.9 keeps
+    -- an ability from being a spell for the COUNTERER's sake (a Stifle must not
+    -- reach a spell), and this is read on the victim's side, where the
+    -- distinction has nothing to decide.
+    --
+    -- Payload-free. WHOSE spells is the carrier's scope, exactly as it is for
+    -- every other arm here -- Spider-Punk says "spells and abilities" with no
+    -- possessive, which is PlayerScope.EachPlayer. A card narrowing by the
+    -- spell's own qualities ("creature spells you control can't be countered")
+    -- would want the Filter that IncreaseSpellCost carries, and none is in the
+    -- pool (#788).
+    CantBeCountered
   deriving (Eq, Ord, Show)
