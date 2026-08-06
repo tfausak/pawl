@@ -22,6 +22,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -32,6 +33,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.TargetSpec (TargetSpec)
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TypeLine as TypeLine
 
 -- The face a card shows where nothing has singled out one half for itself. WHICH
@@ -121,15 +123,19 @@ merge2 l r =
       Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
       Face.mulliganAction = Face.mulliganAction l <> Face.mulliganAction r,
       Face.openingHandAction = Face.openingHandAction l <> Face.openingHandAction r,
+      -- CR 709.4c again, and CR 702.5a: an enchant ability IS an ability in a
+      -- half's text box, so both halves' survive here -- and CR 702.5c says what
+      -- a combined view carrying two of them means, which is Card.enchantSpec's
+      -- conjunction. Concatenated rather than left-biased for that reason, unlike
+      -- the four boxes below.
+      Face.enchant = Face.enchant l <> Face.enchant r,
       -- The first half that has one. CR 709.4 does not say how two printed
-      -- power/toughness/loyalty boxes or two enchant abilities combine, and
-      -- taking the left half's is not implemented as anything the rule
-      -- sanctions (#658).
+      -- power/toughness/loyalty boxes combine, and taking the left half's is not
+      -- implemented as anything the rule sanctions (#658).
       Face.power = firstJust (Face.power l) (Face.power r),
       Face.toughness = firstJust (Face.toughness l) (Face.toughness r),
       Face.loyalty = firstJust (Face.loyalty l) (Face.loyalty r),
-      Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r),
-      Face.enchant = firstJust (Face.enchant l) (Face.enchant r)
+      Face.characteristicPT = firstJust (Face.characteristicPT l) (Face.characteristicPT r)
       -- Face.counterability is NOT listed: record update keeps the left half's,
       -- and writing `Face.counterability l` here would be a no-op. CR 113.6g is
       -- a per-half ability, so the combined view taking the left half's is a
@@ -412,11 +418,46 @@ isAdventure f = Set.member Subtype.Adventure (TypeLine.subtypes (Face.typeLine f
 enchantSlot :: SlotName
 enchantSlot = SlotName.MkSlotName (Text.pack "enchant")
 
--- CR 303.4a / 702.5a: the enchant ability's target spec as a one-entry slot
--- map, empty for every non-Aura. Merged into the two functions above, and
--- passed to Target.fillableModes by Pawl.Engine.Cast so castability accounts
--- for it.
+-- CR 303.4a / 702.5a: the enchant abilities' target spec as a one-entry slot
+-- map, empty for every non-Aura. ONE slot however many instances of enchant the
+-- face has, since CR 303.4a gives an Aura spell a single target and CR 702.5c
+-- makes the instances narrow it together (enchantSpec below). Merged into the two
+-- functions above, and passed to Target.fillableModes by Pawl.Engine.Cast so
+-- castability accounts for it.
 enchantSpecs :: Face.Face Card.Card -> Map SlotName TargetSpec
-enchantSpecs face = case Face.enchant face of
+enchantSpecs face = case enchantSpec face of
   Nothing -> Map.empty
   Just spec -> Map.singleton enchantSlot spec
+
+-- CR 702.5c: "If an Aura has multiple instances of enchant, all of them apply.
+-- The Aura's target must follow the restrictions from all the instances of
+-- enchant." This is where that rule lives -- the ONE spec every reader of an
+-- enchant ability gets, so CR 601.2c's target legality (Pawl.Engine.Cast), CR
+-- 303.4c's admission re-check (Pawl.Engine.Sba.fallsOff) and CR 701.3a's attach
+-- (Pawl.Engine.Resolve.attachmentFor) cannot disagree about what "all of them"
+-- means. Nothing for a face with no enchant ability at all, which is every
+-- non-Aura (the CardSpec lint holds the biconditional).
+--
+-- The conjunction is Filter.And, which already means "matches all of these", so
+-- no new predicate vocabulary is involved. A spec with no Filter narrows nothing
+-- (TargetSpec's own note), so it contributes no conjunct rather than an empty
+-- one -- which keeps a lone bare "enchant creature" folding to ITSELF, and that
+-- matters: Sba.stillLegalEnchant's fast arm matches on exactly that shape.
+--
+-- The POOL is taken from the first instance. CR 702.5c would have the candidate
+-- satisfy every instance's pool as well, and pawl has no intersection of two
+-- Pools (they carry different Recipient tags, and Creatures against Players is
+-- empty outright). No card can reach that: the CardSpec lint rejects a face whose
+-- enchant abilities disagree about their pool (#797).
+enchantSpec :: Face.Face card -> Maybe TargetSpec
+enchantSpec face = case Face.enchant face of
+  [] -> Nothing
+  spec : specs ->
+    Just
+      TargetSpec.MkTargetSpec
+        { TargetSpec.pool = TargetSpec.pool spec,
+          TargetSpec.filter = case Maybe.mapMaybe TargetSpec.filter (spec : specs) of
+            [] -> Nothing
+            [one] -> Just one
+            many -> Just (Filter.And many)
+        }

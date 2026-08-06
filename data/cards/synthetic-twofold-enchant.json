@@ -12,6 +12,14 @@
           "pool": {
             "type": "Creatures"
           }
+        },
+        {
+          "filter": {
+            "type": "IsTapped"
+          },
+          "pool": {
+            "type": "Creatures"
+          }
         }
       ],
       "manaCost": [
@@ -24,12 +32,12 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
+              "type": "White"
             }
           }
         }
       ],
-      "name": "Setessan Training",
+      "name": "Synthetic Twofold Enchant",
       "staticAbilities": [
         {
           "affected": {
@@ -41,51 +49,15 @@
               "value": [
                 {
                   "type": "Literal",
-                  "value": 1
+                  "value": 2
                 },
                 {
                   "type": "Literal",
-                  "value": 0
+                  "value": 2
                 }
               ]
-            },
-            {
-              "type": "GainKeyword",
-              "value": {
-                "type": "Trample"
-              }
             }
           ]
-        }
-      ],
-      "triggeredAbilities": [
-        {
-          "condition": {
-            "type": "SelfEnters"
-          },
-          "modal": {
-            "modes": [
-              {
-                "effects": [
-                  {
-                    "type": "Draw",
-                    "value": [
-                      {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
         }
       ],
       "typeLine": {

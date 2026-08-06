@@ -1001,7 +1001,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.openingHandAction = [],
               Face.additionalCosts = [],
               Face.alternativeCosts = [],
-              Face.enchant = Nothing,
+              Face.enchant = [],
               Face.counterability = Counterability.Counterable
             }
         spellObj =
@@ -1074,7 +1074,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.openingHandAction = [],
               Face.additionalCosts = [],
               Face.alternativeCosts = [],
-              Face.enchant = Nothing,
+              Face.enchant = [],
               Face.counterability = Counterability.Counterable
             }
         spellObj =

@@ -14,11 +14,13 @@
           }
         }
       ],
-      "enchant": {
-        "pool": {
-          "type": "Players"
+      "enchant": [
+        {
+          "pool": {
+            "type": "Players"
+          }
         }
-      },
+      ],
       "manaCost": [
         {
           "type": "Generic",

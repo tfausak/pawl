@@ -19,11 +19,13 @@
           }
         }
       ],
-      "enchant": {
-        "pool": {
-          "type": "Creatures"
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
         }
-      },
+      ],
       "manaCost": [
         {
           "type": "Generic",
