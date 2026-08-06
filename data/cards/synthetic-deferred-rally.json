@@ -1,0 +1,126 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "StepBegins",
+              "value": [
+                {
+                  "type": "Ending",
+                  "value": {
+                    "type": "EndStep"
+                  }
+                },
+                {
+                  "type": "EachTurn"
+                }
+              ]
+            },
+            "intervening": {
+              "comparison": {
+                "type": "AtLeast"
+              },
+              "measured": {
+                "type": "Count",
+                "value": {
+                  "aggregation": {
+                    "type": "Objects"
+                  },
+                  "filter": {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "You"
+                        }
+                      }
+                    ]
+                  },
+                  "scope": {
+                    "type": "InZone",
+                    "value": [
+                      {
+                        "type": "Battlefield"
+                      },
+                      {
+                        "type": "EachPlayer"
+                      }
+                    ]
+                  }
+                }
+              },
+              "threshold": {
+                "type": "Literal",
+                "value": 1
+              }
+            },
+            "modal": {
+              "modes": [
+                {
+                  "effects": [
+                    {
+                      "type": "GainLife",
+                      "value": [
+                        {
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
+                        },
+                        {
+                          "type": "Literal",
+                          "value": 2
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "name": "gain 2 life"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Deferred Rally",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ArmDelayedTrigger",
+                "value": "gain 2 life"
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
