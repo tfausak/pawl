@@ -804,7 +804,16 @@ castProposed pid sid face castFrom candidates before = do
                       -- projection castable measured -- that one read `oid` in a
                       -- hand, this reads `sid` on the stack -- but provably the
                       -- same HALF, since asProposed stamped both.
-                      let paidCost = Cost.total pid sid announcedCost gs
+                      --
+                      -- CR 118.7e: a reduction written with a hybrid mana
+                      -- symbol has its half chosen "at the time the cost
+                      -- reduction is applied", which is this step and not CR
+                      -- 601.2b's announcement above. The answers arrive as the
+                      -- adjustments themselves, so `totalWith` applies exactly
+                      -- what was chosen; `payableCost`'s own reading of them is
+                      -- the unannounced one, which is stricter (#813).
+                      adjustments <- Cost.announceReductions pid sid gs
+                      let paidCost = Cost.totalWith adjustments announcedCost
                       payment <- Cost.pay pid sid paidCost
                       case payment of
                         -- CR 601.2h: the payment failed, so the cast is illegal

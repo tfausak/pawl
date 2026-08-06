@@ -9,10 +9,12 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The seven gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Two more,
--- Synthetic Phyrexian Discount and Synthetic Snow Discount, are the file's
--- SYNTHETIC cards: neither CR 118.7f's reduction nor CR 118.7g's has a
--- printing. Humility,
+-- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Four more --
+-- Synthetic Phyrexian Discount, Synthetic Snow Discount, Synthetic Monocolored
+-- Hybrid Discount and Synthetic Hybrid Discount -- are the file's SYNTHETIC
+-- cards, one per reduction CR 118.7e-g describes and no card prints. Khabál
+-- Ghoul, Withered Wretch and Sol Ring are the costs the last two are aimed at.
+-- Humility,
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
 --
@@ -36,6 +38,7 @@ module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -385,6 +388,64 @@ adjustmentSpec s =
         "{G/P} reduced by {G} is still {G/P}"
         (Cost.applyAdjustments ([], [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
         (ManaCost.MkManaCost [phyrexianGreen])
+
+    -- CR 118.7e, in the small: WHICH TWO THINGS the payer is choosing between.
+    -- "If a colored or colorless half is chosen, the cost is reduced by one mana
+    -- of that type. If a generic half is chosen, the cost is reduced by an
+    -- amount of generic mana equal to that half's number" -- so a colour/colour
+    -- symbol offers two OfTypes and a monocolored one offers an OfType against
+    -- CR 107.4e's {2}. Cost.announceReductions puts exactly this list on the
+    -- wire, and the board-level groups below prove each half against a card.
+    Spec.it s "CR 118.7e a hybrid reduction offers its two halves" $ do
+      Spec.assertEqWith
+        s
+        "{W/U} offers {W} and {U}"
+        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Blue)))
+        (Just [white, blue])
+      Spec.assertEqWith
+        s
+        "{2/B} offers {B} and {2}"
+        (Cost.reductionHalvesOf (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black)))
+        (Just [black, ManaSymbol.Generic 2])
+
+    -- The symbols CR 118.7e does NOT reach, and each for its own reason: a
+    -- printed amount of generic mana and a plain coloured symbol have one half
+    -- to begin with, CR 118.7f gives a Phyrexian reduction its colour outright,
+    -- and CR 118.7g makes an {S} reduction generic mana. A Just here would put a
+    -- prompt in front of a player with nothing to decide.
+    Spec.it s "a symbol with no halves is not asked about" $ do
+      Spec.assertEqWith s "{1}" (Cost.reductionHalvesOf (ManaSymbol.Generic 1)) Nothing
+      Spec.assertEqWith s "{G}" (Cost.reductionHalvesOf green) Nothing
+      Spec.assertEqWith s "{G/P}" (Cost.reductionHalvesOf phyrexianGreen) Nothing
+      Spec.assertEqWith s "{S}" (Cost.reductionHalvesOf ManaSymbol.Snow) Nothing
+
+    -- Pawl.Types.ManaSymbol calls `Hybrid t t` degenerate rather than illegal,
+    -- and no card prints one. Both halves are the same symbol, so there is
+    -- nothing to observe about the answer and CR 118.7e's prompt is elided --
+    -- the one elision this rule permits.
+    Spec.it s "a hybrid of one type offers one half, not the same one twice" $
+      Spec.assertEqWith
+        s
+        "{W/W} offers {W}"
+        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.White)))
+        (Just [white])
+
+    -- Both halves of a colour/colour hybrid really do bite a cost that prints
+    -- both colours, which the board groups below cannot show: their cost prints
+    -- one of the two, deliberately, so that the count tells the answers apart.
+    -- These are the symbols announceReductions leaves behind, cancelled by
+    -- applyAdjustments' ordinary typed path.
+    Spec.it s "CR 118.7e either half of a {W/B} takes its own symbol" $ do
+      Spec.assertEqWith
+        s
+        "{1}{W}{B} reduced by the white half is {1}{B}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1, black])
+      Spec.assertEqWith
+        s
+        "{1}{W}{B} reduced by the black half is {1}{W}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1, white])
 
     -- CR 118.7g, in the small, and the other arm where the two sides part
     -- company. A reduction written {S} is an amount of GENERIC mana, so it
@@ -1209,6 +1270,182 @@ snowDiscountSpec s registry =
       let (cubId, _, gs) = snowDiscountBoard forest discount cub piker 1 2
           paid = S.runPure S.identityAnswer gs (S.cast S.alice cubId)
       Spec.assertEqWith s "one Forest tapped, not two" (S.tappedCount S.alice paid) 1
+
+-- Answers CR 118.7e's Prompt.ChooseReductionHalf with `half` whenever it is on
+-- offer, and defers everything else to S.identityAnswer -- the `announces` shape
+-- Pawl.ManaSpec uses for CR 118.13a's announcements.
+--
+-- The "whenever it is on offer" is what makes the pairs below discriminating: an
+-- interpreter that named a half the symbol does not have would silently get the
+-- first one instead, and the two cases would stop disagreeing.
+takesHalf :: ManaSymbol.ManaSymbol -> Prompt.Prompt r -> r
+takesHalf half p = case p of
+  Prompt.ChooseReductionHalf _ _ _ _ offers ->
+    if elem half offers then half else NonEmpty.head offers
+  _ -> S.identityAnswer p
+
+-- alice controls `copies` reducers and `n` untapped Swamps; her hand holds one
+-- `spell` and one Sol Ring ({1} colourless Artifact). Shared by the two
+-- hybrid-reduction groups below, which differ in which hybrid symbol their
+-- reducer is written with and in which black spell that symbol is aimed at.
+-- Loaded fresh inside each case that needs it -- equivalent because loading is
+-- deterministic and cached (batch-recipe.md).
+hybridDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hybridDiscountBoard swamp discount spell solRing copies n =
+  let base = S.landsInPlay swamp n
+      put g _ = snd (S.addCreature discount S.alice g)
+      withCopies = List.foldl' put base [1 .. copies]
+      (spellId, gs1) = S.addHandCard spell S.alice withCopies
+      (ringId, gs2) = S.addHandCard solRing S.alice gs1
+   in ( spellId,
+        ringId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Synthetic Monocolored Hybrid Discount {2} Artifact: "Black spells you cast
+-- cost {2/B} less to cast."
+--
+-- SYNTHETIC, and the file's third. CR 118.7e exists to say what a reduction
+-- written with a hybrid mana symbol does, so nothing in the rules forbids the
+-- printing -- the pool merely lacks one. Of the 38,542 cards in Scryfall's
+-- Oracle Cards bulk (2026-08-06, which carries un-set, playtest and digital-only
+-- printings), not one states a reduction whose amount contains a hybrid symbol;
+-- the three whose text puts a hybrid symbol in the same sentence as "less"
+-- (Fiend Artisan, Eagle's Rescue, Reaping Willow) all spend it in an activation
+-- cost beside a "mana value N or less".
+--
+-- {2/B} is CR 118.7e's own worked example, and the shape whose two halves differ
+-- in the NUMBER of mana they take: "one black mana" against "two generic mana".
+-- Khabál Ghoul's {2}{B} is the cost both halves bite -- it has a black symbol
+-- for the one and a generic component of two for the other -- which is what
+-- makes the pair below disagree by a whole land. THREE SWAMPS is the board that
+-- tells the three readings apart: full price taps three, the {B} half taps two,
+-- the {2} half taps one.
+--
+-- CR 118.7b-c cannot reach this group, so none of it is hostage to #309: the {2}
+-- half is generic mana and the {B} half finds a black symbol waiting for it, so
+-- neither half is ever the excess that pawl drops and the rule would spill.
+monocoloredHybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+monocoloredHybridDiscountSpec s registry =
+  Spec.describe s "SyntheticMonocoloredHybridDiscount" $ do
+    -- THE HEADLINE FALSIFIER, and it is a GAMEPLAY-level one because CR 118.7e's
+    -- choice is only made on the path that pays: taking the {2} half leaves
+    -- {2}{B} as {B}, one Swamp. Reading the symbol as nothing at all -- what the
+    -- arm did before -- leaves all three tapped.
+    Spec.it s "CR 118.7e a {2/B} reduction taken as {2} takes two generic mana off the cost" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
+          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "one Swamp tapped, not three" (S.tappedCount S.alice paid) 1
+
+    -- THE OTHER HALF of the same symbol, on the same board, and the pair is what
+    -- proves the ANSWER is what decides: CR 118.7e's coloured half takes one
+    -- black mana, so {2}{B} becomes {2} and two Swamps pay it. An engine that
+    -- picked a half for the player could not make both cases pass.
+    Spec.it s "CR 118.7e the same reduction taken as {B} takes one black mana instead" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
+          paid = S.runPure (takesHalf black) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "two Swamps tapped, not one and not three" (S.tappedCount S.alice paid) 2
+
+    -- The control both cases above need: without the artifact the same spell is
+    -- full price whatever the interpreter would have answered, so the mana
+    -- really did leave because of the reduction.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 0 3
+          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "three Swamps tapped" (S.tappedCount S.alice paid) 3
+
+    -- The colour criterion, and it DISCRIMINATES here where the Phyrexian
+    -- group's could not: the {2} half is generic mana, which does not care what
+    -- the cost prints, so Sol Ring's {1} would go to {0} and tap nothing at all
+    -- if the Filter let the reduction reach a colourless spell.
+    Spec.it s "a colourless spell fails the effect's criterion, so it pays in full" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (_, ringId, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
+          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ringId)
+      Spec.assertEqWith s "one Swamp tapped, not none" (S.tappedCount S.alice paid) 1
+
+-- Synthetic Hybrid Discount {2} Artifact: "Black spells you cast cost {W/B}
+-- less to cast."
+--
+-- SYNTHETIC, and the file's fourth, for the reason the group above gives: the
+-- same Scryfall sweep finds no printing whose reduction amount is a hybrid
+-- symbol of either shape.
+--
+-- CR 107.4e's COLOUR/COLOUR half ({W/B}), whose two ways are two colours rather
+-- than a colour against a number. That is what makes it a different question
+-- from the group above and not a relabelling of it, and why CR 118.7e's prompt
+-- answers with the resulting SYMBOL: {2/B}'s halves are an OfType and a Generic,
+-- {W/B}'s are two OfTypes.
+--
+-- Aimed at Withered Wretch's {B}{B}, which prints one of the two colours and not
+-- the other, and NO GENERIC COMPONENT. Both of those are deliberate. Printing
+-- one colour is what lets the count tell the two answers apart -- a cost
+-- printing both would take one mana either way. Printing no generic component is
+-- what keeps the white-half case out of #309's way: CR 118.7b would turn a
+-- stranded {W} into one generic mana and CR 118.7a says generic reductions reach
+-- only the generic component, so pawl DROPPING it and the rule SPILLING it give
+-- the same two Swamps here. Aim the same reduction at a cost with a generic
+-- component and the two readings part company, which is the trap this group is
+-- shaped to avoid.
+hybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hybridDiscountSpec s registry =
+  Spec.describe s "SyntheticHybridDiscount" $ do
+    -- THE HEADLINE FALSIFIER for CR 107.4e's colour/colour half: the black half
+    -- of {W/B} takes one black mana, so {B}{B} becomes {B} and one Swamp pays
+    -- it. Reading the symbol as nothing -- what the arm did before -- taps both.
+    Spec.it s "CR 118.7e a {W/B} reduction taken as {B} takes one black mana off the cost" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      wretch <- S.printingOf s registry "Withered Wretch"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 1 2
+          paid = S.runPure (takesHalf black) gs (S.cast S.alice wretchId)
+      Spec.assertEqWith s "one Swamp tapped, not two" (S.tappedCount S.alice paid) 1
+
+    -- THE ENGINE DOES NOT PICK THE BETTER HALF. CR 118.7e gives the choice to
+    -- the player paying with no condition attached, so a payer who names the
+    -- white half of {W/B} against a cost printing no {W} gets a reduction that
+    -- takes nothing -- and pays both Swamps. This case fails if the engine
+    -- silently takes the half the cost can use, which is exactly what a
+    -- payability filter on the offers would have made it do.
+    Spec.it s "CR 118.7e the same reduction taken as {W} finds no white mana to take" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      wretch <- S.printingOf s registry "Withered Wretch"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 1 2
+          paid = S.runPure (takesHalf white) gs (S.cast S.alice wretchId)
+      Spec.assertEqWith s "two Swamps tapped" (S.tappedCount S.alice paid) 2
+
+    -- The control the headline needs: with no reducer out, two Swamps is what
+    -- the spell costs whatever the interpreter would have answered.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      wretch <- S.printingOf s registry "Withered Wretch"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 0 2
+          paid = S.runPure (takesHalf black) gs (S.cast S.alice wretchId)
+      Spec.assertEqWith s "two Swamps tapped" (S.tappedCount S.alice paid) 2
 
 -- Aims the text changer's one target slot at `oid` -- the SpellsAndPermanents
 -- pool's recipient shape, which both changers below print -- and answers whichever
@@ -2653,6 +2890,8 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   edgewalkerSpec s registry
   phyrexianDiscountSpec s registry
   snowDiscountSpec s registry
+  monocoloredHybridDiscountSpec s registry
+  hybridDiscountSpec s registry
   textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   storedSpec s registry
