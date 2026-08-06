@@ -315,8 +315,10 @@ data TriggerCondition
     -- Pawl.Engine.Event.eventBindings binds it under
     -- Pawl.Engine.Binding.eventAmount for Exquisite Blood's "that much" to read.
     --
-    -- The LOSING player gets no slot of their own. Exquisite Blood's payload
-    -- names only "you", and a card printing "that player" under this condition
-    -- is what must bind one (#829).
+    -- The LOSING player is part of the same event, and gets a slot of their own
+    -- under Pawl.Engine.Binding.triggerPlayer -- the slot CR 701.9a's discard
+    -- condition already stamps -- for Mindcrank's "that player mills that many
+    -- cards" to read. Exquisite Blood's payload names only "you" and reads it
+    -- not at all, which is why the amount arrived one card earlier.
     PlayerLosesLife PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

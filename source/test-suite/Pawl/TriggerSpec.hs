@@ -70,7 +70,10 @@
 -- reader of -- `lifeGainAmountSpec`. That event's mirror, a player LOSING life,
 -- from all three recording sites (CR 119.3's instructed loss, CR 119.2's damage
 -- and CR 119.4's paid life) with the controls that keep it from being a "life
--- total moved" trigger, with Exquisite Blood -- `lifeLossTriggerSpec`.
+-- total moved" trigger, with Exquisite Blood -- `lifeLossTriggerSpec`. That
+-- event read for BOTH the halves CR 603.2 makes part of it -- the amount and the
+-- player who lost it -- on a three-seat board where "that player" and "an
+-- opponent" come apart, with Mindcrank -- `mindcrankSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -4510,12 +4513,94 @@ lifeLossTriggerSpec s registry =
         -- than to one card's payload -- the gain group's last case, mirrored. The
         -- 7 is no life total and no other number in reach, so an arm binding
         -- anything but the event's own amount fails here.
-        Spec.it s "CR 603.2 eventBindings binds the amount the loss event carries" $
+        --
+        -- Both slots at once, and as a WHOLE map rather than a lookup: CR 603.2
+        -- makes the amount and the player one environment, and an equality on the
+        -- whole map is what would catch an arm that bound a third thing.
+        Spec.it s "CR 603.2 eventBindings binds the amount the loss event carries and the loser" $
           Spec.assertEqWith
             s
-            "thatMuch is the loss"
+            "thatMuch is the loss and thatPlayer is who lost it"
             (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost S.bob 7))
-            (Map.singleton Binding.eventAmount (Binding.toAmount 7))
+            (Map.fromList [(Binding.eventAmount, Binding.toAmount 7), (Binding.triggerPlayer, Binding.toPlayer S.bob)])
+        -- The loser is bound under the OTHER relation too, and that is a claim
+        -- about the event rather than about the relation: CR 603.2's environment
+        -- is what the event named, and Event.eventBindingSlots answers per
+        -- CONDITION with no relation in hand, so a slot it promises has to hold
+        -- for every relation the condition admits.
+        Spec.it s "CR 603.2 the loser is bound under the You relation as well" $
+          Spec.assertEqWith
+            s
+            "thatPlayer names the loser whichever relation matched"
+            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost S.alice 3))
+            (Map.fromList [(Binding.eventAmount, Binding.toAmount 3), (Binding.triggerPlayer, Binding.toPlayer S.alice)])
+
+-- CR 603.2's other half of a life-loss event: the PLAYER it named, not only the
+-- amount. Mindcrank, {2} Artifact, "Whenever an opponent loses life, that player
+-- mills that many cards" (CR 701.17a) -- the pool's first life trigger whose
+-- payload acts on the player the event named rather than on CR 109.5's "you",
+-- which is what makes `Binding.triggerPlayer` on this condition a slot something
+-- reads rather than speculative construction.
+--
+-- THREE SEATS, and that is the whole design of the fixture. On a two-seat board
+-- "that player" and "an opponent" name the same person, so an implementation that
+-- milled SOME opponent -- the first one, say -- would pass with the binding
+-- wrong. With bob and carol both opponents of alice, the two cases below differ
+-- only in WHICH of them Sign in Blood targets, so a binding that answers a fixed
+-- opponent fails whichever case is not that opponent, and a binding that answers
+-- CR 109.5's "you" fails both. Confirmed by mutating each of the two in turn.
+--
+-- Every seat is stocked with six cards, which is load-bearing rather than tidy --
+-- the lesson `lifeLossTriggerSpec`'s fixture already carries. Sign in Blood draws
+-- its target two cards before it costs them the life, so a target whose library
+-- ran out would lose to CR 104.3c the next time a player would get priority,
+-- before the trigger could resolve, and the case would pass for that reason
+-- instead of for the binding's.
+mindcrankSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mindcrankSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- Sign in Blood's one target slot, answered with `who` -- as the Exquisite
+      -- Blood group's helper does, and for the same reason.
+      aimAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        _ -> S.identityAnswer p
+      sizeOf zone pid gs = length (Game.zoneMembers zone pid gs)
+      -- alice: two Swamps for the {B}{B}, a Mindcrank, and Sign in Blood in hand.
+      -- bob and carol: nothing but libraries, so neither is distinguishable from
+      -- the other by anything except being targeted.
+      board swamp mindcrank signInBlood =
+        let withMana = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
+            (_, withCrank) = S.addCreature mindcrank S.alice withMana
+            stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard swamp pid g)) gs [1 .. (6 :: Int)]
+         in S.handOne signInBlood (stock S.carol (stock S.bob (stock S.alice withCrank)))
+      cases =
+        [ ("bob", S.bob, S.carol),
+          ("carol", S.carol, S.bob)
+        ]
+   in Spec.describe s "Mindcrank names the player who lost the life"
+        . Foldable.for_ cases
+        $ \(label, loser, bystander) ->
+          -- CR 603.2: the targeted player takes the loss, and the SAME player
+          -- mills 2. Six cards, less the two Sign in Blood draws them, less the
+          -- two milled, leaves two -- while the other opponent's six are
+          -- untouched, which is what a binding naming "an opponent" rather than
+          -- THE opponent fails.
+          Spec.it s ("CR 701.17a the player who lost the life is the player who mills, with " <> label <> " targeted") $ do
+            swamp <- S.printingOf s registry "Swamp"
+            mindcrank <- S.printingOf s registry "Mindcrank"
+            signInBlood <- S.printingOf s registry "Sign in Blood"
+            let (gs, spellId) = board swamp mindcrank signInBlood
+                cast = snd (Engine.runGamePure (aimAt loser) gs (S.cast S.alice spellId))
+                settled = resolveAll cast
+            Spec.assertEqWith s "the targeted player really lost the 2" (S.lifeOf loser settled) (Just 18)
+            Spec.assertEqWith s "and milled 2 into their own graveyard" (sizeOf Zone.Graveyard loser settled) 2
+            Spec.assertEqWith s "leaving 6 - 2 drawn - 2 milled" (sizeOf Zone.Library loser settled) 2
+            Spec.assertEqWith s "the OTHER opponent milled nothing" (sizeOf Zone.Graveyard bystander settled) 0
+            Spec.assertEqWith s "and their library is whole" (sizeOf Zone.Library bystander settled) 6
+            -- alice's graveyard holds Sign in Blood and nothing else: CR 109.5's
+            -- "you" is the wrong answer here, and this is what says so.
+            Spec.assertEqWith s "alice, who controls Mindcrank, milled nothing" (sizeOf Zone.Graveyard S.alice settled) 1
+            Spec.assertEqWith s "and lost no life either" (S.lifeOf S.alice settled) (Just 20)
 
 -- CR 508.3a / 603.3d: Anafenza, the Foremost's OTHER ability -- "whenever this
 -- creature attacks, put a +1/+1 counter on another target tapped creature you
@@ -4610,4 +4695,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeGainTriggerSpec s registry
   lifeGainAmountSpec s registry
   lifeLossTriggerSpec s registry
+  mindcrankSpec s registry
   anafenzaAttackSpec s registry

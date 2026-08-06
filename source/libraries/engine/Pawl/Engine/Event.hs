@@ -2122,12 +2122,19 @@ eventBindings cond event = case (cond, event) of
   -- number: Exquisite Blood's controller is bound as "you" while the loss is an
   -- opponent's.
   --
-  -- The LOSING player is not bound alongside it, though under that relation the
-  -- loser is genuinely somebody else -- which is what separates this from the
-  -- gain arm. Exquisite Blood's payload names only "you", so the card that says
-  -- "that player" is the one that must add it (#829).
-  (TriggerCondition.PlayerLosesLife _, GameEvent.LifeLost _ amount) ->
-    Binding.setEventAmount amount Map.empty
+  -- The LOSING player alongside it, under the reserved slot CR 701.9a's discard
+  -- trigger already stamps: Mindcrank's "that player mills that many cards" reads
+  -- both halves of one event, and CR 603.2 makes both halves part of it.
+  --
+  -- Bound whichever relation matched, and that is a statement about the EVENT
+  -- rather than about the relation -- eventBindingSlots below answers per
+  -- condition with no relation in hand, so a slot it promises has to hold for
+  -- every relation the condition admits. Under You the loser is also CR 109.5's
+  -- "you", so the slot is a second name for one player there; that is a
+  -- redundancy, not a wrong answer, and the alternative -- binding it only under
+  -- Opponent -- would make the promise depend on the relation.
+  (TriggerCondition.PlayerLosesLife _, GameEvent.LifeLost pid amount) ->
+    Binding.setTriggerPlayer pid (Binding.setEventAmount amount Map.empty)
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -2241,12 +2248,13 @@ eventBindingSlots cond = case cond of
   -- GameEvent.LifeLost carries a Natural unconditionally. Exquisite Blood's "you
   -- gain that much life" is what reads it.
   --
-  -- The LOSING player gets no slot, though under Exquisite Blood's Opponent
-  -- relation that player is NOT the "you" Binding.setYou names -- which is what
-  -- separates this from the gain arm above. It stays empty because binding a slot
-  -- nothing reads is speculative construction (PermanentDies' reasoning), so a
-  -- card printing "that player" here is what must add it (#829).
-  TriggerCondition.PlayerLosesLife _ -> Set.singleton Binding.eventAmount
+  -- And the LOSING player, which is what separates this from the gain arm above:
+  -- under Exquisite Blood's Opponent relation that player is NOT the "you"
+  -- Binding.setYou names, and Mindcrank's "that player mills that many cards"
+  -- reads them. Guaranteed for the same reason the amount is -- GameEvent.LifeLost
+  -- carries a PlayerId unconditionally, so the promise holds under either
+  -- relation.
+  TriggerCondition.PlayerLosesLife _ -> Set.fromList [Binding.eventAmount, Binding.triggerPlayer]
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
