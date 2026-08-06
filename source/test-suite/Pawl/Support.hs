@@ -1582,9 +1582,9 @@ drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 -- multi-face test would pass while exercising nothing. Such a test names the
 -- half and calls Pawl.Engine.Cast directly.
 soleFaceName :: ObjectId.ObjectId -> GameState.GameState -> CardName.CardName
-soleFaceName oid gs = case Cast.soleCastableFace oid gs of
-  Just face -> Face.name face
-  Nothing ->
+soleFaceName oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
+  Just [face] -> Face.name face
+  _ ->
     error
       ( "Pawl.Support: "
           <> show (fmap nameOf (Game.cardOf oid gs))
