@@ -101,11 +101,12 @@ producedTypes production = case production of
 -- swaps a Blood Moon'd Reliquary Tower's printed "{T}: Add {C}" for the
 -- Mountain's {R} rather than adding to it.
 --
--- One route per mode, rather than one per combination of modes, because CR
--- 700.2's selection is "choose exactly one" for every mana ability in the pool.
--- An ability that chose two modes at once would make a route the CONCATENATION
--- of the chosen modes' yields (#449). A mode adding no mana contributes an empty
--- route, which the supply model ignores.
+-- One route per SELECTION (Modal.selectionEffects), not per mode: CR 700.2's
+-- selection is what a player actually makes, so a choose-two ability's route is
+-- the CONCATENATION of a legal pair of modes' yields and its options are the
+-- pairs. For "choose exactly one", which is every printed mana ability, that is
+-- one route per mode. A mode adding no mana contributes an empty route, which
+-- the supply model ignores.
 --
 -- Takes a PRE-PROJECTED board, because every caller asks this of every source a
 -- player controls, and each of the two projection reads here was a fresh gather
@@ -116,9 +117,9 @@ manaRoutesOfGiven pcs oid gs =
         fmap
           (\manaType -> [ManaProduction.OfType manaType])
           (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
-      modeRoutes ability =
-        fmap (Maybe.mapMaybe ManaAbility.manaProduced) (Modal.modeEffects (ActivatedAbility.modal ability))
-      fromAbilities = concatMap modeRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
+      selectionRoutes ability =
+        fmap (Maybe.mapMaybe ManaAbility.manaProduced) (Modal.selectionEffects (ActivatedAbility.modal ability))
+      fromAbilities = concatMap selectionRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
 
 -- What tapping this object for mana could actually put in a pool: every route

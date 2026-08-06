@@ -23,9 +23,9 @@ import Pawl.Types.TargetSpec (TargetSpec)
 
 -- Each mode's effects, in printed (mode, then written) order (CR 608.2c) -- one
 -- inner list per mode, kept apart. The shape a caller wants when the MODE is
--- the unit of choice but resolution is not in play: Pawl.Engine.Mana reads it
--- to enumerate the ways one mana ability could be activated (CR 700.2), where
--- flattening would fuse two alternatives into one yield.
+-- the unit of choice but resolution is not in play, where flattening would fuse
+-- two alternatives into one. selectionEffects just below is what CR 700.2's
+-- selection makes of it, and is what Pawl.Engine.Mana reads.
 modeEffects :: Modal.Modal card -> [[Effect card]]
 modeEffects m = fmap (Foldable.toList . Mode.effects) (Foldable.toList (Modal.modes m))
 
@@ -33,6 +33,36 @@ modeEffects m = fmap (Foldable.toList . Mode.effects) (Foldable.toList (Modal.mo
 -- 608.2c).
 allEffects :: Modal.Modal card -> [Effect card]
 allEffects m = concat (modeEffects m)
+
+-- CR 700.2/700.2a: every way this payload's SELECTION could be satisfied -- one
+-- inner list per legal set of modes, each already flattened into printed (mode,
+-- then written) order. The shape a caller wants when the unit of choice is the
+-- whole selection rather than a single mode: Pawl.Engine.Mana reads it to
+-- enumerate the ways one mana ability could be activated, where a choose-two
+-- ability's option is a PAIR of modes adding both modes' mana.
+--
+-- Reduces to modeEffects when the selection is "choose exactly one", which is
+-- what every printed mana ability asks. Targeting is not consulted, so CR
+-- 700.2a's "if one of the modes would be illegal ... that mode can't be chosen"
+-- does not narrow the list here; the one caller is Pawl.Engine.Mana, and CR
+-- 605.1a already keeps a targeting ability from being a mana ability at all.
+selectionEffects :: Modal.Modal card -> [[Effect card]]
+selectionEffects m = fmap concat (combinations (selectionCount m) (modeEffects m))
+
+-- CR 700.2d: "If a player is allowed to choose more than one mode for a modal
+-- spell or ability, that player normally can't choose the same mode more than
+-- once." So these are the size-n SUBLISTS, taken without repetition and keeping
+-- the printed order -- not the size-n sequences.
+--
+-- Empty when the list is shorter than n, since no selection satisfies such a
+-- payload. The "You may choose the same mode more than once" exception CR 700.2d
+-- goes on to name is not modelled (#791).
+combinations :: Natural -> [a] -> [[a]]
+combinations n xs
+  | n == 0 = [[]]
+  | otherwise = case xs of
+      [] -> []
+      h : t -> fmap (h :) (combinations (n - 1) t) <> combinations n t
 
 -- The union of every mode's target specs. Slot names are unique across a card's
 -- modes, and that is CHECKED rather than merely intended: a CardSpec lint
