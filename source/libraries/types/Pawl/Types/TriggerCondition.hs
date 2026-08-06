@@ -1,6 +1,8 @@
 module Pawl.Types.TriggerCondition where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
@@ -321,4 +323,39 @@ data TriggerCondition
     -- cards" to read. Exquisite Blood's payload names only "you" and reads it
     -- not at all, which is why the amount arrived one card earlier.
     PlayerLosesLife PlayerRelation.PlayerRelation
+  | -- | CR 714.2b, generalized over the kind of counter: "when one or more [kind]
+    -- counters are put onto this permanent, if the number of [kind] counters on it
+    -- was less than N and became at least N". A THRESHOLD CROSSING, matched
+    -- against a GameEvent.CountersPut whose before/after pair straddles N.
+    --
+    -- Bearer-scoped, like SelfEnters: the event names an object and the match is a
+    -- comparison of ids.
+    --
+    -- The WHOLE sentence, intervening "if" included, rather than the event half
+    -- here and the "if" half in TriggeredAbility.intervening. Both of that
+    -- clause's conjuncts describe the counter-placement event -- what the number
+    -- WAS and what it BECAME -- and neither is a fact about the board that CR
+    -- 603.4's second check could find changed at resolution. Splitting them would
+    -- put half a sentence into a Condition that cannot express it anyway:
+    -- Pawl.Types.Condition is one measured-comparison-threshold triple, and "was
+    -- less than N and became at least N" is a conjunction of two.
+    --
+    -- The consequence is that a chapter ability already on the stack still
+    -- resolves after its Saga's lore counters are removed, which is the rule: CR
+    -- 704.5s's "isn't the source of a chapter ability that has triggered but not
+    -- yet left the stack" exists precisely because such an ability is expected to
+    -- be waiting there, and a clause that a removal could falsify would make that
+    -- exemption unreachable.
+    --
+    -- The Natural is N, the chapter number. CR 714.2c's "{rN1}, {rN2}--[Effect]"
+    -- is two abilities sharing one effect, and that is how a card writes it: two
+    -- entries in triggeredAbilities with the same modal and different N. The rule
+    -- says the shorthand MEANS that, so nothing here has to represent it.
+    --
+    -- Not restricted to Sagas, and not restricted to lore counters. CR 714.2 puts
+    -- chapter symbols on Sagas, but the shape is the counter kind's rather than the
+    -- subtype's, and Pawl.Engine.Saga is where the Saga-only rules (CR 714.2d's
+    -- final chapter number, CR 714.3c's turn-based action, CR 704.5s's state-based
+    -- action) read the subtype.
+    SelfCountersReached CounterKind.CounterKind Natural.Natural
   deriving (Eq, Ord, Show)

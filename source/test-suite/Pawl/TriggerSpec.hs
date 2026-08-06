@@ -3365,6 +3365,10 @@ representativeEvents cond =
         -- The loss condition's own event, and the only one it admits, on the
         -- gain arm's reasoning: same payload shape, same amount floor.
         TriggerCondition.PlayerLosesLife _ -> one (GameEvent.LifeLost S.bob 2)
+        -- CR 714.2b: a placement on the BEARER that crosses the chapter. The
+        -- bearer here is `departed`, the id Event.matchesTrigger is asked about
+        -- below, and the counts straddle N so the event really matches.
+        TriggerCondition.SelfCountersReached kind n -> one (GameEvent.CountersPut departed kind 0 n)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3389,7 +3393,8 @@ everyTriggerCondition =
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
-    TriggerCondition.PlayerLosesLife PlayerRelation.Opponent
+    TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
+    TriggerCondition.SelfCountersReached CounterKind.Lore 1
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something

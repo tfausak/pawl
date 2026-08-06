@@ -222,3 +222,7 @@ snapshotView shape event = case event of
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
+  -- CR 122.6's placement names an object by id and snapshots no characteristics,
+  -- and putting counters on a permanent is not a zone change, which is what every
+  -- EventShape names.
+  GameEvent.CountersPut {} -> Nothing

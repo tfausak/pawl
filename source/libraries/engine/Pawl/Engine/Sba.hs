@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -515,6 +516,16 @@ performStateBasedActions = do
       -- Pawl.Engine.Monarch keeps rule 725's settle-loop work: this module owns
       -- WHEN a state-based action is checked, not what each one means.
       revving = Speed.startingEngines pcs gs
+      -- CR 704.5s / 714.4, from the SAME pre-pass state as everything above.
+      -- Lives in Pawl.Engine.Saga with the rest of rule 714, the way CR 704.5z
+      -- lives in Pawl.Engine.Speed.
+      --
+      -- The unscanned event log is an input because CR 704.5s exempts a Saga whose
+      -- chapter ability "has triggered but not yet left the stack", and the window
+      -- where such an ability has triggered but is not yet ON the stack is real:
+      -- Engine.performSettle runs this pass before placePendingTriggers. See
+      -- Saga.awaitingChapter.
+      told = Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs
   -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
   -- asks BEFORE anything below moves, so every choice is made against the state
   -- this pass began in -- CR 704.3's simultaneity.
@@ -564,6 +575,22 @@ performStateBasedActions = do
   -- Aura, the one this line does not exclude by name -- from being offered a
   -- destruction that never happens (CR 614.7).
   Event.destroyInBatch gs Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
+  -- CR 704.5s / 714.4: the Saga's controller SACRIFICES it. Neither a
+  -- put-into-graveyard nor a destruction, so it joins neither batch above -- CR
+  -- 701.21a is its own game action, ungated by indestructible and offering
+  -- regeneration nothing, and it goes through Pawl.Engine.Event.sacrifice, the one
+  -- funnel for it.
+  --
+  -- One call per Saga on the LIVE board, unlike the two batches above, because
+  -- that funnel takes one object and re-reads the state. The difference is
+  -- unobservable here in a way it would not be for the batches: a sacrifice moves
+  -- only the Saga named, and the classifier already fixed which Sagas and whose
+  -- from the pre-pass board -- so nothing this pass does can add one, and the
+  -- funnel's own existence check is what drops one another action already moved.
+  --
+  -- A board with two finished Sagas is where a batched version would differ, and
+  -- only if one of them replaced the other's move; no card in the pool does (#842).
+  Monad.mapM_ (uncurry Event.sacrifice) told
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving
@@ -601,7 +628,7 @@ performStateBasedActions = do
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

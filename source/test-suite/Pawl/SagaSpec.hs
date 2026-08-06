@@ -1,0 +1,227 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+
+-- Covers Pawl.Engine.Saga, rule 714: the chapter ability CR 714.2b writes out,
+-- the lore counter CR 714.3a makes a Saga enter with, the turn-based action CR
+-- 505.4 / 703.4f / 714.3c runs as a precombat main phase begins, and the
+-- state-based action CR 704.5s performs once the story is told.
+--
+-- Also the pieces rule 714 needed underneath it, exercised here because this is
+-- where a card reaches them: CounterKind.Lore, GameEvent.CountersPut (the CR
+-- 122.6 record) and TriggerCondition.SelfCountersReached.
+--
+-- History of Benalia is the whole card pool for this file, and is the only Saga
+-- in `data/cards`. Chapters I and II create a 2/2 white Knight token with
+-- vigilance -- CR 714.2c's "I, II --" shorthand, written as the two abilities
+-- that rule says it means -- and chapter III gives Knights its controller
+-- controls +2/+1 until end of turn.
+module Pawl.SagaSpec where
+
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import qualified Data.Text as Text
+import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Saga as Saga
+import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Registry as Registry
+import qualified Pawl.Spec as Spec
+import qualified Pawl.Support as S
+import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Zone as Zone
+
+spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spec s registry = Spec.describe s "Saga" $ do
+  entrySpec s registry
+  chapterSpec s registry
+  advanceSpec s registry
+  sacrificeSpec s registry
+
+knightToken :: CardName.CardName
+knightToken = CardName.MkCardName (Text.pack "Knight Token")
+
+-- One lore counter goes on as the Saga enters (CR 714.3a), which fires chapter I
+-- (CR 714.2b). Both halves are visible from a cast, which is what makes this the
+-- gameplay-level test rather than a projection one.
+entrySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+entrySpec s registry = Spec.describe s "Entry" $ do
+  Spec.it s "CR 714.3a History of Benalia enters with a lore counter on it" $ do
+    plains <- S.printingOf s registry "Plains"
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (gs, spellId) = S.handOne benalia (S.landsInPlay plains 3)
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+        after = S.runPure S.identityAnswer cast Stack.resolveTop
+    case sagaOf after of
+      Nothing -> Spec.assertFailure s "History of Benalia did not reach the battlefield"
+      Just oid ->
+        Spec.assertEqWith s "one lore counter" (S.counterOf CounterKind.Lore oid after) 1
+  Spec.it s "CR 714.2b that counter fires chapter I, which makes a 2/2 Knight with vigilance" $ do
+    plains <- S.printingOf s registry "Plains"
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (gs, spellId) = S.handOne benalia (S.landsInPlay plains 3)
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+        -- The chapter ability is gathered and placed by the settle loop, then
+        -- resolved by the priority round: CR 714.3a's counter goes on inside the
+        -- zone change, so nothing about this is special-cased for entry.
+        after = S.runPure S.identityAnswer resolved Engine.priorityLoop
+    Spec.assertEqWith s "one Knight token" (S.countOnBattlefieldByName knightToken S.alice after) 1
+    case S.tokensOf after of
+      [token] -> do
+        Spec.assertEqWith s "2/2" (S.powerToughnessOf token after) (Just (2, 2))
+        Spec.assertEqWith s "a Knight" (Projection.subtypesOf token after) (Set.singleton Subtype.Knight)
+        Spec.assertBool s (Map.member Keyword.Vigilance (Projection.keywordsOf token after)) "with vigilance"
+      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+
+-- CR 714.2b's threshold crossing, at the level Pawl.Engine.Saga states it. These
+-- are the arithmetic THE SBA AND THE TRIGGER MATCHER SHARE, so a drift between
+-- them shows up here first.
+chapterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chapterSpec s registry = Spec.describe s "Chapters" $ do
+  Spec.it s "CR 714.2b a chapter is crossed going up through it and never again" $ do
+    -- Chapter II: crossed by 1 -> 2 and by 0 -> 3, not by 2 -> 3 or 2 -> 2.
+    Spec.assertBool s (Saga.crossed 1 2 2) "1 -> 2 crosses II"
+    Spec.assertBool s (Saga.crossed 0 3 2) "0 -> 3 crosses II as well as I and III"
+    Spec.assertBool s (not (Saga.crossed 2 3 2)) "2 -> 3 does NOT cross II again"
+    Spec.assertBool s (not (Saga.crossed 2 2 2)) "and a placement of nothing crosses nothing"
+    -- THE FALSIFIER for writing the condition as "the count is now at least N",
+    -- which would re-fire every chapter on every later counter.
+    Spec.assertBool s (not (Saga.crossed 3 4 1)) "chapter I is not re-crossed at four counters"
+  Spec.it s "CR 714.2d the final chapter number is the greatest chapter, and 0 with none" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    plains <- S.printingOf s registry "Plains"
+    let (oid, gs) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        (landId, withLand) = S.addCreature plains S.bob gs
+        pcs = Projection.projectAll withLand
+    case Map.lookup oid pcs of
+      Nothing -> Spec.assertFailure s "the Saga has no projection"
+      Just pc -> do
+        Spec.assertEqWith s "chapters I, II and III" (Saga.chaptersOf pc) [1, 2, 3]
+        Spec.assertEqWith s "final chapter III" (Saga.finalChapterOf pc) 3
+        Spec.assertBool s (Saga.isSaga pc) "and it is a Saga"
+        Spec.assertBool s (Saga.tracksLore pc) "with chapter abilities, so it advances"
+    -- CR 714.2d's second sentence, on a permanent that is no Saga at all: the
+    -- fold answers 0 rather than being undefined over an empty set, which is the
+    -- rule legislating the empty maximum card-shape by card-shape.
+    case Map.lookup landId pcs of
+      Nothing -> Spec.assertFailure s "the Plains has no projection"
+      Just pc -> do
+        Spec.assertEqWith s "a Plains has no chapters" (Saga.finalChapterOf pc) 0
+        Spec.assertBool s (not (Saga.isSaga pc)) "and is not a Saga"
+        Spec.assertBool s (not (Saga.tracksLore pc)) "so nothing advances it"
+
+-- CR 505.4 / 703.4f / 714.3c: the turn-based action.
+advanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+advanceSpec s registry = Spec.describe s "The precombat main phase" $ do
+  Spec.it s "CR 714.3c the active player puts a lore counter on each Saga they control" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        withCounter = S.addCounter CounterKind.Lore 1 oid base
+        gs = precombatMainOf S.alice withCounter
+        after = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
+    Spec.assertEqWith s "a second lore counter" (S.counterOf CounterKind.Lore oid after) 2
+  Spec.it s "CR 714.3c and it fires the chapter that counter crossed, not the ones below it" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        withCounter = S.addCounter CounterKind.Lore 1 oid base
+        gs = precombatMainOf S.alice withCounter
+        advanced = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
+        after = S.runPure S.identityAnswer advanced Engine.priorityLoop
+    -- Chapter II made one Knight. Chapter I did NOT fire again, which is the
+    -- whole content of CR 714.2b's "was less than N": the count went 1 -> 2, and
+    -- one is not less than one.
+    Spec.assertEqWith s "exactly one Knight token" (S.countOnBattlefieldByName knightToken S.alice after) 1
+  Spec.it s "CR 714.3c a Saga its controller does not control the turn of stays put" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (oid, base) = S.addCreature benalia S.bob (Setup.emptyGame S.bothPlayers)
+        withCounter = S.addCounter CounterKind.Lore 1 oid base
+        -- ALICE's precombat main phase. CR 505.4 names the active player, and
+        -- bob's Saga is not theirs to advance.
+        gs = precombatMainOf S.alice withCounter
+        after = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
+    Spec.assertEqWith s "bob's Saga still has one lore counter" (S.counterOf CounterKind.Lore oid after) 1
+
+-- CR 704.5s / 714.4: the state-based action.
+sacrificeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sacrificeSpec s registry = Spec.describe s "The final chapter" $ do
+  Spec.it s "CR 704.5s a Saga at its final chapter number is sacrificed by its controller" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        -- Three counters and NO unscanned placement event, so CR 704.5s's third
+        -- conjunct is satisfied: nothing of this Saga's has triggered.
+        gs = S.addCounter CounterKind.Lore 3 oid base
+        after = S.settleSba gs
+    Spec.assertBool s (not (S.onBattlefield oid after)) "the Saga left the battlefield"
+    Spec.assertEqWith s "and is in its owner's graveyard, a sacrifice being a move to it (CR 701.21a)" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+  Spec.it s "CR 704.5s but NOT while a chapter ability of its own is still on the stack" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    let (oid, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        withCounters = S.addCounter CounterKind.Lore 2 oid base
+        gs = precombatMainOf S.alice withCounters
+        -- The turn-based action takes it to three, which fires chapter III. The
+        -- settle loop's SBA pass runs BEFORE placePendingTriggers, so this is the
+        -- window CR 704.5s's exemption exists for.
+        advanced = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions Phase.PrecombatMain)
+        settled = S.runPure S.identityAnswer advanced Engine.settleForPriority
+    Spec.assertEqWith s "three lore counters" (S.counterOf CounterKind.Lore oid settled) 3
+    Spec.assertBool s (not (null (GameState.stack settled))) "chapter III really reached the stack"
+    Spec.assertBool s (S.onBattlefield oid settled) "and the Saga is still on the battlefield under it"
+    -- THE FALSIFIER for dropping either half of Saga.awaitingChapter: without the
+    -- unscanned-event half the Saga is gone before this line, and without the
+    -- stack half it is gone by the next one.
+    let resolved = S.runPure S.identityAnswer settled Engine.priorityLoop
+    Spec.assertBool s (not (S.onBattlefield oid resolved)) "once chapter III has resolved, it is sacrificed"
+  -- The whole story, chapter by chapter, which is the case that proves the four
+  -- rules hang together rather than each working alone. Two precombat main
+  -- phases, so the Knight chapter III pumps is one chapter II actually made.
+  Spec.it s "CR 714 the Saga runs II then III, pumps its own Knight, and is sacrificed" $ do
+    benalia <- S.printingOf s registry "History of Benalia"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (sagaId, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+        -- Goblin Piker is the CONTROL: a 2/1 alice controls that is no Knight,
+        -- so chapter III's "Knights you control" must leave it alone.
+        (pikerId, withPiker) = S.addCreature piker S.alice base
+        withCounter = S.addCounter CounterKind.Lore 1 sagaId withPiker
+        advance g = S.runPure S.identityAnswer (precombatMainOf S.alice g) (Engine.runTurnBasedActions Phase.PrecombatMain)
+        resolveAll g = S.runPure S.identityAnswer g Engine.priorityLoop
+        -- One to two: chapter II mints the Knight.
+        afterTwo = resolveAll (advance withCounter)
+        -- Two to three: chapter III pumps it, and CR 704.5s then takes the Saga.
+        afterThree = resolveAll (advance afterTwo)
+    Spec.assertEqWith s "chapter II made one Knight" (S.countOnBattlefieldByName knightToken S.alice afterTwo) 1
+    Spec.assertBool s (S.onBattlefield sagaId afterTwo) "and the Saga is still telling its story"
+    case S.tokensOf afterThree of
+      [token] -> do
+        Spec.assertEqWith s "the Knight is 4/3 -- 2/2 plus chapter III's +2/+1" (S.powerToughnessOf token afterThree) (Just (4, 3))
+        Spec.assertEqWith s "and still a Knight" (Projection.subtypesOf token afterThree) (Set.singleton Subtype.Knight)
+      other -> Spec.assertFailure s ("expected exactly one Knight token, got " <> show (length other))
+    Spec.assertEqWith s "the Goblin Piker, no Knight, is untouched at 2/1" (S.powerToughnessOf pikerId afterThree) (Just (2, 1))
+    Spec.assertBool s (not (S.onBattlefield sagaId afterThree)) "and CR 704.5s has taken the Saga, its final chapter told"
+
+-- The battlefield's one History of Benalia, by the subtype rule 714 keys on.
+sagaOf :: GameState.GameState -> Maybe ObjectId.ObjectId
+sagaOf gs =
+  let pcs = Projection.projectAll gs
+      sagas = filter (\oid -> maybe False Saga.isSaga (Map.lookup oid pcs)) (Set.toAscList (GameState.battlefield gs))
+   in case sagas of
+        [oid] -> Just oid
+        _ -> Nothing
+
+-- A board sitting in `pid`'s precombat main phase, which is the moment CR 505.4
+-- names.
+precombatMainOf :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+precombatMainOf pid gs =
+  gs
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = pid,
+      GameState.priority = Just pid
+    }

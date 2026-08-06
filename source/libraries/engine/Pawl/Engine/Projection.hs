@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
@@ -1213,6 +1214,10 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.DamageToPlayerPrevented _ -> condition
   TriggerCondition.PlayerGainsLife _ -> condition
   TriggerCondition.PlayerLosesLife _ -> condition
+  -- CR 714.2b names a counter KIND and a number, neither of which is a subtype
+  -- CR 612.1 can change: a text-changing effect swapping Merfolk for Knight
+  -- leaves a chapter symbol reading the same chapter.
+  TriggerCondition.SelfCountersReached _ _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger
@@ -1636,6 +1641,11 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- reads loyalty -- CR 704.5i and CR 606.6 count Object.counters
               -- directly instead.
               CounterKind.Loyalty -> []
+              -- CR 714.3: a lore counter grants nothing either. CR 714.2b's
+              -- chapter trigger, CR 714.3c's turn-based action and CR 704.5s's
+              -- state-based action count Object.counters directly, the same way
+              -- loyalty's readers do.
+              CounterKind.Lore -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
@@ -2190,6 +2200,10 @@ intrinsicReplacementsOf pc =
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
     <> Keyword.entryReplacementsOf (PC.keywords pc)
+    -- CR 714.3a's intrinsic "this Saga enters with a lore counter on it", minted
+    -- off the same finished projection for CR 306.5b's reason: a subtype is not an
+    -- ability, so a Saga under Humility keeps it.
+    <> Saga.entryReplacementsOf pc
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
 -- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
@@ -2224,6 +2238,10 @@ replacementsAffecting gs =
         Just face ->
           not (null (Face.replacementEffects face))
             || Set.member CardType.Planeswalker (TypeLine.types (Face.typeLine face))
+            -- The Saga disjunct is the planeswalker one's twin: CR 714.3a's
+            -- intrinsic replacement is minted from the projection too, so it
+            -- appears in no base face's list either.
+            || Set.member Subtype.Type.Saga (TypeLine.subtypes (Face.typeLine face))
             || any Keyword.mintsEntryReplacement (Face.keywords face)
             || any (any grantsMintingKeyword . StaticAbility.modifications) (Face.staticAbilities face)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)

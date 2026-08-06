@@ -353,6 +353,7 @@ library engine
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
     Pawl.Engine.Ring
+    Pawl.Engine.Saga
     Pawl.Engine.Sba
     Pawl.Engine.Setup
     Pawl.Engine.Speed
@@ -720,6 +721,7 @@ test-suite pawl-test-suite
     Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.RingSpec
+    Pawl.SagaSpec
     Pawl.SetupSpec
     Pawl.SpeedSpec
     Pawl.Support

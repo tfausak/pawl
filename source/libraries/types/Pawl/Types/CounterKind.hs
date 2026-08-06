@@ -32,4 +32,15 @@ data CounterKind
     -- reads it is CR 704.5i's state-based action and CR 606.6's activation gate,
     -- both counting Object.counters directly.
     Loyalty
+  | -- | CR 714.3: the counters a Saga tracks its progress with. Rule 122.1 gives
+    -- lore counters no lettered clause of their own -- 122.1a-i never name them --
+    -- so rule 714 is the whole citation, the same way CR 122.1e defers loyalty's
+    -- meaning to rule 306.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind either.
+    -- What reads it is CR 714.2b's chapter trigger
+    -- (TriggerCondition.SelfCountersReached), CR 714.3c's turn-based action and CR
+    -- 704.5s's state-based action, all three counting Object.counters directly.
+    Lore
   deriving (Eq, Ord, Show)

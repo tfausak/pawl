@@ -1,6 +1,7 @@
 module Pawl.Types.GameEvent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -215,4 +216,28 @@ data GameEvent
     -- one count against CR 606.3, and no rule asks whether a permanent activated
     -- any ability this turn.
     LoyaltyAbilityActivated ObjectId.ObjectId
+  | -- | CR 122.6: one or more counters were PUT onto an object -- the object, the
+    -- kind, and the counts of that kind on it BEFORE and AFTER. Emitted by
+    -- Pawl.Engine.Event.putCounters, the one placement funnel, and only once the
+    -- CR 616.1 loop has settled how many of what kind actually land, so the pair
+    -- describes the resolved event rather than the proposal.
+    --
+    -- The two counts rather than one amount, and the whole reason this constructor
+    -- is shaped as it is: CR 714.2b's chapter ability asks whether the number "was
+    -- less than N and became at least N", a THRESHOLD CROSSING that neither the
+    -- amount alone nor the resulting total alone can answer. A Saga going from one
+    -- lore counter to three crosses two thresholds at once, and one going from
+    -- three to five crosses neither of those again.
+    --
+    -- BEFORE is strictly less than AFTER: putCounters returns early on a settled
+    -- count of 0, so an event that placed nothing is never recorded. That matches
+    -- CR 122.6's "one or more" and keeps a would-be trigger from firing on a
+    -- replacement that reduced the placement to nothing.
+    --
+    -- Removal is deliberately NOT recorded. CR 122.6 is about putting counters on,
+    -- every rule reading this constructor is phrased that way, and the engine's
+    -- removals are direct writes that bypass the funnel by design (a loyalty cost,
+    -- CR 306.8's damage, CR 704.5q's annihilation). A "counters were removed"
+    -- event is a separate record for the first card that asks for one.
+    CountersPut ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
   deriving (Eq, Ord, Show)

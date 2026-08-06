@@ -6,6 +6,7 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -129,3 +130,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.LifeGained (PlayerId.MkPlayerId 1) 2)
       """ {"type":"LifeGained","value":[1,2]} """
+  -- CR 122.6. The two counts are BEFORE then AFTER, in that order, which CR
+  -- 714.2b's threshold crossing needs to be able to tell apart.
+  Spec.it s "CountersPut" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.CountersPut (ObjectId.MkObjectId 3) CounterKind.Lore 1 2)
+      """ {"type":"CountersPut","value":[3,{"type":"Lore"},1,2]} """
