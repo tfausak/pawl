@@ -1,6 +1,9 @@
 {
   "faces": [
     {
+      "counterability": {
+        "type": "CantBeCountered"
+      },
       "manaCost": [
         {
           "type": "Generic",
@@ -11,49 +14,52 @@
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Red"
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
             }
           }
         }
       ],
-      "name": "Spider-Punk",
+      "name": "Prowling Serpopard",
       "playerAbilities": [
         {
           "effect": {
             "type": "CantBeCountered",
             "value": {
-              "type": "And",
-              "value": []
+              "type": "HasCardType",
+              "value": {
+                "type": "Creature"
+              }
             }
           },
           "scope": {
-            "type": "EachPlayer"
+            "type": "You"
           }
         }
       ],
       "power": {
         "type": "Literal",
-        "value": 2
+        "value": 4
       },
       "toughness": {
         "type": "Literal",
-        "value": 1
+        "value": 3
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Hero"
+            "type": "Cat"
           },
           {
-            "type": "Human"
-          },
-          {
-            "type": "Spider"
-          }
-        ],
-        "supertypes": [
-          {
-            "type": "Legendary"
+            "type": "Snake"
           }
         ],
         "types": [

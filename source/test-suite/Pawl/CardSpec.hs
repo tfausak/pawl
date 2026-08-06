@@ -1337,7 +1337,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerGainsLife _ -> []
 
 -- CR 613.11: which spells a player effect names -- a cost modifier's (CR
--- 601.2f) or a timing permission's (CR 601.3b).
+-- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
+-- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost f _ -> [f]
@@ -1361,9 +1362,10 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.3b's "a spell with certain qualities", which is a Filter over the
   -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
   PlayerEffect.CastAsThoughItHadFlash f -> [f]
-  -- CR 701.6a's arm is payload-free: which spells it names is its carrier's
-  -- PlayerScope, not a Filter (#788).
-  PlayerEffect.CantBeCountered -> []
+  -- CR 701.6a's "a spell or ability", narrowed by the victim's own qualities
+  -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
+  -- Serpopard's is HasCardType Creature).
+  PlayerEffect.CantBeCountered f -> [f]
 
 -- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
