@@ -2080,6 +2080,9 @@ shimatsuSpec s registry =
 riotBoard :: Printing.Printing -> Int -> Printing.Printing -> Int -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
 riotBoard mountain mountains forest forests hand =
   let base = S.landsInPlay mountain mountains
+      -- S.addCreature puts one permanent of a printing onto the battlefield,
+      -- settled; nothing in it is creature-specific, which is what lets a second
+      -- land printing join a board S.landsInPlay built from one.
       addLand g _ = snd (S.addCreature forest S.alice g)
       withForests = List.foldl' addLand base (replicate forests ())
       addOne (ids, g) p = let (oid, g1) = S.addHandCard p S.alice g in (ids <> [oid], g1)
