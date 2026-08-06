@@ -2,6 +2,7 @@ module Pawl.Codec.GameEvent where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Countering as Countering
 import qualified Pawl.Codec.DamageEvent as DamageEvent
 import qualified Pawl.Codec.DiscardCause as DiscardCause
@@ -31,6 +32,8 @@ toJson e = case e of
   GameEvent.LifeLost p n -> Common.tagged "LifeLost" . Just $ Common.array [PlayerId.toJson p, Common.encodeNatural n]
   GameEvent.LifeGained p n -> Common.tagged "LifeGained" . Just $ Common.array [PlayerId.toJson p, Common.encodeNatural n]
   GameEvent.LoyaltyAbilityActivated oid -> Common.tagged "LoyaltyAbilityActivated" . Just $ ObjectId.toJson oid
+  GameEvent.CountersPut oid kind before after ->
+    Common.tagged "CountersPut" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
 
 fromJson :: Value.Value -> Either Text.Text GameEvent.GameEvent
 fromJson value = do
@@ -50,4 +53,6 @@ fromJson value = do
     ("LifeLost", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeLost <$> PlayerId.fromJson p <*> Common.decodeNatural n
     ("LifeGained", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeGained <$> PlayerId.fromJson p <*> Common.decodeNatural n
     ("LoyaltyAbilityActivated", Just v) -> GameEvent.LoyaltyAbilityActivated <$> ObjectId.fromJson v
+    ("CountersPut", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
+      GameEvent.CountersPut <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     _ -> Left . Text.pack $ "unknown GameEvent: " <> t

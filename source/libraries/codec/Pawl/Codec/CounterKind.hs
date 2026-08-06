@@ -15,6 +15,7 @@ toJson k = case k of
   CounterKind.MinusOneMinusOne -> Common.nullary "MinusOneMinusOne"
   CounterKind.Keyword kw -> Common.tagged "Keyword" . Just $ Keyword.toJson kw
   CounterKind.Loyalty -> Common.nullary "Loyalty"
+  CounterKind.Lore -> Common.nullary "Lore"
 
 fromJson :: Value.Value -> Either Text.Text CounterKind.CounterKind
 fromJson value = do
@@ -24,4 +25,5 @@ fromJson value = do
     ("MinusOneMinusOne", _) -> Right CounterKind.MinusOneMinusOne
     ("Keyword", Just v) -> CounterKind.Keyword <$> Keyword.fromJson v
     ("Loyalty", _) -> Right CounterKind.Loyalty
+    ("Lore", _) -> Right CounterKind.Lore
     _ -> Left . Text.pack $ "unknown CounterKind: " <> t
