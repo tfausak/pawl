@@ -185,7 +185,7 @@ inherentPending events gs =
       -- CR 603.4: the intervening "if" is checked here, as the event occurs. A
       -- player already at max speed does not trigger at all, so the turn's one
       -- trigger is still theirs to spend -- which is moot today, nothing being
-      -- able to lower speed, and stated because the rule states it.
+      -- able to lower speed (#808), and stated because the rule states it.
       below = Maybe.maybe False (< maxSpeed) (speedOf you gs)
       alreadyTriggered = Set.member you (GameState.speedIncreasedThisTurn gs)
    in [ PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty
