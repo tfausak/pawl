@@ -57,7 +57,7 @@ toJson encodeCard f =
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Toughness.toJson) (Face.toughness f),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (Face.loyalty f),
       Common.optionalPair "characteristicPT" Nothing (Common.encodeMaybe Quantity.toJson) (Face.characteristicPT f),
-      Common.optionalPair "enchant" Nothing (Common.encodeMaybe TargetSpec.toJson) (Face.enchant f),
+      Common.optionalPair "enchant" [] (Common.encodeList TargetSpec.toJson) (Face.enchant f),
       Common.optionalPair "keywords" Set.empty (Common.encodeSet Keyword.toJson) (Face.keywords f),
       Common.optionalPair "colorIndicator" Set.empty (Common.encodeSet Color.toJson) (Face.colorIndicator f),
       Common.optionalPair "spell" Face.defaultSpell (Modal.toJson encodeCard) (Face.spell f),
@@ -111,7 +111,7 @@ fromJson decodeCard value = do
   alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList (Cost.fromJson Keyword.fromJson)) ps
   mulliganAction <- Common.defaultedField "mulliganAction" [] (Common.decodeList (Effect.fromJson decodeCard)) ps
   openingHandAction <- Common.defaultedField "openingHandAction" [] (Common.decodeList (Effect.fromJson decodeCard)) ps
-  enchant <- Common.defaultedField "enchant" Nothing (Common.decodeMaybe TargetSpec.fromJson) ps
+  enchant <- Common.defaultedField "enchant" [] (Common.decodeList TargetSpec.fromJson) ps
   counterability <- Common.defaultedField "counterability" Counterability.Counterable Counterability.fromJson ps
   pure
     Face.MkFace

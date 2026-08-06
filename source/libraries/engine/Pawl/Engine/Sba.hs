@@ -9,6 +9,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
@@ -21,7 +22,6 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -228,6 +228,10 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- to an id that is no longer a permanent, and attached to one its own enchant
 -- ability no longer admits (CR 303.4c).
 --
+-- ABILITIES, plural, where CR 702.5c applies: Card.enchantSpec is the conjunction
+-- of every instance, so the third clause fires when the host stops matching ANY
+-- of them. Nothing here has to know how many there were.
+--
 -- CR 303.4c's own wording splits that last clause differently, and both halves
 -- land in the SAME place here because a pool's candidate list already excludes
 -- them: Target.creatureRecipients scans the battlefield of players still in the
@@ -255,7 +259,7 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 fallsOff pcs gs oid = case Game.faceOf oid gs of
   Nothing -> False
-  Just face -> case Face.enchant face of
+  Just face -> case Card.enchantSpec face of
     Nothing -> False
     Just spec -> case Game.lookupObject oid gs of
       Nothing -> False
@@ -278,8 +282,9 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
 -- restrict targeting and nothing else -- so an Aura stays attached to a host that
 -- gains either. See Target.admittedRecipients.
 --
--- Pool.Creatures with no Filter is the shape MOST Face.enchant specs in this pool
--- carry (Unholy Strength). Target.creatureRecipients tags every candidate
+-- Pool.Creatures with no Filter is the shape MOST folded enchant specs in this
+-- pool carry (Unholy Strength) -- Card.enchantSpec leaves a lone unfiltered
+-- instance exactly as printed, which is what keeps this arm reachable at all. Target.creatureRecipients tags every candidate
 -- ToCreature, drawn from the battlefield objects owned by a still-playing player,
 -- so with no Filter to narrow that set "still legal" reduces EXACTLY to "still a
 -- creature, on the battlefield, owned by a player still in the game" -- a
@@ -294,7 +299,8 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
 -- whose ControlledBy You conjunct is unanswerable from `pcs` -- CR 109.5 makes
 -- that "you" the AURA's controller (CR 702.5a), so the answer changes when an
 -- opponent steals the enchanted creature -- and CR 702.5d's enchant-player Auras
--- carry a Pool.Players spec. The fallthrough pays the per-Aura re-projection the
+-- carry a Pool.Players spec. A CR 702.5c conjunction of several instances is a
+-- third: Filter.And is a Filter, so it lands here too. The fallthrough pays the per-Aura re-projection the
 -- reduction exists to avoid, but only for those. Serving a filtered spec off
 -- `pcs` would mean answering Filter.matches against the pre-pass projection
 -- instead of a fresh one, which is #430.

@@ -812,7 +812,7 @@ attachmentFor src destination gs
   | Set.member Subtype.Aura subtypes =
       if Projection.isCreatureOf src gs
         then Nothing
-        else case Game.faceOf src gs >>= Face.enchant of
+        else case Game.faceOf src gs >>= Card.enchantSpec of
           Nothing -> Nothing
           Just spec ->
             List.find

@@ -122,7 +122,7 @@ baseFace =
       Face.alternativeCosts = [],
       Face.mulliganAction = [],
       Face.openingHandAction = [],
-      Face.enchant = Nothing,
+      Face.enchant = [],
       Face.counterability = Counterability.Counterable
     }
 
@@ -148,7 +148,7 @@ minimalFace =
       Face.delayedAbilities = Map.empty,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
-      Face.enchant = Nothing,
+      Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
@@ -206,7 +206,7 @@ populatedFace =
       Face.counterability = Counterability.CantBeCountered,
       Face.mulliganAction = [Effect.ExileHandThenDraw],
       Face.openingHandAction = [Effect.ExileHandThenDraw],
-      Face.enchant = Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing),
+      Face.enchant = [TargetSpec.MkTargetSpec Pool.Creatures Nothing],
       Face.castingRestrictions = [CastingRestriction.AttackedThisStep]
     }
 
@@ -236,7 +236,7 @@ populatedFaceJson =
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
     <> "\"mulliganAction\":[{\"type\":\"ExileHandThenDraw\"}],"
     <> "\"openingHandAction\":[{\"type\":\"ExileHandThenDraw\"}],"
-    <> "\"enchant\":{\"pool\":{\"type\":\"Creatures\"}},"
+    <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -301,9 +301,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "openingHandAction (CR 103.6) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.openingHandAction <$> decodeFace v) (Right [])
-    Spec.it s "enchant (CR 702.5a) defaults to Nothing" $ do
+    Spec.it s "enchant (CR 702.5a) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
-      Spec.assertEq s (Face.enchant <$> decodeFace v) (Right Nothing)
+      Spec.assertEq s (Face.enchant <$> decodeFace v) (Right [])
     Spec.it s "castingRestrictions (CR 601.3) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.castingRestrictions <$> decodeFace v) (Right [])
@@ -417,8 +417,8 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.enchant = Just (TargetSpec.MkTargetSpec Pool.Creatures Nothing)}
-        (init baseFaceJson <> ",\"enchant\":{\"pool\":{\"type\":\"Creatures\"}}}")
+        baseFace {Face.enchant = [TargetSpec.MkTargetSpec Pool.Creatures Nothing]}
+        (init baseFaceJson <> ",\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}]}")
     Spec.it s "castingRestrictions" $
       Common.assertJsonCodec
         s
