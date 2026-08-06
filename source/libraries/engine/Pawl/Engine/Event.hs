@@ -2117,14 +2117,15 @@ eventBindings cond event = case (cond, event) of
   -- life". The same slot and the same reading as the gain arm above, off an
   -- event CR 603.2 makes the number part of.
   --
-  -- The AMOUNT the event recorded, never the loser's life total. Under this
-  -- condition's only relation the two are never even the same player's number:
-  -- Exquisite Blood's controller is bound as "you" while the loss is an
+  -- The AMOUNT the event recorded, never the loser's life total. Under the one
+  -- relation a card in the pool uses the two are not even the same player's
+  -- number: Exquisite Blood's controller is bound as "you" while the loss is an
   -- opponent's.
   --
-  -- The LOSING player is not bound alongside it: Exquisite Blood's payload names
-  -- only "you", and unlike the gain arm the loser here is genuinely somebody
-  -- else, so the card that says "that player" is the one that adds it (#829).
+  -- The LOSING player is not bound alongside it, though under that relation the
+  -- loser is genuinely somebody else -- which is what separates this from the
+  -- gain arm. Exquisite Blood's payload names only "you", so the card that says
+  -- "that player" is the one that must add it (#829).
   (TriggerCondition.PlayerLosesLife _, GameEvent.LifeLost _ amount) ->
     Binding.setEventAmount amount Map.empty
   _ -> Map.empty
