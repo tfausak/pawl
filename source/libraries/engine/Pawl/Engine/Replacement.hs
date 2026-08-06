@@ -599,9 +599,11 @@ at xs i fallback = case List.genericDrop i xs of
 -- CR 616.1 / 108.4: who decides. Projection.controllerOf already falls back to
 -- the owner, so CR 616.1's owner clause is free.
 --
--- CR 616.1's APNAP clause has no producer here: one proposed event has exactly
--- one affected object and therefore one chooser, and the damage batch runs each
--- event's loop independently (#71).
+-- One answer per event, because one proposed event has exactly one affected
+-- object. CR 616.1's APNAP clause therefore has nothing to say at this scale and
+-- is honoured a level up, where a whole batch of simultaneous events can present
+-- choices to two players at once: `orderBatch` sorts the batch by this
+-- function's answer before any of it is asked.
 chooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 chooserOf gs event = case event of
   ProposedEvent.WouldChangeZone zc -> Projection.controllerOf (ZoneChange.object zc) gs
@@ -826,13 +828,50 @@ groupPreventions ps =
 -- as the shield has left and no more, which nobody may decline or divide, so the
 -- only freedom the rule grants is which event the shield reaches first.
 --
--- CR 616.1's APNAP clause is honoured across choosers here, which is the one
--- place in this module that can honour it: a lone ProposedEvent has exactly one
--- affected object and therefore one chooser (#71).
-orderForShields :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
-orderForShields events = do
+-- CR 616.1's APNAP clause is honoured here too, and over the WHOLE batch rather
+-- than only over the shield questions: `byApnap` groups the batch by chooser
+-- before anything is asked, so every question one player is owed -- CR 615.7's
+-- allocation and each of their events' CR 616.1 choices alike -- is asked before
+-- the next player's. A lone ProposedEvent still has exactly one affected object
+-- and therefore one chooser, which is why the batch is the only place the clause
+-- can be honoured at all.
+--
+-- The two rules order DIFFERENT LEVELS and so cannot contend for this list. CR
+-- 615.7's freedom is entirely within one chooser: a shield names one recipient,
+-- so every event it contests is addressed to one player's object, and that is
+-- the same player CR 616.1 asks about those events -- `contested` and `choose`
+-- both read the chooser off the recipient through `chooserOf`. `askOne` then
+-- permutes only within that player's own positions. CR 101.4c is the rule that
+-- licenses it: a player making several simultaneous choices makes them in the
+-- order specified, or chooses the order themselves.
+orderBatch :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+orderBatch events = do
   gs <- State.get
-  Monad.foldM askOne events (contested gs events)
+  -- Sorted FIRST: `contested` reports batch positions, so it has to see the list
+  -- `askOne` will splice into.
+  let sorted = byApnap gs events
+  Monad.foldM askOne sorted (contested gs sorted)
+
+-- CR 616.1 / 101.4: group a batch by whose CR 616.1 choice each event is, active
+-- player first. A stable sort, so events sharing a chooser keep their gather
+-- order and CR 615.7's within-chooser permutation is left to `askOne`.
+--
+-- An event with no chooser -- its affected object has left -- sorts last with
+-- the unseated, since `choose` will not prompt for it either.
+byApnap :: GameState -> [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
+byApnap gs =
+  let rank de = maybe (unseated gs) (seatOf gs) (chooserOf gs (ProposedEvent.WouldDealDamage de))
+   in List.sortOn rank
+
+-- CR 101.4: how far down APNAP order a player sits. A player off the seating
+-- roster sorts last, the fallback Resolve.objectRefObjects takes for the same
+-- lookup.
+seatOf :: GameState -> PlayerId -> Int
+seatOf gs pid = Maybe.fromMaybe (unseated gs) (List.elemIndex pid (Game.apnapOrder gs))
+
+-- The seat index that sorts after every real one.
+unseated :: GameState -> Int
+unseated = length . Game.apnapOrder
 
 -- Ask one chooser for the order of the positions their shields are contested
 -- over, and splice the answer back into the batch.
@@ -870,6 +909,11 @@ askOne batch (pid, positions) = do
 -- DAMAGE those events would deal, not against their number, since CR 615.7's
 -- unit is the amount. A shield large enough to cover the lot prevents all of it
 -- whatever the order, so there is nothing to ask.
+--
+-- Not implemented: a shield is the only contested resource this asks about, so a
+-- limited replacement of any other shape that two of one chooser's simultaneous
+-- events could each spend is spent by whichever is settled first, rather than by
+-- CR 101.4c's answer from that chooser (#839).
 --
 -- Several shields contribute ONE question per CHOOSER, over the union of what
 -- they contest: the order the batch is settled in is a single fact about the
@@ -909,12 +953,8 @@ contested gs events =
           _ -> Nothing
       groups = Maybe.mapMaybe contestedBy (collect gs (GameState.replacements gs))
       merged = Map.fromListWith (<>) groups
-      order = Game.apnapOrder gs
-      -- A chooser off the seating roster sorts last, the fallback
-      -- Resolve.objectRefObjects takes for the same lookup.
-      seated pid = Maybe.fromMaybe (length order) (List.elemIndex pid order)
    in [ (pid, List.sort (List.nub positions))
-      | (pid, positions) <- List.sortOn (seated . fst) (Map.toList merged)
+      | (pid, positions) <- List.sortOn (seatOf gs . fst) (Map.toList merged)
       ]
 
 -- CR 615.7: how much of a prevention shield is left, or Nothing for an effect

@@ -935,10 +935,13 @@ resolveDamage de = do
 -- cases on a ProposedEvent or on a ReplacementEffect.
 --
 -- Each event still runs its OWN CR 616.1 loop and the loop's unit is still one
--- event, which is what CR 614.5 and CR 615.10 both describe. Two things this
--- adds over calling resolveDamage per event, and both are rules the BATCH is the
--- only place to state:
+-- event, which is what CR 614.5 and CR 615.10 both describe. Three things this
+-- adds over calling resolveDamage per event, and all three are rules the BATCH is
+-- the only place to state:
 --
+--   * CR 616.1's APNAP clause, because a lone event has one affected object and
+--     so one chooser: only a batch can present choices to two players at once.
+--     orderBatch settles that order before any of the batch is asked.
 --   * CR 615.7's ORDER, because the shield is a single resource allocated across
 --     the whole batch and the rule gives that choice to the shielded side.
 --   * CR 615.13's GROUPING, because that rule fires an ability "each time a
@@ -947,7 +950,7 @@ resolveDamage de = do
 --     the total rather than three.
 resolveDamageBatch :: [DamageEvent.DamageEvent] -> Game ([DamageEvent.DamageEvent], [Prevention])
 resolveDamageBatch events = do
-  ordered <- Replacement.orderForShields events
+  ordered <- Replacement.orderBatch events
   settled <- Monad.mapM resolveDamage ordered
   pure (Maybe.mapMaybe fst settled, Replacement.groupPreventions (concatMap snd settled))
 

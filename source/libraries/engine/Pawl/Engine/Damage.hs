@@ -363,12 +363,16 @@ damageRecipient gs recipient = case recipient of
 -- classes, which is what CR 614.5 and CR 615.10 both describe.
 --
 -- The whole batch goes through Event.resolveDamageBatch rather than
--- through resolveDamage one event at a time, and CR 615.7 is the reason: a
+-- through resolveDamage one event at a time, and CR 615.7 is one reason: a
 -- prevent-the-next-N shield (Mending Hands) is ONE resource allocated across
 -- several simultaneous events, and the shielded side chooses which damage it
 -- prevents. Those loops still run sequentially and the shield is still spent by
 -- whichever runs first -- what changed is that the shielded side, not the batch's
 -- gather order, says which that is.
+--
+-- CR 616.1's APNAP clause is the other: the batch is the only place two players
+-- can owe a replacement choice at the same time, so the batch is where turn
+-- order over those choices can be honoured.
 --
 -- The batch is also the unit CR 615.13 counts preventions in, which is the other
 -- half of what resolveDamageBatch answers: one Prevention per prevention effect
