@@ -232,6 +232,38 @@ data Keyword
     -- rather than beside the other three in pairAllowedGiven.
     Menace
   | Devoid -- 702.114
+  | -- | 702.145b: daybound, the front-face half of the pair rule 702.145 states.
+    -- Three static abilities in one keyword, exactly as the rule bundles them:
+    -- "if it is night and this permanent is represented by a double-faced card,
+    -- it enters transformed", "as it becomes night, if this permanent is front
+    -- face up, transform it", and "this permanent can't transform except due to
+    -- its daybound ability". Pawl.Engine.Daytime is where all three are read, so
+    -- nothing mints an ability object from this -- StartYourEngines' shape rather
+    -- than Cycling's.
+    --
+    -- Nullary, because rule 702.145b takes no parameter, and every reader takes
+    -- MEMBERSHIP rather than a count: rule 702.145c asks whether a player
+    -- controls "a permanent that is front face up with daybound", so a second
+    -- instance turns nothing over twice.
+    --
+    -- The DESIGNATION the rule reads is not here either. CR 731.1 puts day and
+    -- night on the GAME, so it is GameState.daytime, the way CR 725.1's monarch
+    -- is -- this keyword is only what makes a permanent care.
+    Daybound
+  | -- | 702.145e: nightbound, daybound's back-face mirror, and two static
+    -- abilities rather than three: "as it becomes day, if this permanent is back
+    -- face up, transform it" and "this permanent can't transform except due to
+    -- its nightbound ability". The missing third is daybound's enters-transformed
+    -- clause, which rule 702.145e does not state -- a card is cast from its front
+    -- face, so the back face has no entry of its own to rewrite.
+    --
+    -- Nullary and membership-read, for Daybound's reasons. A separate constructor
+    -- and not `Daybound`-with-a-side, because the two abilities differ in which
+    -- designation they watch and in which face they look for, and CR 702.145d and
+    -- CR 702.145g differ further still: daybound's makes it DAY unconditionally,
+    -- where nightbound's makes it night only if no permanent with daybound is on
+    -- the battlefield.
+    Nightbound
   | -- | 702.164a: toxic N. N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --

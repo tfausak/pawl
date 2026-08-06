@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
@@ -182,6 +183,7 @@ slotsOf effect = case effect of
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
+  Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch slot -> Set.singleton slot
   Effect.Attach slot -> Set.singleton slot
   Effect.AttachTarget slot _ -> Set.singleton slot
@@ -273,6 +275,7 @@ readsX = any effectReadsX
       Effect.AffectPlayers {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
+      Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
       Effect.Attach _ -> False
       Effect.AttachTarget {} -> False
@@ -324,6 +327,7 @@ searchesLibrary effect = case effect of
   Effect.AffectPlayers {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
+  Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.Attach _ -> False
   Effect.AttachTarget {} -> False
@@ -705,28 +709,12 @@ resolveAbility abilId srcId ability = do
 -- CR 701.27a over ONE object: turn it over, or leave the map exactly as it was.
 -- The Transform arm of applyEffectWith folds this over its victims.
 --
--- Two ways nothing happens, and neither is an error:
---
---   * the id names nothing on the BATTLEFIELD. CR 701.27a transforms a
---     PERMANENT, which is what CR 110.1 makes an object on the battlefield, so a
---     slot naming a card in another zone turns nothing over. Belt and braces
---     against the common case, where CR 400.7 has already minted a fresh id for
---     the card that left and this id names nothing at all.
---   * Card.turnedOver declines -- CR 701.27c's card that is not double-faced,
---     CR 701.27d's instant or sorcery face.
---   * CR 701.27f's already-turned gate, alreadyTurnedFor below.
---
--- ONE FIELD, in place, because CR 712.18 says the permanent is not a new object:
--- "When a double-faced permanent transforms or converts, it doesn't become a new
--- object. Any effects that applied to that permanent will continue to apply to
--- it." So no id is minted, no timestamp is reissued, and damage, counters and
--- attachments ride through untouched -- the rule's own Example is a +2/+2 that
--- survives the turn. CR 400.7 is the negative half of the same claim: this is not
--- a zone change, so nothing mints an incarnation.
---
--- Reads the object's OWN card (Game.cardOf), never a projected one, which is the
--- footing Object.face is stored on: CR 712.9's first Example turns on a Clone
--- being a one-faced card whatever it copied, and that is the same read.
+-- The turn itself is Game.turnFaceOver, shared with the CR 702.145c/f sweep in
+-- Pawl.Engine.Daytime, and that is where the account of what a turn writes and of
+-- the ways it declines (CR 701.27c, CR 701.27d, a card in another zone) lives.
+-- What this adds is the ONE gate that belongs to an instruction rather than to
+-- the act: CR 701.27f's already-turned check, alreadyTurnedFor below. A static
+-- ability's turn has no such gate, which is why the split is here.
 --
 -- `now` is minted ONCE for the whole instruction by the caller rather than per
 -- victim, because CR 608.2f processes a swept set simultaneously: two Humans
@@ -734,13 +722,8 @@ resolveAbility abilId srcId ability = do
 -- 701.27f comparison must not be able to tell them apart.
 turnOver :: ObjectId -> Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
 turnOver resolving now gs oid objects
-  | not (Set.member oid (GameState.battlefield gs)) = objects
   | alreadyTurnedFor resolving oid gs = objects
-  | otherwise = case (Map.lookup oid objects, Game.cardOf oid gs) of
-      (Just object, Just card) -> case Card.turnedOver (Object.face object) card of
-        Nothing -> objects
-        Just name -> Map.insert oid object {Object.face = Just name, Object.turnedOverAt = Just now} objects
-      _ -> objects
+  | otherwise = Game.turnFaceOver now gs oid objects
 
 -- CR 701.27f, first sentence: "If an activated or triggered ability of a
 -- permanent that isn't a delayed triggered ability of that permanent tries to
@@ -2051,6 +2034,16 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- overwritten (at most one at a time).
         State.modify' (\g -> g {GameState.monarch = Just p})
         State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
+  -- CR 731.1: the GAME gains the designation. Everything about what that entails
+  -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes
+  -- immediately -- is Pawl.Engine.Daytime's, so this arm names no field and asks
+  -- nothing about which effect it came from.
+  --
+  -- Nobody is named and nothing is prompted: rule 731.1 puts the designation on
+  -- the game rather than on a player, unlike BecomeMonarch just above.
+  Effect.ItBecomes designation -> do
+    _ <- Daytime.becomes designation
+    pure ()
   -- CR 701.3a / 702.6a: "Attach this permanent to target creature you control."
   -- CR 701.3a is the move itself -- "take it from where it currently is and put
   -- it onto that object" -- so this relocates a source that is already attached

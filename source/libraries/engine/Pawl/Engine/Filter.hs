@@ -363,5 +363,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.BattleCry -> keyword
   Keyword.Menace -> keyword
   Keyword.Devoid -> keyword
+  Keyword.Daybound -> keyword
+  Keyword.Nightbound -> keyword
   Keyword.Toxic _ -> keyword
   Keyword.StartYourEngines -> keyword

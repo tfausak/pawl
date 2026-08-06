@@ -103,6 +103,9 @@ emptyGame order =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
+          -- CR 731.1: "the game starts with neither designation".
+          GameState.daytime = Nothing,
+          GameState.spellsCastLastTurn = 0,
           GameState.exiledUntilMonarch = Map.empty,
           GameState.extraTurns = [],
           GameState.turnAnchor = Nothing
@@ -286,6 +289,10 @@ restartGame perform starter = do
             GameState.pendingControl = Map.empty,
             GameState.activeControl = Nothing,
             GameState.monarch = Nothing,
+            -- CR 727.1 / 731.1: the restarted game is a new game, which starts
+            -- with neither designation however the ended one finished.
+            GameState.daytime = Nothing,
+            GameState.spellsCastLastTurn = 0,
             GameState.exiledUntilMonarch = Map.empty,
             -- CR 727.1: the game that scheduled them has ended, so no extra
             -- turn survives into the new one.
@@ -370,6 +377,10 @@ subgameStateFrom starter parent =
           GameState.pendingControl = Map.empty,
           GameState.activeControl = Nothing,
           GameState.monarch = Nothing,
+          -- CR 729.1a / 731.1: the subgame is its own game, so it starts with
+          -- neither designation and the main game's is untouched by it.
+          GameState.daytime = Nothing,
+          GameState.spellsCastLastTurn = 0,
           GameState.exiledUntilMonarch = Map.empty,
           -- CR 729.1a: the subgame is its own game and starts from turn 1, so
           -- the main game's pending extra turns are not in it. Its own copy

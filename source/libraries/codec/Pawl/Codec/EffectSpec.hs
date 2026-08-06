@@ -20,6 +20,7 @@ import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
@@ -547,6 +548,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.BecomeMonarch MonarchTarget.TheController)
       """ {"type":"BecomeMonarch","value":{"type":"TheController"}} """
+  Spec.it s "ItBecomes" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ItBecomes Daytime.Night)
+      """ {"type":"ItBecomes","value":{"type":"Night"}} """
   Spec.it s "ExileUntilMonarch" $
     Common.assertJsonCodec
       s

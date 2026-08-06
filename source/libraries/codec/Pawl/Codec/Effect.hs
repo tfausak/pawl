@@ -6,6 +6,7 @@ import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.Daytime as Daytime
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
@@ -111,6 +112,7 @@ toJson codec e = case e of
   Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Common.array [Duration.toJson d, PlayerScope.toJson s, PlayerEffect.toJson pe]))
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
+  Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Daytime.toJson d))
   Effect.ExileUntilMonarch s -> Common.tagged "ExileUntilMonarch" (Just (SlotName.toJson s))
   Effect.Attach s -> Common.tagged "Attach" (Just (SlotName.toJson s))
   Effect.AttachTarget s f -> Common.tagged "AttachTarget" (Just (Common.array [SlotName.toJson s, Filter.toJson Keyword.toJson f]))
@@ -234,6 +236,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]"
     "CreateEmblem" -> Common.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Common.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
+    "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Daytime.fromJson)
     "ExileUntilMonarch" -> Common.withValue mv (fmap Effect.ExileUntilMonarch . SlotName.fromJson)
     "Attach" -> Common.withValue mv (fmap Effect.Attach . SlotName.fromJson)
     "AttachTarget" -> case mv of

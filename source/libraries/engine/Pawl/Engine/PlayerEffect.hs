@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import Pawl.Types.CardName (CardName)
 import qualified Pawl.Types.Face as Face
@@ -166,10 +167,14 @@ applying pid gs =
 -- it at the handoff and no reader ever drains it (scannedThrough is a watermark,
 -- not a consumption). Rule of Law's ruling demands precisely this: the whole
 -- turn, including spells cast before it was on the battlefield.
-castsThisTurn :: PlayerId -> GameState -> Integer
+--
+-- A Natural rather than an Integer, because a count of log entries cannot be
+-- negative and CR 502.2's reader (GameState.spellsCastLastTurn, snapshotted by
+-- Engine.beginTurnOf) holds one.
+castsThisTurn :: PlayerId -> GameState -> Natural
 castsThisTurn pid gs =
   let mine caster = caster == pid
-   in toInteger (length (filter mine (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs)))))
+   in Natural.length (filter mine (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs))))
 
 -- CR 601.3: a player can begin to cast a spell only if no rule or effect
 -- prohibits it. The prohibit half. Cast.permitsCastWhileSearching is not the
@@ -219,7 +224,7 @@ prohibitsCasting pid name gs =
   let cast = castsThisTurn pid gs
       prohibits (source, effect) = case effect of
         PlayerEffect.CantCastSpells -> True
-        PlayerEffect.CantCastMoreThan limit -> cast >= toInteger limit
+        PlayerEffect.CantCastMoreThan limit -> cast >= limit
         -- CR 601.3a / 614.1c: the quality is the name chosen as the SOURCE
         -- entered, so an ability whose permanent has chosen nothing prohibits
         -- nothing.

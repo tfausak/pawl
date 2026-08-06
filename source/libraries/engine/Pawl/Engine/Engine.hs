@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
+import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
@@ -303,15 +304,24 @@ runTurnBasedActions phase = do
   -- for the reason on Pawl.Types.Combat's defender field.
   hasActive <- State.gets (\gs -> List.elem active (Game.stillPlaying gs))
   case phase of
-    Phase.Beginning BeginningStep.Untap -> Monad.when hasActive $ do
-      untapAll active
-      settleAll active
-      State.modify' $ \gs ->
-        -- CR 305.2: the allowance is per TURN, so the count that turn compares
-        -- against starts again at zero. DELETED rather than set to 0 -- an
-        -- absent row and a zero row are the same answer to CR 305.2a, and
-        -- deleting keeps exactly one representation of "has played none".
-        gs {GameState.landsPlayed = Map.delete active (GameState.landsPlayed gs)}
+    Phase.Beginning BeginningStep.Untap -> do
+      -- CR 502.2 / 703.4b: the day/night check, second in the step and BEFORE the
+      -- untap itself (CR 502.3 / 703.4c). Outside the CR 800.4j guard the actions
+      -- below take, because rule 703.4b makes it the GAME's action rather than the
+      -- active player's -- CR 703.4p's sweep is the other one of those.
+      --
+      -- CR 502.1's phasing, which the rule puts first of all, is not implemented
+      -- (#154), so nothing separates the two here.
+      _ <- Daytime.untapCheck
+      Monad.when hasActive $ do
+        untapAll active
+        settleAll active
+        State.modify' $ \gs ->
+          -- CR 305.2: the allowance is per TURN, so the count that turn compares
+          -- against starts again at zero. DELETED rather than set to 0 -- an
+          -- absent row and a zero row are the same answer to CR 305.2a, and
+          -- deleting keeps exactly one representation of "has played none".
+          gs {GameState.landsPlayed = Map.delete active (GameState.landsPlayed gs)}
     Phase.Beginning BeginningStep.DrawStep -> Monad.when hasActive $ do
       skip <- State.gets skipsDraw
       Monad.unless skip (Event.drawCard active)
@@ -621,10 +631,11 @@ settleForPriority = Monad.void performSettle
 -- CR 117.5: each time a player would receive priority, sweep expired "for as
 -- long as" effects, perform state-based actions, then put triggered abilities
 -- on the stack, repeating until none of the three does anything. Then priority
--- is granted (by the caller). The repeat is gated on four cheap booleans -- the
--- conditional sweep, a monarch exile returning, an SBA firing, a trigger being
--- placed -- so a settle that changes nothing costs one board projection and one
--- length comparison per carrier, NOT a deep GameState equality check. On top of
+-- is granted (by the caller). The repeat is gated on five cheap booleans -- the
+-- conditional sweep, a monarch exile returning, a day/night check acting, an SBA
+-- firing, a trigger being placed -- so a settle that changes nothing costs one
+-- board projection and one length comparison per carrier, NOT a deep GameState
+-- equality check. On top of
 -- that, every pass pays three samples of derived state (checkControlContinuity
 -- for CR 302.6, Combat.removeChanged for CR 506.4, Ring.endOnControlChange for
 -- CR 701.54a), because a derived change to control or to card types has nothing
@@ -643,8 +654,9 @@ settleForPriority = Monad.void performSettle
 -- It also REPORTS whether it performed any state-based action or placed any
 -- triggered ability, because one caller needs the answer and the rest do not.
 -- That caller is `cleanupException` (CR 514.3a), and those two are exactly what
--- the rule asks about; the conditional sweep and the monarch exile return also
--- make the loop repeat but are neither, so neither is reported.
+-- the rule asks about; the conditional sweep, the monarch exile return and the
+-- day/night check also make the loop repeat but are none of them, so none is
+-- reported.
 --
 -- Reported across EVERY pass, where CR 704.3's last sentence names the step's
 -- first check. The two agree wherever the conditional sweep is inert, which is
@@ -655,6 +667,11 @@ performSettle :: Game Bool
 performSettle = do
   swept <- Expiry.sweepConditional
   returned <- Monarch.returnExiledForMonarch
+  -- CR 702.145c/d/f/g, checked here for CR 704.3's reason and not because they are
+  -- state-based actions -- both rules say they are not. Before the SBA pass, since
+  -- turning a permanent over changes its power and toughness and CR 704.5f must
+  -- read the board the turn leaves behind.
+  dayNight <- Daytime.settle
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: all three
@@ -678,7 +695,7 @@ performSettle = do
   State.modify' Combat.removeChanged
   checkControlContinuity
   Ring.endOnControlChange
-  more <- if swept || returned || acted || placed then performSettle else pure False
+  more <- if swept || returned || dayNight || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
 -- CR 104.4b: how many events may happen with no player able to decide anything
@@ -1016,6 +1033,12 @@ beginTurnOf pid gs =
             -- next to and for the same reason: this is the handoff, so a new turn
             -- starts with nobody's speed-increase ability spent.
             GameState.speedIncreasedThisTurn = Set.empty,
+            -- CR 502.2 / 731.2: the count the NEXT turn's untap step asks about
+            -- "the previous turn's active player", taken here because the log it
+            -- is folded from is cleared by this same record update and that check
+            -- runs afterwards. The player is the OUTGOING active player, which is what `gs`
+            -- still holds -- the new one is assigned in this same record update.
+            GameState.spellsCastLastTurn = PlayerEffect.castsThisTurn (GameState.activePlayer gs) gs,
             GameState.scannedThrough = 0,
             -- Cleared with the log it describes: the settle Engine.advance runs
             -- immediately before this leaves nothing unscanned, so the sample has
