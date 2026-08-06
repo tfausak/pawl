@@ -107,6 +107,12 @@ costsFor name oid gs = case Game.lookupObject oid gs of
           withAdditional alternative =
             alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
        in case Object.zone obj of
+            -- Rule 702.34a's "if the resulting spell is an instant or sorcery
+            -- spell" is NOT re-asked here. It gates the PERMISSION
+            -- (Pawl.Engine.Keyword.permissionsFor), and Pawl.Engine.Cast.castable
+            -- demands that permission alongside an affordable candidate from this
+            -- list, so a candidate offered here can never carry a graveyard cast
+            -- on its own.
             Zone.Graveyard -> fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
             _ -> printed : fmap withAdditional (Face.alternativeCosts face)
     Source.OfToken _ -> []
