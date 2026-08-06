@@ -2006,6 +2006,94 @@ conditionalCombatRestrictionSpec s registry = Spec.describe s "Conditional Comba
         Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf control) []
       _ -> Spec.assertFailure s "fixture should have two creatures"
 
+-- CR 612.1 reaching a combat restriction's GATE. Glacial Crasher ({4}{U}{U}
+-- Creature -- Elemental 5/5, "Trample. This creature can't attack unless there is
+-- a Mountain on the battlefield." -- checked against Scryfall, 2026-08-05) is the
+-- pool's first restriction whose CR 508.1c "unless" clause names a basic land
+-- type, so it is the first card a Magical Hack can aim at this read-point.
+--
+-- Why this card and not one of the twenty "can't attack unless defending player
+-- controls an Island" printings, which are the same sentence in a commoner shape:
+-- their condition is about the player being attacked, which a Condition cannot
+-- name (#620). Glacial Crasher asks the same question of the WHOLE battlefield,
+-- so it needs no capability pawl lacks. A sweep of the full Oracle corpus
+-- (2026-08-05) for a combat requirement or restriction whose clause names a basic
+-- land type returns this card, Harbor Serpent's five-Island count -- the same
+-- shape with a bigger threshold -- Leviathan's "unless you sacrifice two
+-- Islands", which is a COST and rides Pawl.Types.AttackCost rather than a gate,
+-- Kraken of the Straits's pairwise "can't block this creature", which
+-- Pawl.Types.CombatRestriction's header argues is not representable, that blocked
+-- defending-player family, and landwalk reminder text.
+--
+-- Landwalk is deliberately not this group: textChangedLandwalkSpec above is the
+-- swap reaching a KEYWORD's own land type, which is read out of the
+-- Keyword.Landwalk constructor and never through a Condition.
+--
+-- Two directions, because "the Crasher did not attack" is equally true of a
+-- restriction that was never lifted for some unrelated reason. The hack that
+-- FREES it and the hack that BINDS it are asserted against the same unhacked
+-- controls, and both fail against a reader that passes the printed gate through.
+textChangedCombatRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedCombatRestrictionSpec s registry = Spec.describe s "TextChangedCombatRestriction" $ do
+  -- alice attacks with a lone Glacial Crasher and holds a Magical Hack plus the
+  -- Island that pays for it; bob defends with nothing and, with `withMountain`, a
+  -- Mountain. The Island is alice's own, so it is on the battlefield to be
+  -- COUNTED as well as tapped -- which is the point in the freeing direction,
+  -- where the swap makes the gate read Islands. bob gets no creature, so the
+  -- gameplay case below turns on the declaration alone and never on a block.
+  let crasherBoard withMountain hacked from to = do
+        crasher <- S.printingOf s registry "Glacial Crasher"
+        island <- S.printingOf s registry "Island"
+        mountain <- S.printingOf s registry "Mountain"
+        magicalHack <- S.printingOf s registry "Magical Hack"
+        let (gs0, ours, _) = S.combatBoardOf [crasher] []
+            (_, gs1) = S.addCreature island S.alice gs0
+            gs2 = if withMountain then snd (S.addCreature mountain S.bob gs1) else gs1
+            (hackId, gs3) = S.addHandCard magicalHack S.alice gs2
+        case ours of
+          [crasherId] -> pure (if hacked then castHackAt hackId crasherId from to gs3 else gs3, crasherId)
+          _ -> Spec.assertFailure s "fixture should have the Crasher"
+  Spec.it s "CR 508.1c the printed gate reads Mountains" $ do
+    -- The premise the two hacked cases are read against. Nothing here involves a
+    -- text change: the restriction lifts exactly when a Mountain is on the
+    -- battlefield, and bob's Mountain counts, the clause naming no controller.
+    (without, crasher) <- crasherBoard False False Subtype.Mountain Subtype.Island
+    (with, crasher') <- crasherBoard True False Subtype.Mountain Subtype.Island
+    Spec.assertBool s (not (Combat.canAttack S.alice crasher without)) "with no Mountain the Crasher cannot attack"
+    Spec.assertEqWith s "and is not offered" (Combat.legalAttackers S.alice without) []
+    Spec.assertBool s (Combat.canAttack S.alice crasher' with) "with bob's Mountain it can"
+  Spec.it s "CR 612.1 a hacked Crasher reads ISLANDS and alice's own Island frees it" $ do
+    -- THE FREEING DIRECTION. Mountain -> Island on the Crasher, and the board
+    -- never moves: there is still no Mountain anywhere, and the Island that could
+    -- not satisfy the printed gate satisfies the rewritten one. This fails
+    -- against a reader that hands Condition.holds the printed condition.
+    (gs, crasher) <- crasherBoard False True Subtype.Mountain Subtype.Island
+    -- The anti-vacuity check, first: every assertion below also holds of a Hack
+    -- that was never cast, so this one says the swap really landed on the Crasher.
+    Spec.assertEqWith s "the Hack resolved onto the Crasher" (Projection.textChangesAffecting crasher gs) [(Subtype.Mountain, Subtype.Island)]
+    Spec.assertBool s (Combat.canAttack S.alice crasher gs) "the hacked Crasher may attack"
+    Spec.assertEqWith s "and is offered" (Combat.legalAttackers S.alice gs) [crasher]
+  Spec.it s "CR 612.1 a hack to a type nobody controls BINDS a Crasher the board had freed" $ do
+    -- THE BINDING DIRECTION, and the half that keeps the case above from passing
+    -- by the gate simply going unread. bob's Mountain is on the battlefield and
+    -- lifts the printed restriction; Mountain -> Forest rewrites the gate to a
+    -- type no player controls, so the same board forbids the attack.
+    (gs, crasher) <- crasherBoard True True Subtype.Mountain Subtype.Forest
+    Spec.assertEqWith s "the Hack resolved onto the Crasher" (Projection.textChangesAffecting crasher gs) [(Subtype.Mountain, Subtype.Forest)]
+    Spec.assertBool s (not (Combat.canAttack S.alice crasher gs)) "the hacked Crasher may not attack"
+    Spec.assertEqWith s "and is not offered" (Combat.legalAttackers S.alice gs) []
+  Spec.it s "CR 612.1 whole cards: the rewritten gate decides a real declare attackers step" $ do
+    -- The gameplay-level case, run through CR 703.4i's turn-based action and the
+    -- priority loop rather than a direct call. The Crasher is a 5/5, so bob's life
+    -- total is what the two worlds differ in.
+    (freed, _) <- crasherBoard False True Subtype.Mountain Subtype.Island
+    (bound, _) <- crasherBoard False False Subtype.Mountain Subtype.Island
+    let after = S.runCombat S.aggressiveAnswer freed
+        control = S.runCombat S.aggressiveAnswer bound
+    Spec.assertEqWith s "hacked, the Crasher connects for five" (S.lifeOf S.bob after) (Just 15)
+    Spec.assertEqWith s "unhacked, it is never declared" (S.attackerDeclarationsOf control) []
+    Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob control) (Just 20)
+
 -- CR 508.1c read through CR 506.5, proved by Bonded Construct ("{1} Artifact
 -- Creature -- Construct 2/1, This creature can't attack alone") -- the attacking
 -- side's SET-SHAPED restriction, and menaceSpec's twin across the combat phase.
@@ -3677,6 +3765,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   attackRequirementSpec s registry
   combatRestrictionSpec s registry
   conditionalCombatRestrictionSpec s registry
+  textChangedCombatRestrictionSpec s registry
   attacksAloneSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry

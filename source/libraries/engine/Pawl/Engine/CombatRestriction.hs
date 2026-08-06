@@ -115,7 +115,18 @@ restricted select candidates gs =
             -- BlockRequirement.instances.
             if (null setEffs || Projection.liveGiven setEffs Set.empty source gs)
               && not (removed source)
-              then concatMap (fromRestriction source) restrictions
+              then
+                -- CR 612.1's word swap over the source's own text, computed HERE
+                -- rather than hoisted beside setEffs: textChangesAffecting folds
+                -- the whole continuous-effect list, and the empty case above
+                -- already turned away every permanent that prints no restriction,
+                -- so the fold runs once per restriction-bearing permanent instead
+                -- of once per permanent on the battlefield.
+                --
+                -- The SOURCE's changes and not the restricted creature's: CR
+                -- 612.1 changes the words printed on THAT object, and the gate
+                -- below is printed on the card stating the restriction.
+                concatMap (fromRestriction source (Projection.textChangesAffecting source gs)) restrictions
               else []
       -- CR 613.11 puts these effects after every layer, so the affected set is
       -- read against the FULL projection -- the opposite of
@@ -142,7 +153,13 @@ restricted select candidates gs =
       -- Projection.fullView, matching the affected set above (CR 613.11). The
       -- source is on the battlefield by construction, so no CR 608.2h last
       -- known information is in play.
-      lifted source restriction = case gate restriction of
+      --
+      -- CR 612.1: the gate is REWRITTEN before it is asked, so a hacked Glacial
+      -- Crasher ("can't attack unless there is a Mountain on the battlefield")
+      -- counts Islands. The clause is words printed on the source's card, which
+      -- is what CR 612.1 reaches, and rewriteCondition is the same descent
+      -- gatherStatic applies to a static ability's CR 604.2 "as long as" gate.
+      lifted source changes restriction = case gate restriction of
         Nothing -> False
         Just condition ->
           Condition.holds
@@ -150,10 +167,13 @@ restricted select candidates gs =
             (Filter.MkContext (Projection.controllerOf source gs) (Just source))
             gs
             source
-            condition
-      fromRestriction source restriction = case select restriction of
+            (if null changes then condition else Projection.rewriteCondition changes condition)
+      -- Not implemented: the AFFECTED set beside the gate is passed through
+      -- unrewritten, so a text change reaches only half of one printed sentence
+      -- (#584).
+      fromRestriction source changes restriction = case select restriction of
         Nothing -> []
         Just affected
-          | lifted source restriction -> []
+          | lifted source changes restriction -> []
           | otherwise -> filter (named source affected) candidates
    in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
