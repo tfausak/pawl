@@ -184,6 +184,7 @@ advancing controllerOf pid pcs gs =
 -- The stack half compares OBJECT IDS. CR 400.7 mints a fresh id on every zone
 -- change, which is what makes that right: a Saga that flickered is a new permanent
 -- and is not the source of the old one's chapter ability.
+--
 -- The unscanned events arrive as an ARGUMENT rather than being read off
 -- GameState.scannedThrough here, because Pawl.Engine.Event owns that watermark and
 -- this module sits below it in the import graph. Pawl.Engine.Sba, which has both,
