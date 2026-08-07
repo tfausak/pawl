@@ -19,35 +19,60 @@
         "x86_64-darwin"
         "x86_64-linux"
       ];
+
+      inherit (nixpkgs.lib) fileset;
+
+      # An allowlist rather than a whole-tree copy, so that editing docs/,
+      # script/ or .github/ does not change the derivation and force a rebuild.
+      source = fileset.toSource {
+        root = ./.;
+        fileset = fileset.unions [
+          ./CHANGELOG.md
+          ./LICENSE.txt
+          ./README.md
+          ./cabal.project
+          ./data
+          ./pawl.cabal
+          ./source
+        ];
+      };
     in
     {
       packages = forAllSystems (
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          inherit (pkgs.lib) fileset;
         in
         {
           # Every non-test dependency is a GHC boot library, so this builds
           # without fetching anything from Hackage. doBenchmark compiles the
           # benchmark too, which `cabal test` would not.
           default = pkgs.haskell.lib.compose.doBenchmark (
-            pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" (fileset.toSource {
-              root = ./.;
-              # An allowlist rather than a whole-tree copy, so that editing
-              # docs/, script/ or .github/ does not change the derivation and
-              # force a rebuild.
-              fileset = fileset.unions [
-                ./CHANGELOG.md
-                ./LICENSE.txt
-                ./README.md
-                ./cabal.project
-                ./data
-                ./pawl.cabal
-                ./source
-              ];
-            }) { }
+            pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { }
           );
+        }
+      );
+
+      # Duplicates of CI's lint jobs, so that one `nix flake check` covers what
+      # the pipeline covers. They are cheap, and running them before the build
+      # means a lint failure costs seconds rather than a full compile.
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+        {
+          cabal = pkgs.runCommand "pawl-cabal-check" { nativeBuildInputs = [ pkgs.cabal-install ]; } ''
+            # cabal writes a config on first use, so it needs a writable HOME.
+            # The source is copied because cabal creates dist-newstyle beside
+            # the package, and a store path is read-only.
+            export HOME="$PWD/home"
+            cp --recursive ${source} package
+            chmod --recursive +w package
+            cd package
+            cabal check
+            touch "$out"
+          '';
         }
       );
 
