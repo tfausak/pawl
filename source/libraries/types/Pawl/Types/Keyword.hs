@@ -208,7 +208,7 @@ data Keyword
     -- Megamorph (CR 702.37b) is deliberately NOT this constructor with a flag
     -- and not a sibling either: it adds an "as this permanent is turned face up"
     -- ability (CR 708.11) that pawl cannot yet apply, so it is unimplemented
-    -- rather than modelled (#918).
+    -- rather than modelled (#917).
     Morph (Cost.Cost Keyword)
   | -- | 702.42a: you may choose all modes of this modal spell (rule 700.2) instead
     -- of the number specified, paying an additional cost if you do.

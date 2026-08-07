@@ -6,7 +6,9 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ObjectId as ObjectId
 
--- | Grows: special actions beyond Play.
+-- | What a player with priority may do. CR 116.2 lists twelve SPECIAL actions
+-- and two of them are here -- CR 116.2a's land play and CR 116.2b's turning a
+-- face-down permanent face up; the tracker for the other ten is #875. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The

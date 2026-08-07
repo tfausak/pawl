@@ -147,7 +147,7 @@ faceDownCost =
 -- alternatives are text the face-down object does not have (CR 708.2a). Asked
 -- ahead of the zone case, because CR 702.37a's morph ability "functions in any
 -- zone from which you could play the card it's on" -- the zone question is
--- Cast.castableZones', and that gate reads the face-down face, which permits
+-- Cast.castableZones's, and that gate reads the face-down face, which permits
 -- only the hand.
 costsFor :: CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
 costsFor name oid gs = case Game.lookupObject oid gs of

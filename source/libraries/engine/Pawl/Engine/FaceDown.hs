@@ -110,7 +110,7 @@ turnableFaceUp pid gs =
 -- battlefield entry, so no enters-the-battlefield ability is offered one.
 --
 -- CR 708.11's "as [this permanent] is turned face up" abilities are NOT applied
--- (#918), and no ability triggers on the turning-over either (#919).
+-- (#917), and no ability triggers on the turning-over either (#918).
 turnFaceUp :: PlayerId -> ObjectId -> Game ()
 turnFaceUp pid oid = do
   before <- State.get

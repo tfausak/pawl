@@ -72,7 +72,7 @@ data Object = MkObject
     -- leaves the battlefield is a face-up card again wherever it lands. The one
     -- move that must NOT forget it is CR 708.4's last sentence ("the permanent
     -- the spell becomes will be a face-down permanent"), and
-    -- Event.changeZoneFacing is the door that carries it.
+    -- Event.changeZoneFaceDown is the door that carries it.
     --
     -- NOT hidden from anything that inspects the game state: Object.source still
     -- holds the printing, so CR 708.5's "you can't look at face-down permanents
@@ -340,9 +340,10 @@ data Object = MkObject
 -- object). The first two ARE, but they are what the caller is DECIDING rather
 -- than forgetting: the move names its destination, and CR 613.7d wants the
 -- moment of entry, which only a caller in the Game monad can mint. A caller
--- overrides the rest the same way -- CR 110.5b's "enters tapped" and CR 701.3's
--- attach-on-entry are choices the move makes about the new object, not memories
--- of the old one, so they are reset here and set again by the funnel.
+-- overrides the rest the same way -- CR 110.5b's "enters tapped", CR 708.4's
+-- face-down status and CR 701.3's attach-on-entry are choices the move makes
+-- about the new object, not memories of the old one, so they are reset here and
+-- set again by the funnel.
 newIncarnation :: Object -> Object
 newIncarnation object =
   object
@@ -350,7 +351,7 @@ newIncarnation object =
       -- CR 110.5b for a battlefield entry, CR 708.9 for a departure from one:
       -- a permanent enters face up unless a spell or ability says otherwise,
       -- and a face-down permanent leaving the battlefield is revealed to all
-      -- players as it goes. Event.changeZoneFacing is the "otherwise".
+      -- players as it goes. Event.changeZoneFaceDown is the "otherwise".
       facing = Facing.FaceUp,
       damage = 0,
       sickness = Sickness.Sick,

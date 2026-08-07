@@ -1228,7 +1228,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 -- half is. And that rule's last sentence, "the permanent the spell becomes will
 -- be a face-down permanent", which is the stack-to-battlefield move
 -- Pawl.Engine.Stack makes. CR 708.3 is the same door for a permanent PUT onto
--- the battlefield face down, which nothing in the pool does yet (#921).
+-- the battlefield face down, which nothing in the pool does yet (#919).
 --
 -- A separate door rather than an eighth parameter on changeZoneShowing, as
 -- changeZoneEntering is: the ordinary move leaves CR 110.5b's default standing
