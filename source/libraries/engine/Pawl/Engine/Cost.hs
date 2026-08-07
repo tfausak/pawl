@@ -229,16 +229,16 @@ allAdjustments pid oid gs =
 -- 118.7e's prompt needs: `announceReductions` asks the payer which half of each
 -- hybrid symbol in a reduction it takes, and the answers have to reach
 -- applyAdjustments rather than being read out of the game state a second time.
--- `total` above is this over the adjustments as they stand unannounced, which is
--- the CASTABILITY GATE's reading of them (#813).
+-- `total` above and `totalMana` below are this over the adjustments as they
+-- stand unannounced, which is the CASTABILITY GATE's reading of them (#813).
 totalWith :: ([Natural], [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustments) (Cost.mana cost)}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
 -- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;
--- what wants it separately is `announce`, which has to ask "what will this cost
--- once 601.2f has run?" of candidate costs that do not exist yet and never become
--- a Cost of their own.
+-- what wants it separately is `announce` and `canPaySomeCompletion`, which both
+-- have to ask "what will this cost once 601.2f has run?" of candidate costs that
+-- do not exist yet and never become a Cost of their own.
 totalMana :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
 totalMana pid oid gs = applyAdjustments (allAdjustments pid oid gs)
 
@@ -612,6 +612,47 @@ canPay pid oid cost gs = case Cost.mana cost of
   Just manaCost ->
     Mana.canPayCommitting pid (lifeOwedBy (Cost.components cost)) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
+
+-- CR 118.3 asked one step later than `canPay` asks it: is SOME nonhybrid
+-- equivalent of this cost (CR 601.2b) payable, measured at CR 601.2f's total?
+-- That is the castability / activatability gate's question, and it is the same
+-- question Pawl.Engine.Mana.announce's own `stillPayable` asks of the routes it
+-- offers -- this is that predicate with nothing announced yet, so a gate built on
+-- it cannot refuse a cast the announcement would have had an offer for, and
+-- cannot offer one the announcement could not complete.
+--
+-- Why the COMPLETION has to come first: CR 118.7a's reductions come off the
+-- generic mana component, and a symbol still spelled {2/R} has no generic
+-- component for them to bite (applyAdjustments' MonocoloredHybrid arm). Totalling
+-- the printed cost therefore loses the reduction that CR 601.2b's {2}{2}{2}
+-- announcement would have exposed, which is Flame Javelin's own ruling read
+-- backwards. Completing first and totalling each completion is what puts the two
+-- readings in agreement.
+--
+-- LIFE is threaded, not dropped. `completions` returns the life each route
+-- commits -- CR 107.4f's 2 for a Phyrexian symbol paid that way -- having already
+-- removed the symbol that commits it, so nothing double-counts; what would go
+-- wrong is the other direction, since a route measured without its life is a
+-- route offered to a player who cannot afford it. CR 118.3 makes it one demand on
+-- one life total together with the CR 119.4 payments the components owe, so
+-- `lifeOwedBy` rides on every completion.
+--
+-- `total` is CR 601.2f's totalling of a mana cost, the CALLER's to supply for the
+-- reason Pawl.Engine.Cost.announce's is: Pawl.Engine.Cast passes `totalMana` and
+-- Pawl.Engine.Activate passes `id`, since an activation cost is deliberately not
+-- routed through `total` at all (#90).
+--
+-- The COMPONENTS are asked exactly as `canPay` asks them, and no completion
+-- touches them: `completions` rewrites mana symbols only.
+canPaySomeCompletion :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletion pid oid total_ cost gs = case Cost.mana cost of
+  Nothing -> False
+  Just (ManaCost.MkManaCost symbols) ->
+    let outside = lifeOwedBy (Cost.components cost)
+        payable (completed, life) =
+          Mana.canPayCommitting pid (outside + life) (total_ (ManaCost.MkManaCost completed)) gs
+     in any payable (Mana.completions symbols)
+          && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
 
 -- CR 119.4's payments a cost owes OUTSIDE its mana part, added up -- what CR
 -- 118.3 makes the mana part's own life share a total with. A cost with no PayLife
@@ -1017,9 +1058,11 @@ applyAdjustments adjustments cost =
         -- generic cost reduction applies to it only where the announced payment
         -- includes generic mana. Pawl.Engine.Mana.announce makes that
         -- announcement, so the cost actually paid reaches here as a Generic and is
-        -- reduced; what still arrives unannounced is the CASTABILITY GATE's cost,
-        -- which measures the printed symbols, and CR 118.13b/c's costs, which have
-        -- no announcement at all (#730, #373).
+        -- reduced -- and so does the CASTABILITY GATE's, since
+        -- canPaySomeCompletion completes the cost before totalling each
+        -- completion, which is what stopped the two disagreeing. What still
+        -- arrives unannounced is CR 118.13b/c's costs, which have no announcement
+        -- at all (#373).
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 107.4f makes this a COLOURED mana symbol, and its other half is 2
         -- life rather than any amount of mana, so there is no generic component

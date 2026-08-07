@@ -738,12 +738,13 @@ announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
     -- UNREACHABLE from a caller that gated on payability first, and it is `total`
     -- above that makes that true rather than merely plausible: the gate and this
     -- offer measure payability through the same totalling, so no completion
-    -- payable here can be one the gate refused. The gate is the STRICTER of the
-    -- two for a monocolored hybrid, because it measures a cost whose {2/X} symbols
-    -- CR 118.7a's reductions cannot see into (#730) -- which is the safe
-    -- direction: it can only refuse a cast this function would have had an offer
-    -- for. {X} used to be a wedge in that -- a gate at X=0 while this runs on the
-    -- value the player named -- and BOTH callers now close it the same way, by
+    -- payable here can be one the gate refused. Unreachable BY CONSTRUCTION and
+    -- not by conservatism, because the gate is now the same predicate over the
+    -- same completions -- Pawl.Engine.Cost.canPaySomeCompletion is this
+    -- `stillPayable` with nothing yet announced, which is what closed the
+    -- monocolored hybrid's disagreement about CR 118.7a's reductions. {X} used to
+    -- be a wedge in that -- a gate at X=0 while this runs on the value the player
+    -- named -- and BOTH callers now close it the same way, by
     -- re-asking their own payability predicate at the announced value before
     -- calling Cost.announce at all: Cast.castSpell (#417) and
     -- Activate.activateAbility (#544).
