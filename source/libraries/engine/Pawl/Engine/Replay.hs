@@ -74,6 +74,7 @@ encode p answer = case p of
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
+  Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
   Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
@@ -204,6 +205,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseAnyNumberToSacrifice {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseTapsForTotalPower {} -> case response of
+    Response.ChoseTaps ids -> Just ids
     _ -> Nothing
   Prompt.ChooseAttachment {} -> case response of
     Response.ChoseAttachment oid -> Just oid
@@ -373,6 +377,13 @@ defaultAnswer p = case p of
   -- Every candidate. The maximal subset, mirroring the arm above taking the first
   -- `count` rather than the last: a deterministic fallback, not a recommendation.
   Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList candidates
+  -- CR 702.122a: every candidate, the arm above's maximal subset. Legal whenever
+  -- the cost is payable at all, save for a board where some candidate has
+  -- NEGATIVE power and dragging it in drops the total back under the threshold
+  -- -- in which case the payment goes Unpaid, which `Cost.pay` turns into a
+  -- complete no-op rather than an illegal state. A deterministic fallback, not a
+  -- recommendation.
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   -- CR 701.3a: every candidate is a destination the card's own text offered.
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   -- The first offered candidate is the PRINTED cost for a cast from hand

@@ -123,6 +123,11 @@ data Response
     ChoseBoundToken ObjectId.ObjectId
   | -- | CR 701.21a: the permanents a player chose to sacrifice to pay a cost.
     ChoseSacrifices (Set.Set ObjectId.ObjectId)
+  | -- | CR 702.122a: the permanents a player chose to TAP to pay a cost measured
+    -- by their total power. A separate constructor from ChoseSacrifices above,
+    -- though the payload has the same shape: replaying a transcript against the
+    -- wrong one would tap what it should have sacrificed.
+    ChoseTaps (Set.Set ObjectId.ObjectId)
   | -- | CR 701.3a: the object a player chose to attach a moving permanent to.
     ChoseAttachment ObjectId.ObjectId
   | -- | CR 601.2b: the cost a caster announced they would pay.

@@ -1275,6 +1275,9 @@ keywordFilters keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
+  -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
+  -- ability is built with lives in Pawl.Engine.Keyword and is not card data.
+  Keyword.Crew _ -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -1289,6 +1292,8 @@ costComponentFilters :: CostComponent.CostComponent Keyword.Keyword -> [Filter.T
 costComponentFilters component = case component of
   -- CR 601.2f's "sacrificing permanents": Village Rites' "a creature".
   CostComponent.Sacrifice _ f -> [f]
+  -- CR 702.122a's "other untapped creatures you control".
+  CostComponent.TapForTotalPower _ f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
@@ -2770,6 +2775,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends c = isBattle c /= Maybe.isJust (Face.defense c)
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "battle iff defense" (fmap (S.nameOf . Printing.card) offenders) []
+  -- There is deliberately NO fourth biconditional here pairing the creature card
+  -- type with a printed power, and the omission is a decision rather than a gap.
+  -- CR 208.3 names the counterexample outright -- "even if it's a card with a
+  -- power and toughness printed on it (such as a Vehicle)" -- and CR 301.7a says
+  -- the same from the subtype's side, so Consulate Dreadnought is a noncreature
+  -- card with a printed 7/11 and is not an offender. What holds instead is CR
+  -- 208.1's weaker pairing below: the box in the lower right corner holds two
+  -- numbers or none.
+  --
+  -- The three lints above are safe from that exception because loyalty and
+  -- defense have no analogue of rule 208.3 -- no rule prints either number on a
+  -- card of another type.
+  Spec.it s "CR 208.1 a card has a printed power iff it has a printed toughness" $ do
+    ps <- S.allPrintings s
+    let offends c = Maybe.isJust (Face.power c) /= Maybe.isJust (Face.toughness c)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "power iff toughness" (fmap (S.nameOf . Printing.card) offenders) []
   -- What makes Pawl.Engine.Card.faceNamed's answer unique, and so what makes
   -- referring to a face BY NAME well-defined (CR 709.4a). Held over the whole
   -- pool rather than by construction, because a card file is data.

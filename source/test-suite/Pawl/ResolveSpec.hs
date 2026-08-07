@@ -3315,6 +3315,7 @@ namesInstead :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 namesInstead wanted p = case p of
   Prompt.ChooseSacrifices {} -> Set.singleton wanted
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   _ -> S.identityAnswer p
 
 -- Answers Prompt.ChooseSacrifices with `wanted`, when it is on offer. A pair of
@@ -3325,6 +3326,7 @@ sacrifices wanted p = case p of
   Prompt.ChooseSacrifices _ _ _ candidates _ ->
     if elem wanted candidates then Set.singleton wanted else Set.fromList (take 1 candidates)
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   _ -> S.identityAnswer p
 
 playerSacrificesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

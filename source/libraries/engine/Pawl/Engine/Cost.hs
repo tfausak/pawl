@@ -26,6 +26,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
@@ -41,6 +42,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -410,6 +412,12 @@ reductionHalvesOf symbol = case symbol of
 -- BOTH symbols, because CR 302.6 names both: CR 107.5's tap symbol and CR 107.6's
 -- untap symbol, from each of which CR 702.10c's haste grants the same exemption.
 -- Named for the RULE it answers rather than for one of the two symbols.
+--
+-- CR 702.122a's TapForTotalPower is deliberately NOT here, and the omission is
+-- the rule rather than an oversight: that component taps OTHER permanents, and
+-- rule 302.6 gates a creature's own activated ability with the tap symbol in it.
+-- A Vehicle that arrived this turn may be crewed; rule 302.6's second sentence
+-- still stops it attacking.
 requiresSicknessCheck :: Cost Keyword.Type.Keyword -> Bool
 requiresSicknessCheck cost =
   any (\c -> elem c (Cost.components cost)) [CostComponent.TapThis, CostComponent.UntapThis]
@@ -436,6 +444,7 @@ isLoyaltyComponent component = case component of
   CostComponent.SacrificeThis -> False
   CostComponent.PayLife _ -> False
   CostComponent.Sacrifice _ _ -> False
+  CostComponent.TapForTotalPower _ _ -> False
   CostComponent.DiscardCards _ -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
@@ -476,6 +485,9 @@ zoneOfComponent component = case component of
   CostComponent.SacrificeThis -> Nothing
   CostComponent.PayLife _ -> Nothing
   CostComponent.Sacrifice _ _ -> Nothing
+  -- CR 702.122a taps permanents on the battlefield and moves nothing out of any
+  -- zone, so CR 113.6m says nothing and CR 113.6's default stands.
+  CostComponent.TapForTotalPower _ _ -> Nothing
   CostComponent.DiscardCards _ -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
@@ -504,6 +516,44 @@ removeLoyalty n obj =
 -- returns a hand in a fixed order, which Prompt.ChooseDiscard offers it in.
 discardCandidates :: PlayerId -> ObjectId -> GameState -> [ObjectId]
 discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid gs)
+
+-- The permanents this player may tap to pay a TapForTotalPower component on
+-- `oid`: every battlefield object matching the criterion, ascending, the order
+-- Replacement.sacrificeCandidates offers its own in.
+--
+-- NOT Replacement.sacrificeCandidates, and the difference is the CONTEXT. That
+-- one matches against `Filter.MkContext Nothing Nothing`, which makes IsSource
+-- and ControlledBy vacuous, and pre-narrows to `Projection.controls pid`
+-- structurally. CR 702.122a's criterion needs both of the atoms that context
+-- throws away -- "other" is `Not IsSource` and "you control" is `ControlledBy
+-- You` -- so the perspective is the PAYER and the source is the permanent whose
+-- ability is being paid for. Getting that wrong is not a subtlety here: without
+-- the source, a Vehicle that has already become a creature could crew itself.
+--
+-- The whole battlefield rather than `Projection.controls pid`: the criterion
+-- says who must control the candidate, so narrowing first would decide it twice
+-- and silently make a component whose Filter says otherwise mean something else.
+tapCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+tapCandidates pid oid criterion gs =
+  let context = Filter.MkContext (Just pid) (Just oid)
+      matches candidate =
+        Filter.matches context (Projection.viewOfObject candidate gs) criterion
+   in List.sort (filter matches (Set.toList (GameState.battlefield gs)))
+
+-- The power a candidate contributes to CR 702.122a's total. Zero for a permanent
+-- with no power at all, which after CR 208.3 is every noncreature one -- so an
+-- uncrewed Vehicle standing beside the one being crewed adds nothing even where
+-- a criterion admits it.
+tapPower :: ObjectId -> GameState -> Integer
+tapPower candidate gs = Maybe.fromMaybe 0 (Projection.powerOf candidate gs)
+
+-- CR 701.26a: tap one permanent. A direct edit and not a funnel -- see
+-- payComponent's TapThis arm for why -- shared by the two components that tap,
+-- so the day an Event.tap exists there is one call site to move.
+tapObject :: ObjectId -> Game ()
+tapObject target =
+  State.modify'
+    (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) target (GameState.objects gs)})
 
 -- CR 118.3: a player can't pay a cost without the resources to pay it fully. The
 -- mana part AND every component, measured against the CURRENT state -- before any
@@ -553,6 +603,7 @@ lifeOwedByComponent component = case component of
   CostComponent.UntapThis -> 0
   CostComponent.SacrificeThis -> 0
   CostComponent.Sacrifice _ _ -> 0
+  CostComponent.TapForTotalPower _ _ -> 0
   CostComponent.DiscardCards _ -> 0
   CostComponent.DiscardThis -> 0
   CostComponent.PayEnergy _ -> 0
@@ -590,6 +641,19 @@ canPayComponent pid oid component gs = case component of
   -- effect" is not enforced across two components of ONE cost (#104).
   CostComponent.Sacrifice n criterion ->
     Natural.length (Replacement.sacrificeCandidates pid criterion gs) >= n
+  -- CR 702.122a: payable iff SOME subset of the candidates reaches the
+  -- threshold. Which is decided without enumerating one, because the greatest
+  -- total any subset can reach is the sum of the candidates' POSITIVE powers:
+  -- adding a candidate with power 0 or less can only leave the total where it
+  -- was or lower it, and the player is never obliged to add one. So this is
+  -- exact rather than a bound, and it is `>=` because CR 702.122a says "or
+  -- greater".
+  --
+  -- A threshold of 0 is payable by the empty set, which this answers True for
+  -- without a candidate on the board. No printing has crew 0; the arithmetic
+  -- simply does not need a special case.
+  CostComponent.TapForTotalPower n criterion ->
+    sum (fmap (max 0 . (`tapPower` gs)) (tapCandidates pid oid criterion gs)) >= toInteger n
   -- CR 601.2f: payable only if the hand holds at least that many cards.
   --
   -- `oid` is excluded, and that is CR 601.2a, not a convenience: the card moves
@@ -690,7 +754,7 @@ payComponents pid oid components = case components of
 payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent pid oid component = case component of
   CostComponent.TapThis -> do
-    State.modify' (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)})
+    tapObject oid
     pure Payment.Paid
   -- CR 107.6: a direct edit like TapThis above, and not through any funnel. That
   -- is an implementation choice and NOT a distinction CR 701.26b draws. Nothing
@@ -734,6 +798,40 @@ payComponent pid oid component = case component of
     if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
       then do
         Monad.mapM_ (Event.sacrifice pid) (Set.toAscList chosen)
+        pure Payment.Paid
+      else pure Payment.Unpaid
+  -- CR 702.122a: the payer chooses WHICH permanents to tap and HOW MANY, so this
+  -- is a prompt, and unlike Sacrifice above it is NEVER elided. Whether the
+  -- answer is forced is a question about subsets rather than about a count --
+  -- crew 6 with a 6-power and a 7-power creature has two legal answers and crew
+  -- 6 with a 4 and a 3 has one -- so eliding would mean enumerating subsets to
+  -- find out, and getting it wrong in the second direction decides for the
+  -- player. Asking a forced question costs a redundant prompt and decides
+  -- nothing. See Pawl.Types.Prompt.ChooseTapsForTotalPower.
+  --
+  -- Reject-not-repair, Sacrifice's posture: an answer that is not a subset of the
+  -- offered candidates, or whose total power falls short, makes the whole payment
+  -- Unpaid, which `pay`'s restore turns into a no-op. The total is summed over
+  -- the answer as given, INCLUDING any negative power in it -- CR 702.122a
+  -- measures the creatures that were tapped, not a best case.
+  --
+  -- The tap is a direct edit, TapThis' route and for TapThis' stated reason:
+  -- nothing in the pool watches for a permanent becoming tapped, so the funnel
+  -- CR 701.26a would justify has no observer to serve yet.
+  --
+  -- Not implemented: CR 702.122b/c's "crews a Vehicle" and "crewed by" relation,
+  -- and so CR 702.122e's "becomes crewed" trigger and CR 702.122d's "can't crew
+  -- Vehicles" restriction -- the chosen set is spent here and recorded nowhere
+  -- (#915).
+  CostComponent.TapForTotalPower n criterion -> do
+    gs <- State.get
+    let candidates = tapCandidates pid oid criterion gs
+        decider = Decide.deciderFor pid gs
+    chosen <- Game.choose (Prompt.ChooseTapsForTotalPower decider pid oid candidates n)
+    let totalPower = sum (fmap (`tapPower` gs) (Set.toAscList chosen))
+    if Set.isSubsetOf chosen (Set.fromList candidates) && totalPower >= toInteger n
+      then do
+        Monad.mapM_ tapObject (Set.toAscList chosen)
         pure Payment.Paid
       else pure Payment.Unpaid
   -- CR 701.9b: the discarding player chooses which cards, so this is a prompt.

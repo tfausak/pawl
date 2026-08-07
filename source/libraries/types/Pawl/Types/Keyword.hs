@@ -252,6 +252,24 @@ data Keyword
     -- rather than beside the other three in pairAllowedGiven.
     Menace
   | Devoid -- 702.114
+  | -- | 702.122a: crew N, an ACTIVATED ability meaning "Tap any number of other
+    -- untapped creatures you control with total power N or greater: This
+    -- permanent becomes an artifact creature until end of turn."
+    -- Pawl.Engine.Keyword.crew mints the whole ability from this constructor,
+    -- the way rule 702.29a's cycling is minted from Cycling -- the difference
+    -- being the ZONE, since rule 702.122a's ability functions on the
+    -- battlefield rather than in a hand.
+    --
+    -- N rides the constructor, Toxic's shape: `Crew 1` and `Crew 6` are
+    -- distinct keywords. Unlike toxic the Ns are never summed -- CR 702.122a
+    -- states one self-contained ability, so two crew abilities are two
+    -- activatable abilities with two separate thresholds, which is the
+    -- per-instance reading Poisonous takes.
+    --
+    -- A Natural and not a Cost, unlike Cycling and Flashback: rule 702.122a's
+    -- cost is not a Cost the card names, it is a SHAPE the rule states, and the
+    -- only thing the card supplies is the threshold.
+    Crew Natural.Natural
   | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
     -- enter with an additional +1/+1 counter on it. If you don't, it gains
     -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,

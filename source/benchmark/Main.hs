@@ -111,6 +111,16 @@ alwaysPass p = case p of
   -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
   -- permanent away. The engine's own replay fallback takes the maximal one.
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
+  -- CR 702.122a: tap every candidate, the maximal subset, matching
+  -- Replay.defaultAnswer. NOT the empty set the arm above takes: this prompt is
+  -- raised only once a crew ability is already being activated, so declining is
+  -- not on offer, and an answer under the threshold makes the payment Unpaid
+  -- (CR 601.2h forbids a partial payment) and voids the activation instead of
+  -- paying it. The maximal subset clears the threshold whenever the cost is
+  -- payable at all, save on a board where a candidate has negative power. A
+  -- deterministic answer, not a recommendation -- and unreached today, since no
+  -- benchmark deck holds a Vehicle and castElsePlay never activates anything.
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
@@ -185,6 +195,16 @@ castAnswer p = case p of
   -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
   -- permanent away. The engine's own replay fallback takes the maximal one.
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
+  -- CR 702.122a: tap every candidate, the maximal subset, matching
+  -- Replay.defaultAnswer. NOT the empty set the arm above takes: this prompt is
+  -- raised only once a crew ability is already being activated, so declining is
+  -- not on offer, and an answer under the threshold makes the payment Unpaid
+  -- (CR 601.2h forbids a partial payment) and voids the activation instead of
+  -- paying it. The maximal subset clears the threshold whenever the cost is
+  -- payable at all, save on a board where a candidate has negative power. A
+  -- deterministic answer, not a recommendation -- and unreached today, since no
+  -- benchmark deck holds a Vehicle and castElsePlay never activates anything.
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand
@@ -260,6 +280,16 @@ fightAnswer p = case p of
   -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
   -- permanent away. The engine's own replay fallback takes the maximal one.
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
+  -- CR 702.122a: tap every candidate, the maximal subset, matching
+  -- Replay.defaultAnswer. NOT the empty set the arm above takes: this prompt is
+  -- raised only once a crew ability is already being activated, so declining is
+  -- not on offer, and an answer under the threshold makes the payment Unpaid
+  -- (CR 601.2h forbids a partial payment) and voids the activation instead of
+  -- paying it. The maximal subset clears the threshold whenever the cost is
+  -- payable at all, save on a board where a candidate has negative power. A
+  -- deterministic answer, not a recommendation -- and unreached today, since no
+  -- benchmark deck holds a Vehicle and castElsePlay never activates anything.
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand

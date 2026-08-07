@@ -47,6 +47,35 @@ data CostComponent keyword
     -- characteristic: Blood Moon makes a nonbasic land a Mountain, and it may be
     -- sacrificed as one.
     Sacrifice Natural.Natural (Filter.Filter keyword)
+  | -- | CR 702.122a's cost half: tap ANY NUMBER of untapped permanents matching
+    -- the Filter, chosen so that their TOTAL power is the Natural or greater.
+    -- Crew 6's "tap any number of other untapped creatures you control with
+    -- total power 6 or greater" is the printing, and the whole of "other
+    -- untapped creatures you control" rides the Filter rather than this
+    -- constructor -- CR 702.122a's "other" is `Not IsSource`, its "untapped" is
+    -- `Not IsTapped` and its "you control" is `ControlledBy You`, all three
+    -- already in the vocabulary.
+    --
+    -- NOT `Sacrifice`-shaped, and the difference is the whole point of a second
+    -- arm: Sacrifice's Natural is HOW MANY objects, which the payer must match
+    -- exactly, while this one is a THRESHOLD on an aggregate of the chosen set.
+    -- CR 702.122a's "or greater" makes overpaying legal, so the number of
+    -- objects is not determined by the cost at all -- one 7-power creature and
+    -- three 2-power ones are both legal answers to crew 6.
+    --
+    -- The aggregate lives here and not in the Filter, because a Filter is a
+    -- predicate over ONE candidate (see Pawl.Types.Filter) and total power is a
+    -- property of the chosen SET. Pawl.Types.Aggregation, the other aggregate
+    -- vocabulary, has no summing arm either.
+    --
+    -- POWER specifically, and not a general characteristic: CR 702.122a names
+    -- power, and it is the only aggregate threshold any cost in the pool states.
+    -- Convoke (CR 702.51) is the other any-number tap cost and is a different
+    -- shape entirely -- each tapped creature pays one symbol, with no threshold
+    -- to reach -- so it will not reuse this arm.
+    --
+    -- A Natural and not a Quantity, for PayLife's reason above.
+    TapForTotalPower Natural.Natural (Filter.Filter keyword)
   | -- | CR 601.2f: discard this many cards from hand (Cathartic Reunion's two).
     -- CR 701.9b gives the choice to the discarding player, so this is a prompt
     -- and never an engine pick -- the same shape Sacrifice above has.
