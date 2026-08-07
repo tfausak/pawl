@@ -74,10 +74,14 @@ woundedByDeathtouch gs oid =
 -- CR 704.5f: toughness 0 or less -- a put-into-graveyard, NOT a destruction, so
 -- ungated by indestructible and NOT saved by regeneration (CR 701.19a).
 --
--- The isCreature guard is not redundant. Only creatures have printed toughness
--- today, so toughnessOf already implies it -- but CR 301.7a is why the two are
--- not the same question: a noncreature Vehicle has the printed numbers and not
--- the characteristic, and 704.5f/g must not touch it.
+-- The isCreature guard states CR 301.7a's distinction rather than relying on it.
+-- An uncrewed Consulate Dreadnought is a permanent with printed numbers and no
+-- toughness CHARACTERISTIC, and 704.5f/g must not touch it -- which
+-- Projection.noncreaturePT already guarantees by answering Nothing for it, so
+-- the two conjuncts now agree by construction on every permanent in the pool.
+-- Kept because they are different questions: rule 208.5 gives a creature with no
+-- value for its toughness a toughness of 0, and the day that is implemented
+-- (#759) this guard is what keeps a Vehicle out of the graveyard.
 --
 -- Takes the object's already-projected characteristics (checkStateBasedActions
 -- projects the whole board once, per CR 704.3 simultaneity).

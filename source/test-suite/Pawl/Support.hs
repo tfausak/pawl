@@ -342,6 +342,13 @@ playLandAnswer p = case p of
   -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
   -- permanent away. The engine's own replay fallback takes the maximal one.
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
+  -- CR 702.122a: every candidate, the MAXIMAL subset and the opposite of the
+  -- arm above. Tapping is not throwing a permanent away, and the minimal
+  -- answer -- the empty set -- fails to reach any threshold above 0, so a
+  -- default answerer choosing it would make every crew activation it was ever
+  -- offered go Unpaid. A test that cares which creatures crew says so with its
+  -- own interpreter.
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand

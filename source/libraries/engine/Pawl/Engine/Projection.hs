@@ -2087,7 +2087,42 @@ projectWith admits cands = forObject
                         ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
                         step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
                      in (List.foldl' step seeded ordered, decided')
-       in fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers)
+       in noncreaturePT oid gs (fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers))
+
+-- CR 208.3: "A noncreature permanent has no power or toughness, even if it's a
+-- card with a power and toughness printed on it (such as a Vehicle)." Applied to
+-- the FINISHED fold, which is the only place it can go: the card types it reads
+-- are settled at CR 613.1d layer 4, so an uncrewed Consulate Dreadnought reports
+-- no power while a crewed one reports 7 -- CR 301.7b's "it immediately has its
+-- printed power and toughness", falling out of the type change rather than being
+-- a second effect.
+--
+-- CR 208.3a is the other half and needs no code: an effect that would set or
+-- modify a noncreature permanent's P/T "is created even though it doesn't do
+-- anything unless that permanent becomes a creature", and pawl's continuous
+-- effects are STORED and re-applied per projection, so a Veteran Motorist's
+-- +1/+1 on an uncrewed Vehicle sits in GameState.continuousEffects and starts
+-- counting the moment layer 4 makes it a creature. That it applies at all is
+-- what applying this gate AFTER layer 7 buys -- gating before the fold would
+-- leave `addPT` nothing to add to and lose the effect for good.
+--
+-- ON THE BATTLEFIELD ONLY, which is rule 208.3's own second sentence: "A
+-- noncreature object not on the battlefield has power or toughness only if it
+-- has a power and toughness printed on it." So a Vehicle in a hand or a
+-- graveyard keeps its printed numbers, and every off-battlefield read of them
+-- -- Filter.PowerAtLeast over a graveyard pool, a Count, the codec -- is
+-- unaffected.
+--
+-- Sound on a layer-BOUNDED projection too (projectUpTo), though it is reading
+-- card types the bound may not have finished: a printed creature type arrives in
+-- the seed and no bound can remove it, so the only thing a bound can hide is a
+-- type-CHANGING effect -- which under-reads in exactly the direction #157
+-- already records for a bounded count.
+noncreaturePT :: ObjectId -> GameState -> ProjectedCharacteristics -> ProjectedCharacteristics
+noncreaturePT oid gs pc
+  | Set.member CardType.Creature (PC.cardTypes pc) = pc
+  | not (Set.member oid (GameState.battlefield gs)) = pc
+  | otherwise = pc {PC.power = Nothing, PC.toughness = Nothing}
 
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
@@ -2190,10 +2225,16 @@ abilitiesOf = abilitiesGiven Map.empty
 
 abilitiesGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Type.Card]
 abilitiesGiven pcs oid gs =
-  let granted ability = case ActivatedAbility.condition ability of
+  let pc = projectGiven pcs oid gs
+      granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
         Just cond -> Condition.holds (fullView gs) (Filter.MkContext (controllerOf oid gs) (Just oid)) gs oid cond
-   in filter granted (PC.activatedAbilities (projectGiven pcs oid gs))
+   in -- Rule 702's own activated abilities are appended here, the shape
+      -- intrinsicReplacementsOf takes one function down: the card's printed list
+      -- is the projection's, and Pawl.Engine.Keyword mints the rule's from the
+      -- POST-LAYER keyword map, so Humility takes crew away with the rest. Every
+      -- reader gets one flat list and never learns rule 702 wrote part of it.
+      filter granted (PC.activatedAbilities pc <> Keyword.battlefieldAbilitiesOf (PC.keywords pc))
 
 -- CR 614 / 613 layer 6: an object's replacement effects after the layer system,
 -- the same projection posture as abilitiesOf. A Humility'd creature has none.
