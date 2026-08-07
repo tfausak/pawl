@@ -66,6 +66,32 @@ import qualified Pawl.Types.Zone as Zone
 unpayable :: Cost Keyword.Type.Keyword
 unpayable = Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
 
+-- CR 118.9: the alternative cost "applied to it from another effect" that the
+-- rule's own second phrasing names -- "You may cast [this object] without paying
+-- its mana cost". Everything about the printed cost survives except the mana
+-- part, which becomes {0}.
+--
+-- Just an EMPTY ManaCost and never Nothing, which is the whole of what makes it
+-- payable: Pawl.Types.Cost's Nothing is CR 118.6's unpayable cost, and
+-- `Just (MkManaCost [])` is {0} (CR 118.5, CR 118.5a). Ornithopter and Ancestral
+-- Vision are the two spellings, and this rule produces the first.
+--
+-- The additional costs ride along, which is CR 118.9d in as many words: "an
+-- alternative cost doesn't change a spell's mana cost, only what its controller
+-- has to pay", and "if an alternative cost is being paid to cast a spell, any
+-- additional costs ... that affect that spell are applied to that alternative
+-- cost". `costsFor`'s `withAdditional` wraps the card's own alternatives the
+-- same way, for the same rule.
+--
+-- The face is the one being CAST (CR 709.3a / 712.11a), so an offer to cast a
+-- back face free carries that face's additional costs and not the front's.
+withoutPayingManaCost :: Face.Face card -> Cost Keyword.Type.Keyword
+withoutPayingManaCost face =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components = Face.additionalCosts face
+    }
+
 -- The first offered candidate, or `unpayable` when none was offered. The one
 -- total, documented answer every ChooseCost fallback uses.
 firstOffered :: [Cost Keyword.Type.Keyword] -> Cost Keyword.Type.Keyword

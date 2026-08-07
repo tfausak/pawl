@@ -141,6 +141,11 @@ data Response
   | -- | CR 603.5: whether the controller of a resolving spell or ability
     -- exercised a printed "may".
     ChoseOptional OptionalDecision.OptionalDecision
+  | -- | CR 608.2g: whether a player took a cast a resolving effect offered them.
+    -- Distinct from ChoseOptional, which records CR 603.5's "may" over a whole
+    -- mode, and from CastWhileSearched, which records the same rule's
+    -- library-search producer and names which card was cast.
+    ChoseOfferedCast OptionalDecision.OptionalDecision
   | -- | CR 118.12a: whether the player a resolving spell or ability offered a
     -- cost to chose to pay it. Distinct from ChoseOptional, which records CR
     -- 603.5's "may" and is always answered by the resolving controller.

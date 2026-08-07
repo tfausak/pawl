@@ -192,8 +192,9 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- Subtype.Fortification is the one clause of the rule with no constructor to case
 -- on, and is therefore unreachable rather than elided. The BATTLE clause is
--- written out, though nothing reaches it: CardType.Battle exists, but no card in
--- the pool carries one (#302). That is becomesUnattached's posture toward CR
+-- written out, though nothing reaches it: the pool has a battle, but CR 310.9
+-- forbids attaching one and no effect in the pool tries. That is
+-- becomesUnattached's posture toward CR
 -- 704.5n's "or to a player" -- express the clause, and let the pool decide when it
 -- fires. "Or to a player" needs no clause at all here: this rule asks only whether
 -- the attached permanent may be attached to ANYTHING, so the `Just _` below covers
@@ -527,6 +528,14 @@ performStateBasedActions = do
       -- Engine.performSettle runs this pass before placePendingTriggers. See
       -- Saga.awaitingChapter.
       told = Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs
+      -- CR 704.5v / 310.7, from the SAME pre-pass state as everything above, and
+      -- living in Pawl.Engine.Battle with the rest of rule 310 the way CR 704.5s
+      -- lives in Pawl.Engine.Saga.
+      --
+      -- The unscanned event log is an input for the reason CR 704.5s's is: the rule
+      -- exempts a battle whose ability "has triggered but not yet left the stack",
+      -- and this pass runs before placePendingTriggers. See Battle.awaitingAbility.
+      routed = Battle.defeated pcs (Event.unscannedEvents gs) gs
       -- CR 704.5w / 704.5x: the battles whose protector designation has become
       -- illegal, paired with the projection and controller the re-choice needs.
       -- What "illegal" means is CR 310.10, and it lives in Pawl.Engine.Battle with
@@ -539,7 +548,7 @@ performStateBasedActions = do
         pc <- Map.lookup oid pcs
         Monad.guard (Battle.isBattle pc)
         controller <- Projection.controllerOf oid gs
-        Monad.guard (Battle.needsProtector pc controller (Game.stillPlaying gs) (Object.protector =<< Game.lookupObject oid gs))
+        Monad.guard (Battle.needsProtector pc controller (Game.stillPlaying gs) (Battle.isBeingAttacked oid gs) (Object.protector =<< Game.lookupObject oid gs))
         pure (oid, pc, controller)
       undefended = Maybe.mapMaybe undefendedOne onBattlefield
   -- CR 704.5j: the legend rule is one of the two state-based actions that ASK --
@@ -575,9 +584,9 @@ performStateBasedActions = do
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
   -- rule's losers), CR 704.5k (the world rule's), CR 704.5m (an Aura attached to
-  -- nothing) and CR 704.5w/704.5x (a battle no player can protect). None of the
-  -- six is a destruction, so none consults indestructible or a regeneration
-  -- shield.
+  -- nothing), CR 704.5v (a battle at defense 0) and CR 704.5w/704.5x (a battle no
+  -- player can protect). None of the seven is a destruction, so none consults
+  -- indestructible or a regeneration shield.
   --
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
   -- controller kept a DIFFERENT copy is named by 704.5f and 704.5j alike, and
@@ -591,7 +600,7 @@ performStateBasedActions = do
   -- from the board the pass began in, so an animated Rest in Peace this pass is
   -- itself burying still exiles the cards the rest of the batch would put into
   -- graveyards. See Pawl.Engine.Replacement's applyReplacementsIn.
-  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable))
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.

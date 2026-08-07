@@ -32,6 +32,7 @@ isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
   Recipient.ToPlaneswalker _ -> False
+  Recipient.ToBattle _ -> False
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
 
@@ -46,7 +47,7 @@ castElsePlay actions =
         Action.Cast {} -> True
         _ -> False
       isPlay a = case a of
-        Action.Play _ -> True
+        Action.Play {} -> True
         _ -> False
    in case filter isCast actions of
         h : _ -> h
@@ -118,6 +119,10 @@ alwaysPass p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -188,6 +193,10 @@ castAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -259,6 +268,10 @@ fightAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is

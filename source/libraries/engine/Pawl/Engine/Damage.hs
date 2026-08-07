@@ -7,6 +7,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -75,6 +76,10 @@ legalAssignment thresholds power answer =
         -- attackerAssignment never offers the player alongside it, and the gate
         -- below reads the whole non-blocker share either way.
         Recipient.ToPlaneswalker _ -> True
+        -- And a battle, for the same clause of CR 702.19b: it is what the creature
+        -- is attacking, so the excess going to it is on the defender's side of the
+        -- split rather than the blockers'.
+        Recipient.ToBattle _ -> True
         Recipient.ToObject _ -> False
       defenderAmount = sum (Map.elems (Map.filterWithKey (\r _ -> isDefender r) answer))
       blockerThresholds = Map.filterWithKey (\r _ -> not (isDefender r)) thresholds
@@ -174,6 +179,13 @@ combatRecipient gs target = case target of
     if Combat.stillAttacked oid gs
       then Just (Recipient.ToPlaneswalker oid)
       else Nothing
+  -- CR 310.5 / 506.4, the planeswalker arm's twin: a battle that has left the
+  -- battlefield is removed from combat and stops being attacked, so CR 510.1b
+  -- gives the creature nothing to assign to.
+  AttackTarget.OfBattle oid ->
+    if Combat.stillAttackedBattle oid gs
+      then Just (Recipient.ToBattle oid)
+      else Nothing
 
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
@@ -248,9 +260,9 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                 -- handled above, so this fallback is unreachable, and answering
                 -- with the CR 510.1c default is the conservative reading.
                 let banded = any (\b -> Projection.hasKeyword Keyword.Banding b gs) blockers
-                    defending = case target of
-                      AttackTarget.OfPlayer defender -> Just defender
-                      AttackTarget.OfPlaneswalker oid -> Projection.controllerOf oid gs
+                    -- CR 508.5 / CR 310.8d, shared with the landwalk reading in
+                    -- Combat.defendingPlayerOf so the two cannot drift.
+                    defending = Combat.defendingPlayerOf (Projection.controlGrants gs) target gs
                     chooser = if banded then Maybe.fromMaybe pid defending else pid
                 let decider = Decide.deciderFor chooser gs
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
@@ -329,28 +341,30 @@ gatherCombatDamage assigns = do
 -- 616's replacement loop, CR 704.5h's deathtouch scan, CR 608.2i's turn log --
 -- sees an event that never happened.
 --
--- ToCreature, ToPlaneswalker and ToPlayer pass through untouched. Each is
--- produced either by combat (CR 510.1b-d) or by a CR 601.2c target chosen out of
--- a typed Pool, so what it names was already classified when the recipient was
+-- ToCreature, ToPlaneswalker, ToBattle and ToPlayer pass through untouched. Each
+-- is produced either by combat (CR 510.1b-d) or by a CR 601.2c target chosen out
+-- of a typed Pool, so what it names was already classified when the recipient was
 -- built; re-asking here would be a second, later reading of the same question,
 -- which is what CR 608.2b's target re-validation is for and this is not.
 --
--- Only battles are missing from the classification, and only because Recipient
--- has no ToBattle tag to classify one as (#302); CR 120.3h is what it would need.
+-- Rule 120.1a's three object kinds are now all three classifiable, so a ToObject
+-- naming none of them is CR 120.1a's "can't" and nothing else.
 --
 -- The creature test comes first, and for a permanent that is both a creature and
--- a planeswalker that is the wrong answer -- CR 120.3c and CR 120.3e both apply
--- and one Recipient cannot carry both (#503). Unreachable today: nothing in the
--- pool prints both card types, and no effect in it adds a creature type to a
--- planeswalker.
+-- a planeswalker or a battle that is the wrong answer -- CR 120.3c, CR 120.3e and
+-- CR 120.3h all apply and one Recipient cannot carry two (#503). Unreachable
+-- today: nothing in the pool prints two of those card types, and no effect in it
+-- adds a creature type to a planeswalker or a battle.
 damageRecipient :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
 damageRecipient gs recipient = case recipient of
   Recipient.ToPlayer _ -> Just recipient
   Recipient.ToCreature _ -> Just recipient
   Recipient.ToPlaneswalker _ -> Just recipient
+  Recipient.ToBattle _ -> Just recipient
   Recipient.ToObject oid
     | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
     | Projection.isPlaneswalkerOf oid gs -> Just (Recipient.ToPlaneswalker oid)
+    | Projection.isBattleOf oid gs -> Just (Recipient.ToBattle oid)
     | otherwise -> Nothing
 
 -- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
@@ -410,6 +424,23 @@ applyDamage events = do
                   { Object.counters =
                       Map.insert
                         CounterKind.Loyalty
+                        (Natural.minusSaturating (have obj) (DamageEvent.amount ev))
+                        (Object.counters obj)
+                  }
+           in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
+        -- CR 310.6 / CR 120.3h: damage dealt to a battle removes that many defense
+        -- counters from it. The planeswalker arm above with a different counter
+        -- kind, and written the same way for the same three reasons: directly rather
+        -- than through a "would remove counters" sub-replacement (#122), floored at
+        -- 0 because Object.counters is Natural and CR 122.1g makes defense the
+        -- COUNT, and destroying nothing (CR 120.5) -- CR 704.5v reads the 0.
+        Recipient.ToBattle oid ->
+          let have obj = Map.findWithDefault 0 CounterKind.Defense (Object.counters obj)
+              strip obj =
+                obj
+                  { Object.counters =
+                      Map.insert
+                        CounterKind.Defense
                         (Natural.minusSaturating (have obj) (DamageEvent.amount ev))
                         (Object.counters obj)
                   }
@@ -510,6 +541,28 @@ applyDamage events = do
       lifeGainedBy ev = case DamageEvent.dealtByLifelink ev of
         Just pid | DamageEvent.amount ev > 0 -> [GameEvent.LifeGained pid (DamageEvent.amount ev)]
         _ -> []
+      -- CR 310.6's counter removal, recorded so CR 310.11b's "when the last
+      -- defense counter is removed" has an event to fire off.
+      --
+      -- ONE record per BATTLE and not one per damage event, which is CR 510.2's
+      -- simultaneity taken seriously: two unblocked attackers that between them
+      -- take a defense-5 battle to 0 removed its last defense counter ONCE, so the
+      -- Siege ability triggers once. A per-event record would have neither event
+      -- reach 0 and the trigger would never fire at all.
+      --
+      -- Read as a BEFORE/AFTER pair off the two boards rather than summed out of
+      -- the events, so the record describes what actually came off: the floor in
+      -- markOne above means 4 damage to a defense-1 battle removes one counter,
+      -- not four.
+      battleHit ev = case DamageEvent.target ev of
+        Recipient.ToBattle oid -> Just oid
+        _ -> Nothing
+      removalOn before after oid =
+        let was = Battle.defenseOn oid before
+            now = Battle.defenseOn oid after
+         in [GameEvent.CountersRemoved oid CounterKind.Defense was now | was > now]
+      removalsBetween before after =
+        concatMap (removalOn before after) (List.nub (Maybe.mapMaybe battleHit survivors))
   -- CR 608.2i: each surviving event is RECORDED, not enqueued. Sba consumes by
   -- bumping GameState.damageScannedThrough; the record survives the check.
   --
@@ -537,7 +590,15 @@ applyDamage events = do
             -- gain sit together: a lifelink attacker's two records describe a
             -- single event, and CR 702.15e already makes each source's gain its
             -- own entry.
-            List.foldl' (flip Event.recordEvent) dealt (concatMap (\ev -> lifeLostBy ev <> lifeGainedBy ev) survivors)
+            --
+            -- CR 310.6's counter removals join them, after the damage and for the
+            -- same reason: they are a RESULT of it (CR 120.3h), so the cause reads
+            -- first. `marked` is the board markOne left, which is what makes the
+            -- pair the removal that actually happened.
+            List.foldl'
+              (flip Event.recordEvent)
+              dealt
+              (concatMap (\ev -> lifeLostBy ev <> lifeGainedBy ev) survivors <> removalsBetween gs marked)
     )
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --

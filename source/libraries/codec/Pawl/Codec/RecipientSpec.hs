@@ -27,6 +27,14 @@ spec s = Spec.describe s "Pawl.Codec.Recipient" $ do
       Recipient.fromJson
       (Recipient.ToPlaneswalker (ObjectId.MkObjectId 2))
       """ {"type":"ToPlaneswalker","value":2} """
+  -- CR 120.3h's is a third, for CR 115.4's fourth kind of "any target".
+  Spec.it s "ToBattle" $
+    Common.assertJsonCodec
+      s
+      Recipient.toJson
+      Recipient.fromJson
+      (Recipient.ToBattle (ObjectId.MkObjectId 5))
+      """ {"type":"ToBattle","value":5} """
   Spec.it s "ToPlayer" $
     Common.assertJsonCodec
       s

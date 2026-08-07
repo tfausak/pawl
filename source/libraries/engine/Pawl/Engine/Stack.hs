@@ -57,19 +57,29 @@ resolveTopWith runSubgame = do
           -- is-it-a-permanent/is-it-an-Aura check narrows the same way every
           -- OTHER characteristic read of a stack object already does
           -- (Cost.costsFor resolves the same way, through Game.resolveFace).
-          -- Action.playableLands stays on Card.combined on purpose: Action.Play
-          -- carries no face, and the layout that would make a land's halves
-          -- differ is CR 712.12's modal double-faced card, which has not landed.
+          -- Action.playableLands asks the same question of a land play through
+          -- Card.landFaces, which CR 712.12 gives the same shape: a chosen face
+          -- where the layout has one, and the combined view where it does not.
           --
           -- Falls back to the combined view for parity with faceOf's own
           -- fallback; unreachable here since `obj` already resolved via this
           -- same `oid`.
           let face = Maybe.fromMaybe (Card.combined (Printing.card printing)) (Game.faceOf oid gs)
+              -- CR 712.13: the face this spell showed on the stack, carried onto
+              -- the permanent for the layouts whose rules say so and dropped for
+              -- the rest (Card.enteringFace). Read off `obj` rather than off
+              -- `face`, because what the rule carries is the object's own record
+              -- of which face is up and not the face a fallback resolved to.
+              entering = Card.enteringFace (Printing.card printing) (Object.face obj)
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
                 else
+                  -- `entering` is carried on BOTH branches below: CR 712.13 is
+                  -- about the resolving spell rather than about which kind of
+                  -- permanent it becomes, and an Aura back face would carry its
+                  -- face for the same reason a creature one does.
                   if not (Card.isAura face)
-                    then carryOver oid =<< Event.changeZoneReturning oid Zone.Battlefield
+                    then carryOver oid =<< Event.changeZoneShowing oid Zone.Battlefield entering
                     else -- CR 303.4a made this spell target, so CR 608.2b applies
                     -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
                     -- the type line (CR 205.3h), the same closed-half
@@ -87,7 +97,7 @@ resolveTopWith runSubgame = do
                           -- that is Object.owner for every spell in the pool --
                           -- nothing here lets a player cast a card they do not
                           -- own, so the two readings coincide (#83).
-                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped Nothing Nothing
+                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped Nothing entering
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}

@@ -74,3 +74,4 @@ manaProduced effect = case effect of
   Effect.PlaySubgame _ -> Nothing
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary _ -> Nothing
+  Effect.OfferCast {} -> Nothing

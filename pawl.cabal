@@ -96,6 +96,8 @@ library codec
     Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
     Pawl.Codec.CastingRestrictionSpec
+    Pawl.Codec.CastOffer
+    Pawl.Codec.CastOfferSpec
     Pawl.Codec.Color
     Pawl.Codec.ColorSpec
     Pawl.Codec.CombatRestriction
@@ -517,6 +519,7 @@ library types
     Pawl.Types.CardType
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
+    Pawl.Types.CastOffer
     Pawl.Types.Color
     Pawl.Types.Combat
     Pawl.Types.CombatRestriction
@@ -719,6 +722,7 @@ test-suite pawl-test-suite
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.ManaSpec
+    Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
     Pawl.PerformanceSpec

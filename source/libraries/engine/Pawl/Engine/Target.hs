@@ -101,10 +101,9 @@ legalRecipients perspective source spec gs =
    in Set.filter keep (admittedGiven pcs perspective source spec gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
--- Pool's base candidate set (CR 115.4's "any target" is creatures and
--- planeswalkers on the battlefield plus players still in the game; the battles
--- that rule also names are not admitted, #302) narrowed by its Filter. Rule 702's
--- targeting restrictions are NOT applied.
+-- Pool's base candidate set (CR 115.4's "any target" is creatures, planeswalkers
+-- and battles on the battlefield plus players still in the game) narrowed by its
+-- Filter. Rule 702's targeting restrictions are NOT applied.
 --
 -- Separate from legalRecipients because "can't be the target of" and "is an
 -- illegal object to be attached to" are different questions, and rule 702 says so
@@ -145,6 +144,7 @@ admittedGiven pcs perspective source spec gs =
         Recipient.ToPlayer pid -> against (Filter.playerView pid)
         Recipient.ToCreature oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToPlaneswalker oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
+        Recipient.ToBattle oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
         Recipient.ToObject oid -> against (Projection.viewOfObjectGiven pcs grants oid gs)
       against view = case narrowing of
         Nothing -> True
@@ -226,8 +226,8 @@ admittedGiven pcs perspective source spec gs =
 --
 -- EXHAUSTIVE over Recipient rather than routed through Recipient.objectOf: with
 -- the player arm split out, an objectOf-shaped match would leave a Nothing branch
--- no input reaches and would silently swallow a new constructor. CR 120.3h's
--- battle (#302) must break this build rather than default to targetable.
+-- no input reaches and would silently swallow a new constructor -- a new one must
+-- break this build rather than default to targetable.
 targetable :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> Filter.View -> GameState -> Recipient -> Bool
 targetable pcs perspective source sourceView gs recipient =
   let restrictedObject oid =
@@ -258,6 +258,7 @@ targetable pcs perspective source sourceView gs recipient =
         Recipient.ToPlayer pid -> not (PlayerEffect.protectedFromTargeting perspective pid gs)
         Recipient.ToCreature oid -> restrictedObject oid
         Recipient.ToPlaneswalker oid -> restrictedObject oid
+        Recipient.ToBattle oid -> restrictedObject oid
         Recipient.ToObject oid -> restrictedObject oid
 
 -- CR 702.11b / CR 702.11d's "your opponents": is `perspective` -- CR 109.5's
@@ -316,6 +317,7 @@ basePoolGiven pcs context pool gs = case pool of
     Set.unions
       [ creatureRecipientsGiven pcs gs,
         planeswalkerRecipientsGiven pcs gs,
+        battleRecipientsGiven pcs gs,
         playerRecipients gs
       ]
   Pool.Permanents -> permanentRecipients gs
@@ -362,6 +364,34 @@ planeswalkerRecipientsGiven pcs gs =
         . fmap Recipient.ToPlaneswalker
         $ concatMap
           (filter isPlaneswalkerId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
+          (Game.stillPlaying gs)
+
+-- CR 115.4: battles on the battlefield, per playing player's zone, tagged
+-- ToBattle. planeswalkerRecipientsGiven's twin one card type over, sharing the same
+-- walk and the same projection, and a pool of its own for the same reason: CR
+-- 120.3h's answer to "what does damage to this do" is picked here, once, and
+-- carried on the recipient.
+--
+-- The walk is over each still-playing player's slice of the battlefield, which
+-- Game.zoneMembers cuts by OWNER -- the same walk the two arms above make, and the
+-- reason it is right here is that CR 115.4 draws no line at all: neither the
+-- battle's controller nor its protector narrows the candidates. Being a legal
+-- target is not being attackable (CR 310.8b): a "deals 3 damage to any target"
+-- spell may name a battle whose protector the caster is.
+--
+-- A permanent that is both a battle and a creature would appear under both tags,
+-- which is one target choice too many (#503) -- planeswalkerRecipientsGiven's
+-- caveat, unchanged.
+battleRecipients :: GameState -> Set Recipient
+battleRecipients gs = battleRecipientsGiven (Projection.projectAll gs) gs
+
+battleRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> GameState -> Set Recipient
+battleRecipientsGiven pcs gs =
+  let isBattleId oid = Projection.isBattleGiven pcs oid gs
+   in Set.fromList
+        . fmap Recipient.ToBattle
+        $ concatMap
+          (filter isBattleId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
           (Game.stillPlaying gs)
 
 -- CR 115: players still in the game, tagged ToPlayer.

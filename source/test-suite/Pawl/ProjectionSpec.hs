@@ -1095,7 +1095,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
 
   -- Conversion is the pool's first static ability whose AFFECTED set names a
   -- basic land type, which is what makes CR 612's word swap reach an affected set
-  -- at all (#584). The pair below differs only in whether the swap is installed.
+  -- at all. The pair below differs only in whether the swap is installed.
   Spec.it s "CR 305.7 Conversion turns Mountains into Plains" $ do
     mountain <- S.printingOf s registry "Mountain"
     island <- S.printingOf s registry "Island"
@@ -1124,6 +1124,51 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (not (Set.member Subtype.Type.Island (Projection.subtypesOf islandId gs))) "and no longer an Island"
     Spec.assertBool s (Set.member Subtype.Type.Mountain (Projection.subtypesOf mountainId gs)) "the Mountain is left alone"
     Spec.assertBool s (not (Set.member Subtype.Type.Plains (Projection.subtypesOf mountainId gs))) "and is not a Plains"
+
+  -- CR 612.1 reaching the OTHER read-point of the same affected clause: CR 305.7's
+  -- ability strip, which Projection.setLandSubtypeEffects gathers and
+  -- Projection.liveGiven answers. The layer fold above decides what a subtype
+  -- BECOMES; this gate decides whose rules-text abilities survive, and the two must
+  -- agree about which permanents Conversion names.
+  --
+  -- SYNTHETIC CARD, and why. The gate reads BASE characteristics, so seeing it
+  -- disagree needs a permanent whose PRINTED type line carries a basic land type
+  -- AND which has a rules-text static ability reaching other objects. Every basic
+  -- land is abilityless, and no printed nonbasic land in the pool carries a basic
+  -- land type beside such an ability, so nothing could be on both sides at once.
+  --
+  --   Synthetic Volcanic Estuary  Land -- Mountain
+  --     "All Forests are Swamps."
+  --
+  -- Nothing in the CR forbids it: CR 305.7's own subject is a land whose subtype is
+  -- set, so a land that both HAS a basic land type and SETS one is the rule's
+  -- ordinary shape rather than an exception to it.
+  --
+  -- Swamp and not Island on purpose. The Estuary's own effect is a layer-4
+  -- subtype set, and so is Conversion's, so a shared word would put CR 613.8's
+  -- dependency between them and make the two worlds differ for a second reason.
+  Spec.it s "CR 305.7 Conversion strips the Estuary's ability, and CR 612.1 hands it back" $ do
+    forest <- S.printingOf s registry "Forest"
+    estuary <- S.printingOf s registry "Synthetic Volcanic Estuary"
+    conversion <- S.printingOf s registry "Conversion"
+    let base = Setup.emptyGame S.bothPlayers
+        (forestId, g1) = S.addCreature forest S.alice base
+        (_, g2) = S.addCreature estuary S.alice g1
+        (conversionId, printed) = S.addCreature conversion S.alice g2
+        -- The same Magical Hack as the case above, on the same card: "All
+        -- Mountains are Plains" becomes "All Islands are Plains". The Estuary's
+        -- printed type line still says Mountain, so the rewritten clause no longer
+        -- names it.
+        hacked = S.withEffectAt conversionId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Mountain Subtype.Type.Island) printed
+        -- The anti-vacuity control: with no Conversion at all the Estuary's
+        -- ability plainly works, so "the Forest is a Swamp" below is the strip
+        -- lifting rather than the card doing nothing either way.
+        alone = g2
+    Spec.assertBool s (Set.member Subtype.Type.Swamp (Projection.subtypesOf forestId alone)) "with no Conversion the Estuary makes the Forest a Swamp"
+    Spec.assertBool s (Set.member Subtype.Type.Forest (Projection.subtypesOf forestId printed)) "under the printed Conversion the Forest is untouched"
+    Spec.assertBool s (not (Set.member Subtype.Type.Swamp (Projection.subtypesOf forestId printed))) "because CR 305.7 stripped the Estuary's ability"
+    Spec.assertBool s (Set.member Subtype.Type.Swamp (Projection.subtypesOf forestId hacked)) "under the hacked one the ability is live again"
+    Spec.assertBool s (not (Set.member Subtype.Type.Forest (Projection.subtypesOf forestId hacked))) "and CR 305.7's set replaced the old land type"
 
   -- CR 111.3: a token is not a card, and nothing in CR 613 changes that -- so
   -- Not IsToken reads no projected aspect and no ordering turns on it.

@@ -920,8 +920,23 @@ priorityLoop = do
                                   else do
                                     State.modify' (\g -> g {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)})
                                     loop
-                              Action.Type.Play oid -> do
-                                Event.changeZone oid Zone.Battlefield
+                              Action.Type.Play oid mName -> do
+                                -- CR 712.12: "A player playing a modal
+                                -- double-faced card ... as a land chooses one of
+                                -- its faces that's a land before putting it onto
+                                -- the battlefield. It enters the battlefield with
+                                -- that face up." The choice was made when the
+                                -- action was chosen (Action.playableLands offers
+                                -- one per face), so the move is what carries it --
+                                -- the door CR 709.3a's chosen half already uses.
+                                --
+                                -- NOT changeZoneEntering, which is where CR
+                                -- 712.14b turns a put-onto-the-battlefield
+                                -- instruction away: playing a land is a special
+                                -- action (CR 305.1), not such an instruction, and
+                                -- CR 712.12 permits exactly the card CR 712.14b
+                                -- stops.
+                                Monad.void (Event.changeZoneShowing oid Zone.Battlefield mName)
                                 -- CR 305.2a counts the lands played this turn,
                                 -- so this TALLIES rather than flagging: the
                                 -- second land Exploration allows has to be

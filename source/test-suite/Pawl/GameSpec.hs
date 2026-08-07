@@ -228,7 +228,7 @@ actionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 actionSpec s registry = Spec.describe s "Action" $ do
   Spec.it s "a land in hand is playable in a main phase" $ do
     mountain <- S.printingOf s registry "Mountain"
-    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)) "play"
+    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) Nothing `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)) "play"
 
   Spec.it s "passing is always legal" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -248,7 +248,7 @@ actionSpec s registry = Spec.describe s "Action" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.oneMountainState mountain Phase.PrecombatMain
         (_, withSpell) = S.spellOnStack piker S.alice base
-    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice base) "playable while the stack is empty"
+    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) Nothing `elem` Action.legalActions S.alice base) "playable while the stack is empty"
     Spec.assertEqWith s "only pass while a spell is on it" (Action.legalActions S.alice withSpell) [A.Pass]
 
   -- CR 305.2b: with the normal allowance of one already spent, no further play
@@ -403,6 +403,7 @@ recordingAnswer p = case p of
   Prompt.OpeningHandAction {} -> pure Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> pure OptionalDecision.Declines
+  Prompt.OfferedCast {} -> pure OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -1039,7 +1040,7 @@ concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
             if pid == S.bob
               then do
                 State.modify' (\(ds, cs) -> (ds <> [decider], cs))
-                pure (A.Play mountainOid)
+                pure (A.Play mountainOid Nothing)
               else pure (S.identityAnswer p)
           Prompt.Concede asked -> do
             (_, asksSoFar) <- State.get
@@ -1829,6 +1830,7 @@ slaveAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -1893,6 +1895,7 @@ isPlayerRecipient r = case r of
   Recipient.ToPlayer _ -> True
   Recipient.ToCreature _ -> False
   Recipient.ToPlaneswalker _ -> False
+  Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
 
 pickPlayerRecipient :: Set.Set Recipient.Recipient -> Maybe Recipient.Recipient

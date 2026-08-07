@@ -31,6 +31,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.EffectZone as EffectZone
@@ -156,6 +157,7 @@ movedOf event = case event of
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -174,6 +176,7 @@ damageOf event = case event of
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
@@ -192,6 +195,7 @@ revealOf event = case event of
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
@@ -1128,16 +1132,42 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- tapped is never untapped for an instant, and so a permanent an effect says
 -- enters under someone's control never belongs to its owner for an instant --
 -- CR 614.1c's entry replacements run inside this call and read both.
+--
+-- The one door CR 712.14b applies to, and that is what the rule's own wording
+-- picks out: "If a player is INSTRUCTED to put a modal double-faced card onto
+-- the battlefield and its front face isn't a permanent card, the card stays in
+-- its current zone." An instruction to put an object onto the battlefield is
+-- exactly the move that names how it enters, so the other doors are out of the
+-- rule's scope rather than exempted from it -- a permanent spell RESOLVING (CR
+-- 712.13, Pawl.Engine.Stack) and a land PLAYED (CR 712.12, Pawl.Engine.Engine)
+-- both reach the battlefield without any instruction to put them there.
+--
+-- Nothing, the same answer a CR 616.1 replacement that cancelled the move gives,
+-- so every caller already handles it: "the card stays in its current zone" and
+-- "nothing entered" are the same fact. Asked BEFORE the funnel, because CR
+-- 712.14b is not a replacement effect -- there is no event for CR 616.1 to
+-- choose among, and running the entry loop first would fire CR 614.1c's
+-- as-enters abilities for a card that never enters.
 changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
-changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing oid requestedDest Nothing tapped under Nothing
+changeZoneEntering oid requestedDest tapped under = do
+  gs <- State.get
+  let refused = requestedDest == Zone.Battlefield && maybe False Card.staysWhenPutOntoBattlefield (Game.cardOf oid gs)
+  if refused
+    then pure Nothing
+    else changeZoneAttaching Nothing oid requestedDest Nothing tapped under Nothing
 
 -- changeZoneReturning for a move that puts the object into its destination
 -- SHOWING one named face: CR 709.3's choice of which half of a split card is
 -- being cast, which the rule makes "before putting it onto the stack", so the
 -- move is what carries it. CR 712.11b words the modal double-faced card's
 -- version of the same choice identically, and CR 712.11c its version of CR
--- 709.3a, so this door is the shape both layouts ask for even though only the
--- split one ships.
+-- 709.3a, so both layouts come through this door.
+--
+-- The face is a MAYBE, because the third rule asking for this door does not
+-- always have one to name: CR 712.13 carries a resolving double-faced spell's
+-- face onto the battlefield, and Pawl.Engine.Stack asks that of every permanent
+-- spell it resolves, most of which show nothing (Pawl.Engine.Card.enteringFace).
+-- Nothing here is exactly changeZoneReturning.
 --
 -- A separate door rather than a seventh parameter on changeZone, as
 -- changeZoneEntering is: the ~30 callers moving an object that shows whatever its
@@ -1151,8 +1181,8 @@ changeZoneEntering oid requestedDest tapped under = changeZoneAttaching Nothing 
 -- CR 616.1 redirect to another zone drops the face instead of carrying it there.
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
-changeZoneShowing :: ObjectId -> Zone -> CardName.CardName -> Game (Maybe ObjectId)
-changeZoneShowing oid requestedDest name = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing (Just name)
+changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
+changeZoneShowing oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -1186,7 +1216,8 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- 110.2a's entry controller, Nothing for every door but changeZoneEntering --
 -- and Nothing there too for a move whose effect names no player, which by CR
 -- 110.2 and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
--- half, Nothing for every door but changeZoneShowing.
+-- half or CR 712.13's carried face, Nothing for every door but
+-- changeZoneShowing.
 changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Maybe CardName.CardName -> Game (Maybe ObjectId)
 changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
   gs <- State.get
@@ -1302,16 +1333,15 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
               -- The SETTLED destination against the REQUESTED one rather than
               -- against Zone.Stack: the rule is that the face describes the move
               -- the caller asked for, not that a face is only ever a stack half.
-              -- CR 712.13's face carried out of the stack (#657) is the same
-              -- shape with Battlefield in both slots.
-              --
-              -- What is still dropped is the face a move OUT of the stack should
-              -- carry -- CR 712.13: "a resolving double-faced spell that becomes
-              -- a permanent is put onto the battlefield with the same face up
-              -- that was face up on the stack". Not implemented; the caller that
-              -- would pass it is Pawl.Engine.Stack's permanent branch, and no
-              -- printing in the pool makes the dropped face differ from the one
-              -- the destination resolves anyway (#657).
+              -- CR 712.13's face carried OUT of the stack is that same shape with
+              -- Battlefield in both slots -- "a resolving double-faced spell that
+              -- becomes a permanent is put onto the battlefield with the same face
+              -- up that was face up on the stack" -- and Pawl.Engine.Stack's
+              -- permanent branch is what passes it, through
+              -- Pawl.Engine.Card.enteringFace. Pawl.ModalDoubleFacedSpec's
+              -- "casting the back face puts the artifact onto the battlefield"
+              -- proves it for a modal card, and Pawl.BattleSpec's "she may then
+              -- cast it TRANSFORMED and FREE" for a transforming one.
               mkObj ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,
@@ -1738,6 +1768,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
   -- entered the battlefield. The bearer frames the match rather than being it --
   -- it is the Filter.Context's source (so `Not IsSource` is Soul Warden's
@@ -1780,6 +1811,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -1799,6 +1831,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -1822,6 +1855,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Engine.Monarch.inherentMatch, not here.
@@ -1852,6 +1886,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
   -- ability's controller (CR 603.3a), and Megrim's "an opponent" is every other
@@ -1886,6 +1921,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
   -- declaration event rather than Combat.attackers, which keeps that rule's last
   -- sentence true -- a creature put onto the battlefield attacking is in the
@@ -1914,6 +1950,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 603.6: a zone-change trigger matched on BOTH ends of the move, library to
   -- graveyard. The bearer is the incarnation the card became on arrival per CR
   -- 400.7e, a graveyard being public (CR 400.2). The pair is also what makes CR
@@ -1939,6 +1976,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 603.6 with NO origin zone: the destination is the whole condition, so a
   -- discard, a mill, a countered spell and a death all match. `from` is
   -- deliberately unread, which is the one line separating this from the two
@@ -1967,6 +2005,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 603.6c narrowed by CR 700.4's definition of "dies": the bearer was put into
   -- a graveyard from the battlefield. Both ends are load-bearing -- `from` keeps a
   -- permanent DISCARDED out of a hand silent, and `to` keeps one EXILED off the
@@ -1995,6 +2034,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- The same rule and zone pair as SelfDies, watched by a BYSTANDER. The bearer
   -- frames the match rather than being it, as for PermanentEnters: it is the
   -- Filter.Context's source (so `Not IsSource` is "another"), and its controller
@@ -2036,6 +2076,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 603.6c taken whole. The `from` half matches SelfDies'; the `to` half is
   -- where they part company, this one asking only that the destination be ANOTHER
   -- zone.
@@ -2067,6 +2108,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -2097,6 +2139,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 615.13: a prevention effect was applied and prevented some damage, and the
   -- damage it prevented was addressed to a player the relation admits. CR 109.5 /
   -- 603.3a fix "you" as the ability's controller, exactly as PlayerDiscards and
@@ -2123,6 +2166,7 @@ matchesTrigger gs bearer you cond event = case cond of
         PlayerRelation.Opponent -> pid /= you
       Recipient.ToCreature _ -> False
       Recipient.ToPlaneswalker _ -> False
+      Recipient.ToBattle _ -> False
       Recipient.ToObject _ -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -2137,6 +2181,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 119.9: a source caused a player the relation admits to gain life. The
   -- gaining player comes from the event; CR 109.5 / 603.3a fix "you" as the
   -- ability's controller, exactly as PlayerDiscards, SpellOrAbilityCounters and
@@ -2173,6 +2218,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- A player the relation admits LOST life -- Exquisite Blood's "whenever an
   -- opponent loses life". The losing player comes from the event; CR 109.5 /
   -- 603.3a fix "you" as the ability's controller, exactly as PlayerGainsLife
@@ -2216,6 +2262,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 714.2b: counters of this kind were put onto the BEARER, and the count
   -- crossed N going up. Both halves of the rule's sentence are here -- see
   -- Pawl.Types.TriggerCondition.SelfCountersReached for why the intervening "if"
@@ -2232,6 +2279,33 @@ matchesTrigger gs bearer you cond event = case cond of
   -- then only on the turn the Saga entered; it is not implemented (#841).
   TriggerCondition.SelfCountersReached wanted n -> case event of
     GameEvent.CountersPut oid kind before after -> oid == bearer && kind == wanted && Saga.crossed before after n
+    -- Rule 714.2b says "are PUT onto", so a removal crosses nothing: a Saga whose
+    -- lore counters were taken off and put back fires its chapters again.
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 310.11b: the LAST counter of this kind came off the BEARER. The mirror of
+  -- the arm above, and narrower in the way rule 310.11b is narrower than rule
+  -- 714.2b: there is no threshold to cross, only a count that reached none.
+  --
+  -- `after == 0` alone, with no `before > 0` conjunct: GameEvent.CountersRemoved is
+  -- recorded only where something actually came off, so an event that removed
+  -- nothing is not in the log to match. That invariant is the record's, stated on
+  -- the constructor, exactly as CountersPut's "before < after" is.
+  TriggerCondition.SelfLastCounterRemoved wanted -> case event of
+    GameEvent.CountersRemoved oid kind _ after -> oid == bearer && kind == wanted && after == 0
+    GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
@@ -2264,6 +2338,7 @@ eventBindings cond event = case (cond, event) of
       Recipient.ToPlayer pid -> Binding.setTriggerPlayer pid Map.empty
       Recipient.ToCreature _ -> Map.empty
       Recipient.ToPlaneswalker _ -> Map.empty
+      Recipient.ToBattle _ -> Map.empty
       Recipient.ToObject _ -> Map.empty
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
@@ -2494,6 +2569,7 @@ eventBindingSlots cond = case cond of
   -- event carries are the CONDITION's, not the payload's: no chapter ability in
   -- print says "that many", and eventBindings has no arm for this condition.
   TriggerCondition.SelfCountersReached _ _ -> Set.empty
+  TriggerCondition.SelfLastCounterRemoved _ -> Set.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -2502,6 +2578,7 @@ isPlayerRecipient r = case r of
   Recipient.ToPlayer _ -> True
   Recipient.ToCreature _ -> False
   Recipient.ToPlaneswalker _ -> False
+  Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
 
 -- CR 603.6a: every event is checked against every permanent currently on the
@@ -2562,7 +2639,10 @@ eventTriggers events gs =
       -- from its keywords. Derived from POST-LAYER counts, so Humility takes them
       -- away and a layer-6 grant adds them without special-casing. Shared by both
       -- candidate sources, so a live and a last-known permanent read alike.
-      abilitiesOf pc = PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc)
+      -- CR 310.11b's Siege ability is minted the same way and for the same reason,
+      -- off the same finished projection: rule 310 gives it, no card prints it, and
+      -- the scan below never learns which rule produced any of these.
+      abilitiesOf pc = PC.triggeredAbilities pc <> Keyword.triggeredAbilitiesOf (PC.keywords pc) <> Battle.triggeredAbilitiesOf pc
       -- CR 113.6m's "functions ONLY in that zone", asked of a permanent read AS
       -- BEING ON THE BATTLEFIELD: a Squee, Goblin Nabob standing there does not
       -- see its own upkeep, because the ability that watches for it functions in
@@ -2677,6 +2757,7 @@ eventTriggers events gs =
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
+        GameEvent.CountersRemoved {} -> Map.empty
       -- CR 603.10a's look-back at the permanent this event removed: every
       -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
       -- above gives.
@@ -2745,6 +2826,7 @@ eventTriggers events gs =
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
+        GameEvent.CountersRemoved {} -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
       -- one ability those rules put there. The one source that widens the SCANNED
       -- ZONE rather than recovering an object an event names, which is why it is
@@ -2915,6 +2997,7 @@ functionsInGraveyard cond = case cond of
   -- Saga's lore counters on the permanent -- so CR 113.6's default holds and a
   -- chapter ability functions from the battlefield alone.
   TriggerCondition.SelfCountersReached _ _ -> False
+  TriggerCondition.SelfLastCounterRemoved _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -2980,6 +3063,7 @@ controllerTurnScoped cond = case cond of
   -- 714.3c's turn-based action is the controller's own turn, and that is the
   -- action's restriction rather than this condition's.
   TriggerCondition.SelfCountersReached _ _ -> False
+  TriggerCondition.SelfLastCounterRemoved _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -3062,6 +3146,7 @@ stateTriggers gs
               -- exactly the difference CR 603.8 draws, and the reason a Saga does
               -- not re-run its final chapter for as long as it sits there.
               TriggerCondition.SelfCountersReached _ _ -> False
+              TriggerCondition.SelfLastCounterRemoved _ -> False
             lives = filter live (Projection.triggeredAbilitiesOf oid gs)
             -- Each live copy against the copies of itself that came earlier in
             -- the list, which gives it a 1-based ordinal among its equals: the

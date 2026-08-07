@@ -4,10 +4,8 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 
 -- | What an attacking creature is attacking (CR 508.1b), which CR 506.3 limits to
--- a player, a planeswalker or a battle. These arms are that enumeration minus the
--- battle: it grows an OfBattle arm (CR 310.5, #302). CardType.Battle exists, so
--- the missing piece is the arm and the CR 310.8 protector it would be attacked
--- through, not the card type.
+-- a player, a planeswalker or a battle. These arms are that enumeration, and the
+-- rulebook's own: nothing here asks which EFFECT an object carries.
 --
 -- Ord because Pawl.Types.Combat's `attacked` is a Set of these.
 data AttackTarget
@@ -17,4 +15,14 @@ data AttackTarget
     -- re-ask whether it is still an attackable planeswalker as they read it
     -- (Pawl.Engine.Combat.stillAttacked).
     OfPlaneswalker ObjectId.ObjectId
+  | -- | CR 310.5. Named by id for OfPlaneswalker's reason, and the id is the
+    -- battle's rather than its protector's: CR 310.8f lets the designation move
+    -- while the attack stands, so who is being attacked THROUGH is re-read from
+    -- the battle at every use (Pawl.Engine.Combat.defendingPlayerOf, CR 310.8d).
+    --
+    -- Unlike OfPlaneswalker, this arm does NOT imply the target belongs to the
+    -- defending player: CR 310.8b makes a battle attackable by anyone for whom
+    -- its protector is a defending player, so a Siege's own controller can attack
+    -- it (CR 310.11a puts the protector among the controller's opponents).
+    OfBattle ObjectId.ObjectId
   deriving (Eq, Ord, Show)

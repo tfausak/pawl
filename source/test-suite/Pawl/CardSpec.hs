@@ -428,6 +428,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached _ _ -> []
+  -- CR 310.11b carries a counter kind alone.
+  TriggerCondition.SelfLastCounterRemoved _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -484,6 +486,7 @@ effectCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -691,6 +694,7 @@ effectReplacements effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
   Effect.ChangeText {} -> []
 
 -- #437: does this replacement carry a PhasePattern with a BAKED player in it?
@@ -1381,6 +1385,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached _ _ -> []
+  -- CR 310.11b carries a counter kind alone.
+  TriggerCondition.SelfLastCounterRemoved _ -> []
 
 -- CR 613.11: which spells a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
@@ -1657,6 +1663,7 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn _ _ -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
 
 -- Per MODE rather than through Modal.allTargetSpecs, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check

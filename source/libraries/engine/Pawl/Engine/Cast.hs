@@ -530,6 +530,10 @@ permissionsOf face =
 -- is a creature and none is a legendary sorcery -- and is written anyway,
 -- because the alternative is a cast the rules forbid.
 --
+-- Those three conjuncts, and the affordability and target-fillability beside
+-- them, are `castableWhenOffered` below -- shared with CR 608.2g's other
+-- producer, so the two offers cannot come to disagree about what is still asked.
+--
 -- printedRestrictionsOk rides along too, and it is the closest call of the three:
 -- a "Cast this spell only during the declare attackers step" IS about timing, so
 -- the ruling's "except for timing" could be read to lift it. pawl takes the
@@ -551,16 +555,47 @@ castableWhileSearching pid gs =
             -- is evaluated against is still CR 709.3a's chosen one.
             proposed = asProposed oid name gs
          in permitsCastWhileSearching face
-              -- CR 601.3's prohibit half, moved inside `allowed` when it grew
-              -- a name: a quality-bearing prohibition stops one card without
-              -- stopping the search's other candidates.
-              && not (PlayerEffect.prohibitsCasting pid name proposed)
-              && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
-              && printedRestrictionsOk pid oid name proposed
-              && legendaryRestrictionOk pid oid name proposed
-              && targetable pid oid name proposed
+              && castableWhenOffered pid oid name (Cost.costsFor name oid proposed) proposed
       proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (foldMap Card.castableFaces (Game.cardOf oid gs)))
    in concatMap proposals (Game.zoneMembers Zone.Library pid gs)
+
+-- CR 608.2g: everything a cast an EFFECT offers must still satisfy, given the
+-- candidate costs that offer supplies. `castable`'s conjuncts minus the two the
+-- offer itself answers:
+--
+--   * TIMING. CR 608.2g's cast happens inside a resolution, where CR 117.1a's
+--     window is closed and no player has priority. The Panglacial ruling says the
+--     same of that rule's other producer -- "follows all normal rules ... except
+--     for timing".
+--   * CR 601.3's PERMISSION and the zone it turns into. The effect instructing
+--     the cast IS the permission, and it names the object rather than a zone, so
+--     inCastableZone has nothing to ask. Each caller keeps its own gate for the
+--     half of rule 601.3 that is about the card -- Panglacial's printed
+--     permission above, and CR 310.11b's "it" being where the exile left it.
+--
+-- Everything else stays, and CR 601.3's own second half is why: that rule is one
+-- sentence with two limbs, and neither producer excepts the PROHIBIT one. A Rule
+-- of Law still stops the cast, a Null Chamber that named the card still stops it,
+-- CR 205.4e still applies, an unpayable cost is still no offer, and CR 601.2c
+-- still needs a fillable target set.
+--
+-- The candidates arrive as an ARGUMENT rather than being read from the object,
+-- because that is exactly what CR 118.9's "applied to it from another effect"
+-- changes: an offer carrying that alternative hands in the one cost the rule
+-- allows (CR 118.9a), where an offer carrying none hands in Cost.costsFor's own
+-- list.
+--
+-- `gs` must already be `asProposed`-stamped for the half being offered, as
+-- `castable`'s conjuncts require.
+castableWhenOffered :: PlayerId -> ObjectId -> CardName.CardName -> [Cost Keyword] -> GameState -> Bool
+castableWhenOffered pid oid name candidates proposed =
+  -- CR 601.3's prohibit half, asked with the half's own name: a quality-bearing
+  -- prohibition stops one card without stopping any other candidate.
+  not (PlayerEffect.prohibitsCasting pid name proposed)
+    && any (payableCost pid oid proposed) candidates
+    && printedRestrictionsOk pid oid name proposed
+    && legendaryRestrictionOk pid oid name proposed
+    && targetable pid oid name proposed
 
 -- CR 601.3 (Panglacial): while a player searches their own library, offer them
 -- the chance to cast a castable-while-searching card from it, before any card is
@@ -600,8 +635,10 @@ castWhileSearching pid = do
 -- TWO things are read from `before`, one step ahead of the move, because CR
 -- 400.7 mints an incarnation with no memory of where it came from: the zone the
 -- cast was proposed FROM, which armCastFromGraveyard needs, and the CANDIDATE
--- COSTS, which pawl offers by zone. CR 601.2b determines those at the proposal,
--- so locking them in there is the rule's own reading rather than a workaround.
+-- COSTS, which pawl offers by zone -- unless an effect applied an alternative
+-- cost, in which case CR 118.9's is the only one (castSpellWith). CR 601.2b
+-- determines those at the proposal, so locking them in there is the rule's own
+-- reading rather than a workaround.
 --
 -- REJECT-NOT-REPAIR, as a genuine rewind: an illegal answer at any step restores
 -- `before`, which is what undoes the CR 601.2a move -- CR 601.2's own remedy, and
@@ -626,13 +663,30 @@ castWhileSearching pid = do
 -- prompted for here. CR 601.2b's last sentence is what that buys -- a
 -- previously made choice may restrict the ones announced below.
 castSpell :: PlayerId -> ObjectId -> CardName.CardName -> Game ()
-castSpell pid oid name = do
+castSpell = castSpellWith Nothing
+
+-- castSpell with CR 118.9's other source of an alternative cost: one "applied to
+-- it from another effect" rather than listed in the spell's own text. Just c
+-- REPLACES the candidate list with that one cost; Nothing is CR 601.2b's own
+-- candidates, which is every cast the rules themselves offer.
+--
+-- REPLACES rather than joins, and CR 118.9b is why: "an effect that allows you to
+-- cast a spell may require a certain alternative cost to be paid". CR 310.11b's
+-- offer is one of those -- a player casting a defeated Siege does not get to pay
+-- {2}{W} instead -- and CR 118.9a's "only one alternative cost can be applied to
+-- any one spell" is what keeps the printed alternatives from joining it.
+--
+-- Nothing about the offer is re-checked here: `castSpellWith` casts, and whether
+-- the cast may be offered at all is `castableWhenOffered`'s question, asked by
+-- the caller that made the offer.
+castSpellWith :: Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Game ()
+castSpellWith applied pid oid name = do
   before <- State.get
   case proposedFace oid name before of
     Nothing -> pure ()
     Just face -> do
       let castFrom = fmap Object.zone (Game.lookupObject oid before)
-          candidates = Cost.costsFor name oid before
+          candidates = maybe (Cost.costsFor name oid before) pure applied
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -647,7 +701,7 @@ castSpell pid oid name = do
       -- Nothing means the id was unknown or the CR 616.1 replacement loop
       -- cancelled the move, and a proposal whose first step did not happen is
       -- one the game returns from (CR 601.2).
-      moved <- Event.changeZoneShowing oid Zone.Stack name
+      moved <- Event.changeZoneShowing oid Zone.Stack (Just name)
       case moved of
         Nothing -> State.put before
         Just sid -> castProposed pid sid face castFrom candidates before

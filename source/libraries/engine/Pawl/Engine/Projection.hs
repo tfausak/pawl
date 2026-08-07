@@ -858,14 +858,13 @@ setLandSubtypeEffects gs =
       -- ability whose affected set names a basic land type, so it is the first
       -- card a Magical Hack could aim at this read-point at all.
       --
-      -- The disagreement is still NOT OBSERVABLE, and this rewrite is consistency
-      -- rather than a fix with a test behind it: no test discriminates it, checked
-      -- by mutating it away. This gate decides whose rules-text abilities CR 305.7
-      -- strips, so seeing it needs a permanent whose PRINTED type line carries a
-      -- basic land type AND which has a rules-text static ability reaching other
-      -- objects -- affectsBase reads base characteristics. Every basic land is
-      -- abilityless, and no nonbasic land in the pool carries a basic land type,
-      -- so nothing can currently be on both sides (#584).
+      -- Proved by Pawl.ProjectionSpec's "Conversion strips the Estuary's ability,
+      -- and CR 612.1 hands it back". Seeing this rewrite at all takes a permanent
+      -- whose PRINTED type line carries a basic land type AND which has a
+      -- rules-text static ability reaching other objects -- affectsBase reads base
+      -- characteristics, so both sides have to be true of one card. Synthetic
+      -- Volcanic Estuary is that card, and the spec's comment says why it is
+      -- written rather than found.
       --
       -- textChangesAffecting folds the whole effect list, and this function is
       -- hoisted out of gather's walk to keep that off the per-permanent path, so
@@ -1091,6 +1090,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary _ -> effect
+  Effect.OfferCast {} -> effect
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.
@@ -1227,6 +1227,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 612.1 can change: a text-changing effect swapping Merfolk for Knight
   -- leaves a chapter symbol reading the same chapter.
   TriggerCondition.SelfCountersReached _ _ -> condition
+  TriggerCondition.SelfLastCounterRemoved _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger
@@ -1657,9 +1658,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- loyalty's readers do.
               CounterKind.Lore -> []
               -- Nor does a defense counter, for the reason loyalty's and lore's
-              -- arms give: no CR 613 layer reads defense. Unlike those two this
-              -- one has no reader AT ALL yet -- CR 704.5v is what will count
-              -- Object.counters directly, and it is not built (#302).
+              -- arms give: no CR 613 layer reads defense. CR 310.6's removal, CR
+              -- 310.11b's trigger and CR 704.5v's state-based action all count
+              -- Object.counters directly, exactly as those two do.
               CounterKind.Defense -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
@@ -1698,10 +1699,10 @@ data Aspect
 -- instant control or creature-ness changes, and pawl removes it at the next
 -- settle.
 --
--- The CR 506.4 clauses that remain unbuilt -- phasing (#154) and an attacked
--- battle (#302) -- would arrive by one of those same doors; the
--- attacked-planeswalker clauses are answered where the attack target is read
--- (Combat.stillAttacked) and never edit the record at all.
+-- The CR 506.4 clause that remains unbuilt -- phasing (#154) -- would arrive by
+-- one of those same doors; the attacked-planeswalker and attacked-battle clauses
+-- are answered where the attack target is read (Combat.stillAttacked and
+-- Combat.stillAttackedBattle) and never edit the record at all.
 filterReads :: Filter.Type.Filter Keyword.Type.Keyword -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
@@ -2373,6 +2374,19 @@ isPlaneswalkerOf = isPlaneswalkerGiven Map.empty
 
 isPlaneswalkerGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
 isPlaneswalkerGiven pcs oid gs = Set.member CardType.Planeswalker (cardTypesGiven pcs oid gs)
+
+-- CR 613.1d a third time, for CR 115.4's fourth kind of "any target" and CR
+-- 120.3h's defense-counter removal. Projected for isCreatureOf's reason.
+--
+-- Pawl.Engine.Battle.isBattle asks the same question of an already-finished
+-- projection, and is the form rule 310's own module uses -- that module imports no
+-- Projection, deliberately. This is the id-taking form its callers on this side of
+-- the graph (Pawl.Engine.Target's pool, Pawl.Engine.Damage's classification) want.
+isBattleOf :: ObjectId -> GameState -> Bool
+isBattleOf = isBattleGiven Map.empty
+
+isBattleGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
+isBattleGiven pcs oid gs = Set.member CardType.Battle (cardTypesGiven pcs oid gs)
 
 -- The same question against a PRECOMPUTED candidate list rather than a
 -- pre-projected board. For a caller asking about a handful of objects out of a

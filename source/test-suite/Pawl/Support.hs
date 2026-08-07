@@ -225,6 +225,7 @@ isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
   Recipient.ToPlaneswalker _ -> False
+  Recipient.ToBattle _ -> False
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
 
@@ -293,6 +294,10 @@ identityAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -335,7 +340,7 @@ castAnswer p = case p of
           A.Cast {} -> True
           _ -> False
         isPlay a = case a of
-          A.Play _ -> True
+          A.Play {} -> True
           _ -> False
      in case filter isCast actions of
           h : _ -> h
@@ -374,6 +379,10 @@ castAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -448,6 +457,10 @@ aggressiveAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -517,7 +530,7 @@ playLandAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
-          A.Play _ -> True
+          A.Play {} -> True
           A.Pass -> False
           A.Cast {} -> False
           A.Activate _ _ -> False
@@ -556,6 +569,10 @@ playLandAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -1644,7 +1661,7 @@ isCastOf :: ObjectId.ObjectId -> A.Action -> Bool
 isCastOf oid action = case action of
   A.Cast o _ -> o == oid
   A.Pass -> False
-  A.Play _ -> False
+  A.Play {} -> False
   A.Activate _ _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer

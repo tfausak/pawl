@@ -147,6 +147,7 @@ playersFor context gs ref =
             Recipient.ToPlayer pid -> Just [pid]
             Recipient.ToCreature _ -> Nothing
             Recipient.ToPlaneswalker _ -> Nothing
+            Recipient.ToBattle _ -> Nothing
             Recipient.ToObject _ -> Nothing
 
 -- CR 608.2h: the view of a past event, built from the snapshot the event
@@ -226,3 +227,4 @@ snapshotView shape event = case event of
   -- and putting counters on a permanent is not a zone change, which is what every
   -- EventShape names.
   GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing

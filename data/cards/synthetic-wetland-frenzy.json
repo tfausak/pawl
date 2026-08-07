@@ -1,0 +1,55 @@
+{
+  "faces": [
+    {
+      "attackRequirements": [
+        {
+          "subject": {
+            "type": "Matching",
+            "value": {
+              "type": "HasSubtype",
+              "value": {
+                "type": "Swamp"
+              }
+            }
+          }
+        }
+      ],
+      "blockRequirements": [
+        {
+          "attacker": {
+            "type": "Matching",
+            "value": {
+              "type": "HasSubtype",
+              "value": {
+                "type": "Island"
+              }
+            }
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Wetland Frenzy",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}

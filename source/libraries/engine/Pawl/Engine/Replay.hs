@@ -81,6 +81,7 @@ encode p answer = case p of
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
+  Prompt.OfferedCast {} -> Response.ChoseOfferedCast answer
   Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
   Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
@@ -225,6 +226,9 @@ decode p response = case p of
   Prompt.ChooseOptional {} -> case response of
     Response.ChoseOptional decision -> Just decision
     _ -> Nothing
+  Prompt.OfferedCast {} -> case response of
+    Response.ChoseOfferedCast decision -> Just decision
+    _ -> Nothing
   Prompt.ChooseToPay {} -> case response of
     Response.ChoseToPay decision -> Just decision
     _ -> Nothing
@@ -301,6 +305,7 @@ defaultAnswer p = case p of
         isCreatureRecipient r = case r of
           Recipient.ToCreature _ -> True
           Recipient.ToPlaneswalker _ -> False
+          Recipient.ToBattle _ -> False
           Recipient.ToPlayer _ -> False
           Recipient.ToObject _ -> False
      in case blockers of
@@ -387,6 +392,9 @@ defaultAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
+  -- exactly where the resolving effect put it.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is always legal, and it
   -- spends nothing -- which keeps a short transcript from tapping a payer's board.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines

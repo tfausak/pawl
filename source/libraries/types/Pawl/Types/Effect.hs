@@ -2,6 +2,7 @@ module Pawl.Types.Effect where
 
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
@@ -675,9 +676,33 @@ data Effect card
     -- No PlayerRef saying whose library, and none is expressible: the answer is
     -- the OWNER of the object the slot names, which PlayerRef's three arms cannot
     -- read off a bound OBJECT. Derived rather than named is what the card says,
-    -- and it is what makes this one opcode rather than a move plus a shuffle:
-    -- Resolve.resolveModes fixes a resolving ABILITY's bindings before its effect
-    -- fold begins, so a later effect could not read an incarnation this one had
-    -- just bound anyway.
+    -- and it is what makes this one opcode rather than a move plus a shuffle: CR
+    -- 701.24c shuffles the library even when the move did not happen, which a
+    -- second effect reading the first one's result could not say. A pair CAN be
+    -- written -- OfferCast reads a slot MoveToZone bound in the same list -- so
+    -- the reason is the rule and not a limit of the DSL.
     ShuffleIntoLibrary SlotName.SlotName
+  | -- | CR 608.2g: offer this effect's controller the cast of the object the slot
+    -- names -- "if an effect specifically instructs or allows a player to cast a
+    -- spell during resolution, they do so by following the steps in rules
+    -- 601.2a-i, except no player receives priority after it's cast". CR 310.11b's
+    -- "then you may cast it transformed without paying its mana cost" is the
+    -- producer, and the CastOffer is that sentence's two riders.
+    --
+    -- The slot is a READ, not a definition, and the one it reads is normally
+    -- bound by a MoveToZone earlier in the same instruction list -- rule 310.11b's
+    -- "exile it, THEN you may cast it" is one sentence about two incarnations of
+    -- one card (CR 400.7). Resolve reads it off the resolving object's LIVE
+    -- bindings for that reason, the way Sacrifice reads a group slot.
+    --
+    -- An OFFER and not a cast: CR 601.2b's own announcements still belong to the
+    -- player, and the "may" ahead of them is asked first (Prompt.OfferedCast).
+    -- Nothing here says the cast succeeds -- an announcement the player cannot
+    -- complete is reversed by CR 601.2, which puts the card back where it was.
+    --
+    -- NOT a permission written onto the card. CR 715.3d's exile permission lasts
+    -- "for as long as that card remains exiled" and is Object.playableFromExileBy;
+    -- this one is a single opportunity taken during a resolution, and a Siege
+    -- whose controller declines it stays in exile uncastable.
+    OfferCast SlotName.SlotName CastOffer.CastOffer
   deriving (Eq, Ord, Show)

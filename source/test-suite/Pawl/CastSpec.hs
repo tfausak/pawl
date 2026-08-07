@@ -637,6 +637,7 @@ discardLastAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -1508,6 +1509,7 @@ isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
   AttackTarget.OfPlaneswalker _ -> True
   AttackTarget.OfPlayer _ -> False
+  AttackTarget.OfBattle _ -> False
 
 printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
@@ -2044,6 +2046,7 @@ castFirstOption p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -2126,6 +2129,7 @@ castPanglacial p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
