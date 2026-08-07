@@ -44,20 +44,20 @@
           pkgs = nixpkgs.legacyPackages.${system};
 
           # Every non-test dependency is a GHC boot library, so this builds
-          # without fetching anything from Hackage. doBenchmark compiles the
-          # benchmark too, which `cabal test` would not.
-          pawl =
-            pkgs.haskell.lib.compose.overrideCabal
-              (old: {
-                # nixpkgs installs executables but not benchmarks, so the compiled
-                # benchmark binary would be discarded. Keep it, so it can be run.
-                postInstall = (old.postInstall or "") + ''
-                  install -D -m 755 dist/build/pawl-benchmark/pawl-benchmark "$out/bin/pawl-benchmark"
-                '';
-              })
-              (
-                pkgs.haskell.lib.compose.doBenchmark (pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { })
-              );
+          # without fetching anything from Hackage.
+          pawl = pkgs.lib.pipe (pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { }) [
+            # Compiles the benchmark, which `cabal test` would not.
+            pkgs.haskell.lib.compose.doBenchmark
+            # -Werror, matching what CI used to get from the cabal build job.
+            (pkgs.haskell.lib.compose.enableCabalFlag "pedantic")
+            (pkgs.haskell.lib.compose.overrideCabal (old: {
+              # nixpkgs installs executables but not benchmarks, so the compiled
+              # benchmark binary would be discarded. Keep it, so it can be run.
+              postInstall = (old.postInstall or "") + ''
+                install -D -m 755 dist/build/pawl-benchmark/pawl-benchmark "$out/bin/pawl-benchmark"
+              '';
+            }))
+          ];
         in
         {
           default = pawl;
