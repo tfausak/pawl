@@ -88,6 +88,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SourceRelation as SourceRelation
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -483,6 +484,21 @@ castingSkirmishAnswer victim p = case p of
           h : _ -> h
           [] -> Action.Pass
   _ -> skirmishAnswer victim p
+
+-- Cast whatever is offered, and otherwise pass. Read by the CR 614.1d case
+-- below, where the one castable card in the game is the {B} creature whose
+-- castability that case measures -- so "whatever is offered" is that card or
+-- nothing at all.
+castOrPassAnswer :: Prompt.Prompt r -> r
+castOrPassAnswer p = case p of
+  Prompt.ChooseAction _ _ actions ->
+    let isCast a = case a of
+          Action.Cast {} -> True
+          _ -> False
+     in case filter isCast actions of
+          h : _ -> h
+          [] -> Action.Pass
+  _ -> S.identityAnswer p
 
 -- Stonehorn Dignitary {3}{W} Creature -- Rhino Soldier 1/4: "When this creature
 -- enters, target opponent skips their next combat phase." (oracle checked on
@@ -1688,6 +1704,55 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         let after = castAndResolve (raceAnswer corpsejack piker) gs spellId
          in Spec.assertEqWith s "not doubled -- ControllerRelation is Yours" (countersOn CounterKind.PlusOnePlusOne piker after) 1
       _ -> Spec.assertFailure s "fixture did not build both sides"
+  -- CR 614.1d: "Continuous effects that read '[This permanent] enters . . .' or
+  -- '[Objects] enter [the battlefield] . . .' are replacement effects." Zof
+  -- Bloodbog prints one sentence of exactly that shape -- "This land enters
+  -- tapped" -- and no effect is involved anywhere on the path: CR 305.1's special
+  -- action simply puts the land onto the battlefield, so the rewrite has to be
+  -- read off the permanent's own text through the CR 616.1 loop.
+  --
+  -- Played through the real priority loop rather than through the entry funnel,
+  -- so what is asserted is the whole path a player actually takes to CR 305.1.
+  --
+  -- The tap state on its own is a field this same code just wrote, so what the
+  -- case measures is what a PLAYER loses by it: Typhoid Rats, a {B} creature, is
+  -- in the hand beside the land, and the tapped land's "{T}: Add {B}" is the only
+  -- mana in the game. So the Rats stays uncast here and enters on the SAME board
+  -- with that one land forced untapped -- the only difference entering tapped
+  -- makes. Without the second half the first would pass on a board where the Rats
+  -- was uncastable for some other reason.
+  --
+  -- CR 302.6 has nothing to say either way: Zof Bloodbog is a land, so summoning
+  -- sickness is not what is being measured.
+  Spec.it s "CR 614.1d Zof Bloodbog's own text makes it enter TAPPED" $ do
+    zof <- S.printingOf s registry "Zof Consumption"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    let (_, withZof) = S.addHandCard zof S.alice (Setup.emptyGame S.bothPlayers)
+        (_, filled) = S.addHandCard rats S.alice withZof
+        board =
+          filled
+            { GameState.phase = Phase.PrecombatMain,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+        played = S.runPure S.playLandAnswer board Engine.priorityLoop
+        untap oid gs = gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)}
+        ratsName = CardName.MkCardName (Text.pack "Typhoid Rats")
+        ratsOut gs = length [o | o <- Set.toList (GameState.battlefield gs), Projection.nameOf o gs == ratsName]
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
+        Spec.assertEqWith
+          s
+          "so the {B} creature in hand stays there -- no mana to cast it with"
+          (ratsOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          0
+        Spec.assertEqWith
+          s
+          "and the same land untapped pays for it"
+          (ratsOut (S.runPure castOrPassAnswer (untap permId played) Engine.priorityLoop))
+          1
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
   Spec.it s "CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f)" $ do
     island <- S.printingOf s registry "Island"
     pikerPrinting <- S.printingOf s registry "Goblin Piker"
