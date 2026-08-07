@@ -20,8 +20,9 @@
 -- Zof Consumption // Zof Bloodbog -- a {4}{B}{B} Sorcery over a Land -- carries
 -- the PLAY-side ones, and is the shape CR 712.12 and CR 712.14b are both about:
 -- a face that is a land where the front face is not a permanent card at all.
--- The land face's printed "This land enters tapped" is not transcribed, so the
--- permanent these cases watch enter is untapped (#894).
+-- The land face's printed "This land enters tapped" is CR 614.1d's replacement
+-- rather than CR 712.12's business, so the permanent these cases watch enter is
+-- tapped and none of them asserts on that; Pawl.ReplacementSpec is where it is.
 module Pawl.ModalDoubleFacedSpec where
 
 import qualified Control.Monad as Monad

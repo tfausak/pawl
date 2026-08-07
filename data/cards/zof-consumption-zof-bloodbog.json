@@ -106,6 +106,19 @@
         }
       ],
       "name": "Zof Bloodbog",
+      "replacementEffects": [
+        {
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "Tapped"
+            }
+          ]
+        }
+      ],
       "typeLine": {
         "types": [
           {
