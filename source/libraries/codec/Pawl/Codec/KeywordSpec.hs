@@ -201,6 +201,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Banding
       """ {"type":"Banding"} """
+  -- CR 702.26a: nullary, because the rule takes no parameter -- what a phasing
+  -- permanent does is entirely the untap step's business.
+  Spec.it s "Phasing" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Phasing
+      """ {"type":"Phasing"} """
   -- CR 702.29e: the typecycling filter rides the same keyword arm and
   -- is absent for plain cycling, so both spellings have to survive the trip.
   Spec.it s "Cycling round-trips with and without a typecycling filter" $ do
