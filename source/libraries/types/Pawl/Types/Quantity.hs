@@ -133,7 +133,8 @@ data Quantity
     Speed PlayerRef.PlayerRef
   | -- | CR 122.1: how many counters of a kind a PLAYER has -- CR 728.1's "a
     -- number of cards equal to the number of rad counters they have", and the
-    -- shape "the number of experience counters you have" asks for.
+    -- shape Ezuri, Claw of Progress' "where X is the number of experience
+    -- counters you have" asks for.
     --
     -- LifeTotal's and Speed's sibling: one number attached to a player rather
     -- than a population in a zone, so it is not a Count -- CR 400.1 scopes a

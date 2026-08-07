@@ -69,6 +69,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       (Filter.PowerAtLeast 4)
       """ {"type":"PowerAtLeast","value":4} """
+  Spec.it s "PowerAtMost" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Filter.PowerAtMost 2)
+      """ {"type":"PowerAtMost","value":2} """
   Spec.it s "ManaValueAtMost" $
     Common.assertJsonCodec
       s

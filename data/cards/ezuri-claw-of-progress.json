@@ -1,0 +1,190 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Ezuri, Claw of Progress",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "PermanentEnters",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Creature"
+                  }
+                },
+                {
+                  "type": "ControlledBy",
+                  "value": {
+                    "type": "You"
+                  }
+                },
+                {
+                  "type": "PowerAtMost",
+                  "value": 2
+                }
+              ]
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "GainPlayerCounters",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Experience"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Combat",
+                "value": {
+                  "type": "BeginningOfCombat"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
+                      },
+                      {
+                        "type": "PlayerCounters",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Experience"
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "IsSource"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elf"
+          },
+          {
+            "type": "Phyrexian"
+          },
+          {
+            "type": "Warrior"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

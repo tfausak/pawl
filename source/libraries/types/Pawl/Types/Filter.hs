@@ -47,18 +47,26 @@ data Filter keyword
     -- Projection.viewOfCard is the printed-card fallback off the battlefield.
     HasKeyword keyword
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
+  | -- | CR 208.1 in the other direction: the object's power is <= this literal --
+    -- Ezuri, Claw of Progress' "a creature you control with power 2 or less".
+    --
+    -- A SIBLING of PowerAtLeast above and NOT its negation: power is a
+    -- characteristic an object may simply not have, so `Not (PowerAtLeast 3)`
+    -- admits every land, instant and player on the board, while this admits none
+    -- of them. Both arms answer False for an absent power, so neither is
+    -- reachable from the other, and Pawl.FilterSpec pins that pair apart.
+    PowerAtMost Integer
   | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
     -- Command's "creature card with mana value 2 or less".
     --
-    -- AT MOST where power's atom is at least, because that is the direction the
-    -- cards ask in: a mana value bounds what a cheap-thing effect may reach, and
-    -- a power threshold bounds what a big-thing effect may. Neither is the
-    -- other's negation -- `Not (PowerAtLeast 3)` is power <= 2 only for an
-    -- object that HAS a power, and every object has a mana value -- so a single
-    -- comparison atom with a direction flag would buy nothing.
+    -- Only AT MOST, where power above has both directions, because that is the
+    -- direction the cards ask in: a mana value bounds what a cheap-thing effect
+    -- may reach. Nothing in the pool asks for a mana value floor, and an unused
+    -- arm is the speculative construction the project forbids.
     --
-    -- Unlike PowerAtLeast, this is answerable OFF the battlefield, which is the
-    -- point: rule 202.3 reads the printed mana cost, which exists in every zone,
+    -- Unlike the two power atoms above, this is answerable OFF the battlefield,
+    -- which is the point: rule 202.3 reads the printed mana cost, which exists in
+    -- every zone,
     -- and the graveyard is where the card asking is looking (CR 115.2's other
     -- zone half, via Pool.CardsInGraveyard). No Modification writes a mana cost,
     -- so there is nothing projected to read instead.
