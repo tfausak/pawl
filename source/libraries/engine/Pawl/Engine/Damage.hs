@@ -174,6 +174,11 @@ combatRecipient gs target = case target of
     if Combat.stillAttacked oid gs
       then Just (Recipient.ToPlaneswalker oid)
       else Nothing
+  -- NOT IMPLEMENTED: combat damage dealt to a battle, which CR 120.3h and CR
+  -- 310.6 turn into that many defense counters coming off it. Recipient has no
+  -- ToBattle tag to name one with, so the assignment finds nothing to address and
+  -- an unblocked attacker on a battle deals no damage at all (#897).
+  AttackTarget.OfBattle _ -> Nothing
 
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
@@ -248,9 +253,9 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                 -- handled above, so this fallback is unreachable, and answering
                 -- with the CR 510.1c default is the conservative reading.
                 let banded = any (\b -> Projection.hasKeyword Keyword.Banding b gs) blockers
-                    defending = case target of
-                      AttackTarget.OfPlayer defender -> Just defender
-                      AttackTarget.OfPlaneswalker oid -> Projection.controllerOf oid gs
+                    -- CR 508.5 / CR 310.8d, shared with the landwalk reading in
+                    -- Combat.defendingPlayerOf so the two cannot drift.
+                    defending = Combat.defendingPlayerOf (Projection.controlGrants gs) target gs
                     chooser = if banded then Maybe.fromMaybe pid defending else pid
                 let decider = Decide.deciderFor chooser gs
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
@@ -336,7 +341,7 @@ gatherCombatDamage assigns = do
 -- which is what CR 608.2b's target re-validation is for and this is not.
 --
 -- Only battles are missing from the classification, and only because Recipient
--- has no ToBattle tag to classify one as (#302); CR 120.3h is what it would need.
+-- has no ToBattle tag to classify one as (#897); CR 120.3h is what it would need.
 --
 -- The creature test comes first, and for a permanent that is both a creature and
 -- a planeswalker that is the wrong answer -- CR 120.3c and CR 120.3e both apply

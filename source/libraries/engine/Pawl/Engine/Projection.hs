@@ -857,14 +857,13 @@ setLandSubtypeEffects gs =
       -- ability whose affected set names a basic land type, so it is the first
       -- card a Magical Hack could aim at this read-point at all.
       --
-      -- The disagreement is still NOT OBSERVABLE, and this rewrite is consistency
-      -- rather than a fix with a test behind it: no test discriminates it, checked
-      -- by mutating it away. This gate decides whose rules-text abilities CR 305.7
-      -- strips, so seeing it needs a permanent whose PRINTED type line carries a
-      -- basic land type AND which has a rules-text static ability reaching other
-      -- objects -- affectsBase reads base characteristics. Every basic land is
-      -- abilityless, and no nonbasic land in the pool carries a basic land type,
-      -- so nothing can currently be on both sides (#584).
+      -- Proved by Pawl.ProjectionSpec's "Conversion strips the Estuary's ability,
+      -- and CR 612.1 hands it back". Seeing this rewrite at all takes a permanent
+      -- whose PRINTED type line carries a basic land type AND which has a
+      -- rules-text static ability reaching other objects -- affectsBase reads base
+      -- characteristics, so both sides have to be true of one card. Synthetic
+      -- Volcanic Estuary is that card, and the spec's comment says why it is
+      -- written rather than found.
       --
       -- textChangesAffecting folds the whole effect list, and this function is
       -- hoisted out of gather's walk to keep that off the per-permanent path, so

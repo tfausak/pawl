@@ -1508,6 +1508,7 @@ isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
   AttackTarget.OfPlaneswalker _ -> True
   AttackTarget.OfPlayer _ -> False
+  AttackTarget.OfBattle _ -> False
 
 printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
