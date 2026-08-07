@@ -380,6 +380,21 @@ viewOfObjectGiven :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> 
 viewOfObjectGiven pcs grants oid gs =
   viewOfCharacteristics oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) gs
 
+-- CR 112.2 / 601.2a: the view of a SPELL on the stack, whose controller is "by
+-- default, the player who put it on the stack" -- the player casting it, which
+-- CR 601.2a says the same way. `viewOfObject` above cannot answer that -- a
+-- stack object carries no Object.enteredUnder (Event.changeZone stamps it for a
+-- battlefield entry alone), so defaultControllerOf would hand back the card's
+-- OWNER, a different player for anything cast from somebody else's zone. The
+-- caster is what GameEvent.SpellCast records, so it is passed in rather than
+-- rediscovered.
+--
+-- Characteristics come from the live projection, which is CR 601.2i's own order:
+-- effects that modify the spell as it is cast are applied BEFORE it becomes cast,
+-- so by the time a trigger reads this they are already on the stack object.
+viewOfSpell :: PlayerId.PlayerId -> ObjectId -> GameState -> Filter.View
+viewOfSpell caster oid gs = viewOfCharacteristics oid (project oid gs) (Just caster) gs
+
 -- The ViewOf for callers OUTSIDE the CR 613 layer fold: every object projected
 -- with all layers applied. `viewUpTo` below is the bounded counterpart for
 -- callers INSIDE the fold. Picking the wrong one is not a type error -- both are
@@ -1207,6 +1222,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
   TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
   TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
+  TriggerCondition.SpellCast f -> TriggerCondition.SpellCast (Filter.rewrite pairs f)
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins _ _ -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition

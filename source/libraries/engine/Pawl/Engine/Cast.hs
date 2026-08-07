@@ -880,7 +880,12 @@ castProposed pid sid face castFrom candidates before = do
                           -- CR 601.2i: the spell has been cast. Emitted AFTER the
                           -- last step that can fail, so a rejected announcement
                           -- records nothing.
-                          State.modify' (Event.recordEvent (GameEvent.SpellCast pid))
+                          --
+                          -- `sid` is the spell -- the incarnation CR 601.2a put
+                          -- on the stack, which is what a "whenever you cast a
+                          -- [type] spell" trigger reads its characteristics off
+                          -- (TriggerCondition.SpellCast).
+                          State.modify' (Event.recordEvent (GameEvent.SpellCast pid sid))
                           -- Stamped on `sid` itself, the incarnation CR 601.2a
                           -- put on the stack, rather than on whatever is on top
                           -- of it now.

@@ -379,4 +379,35 @@ data TriggerCondition
     -- SelfCountersReached's reason: the shape is the counter kind's, and
     -- Pawl.Engine.Battle is where rule 310's battle-only reading lives.
     SelfLastCounterRemoved CounterKind.CounterKind
+  | -- | CR 601.2i: "whenever you cast a [type] spell" -- Young Pyromancer's
+    -- "whenever you cast an instant or sorcery spell". That rule's second
+    -- sentence is the trigger event in as many words: "any abilities that
+    -- trigger when a spell is cast or put onto the stack trigger at this time".
+    -- Matched against GameEvent.SpellCast, whose ObjectId is the spell.
+    --
+    -- PermanentEnters' shape rather than PlayerDiscards': a FILTER over the
+    -- spell, not a PlayerRelation over the caster. The printed sentence narrows
+    -- two things at once -- who cast it and what it was -- and only one of those
+    -- is a player, so a PlayerRelation would say half of it and leave "an
+    -- instant or sorcery" unwritable. Both halves fit in the Filter instead:
+    -- "you cast" is Filter.ControlledBy You read against CR 109.5's "you", the
+    -- ability's controller (CR 603.3a), and "an instant or sorcery spell" is a
+    -- disjunction of Filter.HasCardType. A card watching an OPPONENT cast is the
+    -- same constructor with Filter.ControlledBy Opponent, which is the second
+    -- reason the relation is not a separate payload.
+    --
+    -- NOT self-scoped: the bearer is a creature watching the stack, and is the
+    -- Filter.Context's source, so "another" and "this spell" are expressible as
+    -- Filter.Not Filter.IsSource and Filter.IsSource if a card ever wants them.
+    --
+    -- The spell is read AS IT IS ON THE STACK. CR 608.2h is not involved -- CR
+    -- 601.2a leaves the spell there "until it resolves, it's countered, or a rule
+    -- or effect moves it elsewhere", none of which can have happened yet -- but
+    -- the stack incarnation is the right object for a stronger reason: CR 601.2i
+    -- applies the effects that modify the spell's characteristics BEFORE it
+    -- becomes cast, so a card in the hand is the wrong thing to read.
+    --
+    -- Nothing about the spell is bound for the payload to name, so a card saying
+    -- "copy that spell" is not expressible through this condition (#910).
+    SpellCast (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)

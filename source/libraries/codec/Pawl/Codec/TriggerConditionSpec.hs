@@ -235,3 +235,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfLastCounterRemoved CounterKind.Defense)
       """ {"type":"SelfLastCounterRemoved","value":{"type":"Defense"}} """
+  -- CR 601.2i. The payload is a Filter over the SPELL, so Young Pyromancer's two
+  -- printed narrowings -- who cast it and what it was -- are both inside it.
+  Spec.it s "SpellCast round-trips with its Filter" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SpellCast (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Or [Filter.HasCardType CardType.Instant, Filter.HasCardType CardType.Sorcery]]))
+      """ {"type":"SpellCast","value":{"type":"And","value":[{"type":"ControlledBy","value":{"type":"You"}},{"type":"Or","value":[{"type":"HasCardType","value":{"type":"Instant"}},{"type":"HasCardType","value":{"type":"Sorcery"}}]}]}} """

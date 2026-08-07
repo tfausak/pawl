@@ -3323,6 +3323,90 @@ leavesBattlefieldSpec s registry =
           Spec.assertEqWith s "and at 25 once it does" (S.lifeOf S.alice after) (Just 25)
           Spec.assertEqWith s "with no Beast token anywhere" (length (beastsOf S.alice after)) 0
 
+-- CR 601.2i's second sentence -- "any abilities that trigger when a spell is
+-- cast or put onto the stack trigger at this time" -- which is the whole trigger
+-- event TriggerCondition.SpellCast matches.
+--
+-- Young Pyromancer, {1}{R} Creature -- Human Shaman 2/1: "Whenever you cast an
+-- instant or sorcery spell, create a 1/1 red Elemental creature token." Two
+-- narrowings in one printed sentence, and the Filter carries both -- "you cast"
+-- is Filter.ControlledBy You against CR 109.5's "you" (CR 603.3a), "an instant
+-- or sorcery spell" a disjunction of Filter.HasCardType -- so a board that moved
+-- only one of them at a time could not tell a working Filter from one that
+-- always passes. Each case below moves exactly one.
+--
+-- Boil, {3}{R} Instant "Destroy all Islands", is the spell cast: it TARGETS
+-- NOTHING, so no answerer choice enters the fixture, and no player here controls
+-- an Island, so its resolution changes nothing that an assertion reads. The
+-- Elemental token is therefore the only thing the cast can put on the
+-- battlefield.
+--
+-- THREE seats. At two players every board has exactly one non-controller, so
+-- "the caster is not you" and "the caster is that one opponent" are the same
+-- sentence and a Filter that confused them would still answer right. carol is
+-- the seat that is neither the caster nor the ability's controller, and the
+-- opponent case below names all three players in its assertions.
+youngPyromancerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+youngPyromancerSpec s registry =
+  let elemental = CardName.MkCardName (Text.pack "Elemental Token")
+      elementalsOf = S.countOnBattlefieldByName elemental
+      -- alice has Young Pyromancer and four Mountains, bob four Mountains, carol
+      -- nothing at all. Four each is Boil's {3}{R}, and covers Goblin Piker's
+      -- {2}{R} with one to spare.
+      board mountain pyromancer =
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+            withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
+            (_, withPyromancer) = S.addCreature pyromancer S.alice withLands
+         in withPyromancer
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+   in Spec.describe s "SpellCast" $ do
+        -- THE case: the trigger fires at all, and the token it makes is the one
+        -- the ability names rather than merely something arriving on the stack.
+        Spec.it s "CR 601.2i casting an instant fires Young Pyromancer" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          pyromancer <- S.printingOf s registry "Young Pyromancer"
+          boil <- S.printingOf s registry "Boil"
+          let (boilId, gs) = S.addHandCard boil S.alice (board mountain pyromancer)
+              after = castAndResolve S.alice boilId gs
+          Spec.assertEqWith s "no Elemental before the cast" (elementalsOf S.alice gs) 0
+          Spec.assertEqWith s "exactly one Elemental token afterwards" (elementalsOf S.alice after) 1
+        -- The card-type half of the Filter, moved on its own: alice still casts,
+        -- and only what she casts changes. A Filter that admitted everything and
+        -- one that read the type correctly are indistinguishable without this.
+        Spec.it s "CR 601.2i a CREATURE spell fires nothing" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          pyromancer <- S.printingOf s registry "Young Pyromancer"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, gs) = S.addHandCard piker S.alice (board mountain pyromancer)
+              after = castAndResolve S.alice pikerId gs
+          -- Positive control: the cast really happened and really resolved, so
+          -- the silence below is the Filter's answer and not a fixture that
+          -- never cast anything.
+          Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+          Spec.assertEqWith s "and no Elemental token" (elementalsOf S.alice after) 0
+        -- The "you" half, moved on its own: the same instant, cast from the seat
+        -- to alice's left instead of hers. carol makes the board three-handed,
+        -- so "bob cast it" is not the same statement as "an opponent cast it".
+        Spec.it s "CR 109.5 'you cast': an OPPONENT's instant fires nothing" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          pyromancer <- S.printingOf s registry "Young Pyromancer"
+          boil <- S.printingOf s registry "Boil"
+          let base = board mountain pyromancer
+              (bobsBoil, withBobs) = S.addHandCard boil S.bob base
+              (alicesBoil, gs) = S.addHandCard boil S.alice withBobs
+              byBob = castAndResolve S.bob bobsBoil gs
+              byAlice = castAndResolve S.alice alicesBoil gs
+          Spec.assertEqWith s "alice gets no Elemental from bob's cast" (elementalsOf S.alice byBob) 0
+          Spec.assertEqWith s "and neither does bob" (elementalsOf S.bob byBob) 0
+          Spec.assertEqWith s "and neither does carol" (elementalsOf S.carol byBob) 0
+          -- The same board, one caster apart: alice casting her own copy is what
+          -- proves the seat is the only thing the silence above turns on.
+          Spec.assertEqWith s "the same board fires for alice's own cast" (elementalsOf S.alice byAlice) 1
+
 -- The events a trigger condition GENUINELY fires on (Event.matchesTrigger's own
 -- arms are the spec), so eventBindings is exercised through its matching arm
 -- rather than through its `_ -> Map.empty` fallthrough. A pair that did not
@@ -3409,6 +3493,10 @@ representativeEvents cond =
         -- CR 310.11b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
         TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved departed kind 1 0)
+        -- CR 601.2i's own event, and the only one this condition admits. The
+        -- payload is a caster and the spell, and neither is bound, so the floor
+        -- is empty whichever spell it names.
+        TriggerCondition.SpellCast _ -> one (GameEvent.SpellCast S.alice arrived)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3435,7 +3523,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached CounterKind.Lore 1,
-    TriggerCondition.SelfLastCounterRemoved CounterKind.Defense
+    TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
+    TriggerCondition.SpellCast Filter.Type.IsSource
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -4902,3 +4991,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   mindcrankSpec s registry
   anafenzaAttackSpec s registry
   ezuriExperienceSpec s registry
+  youngPyromancerSpec s registry

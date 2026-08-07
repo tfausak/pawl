@@ -59,12 +59,28 @@ data GameEvent
     -- both an "at the beginning of each end step" step trigger and a CR 603.7
     -- delayed ability match against.
     StepBegan Phase.Phase PlayerId.PlayerId
-  | -- | CR 601.2i: a player cast a spell. The event Rule of Law counts, and the
-    -- reason the count is a fold over the whole turn log rather than a per-effect
-    -- watermark: its ruling looks at the entire turn, even if Rule of Law was not
-    -- on the battlefield when the spell was cast. The CAST is the event, not the
-    -- resolution -- a countered spell still counts.
-    SpellCast PlayerId.PlayerId
+  | -- | CR 601.2i: a player cast a spell -- the caster, and the spell. The event
+    -- Rule of Law counts, and the reason the count is a fold over the whole turn
+    -- log rather than a per-effect watermark: its ruling looks at the entire
+    -- turn, even if Rule of Law was not on the battlefield when the spell was
+    -- cast. The CAST is the event, not the resolution -- a countered spell still
+    -- counts.
+    --
+    -- The ObjectId is the spell's STACK incarnation, the object CR 601.2a put
+    -- there and the one CR 601.2i's "the spell becomes cast" is about. Not the
+    -- card in the hand: CR 400.7 minted a new object on the way to the stack, and
+    -- CR 601.2i applies the effects that modify the spell's characteristics as it
+    -- is cast BEFORE it becomes cast -- so what a "whenever you cast a [type]
+    -- spell" trigger asks about is already written on the stack object. Still on
+    -- the stack when the trigger is checked, so CR 608.2h's last known
+    -- information is not involved.
+    --
+    -- Not derivable from the Moved event that CR 601.2a's move to the stack
+    -- records. Arriving on the stack is not being cast: CR 707.10 puts a COPY of
+    -- a spell there and says in as many words that it "isn't cast", and CR 601.2
+    -- can reverse a proposed cast after the move has already happened -- which is
+    -- why Pawl.Engine.Cast emits this only past the last step that can fail.
+    SpellCast PlayerId.PlayerId ObjectId.ObjectId
   | -- | CR 725.1: a player became the monarch. What Palace Jailer's exile duration
     -- keys off, and the substrate for any future "whenever a player becomes the
     -- monarch" trigger.

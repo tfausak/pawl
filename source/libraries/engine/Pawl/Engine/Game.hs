@@ -493,7 +493,7 @@ honourShuffle offered answer =
 -- Pawl.Engine.Projection and Pawl.Engine.Count already case on it too.
 castOf :: GameEvent -> Maybe PlayerId
 castOf event = case event of
-  GameEvent.SpellCast pid -> Just pid
+  GameEvent.SpellCast pid _ -> Just pid
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented _ _ -> Nothing
