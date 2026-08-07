@@ -651,6 +651,34 @@ data Prompt r where
   -- all single-mode; a modal payload mixing a live mode with a dead optional one
   -- would reach this prompt with nothing to decide (#336).
   ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 608.2g: a cast that a RESOLVING effect specifically allows -- "if an
+  -- effect specifically instructs or allows a player to cast a spell during
+  -- resolution, they do so by following the steps in rules 601.2a-i". CR
+  -- 310.11b's "then you may cast it transformed without paying its mana cost" is
+  -- the producer: Exercises casts it, Declines leaves the card where it is.
+  --
+  -- The ObjectId is the CARD being offered -- the exiled incarnation CR 400.7
+  -- minted, not the ability resolving -- and the CardName is the half CR 712.11a
+  -- puts on the stack, the same pair Action.Cast and CastWhileSearching carry and
+  -- for the same reason: a bare id would leave which face is being offered
+  -- invisible to the answerer.
+  --
+  -- Distinct from CastWhileSearching, which is the same rule's other producer.
+  -- That one offers a LIST and loops, because CR 601.3's Panglacial permission
+  -- ranges over a whole library and several cards may hold it; this one offers
+  -- exactly the one object the resolving effect named, so the question is
+  -- yes-or-no and is asked once.
+  --
+  -- Distinct from ChooseOptional, which is CR 603.5's printed "may" over a whole
+  -- MODE. CR 310.11b's "may" governs one clause of a mandatory ability -- the
+  -- exile before it is not optional -- so a mode-wide question would make
+  -- declining the cast decline the exile too.
+  --
+  -- NEVER elided: CR 601.2b's own decisions aside, casting and not casting reach
+  -- plainly different boards. The offer is not made at all when the rules leave
+  -- nothing to ask -- the card is no longer where the effect left it (CR 608.2h),
+  -- or the cast is one Cast.castableWhenOffered says cannot legally happen.
+  OfferedCast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
   -- | CR 118.12 / 118.12a: whether this player pays a cost a RESOLVING spell or
   -- ability offers them -- Mana Leak's "unless its controller pays {3}", which CR
   -- 118.12a rewrites as "its controller may pay {3}. If they don't, counter it."

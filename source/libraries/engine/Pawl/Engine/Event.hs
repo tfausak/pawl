@@ -1339,8 +1339,9 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
               -- up that was face up on the stack" -- and Pawl.Engine.Stack's
               -- permanent branch is what passes it, through
               -- Pawl.Engine.Card.enteringFace. Pawl.ModalDoubleFacedSpec's
-              -- "casting the back face puts the artifact onto the battlefield" is
-              -- what proves it.
+              -- "casting the back face puts the artifact onto the battlefield"
+              -- proves it for a modal card, and Pawl.BattleSpec's "she may then
+              -- cast it TRANSFORMED and FREE" for a transforming one.
               mkObj ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,

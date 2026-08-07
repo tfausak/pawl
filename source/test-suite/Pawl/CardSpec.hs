@@ -482,6 +482,7 @@ effectCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -688,6 +689,7 @@ effectReplacements effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
   Effect.ChangeText {} -> []
 
 -- #437: does this replacement carry a PhasePattern with a BAKED player in it?
@@ -1653,6 +1655,7 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn _ _ -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
 
 -- Per MODE rather than through Modal.allTargetSpecs, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check

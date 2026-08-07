@@ -219,11 +219,12 @@ castableFaces card = case Card.layout card of
   -- Adventure's two ways to play, a nonmodal double-faced card's back face is not
   -- something a player may elect to cast. Only an effect allowing the card to be
   -- cast "transformed" or "converted" puts a back face on the stack (CR 712.8c /
-  -- 712.11a), and pawl has none: the convert wording is #698, and the wordings
-  -- that reach a back face without one on the STACK put the card onto the
-  -- battlefield transformed instead -- CR 712.13a for a double-faced spell
-  -- already on the stack, CR 712.14a for a card put there without being cast
-  -- (#70).
+  -- 712.11a), and such an effect names the face itself rather than reaching this
+  -- list -- Effect.OfferCast carries CR 310.11b's "transformed" rider and
+  -- Pawl.Engine.Resolve answers it with `backFace` below. What is still absent is
+  -- the CONVERT wording (#698), and the wordings that reach a back face without
+  -- one on the STACK -- CR 712.13a for a double-faced spell already on the stack,
+  -- CR 712.14a for a card put there without being cast (#70).
   Layout.Transforming -> [NonEmpty.head (Card.faces card)]
   -- CR 712.11b: "A player casting a modal double-faced card or a copy of a modal
   -- double-faced card as a spell chooses which face they are casting before
@@ -304,6 +305,68 @@ staysWhenPutOntoBattlefield card = case Card.layout card of
   Layout.Adventure -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> not (isPermanent (NonEmpty.head (Card.faces card)))
+
+-- CR 712.8a / 712.11: the FRONT face of a card -- the face a double-faced card
+-- shows wherever nothing has turned it over, and the face CR 712.11 makes a
+-- double-faced spell be cast with by default.
+--
+-- The first, which is the ordering Pawl.Types.Layout's Transforming and
+-- ModalDoubleFaced both document, and TOTAL for the reason `combined` is:
+-- Card.faces is a NonEmpty, so every layout has one. NOT `combined`, and only
+-- Split tells them apart -- CR 709.4's combined view is what a split card has
+-- off the stack, and its FIRST HALF is a different object.
+frontFace :: Card.Card -> Face.Face Card.Card
+frontFace = NonEmpty.head . Card.faces
+
+-- CR 712.1 / 712.11a: the BACK face of a double-faced card -- the one "if a
+-- double-faced card ... is cast as a spell 'transformed' ... it's put on the
+-- stack with its back face up" names, and whose characteristics the resulting
+-- spell then has (CR 712.8c for the nonmodal kind, CR 712.8f for the modal one).
+--
+-- Nothing for every layout that has no back face. CR 712.14a states the same
+-- answer one zone over -- "if a player is instructed to put a card that isn't a
+-- double-faced card onto the battlefield transformed or converted, that card
+-- stays in its current zone" -- so an offer to cast such a card transformed
+-- offers nothing rather than offering its front face under another name.
+--
+-- The SUCCESSOR of the front face, wrapping, which is `turnedOver`'s expression
+-- read from the front: rule 712.1 gives a double-faced card two faces, and
+-- docs/design.md section 2.11's standing rule against baking arity in makes a
+-- longer list rotate rather than fail. Written separately from `turnedOver`
+-- because that function answers CR 701.27a's question about a PERMANENT already
+-- showing a face, and this one answers a question about a CARD in a zone where
+-- CR 712.8a says it shows only its front.
+backFace :: Card.Card -> Maybe (Face.Face Card.Card)
+backFace card =
+  let successor = case NonEmpty.tail (Card.faces card) of
+        [] -> Nothing
+        next : _ -> Just next
+   in case Card.layout card of
+        Layout.Normal -> Nothing
+        Layout.Split -> Nothing
+        Layout.Adventure -> Nothing
+        Layout.Transforming -> successor
+        -- The SAME answer, because CR 712.11a says "a double-faced card" and CR
+        -- 712.1 counts the modal kind among them: a card cast "transformed" is
+        -- put on the stack with its back face up whichever kind it is, and CR
+        -- 712.9 lets a modal double-faced permanent turn over for the same
+        -- reason.
+        --
+        -- NOT how a modal double-faced card's back face is ordinarily reached,
+        -- and that distinction is the whole point of the arm. CR 712.11b --
+        -- "chooses which face they are casting before putting it onto the
+        -- stack" -- makes that a CHOICE the caster makes at every cast, which is
+        -- `castableFaces` offering every face above; routing it through a
+        -- "transformed" rider instead would turn the player's choice into an
+        -- effect's instruction and make the front face the only ordinary offer.
+        -- The two rules answer different questions and this arm answers only CR
+        -- 712.11a's.
+        --
+        -- No printing reaches it today: the pool's only producer of a cast
+        -- "transformed" is CR 310.11b's defeated Siege, and no battle is a modal
+        -- double-faced card. The wording that could is CR 701.28's "converted"
+        -- (#698), which CR 712.3 names on exactly this layout.
+        Layout.ModalDoubleFaced -> successor
 
 -- CR 701.27a: "To transform a permanent, turn it over so that its other face is
 -- up." WHICH face that leaves up, by NAME -- the form Object.face stores, and

@@ -1085,6 +1085,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary _ -> effect
+  Effect.OfferCast {} -> effect
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.

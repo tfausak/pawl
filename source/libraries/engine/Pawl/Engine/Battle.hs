@@ -1,8 +1,8 @@
 -- | CR 310, battles: the defense a battle enters with (CR 310.4b), the protector
 -- designated as it enters (CR 310.8a / 310.11a) together with the state-based
 -- actions that repair that designation (CR 704.5w / 704.5x), the intrinsic ability
--- rule 310.11b gives a Siege, and the state-based action rule 310.7 / 704.5v
--- performs on a battle at defense 0.
+-- rule 310.11b gives a Siege -- both halves of its sentence -- and the state-based
+-- action rule 310.7 / 704.5v performs on a battle at defense 0.
 --
 -- Pawl.Engine.Saga's sibling, and kept apart from Pawl.Engine.Sba for the reason
 -- that module gives: Sba owns WHEN a state-based action is checked, not what any
@@ -31,9 +31,11 @@
 -- of CR 120.3 among several, and it lives beside the others in Pawl.Engine.Damage.
 -- What this module owns is what the rest of rule 310 makes of the result.
 --
--- NOT IMPLEMENTED, and the second half of CR 310.11b's sentence: "then you may
--- cast it transformed without paying its mana cost". The Siege reaches exile and
--- stops there (#901).
+-- CR 310.11b's sentence is whole here, but only its first half is rule 310: the
+-- second half is three rules this module names and does not own -- CR 608.2g's
+-- cast during a resolution, CR 712.11a's transformed face and CR 118.9's
+-- alternative cost -- carried as an Effect.OfferCast the DSL states and
+-- Pawl.Engine.Resolve performs.
 module Pawl.Engine.Battle where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -50,6 +52,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -241,35 +244,46 @@ designateProtector pc controller oid = do
 -- `battleTypes` above is where that gate is stated once.
 --
 -- Single mode, no targets, ChooseExactly 1, and Mandatory: rule 310.11b's exile is
--- not optional -- the "you may" governs the casting that follows it, which is the
--- half not built.
+-- not optional. The "you may" governs only the casting that follows it, which is
+-- why it is the OFFER's own prompt (Prompt.OfferedCast) rather than the mode's
+-- CR 603.5 optionality -- a mode-wide "may" would let a player decline the exile.
 --
--- NOT IMPLEMENTED: "then you may cast it transformed without paying its mana cost"
--- (#901). Pawl has no way to offer a cast from exile, as the back face, for free,
--- so the ability stops at the exile. A defeated Siege therefore reaches exile and
--- stays there.
+-- TWO effects for one sentence, joined by a slot, because CR 400.7 makes the two
+-- "it"s two objects: the permanent that was on the battlefield is exiled, and
+-- what may then be cast is the card the move minted in exile. Binding.became is
+-- that name -- the reserved slot for the incarnation a card became -- and
+-- Pawl.Engine.Resolve reads it live, since a resolving ability's target map is
+-- fixed before its effect fold begins.
 siegeDefeat :: TriggeredAbility Card
 siegeDefeat =
   TriggeredAbility.MkTriggeredAbility
     { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.fromList [exile, offer]) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
   where
     -- "Exile it": the permanent the ability triggered from, which CR 113.7 binds
-    -- under Binding.triggerSource. No entry riders, no bound incarnation and no
-    -- stated origin zone -- the ability functions on the battlefield, where the
-    -- permanent already is.
-    effect =
+    -- under Binding.triggerSource. No entry riders and no stated origin zone --
+    -- the ability functions on the battlefield, where the permanent already is --
+    -- and Binding.became for the exiled incarnation the next effect names.
+    exile =
       Effect.MoveToZone
         Binding.triggerSource
         Zone.Exile
         EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False}
+        (Just Binding.became)
         Nothing
-        Nothing
+    -- "then you may cast it transformed without paying its mana cost": CR 608.2g's
+    -- cast during a resolution, with CR 712.11a's face rider and CR 118.9's
+    -- alternative cost. Both riders come from the OFFER, so nothing downstream
+    -- learns that rule 310.11b is what wrote them.
+    offer =
+      Effect.OfferCast
+        Binding.became
+        CastOffer.MkCastOffer {CastOffer.transformed = True, CastOffer.withoutPayingManaCost = True}
 
 -- The intrinsic triggered abilities rule 310 gives a permanent, read off the
 -- finished projection. Pawl.Engine.Keyword.triggeredAbilitiesOf's sibling, and

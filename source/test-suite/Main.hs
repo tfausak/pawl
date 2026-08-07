@@ -20,6 +20,7 @@ import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
+import qualified Pawl.Codec.CastOfferSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
 import qualified Pawl.Codec.ColorSpec
@@ -242,6 +243,7 @@ spec s registry = do
   Pawl.Codec.BlockRequirementSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
+  Pawl.Codec.CastOfferSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
   Pawl.Codec.ColorSpec.spec s

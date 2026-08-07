@@ -130,6 +130,14 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- rebinding the source to the arrival redirects every viewWithLastKnown
 -- quantity read onto the graveyard card's printed characteristics.
 --
+-- A SECOND writer, and the same notion of "it" from the other side: an ability
+-- whose own effect performs the move binds the arrival here too, through
+-- Effect.MoveToZone's CR 400.7 slot. Rule 310.11b's "exile it, then you may cast
+-- it" is that shape (Pawl.Engine.Battle.siegeDefeat), and the two writers cannot
+-- collide -- eventBindings stamps this slot only for the zone-change conditions
+-- listed in Event.eventBindingSlots, and a counter-removal condition is not one.
+-- No CARD may bind it, which Pawl.CardSpec's reservedBindings sweep enforces.
+--
 -- Stamped by Pawl.Engine.Event.eventBindings alongside `triggerPlayer`, and not
 -- a target -- same CR 608.2b posture as that slot, including the "no card's
 -- targetSpecs may name it" sweep and the eventBindingSlots check on reads. A
