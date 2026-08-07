@@ -3,6 +3,7 @@ module Pawl.Codec.Effect where
 import qualified Data.Maybe as Maybe
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
+import qualified Pawl.Codec.CastOffer as CastOffer
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
@@ -131,6 +132,14 @@ toJson codec e = case e of
   -- A bare slot name, not an array: the library is derived from the object that
   -- slot names (CR 701.24), so there is no second field to write.
   Effect.ShuffleIntoLibrary s -> Common.tagged "ShuffleIntoLibrary" (Just (SlotName.toJson s))
+  -- The slot alone when the offer carries neither of CR 310.11b's riders, which
+  -- is an ordinary cast of the card; the pair otherwise. Elided the way
+  -- MoveToZone's EntryRiders are, and told apart on decode by JSON TYPE.
+  Effect.OfferCast s offer ->
+    Common.tagged "OfferCast" . Just $
+      if offer == CastOffer.defaultValue
+        then SlotName.toJson s
+        else Common.array [SlotName.toJson s, CastOffer.toJson offer]
 
 -- Everything a MoveToZone payload may carry after its slot and its destination
 -- zone: the EntryRiders (CR 110.5b), the slot binding the destination
@@ -293,4 +302,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [r, skips])) -> Effect.TakeExtraTurn <$> PlayerRef.fromJson r <*> Common.decodeSet PhaseSelector.fromJson skips
       _ -> Left . Text.pack $ "TakeExtraTurn expects [playerRef, phaseSelectors]"
     "ShuffleIntoLibrary" -> Common.withValue mv (fmap Effect.ShuffleIntoLibrary . SlotName.fromJson)
+    "OfferCast" -> case mv of
+      Just (Value.Array (Array.MkArray [s, o])) -> Effect.OfferCast <$> SlotName.fromJson s <*> CastOffer.fromJson o
+      _ -> Common.withValue mv (fmap (\s -> Effect.OfferCast s CastOffer.defaultValue) . SlotName.fromJson)
     _ -> Left . Text.pack $ "unknown Effect: " <> t

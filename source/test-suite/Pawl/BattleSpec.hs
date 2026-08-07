@@ -44,9 +44,10 @@
 -- on purpose: a defense-5 battle taking 5 at once could not tell "removed all the
 -- counters" from "removed the right number".
 --
--- NOT COVERED, because it is not built (#901): the SECOND half of CR 310.11b's
--- sentence, "then you may cast it transformed without paying its mana cost". A
--- defeated Siege reaches exile below and stops there.
+-- And the second half of CR 310.11b's sentence, "then you may cast it transformed
+-- without paying its mana cost": CR 608.2g's offered cast, CR 118.9's alternative
+-- cost, CR 712.11a / 712.8c's back-face spell and CR 712.13's back-face permanent,
+-- all in defeatSpec below.
 module Pawl.BattleSpec where
 
 import qualified Control.Monad as Monad
@@ -55,6 +56,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
@@ -78,8 +80,10 @@ import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
@@ -87,6 +91,7 @@ import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
@@ -534,6 +539,56 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
         Spec.assertEqWith s "and in nobody's graveyard" (copiesIn Zone.Graveyard) 0
         Spec.assertBool s (not (S.onBattlefield battle afterBoth)) "and not on the battlefield"
       _ -> Spec.assertFailure s "fixture should have a Bolt and a Firebolt"
+  Spec.it s "CR 310.11b / 118.9 / 712.11a she may then cast it TRANSFORMED and FREE" $ do
+    -- THE PROVING CASE for the second half of rule 310.11b's sentence, on the
+    -- identical board as the exile case above with alice ACCEPTING the offer
+    -- rather than declining it.
+    --
+    -- Free-ness is what makes it happen, not a convenience: every land alice has
+    -- is tapped by this point -- three Plains paid for the Invasion and one
+    -- Mountain for each of the two burn spells -- so a cast asked for Serra
+    -- Faithkeeper's front-face {2}{W} could not be announced at all. CR 118.9's
+    -- alternative cost is the only route onto the stack.
+    --
+    -- Transformed-ness is read off characteristics the FRONT face does not have.
+    -- The front face is a Battle -- Siege with defense 5 and no power at all, so
+    -- a 4/4 with flying and vigilance cannot be it (CR 712.8c / 712.11a). The
+    -- exile count going to 0 is what says the card left rather than being copied.
+    invasion <- S.printingOf s registry "Invasion of Dominaria"
+    (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt", "Firebolt"]
+    case spells of
+      [boltId, fireboltId] -> do
+        let afterBolt = castAt battle S.alice boltId gs
+            afterBoth = castAtWith takesTheCast battle S.alice fireboltId afterBolt
+        case angelOn afterBoth of
+          Nothing -> Spec.assertFailure s "Serra Faithkeeper should be on the battlefield"
+          Just (oid, pc) -> do
+            Spec.assertEqWith s "a 4/4" (PC.power pc, PC.toughness pc) (Just 4, Just 4)
+            Spec.assertEqWith s "an Angel" (PC.subtypes pc) (Set.singleton Subtype.Angel)
+            Spec.assertEqWith
+              s
+              "with flying and vigilance"
+              (Map.keysSet (PC.keywords pc))
+              (Set.fromList [Keyword.Flying, Keyword.Vigilance])
+            -- CR 110.2b: the permanent's controller is the player who put the
+            -- spell onto the stack. The Siege she also controlled makes that a
+            -- weak reading on its own, which is why the assertions above carry
+            -- the weight.
+            Spec.assertEqWith s "under alice's control" (Projection.controllerOf oid afterBoth) (Just S.alice)
+            Spec.assertEqWith s "and the card has left exile" (invasionsIn (S.printingName invasion) Zone.Exile afterBoth) 0
+      _ -> Spec.assertFailure s "fixture should have a Bolt and a Firebolt"
+  Spec.it s "CR 310.11b declining the offer leaves the card in exile" $ do
+    -- THE FALSIFIER for casting it unasked. Rule 310.11b says "you MAY cast it",
+    -- so the identical board with the offer declined must leave the Angel
+    -- unmade -- which is also what the exile case above depends on, since its
+    -- answerer declines.
+    (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt", "Firebolt"]
+    case spells of
+      [boltId, fireboltId] -> do
+        let afterBolt = castAt battle S.alice boltId gs
+            afterBoth = castAt battle S.alice fireboltId afterBolt
+        Spec.assertEqWith s "no Angel" (fmap fst (angelOn afterBoth)) Nothing
+      _ -> Spec.assertFailure s "fixture should have a Bolt and a Firebolt"
   Spec.it s "CR 310.6 the FIRST of those two spells defeats nothing" $ do
     -- THE FALSIFIER for the case above: the identical board after the Bolt alone.
     -- Without it, an engine that exiled a battle on any damage at all would pass.
@@ -570,13 +625,44 @@ defeatSpec s registry = Spec.describe s "Defeat" $ do
 -- off -- is placed and resolved inside the same loop. Every case above reads the
 -- board that loop leaves.
 castAt :: ObjectId.ObjectId -> PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-castAt battle caster spell gs =
+castAt = castAtWith S.identityAnswer
+
+-- castAt with the fallback answerer named, so one case can accept CR 310.11b's
+-- offered cast while every other one declines it (Replay.defaultAnswer's arm).
+castAtWith ::
+  (forall r. Prompt.Prompt r -> r) ->
+  ObjectId.ObjectId ->
+  PlayerId.PlayerId ->
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  GameState.GameState
+castAtWith fallback battle caster spell gs =
   let answer :: Prompt.Prompt r -> r
       answer p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToBattle battle)) sets
-        _ -> S.identityAnswer p
+        _ -> fallback p
       cast = S.runPure answer gs (S.cast caster spell)
    in S.runPure answer cast Engine.priorityLoop
+
+-- CR 608.2g: take the cast CR 310.11b offers, and answer everything else as
+-- S.identityAnswer does.
+takesTheCast :: Prompt.Prompt r -> r
+takesTheCast p = case p of
+  Prompt.OfferedCast {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- The battlefield permanent whose PROJECTED name is Serra Faithkeeper -- the back
+-- face, which is what CR 712.8c gives the resulting spell and CR 712.13 carries
+-- onto the battlefield. Read off the projection rather than off the card, since
+-- the CARD is named for its front face in every zone (CR 712.8a).
+angelOn :: GameState.GameState -> Maybe (ObjectId.ObjectId, PC.ProjectedCharacteristics)
+angelOn gs =
+  let wanted = CardName.MkCardName (Text.pack "Serra Faithkeeper")
+      pcs = Projection.projectAll gs
+      hit oid = fmap ((,) oid) (List.find ((== wanted) . PC.name) (Map.lookup oid pcs))
+   in case Maybe.mapMaybe hit (Set.toAscList (GameState.battlefield gs)) of
+        [found] -> Just found
+        _ -> Nothing
 
 -- Set a battle's defense counters to none without any damage having been dealt, so
 -- the two CR 704.5v cases differ in the unscanned event log ALONE.

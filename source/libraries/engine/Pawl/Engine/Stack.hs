@@ -74,6 +74,10 @@ resolveTopWith runSubgame = do
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
                 else
+                  -- `entering` is carried on BOTH branches below: CR 712.13 is
+                  -- about the resolving spell rather than about which kind of
+                  -- permanent it becomes, and an Aura back face would carry its
+                  -- face for the same reason a creature one does.
                   if not (Card.isAura face)
                     then carryOver oid =<< Event.changeZoneShowing oid Zone.Battlefield entering
                     else -- CR 303.4a made this spell target, so CR 608.2b applies
