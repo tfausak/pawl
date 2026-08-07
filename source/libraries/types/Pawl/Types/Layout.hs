@@ -39,8 +39,26 @@ data Layout
     -- for them, and CR 712.8a/712.8d is what makes the front face the one
     -- Pawl.Engine.Card.combined answers with.
     --
-    -- The other two kinds of double-faced card CR 712.1 lists have no constructor
-    -- here: modal double-faced cards (CR 712.3, #697) and meld cards (CR 712.4,
-    -- #369).
+    -- The last kind of double-faced card CR 712.1 lists has no constructor here:
+    -- meld cards (CR 712.4, #369).
     Transforming
+  | -- | CR 712.3: a MODAL double-faced card -- "Modal double-faced cards have a
+    -- Magic card face on each side. These faces are usually independent from one
+    -- another, but they may have an ability that allows them to 'transform' or
+    -- 'convert' on either face."
+    --
+    -- Independent is the whole of what separates it from Transforming above.
+    -- CR 712.11b lets a player choose which face they are casting where CR
+    -- 712.11 gives a nonmodal card only its front face, and CR 712.8f gives the
+    -- resulting spell or permanent "only the characteristics of the face that's
+    -- up" with none of CR 712.8e's mana-value exception carried over.
+    --
+    -- FIRST face front, the rest back -- the positional reading Adventure and
+    -- Transforming above already take, and CR 712.3a/712.3b's printed symbols
+    -- are what Pawl.Types.Card.faces' printed order stands in for.
+    --
+    -- Named in full rather than `Modal`, because "modal" already means CR 700.2's
+    -- modal spells everywhere else in pawl (Pawl.Types.Modal, Pawl.Engine.Modal,
+    -- Face.spell's modes) and the two have nothing to do with each other.
+    ModalDoubleFaced
   deriving (Eq, Ord, Show)

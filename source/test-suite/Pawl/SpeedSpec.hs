@@ -150,7 +150,7 @@ isActivateOf :: ObjectId.ObjectId -> A.Action -> Bool
 isActivateOf oid action = case action of
   A.Activate o _ -> o == oid
   A.Pass -> False
-  A.Play _ -> False
+  A.Play {} -> False
   A.Cast _ _ -> False
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

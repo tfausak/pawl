@@ -647,7 +647,7 @@ castSpell pid oid name = do
       -- Nothing means the id was unknown or the CR 616.1 replacement loop
       -- cancelled the move, and a proposal whose first step did not happen is
       -- one the game returns from (CR 601.2).
-      moved <- Event.changeZoneShowing oid Zone.Stack name
+      moved <- Event.changeZoneShowing oid Zone.Stack (Just name)
       case moved of
         Nothing -> State.put before
         Just sid -> castProposed pid sid face castFrom candidates before
