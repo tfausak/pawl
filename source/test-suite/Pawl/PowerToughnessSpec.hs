@@ -7,7 +7,8 @@
 -- determine) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer Strength,
 -- Twisted Image, Nightmare, Monstrous War-Leech, Omnath Locus of Mana, Serra
 -- Avatar), plus CR 604.2's "as long as" gate on a printed static ability (Kird
--- Ape).
+-- Ape) and CR 613.4c's layer 7c anthem narrowed by a keyword its affected
+-- objects have (Hand of the Praetors).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -548,6 +549,56 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   serraAvatarSpec s registry
   kirdApeSpec s registry
   woodElementalSpec s registry
+  handOfThePraetorsSpec s registry
+
+-- CR 613.4c layer 7c, narrowed by a KEYWORD the affected object has: Hand of the
+-- Praetors, {3}{B} Creature -- Phyrexian Zombie 3/2, "Other creatures you
+-- control with infect get +1/+1."
+--
+-- Three narrowings in one printed line -- "other" (the ability's own source,
+-- excluded by Filter.Not Filter.IsSource), "you control" (CR 109.5's "you",
+-- which for a static ability is the current controller of the object it is on),
+-- and "with infect" (CR 702.90) -- and each case below moves exactly one, so an
+-- Affected filter that admitted every creature is distinguishable from one that
+-- reads all three.
+--
+-- Every printed box on the board is a different pair -- the Hand's 3/2, Glistener
+-- Elf's 1/1, Goblin Piker's 2/1 -- so no assertion's expected value is reachable
+-- by pumping the wrong creature.
+--
+-- The cast trigger on the same card is Pawl.TriggerSpec's.
+handOfThePraetorsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+handOfThePraetorsSpec s registry = Spec.describe s "Hand of the Praetors" $ do
+  -- THE case, and the "other" half beside it: the Elf grows and the Hand, which
+  -- also has infect and is also a creature alice controls, does not grow itself.
+  Spec.it s "CR 613.4c an infect creature you control gets +1/+1, and the Hand does not pump itself" $ do
+    hand <- S.printingOf s registry "Hand of the Praetors"
+    elf <- S.printingOf s registry "Glistener Elf"
+    let (elfId, alone) = S.addCreature elf S.alice (Setup.emptyGame S.bothPlayers)
+        (handId, gs) = S.addCreature hand S.alice alone
+    Spec.assertEqWith s "the Elf is its printed 1/1 with no Hand out" (S.powerToughnessOf elfId alone) (Just (1, 1))
+    Spec.assertEqWith s "and a 2/2 once the Hand is" (S.powerToughnessOf elfId gs) (Just (2, 2))
+    Spec.assertEqWith s "'other': the Hand stays its printed 3/2" (S.powerToughnessOf handId gs) (Just (3, 2))
+  -- The KEYWORD half, moved on its own: still a creature, still alice's, and
+  -- Goblin Piker (2/1, no keywords) is left alone.
+  Spec.it s "CR 702.90 a creature you control WITHOUT infect gets nothing" $ do
+    hand <- S.printingOf s registry "Hand of the Praetors"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, withPiker) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        gs = snd (S.addCreature hand S.alice withPiker)
+    Spec.assertEqWith s "the Piker is its printed 2/1" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+  -- The CONTROLLER half, moved on its own: the same infect creature, on the same
+  -- shared battlefield (CR 400.1), under bob.
+  Spec.it s "CR 109.5 'you control': an opponent's infect creature is not pumped" $ do
+    hand <- S.printingOf s registry "Hand of the Praetors"
+    elf <- S.printingOf s registry "Glistener Elf"
+    let (bobsElf, withBobs) = S.addCreature elf S.bob (Setup.emptyGame S.bothPlayers)
+        (alicesElf, withBoth) = S.addCreature elf S.alice withBobs
+        gs = snd (S.addCreature hand S.alice withBoth)
+    Spec.assertEqWith s "bob's Elf is its printed 1/1" (S.powerToughnessOf bobsElf gs) (Just (1, 1))
+    -- The positive control on the same board: alice's own copy of the very same
+    -- printing does grow, so the silence above is the controller and nothing else.
+    Spec.assertEqWith s "and alice's own copy is a 2/2" (S.powerToughnessOf alicesElf gs) (Just (2, 2))
 
 -- Wood Elemental ({3}{G} Creature -- Elemental, printed */*), whole text: "As
 -- this creature enters, sacrifice any number of untapped Forests." / "Wood
