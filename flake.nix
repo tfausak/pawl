@@ -21,6 +21,33 @@
       ];
     in
     {
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          inherit (pkgs.lib) fileset;
+        in
+        {
+          # Every non-test dependency is a GHC boot library, so this builds
+          # without fetching anything from Hackage.
+          default = pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" (fileset.toSource {
+            root = ./.;
+            # An allowlist rather than a whole-tree copy, so that editing
+            # docs/, script/ or .github/ does not change the derivation and
+            # force a rebuild.
+            fileset = fileset.unions [
+              ./CHANGELOG.md
+              ./LICENSE.txt
+              ./README.md
+              ./cabal.project
+              ./data
+              ./pawl.cabal
+              ./source
+            ];
+          }) { };
+        }
+      );
+
       devShells = forAllSystems (
         system:
         let
