@@ -715,6 +715,7 @@ test-suite pawl-test-suite
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.ManaSpec
+    Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
     Pawl.PerformanceSpec

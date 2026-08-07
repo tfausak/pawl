@@ -170,7 +170,8 @@ data Object = MkObject
     -- Pawl.CardSpec's "a card's face names are pairwise distinct" corpus lint
     -- holds that of every loadable card, and every writer of this field draws
     -- the name from that same card's faces: Pawl.Engine.Event.changeZoneShowing
-    -- names the half being put onto the stack (CR 709.3a), the gate-side
+    -- names the half being put onto the stack (CR 709.3a) and the face a
+    -- resolving permanent spell enters with (CR 712.13), the gate-side
     -- Pawl.Engine.Cast.asProposed names that same half (CR 709.3b), and
     -- Pawl.Engine.Resolve's Transform arm names the face CR 701.27a turned the
     -- permanent over to.
@@ -178,7 +179,7 @@ data Object = MkObject
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
     -- because CR 400.7 makes the moved object a new one, and set again by a move
     -- only where the move itself says which face the object arrives showing
-    -- (CR 709.3a). That clear is also CR
+    -- (CR 709.3a, CR 712.13). That clear is also CR
     -- 712.8a -- a transformed permanent that leaves the battlefield is a card
     -- with only its front face's characteristics again -- rather than only a
     -- forgetting.

@@ -42,6 +42,14 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       Layout.fromJson
       Layout.Transforming
       """ {"type":"Transforming"} """
+  -- CR 712.3.
+  Spec.it s "ModalDoubleFaced" $
+    Common.assertJsonCodec
+      s
+      Layout.toJson
+      Layout.fromJson
+      Layout.ModalDoubleFaced
+      """ {"type":"ModalDoubleFaced"} """
   -- CR 709-722 names a dozen more layouts, most of which have not landed. A
   -- file naming one must fail loudly rather than fall back to Normal, which
   -- would silently play a flip card (CR 710) as its unflipped half.
