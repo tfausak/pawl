@@ -319,7 +319,46 @@ data Object = MkObject
     -- because CR 400.7 makes the moved object a new one -- a battle that returns
     -- to the battlefield is a new battle and chooses a protector afresh (CR
     -- 310.8a).
-    protector :: Maybe PlayerId.PlayerId
+    protector :: Maybe PlayerId.PlayerId,
+    -- | CR 709.5c: the UNLOCKED DESIGNATIONS this permanent has. "'Left half
+    -- unlocked' and 'right half unlocked' are designations that a permanent on
+    -- the battlefield can have. Together, they are called the unlocked
+    -- designations. A particular half of a permanent is said to be 'unlocked' if
+    -- it has the appropriate unlocked designation. Otherwise, that half is said
+    -- to be locked."
+    --
+    -- Named by HALF rather than positionally, and a Set rather than a pair of
+    -- Bools: docs/design.md section 2.11's standing rule against baking arity
+    -- into the card model, and CR 709.4a's own convention that a split card's
+    -- halves are referred to by name (the same reading `face` above takes). The
+    -- names are the halves' own, so Pawl.Engine.Card.faceNamed and the
+    -- pairwise-distinct corpus lint that backs it are what make a member of this
+    -- set pick out one half.
+    --
+    -- Empty for every object that is not a Room permanent, and for a Room that
+    -- entered with neither door open (CR 709.5d's last sentence: "If it's
+    -- entering the battlefield and neither half was cast as a spell, it enters
+    -- with neither unlocked designation"). Those two are the same value because
+    -- the rules make them the same fact -- a permanent with no unlocked
+    -- designations -- and only a card with a shared type line has halves for one
+    -- to name.
+    --
+    -- STORED rather than projected, for protector's reason: CR 709.5e's special
+    -- action and CR 709.5f/709.5g's unlock and lock all WRITE it, so nothing a
+    -- layer computes may be allowed to move it. What it feeds is the substitution
+    -- at Pawl.Engine.Game.faceOf (Pawl.Engine.Card.roomFace), which sits before
+    -- layer 1 rather than in it.
+    --
+    -- NOT a copiable value, and CR 709.5 draws that line itself: the two static
+    -- abilities and "which half of that permanent a characteristic is in" are
+    -- copiable, the DESIGNATIONS are not. So a permanent that becomes a copy of a
+    -- Room copies the doors' text and keeps its own doors open or shut.
+    --
+    -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
+    -- because CR 400.7 makes the moved object a new one -- and CR 709.5d is what
+    -- re-decides it, from the half that was cast, every time the permanent
+    -- enters.
+    unlockedHalves :: Set.Set CardName.CardName
   }
   deriving (Eq, Ord, Show)
 
@@ -366,5 +405,6 @@ newIncarnation object =
       turnedOverAt = Nothing,
       playableFromExileBy = Nothing,
       ringBearerFor = Nothing,
-      protector = Nothing
+      protector = Nothing,
+      unlockedHalves = Set.empty
     }

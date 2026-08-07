@@ -9,6 +9,7 @@ toJson :: Layout.Layout -> Value.Value
 toJson l = Common.nullary $ case l of
   Layout.Normal -> "Normal"
   Layout.Split -> "Split"
+  Layout.Room -> "Room"
   Layout.Adventure -> "Adventure"
   Layout.Transforming -> "Transforming"
   Layout.ModalDoubleFaced -> "ModalDoubleFaced"
@@ -19,6 +20,7 @@ fromJson =
     "Layout"
     [ ("Normal", Layout.Normal),
       ("Split", Layout.Split),
+      ("Room", Layout.Room),
       ("Adventure", Layout.Adventure),
       ("Transforming", Layout.Transforming),
       ("ModalDoubleFaced", Layout.ModalDoubleFaced)

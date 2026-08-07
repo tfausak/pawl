@@ -617,7 +617,8 @@ addCreature printing pid gs =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( oid,
         gs2
@@ -824,7 +825,8 @@ addToken card pid gs =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( oid,
         gs2
@@ -859,7 +861,8 @@ addLibraryCard printing pid gs =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( oid,
         gs2
@@ -894,7 +897,8 @@ addGraveyardCard printing pid gs =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( oid,
         gs2
@@ -936,7 +940,8 @@ addExiledCard printing pid gs =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( oid,
         gs2
@@ -985,7 +990,8 @@ addHandCard printing pid gs =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( oid,
         gs2
@@ -1037,7 +1043,8 @@ landsInPlay land n =
                   Object.turnedOverAt = Nothing,
                   Object.playableFromExileBy = Nothing,
                   Object.ringBearerFor = Nothing,
-                  Object.protector = Nothing
+                  Object.protector = Nothing,
+                  Object.unlockedHalves = Set.empty
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1071,7 +1078,8 @@ handOne printing base =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1111,7 +1119,8 @@ pikerInHand land piker n ph =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
       gs3 =
         gs2
@@ -1581,7 +1590,8 @@ oneMountainState mountain ph =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1723,7 +1733,8 @@ spellOnStack printing pid gs =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in ( oid,
         gs2

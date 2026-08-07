@@ -142,6 +142,17 @@ combined card = case Card.layout card of
   -- nothing to write and so also covers Who // What // When // Where // Why, a
   -- five-part split card from a silver-border Un-set, entirely outside the CR.
   Layout.Split -> foldSplit (Card.faces card)
+  -- CR 709.4 again, and the same expression for a different reason. A Room is a
+  -- split card (CR 709.5's own first words, "Some split cards are permanent
+  -- cards with a single shared type line"), so its off-the-battlefield view is
+  -- the two halves combined exactly as CR 709.4 says. What CR 709.5 adds only
+  -- bites on the battlefield: its two static abilities subtract a LOCKED half's
+  -- name, mana cost and rules text, and CR 709.5c makes the unlocked
+  -- designations something "a permanent on the battlefield can have". A Room in a
+  -- hand, a graveyard or a library has no designations because it is not a
+  -- permanent, so no half is locked and nothing is taken back out -- see
+  -- roomFace below, which is this value with the locked halves subtracted.
+  Layout.Room -> foldSplit (Card.faces card)
   -- CR 715.4: "In every zone except the stack, and while on the stack not as an
   -- Adventure, an adventurer card has only its normal characteristics." The
   -- alternative characteristics of CR 715.2 are reached ONLY through
@@ -293,6 +304,18 @@ castableFaces :: Card.Card -> [Face.Face Card.Card]
 castableFaces card = case Card.layout card of
   Layout.Normal -> [NonEmpty.head (Card.faces card)]
   Layout.Split -> NonEmpty.toList (Card.faces card)
+  -- CR 709.3 reaches a Room unchanged: it is a split card, so its caster chooses
+  -- which half before putting it onto the stack, and every half is offered for
+  -- Split's reason -- the choice is the player's. The reminder text on the
+  -- printings says the same ("You may cast either half").
+  --
+  -- CR 709.5b is what makes the resulting SPELL differ from an ordinary split
+  -- card's: "The existence of each half of an object with a shared type line is
+  -- part of that object's copiable values, even if that object is a spell on the
+  -- stack. This is an exception to rule 709.3b." That exception is about what the
+  -- spell still HAS, not about what may be cast, so it changes nothing here --
+  -- CR 709.3a still evaluates and prices only the chosen half.
+  Layout.Room -> NonEmpty.toList (Card.faces card)
   -- CR 715.3: "As a player plays an adventurer card, the player chooses whether
   -- they play the card normally or as an Adventure." Both, for Split's reason:
   -- the choice is the player's, and offering each half as its own legal action
@@ -359,6 +382,10 @@ landFaces card =
       offered = case Card.layout card of
         Layout.Normal -> byDefault
         Layout.Split -> byDefault
+        -- CR 709.5 makes a Room a PERMANENT card, and every printing's shared
+        -- type line reads "Enchantment - Room", so the filter below drops the
+        -- pair whichever view is offered.
+        Layout.Room -> byDefault
         Layout.Adventure -> byDefault
         -- CR 712.8a again, and CR 712.12 names the MODAL kind alone: a nonmodal
         -- double-faced card in a hand is only its front face, so a back face that
@@ -391,6 +418,7 @@ staysWhenPutOntoBattlefield :: Card.Card -> Bool
 staysWhenPutOntoBattlefield card = case Card.layout card of
   Layout.Normal -> False
   Layout.Split -> False
+  Layout.Room -> False
   Layout.Adventure -> False
   Layout.Transforming -> False
   Layout.ModalDoubleFaced -> not (isPermanent (NonEmpty.head (Card.faces card)))
@@ -433,6 +461,11 @@ backFace card =
    in case Card.layout card of
         Layout.Normal -> Nothing
         Layout.Split -> Nothing
+        -- A Room's halves are not faces of a double-faced card: CR 712.1 lists
+        -- the kinds and a shared type line is not among them, so CR 712.14a's
+        -- "a card that isn't a double-faced card ... stays in its current zone"
+        -- is the answer, and Nothing is how this function says it.
+        Layout.Room -> Nothing
         Layout.Adventure -> Nothing
         Layout.Transforming -> successor
         -- The SAME answer, because CR 712.11a says "a double-faced card" and CR
@@ -497,6 +530,10 @@ turnedOver :: Maybe CardName.CardName -> Card.Card -> Maybe CardName.CardName
 turnedOver mName card = case Card.layout card of
   Layout.Normal -> Nothing
   Layout.Split -> Nothing
+  -- CR 701.27c / 712.9: a Room is not represented by a double-faced token or a
+  -- double-faced card, so an instruction to transform one does nothing. Its two
+  -- halves are both on the front, which is what a shared type line means.
+  Layout.Room -> Nothing
   Layout.Adventure -> Nothing
   Layout.Transforming -> nextFace mName card
   Layout.ModalDoubleFaced -> nextFace mName card
@@ -530,13 +567,23 @@ nextFace mName card =
 -- combined and normal characteristics respectively in every zone but the stack.
 -- Dropping the face is what gives them that.
 --
--- CR 709.5d asks for the same carry-through the other rule does -- a permanent
--- with a shared type line is unlocked on the half that was cast -- and is NOT
--- implemented here: Rooms have no Layout arm at all (#892).
 enteringFace :: Card.Card -> Maybe CardName.CardName -> Maybe CardName.CardName
 enteringFace card shown = case Card.layout card of
   Layout.Normal -> Nothing
   Layout.Split -> Nothing
+  -- CR 709.5d asks for the same carry-through CR 712.13 does -- "A permanent
+  -- with a shared type line is given the 'left half unlocked' designation as it
+  -- enters the battlefield if its left half was cast as a spell" -- so the half
+  -- the spell showed has to survive the move, and this is the one channel that
+  -- carries it.
+  --
+  -- What the permanent does with it is where the two rules part. CR 712.13
+  -- leaves a double-faced permanent SHOWING the face, which Object.face records;
+  -- CR 709.5c's answer is a DESIGNATION, and a Room shows both halves at once
+  -- whichever doors are open. So Pawl.Engine.Event.changeZoneAttaching spends
+  -- this answer on Object.unlockedHalves rather than on Object.face, gated by
+  -- hasSharedTypeLine below -- see the `face` note in its mkObj.
+  Layout.Room -> shown
   Layout.Adventure -> Nothing
   -- CR 712.11 casts one with its front face up, so for an ordinary cast `shown`
   -- IS the front face and CR 712.8a would resolve Nothing to that same face. The
@@ -570,6 +617,12 @@ manaCostFace :: Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
 manaCostFace card live = case Card.layout card of
   Layout.Normal -> live
   Layout.Split -> live
+  -- The live face, which for a Room permanent is roomFace's subtracted view: CR
+  -- 709.5 takes a locked half's MANA COST away along with its name and rules
+  -- text, so the mana value of a Room with one door open is that door's alone.
+  -- CR 712.8e's exception is written about a nonmodal double-faced permanent and
+  -- reaches nothing here.
+  Layout.Room -> live
   Layout.Adventure -> live
   Layout.Transforming -> NonEmpty.head (Card.faces card)
   -- The live face, and NOT the front one: CR 712.8e's mana-value exception is
@@ -579,6 +632,112 @@ manaCostFace card live = case Card.layout card of
   -- has only the characteristics of the face that's up." Mana value is a
   -- characteristic (CR 109.3), so the face that's up is where it is read from.
   Layout.ModalDoubleFaced -> live
+
+-- CR 709.5: does this card have a SHARED TYPE LINE -- is it a Room? "Some split
+-- cards are permanent cards with a single shared type line", and everything the
+-- rule adds over CR 709.4 hangs off that one fact: the two static abilities that
+-- subtract a locked half (roomFace below), CR 709.5c's designations, CR 709.5d's
+-- entering designation and CR 709.5e's unlock cost.
+--
+-- A LAYOUT read, like every other classification in this module, and never a
+-- question about which card it is. Named for the rule's own phrase rather than
+-- `isRoom`, because "Room" is the SUBTYPE the printings happen to share (CR
+-- 205.3) and a shared type line is what CR 709.5 actually turns on; nothing in
+-- the rule requires the type line it shares to say Room.
+hasSharedTypeLine :: Card.Card -> Bool
+hasSharedTypeLine card = case Card.layout card of
+  Layout.Normal -> False
+  Layout.Split -> False
+  Layout.Room -> True
+  Layout.Adventure -> False
+  Layout.Transforming -> False
+  Layout.ModalDoubleFaced -> False
+
+-- CR 709.5: what a Room permanent's characteristics ARE, given which of its
+-- halves are unlocked (CR 709.5c). The shared type line "represents two static
+-- abilities that function on the battlefield" -- "As long as this permanent
+-- doesn't have the 'left half unlocked' designation, it doesn't have the name,
+-- mana cost, or rules text of this object's left half", and its mirror -- so this
+-- is CR 709.4's combined view (`combined` above) with every LOCKED half's name,
+-- mana cost and rules text taken back out.
+--
+-- A SUBSTITUTION and not a pair of real static abilities, which is the reading CR
+-- 709.5's own last sentence gives: "These abilities, as well as which half of that
+-- permanent a characteristic is in, are part of that object's copiable values."
+-- Copiable values are where the CR 613 fold STARTS, so the subtraction has to be
+-- done before layer 1 rather than inside layer 3 or 6 -- and doing it as layers
+-- would be wrong twice over. It would let a later timestamp or a dependency
+-- reorder it, which copiable values cannot be; and CR 707.2 would then copy a
+-- Room's whole text and leave the copy's doors unsubtractable, where the rule
+-- says the abilities and the halves are copied. This is exactly the position CR
+-- 708.2 puts a face-down permanent's characteristics in, and faceDownFace above
+-- is substituted at the same seam (Pawl.Engine.Game.faceOf).
+--
+-- The type line survives a locked half, and that is the rule rather than an
+-- omission: CR 709.5 subtracts the name, the mana cost and the rules text, and
+-- nothing else. CR 709.5a says why -- "Each half of a split card with a shared
+-- type line shares the types and subtypes listed on that card's shared type
+-- line" -- so a Room with both doors locked is still an Enchantment Room. The
+-- printed P/T boxes and colour indicator stay for the same reason: neither is
+-- rules text, and no printing has either.
+--
+-- The NAME is rebuilt rather than folded, because CR 709.4a's join is over the
+-- names the object HAS: a Room with one door open has one name, and joining an
+-- emptied one would leave the "Roaring Furnace//" of a half that was subtracted.
+-- With no door open it has no name at all, which is the empty CardName
+-- faceDownFace uses for CR 708.2a's "no name" -- the same value
+-- Pawl.Engine.Projection.baseCharacteristics gives an object with no card behind
+-- it, and one that matches no printing.
+roomFace :: Set.Set CardName.CardName -> Card.Card -> Face.Face Card.Card
+roomFace unlocked card =
+  let isUnlocked face = Set.member (Face.name face) unlocked
+      folded = foldSplit (fmap (\face -> if isUnlocked face then face else subtractHalf face) (Card.faces card))
+   in folded
+        { Face.name = case filter isUnlocked (NonEmpty.toList (Card.faces card)) of
+            [] -> CardName.MkCardName Text.empty
+            face : faces -> CardName.join (Face.name face NonEmpty.:| fmap Face.name faces)
+        }
+
+-- roomFace's per-half half: one LOCKED half of a Room, emptied of everything CR
+-- 709.5's static abilities take away -- "the name, mana cost, or rules text".
+--
+-- Written out field by field rather than derived from faceDownFace, for the
+-- reason that value's own note gives: a field added to Pawl.Types.Face has to be
+-- DECIDED here rather than defaulting to the printed half's. The two lists differ
+-- because the two rules differ -- CR 708.2a replaces the whole face, where CR
+-- 709.5 subtracts three things from it and leaves the rest standing.
+--
+-- Face.spell is emptied even though nothing reads it: merge2 keeps the LEFT
+-- half's spell unconditionally, so a locked left half would otherwise donate its
+-- text to a permanent the rule says does not have it. Face.counterability is
+-- emptied for the same reason -- CR 113.6g is a per-half ability, so it is rules
+-- text of that half.
+subtractHalf :: Face.Face Card.Card -> Face.Face Card.Card
+subtractHalf face =
+  face
+    { Face.name = CardName.MkCardName Text.empty,
+      Face.manaCost = Nothing,
+      Face.keywords = Set.empty,
+      Face.staticAbilities = [],
+      Face.spell = Face.defaultSpell,
+      Face.activatedAbilities = [],
+      Face.replacementEffects = [],
+      Face.triggeredAbilities = [],
+      Face.delayedAbilities = Map.empty,
+      Face.castingPermissions = [],
+      Face.castingRestrictions = [],
+      Face.enchant = [],
+      Face.counterability = Counterability.Counterable,
+      Face.additionalCosts = [],
+      Face.alternativeCosts = [],
+      Face.playerAbilities = [],
+      Face.blockRequirements = [],
+      Face.attackRequirements = [],
+      Face.combatRestrictions = [],
+      Face.attackCosts = [],
+      Face.mulliganActions = [],
+      Face.openingHandActions = []
+    }
 
 -- The face of this card with the given name, if it has one. CR 709.4a: a card's
 -- faces are referred to BY NAME, which is what a player names in paper and what

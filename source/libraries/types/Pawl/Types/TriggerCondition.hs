@@ -1,6 +1,7 @@
 module Pawl.Types.TriggerCondition where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
@@ -412,4 +413,34 @@ data TriggerCondition
     -- is CR 701.6a acting on that slot. The CASTER is not separately bound,
     -- being CR 112.2's controller of the spell already there (#913).
     SpellCast (Filter.Filter Keyword.Keyword)
+  | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
+    -- the ability is given the unlocked designation for the NAMED half. "Some
+    -- abilities trigger when a player unlocks a particular half of a permanent.
+    -- These abilities trigger when that permanent is given the appropriate
+    -- unlocked designation, regardless of whether it was given that designation
+    -- while entering the battlefield or after entering the battlefield."
+    --
+    -- Self-scoped like SelfEnters above -- the bearer's identity is part of the
+    -- match -- plus the half, which is what makes this the only condition that
+    -- names one. CR 709.5h's "a PARTICULAR half" is why: a Room whose two doors
+    -- both carry an unlock trigger has two abilities that see the same event, and
+    -- only the door's name separates them. The name is the ability's own half,
+    -- which is what "this door" means (CR 709.5j: "A door is a half of that
+    -- permanent") -- Pawl.CardSpec's lint holds that it is one of the card's own
+    -- face names.
+    --
+    -- Reaching the half from the ABILITY instead would need the face an ability
+    -- was printed on to survive into Pawl.Engine.Projection's flattened list, and
+    -- it does not: CR 709.4c combines the halves' abilities into one text box and
+    -- nothing downstream remembers which half wrote which line. Naming the door
+    -- is the card stating a fact about itself, the same kind of thing a chosen
+    -- name is, and not the engine casing on which card it is.
+    --
+    -- The condition is about the DESIGNATION and not about who gave it: a door
+    -- unlocked by CR 709.5e's special action, by CR 709.5f's keyword action, and
+    -- by CR 709.5d's entry all fire it. CR 709.5i's "fully unlocks" is a second
+    -- shape -- the permanent getting the other designation while it has one, or
+    -- both at once -- and has no constructor here, since no printing in the pool
+    -- says it (#N).
+    SelfHalfUnlocked CardName.CardName
   deriving (Eq, Ord, Show)

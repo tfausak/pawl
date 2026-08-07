@@ -26,6 +26,14 @@ spec s = Spec.describe s "Pawl.Codec.Layout" $ do
       Layout.fromJson
       Layout.Split
       """ {"type":"Split"} """
+  -- CR 709.5.
+  Spec.it s "Room" $
+    Common.assertJsonCodec
+      s
+      Layout.toJson
+      Layout.fromJson
+      Layout.Room
+      """ {"type":"Room"} """
   -- CR 715.1.
   Spec.it s "Adventure" $
     Common.assertJsonCodec

@@ -275,6 +275,32 @@ resolveFace mName card = case mName of
   -- a bug in one of them.
   Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
 
+-- resolveFace for a reader that has the OBJECT and not just its chosen half --
+-- the door CR 709.5's subtraction is behind.
+--
+-- A Room permanent's characteristics are neither of the two answers above. CR
+-- 709.4's combined view is what the card has off the battlefield, and CR 709.3b's
+-- single half is what a spell on the stack has; a Room on the battlefield has its
+-- halves combined MINUS every locked one's name, mana cost and rules text
+-- (Card.roomFace). Since it is not showing a half at all,
+-- Event.changeZoneAttaching stores no `face` for it and its unlocked
+-- designations (CR 709.5c) are the whole of what says which halves it has.
+--
+-- Gated on the BATTLEFIELD, which is CR 709.5c's own scope: the unlocked
+-- designations are ones "a permanent on the battlefield can have", so a Room in a
+-- hand, a graveyard or a library has none -- and reading no designations as no
+-- unlocked halves there would give it no name and no text, when CR 709.4 gives it
+-- both halves combined. On the STACK the ordinary reading stands: CR 709.3b
+-- leaves only the cast half's characteristics, and CR 709.5b's exception to it is
+-- about the halves' EXISTENCE being copiable rather than about which
+-- characteristics the spell has.
+resolveFaceFor :: Maybe Object.Object -> Card -> Face Card
+resolveFaceFor mObj card = case mObj of
+  Just obj
+    | Card.hasSharedTypeLine card && Object.zone obj == Zone.Battlefield ->
+        Card.roomFace (Object.unlockedHalves obj) card
+  _ -> resolveFace (mObj >>= Object.face) card
+
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).
 --
@@ -310,7 +336,7 @@ faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
 faceUpFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
 faceUpFaceOf oid gs = do
   card <- cardOf oid gs
-  Just (resolveFace (lookupObject oid gs >>= Object.face) card)
+  Just (resolveFaceFor (lookupObject oid gs) card)
 
 -- `faceOf`, narrowed to the one characteristic that is not always read off the
 -- live face: CR 712.8e calculates a nonmodal double-faced permanent's mana value
@@ -332,7 +358,7 @@ manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just Facing.FaceDown -> Just Card.faceDownFace
   _ -> do
     card <- cardOf oid gs
-    Just (Card.manaCostFace card (resolveFace (lookupObject oid gs >>= Object.face) card))
+    Just (Card.manaCostFace card (resolveFaceFor (lookupObject oid gs) card))
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
 -- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the
@@ -351,7 +377,7 @@ faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just Facing.FaceDown -> Just Card.faceDownFace
   _ -> do
     card <- cardOfWithLastKnown oid gs
-    Just (resolveFace (lookupObject oid gs >>= Object.face) card)
+    Just (resolveFaceFor (lookupObject oid gs) card)
 
 -- CR 701.27a over ONE object: "turn it over so that its other face is up", or
 -- leave the map exactly as it was. The primitive BOTH transform paths share --
@@ -538,6 +564,7 @@ honourShuffle offered answer =
 castOf :: GameEvent -> Maybe PlayerId
 castOf event = case event of
   GameEvent.SpellCast pid _ -> Just pid
+  GameEvent.HalfUnlocked _ _ -> Nothing
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented _ _ -> Nothing

@@ -569,7 +569,8 @@ placeBorne srcId pending = do
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if Natural.length legal < count

@@ -432,7 +432,8 @@ activateAbility pid srcId ability = do
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
       onStack =
         gs2
