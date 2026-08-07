@@ -69,7 +69,7 @@ instances able candidates attackers gs =
             -- have started on its behalf -- a requirement is its OWN carrier,
             -- never part of a StaticAbility, so CR 613.6 has nothing here to
             -- hold together. The cut is unconditional.
-            if (null setEffs || Projection.liveGiven setEffs Set.empty source gs)
+            if (null setEffs || Projection.liveGiven setEffs source gs)
               && not (removed source)
               then
                 -- CR 612.1's word swap over the source's own text, computed HERE

@@ -140,7 +140,7 @@ applying pid gs =
               -- already STARTED to apply cannot reach it: CR 613.10/613.11 apply
               -- a player effect AFTER the seven layers have run, so it never
               -- started to apply before layer 6 and the cut is unconditional.
-              if (null setEffs || Projection.liveGiven setEffs Set.empty oid gs)
+              if (null setEffs || Projection.liveGiven setEffs oid gs)
                 && not (removed oid)
                 then
                   -- CR 612.1's word swap over the permanent's own text, computed

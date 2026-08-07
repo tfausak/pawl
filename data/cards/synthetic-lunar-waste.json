@@ -1,0 +1,55 @@
+{
+  "faces": [
+    {
+      "name": "Synthetic Lunar Waste",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "And",
+              "value": [
+                {
+                  "type": "HasCardType",
+                  "value": {
+                    "type": "Land"
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "HasSupertype",
+                    "value": {
+                      "type": "Basic"
+                    }
+                  }
+                },
+                {
+                  "type": "Not",
+                  "value": {
+                    "type": "IsSource"
+                  }
+                }
+              ]
+            }
+          },
+          "modifications": [
+            {
+              "type": "SetLandSubtype",
+              "value": {
+                "type": "Mountain"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}
