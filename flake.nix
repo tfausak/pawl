@@ -75,6 +75,16 @@
             find source -name '*.hs' -print0 | xargs -0 ormolu --mode check
             touch "$out"
           '';
+
+          # .hlint.yaml is passed explicitly rather than added to the source
+          # fileset: hlint only finds it by walking up from the target, and
+          # putting it in the fileset would rebuild the package whenever a
+          # lint rule changed.
+          hlint = pkgs.runCommand "pawl-hlint-check" { nativeBuildInputs = [ pkgs.hlint ]; } ''
+            cd ${source}
+            hlint --hint=${./.hlint.yaml} source
+            touch "$out"
+          '';
         }
       );
 
