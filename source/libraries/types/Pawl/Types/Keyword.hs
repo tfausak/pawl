@@ -232,6 +232,24 @@ data Keyword
     -- rather than beside the other three in pairAllowedGiven.
     Menace
   | Devoid -- 702.114
+  | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
+    -- enter with an additional +1/+1 counter on it. If you don't, it gains
+    -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,
+    -- and Pawl.Engine.Keyword.entryReplacementsOf mints one from this
+    -- constructor the way rule 702.70a's ability is minted from Poisonous.
+    --
+    -- Nullary, because rule 702.136a takes no parameter, and its reader takes the
+    -- per-keyword COUNT rather than membership: CR 702.136b says each instance
+    -- works separately, so a creature with riot twice is offered the choice
+    -- twice and may take a counter for one and haste for the other.
+    --
+    -- The two halves are deliberately NOT split across two constructors or
+    -- folded into an existing rewrite. The counter half goes through CR 122.6's
+    -- funnel so CR 614.16 sees it (Doubling Season doubles riot's counter), and
+    -- the haste half is a CR 611.2 continuous effect with no duration -- neither
+    -- is a copiable value, which is what rules out reusing
+    -- Pawl.Types.EntryOption's keyword set (CR 707.2).
+    Riot
   | -- | 702.145b: daybound, the front-face half of the pair rule 702.145 states.
     -- Three static abilities in one keyword, exactly as the rule bundles them:
     -- "if it is night and this permanent is represented by a double-faced card,
@@ -290,8 +308,11 @@ data Keyword
     StartYourEngines
   deriving (Eq, Ord, Show)
 
--- Devoid is folded as a characteristic-defining ability at the start of layer 5
--- (Projection.applyColorDefining), per CR 613.3. A devoid GRANTED by a layer-6
--- effect still does nothing to colour: CR 604.3a(2) makes such a grant
--- non-characteristic-defining, so it would be an ordinary layer-5 effect, which
--- is not built. No card in the pool grants devoid (#675).
+-- Devoid takes TWO routes, decided by where the instance came from. A PRINTED one
+-- is a characteristic-defining ability and is folded at the start of layer 5
+-- (Projection.applyColorDefining), per CR 613.3. A GRANTED one is not, CR 604.3a
+-- denying CDA status to an ability that is not printed on the card it affects, so
+-- Projection.grantedDevoidParts routes it into layer 5 as an ordinary colour
+-- effect timestamped with the granting permanent (CR 613.7a). Slivdrazi
+-- Monstrosity is the card that separates them, and Pawl.ColorSpec's "CR 613.7a a
+-- granted devoid clears an OLDER 'in addition' colour" is the proof.

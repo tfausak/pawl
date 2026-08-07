@@ -27,6 +27,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.Object as Object
@@ -176,7 +177,7 @@ powderGame powder mountain n =
    in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
 -- Records every CR 103.5b offer's candidate list, declines it, and keeps.
-recordWindow :: Prompt.Prompt r -> State.State [[ObjectId.ObjectId]] r
+recordWindow :: Prompt.Prompt r -> State.State [[(ObjectId.ObjectId, HandActionIndex.HandActionIndex)]] r
 recordWindow p = case p of
   Prompt.MulliganAction _ _ candidates -> do
     State.modify' (candidates :)
@@ -193,6 +194,26 @@ usePowder p = case p of
   Prompt.MulliganAction _ _ candidates -> Maybe.listToMaybe candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   _ -> S.identityAnswer p
+
+-- Takes the offered CR 103.5b action whose index is `i`, and always keeps.
+-- Answering by INDEX is the whole point: the fixture card grants two actions, so
+-- the ObjectId alone would not say which of them was taken.
+useActionAt :: Natural -> Prompt.Prompt r -> r
+useActionAt i p = case p of
+  Prompt.MulliganAction _ _ candidates ->
+    List.find (\(_, index) -> index == HandActionIndex.MkHandActionIndex i) candidates
+  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
+  _ -> S.identityAnswer p
+
+-- alice's library: a Synthetic Twofold Powder on top, then `n` Mountains; bob's
+-- is uniform. The Powder is drawn into her opening hand, which is where CR
+-- 103.5b reads from.
+twofoldGame :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameState
+twofoldGame twofold mountain n =
+  let g0 = Setup.emptyGame S.bothPlayers
+      addMany p pid k g = List.foldl' (\h _ -> snd (S.addCreature p pid h)) g (replicate k ())
+      withAlice = addMany mountain S.alice n (addMany twofold S.alice 1 g0)
+   in poolToLibrary S.bob (poolToLibrary S.alice (addMany mountain S.bob n withAlice))
 
 -- alice's library: `above` Mountains, then a Serum Powder, then 20 more; bob's
 -- is uniform. With `above` = 7 the Powder is NOT in the opening hand and is
@@ -465,7 +486,7 @@ spec s registry =
       case Game.zoneMembers Zone.Hand S.alice drawn of
         [] -> Spec.assertFailure s "expected a drawn opening hand to act from"
         oid : _ -> do
-          let after = S.runPure S.identityAnswer drawn (Resolve.performHandAction oid S.alice [Effect.MoveToZone Binding.triggerSource Zone.Exile EntryRiders.defaultValue Nothing])
+          let after = S.runPure S.identityAnswer drawn (Resolve.performHandAction oid S.alice [Effect.MoveToZone Binding.triggerSource Zone.Exile EntryRiders.defaultValue Nothing Nothing])
           Spec.assertEqWith s "the named card left the hand" (S.handSize S.alice after) 6
           Spec.assertEqWith s "and is in exile" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
     Spec.it s "CR 103.5b: the action is not a mulligan -- it does not add to the bottom count" $ do
@@ -495,6 +516,52 @@ spec s registry =
       let after = run usePowder (chainGame powder mountain)
       Spec.assertEqWith s "two hands exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 14
       Spec.assertEqWith s "and the third hand is a full seven" (S.handSize S.alice after) 7
+    Spec.it s "CR 103.5b: one card granting two actions offers both" $ do
+      -- Nothing in CR 103 caps how many such actions a card grants, so the two
+      -- are two offers with the same granting card and different indices. A
+      -- single offer here would mean the second action is unreachable.
+      twofold <- S.printingOf s registry "Synthetic Twofold Powder"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = twofoldGame twofold mountain 20
+          ((_, _after), offered) = State.runState (Engine.runGame recordWindow gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])) []
+      Spec.assertEqWith s "exactly one offer -- alice's, in the one round she declares" (length offered) 1
+      Spec.assertEqWith s "and it offered two actions" (fmap length offered) [2]
+      Spec.assertEqWith
+        s
+        "both from the same card, as its first and second action"
+        (fmap (fmap snd) offered)
+        [[HandActionIndex.MkHandActionIndex 0, HandActionIndex.MkHandActionIndex 1]]
+      Spec.assertEqWith
+        s
+        "and the two entries name one card, not two"
+        (fmap (length . List.nub . fmap fst) offered)
+        [1]
+    Spec.it s "CR 103.5b: taking the FIRST of two actions does the first one's thing" $ do
+      twofold <- S.printingOf s registry "Synthetic Twofold Powder"
+      mountain <- S.printingOf s registry "Mountain"
+      let after = run (useActionAt 0) (twofoldGame twofold mountain 20)
+      Spec.assertEqWith s "her opening seven are exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 7
+      Spec.assertEqWith s "her hand is a full seven again" (S.handSize S.alice after) 7
+      Spec.assertEqWith s "and nothing went to the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 0
+    Spec.it s "CR 103.5b: taking the SECOND of two actions does the second one's thing" $ do
+      -- The discriminating case: the same card, the same window, the other
+      -- index. Exiling nothing and putting exactly the granting card onto the
+      -- battlefield is what tells the second action apart from the first.
+      twofold <- S.printingOf s registry "Synthetic Twofold Powder"
+      mountain <- S.printingOf s registry "Mountain"
+      let after = run (useActionAt 1) (twofoldGame twofold mountain 20)
+      Spec.assertEqWith s "the granting card is on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+      Spec.assertEqWith s "her hand is one smaller" (S.handSize S.alice after) 6
+      Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    Spec.it s "CR 103.5b: a two-action card replays deterministically" $ do
+      twofold <- S.printingOf s registry "Synthetic Twofold Powder"
+      mountain <- S.printingOf s registry "Mountain"
+      let gs0 = twofoldGame twofold mountain 20
+          ((_, recorded), responses) = Replay.record (useActionAt 1) gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
+          ((_, replayed), desync) = Replay.replay responses gs0 (Mulligan.openingHands S.performer [S.alice, S.bob])
+      Spec.assertEqWith s "the transcript answered every prompt" desync Nothing
+      Spec.assertEqWith s "the battlefield the second action made matches" (Game.zoneMembers Zone.Battlefield S.alice recorded) (Game.zoneMembers Zone.Battlefield S.alice replayed)
+      Spec.assertEqWith s "and the replay exiled nothing either" (length (Game.zoneMembers Zone.Exile S.alice replayed)) 0
     Spec.it s "CR 103.5b: a hand with no granting card is not asked" $ do
       -- Where the rules leave nothing to ask, don't prompt.
       mountain <- S.printingOf s registry "Mountain"

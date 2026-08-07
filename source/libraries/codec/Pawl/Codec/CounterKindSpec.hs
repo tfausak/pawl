@@ -40,3 +40,18 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       CounterKind.fromJson
       CounterKind.Loyalty
       """ {"type":"Loyalty"} """
+  -- CR 714.3, the kind rule 122.1 never lists.
+  Spec.it s "Lore" $
+    Common.assertJsonCodec
+      s
+      CounterKind.toJson
+      CounterKind.fromJson
+      CounterKind.Lore
+      """ {"type":"Lore"} """
+  Spec.it s "Defense" $
+    Common.assertJsonCodec
+      s
+      CounterKind.toJson
+      CounterKind.fromJson
+      CounterKind.Defense
+      """ {"type":"Defense"} """

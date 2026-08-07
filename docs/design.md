@@ -641,6 +641,10 @@ Two different reasons. Worth separating, because the second list might get rever
 
 **You don't need to ban any of this.** Chaos Orb, Falling Star and Shahrazad are already banned in every format WotC runs. Format legality is machinery you need anyway — MTGJSON ships `legalities` on the atomic model, and the deckbuilder needs it to know Black Lotus isn't Modern-legal. These fall out of the pool through the same door. No special case, no engine flag.
 
+**Digital-only cards are in scope.** Arena and Alchemy printings are real cards; there is no reason not to support them, and the formats that exclude them do it through `legalities`, the same door as everything above. So a rule whose only producer is a digital-only card is reachable by a real printing, not a candidate for a synthetic one.
+
+**Prefer card sources in this order: regular, Arena, playtest, un-set, synthetic.** All five are acceptable; Mystery Booster playtest cards (Slivdrazi Monstrosity and friends) are ordinary gate cards. The order ranks candidates when more than one card could prove a rule, rather than banning the tail. Synthetic stays the last resort, and if a better-ranked printing turns up for a rule a worse-ranked one already proves, swap it in. This is about which card proves a rule, not about which rules are worth doing: the leverage argument below picks *what* to implement and is untouched by it.
+
 ### Silver border: canaries, not flexes
 
 Sorting rule: **do the un-cards whose difficulty is shared with black border.**

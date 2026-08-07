@@ -27,6 +27,7 @@ import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
@@ -62,6 +63,17 @@ data Face card = MkFace
     -- the loyalty of the permanent as it WOULD exist on the battlefield (CR
     -- 614.12) rather than the loyalty printed on whatever card is underneath.
     loyalty :: Maybe Loyalty.Loyalty,
+    -- | CR 210.1 / 310.4a: the number in the card's lower right corner. Nothing
+    -- for every card that is not a battle; the CardSpec lint family holds that
+    -- biconditional in both directions, exactly as it does for loyalty above.
+    --
+    -- Read through Pawl.Engine.Projection, never directly, for a REASON WEAKER
+    -- than loyalty's: CR 707.2's list of copiable values names loyalty and stops
+    -- short of defense. See Pawl.Types.Defense for why the projection is still
+    -- where this belongs. What reads it is CR 310.4b's intrinsic enters-with
+    -- replacement, which needs the defense of the permanent as it WOULD exist on
+    -- the battlefield (CR 614.12).
+    defense :: Maybe Defense.Defense,
     -- | CR 702. A Set because this is PRINTED text: a card names each keyword
     -- ability it has once, so there is no printed multiplicity to lose. Where
     -- multiplicity does arise -- the same ability printed and granted, which CR
@@ -151,15 +163,16 @@ data Face card = MkFace
     -- axis (playerAbilities / Effect.AffectPlayers); every entry here is a card
     -- restricting only itself.
     castingRestrictions :: [CastingRestriction.CastingRestriction],
-    -- | CR 702.5a: this face's `enchant` ability, restricting what an Aura spell
-    -- can target and what an Aura can enchant. Nothing for every card that is not
-    -- an Aura; the CardSpec lint family holds the biconditional both ways.
+    -- | CR 702.5a: this face's `enchant` abilities, restricting what an Aura spell
+    -- can target and what an Aura can enchant. Empty for every card that is not an
+    -- Aura; the CardSpec lint family holds the biconditional both ways.
     --
-    -- A TargetSpec, not a Filter, because CR 702.5d's enchant-player Auras need
-    -- the Pool axis and TargetSpec already is {pool, filter}. SINGULAR: CR 702.5c's
-    -- multiple applying instances are unrepresentable, and no card in this pool
-    -- prints two (#189).
-    enchant :: Maybe TargetSpec.TargetSpec,
+    -- TargetSpecs, not Filters, because CR 702.5d's enchant-player Auras need the
+    -- Pool axis and TargetSpec already is {pool, filter}. A LIST, because CR 702.5c
+    -- makes multiple instances of enchant all apply -- printed order, the order the
+    -- other ability lists on this record keep. Pawl.Engine.Card.enchantSpec is the
+    -- conjunction every reader goes through, and the one place that rule is applied.
+    enchant :: [TargetSpec.TargetSpec],
     -- | CR 113.6g: a can't-be-countered ability functions on the stack (Rending
     -- Volley). Read straight off the card by Event.counter rather than through the
     -- projection -- the castingPermissions precedent: a spell on the stack gets no
@@ -167,6 +180,11 @@ data Face card = MkFace
     -- battlefield permanents and every dynamic affected set is battlefield-gated
     -- (#160). CR 613 itself does reach the stack; this is a fact about the engine,
     -- not about the rules.
+    --
+    -- CR 113.6g's SELF-referential clause only. A permanent's static ability
+    -- about OTHER objects being uncounterable (Spider-Punk) rides
+    -- playerAbilities below instead; Pawl.Types.Counterability argues why the two
+    -- carriers cannot be merged.
     counterability :: Counterability.Counterability,
     -- | CR 118.8: this face's printed additional costs, paid at the same time as
     -- the spell's mana cost (Village Rites). Read directly from the card, the
@@ -230,24 +248,29 @@ data Face card = MkFace
     -- attack, so it must stay on CR 508.1a's candidate list, where a
     -- CombatRestriction takes its subject off.
     attackCosts :: [AttackCost.AttackCost],
-    -- | CR 103.5b: the effects of this face's "any time you could mulligan"
-    -- action, in written order (Serum Powder). Read directly from the card, the
-    -- castingPermissions precedent: the ability functions in the HAND (CR 113.6),
-    -- which pawl's projection does not reach (#160).
+    -- | CR 103.5b: this face's "any time you could mulligan" actions, in printed
+    -- order, each one its own list of effects in written order (Serum Powder).
+    -- Read directly from the card, the castingPermissions precedent: the ability
+    -- functions in the HAND (CR 113.6), which pawl's projection does not reach
+    -- (#160).
     --
-    -- An empty list means NO action, not an action that does nothing: the two are
-    -- indistinguishable in play. One action per card; a printing declaring two is
-    -- unrepresentable (#183).
-    mulliganAction :: [Effect.Effect card],
-    -- | CR 103.6 / 103.6a: the effects of this face's opening-hand action, in
-    -- written order (Leyline of the Void). Read directly from the card, the
-    -- mulliganAction precedent (CR 113.6, #160).
+    -- A LIST OF ACTIONS and not one action's effects: nothing in CR 103 caps how
+    -- many such actions a face may grant, and two are two separate offers a
+    -- player picks between, which is why Pawl.Types.HandActionIndex exists.
+    -- An empty OUTER list means the face grants no such action at all, which is
+    -- how a card that says nothing about this window is never offered one.
+    mulliganActions :: [[Effect.Effect card]],
+    -- | CR 103.6 / 103.6a: this face's opening-hand actions, shaped exactly like
+    -- mulliganActions above and read the same way (CR 113.6, #160).
     --
-    -- The SIBLING of mulliganAction, not a reuse: the two windows are at different
+    -- The SIBLING of mulliganActions, not a reuse: the two windows are at different
     -- times (CR 103.5b sits AT a declaration, CR 103.6 opens once the whole
     -- mulligan process is complete), and a card that acts at one must not be
-    -- offered at the other. One action per card, the same caveat (#183).
-    openingHandAction :: [Effect.Effect card]
+    -- offered at the other.
+    --
+    -- No card grants two of these, so the two-action offer is proved on the CR
+    -- 103.5b window only (#803).
+    openingHandActions :: [[Effect.Effect card]]
   }
   deriving (Eq, Ord, Show)
 

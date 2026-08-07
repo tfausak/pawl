@@ -225,6 +225,7 @@ isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
   Recipient.ToPlaneswalker _ -> False
+  Recipient.ToBattle _ -> False
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
 
@@ -262,6 +263,7 @@ identityAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   -- CR 201.2a: an object with no name doesn't have the same name as any other
   -- object, so the empty name is the least eventful answer -- a Null Chamber
@@ -272,6 +274,7 @@ identityAnswer p = case p of
   -- CR 102.2: raised only where there are two or more opponents to pick from,
   -- which no two-player board reaches.
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -291,6 +294,10 @@ identityAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -300,6 +307,9 @@ identityAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -330,7 +340,7 @@ castAnswer p = case p of
           A.Cast {} -> True
           _ -> False
         isPlay a = case a of
-          A.Play _ -> True
+          A.Play {} -> True
           _ -> False
      in case filter isCast actions of
           h : _ -> h
@@ -345,9 +355,11 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -367,6 +379,10 @@ castAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -376,6 +392,9 @@ castAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -414,9 +433,11 @@ aggressiveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -436,6 +457,10 @@ aggressiveAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -445,6 +470,9 @@ aggressiveAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -502,7 +530,7 @@ playLandAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
-          A.Play _ -> True
+          A.Play {} -> True
           A.Pass -> False
           A.Cast {} -> False
           A.Activate _ _ -> False
@@ -517,9 +545,11 @@ playLandAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -539,6 +569,10 @@ playLandAnswer p = case p of
   -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
   -- so with its own interpreter, which is what makes that answer discriminating.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -548,6 +582,9 @@ playLandAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -576,7 +613,8 @@ addCreature printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -781,7 +819,8 @@ addToken card pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -814,7 +853,8 @@ addLibraryCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -847,7 +887,8 @@ addGraveyardCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -887,7 +928,8 @@ addExiledCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -934,7 +976,8 @@ addHandCard printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2
@@ -984,7 +1027,8 @@ landsInPlay land n =
                   Object.face = Nothing,
                   Object.turnedOverAt = Nothing,
                   Object.playableFromExileBy = Nothing,
-                  Object.ringBearerFor = Nothing
+                  Object.ringBearerFor = Nothing,
+                  Object.protector = Nothing
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1016,7 +1060,8 @@ handOne printing base =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -1054,7 +1099,8 @@ pikerInHand land piker n ph =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
       gs3 =
         gs2
@@ -1522,7 +1568,8 @@ oneMountainState mountain ph =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1582,9 +1629,9 @@ drawStep = Engine.runTurnBasedActions (Phase.Beginning BeginningStep.DrawStep)
 -- multi-face test would pass while exercising nothing. Such a test names the
 -- half and calls Pawl.Engine.Cast directly.
 soleFaceName :: ObjectId.ObjectId -> GameState.GameState -> CardName.CardName
-soleFaceName oid gs = case Cast.soleCastableFace oid gs of
-  Just face -> Face.name face
-  Nothing ->
+soleFaceName oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
+  Just [face] -> Face.name face
+  _ ->
     error
       ( "Pawl.Support: "
           <> show (fmap nameOf (Game.cardOf oid gs))
@@ -1614,7 +1661,7 @@ isCastOf :: ObjectId.ObjectId -> A.Action -> Bool
 isCastOf oid action = case action of
   A.Cast o _ -> o == oid
   A.Pass -> False
-  A.Play _ -> False
+  A.Play {} -> False
   A.Activate _ _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
@@ -1658,7 +1705,8 @@ spellOnStack printing pid gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( oid,
         gs2

@@ -96,6 +96,8 @@ library codec
     Pawl.Codec.CastingPermissionSpec
     Pawl.Codec.CastingRestriction
     Pawl.Codec.CastingRestrictionSpec
+    Pawl.Codec.CastOffer
+    Pawl.Codec.CastOfferSpec
     Pawl.Codec.Color
     Pawl.Codec.ColorSpec
     Pawl.Codec.CombatRestriction
@@ -134,6 +136,8 @@ library codec
     Pawl.Codec.DamageRewriteSpec
     Pawl.Codec.Daytime
     Pawl.Codec.DaytimeSpec
+    Pawl.Codec.Defense
+    Pawl.Codec.DefenseSpec
     Pawl.Codec.DelayedTrigger
     Pawl.Codec.DelayedTriggerSpec
     Pawl.Codec.DestructionRewrite
@@ -287,8 +291,6 @@ library codec
     Pawl.Codec.ZoneChangePattern
     Pawl.Codec.ZoneChangePatternSpec
     Pawl.Codec.ZoneChangeSpec
-    Pawl.Codec.ZoneChangeSubject
-    Pawl.Codec.ZoneChangeSubjectSpec
     Pawl.Codec.ZoneSpec
 
 -- An arbitrary precision decimal number, in the spirit of the Decimal and
@@ -321,6 +323,7 @@ library engine
     Pawl.Engine.Activate
     Pawl.Engine.AttackCost
     Pawl.Engine.AttackRequirement
+    Pawl.Engine.Battle
     Pawl.Engine.Binding
     Pawl.Engine.BlockRequirement
     Pawl.Engine.Card
@@ -334,6 +337,7 @@ library engine
     Pawl.Engine.Daytime
     Pawl.Engine.Decide
     Pawl.Engine.Departure
+    Pawl.Engine.EffectZone
     Pawl.Engine.Engine
     Pawl.Engine.Event
     Pawl.Engine.Expiry
@@ -354,6 +358,7 @@ library engine
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
     Pawl.Engine.Ring
+    Pawl.Engine.Saga
     Pawl.Engine.Sba
     Pawl.Engine.Setup
     Pawl.Engine.Speed
@@ -511,6 +516,7 @@ library types
     Pawl.Types.CardType
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
+    Pawl.Types.CastOffer
     Pawl.Types.Color
     Pawl.Types.Combat
     Pawl.Types.CombatRestriction
@@ -524,6 +530,7 @@ library types
     Pawl.Types.CostComponent
     Pawl.Types.Count
     Pawl.Types.Counterability
+    Pawl.Types.CounterCause
     Pawl.Types.Countering
     Pawl.Types.CounterKind
     Pawl.Types.CounterPattern
@@ -535,6 +542,7 @@ library types
     Pawl.Types.Decider
     Pawl.Types.DecisionLog
     Pawl.Types.Deck
+    Pawl.Types.Defense
     Pawl.Types.DelayedTrigger
     Pawl.Types.Departure
     Pawl.Types.DestructionRewrite
@@ -556,6 +564,7 @@ library types
     Pawl.Types.Game
     Pawl.Types.GameEvent
     Pawl.Types.GameState
+    Pawl.Types.HandActionIndex
     Pawl.Types.HandActionPerformer
     Pawl.Types.HybridPayment
     Pawl.Types.Keyword
@@ -650,7 +659,6 @@ library types
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
     Pawl.Types.ZoneChangePattern
-    Pawl.Types.ZoneChangeSubject
 
 executable pawl
   import: executable
@@ -686,6 +694,7 @@ test-suite pawl-test-suite
     Pawl.ActivateSpec
     Pawl.AdventureSpec
     Pawl.AuraSpec
+    Pawl.BattleSpec
     Pawl.BindingSpec
     Pawl.Cards
     Pawl.CardSpec
@@ -709,6 +718,7 @@ test-suite pawl-test-suite
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.ManaSpec
+    Pawl.ModalDoubleFacedSpec
     Pawl.ModalSpec
     Pawl.MulliganSpec
     Pawl.PerformanceSpec
@@ -721,6 +731,7 @@ test-suite pawl-test-suite
     Pawl.ReplaySpec
     Pawl.ResolveSpec
     Pawl.RingSpec
+    Pawl.SagaSpec
     Pawl.SetupSpec
     Pawl.SpeedSpec
     Pawl.Support

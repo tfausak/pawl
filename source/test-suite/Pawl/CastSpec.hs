@@ -487,6 +487,65 @@ castSpec s registry = Spec.describe s "Cast" $ do
     Spec.assertEqWith s "Panglacial is on the stack" onStack 1
     Spec.assertEqWith s "Panglacial left the library" (S.countByName (CardName.MkCardName $ Text.pack "Panglacial Wurm") S.alice after) 0
     Spec.assertEqWith s "seven Forests tapped to pay {5}{G}{G}" (S.tappedCount S.alice after) 7
+  -- CR 709.3 ("A player chooses which half of a split card they are casting
+  -- before putting it onto the stack") does not stop at the library door, and CR
+  -- 601.3 grants a permission to CAST rather than a narrower one: a split card
+  -- printing the Panglacial permission on each half offers TWO options during a
+  -- search, and picking between them is the player's choice.
+  Spec.it s "CR 709.3 a split card offers BOTH halves during a search" $ do
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    split <- S.printingOf s registry "Synthetic Glacial Half"
+    let (_, withMountain) = S.addCreature mountain S.alice (S.landsInPlay forest 1)
+        (_, gs) = S.addLibraryCard split S.alice withMountain
+    Spec.assertEqWith s "both halves offered, by name" (fmap snd (Cast.castableWhileSearching S.alice gs)) [glacialHalf, volcanicHalf]
+  -- The control, one Mountain apart from the pair above: CR 709.3a's "Only the
+  -- chosen half is evaluated to see if it can be cast" gates each half on its
+  -- OWN cost, so a lone Forest reaches {G} and not {R}. Without this, "both
+  -- halves offered" is indistinguishable from "the search offers whatever it
+  -- finds".
+  Spec.it s "CR 709.3a a lone Forest reaches only the {G} half" $ do
+    forest <- S.printingOf s registry "Forest"
+    split <- S.printingOf s registry "Synthetic Glacial Half"
+    let (_, gs) = S.addLibraryCard split S.alice (S.landsInPlay forest 1)
+    Spec.assertEqWith s "only the affordable half" (fmap snd (Cast.castableWhileSearching S.alice gs)) [glacialHalf]
+  -- WHICH half the player picked is what reaches the stack, not the first one
+  -- the engine happened to enumerate: the answerer takes the LAST option, and
+  -- the Volcanic half is what lands there. CR 709.3b -- "While on the stack,
+  -- only the characteristics of the half being cast exist" -- is what makes the
+  -- 2/2 an assertion and not a restatement of the name.
+  --
+  -- Gameplay-level: Evolving Wilds is activated and its ability resolves, and
+  -- the cast happens inside that resolution (CR 601.3), where no player has
+  -- priority.
+  Spec.it s "CR 709.3b the half the player chose is the half on the stack" $ do
+    evolvingWilds <- S.printingOf s registry "Evolving Wilds"
+    forest <- S.printingOf s registry "Forest"
+    mountain <- S.printingOf s registry "Mountain"
+    split <- S.printingOf s registry "Synthetic Glacial Half"
+    let g0 = Setup.emptyGame S.bothPlayers
+        (ewId, g1) = S.addCreature evolvingWilds S.alice g0
+        (_, g2) = S.addCreature mountain S.alice (snd (S.addCreature forest S.alice g1))
+        (_, g3) = S.addLibraryCard split S.alice g2
+        g4 = g3 {GameState.activePlayer = S.alice, GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+    case Projection.abilitiesOf ewId g4 of
+      ewAbility : _ ->
+        let action = do
+              Activate.activateAbility S.alice ewId ewAbility
+              Stack.resolveTop -- the search, with the cast made inside it
+            after = snd (Engine.runGamePure castLastOption g4 action)
+         in do
+              Spec.assertEqWith s "the card left the library" (S.countByName glacialHalf S.alice after) 0
+              -- No assertion on WHICH land paid: castLastOption answers
+              -- ChooseManaSource with the head of the candidates, so it taps the
+              -- Forest for a {G} that {R} cannot use before reaching the
+              -- Mountain. That is the answerer being naive, not the cast.
+              case GameState.stack after of
+                [] -> Spec.assertFailure s "expected the chosen half on the stack"
+                top : _ -> do
+                  Spec.assertEqWith s "the Volcanic half, not the Glacial one" (Projection.nameOf top after) volcanicHalf
+                  Spec.assertEqWith s "and CR 709.3b's 2/2, not the Glacial half's 1/1" (Projection.powerOf top after) (Just 2)
+      [] -> Spec.assertFailure s "Evolving Wilds should have an activated ability"
   -- CR 601.3's subject is "a spell or ability". The offer used to be made from
   -- Stack's Source.OfAbility arm alone, so a searching SPELL never got it; it now
   -- lives in the Search effect itself, which both paths reach (#57).
@@ -506,8 +565,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
-        casts = Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events after))
-    Spec.assertEqWith s "no cast before" (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs))) []
+        casts = Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events after))
+    Spec.assertEqWith s "no cast before" (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events gs))) []
     Spec.assertEqWith s "exactly one cast, by alice" casts [S.alice]
   Spec.it s "CR 601.2i a cast that is rejected records nothing" $ do
     -- A Bolt with no mana available: legalActions would never offer it, and
@@ -516,7 +575,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 0 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
-    Spec.assertEqWith s "no cast recorded" (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events after))) []
+    Spec.assertEqWith s "no cast recorded" (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events after))) []
 
 -- Chooses X=3 and aims every target slot at bob; other prompts take the identity
 -- fallback. Casing on a GADT prompt with an identityAnswer default is the liar
@@ -558,9 +617,11 @@ discardLastAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -576,6 +637,7 @@ discardLastAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -585,6 +647,9 @@ discardLastAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -646,7 +711,8 @@ handInPlay printing board =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),
@@ -1122,11 +1188,11 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
         (gs, spellId) = S.handOne unholyStrength base
     Spec.assertBool s (not (S.castable S.alice spellId gs)) "not castable with an empty board"
 
--- alice controls `n` untapped Mountains and has one card of `printing` wherever
--- `place` puts it, with priority in her own precombat main phase.
+-- alice controls `n` untapped copies of `land` and has one card of `printing`
+-- wherever `place` puts it, with priority in her own precombat main phase.
 boardWith :: (Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)) -> Printing.Printing -> Printing.Printing -> Int -> (ObjectId.ObjectId, GameState.GameState)
-boardWith place mountain printing n =
-  let (oid, gs) = place printing S.alice (S.landsInPlay mountain n)
+boardWith place land printing n =
+  let (oid, gs) = place printing S.alice (S.landsInPlay land n)
    in ( oid,
         gs
           { GameState.phase = Phase.PrecombatMain,
@@ -1262,6 +1328,58 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     Spec.assertBool s (not (S.castable S.alice inGraveyard gs)) "not castable from the graveyard"
     Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs))) "and not offered"
 
+-- CR 702.34a's conditional: "You may cast this card from your graveyard IF THE
+-- RESULTING SPELL IS AN INSTANT OR SORCERY SPELL by paying [cost] rather than
+-- paying its mana cost." The clause is a real condition on the CR 601.3
+-- permission, not a restatement of where flashback is printed, and it is the one
+-- half of rule 702.34a no printing can reach.
+--
+-- The proving card is a LABELED SYNTHETIC: "Synthetic Flashback Creature", a
+-- {R} 2/1 creature with "Flashback {4}{R}". Nothing in the CR forbids the
+-- printing -- rule 702.34a's "appears on some instants and sorceries" describes
+-- the pool rather than restricting it, and the clause would be dead text if the
+-- restriction were structural. No real card reaches it: every printed card with
+-- flashback is an instant or a sorcery, every printed effect that GRANTS
+-- flashback restricts itself to instant and sorcery cards (Snapcaster Mage), and
+-- no effect in this pool changes a card's types while it sits in a graveyard.
+--
+-- What makes the negative discriminating is that its costs are Firebolt's
+-- exactly, {R} with flashback {4}{R}, on Firebolt's own six-Mountain board. So
+-- the two directions below differ in the type line and in nothing else, and the
+-- from-hand case rules out mana, timing and the card itself as the reason the
+-- graveyard cast is missing.
+flashbackCardTypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
+  Spec.it s "CR 702.34a a creature card with flashback is not castable from the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    creature <- S.printingOf s registry "Synthetic Flashback Creature"
+    let (inGraveyard, graveyardBoard) = inGraveyardWith mountain creature 6
+        (inHand, handBoard) = inHandWith mountain creature 6
+    Spec.assertBool s (not (Card.isInstant (S.combinedFace creature))) "not an instant"
+    Spec.assertBool s (not (Card.isSorcery (S.combinedFace creature))) "not a sorcery"
+    Spec.assertBool s (S.castable S.alice inHand handBoard) "castable from her hand, so the board affords it"
+    Spec.assertBool s (not (S.castable S.alice inGraveyard graveyardBoard)) "not castable from the graveyard"
+    Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice graveyardBoard))) "and not offered"
+  -- The other direction, on the same board: the clause holds for a card that
+  -- meets it, so the check is not simply refusing every flashback cast.
+  Spec.it s "CR 702.34a a sorcery card with the same keyword is castable from the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    firebolt <- S.printingOf s registry "Firebolt"
+    let (inGraveyard, gs) = inGraveyardWith mountain firebolt 6
+    Spec.assertBool s (Card.isSorcery (S.combinedFace firebolt)) "a sorcery"
+    Spec.assertBool s (S.castable S.alice inGraveyard gs) "castable from the graveyard"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "and offered"
+  -- Rule 702.34a's clause is a DISJUNCTION, and Think Twice is its instant limb:
+  -- {1}{U} "Draw a card." with "Flashback {2}{U}". Without this case a check that
+  -- asked only about sorceries would still pass everything above.
+  Spec.it s "CR 702.34a an instant card with flashback is castable from the graveyard too" $ do
+    island <- S.printingOf s registry "Island"
+    thinkTwice <- S.printingOf s registry "Think Twice"
+    let (inGraveyard, gs) = inGraveyardWith island thinkTwice 3
+    Spec.assertBool s (Card.isInstant (S.combinedFace thinkTwice)) "an instant"
+    Spec.assertBool s (S.castable S.alice inGraveyard gs) "castable from the graveyard"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "and offered"
+
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
@@ -1391,6 +1509,7 @@ isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
   AttackTarget.OfPlaneswalker _ -> True
   AttackTarget.OfPlayer _ -> False
+  AttackTarget.OfBattle _ -> False
 
 printedCastingRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestriction" $ do
@@ -1683,6 +1802,17 @@ waxName, waneName :: CardName.CardName
 waxName = CardName.MkCardName (Text.pack "Wax")
 waneName = CardName.MkCardName (Text.pack "Wane")
 
+-- The two halves of
+-- data/cards/synthetic-glacial-half-synthetic-volcanic-half.json, a split card
+-- printing Panglacial Wurm's permission on each half. Synthetic because no
+-- printing carries that permission on a multi-face card: an api.scryfall.com
+-- sweep with include_extras for o:"searching your library" and
+-- oracle:/you may cast .* from your library/ returns Panglacial Wurm and
+-- Infernal Spawn of Infernal Spawn of Evil, both single-faced.
+glacialHalf, volcanicHalf :: CardName.CardName
+glacialHalf = CardName.MkCardName (Text.pack "Synthetic Glacial Half")
+volcanicHalf = CardName.MkCardName (Text.pack "Synthetic Volcanic Half")
+
 -- The pool's first split card (CR 709.1), and so the first case here that
 -- exercises CR 709.3-709.4 against a printed card rather than a fixture: Wax is
 -- {G} "Target creature gets +2/+2 until end of turn", Wane is {W} "Destroy
@@ -1792,6 +1922,57 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     -- indistinguishable from "the first face wins": with both halves payable,
     -- both are offered and CR 709.3's choice is left to the player.
     Spec.assertEqWith s "a Forest and a Plains: both halves" (namesOffered both) [waxName, waneName]
+  -- The observer for CR 709.3a's half being part of the CR 601.2a MOVE rather
+  -- than a stamp applied once the move has landed.
+  --
+  -- Synthetic Stack Interdiction is "If a green card would be put onto the stack,
+  -- exile it instead" -- a CR 614.1a replacement of the one zone change CR 601.2a
+  -- makes. Nothing printed watches that event: a sweep of Scryfall's oracle bulk
+  -- data (38,542 cards) for "onto the stack" returns two, and neither replaces
+  -- anything -- Grip of Chaos is a TRIGGER on the same moment, and Ertai's
+  -- Meddling only says where a delayed card goes. So the redirect is synthetic
+  -- while the split card it reads is a printing.
+  --
+  -- Two readings of the same card, one case:
+  --
+  --   * BEFORE the move, CR 616.1 asks the pattern about the card as it still
+  --     sits in the hand, where CR 709.4 gives it both halves combined. The half
+  --     being cast is WANE, which is white; the pattern names GREEN, which only
+  --     Wax is. An engine reading CR 709.3b's chosen half here would find no
+  --     green card, decline the redirect, and leave Wane on the stack.
+  --   * AFTER it, the card is in EXILE and was never put onto the stack at all,
+  --     so CR 709.3a ("only that half is considered to be put onto the stack")
+  --     has nothing to say about it and CR 709.4's combined view is what it
+  --     shows -- both names, and the colours of the combined mana cost (CR
+  --     709.4b).
+  --
+  -- CR 614.6 is what makes the second reading follow from the first: the
+  -- modified event is the event that happens, so the destination the CR 616.1
+  -- loop settled on is the destination the move must answer for. Only a writer
+  -- INSIDE the move can, which is what this proves -- restoring the pre-#781
+  -- ordering (Event.changeZoneAttaching setting no face, Cast.castSpell stamping
+  -- the chosen half onto whatever the move handed back) exiles a card named
+  -- "Wane" whose only colour is white, and fails this case.
+  Spec.it s "CR 709.4 a cast redirected off the stack keeps both halves" $ do
+    plains <- S.printingOf s registry "Plains"
+    ghostlyPrison <- S.printingOf s registry "Ghostly Prison"
+    interdiction <- S.printingOf s registry "Synthetic Stack Interdiction"
+    waxWane <- S.printingOf s registry "Wax"
+    -- The Prison is Wane's target (CR 601.2c), so the cast does not rewind for
+    -- want of one before it ever reaches the move.
+    let (_, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
+        (_, withInterdiction) = S.addCreature interdiction S.alice withPrison
+        (gs, oid) = S.handOne waxWane withInterdiction
+        after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))
+    -- Not asserted: what CR 601.2b-i do afterwards. castSpell announces, prices
+    -- and pays for a spell the redirect has already moved off the stack, and
+    -- which of the two defensible readings is right is not implemented (#816).
+    Spec.assertEqWith s "the redirect fired, so nothing reached the stack" (length (GameState.stack after)) 0
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiled] -> do
+        Spec.assertEqWith s "in exile, CR 709.4's combined view" (Projection.nameOf exiled after) (CardName.MkCardName (Text.pack "Wax//Wane"))
+        Spec.assertEqWith s "and CR 709.4b's combined colours" (Projection.colorsOf exiled after) (Set.fromList [Color.Green, Color.White])
+      _ -> Spec.assertFailure s "expected the redirected card in exile"
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
@@ -1808,6 +1989,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   entwineSpec s registry
   auraTargetSpec s registry
   fireboltSpec s registry
+  flashbackCardTypeSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry
   flashSpec s registry
@@ -1844,9 +2026,11 @@ castFirstOption p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -1862,6 +2046,7 @@ castFirstOption p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -1871,6 +2056,9 @@ castFirstOption p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -1921,9 +2109,11 @@ castPanglacial p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -1939,6 +2129,7 @@ castPanglacial p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -1948,6 +2139,20 @@ castPanglacial p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
+
+-- castPanglacial answering the search offer with the LAST option rather than
+-- the first. That difference is the whole point: a test asserting WHICH half of
+-- a split card reached the stack proves nothing if the answerer and the engine
+-- agree on "the first one" by accident (CR 709.3).
+castLastOption :: Prompt.Prompt r -> r
+castLastOption p = case p of
+  Prompt.CastWhileSearching _ _ options -> case reverse options of
+    choice : _ -> Just choice
+    [] -> Nothing
+  _ -> castPanglacial p

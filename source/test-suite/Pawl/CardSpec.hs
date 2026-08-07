@@ -68,6 +68,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
@@ -106,6 +107,7 @@ import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -116,6 +118,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 import qualified System.Directory as Directory
 
 -- Not red-specific despite its first callers: just the Maybe wrapper every
@@ -135,6 +138,7 @@ vanillaFace name typeLine =
       Face.power = Nothing,
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
+      Face.defense = Nothing,
       Face.keywords = Set.empty,
       Face.colorIndicator = Set.empty,
       Face.staticAbilities = [],
@@ -151,11 +155,11 @@ vanillaFace name typeLine =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.attackCosts = [],
-      Face.mulliganAction = [],
-      Face.openingHandAction = [],
+      Face.mulliganActions = [],
+      Face.openingHandActions = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
-      Face.enchant = Nothing,
+      Face.enchant = [],
       Face.counterability = Counterability.Counterable
     }
 
@@ -417,6 +421,12 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SpellOrAbilityCounters _ -> []
   -- CR 615.13's prevention condition is a PlayerRelation too.
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  TriggerCondition.PlayerGainsLife _ -> []
+  TriggerCondition.PlayerLosesLife _ -> []
+  -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
+  TriggerCondition.SelfCountersReached _ _ -> []
+  -- CR 310.11b carries a counter kind alone.
+  TriggerCondition.SelfLastCounterRemoved _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -472,6 +482,7 @@ effectCounts effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -678,6 +689,7 @@ effectReplacements effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
   Effect.ChangeText {} -> []
 
 -- #437: does this replacement carry a PhasePattern with a BAKED player in it?
@@ -1032,8 +1044,8 @@ modalTrigger condition modes =
 
 -- Pawl.Engine.Binding's reserved slot names in full: the binding keys the engine
 -- STAMPS rather than asks a player for. The whole module's list rather than a
--- hand-picked subset, so a new reserved slot joins the declaration sweep below
--- by being added here and nowhere else.
+-- hand-picked subset, so a new reserved slot joins BOTH sweeps below -- the
+-- declaration one and the binding one -- by being added here and nowhere else.
 reservedSlots :: Set.Set SlotName.SlotName
 reservedSlots =
   Set.fromList
@@ -1044,7 +1056,7 @@ reservedSlots =
       Binding.you,
       Binding.triggerPlayer,
       Binding.became,
-      Binding.preventedAmount,
+      Binding.eventAmount,
       Binding.sacrificedCount
     ]
 
@@ -1097,6 +1109,37 @@ declaredTargetSlots card =
 -- way the engine asked a question it did not use.
 reservedDeclarations :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
+
+-- Every slot a card BINDS: the names its own effects author for a later effect
+-- to read back -- Resolve.boundSlots over every carrier a card can execute an
+-- effect from (cardResolutionEffects), which is the spell modes plus the
+-- activated, triggered and delayed abilities.
+--
+-- declaredTargetSlots' sibling and the other half of the same question. A target
+-- spec is not the only way a card names a slot: MoveToZone and Create name the
+-- incarnation CR 400.7 mints, PlaySubgame names CR 729.1b's loser, and Destroy
+-- names how many it destroyed.
+--
+-- Not covered, as declaredTargetSlots does not cover it either: the abilities
+-- printed on a token or emblem a Create or CreateEmblem MINTS, which arrive as
+-- an effect's payload rather than as a printing (#849).
+boundSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+boundSlots = Resolve.definedSlots . cardResolutionEffects
+
+-- The reserved names a card BINDS -- reservedDeclarations' sibling, and empty
+-- for every card authored correctly for the same reason.
+--
+-- A DIFFERENT failure from declaring one, and the more dangerous of the two,
+-- because nothing about it is a discarded prompt: the card's own write lands on
+-- the very key the engine stamps. Pawl.Engine.Quantity.evaluateFor's InSlot arm
+-- asks the effect's SOURCE before the stack object precisely because
+-- Resolve.bindAmountSlot writes to the source and Event.eventBindings writes
+-- where the trigger's bindings live; a card binding CR 615.13's `thatMuch` from
+-- a Destroy would therefore SHADOW the amount the event supplied with its own
+-- count, and win, silently. The comment there argues the two writers "cannot
+-- collide over one name" -- this sweep is what makes that argument true.
+reservedBindings :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+reservedBindings = Set.intersection reservedSlots . boundSlots
 
 -- CR 111.4: "A spell or ability that creates a token sets both its name and its
 -- subtype(s). If the spell or ability doesn't specify the name of the token, its
@@ -1216,6 +1259,7 @@ keywordFilters keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.StartYourEngines -> []
@@ -1238,6 +1282,7 @@ costComponentFilters component = case component of
   CostComponent.PayEnergy _ -> []
   CostComponent.AddLoyaltyToThis _ -> []
   CostComponent.RemoveLoyaltyFromThis _ -> []
+  CostComponent.ExileThisFromGraveyard -> []
 
 -- The Filter narrowing a target slot's CR 115 pool -- "target creature with
 -- flying" -- and CR 303.4a's enchant slot, which is a TargetSpec too.
@@ -1331,9 +1376,16 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfLeavesTheBattlefield -> []
   TriggerCondition.SpellOrAbilityCounters _ -> []
   TriggerCondition.DamageToPlayerPrevented _ -> []
+  TriggerCondition.PlayerGainsLife _ -> []
+  TriggerCondition.PlayerLosesLife _ -> []
+  -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
+  TriggerCondition.SelfCountersReached _ _ -> []
+  -- CR 310.11b carries a counter kind alone.
+  TriggerCondition.SelfLastCounterRemoved _ -> []
 
 -- CR 613.11: which spells a player effect names -- a cost modifier's (CR
--- 601.2f) or a timing permission's (CR 601.3b).
+-- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
+-- 701.6a).
 playerEffectFilters :: PlayerEffect.PlayerEffect -> [Filter.Type.Filter Keyword.Keyword]
 playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.IncreaseSpellCost f _ -> [f]
@@ -1357,6 +1409,130 @@ playerEffectFilters playerEffect = case playerEffect of
   -- CR 601.3b's "a spell with certain qualities", which is a Filter over the
   -- spell exactly as a cost modifier's is (Vedalken Orrery's is `And []`).
   PlayerEffect.CastAsThoughItHadFlash f -> [f]
+  -- CR 701.6a's "a spell or ability", narrowed by the victim's own qualities
+  -- exactly as a cost modifier's is (Spider-Punk's is `And []`, Prowling
+  -- Serpopard's is HasCardType Creature).
+  PlayerEffect.CantBeCountered f -> [f]
+  -- CR 615.12 carries no Filter: what it narrows by is a DamagePattern, whose
+  -- own axes are a kind, a source relation and a recipient rather than a
+  -- predicate over an object (Excruciator's "by this creature"). The pattern's
+  -- authorability is linted by unpreventablePatternOffends below.
+  PlayerEffect.DamageCantBePrevented _ -> []
+
+-- Does this carrier pair CR 615.12's "damage can't be prevented" with a
+-- scope narrower than the whole table?
+--
+-- Pawl.Engine.PlayerEffect.unpreventable asks no player, because CR 615.12's
+-- sentence is about a damage EVENT and names no player to ask about. It gathers
+-- from the whole board instead -- "which seats have such an effect applying?" --
+-- which admits the same events as "it applies" exactly when the scope is
+-- PlayerScope.EachPlayer, and reads a narrower one as board-wide. This lint is
+-- what makes that exactness a property of the pool rather than a hope: no card
+-- may author the scope the fold cannot see.
+--
+-- The rule, not just the engine, is what backs the ban. Every printed narrowing
+-- of CR 615.12 narrows by a quality of the damage EVENT and not by a player:
+-- Excruciator's source, Frenzied Baloth's kind, Questing Beast's source
+-- relation, Whippoorwill's recipient. That axis is the DamagePattern the
+-- constructor now carries, never a carrier scope -- a scope names which players
+-- an effect applies TO, and a damage event between two creatures applies to no
+-- player at all.
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum: a second
+-- player effect whose reading depends on its scope must break this build.
+unpreventableScopeOffends :: PlayerScope.PlayerScope -> PlayerEffect.PlayerEffect -> Bool
+unpreventableScopeOffends scope playerEffect = case playerEffect of
+  PlayerEffect.DamageCantBePrevented _ -> scope /= PlayerScope.EachPlayer
+  -- Every other arm IS asked about a player, so its scope is read exactly as
+  -- written and any of the three is legitimate: Rule of Law and Thalia say
+  -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
+  -- Serpopard says You.
+  PlayerEffect.IncreaseSpellCost _ _ -> False
+  PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.CantCastSpells -> False
+  PlayerEffect.CantCastMoreThan _ -> False
+  PlayerEffect.CantCastChosenName -> False
+  PlayerEffect.CantPlayLandChosenName -> False
+  PlayerEffect.PlayAdditionalLands _ -> False
+  PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.CantBeTargetedBy _ -> False
+  PlayerEffect.CastAsThoughItHadFlash _ -> False
+  PlayerEffect.CantBeCountered _ -> False
+
+-- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
+-- DamagePattern: does this card author a field of that pattern the engine bakes?
+--
+-- `whichRecipient` is the one, and for damagePatternOffends' reason -- a card
+-- cannot name an ObjectId or a PlayerId. Whippoorwill's "damage that would be
+-- dealt to THAT CREATURE" does name a recipient, but the creature is the one its
+-- resolution chose, so the pattern is the engine's to bake and never the card
+-- file's to write. `whichKind` and `whichSource` are both authorable here and
+-- are exactly what Frenzied Baloth and Excruciator print.
+--
+-- Not implemented: no resolution bakes a recipient into THIS pattern, the way
+-- Resolve's prevention arms bake one into a shield's, so the field has no
+-- producer on either side yet (#845).
+--
+-- Exhaustive rather than a wildcard, this file's discipline for a sum.
+unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
+unpreventablePatternOffends playerEffect = case playerEffect of
+  PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_)
+  PlayerEffect.IncreaseSpellCost _ _ -> False
+  PlayerEffect.ReduceSpellCost _ _ -> False
+  PlayerEffect.CantCastSpells -> False
+  PlayerEffect.CantCastMoreThan _ -> False
+  PlayerEffect.CantCastChosenName -> False
+  PlayerEffect.CantPlayLandChosenName -> False
+  PlayerEffect.PlayAdditionalLands _ -> False
+  PlayerEffect.NoMaximumHandSize -> False
+  PlayerEffect.DontLoseUnspentMana _ -> False
+  PlayerEffect.CantBeTargetedBy _ -> False
+  PlayerEffect.CastAsThoughItHadFlash _ -> False
+  PlayerEffect.CantBeCountered _ -> False
+
+-- The non-vacuity half of both lints above: is this CR 615.12's effect at all?
+-- A wildcard is right here, where it is not above -- this asks "did the sweep
+-- have anything to look at", not "is it well-formed". isPhaseR's shape.
+isUnpreventable :: PlayerEffect.PlayerEffect -> Bool
+isUnpreventable playerEffect = case playerEffect of
+  PlayerEffect.DamageCantBePrevented _ -> True
+  _ -> False
+
+-- The pattern that narrows nothing: Spider-Punk's, and what a fixture below
+-- restates a card's effect to when the pattern is not the axis under test.
+anyDamage :: DamagePattern.DamagePattern
+anyDamage =
+  DamagePattern.MkDamagePattern
+    { DamagePattern.whichKind = Nothing,
+      DamagePattern.whichSource = SourceRelation.AnySource,
+      DamagePattern.whichRecipient = Nothing
+    }
+
+-- Every (scope, player effect) pair a card authors, on BOTH of the carriers
+-- Pawl.Engine.PlayerEffect.applying folds together: the printed static ability
+-- (CR 604.2, Spider-Punk) and the stored one a resolution installs (CR 611.2c,
+-- Silence -- and Skullcrack's "damage can't be prevented this turn", whenever
+-- the pool gains it).
+cardPlayerScopes :: Face.Face Card.Type.Card -> [(PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)]
+cardPlayerScopes card =
+  fmap printedPlayerScope (Face.playerAbilities card)
+    <> Maybe.mapMaybe storedPlayerScope (cardResolutionEffects card)
+
+-- The printed carrier's pair: the record's two fields, in the order the lint
+-- above reads them.
+printedPlayerScope :: PlayerStaticAbility.PlayerStaticAbility -> (PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)
+printedPlayerScope ability = (PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)
+
+-- The stored carrier's pair, or Nothing for the overwhelming majority of
+-- effects, which install no continuous effect on the player axis at all. A
+-- wildcard here rather than one arm per effect, matching the control lint's own
+-- sweep over this sum: Pawl.Types.Effect is the open half's alphabet, and a new
+-- resolution effect is not a new player carrier.
+storedPlayerScope :: Effect.Effect Card.Type.Card -> Maybe (PlayerScope.PlayerScope, PlayerEffect.PlayerEffect)
+storedPlayerScope effect = case effect of
+  Effect.AffectPlayers _ scope playerEffect -> Just (scope, playerEffect)
+  _ -> Nothing
 
 -- The Filters an EntryRewrite carries, on two different axes. CR 201.4a's is the
 -- restriction on which cards' names an as-enters name choice may name (Null
@@ -1374,6 +1550,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.ChooseBasicLandType -> []
   EntryRewrite.WithCounters _ _ -> []
   EntryRewrite.UnderSourceControl -> []
+  EntryRewrite.Riot -> []
   EntryRewrite.SacrificeAnyNumber f _ -> [f]
 
 -- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
@@ -1390,7 +1567,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
-  ReplacementEffect.ZoneChangeR _ _ -> []
+  ReplacementEffect.ZoneChangeR zoneChangePattern _ -> [ZoneChangePattern.whatObject zoneChangePattern]
   ReplacementEffect.EntryR entryPattern entryRewrite -> entryPattern : entryRewriteFilters entryRewrite
   ReplacementEffect.DamageR _ _ -> []
   ReplacementEffect.DestructionR _ -> []
@@ -1478,6 +1655,7 @@ effectFilters effect = case effect of
   Effect.PlaySubgame _ -> []
   Effect.TakeExtraTurn _ _ -> []
   Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
 
 -- Per MODE rather than through Modal.allTargetSpecs, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check
@@ -1530,7 +1708,7 @@ activatedAbilityFilters ability =
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target specs and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
---   * `mulliganAction` (CR 103.5b) and `openingHandAction` (CR 103.6) -- the two
+--   * `mulliganActions` (CR 103.5b) and `openingHandActions` (CR 103.6) -- the two
 --     pregame actions, which `cardResolutionEffects` above does not reach.
 --
 -- The other eight fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
@@ -1557,7 +1735,7 @@ cardFilters card =
         <> concatMap (\(Toughness.MkToughness quantity) -> quantityFilters quantity) (Maybe.maybeToList (Face.toughness card))
         <> concatMap staticAbilityFilters (Face.staticAbilities card)
         <> concatMap replacementEffectFilters (Face.replacementEffects card)
-        <> concatMap targetSpecFilters (Maybe.maybeToList (Face.enchant card))
+        <> concatMap targetSpecFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
         <> concatMap costFilters (Face.alternativeCosts card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
@@ -1570,8 +1748,8 @@ cardFilters card =
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
     <> concatMap triggeredAbilityFilters (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityFilters (Map.elems (Face.delayedAbilities card))
-    <> concatMap effectFilters (Face.mulliganAction card)
-    <> concatMap effectFilters (Face.openingHandAction card)
+    <> concatMap (concatMap effectFilters) (Face.mulliganActions card)
+    <> concatMap (concatMap effectFilters) (Face.openingHandActions card)
 
 -- How many CR 701.3a atoms this card carries in an Effect.AttachTarget's
 -- destination filter, and how many anywhere else. The second number is the
@@ -1843,6 +2021,69 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends = not . Set.null . reservedDeclarations
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card declares a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The sweep above's other half: declaring a reserved slot as a target is not
+  -- the only way a card names one. Four opcodes carry a SlotName they
+  -- BIND, and a card is free to write a reserved name into any of them, which
+  -- the declaration sweep cannot see because none of the four is a target spec.
+  -- See reservedBindings for why that is the worse of the two failures.
+  Spec.it s "no reserved binding slot is ever bound by a card" $ do
+    ps <- S.allPrintings s
+    let offends = not . Set.null . reservedBindings
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card binds a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Guards the sweep against passing vacuously, in both the ways it could.
+    -- The pool binds slots at all:
+    let poolBinds = Set.unions (concatMap (overFaces (pure . boundSlots) . Printing.card) ps)
+    Spec.assertBool s (not (Set.null poolBinds)) "the pool binds slots"
+    -- and the sweep reaches an ABILITY's binds, not just a spell mode's. Bane
+    -- of Progress binds the count of what it destroyed from a triggered
+    -- ability, so Card.allEffects -- the spell-modes view -- sees nothing.
+    baneOfProgress <- S.printingOf s registry "Bane of Progress"
+    let bane = S.combinedFace baneOfProgress
+    Spec.assertEqWith
+      s
+      "Bane of Progress binds its destroyed count, which the spell-modes view misses"
+      (boundSlots bane, Resolve.definedSlots (Card.allEffects bane))
+      (Set.singleton (SlotName.MkSlotName (Text.pack "destroyed")), Set.empty)
+  -- The sweep above passes VACUOUSLY over the committed pool, exactly as the
+  -- declaration sweep does, so it is proven here against a hand-built offender
+  -- instead -- never a card file, because a misauthored card must not be
+  -- loadable. Bane of Progress already binds a Destroy's count, so renaming
+  -- that one slot to a reserved name is the whole graft.
+  --
+  -- CR 615.13's `thatMuch` is the name chosen because it is the one with teeth:
+  -- Pawl.Engine.Quantity.evaluateFor's InSlot arm asks the effect's SOURCE
+  -- before the stack object, and Resolve.bindAmountSlot writes a Destroy's count
+  -- to the source -- so this graft, under a prevention trigger, would answer
+  -- "that much" with the card's own count and never consult the event's.
+  --
+  -- Asserted TWICE, in the declaration self-test's posture: the new sweep sees
+  -- the offender and reservedDeclarations does NOT. The second half is the hole
+  -- this test exists to close, and it fails if the binding sweep is ever
+  -- narrowed back into the declaration one.
+  Spec.it s "the lint itself catches an effect that binds a reserved slot" $ do
+    baneOfProgress <- S.printingOf s registry "Bane of Progress"
+    let rebind slot effect = case effect of
+          Effect.Destroy ref regenerability (Just _) -> Effect.Destroy ref regenerability (Just slot)
+          other -> other
+        overModal f modal =
+          modal {Modal.modes = fmap (\m -> m {Mode.effects = fmap f (Mode.effects m)}) (Modal.modes modal)}
+        withBind slot card =
+          card
+            { Face.triggeredAbilities =
+                fmap (\t -> t {TriggeredAbility.modal = overModal (rebind slot) (TriggeredAbility.modal t)}) (Face.triggeredAbilities card)
+            }
+        offender = withBind Binding.eventAmount (S.combinedFace baneOfProgress)
+    Spec.assertEqWith
+      s
+      "CR 615.13 thatMuch bound by a Destroy is caught, and the declaration sweep misses it"
+      (reservedBindings offender, reservedDeclarations offender)
+      (Set.singleton Binding.eventAmount, Set.empty)
+    Spec.assertEqWith
+      s
+      "and the real card binds no reserved slot"
+      (reservedBindings (S.combinedFace baneOfProgress))
+      Set.empty
   -- The read half of the same dataflow question, for the one carrier that has no
   -- resolution to bind anything: CR 604.3's characteristic-defining P/T. A CDA is
   -- a static ability, so there is no earlier effect of a resolution to mint its
@@ -2060,7 +2301,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a reserved event slot the condition never binds" $ do
     roaches <- S.printingOf s registry "Endless Cockroaches"
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
-        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing
+        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing Nothing
         -- Rule 702.70a's shape, as a targetless read of "that player".
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
     Spec.assertBool
@@ -2125,7 +2366,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         youDiscards = Effect.Discard Binding.you (Quantity.Type.Literal 1)
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
-        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing
+        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing Nothing
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
         -- CR 113.7's source slot, which every activation DOES bind.
         tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
@@ -2202,7 +2443,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         ownDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
         -- Mode 0 MINTS `exiled` at a MoveToZone's destination; mode 1 reads it.
         -- The two never resolve together, so mode 1's read is dangling.
-        exileIt = Effect.MoveToZone creature Zone.Exile EntryRiders.defaultValue (Just exiled)
+        exileIt = Effect.MoveToZone creature Zone.Exile EntryRiders.defaultValue (Just exiled) Nothing
         crossMinted = modalActivated [lintMode [exileIt] [creature], lintMode [tap exiled] []]
         ownMinted = modalActivated [lintMode [exileIt, tap exiled] [creature], lintMode [tap victim] [victim]]
     Spec.assertBool s (activatedAbilityOffends crossDeclared) "a mode reading a slot only another mode declares is rejected"
@@ -2213,7 +2454,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- CR 400.7e's `became` is bound by the condition for the whole ability, so a
     -- SECOND mode reading it is accepted, and a mode reading it under a
     -- condition that never binds it is rejected however late the mode sits.
-    let returnBecame = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing
+    let returnBecame = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing Nothing
         secondModeReads condition = modalTrigger condition [lintMode [] [], lintMode [returnBecame] []]
     Spec.assertBool
       s
@@ -2237,18 +2478,56 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "a card with no enchant ability declares no enchant slot" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let card = S.combinedFace piker
-    Spec.assertEqWith s "no enchant spec" (Face.enchant card) Nothing
+    Spec.assertEqWith s "no enchant spec" (Face.enchant card) []
     Spec.assertBool s (not (Card.isAura card)) "not an Aura"
     Spec.assertEqWith s "no enchant slot" (Card.enchantSpecs card) Map.empty
   -- CR 303.4 / 702.5a: the biconditional. An Aura without enchant has no legal
   -- target and could never be cast; a non-Aura with enchant declares a restriction
   -- nothing reads. The D4 lint cannot see either, because it walks
   -- Mode.targetSpecs and the enchant slot is not there (#184's shape).
+  --
+  -- "AT LEAST one", since CR 702.5c lets an Aura have several -- the count is not
+  -- what makes a card an Aura, only the presence.
   Spec.it s "a card is an Aura iff it declares an enchant ability" $ do
     ps <- S.allPrintings s
-    let offends c = Card.isAura c /= Maybe.isJust (Face.enchant c)
+    let offends c = Card.isAura c /= not (null (Face.enchant c))
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "Aura iff enchant" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 702.5c makes every instance of enchant apply at once, and its last
+  -- sentence -- "The Aura can enchant only objects or players that match all of
+  -- its enchant abilities" -- conjoins the POOLS exactly as it does the Filters.
+  -- Pawl.Engine.Card.enchantSpec folds the instances into ONE spec by Anding
+  -- their Filters and keeping the FIRST instance's Pool. This lint is what makes
+  -- that fold exact, and the rule it enforces is that CR 115's Pool enum is not
+  -- closed under intersection. Three shapes, one expressible: a NESTED pair has a
+  -- Pool naming the intersection (Creatures against Permanents is Creatures); a
+  -- DISJOINT pair intersects to nothing (Creatures against Players, which is CR
+  -- 702.5d keeping an enchant-player Aura off permanents), and no Pool names the
+  -- empty set; and an OVERLAPPING pair can name a set the enum simply lacks
+  -- (AnyTarget against Permanents is creatures-and-planeswalkers). Taking the
+  -- first instance is order-dependent even in the expressible case, so a card
+  -- whose enchant abilities disagreed would be silently judged by whichever pool
+  -- was written down first.
+  --
+  -- The disjoint case is INCOHERENT rather than merely unrepresentable, and the
+  -- CR says what becomes of such an Aura without needing a pool for it: CR 303.4a
+  -- makes its spell require a target and CR 601.2c has no appropriate object or
+  -- player to announce for it, so it cannot be cast; an effect putting it onto the
+  -- battlefield leaves it where it is, or bins it if that zone is the stack (CR
+  -- 303.4g); and one that arrived anyway is put into its owner's graveyard on the
+  -- next state-based check (CR 704.5m). A card in that shape is dead text.
+  --
+  -- Unprinted rather than impossible, which is why this lives here rather than
+  -- being ruled out: nothing in CR 702.5 requires the instances to agree, and
+  -- Animate Dead prints both pools on one card ("enchant creature card in a
+  -- graveyard", then "enchant creature put onto the battlefield with this Aura")
+  -- -- only its lose-as-it-gains clause keeps the two from applying at once
+  -- (#797).
+  Spec.it s "every enchant ability on a card draws from the same pool" $ do
+    ps <- S.allPrintings s
+    let offends c = length (List.nub (fmap TargetSpec.pool (Face.enchant c))) > 1
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card mixes enchant pools, since CR 702.5c intersects them and Pool is not closed under intersection" (fmap (S.nameOf . Printing.card) offenders) []
   -- Pawl.Engine.Card.allTargetSpecs binds the enchant spec under this name (Task 6), so a
   -- mode declaring it would be silently shadowed.
   -- #199: no card authors a layer-2 control modification into an effect that
@@ -2335,6 +2614,89 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (any damagePatternOffends printed)) "the real Fog names no recipient and counts nothing"
     Spec.assertBool s (any (damagePatternOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
     Spec.assertBool s (any (damagePatternOffends . bakeShield) printed) "and so is one counting a shield down"
+  -- The same shape one axis over, and the thing that makes
+  -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
+  -- approximate. See unpreventableScopeOffends.
+  Spec.it s "no card narrows CR 615.12's \"damage can't be prevented\" by player" $ do
+    ps <- S.allPrintings s
+    let offenders = filter (anyFace (any (uncurry unpreventableScopeOffends) . cardPlayerScopes) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no such effect in the pool at all
+    -- this would pass whatever the classification said. Spider-Punk is the card
+    -- that prints one.
+    Spec.assertBool s (any (anyFace (any (isUnpreventable . snd) . cardPlayerScopes) . Printing.card) ps) "the pool has a card printing unpreventable damage"
+    Spec.assertEqWith s "CR 615.12 names no player, so its carrier is scoped to every player" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against Spider-Punk rescoped rather than
+  -- against a card file, exactly as the two cases above are.
+  Spec.it s "the lint itself catches a narrowed unpreventable-damage carrier" $ do
+    spiderPunk <- S.printingOf s registry "Spider-Punk"
+    let card = S.combinedFace spiderPunk
+        narrow ability = ability {PlayerStaticAbility.scope = PlayerScope.You}
+        narrowed = card {Face.playerAbilities = fmap narrow (Face.playerAbilities card)}
+        offends = any (uncurry unpreventableScopeOffends) . cardPlayerScopes
+    Spec.assertBool s (not (offends card)) "the real Spider-Punk names nobody and is accepted"
+    Spec.assertBool s (offends narrowed) "and the same card scoped to its controller is rejected"
+    -- The ban is CR 615.12's alone: rescoping does not condemn a card whose
+    -- effects are all asked about a player. Prowling Serpopard is the printing
+    -- that legitimately says PlayerScope.You.
+    serpopard <- S.printingOf s registry "Prowling Serpopard"
+    Spec.assertBool s (not (offends (S.combinedFace serpopard))) "a You-scoped countering prohibition is accepted"
+    -- And the STORED carrier, which no printing pairs with CR 615.12 yet:
+    -- Silence's own Effect.AffectPlayers, saying "damage can't be prevented"
+    -- instead of what it says. Skullcrack is the printing that would make this
+    -- shape real, and this is what keeps the sweep honest until it lands.
+    silence <- S.printingOf s registry "Silence"
+    let unpreventable effect = case effect of
+          Effect.AffectPlayers duration scope _ -> Effect.AffectPlayers duration scope (PlayerEffect.DamageCantBePrevented anyDamage)
+          other -> other
+        widen effect = case effect of
+          Effect.AffectPlayers duration _ playerEffect -> Effect.AffectPlayers duration PlayerScope.EachPlayer playerEffect
+          other -> other
+        overSpell f face =
+          face
+            { Face.spell =
+                (Face.spell face)
+                  { Modal.modes = fmap (\mode -> mode {Mode.effects = fmap f (Mode.effects mode)}) (Modal.modes (Face.spell face))
+                  }
+            }
+        silenced = S.combinedFace silence
+    Spec.assertBool s (not (offends silenced)) "the real Silence, whose stored effect is scoped to its opponents, is accepted"
+    Spec.assertBool s (offends (overSpell unpreventable silenced)) "a stored CR 615.12 effect scoped to opponents is rejected"
+    Spec.assertBool s (not (offends (overSpell (widen . unpreventable) silenced))) "and the same stored effect scoped to every player is accepted"
+  -- The pattern axis of the same carrier, and damagePatternOffends' twin: a card
+  -- may narrow CR 615.12 by kind or by source, and may not name the RECIPIENT,
+  -- which only Resolve can bake. See unpreventablePatternOffends.
+  Spec.it s "no card authors a recipient into CR 615.12's damage pattern" $ do
+    ps <- S.allPrintings s
+    let patterns = concatMap (overFaces (fmap snd . cardPlayerScopes) . Printing.card) ps
+        offenders = filter (anyFace (any (unpreventablePatternOffends . snd) . cardPlayerScopes) . Printing.card) ps
+    -- The non-vacuity guard, and the guard that the AUTHORABLE axes really are
+    -- authored: Spider-Punk narrows nothing and Excruciator names TheSource, so
+    -- the sweep has both a permissive and a narrowed pattern to look at.
+    Spec.assertBool s (any isUnpreventable patterns) "the pool has a card printing unpreventable damage"
+    Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage) patterns) "Spider-Punk's pattern narrows nothing"
+    Spec.assertBool s (elem (PlayerEffect.DamageCantBePrevented anyDamage {DamagePattern.whichSource = SourceRelation.TheSource}) patterns) "Excruciator's names its own source"
+    Spec.assertEqWith s "CR 615.7's recipient is baked, never printed" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The rejecting direction, proven against Excruciator restated rather than
+  -- against a card file, exactly as the cases above are.
+  Spec.it s "the lint itself catches a printed recipient on CR 615.12" $ do
+    excruciator <- S.printingOf s registry "Excruciator"
+    let card = S.combinedFace excruciator
+        bake playerEffect = case playerEffect of
+          PlayerEffect.DamageCantBePrevented pattern_ ->
+            PlayerEffect.DamageCantBePrevented pattern_ {DamagePattern.whichRecipient = Just (Recipient.ToPlayer S.alice)}
+          other -> other
+        restate f ability = ability {PlayerStaticAbility.effect = f (PlayerStaticAbility.effect ability)}
+        over f = card {Face.playerAbilities = fmap (restate f) (Face.playerAbilities card)}
+        offends = any (unpreventablePatternOffends . snd) . cardPlayerScopes
+        kind playerEffect = case playerEffect of
+          PlayerEffect.DamageCantBePrevented pattern_ ->
+            PlayerEffect.DamageCantBePrevented pattern_ {DamagePattern.whichKind = Just DamageKind.Combat}
+          other -> other
+    Spec.assertBool s (not (offends card)) "the real Excruciator names a source and no recipient, and is accepted"
+    Spec.assertBool s (offends (over bake)) "and the same clause naming a shielded player is rejected"
+    -- Frenzied Baloth's axis, which is authorable and must stay so: narrowing by
+    -- KIND is not what this lint bans.
+    Spec.assertBool s (not (offends (over kind))) "narrowing the same clause to combat damage is accepted"
   -- CR 306.5 / 306.5a: the other card-type biconditional, the Aura/enchant
   -- lint's shape. "Loyalty is a characteristic only planeswalkers have", so a
   -- planeswalker without one has nothing for CR 306.5b's intrinsic replacement
@@ -2349,6 +2711,20 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offends c = isPlaneswalker c /= Maybe.isJust (Face.loyalty c)
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "planeswalker iff loyalty" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 310.4 / 210.1: the same biconditional one rule number over. "Defense is a
+  -- characteristic that battles have", so a battle without one has nothing for CR
+  -- 310.4b's intrinsic replacement to place and would enter with no defense
+  -- counters at all; a non-battle with a printed defense carries a number no rule
+  -- reads.
+  --
+  -- Projection.intrinsicReplacementsOf's own comment leans on this in both
+  -- directions too, which is why it is a lint and not a per-card assertion.
+  Spec.it s "a card is a battle iff it has a printed defense" $ do
+    ps <- S.allPrintings s
+    let isBattle c = Set.member CardType.Battle (TypeLine.types (Face.typeLine c))
+        offends c = isBattle c /= Maybe.isJust (Face.defense c)
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "battle iff defense" (fmap (S.nameOf . Printing.card) offenders) []
   -- What makes Pawl.Engine.Card.faceNamed's answer unique, and so what makes
   -- referring to a face BY NAME well-defined (CR 709.4a). Held over the whole
   -- pool rather than by construction, because a card file is data.
@@ -2444,7 +2820,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               base {Face.spell = spellOf [] (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Permanents (Just buried)))}
             ),
             ( "CR 303.4a's enchant ability",
-              base {Face.enchant = Just (TargetSpec.MkTargetSpec Pool.Permanents (Just buried))}
+              base {Face.enchant = [TargetSpec.MkTargetSpec Pool.Permanents (Just buried)]}
             ),
             ( "a static ability's affected set",
               base
@@ -2524,7 +2900,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 }
             ),
             ( "CR 103.5b's pregame action",
-              base {Face.mulliganAction = [Effect.Search buried SearchDestination.RevealThenHand]}
+              base {Face.mulliganActions = [[Effect.Search buried SearchDestination.RevealThenHand]]}
             )
           ]
         report (label, card) = (label, canHostSubjectOffends card, canHostSubjectCounts card)

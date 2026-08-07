@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Ring as Ring
+import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Speed as Speed
@@ -47,6 +48,8 @@ import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
+import qualified Pawl.Types.CounterCause as CounterCause
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
@@ -350,6 +353,20 @@ runTurnBasedActions phase = do
       needSecond <- Damage.dealCombatDamage
       Monad.when needSecond $
         State.modify' (\gs -> gs {GameState.remaining = Turn.spliceSecondDamage (GameState.remaining gs)})
+    -- CR 505.4 / 703.4f / 714.3c: "immediately after a player's precombat main
+    -- phase begins, that player puts a lore counter on each Saga enchantment they
+    -- control with one or more chapter abilities". A turn-based action, not a
+    -- trigger, which is why it lives here and not in the gatherer.
+    --
+    -- The active player's, so it takes the CR 800.4j guard the list above names:
+    -- CR 505.4 says "the active player", and only they have a precombat main
+    -- phase. Vacuous under that guard rather than merely skipped -- CR 800.4a has
+    -- already taken a departed player's permanents, so there is no Saga they
+    -- control left to advance.
+    --
+    -- CR 703.4g's Attraction roll, which that rule says happens immediately
+    -- after this, has no producer in the pool and no site here.
+    Phase.PrecombatMain -> Monad.when hasActive (advanceSagas active)
     -- CR 511.1: the end of combat step has no turn-based actions, so it has no
     -- arm here, deliberately. CR 511.3's removal from combat is an end-of-STEP
     -- action and runStep performs it there, beside CR 500.5's mana emptying.
@@ -368,6 +385,35 @@ runTurnBasedActions phase = do
       State.modify' Damage.removeAllDamage
       State.modify' Expiry.dropAtCleanup
     _ -> pure ()
+
+-- CR 505.4 / 703.4f / 714.3c's ACTION half: one lore counter onto each Saga this
+-- player controls that has one or more chapter abilities.
+--
+-- Here rather than in Pawl.Engine.Saga for the reason that module's header gives:
+-- it sits below Pawl.Engine.Event in the import graph, so it can classify which
+-- Sagas advance but cannot call the CR 122.6 placement funnel. Pawl.Engine.Speed
+-- and Pawl.Engine.Sba are split the same way.
+--
+-- Through Event.putCounters, so the placement records the CR 122.6 event CR
+-- 714.2b's chapter abilities are gathered from.
+--
+-- ByRule, which is CR 614.16's answer and not a shortcut: that rule's replacement
+-- effects reach a placement made by a resolving spell or ability, or by another
+-- replacement or prevention effect, and CR 609.1 makes a turn-based action neither.
+-- So Doubling Season does NOT advance a Saga two chapters a turn, though it DOES
+-- double the lore counter CR 714.3a's replacement gives it as it enters -- and that
+-- asymmetry is the whole reason Pawl.Types.CounterCause exists.
+--
+-- The Sagas are fixed from ONE projection taken before any counter goes on, which
+-- is CR 703.4f's own reading: the whole placement is a single turn-based action,
+-- so a Saga whose chapter ability would give its controller another Saga does not
+-- advance that one too. Those abilities have not even triggered yet -- CR 714.3c
+-- says the action does not use the stack, and nothing resolves until priority.
+advanceSagas :: PlayerId -> Game ()
+advanceSagas pid = do
+  gs <- State.get
+  let pcs = Projection.projectAll gs
+  Monad.mapM_ (\oid -> Event.putCounters CounterCause.ByRule oid CounterKind.Lore 1) (Saga.advancing (\oid -> Projection.controllerOf oid gs) pid pcs gs)
 
 -- CR 603.3: put each triggered ability that fired since the last placement on the
 -- stack, in APNAP order (CR 603.3b): active player's triggers first, then each
@@ -514,7 +560,8 @@ placeBorne srcId pending = do
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if Natural.length legal < count
@@ -868,8 +915,23 @@ priorityLoop = do
                                   else do
                                     State.modify' (\g -> g {GameState.passes = passes, GameState.priority = Just (nextStillPlaying gs p)})
                                     loop
-                              Action.Type.Play oid -> do
-                                Event.changeZone oid Zone.Battlefield
+                              Action.Type.Play oid mName -> do
+                                -- CR 712.12: "A player playing a modal
+                                -- double-faced card ... as a land chooses one of
+                                -- its faces that's a land before putting it onto
+                                -- the battlefield. It enters the battlefield with
+                                -- that face up." The choice was made when the
+                                -- action was chosen (Action.playableLands offers
+                                -- one per face), so the move is what carries it --
+                                -- the door CR 709.3a's chosen half already uses.
+                                --
+                                -- NOT changeZoneEntering, which is where CR
+                                -- 712.14b turns a put-onto-the-battlefield
+                                -- instruction away: playing a land is a special
+                                -- action (CR 305.1), not such an instruction, and
+                                -- CR 712.12 permits exactly the card CR 712.14b
+                                -- stops.
+                                Monad.void (Event.changeZoneShowing oid Zone.Battlefield mName)
                                 -- CR 305.2a counts the lands played this turn,
                                 -- so this TALLIES rather than flagging: the
                                 -- second land Exploration allows has to be

@@ -19,7 +19,6 @@ import qualified Data.Foldable as Foldable
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaFilter as ManaFilter
@@ -27,6 +26,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import Pawl.Types.CardName (CardName)
+import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
@@ -42,6 +42,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerScope (PlayerScope)
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
+import Pawl.Types.Subtype (Subtype)
 
 -- CR 109.5: "you" on an object is its controller, and for a static ability the
 -- CURRENT controller. `pid` is the player being asked about; `controller` is the
@@ -141,7 +142,18 @@ applying pid gs =
               -- started to apply before layer 6 and the cut is unconditional.
               if (null setEffs || Projection.liveGiven setEffs Set.empty oid gs)
                 && not (removed oid)
-                then fmap (\ability -> (Just oid, controller, PlayerStaticAbility.scope ability, PlayerStaticAbility.effect ability)) abilities
+                then
+                  -- CR 612.1's word swap over the permanent's own text, computed
+                  -- HERE rather than hoisted beside setEffs above, exactly as
+                  -- Pawl.Engine.CombatRestriction.restricted computes it:
+                  -- textChangesAffecting folds the whole continuous-effect list,
+                  -- and the empty case above has already turned away every
+                  -- permanent that prints no player ability, so the fold runs
+                  -- once per ability-bearing permanent instead of once per
+                  -- permanent on the battlefield.
+                  let changes = Projection.textChangesAffecting oid gs
+                      readAs = if null changes then id else rewritePlayerEffect changes
+                   in fmap (\ability -> (Just oid, controller, PlayerStaticAbility.scope ability, readAs (PlayerStaticAbility.effect ability))) abilities
                 else []
       printed = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
       -- CR 611.2c: the stored carrier. Its controller is read off the record and
@@ -151,6 +163,12 @@ applying pid gs =
       -- Neither gate above touches it, because it is not an ability for CR 613.1f
       -- to remove: CR 611.2a gives a resolved spell's continuous effect a duration
       -- of its own. Humility cannot take back a Silence that has already resolved.
+      --
+      -- No CR 612.1 rewrite either, and for the same reason read the other way: a
+      -- text-changing effect changes the words printed on an OBJECT, and this
+      -- carrier has none behind it. The words a stored effect holds were fixed by
+      -- the spell that made it, whose own text a swap reaches while it is still on
+      -- the stack (Pawl.Engine.Projection.rewriteEffect).
       storedOne active =
         ( Nothing,
           ActivePlayerEffect.controller active,
@@ -161,6 +179,53 @@ applying pid gs =
       keep (_, controller, scope, _) = inScope pid controller scope
       effectOf (source, _, _, effect) = (source, effect)
    in fmap effectOf (filter keep (printed <> stored))
+
+-- CR 612.1's subtype word swap over a PlayerEffect, the CR 613.10/613.11 axis's
+-- answer to Pawl.Engine.Projection.rewriteModification. An Artificial Evolution
+-- resolved at an Edgewalker moves "Cleric spells you cast cost {W}{B} less to
+-- cast" onto the new word, because the word naming which spells the ability
+-- discounts is text printed on the permanent like any other.
+--
+-- HERE and not beside rewriteModification, which is where the printed-text
+-- rewrites for objects live: this module is the only one that may case on
+-- PlayerEffect, and Pawl.Engine.Projection never sees the type at all. The
+-- shape Pawl.Engine.CombatRestriction takes for a restriction -- destructure the
+-- module's own type, hand each inner value to the module that owns it -- is the
+-- one taken here, with Pawl.Engine.Filter.rewrite doing the descent.
+--
+-- Exhaustive rather than a catch-all, for rewriteModification's stated reason: a
+-- later arm that can hold a word must break this build instead of silently
+-- keeping the printed one.
+--
+-- CR 612.2's family gate is not restated at the Filter descent, for the reason
+-- Filter.rewrite's own comment gives: a HasSubtype atom may name a word of any
+-- family, so the family the word is used AS is the family it belongs to, and the
+-- exact lookup already asks CR 612.2's question. A Magical Hack's land-type pair
+-- therefore leaves Edgewalker's Cleric alone.
+rewritePlayerEffect :: [(Subtype, Subtype)] -> PlayerEffect -> PlayerEffect
+rewritePlayerEffect pairs effect = case effect of
+  -- The four arms carrying a Filter, which is the only place in this type a
+  -- subtype word can hide. Thalia's "noncreature spells", Vedalken Orrery's
+  -- "spells" and Prowling Serpopard's "creature spells" name none today;
+  -- Edgewalker's "Cleric spells" does.
+  PlayerEffect.IncreaseSpellCost f n -> PlayerEffect.IncreaseSpellCost (Filter.rewrite pairs f) n
+  PlayerEffect.ReduceSpellCost f cost -> PlayerEffect.ReduceSpellCost (Filter.rewrite pairs f) cost
+  PlayerEffect.CastAsThoughItHadFlash f -> PlayerEffect.CastAsThoughItHadFlash (Filter.rewrite pairs f)
+  PlayerEffect.CantBeCountered f -> PlayerEffect.CantBeCountered (Filter.rewrite pairs f)
+  -- The rest name no word a subtype pair could reach. The two chosen-name arms
+  -- carry nothing at all -- CR 201.4's names are read off the source's
+  -- Object.chosenNames -- and CR 612.2's second sentence says a subtype swap
+  -- could not touch a card name even if they did. A count, a mana filter and a
+  -- player scope are not words either.
+  PlayerEffect.CantCastSpells -> effect
+  PlayerEffect.CantCastMoreThan _ -> effect
+  PlayerEffect.CantCastChosenName -> effect
+  PlayerEffect.CantPlayLandChosenName -> effect
+  PlayerEffect.PlayAdditionalLands _ -> effect
+  PlayerEffect.NoMaximumHandSize -> effect
+  PlayerEffect.DontLoseUnspentMana _ -> effect
+  PlayerEffect.CantBeTargetedBy _ -> effect
+  PlayerEffect.DamageCantBePrevented _ -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -174,7 +239,7 @@ applying pid gs =
 castsThisTurn :: PlayerId -> GameState -> Natural
 castsThisTurn pid gs =
   let mine caster = caster == pid
-   in Natural.length (filter mine (Maybe.mapMaybe Event.castOf (Foldable.toList (GameState.events gs))))
+   in Natural.length (filter mine (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events gs))))
 
 -- CR 601.3: a player can begin to cast a spell only if no rule or effect
 -- prohibits it. The prohibit half. Cast.permitsCastWhileSearching is not the
@@ -248,6 +313,13 @@ prohibitsCasting pid name gs =
         -- prohibition, and CR 101.2 would let a prohibition outvote it anyway.
         -- mayCastAsThoughItHadFlash below is where it is read.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        -- CR 701.6a is about a spell or ability ALREADY on the stack, and CR
+        -- 601.3 is about beginning to cast one: an uncounterable spell is not a
+        -- spell anyone is more or less allowed to cast.
+        PlayerEffect.CantBeCountered _ -> False
+        -- CR 615.12 edits what CR 615.1's shields do to a damage event. Nobody
+        -- is more or less allowed to cast a spell for it.
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -288,6 +360,10 @@ prohibitsPlayingLand pid name gs =
         -- CR 305.1 again: a land is never cast, so a permission about the timing
         -- of a CAST has nothing to widen here either.
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        -- CR 305.1 again: a land is never put on the stack, so nothing about
+        -- countering reaches a land play.
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any prohibits (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -300,15 +376,22 @@ prohibitsPlayingLand pid name gs =
 chosenNamesOf :: Maybe ObjectId -> GameState -> Set.Set CardName
 chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid -> Game.lookupObject oid gs)
 
--- Does this spell match a player effect's Filter? Shared by the two questions
--- that carry one -- CR 601.2f's cost adjustments and CR 601.3b's timing
--- permission -- so that "which spells does this effect name?" has one reading.
+-- Does this spell match a player effect's Filter? Shared by the three questions
+-- that carry one -- CR 601.2f's cost adjustments, CR 601.3b's timing permission
+-- and CR 701.6a's countering prohibition -- so that "which spells does this
+-- effect name?" has one reading.
 --
 -- Evaluated against the PROJECTED view (Projection.viewOfObject) -- a card type
 -- is CR 613.1d layer 4 and a colour is CR 613.1e layer 5 -- never a printed
 -- characteristic. The perspective is the spell's own controller (CR 109.5). Runs
 -- through the identity-blind Filter.matches: this module never learns which
 -- spell produced the Filter.
+--
+-- A SPELL is what the first two callers can ever hand it, but cantBeCountered
+-- below reaches CR 113.9's abilities on the stack too. Nothing here needs a case
+-- for that: an ability has no card, so the view carries no card type and no
+-- colour, and every atom naming a quality is simply false of it while `And []`
+-- stays true.
 matchesSpell :: Filter Keyword -> ObjectId -> GameState -> Bool
 matchesSpell filter_ oid gs =
   -- No source in scope at this site: `oid` is the AFFECTED object, not a source.
@@ -343,6 +426,8 @@ costAdjustments pid oid gs =
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -355,6 +440,8 @@ costAdjustments pid oid gs =
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
       effects = fmap snd (applying pid gs)
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 
@@ -404,6 +491,8 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -448,6 +537,11 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.NoMaximumHandSize -> False
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        -- CR 701.6a grants no targeting immunity: Pawl.Types.Counterability
+        -- says the same about CR 113.6g, and a Cancel at a spell Spider-Punk
+        -- protects still targets it legally and still resolves.
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -493,6 +587,8 @@ landPlaysAllowed pid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.DontLoseUnspentMana _ -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -519,6 +615,8 @@ maximumHandSize pid gs =
         PlayerEffect.DontLoseUnspentMana _ -> False
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
    in if any (removes . snd) (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
@@ -561,5 +659,117 @@ keepsUnspentMana pid gs =
         PlayerEffect.NoMaximumHandSize -> Nothing
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.DamageCantBePrevented _ -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
+
+-- CR 701.6a / 613.11: can this spell or ability on the stack be countered
+-- (Spider-Punk, Prowling Serpopard)? The typed question
+-- Pawl.Engine.Event.counter asks at its funnel, so that module never sees a
+-- PlayerEffect constructor.
+--
+-- Takes the player who controls the VICTIM, which CR 113.8 supplies for the
+-- ability half -- "the controller of an activated ability on the stack is the
+-- player who activated it" -- and CR 601.2a for the spell half. Never the
+-- countering spell's controller: the protection is the victim's.
+--
+-- Takes the VICTIM's id as well, for the Filter: Prowling Serpopard protects
+-- only "creature spells", which is a question about the victim's own
+-- characteristics and not about who controls it. Read through the same
+-- matchesSpell as CR 601.2f's cost adjustments and CR 601.3b's timing
+-- permission, so "which objects does this effect name?" has one reading on this
+-- axis.
+--
+-- CR 113.9's other subject needs no case of its own. An ability on the stack has
+-- no card behind it -- Game.faceOf answers Nothing for one -- so
+-- Projection.viewOfObject hands the matcher an object with no card types and no
+-- colours: `And []` is true of it (Spider-Punk still stops a Stifle) and any
+-- atom naming a quality is false of it (Prowling Serpopard does not). The rule
+-- lives in the card's own filter rather than in a branch here.
+--
+-- A DISJUNCTION for CR 101.2's reason, the shape every prohibition here takes:
+-- one applicable "can't" is enough and nothing outvotes it. CR 613.11's
+-- timestamp order has nothing to order, since no answer depends on which ran
+-- first.
+--
+-- Read LIVE through `applying`, like every other question in this module, so a
+-- Spider-Punk destroyed earlier in the turn is simply not found (CR 604.2).
+cantBeCountered :: PlayerId -> ObjectId -> GameState -> Bool
+cantBeCountered pid oid gs =
+  let stops effect = case effect of
+        PlayerEffect.CantBeCountered criterion -> matchesSpell criterion oid gs
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        -- Spider-Punk's OTHER sentence, and no part of this answer: CR 615.12
+        -- is about a damage event and CR 701.6a about an object on the stack.
+        -- The two travel together on one card and share nothing.
+        PlayerEffect.DamageCantBePrevented _ -> False
+   in any (stops . snd) (applying pid gs)
+
+-- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
+-- now (Spider-Punk, Excruciator), each paired with the SOURCE of the ability
+-- that says it. The typed question Pawl.Engine.Replacement.preventable asks, so
+-- neither that module nor Pawl.Engine.Event ever sees a PlayerEffect
+-- constructor.
+--
+-- Hands back the PATTERNS rather than a yes/no, because CR 615.12's sentence is
+-- about a damage EVENT and the printed narrowings name a quality of one:
+-- Excruciator's names its own source. Reading a pattern against an event is CR
+-- 615.1's own arithmetic, which Pawl.Engine.Replacement.matchesDamagePattern
+-- owns for the shields, and one reading of what a DamagePattern means is worth
+-- more than a boolean asked here.
+--
+-- The SOURCE rides out because SourceRelation.TheSource is resolved against it
+-- -- Excruciator's clause names the permanent that prints it -- and it is the
+-- Maybe `applying` already carries: Nothing for a stored CR 611.2c effect, which
+-- has no permanent behind it, and no printing pairs one with a self-naming
+-- pattern.
+--
+-- Gathered from EVERY still-playing player rather than from one, because
+-- `applying` is indexed by player and this effect is not. That reading is EXACT
+-- for PlayerScope.EachPlayer, the scope Spider-Punk's possessive-free sentence
+-- writes: EachPlayer is in scope for everybody, so "some player has it applying"
+-- and "it applies" are the same fact. Duplicated rows are why the caller folds
+-- with `any` and not with a count.
+--
+-- A narrower scope would make them come apart, and no card may write one:
+-- Pawl.CardSpec's "no card narrows CR 615.12" lint sweeps both carriers
+-- `applying` folds together -- the printed static ability and the stored
+-- Effect.AffectPlayers -- and rejects any that pairs this effect with another
+-- scope. There is nothing for a scope to select here anyway: CR 615.12's
+-- sentence names a damage event, and its narrowings narrow the event rather
+-- than the table.
+--
+-- CR 102.1's departed seats are already excluded, since Game.stillPlaying is
+-- what `applying`'s own scope resolution folds over.
+--
+-- Read LIVE through `applying`, like every other question in this module, so an
+-- Excruciator destroyed earlier in the turn simply stops being found and the
+-- shields on the board go back to working (CR 604.2).
+unpreventable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]
+unpreventable gs =
+  let says (src, effect) = case effect of
+        PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
+        PlayerEffect.CantBeCountered _ -> Nothing
+        PlayerEffect.CantCastSpells -> Nothing
+        PlayerEffect.CantCastMoreThan _ -> Nothing
+        PlayerEffect.CantCastChosenName -> Nothing
+        PlayerEffect.CantPlayLandChosenName -> Nothing
+        PlayerEffect.IncreaseSpellCost _ _ -> Nothing
+        PlayerEffect.ReduceSpellCost _ _ -> Nothing
+        PlayerEffect.PlayAdditionalLands _ -> Nothing
+        PlayerEffect.NoMaximumHandSize -> Nothing
+        PlayerEffect.DontLoseUnspentMana _ -> Nothing
+        PlayerEffect.CantBeTargetedBy _ -> Nothing
+        PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
+   in concatMap (\pid -> Maybe.mapMaybe says (applying pid gs)) (Game.stillPlaying gs)

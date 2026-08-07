@@ -6,7 +6,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- Its KIND is a closed-half classification, the same posture as Keyword: the
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
--- loyalty; the rest of CR 122.1c-i are future.
+-- loyalty, and rule 714 for lore -- which rule 122.1 never lists at all. The rest
+-- of CR 122.1c-i are future.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 data CounterKind
   = PlusOnePlusOne -- CR 122.1a: +1/+1
@@ -32,4 +33,29 @@ data CounterKind
     -- reads it is CR 704.5i's state-based action and CR 606.6's activation gate,
     -- both counting Object.counters directly.
     Loyalty
+  | -- | CR 714.3: the counters a Saga tracks its progress with. Rule 122.1 gives
+    -- lore counters no lettered clause of their own -- 122.1a-i never name them --
+    -- so rule 714 is the whole citation. Contrast CR 122.1e, which does give
+    -- loyalty a clause of its own and cross-refers rule 704 from it.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind either.
+    -- What reads it is CR 714.2b's chapter trigger
+    -- (TriggerCondition.SelfCountersReached), CR 714.3c's turn-based action and CR
+    -- 704.5s's state-based action, all three counting Object.counters directly.
+    Lore
+  | -- | CR 122.1g / 310.4c: a battle's defense on the battlefield is this count,
+    -- never a Pawl.Types.Defense -- that type carries only CR 310.4a's PRINTED
+    -- number. The exact twin of Loyalty above, down to the rule that puts the
+    -- permanent into its owner's graveyard when the count reaches 0.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind.
+    --
+    -- Three readers, and unlike Loyalty's they are the whole of the count's story:
+    -- CR 310.6 / 120.3h takes counters off in Pawl.Engine.Damage, CR 310.11b's
+    -- intrinsic Siege ability fires when the last one goes, and CR 704.5v buries a
+    -- battle sitting at 0 that owes no ability. All three count Object.counters
+    -- directly, as loyalty's and lore's readers do.
+    Defense
   deriving (Eq, Ord, Show)

@@ -17,6 +17,8 @@ import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
+import Pawl.Types.GameEvent (GameEvent)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -263,10 +265,13 @@ resolveFace mName card = case mName of
   -- A name that does not resolve falls back to the combined view rather than
   -- failing. Pawl.CardSpec's "a card's face names are pairwise distinct" corpus
   -- lint holds that of every loadable card, which is what makes faceNamed's
-  -- answer unique whenever the name IS one of the card's own faces, and both
-  -- writers of this field (Cast.asProposed and Resolve's CR 701.27a Transform
-  -- arm) store a name they read from that same card's faces -- so this arm has
-  -- no case that reaches it, short of a bug in one of them.
+  -- answer unique whenever the name IS one of the card's own faces, and all
+  -- three writers of this field (Event.changeZoneAttaching's mkObj, which CR
+  -- 709.3a's chosen half and CR 712.13's carried face both ride in on;
+  -- Cast.asProposed, the gate's speculative
+  -- stamp; and Resolve's CR 701.27a Transform arm) store a name they read from
+  -- that same card's faces -- so this arm has no case that reaches it, short of
+  -- a bug in one of them.
   Just n -> Maybe.fromMaybe (Card.combined card) (Card.faceNamed n card)
 
 -- The face of the card an object is showing. Nothing when the id is unknown or
@@ -477,3 +482,29 @@ honourShuffle offered answer =
   if List.sort answer == List.sort offered
     then answer
     else offered
+
+-- The caster an event describes, if it is a cast (CR 601.2i).
+--
+-- HERE rather than beside Pawl.Engine.Event's other GameEvent classifiers, and
+-- only because of the import graph: its one caller is
+-- Pawl.Engine.PlayerEffect.castsThisTurn, and Pawl.Engine.Event now asks that
+-- module CR 701.6a's counterability question -- so an Event.castOf would put
+-- the two modules in a cycle. Nothing about GameEvent is owned by Event --
+-- Pawl.Engine.Projection and Pawl.Engine.Count already case on it too.
+castOf :: GameEvent -> Maybe PlayerId
+castOf event = case event of
+  GameEvent.SpellCast pid -> Just pid
+  GameEvent.Moved _ _ -> Nothing
+  GameEvent.DamageDealt _ -> Nothing
+  GameEvent.DamagePrevented _ _ -> Nothing
+  GameEvent.StepBegan _ _ -> Nothing
+  GameEvent.BecameMonarch _ -> Nothing
+  GameEvent.Discarded {} -> Nothing
+  GameEvent.Revealed _ _ -> Nothing
+  GameEvent.AttackerDeclared _ -> Nothing
+  GameEvent.SpellCountered _ -> Nothing
+  GameEvent.LoyaltyAbilityActivated _ -> Nothing
+  GameEvent.LifeLost _ _ -> Nothing
+  GameEvent.LifeGained _ _ -> Nothing
+  GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing

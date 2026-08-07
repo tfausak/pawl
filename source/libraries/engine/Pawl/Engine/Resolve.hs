@@ -40,8 +40,10 @@ import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -145,12 +147,12 @@ slotsOf effect = case effect of
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn slot -> Set.singleton slot
   -- The third field is a DEFINITION (how many this sweep destroyed), not a read,
-  -- so it belongs to definedSlots below and must not appear here -- Create's and
+  -- so it belongs to boundSlots below and must not appear here -- Create's and
   -- PlaySubgame's slots take the same posture.
   Effect.Destroy ref _ _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.RemoveFromCombat slot -> Set.singleton slot
-  Effect.MoveToZone slot _ _ _ -> Set.singleton slot
+  Effect.MoveToZone slot _ _ _ _ -> Set.singleton slot
   Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Mill slot quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
@@ -193,6 +195,9 @@ slotsOf effect = case effect of
   -- The PlayerRef may name a target slot -- Time Warp's "target player".
   Effect.TakeExtraTurn ref _ -> playerRefSlots ref
   Effect.ShuffleIntoLibrary slot -> Set.singleton slot
+  -- OfferCast's slot is a READ: it names the object being offered, bound by an
+  -- earlier effect of the same list (CR 400.7).
+  Effect.OfferCast slot _ -> Set.singleton slot
 
 -- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
 -- Condition.
@@ -282,6 +287,7 @@ readsX = any effectReadsX
       Effect.PlaySubgame _ -> False
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary _ -> False
+      Effect.OfferCast {} -> False
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -335,6 +341,10 @@ searchesLibrary effect = case effect of
   -- CR 701.24 shuffles a library but never LOOKS at one, which is what CR 701.23a
   -- makes a search, so this opens no window.
   Effect.ShuffleIntoLibrary _ -> False
+  -- CR 608.2g's other producer, and not a search: the offered cast names one
+  -- object the effect already has, so no library is looked at and the
+  -- Panglacial window does not open on top of it.
+  Effect.OfferCast {} -> False
   Effect.TakeExtraTurn {} -> False
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name. The read half of
@@ -360,19 +370,87 @@ onsetGatedAbilities effects =
         _ -> Nothing
    in Set.fromList (Maybe.mapMaybe named effects)
 
--- The slots an effect list DEFINES rather than reads: a Create that names what
--- it mints -- one token, or every one of them -- a MoveToZone that names the incarnation CR
--- 400.7 minted at the destination, a PlaySubgame that names its loser, a Destroy
--- that names how many it destroyed. The write half of the same lint.
+-- boundSlots over a whole effect list: the write half of the dataflow lint,
+-- against which Quantity.slots and slotsOf are the read half.
 definedSlots :: [Effect Card.Type.Card] -> Set SlotName
-definedSlots effects =
-  let bound effect = case effect of
-        Effect.Create _ _ _ mSlot -> mSlot
-        Effect.MoveToZone _ _ _ mSlot -> mSlot
-        Effect.PlaySubgame slot -> Just slot
-        Effect.Destroy _ _ mSlot -> mSlot
-        _ -> Nothing
-   in Set.fromList (Maybe.mapMaybe bound effects)
+definedSlots = foldMap boundSlots
+
+-- slotsOf's mirror for ONE effect: the slots it BINDS rather than reads -- a
+-- Create that names what it mints, one token or every one of them, a MoveToZone
+-- that names the incarnation CR 400.7 minted at the destination, a PlaySubgame
+-- that names its loser, a Destroy that names how many it destroyed. Every
+-- position in the DSL at which a card AUTHORS a name the engine will later
+-- write a binding to, which is what makes it the set Pawl.CardSpec's
+-- reserved-name sweep ranges over.
+--
+-- EXHAUSTIVE, and deliberately so, where this was a four-arm case under a
+-- wildcard. The wildcard filed every opcode it had not been told about under
+-- "binds nothing", which is silent in both directions: a new bind position
+-- would drop out of the dataflow lint's write half AND out of that sweep, the
+-- second being how a card could name CR 615.13's `thatMuch` in a Destroy and
+-- shadow the amount the event supplied. Spelling every arm makes adding an
+-- opcode a compile error until an author decides which half it belongs to.
+--
+-- An arm that both READS and BINDS appears in both functions with different
+-- fields -- MoveToZone reads what it moves and binds what arrived. slotsOf's
+-- comments at those arms say which field is which.
+boundSlots :: Effect Card.Type.Card -> Set SlotName
+boundSlots effect = case effect of
+  -- CR 400.7: the incarnation minted at the destination, named so a later
+  -- effect can reach the object the move created rather than the one it ended.
+  Effect.MoveToZone _ _ _ mSlot _ -> foldMap Set.singleton mSlot
+  -- The token or tokens this Create minted, named so a later effect can refer
+  -- back to them -- CR 603.7c's delayed trigger "that refers to a particular
+  -- object" is the case that needs the name to survive the resolution.
+  Effect.Create _ _ _ mSlot -> foldMap Set.singleton mSlot
+  -- CR 729.1b: the subgame's loser, derived rather than chosen.
+  Effect.PlaySubgame slot -> Set.singleton slot
+  -- How many permanents this destruction ACTUALLY destroyed, for a later "for
+  -- each ... destroyed this way" to read as a Quantity.
+  Effect.Destroy _ _ mSlot -> foldMap Set.singleton mSlot
+  Effect.DealDamage {} -> Set.empty
+  Effect.ModifyTarget {} -> Set.empty
+  Effect.ChangeText {} -> Set.empty
+  Effect.AddMana _ -> Set.empty
+  Effect.Search _ _ -> Set.empty
+  Effect.ExileAllGraveyards -> Set.empty
+  Effect.Proliferate -> Set.empty
+  Effect.TemptWithTheRing -> Set.empty
+  Effect.ExileHandThenDraw -> Set.empty
+  Effect.PlayerSacrifices {} -> Set.empty
+  Effect.RestartGame -> Set.empty
+  Effect.ControlPlayerNextTurn _ -> Set.empty
+  Effect.Sacrifice _ -> Set.empty
+  Effect.RemoveFromCombat _ -> Set.empty
+  Effect.Draw {} -> Set.empty
+  Effect.Mill {} -> Set.empty
+  Effect.Discard {} -> Set.empty
+  Effect.LoseLife {} -> Set.empty
+  Effect.GainLife {} -> Set.empty
+  Effect.IncreaseSpeed {} -> Set.empty
+  Effect.Replace {} -> Set.empty
+  Effect.SkipNextPhase {} -> Set.empty
+  Effect.PreventNextDamage {} -> Set.empty
+  Effect.PreventAllDamage {} -> Set.empty
+  Effect.Counter _ -> Set.empty
+  Effect.PutCounters {} -> Set.empty
+  Effect.GainPlayerCounters {} -> Set.empty
+  Effect.Tap _ -> Set.empty
+  Effect.Untap _ -> Set.empty
+  Effect.Transform _ -> Set.empty
+  Effect.AddPhases _ -> Set.empty
+  Effect.GainControl _ _ -> Set.empty
+  Effect.ArmDelayedTrigger {} -> Set.empty
+  Effect.AffectPlayers {} -> Set.empty
+  Effect.CreateEmblem {} -> Set.empty
+  Effect.BecomeMonarch {} -> Set.empty
+  Effect.ItBecomes _ -> Set.empty
+  Effect.ExileUntilMonarch _ -> Set.empty
+  Effect.Attach _ -> Set.empty
+  Effect.AttachTarget {} -> Set.empty
+  Effect.TakeExtraTurn {} -> Set.empty
+  Effect.ShuffleIntoLibrary _ -> Set.empty
+  Effect.OfferCast {} -> Set.empty
 
 -- Does a Create's slot name EVERY token it minted ("those tokens") rather than
 -- one particular one (CR 603.7c's "it")? Which of the two a card means is its own
@@ -812,7 +890,7 @@ attachmentFor src destination gs
   | Set.member Subtype.Aura subtypes =
       if Projection.isCreatureOf src gs
         then Nothing
-        else case Game.faceOf src gs >>= Face.enchant of
+        else case Game.faceOf src gs >>= Card.enchantSpec of
           Nothing -> Nothing
           Just spec ->
             List.find
@@ -975,6 +1053,80 @@ objectRefRecipients legality chosen resolving controller source gs ref = case re
 -- to fail if that lint were ever removed.
 slotGroup :: SlotName -> ObjectId -> GameState -> Maybe (Seq.Seq ObjectId)
 slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bindings (Game.lookupObject resolving gs))
+
+-- slotGroup's singular: the ONE object bound at a slot, read live off the
+-- resolving object rather than out of `chosen`.
+--
+-- LIVE is the whole point, and it is what `chosen` cannot be: resolveModes fixes
+-- a resolving ability's target map before its effect fold begins, so an
+-- incarnation an earlier effect of the same list bound (Effect.MoveToZone's CR
+-- 400.7 slot) is not in it. Every reader of such a binding goes through a live
+-- read for that reason -- see bindObjectsSlot's note, and CR 603.7c for why the
+-- binding exists at all.
+--
+-- Nothing when the slot is unbound, holds a group, or names a player: a cast
+-- offer and a zone move both want one object or none.
+slotOne :: SlotName -> ObjectId -> GameState -> Maybe ObjectId
+slotOne slot resolving gs = do
+  obj <- Game.lookupObject resolving gs
+  Recipient.objectOf =<< Map.lookup slot (Binding.targetsOf (Object.bindings obj))
+
+-- CR 608.2g: make the offer Effect.OfferCast carries, and cast if it is taken.
+--
+-- The four questions, in the order the rules ask them:
+--
+--   1. IS THERE ANYTHING TO OFFER. The slot names an incarnation an earlier
+--      effect bound (CR 400.7), and CR 603.7c's "if the object ... is no longer
+--      in the zone it's expected to be in" is answered here by the id simply not
+--      resolving to an object any more.
+--   2. WHICH FACE (CR 712.11a). `transformed` puts the back face on the stack and
+--      CR 712.8c gives the resulting spell that face's characteristics; without
+--      the rider it is CR 712.11's default, the card's front face.
+--   3. WHAT IT COSTS (CR 118.9). `withoutPayingManaCost` applies the alternative
+--      cost the rule names by that very phrase; without the rider the candidates
+--      are CR 601.2b's own.
+--   4. MAY IT BE CAST AT ALL, which is Cast.castableWhenOffered -- the prohibit
+--      half of CR 601.3, an affordable cost, and a fillable target set. Asked
+--      BEFORE the prompt, so the player is never offered a cast the announcement
+--      would only reverse.
+--
+-- Then, and only then, the "may" (CR 601.2b's decisions are the player's, and so
+-- is this one). Declining leaves the card exactly where the earlier effect put
+-- it, which for CR 310.11b is exile.
+--
+-- THE INVARIANT: everything above is a CLASSIFICATION carried by the opcode's
+-- CastOffer -- which face, which cost -- and nothing here asks which effect is
+-- offering or which card is being offered.
+offerCast :: ObjectId -> PlayerId -> SlotName -> CastOffer.CastOffer -> Game ()
+offerCast resolving controller slot offer = do
+  gs <- State.get
+  let offered = do
+        oid <- slotOne slot resolving gs
+        card <- Game.cardOf oid gs
+        -- CR 712.11a for the transformed rider; CR 712.11's default otherwise.
+        -- Nothing for a card with no back face at all, which is CR 712.14a's
+        -- answer to the same instruction one zone over: an offer that cannot be
+        -- made is not made.
+        --
+        -- CR 709.3's half-choice is not offered on the untransformed branch: the
+        -- front face is taken, which for every layout but Split is the only
+        -- castable face there is (#904).
+        face <- if CastOffer.transformed offer then Card.backFace card else Just (Card.frontFace card)
+        let name = Face.name face
+            -- CR 118.9a: at most ONE alternative cost, so the applied one
+            -- replaces the candidates rather than joining them.
+            applied = if CastOffer.withoutPayingManaCost offer then Just (Cost.withoutPayingManaCost face) else Nothing
+            candidates = maybe (Cost.costsFor name oid (Cast.asProposed oid name gs)) pure applied
+        Monad.guard (Cast.castableWhenOffered controller oid name candidates (Cast.asProposed oid name gs))
+        pure (oid, name, applied)
+  case offered of
+    Nothing -> pure ()
+    Just (oid, name, applied) -> do
+      let decider = Decide.deciderFor controller gs
+      decision <- Game.choose (Prompt.OfferedCast decider controller oid name)
+      case decision of
+        OptionalDecision.Declines -> pure ()
+        OptionalDecision.Exercises -> Cast.castSpellWith applied controller oid name
 
 -- CR 615.3: install one floating prevention shield over `recipient`, for a
 -- duration. The shared body of Effect.PreventNextDamage's and
@@ -1413,7 +1565,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
         _ -> gs
-  Effect.MoveToZone slot zone entry mSlot ->
+  Effect.MoveToZone slot zone entry mSlot _ ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
@@ -1512,6 +1664,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               Monad.void (Event.changeZoneReturning target Zone.Library)
               Mulligan.shuffleLibrary (Object.owner obj)
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
+  Effect.OfferCast slot offer -> offerCast resolving controller slot offer
   Effect.Draw ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -1644,9 +1797,15 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror in every respect but the sign. The
   -- comments above apply verbatim: same `viewWithLastKnown` reading, same
-  -- unordered adjustment, same direct write to the player record. The one
-  -- difference is that nothing in CR 704.5 follows a gain -- CR 704.5a fires on
-  -- "0 or less life", which a gain cannot reach.
+  -- unordered adjustment, same direct write to the player record, and the same CR
+  -- 608.2i record appended alongside it. The one difference is that nothing in CR
+  -- 704.5 follows a gain -- CR 704.5a fires on "0 or less life", which a gain
+  -- cannot reach.
+  --
+  -- The `n > 0` guard is CR 119.9's in as many words: "if a player gains 0 life,
+  -- no life gain event has occurred". Here it is load-bearing rather than tidy --
+  -- a Quantity that evaluates to 0 (an X of nothing, a count of an empty board)
+  -- must leave the log silent, or "whenever you gain life" would fire on it.
   Effect.GainLife ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -1657,32 +1816,37 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         | n > 0 ->
             Monad.forM_ gainers $ \pid ->
               State.modify'
-                ( \g ->
-                    g
-                      { GameState.players =
-                          Map.adjust
-                            (\p -> p {Player.life = Player.life p + n})
-                            pid
-                            (GameState.players g)
-                      }
+                ( Event.recordEvent (GameEvent.LifeGained pid (Integer.toNaturalSaturating n))
+                    . ( \g ->
+                          g
+                            { GameState.players =
+                                Map.adjust
+                                  (\p -> p {Player.life = Player.life p + n})
+                                  pid
+                                  (GameState.players g)
+                            }
+                      )
                 )
       _ -> pure ()
-  -- CR 702.179c: each named player's speed increases by this much. Its one
-  -- producer is Pawl.Engine.Speed's inherent triggered ability (CR 702.179d),
-  -- which is why this arm reads a PlayerRef it will only ever see as
-  -- `Relative You`.
+  -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.
+  -- Speed's inherent triggered ability (CR 702.179d) is one producer and card data
+  -- is the other, so the PlayerRef is genuinely read rather than known --
+  -- Pawl.SpeedSpec's CardIncrease group moves a player who is not the effect's
+  -- controller, which is what proves it.
   --
   -- The two readings CR 702.179c distinguishes -- a player who HAS speed, whose
   -- speed goes up by the value, and a player who has NONE, whose speed BECOMES
   -- the value -- are spelled separately here even though they coincide
   -- arithmetically against a stand-in zero. They are separate in the rule, and
-  -- the day a card decreases speed the stand-in zero would stop being harmless.
+  -- the day a card decreases speed (#808) the stand-in zero would stop being
+  -- harmless. Only a card can reach the second reading at all: rule 702.179d's
+  -- ability exists only for a player who already has 1 or more speed.
   --
-  -- No cap is applied. Nothing in rule 702.179 bounds speed from above; what
-  -- keeps it at 4 is that the only ability which raises it is gated on "if your
-  -- speed is less than 4" (CR 702.179d), checked when it triggers (CR 603.4) and
+  -- No cap is applied. Nothing in rule 702.179 bounds speed from above, and a cap
+  -- here would be a rule pawl invented; what keeps rule 702.179d's own climb at 4
+  -- is its "if your speed is less than 4", checked when it triggers (CR 603.4) and
   -- again as it resolves (CR 608.2a) -- Pawl.Engine.Stack's inherent-trigger arm.
-  -- A cap here would be a rule pawl invented.
+  -- Whether an EFFECT may push past 4, having no such gate, is unsettled (#809).
   Effect.IncreaseSpeed ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
@@ -2210,7 +2374,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
-          Just n -> Monad.when (n > 0) (Event.putCounters target kind (Integer.toNaturalSaturating n))
+          Just n -> Monad.when (n > 0) (Event.putCounters CounterCause.ByEffect target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
       -- CR 701.34a: "choose any number of permanents and/or players that have a
       -- counter, then give each one additional counter of each kind that permanent or
@@ -2264,7 +2428,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- counter replacements (Hardened Scales, Doubling Season) apply to a
       -- proliferated counter exactly as they do to a placed one.
       Monad.forM_ keptPermanents $ \oid ->
-        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters oid kind 1
+        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters CounterCause.ByEffect oid kind 1
       -- Player counters are added directly, with no CR 614 opportunity, matching
       -- GainPlayerCounters below and gapped for the same reason (#122).
       Monad.forM_ keptPlayers $ \pid ->
@@ -2539,9 +2703,11 @@ bindSlot holder slot target gs =
 -- 603.7c) -- ArmDelayedTrigger captures this object's whole environment, which is
 -- how "those tokens" outlives the resolution that minted them.
 --
--- A group slot is readable mid-fold on BOTH paths, unlike bindSlot's single
--- object: every reader goes through slotGroup, which reads live GameState rather
--- than `chosen` -- `chosen` carries CR 601.2c's targets and this is never one.
+-- Readable mid-fold on BOTH paths, because every reader goes through slotGroup,
+-- which reads live GameState rather than `chosen` -- `chosen` carries CR 601.2c's
+-- targets and this is never one, and on the ability path resolveModes fixes it
+-- before the fold begins. bindSlot's SINGLE object is readable the same way and
+-- for the same reason, through slotOne; what neither is, is visible in `chosen`.
 bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
 bindObjectsSlot holder slot targets gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}

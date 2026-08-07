@@ -4,7 +4,6 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Numeric.Natural
 import qualified Pawl.Engine.Decide as Decide
@@ -17,6 +16,7 @@ import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
@@ -58,22 +58,23 @@ openingHands perform owners = do
   -- CR 103.6: the opening-hand window, after the WHOLE CR 103.5 process.
   openingHandActions perform owners
 
--- CR 103.5b / CR 103.6: the cards in this player's hand that grant an action
--- from the window `field` names, each paired with the effects that action
--- performs. A CLASSIFICATION, not an identity test: this asks whether the card
--- declares an action, never which card it is.
+-- CR 103.5b / CR 103.6: every action the cards in this player's hand grant from
+-- the window `field` names, keyed by the granting card AND which of that card's
+-- actions it is, and paired with the effects that action performs. A card
+-- printing two actions contributes two entries, in printed order -- nothing in
+-- CR 103 caps the number, and the two are different offers. A CLASSIFICATION,
+-- not an identity test: this asks whether the card declares an action, never
+-- which card it is.
 --
 -- Read straight off the face (Game.faceOf) and never through the projection --
 -- the Face.castingPermissions precedent: these abilities function in the HAND
 -- (CR 113.6), which pawl's projection does not reach (#160).
-actionsFor :: (Face.Face Card.Card -> [Effect Card.Card]) -> PlayerId -> GameState.GameState -> [(ObjectId, [Effect Card.Card])]
+actionsFor :: (Face.Face Card.Card -> [[Effect Card.Card]]) -> PlayerId -> GameState.GameState -> [((ObjectId, HandActionIndex.HandActionIndex), [Effect Card.Card])]
 actionsFor field pid gs =
-  let withAction oid = case Game.faceOf oid gs of
-        Nothing -> Nothing
-        Just face -> case field face of
-          [] -> Nothing
-          effects -> Just (oid, effects)
-   in Maybe.mapMaybe withAction (Game.zoneMembers Zone.Hand pid gs)
+  let withActions oid = case Game.faceOf oid gs of
+        Nothing -> []
+        Just face -> zipWith (\i effects -> ((oid, HandActionIndex.MkHandActionIndex i), effects)) [0 ..] (field face)
+   in concatMap withActions (Game.zoneMembers Zone.Hand pid gs)
 
 -- The shared CR 103.5b / CR 103.6 loop: offer this player every action their
 -- hand grants through `field`, on the `question` channel, until they decline or
@@ -83,10 +84,12 @@ actionsFor field pid gs =
 --
 -- Terminates even against an interpreter that never declines: every action in
 -- the pool moves its card out of the hand (CR 103.6a onto the battlefield, CR
--- 103.5b's into exile), so the candidate list strictly shrinks.
+-- 103.5b's into exile), and a card leaving takes ALL of its entries with it, so
+-- the candidate list strictly shrinks. An action that leaves its card in the
+-- hand, and so can be taken again in the same window, is not supported (#801).
 handWindow ::
-  (Face.Face Card.Card -> [Effect Card.Card]) ->
-  (Decider.Decider -> PlayerId -> [ObjectId] -> Prompt.Prompt (Maybe ObjectId)) ->
+  (Face.Face Card.Card -> [[Effect Card.Card]]) ->
+  (Decider.Decider -> PlayerId -> [(ObjectId, HandActionIndex.HandActionIndex)] -> Prompt.Prompt (Maybe (ObjectId, HandActionIndex.HandActionIndex))) ->
   HandActionPerformer ->
   PlayerId ->
   Game ()
@@ -100,13 +103,16 @@ handWindow field question perform pid = do
       answer <- Game.choose (question decider pid (fmap fst candidates))
       case answer of
         Nothing -> pure ()
-        Just oid -> case lookup oid candidates of
-          -- An id that was not offered: validated by MEMBERSHIP, the
+        -- The card AND the index, because a card granting two actions leaves the
+        -- card alone ambiguous, and picking either one for the player would be
+        -- the engine making a choice.
+        Just key -> case lookup key candidates of
+          -- A key that was not offered: validated by MEMBERSHIP, the
           -- Action.Activate posture, which keeps this total with no partial
           -- lookup and no way for an interpreter to conjure an action.
           Nothing -> pure ()
           Just effects -> do
-            perform oid pid effects
+            perform (fst key) pid effects
             handWindow field question perform pid
 
 -- CR 103.6: the starting player acts first, then each other player in turn
@@ -115,7 +121,7 @@ handWindow field question perform pid = do
 -- Game.stillPlayingInOrder, so they get no window and no opening hand.
 openingHandActions :: HandActionPerformer -> [PlayerId] -> Game ()
 openingHandActions perform owners =
-  Monad.forM_ owners (handWindow Face.openingHandAction Prompt.OpeningHandAction perform)
+  Monad.forM_ owners (handWindow Face.openingHandActions Prompt.OpeningHandAction perform)
 
 -- CR 103.5: repeat the declare-all-then-take-all round until no still-deciding
 -- player mulligans. `deciding` is the players who have NOT yet kept -- keeping
@@ -133,7 +139,7 @@ mulliganRounds perform counts deciding = do
     -- would declare", and the declaration follows it. Reading the hand size
     -- after it is load-bearing: an action that empties the hand makes this a
     -- forced keep under CR 103.5's final sentence.
-    handWindow Face.mulliganAction Prompt.MulliganAction perform pid
+    handWindow Face.mulliganActions Prompt.MulliganAction perform pid
     handSize <- State.gets (length . Game.zoneMembers Zone.Hand pid)
     if handSize <= 0
       then pure (pid, MulliganDecision.Keep)

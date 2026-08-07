@@ -1,17 +1,19 @@
 {
   "faces": [
     {
-      "enchant": {
-        "filter": {
-          "type": "ControlledBy",
-          "value": {
-            "type": "You"
+      "enchant": [
+        {
+          "filter": {
+            "type": "ControlledBy",
+            "value": {
+              "type": "You"
+            }
+          },
+          "pool": {
+            "type": "Creatures"
           }
-        },
-        "pool": {
-          "type": "Creatures"
         }
-      },
+      ],
       "manaCost": [
         {
           "type": "Generic",

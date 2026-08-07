@@ -1,0 +1,68 @@
+{
+  "faces": [
+    {
+      "additionalCosts": [
+        {
+          "type": "PayLife",
+          "value": 2
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Phyrexian",
+          "value": {
+            "type": "Green"
+          }
+        }
+      ],
+      "name": "Synthetic Phyrexian Toll",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

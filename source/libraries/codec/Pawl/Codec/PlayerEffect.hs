@@ -2,6 +2,7 @@ module Pawl.Codec.PlayerEffect where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaCost as ManaCost
@@ -24,6 +25,8 @@ toJson e = case e of
   PlayerEffect.DontLoseUnspentMana f -> Common.tagged "DontLoseUnspentMana" . Just $ ManaFilter.toJson f
   PlayerEffect.CantBeTargetedBy sc -> Common.tagged "CantBeTargetedBy" . Just $ PlayerScope.toJson sc
   PlayerEffect.CastAsThoughItHadFlash c -> Common.tagged "CastAsThoughItHadFlash" . Just $ Filter.toJson Keyword.toJson c
+  PlayerEffect.CantBeCountered c -> Common.tagged "CantBeCountered" . Just $ Filter.toJson Keyword.toJson c
+  PlayerEffect.DamageCantBePrevented p -> Common.tagged "DamageCantBePrevented" . Just $ DamagePattern.toJson p
 
 fromJson :: Value.Value -> Either Text.Text PlayerEffect.PlayerEffect
 fromJson value = do
@@ -40,4 +43,6 @@ fromJson value = do
     ("DontLoseUnspentMana", Just v) -> PlayerEffect.DontLoseUnspentMana <$> ManaFilter.fromJson v
     ("CantBeTargetedBy", Just v) -> PlayerEffect.CantBeTargetedBy <$> PlayerScope.fromJson v
     ("CastAsThoughItHadFlash", Just v) -> PlayerEffect.CastAsThoughItHadFlash <$> Filter.fromJson Keyword.fromJson v
+    ("CantBeCountered", Just v) -> PlayerEffect.CantBeCountered <$> Filter.fromJson Keyword.fromJson v
+    ("DamageCantBePrevented", Just v) -> PlayerEffect.DamageCantBePrevented <$> DamagePattern.fromJson v
     _ -> Left . Text.pack $ "unknown PlayerEffect: " <> t

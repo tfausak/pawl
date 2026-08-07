@@ -2,6 +2,7 @@ module Pawl.Types.Effect where
 
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
+import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Daytime as Daytime
@@ -194,7 +195,23 @@ data Effect card
     -- zone change the old id is gone. Meandering Towershell is the producer, its
     -- two "it"s two incarnations of one card. A DEFINITION, not a read: never a
     -- target, never in targetSpecs.
-    MoveToZone SlotName.SlotName Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName)
+    --
+    -- The trailing Maybe Zone is the zone the effect's own words say the object
+    -- is moved OUT of -- Reassembling Skeleton's "return this card FROM YOUR
+    -- GRAVEYARD to the battlefield". Nothing for every effect that states no
+    -- such zone, which is every targeted move in the pool: "return target
+    -- creature card from a graveyard" states it in the TARGET's filter, where
+    -- choosing the target is what enforces it, and Unsummon's bounce states no
+    -- origin at all.
+    --
+    -- It exists for CR 113.6m, which reads "an ability whose cost or effect
+    -- specifies that it moves the object it's on out of a particular zone
+    -- functions only in that zone": that reading is a CLASSIFICATION of the
+    -- effect (Pawl.Engine.EffectZone), and a classification can only report a
+    -- zone the data states. The resolver ignores it -- for the self-slot shape
+    -- the rule is what guarantees the object is in that zone when the ability is
+    -- activated, so a funnel that moves it from wherever it is cannot disagree.
+    MoveToZone SlotName.SlotName Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName) (Maybe Zone.Zone)
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one at
     -- a time (CR 121.2). Divination is `Relative You`; Ancestral Recall is
     -- `InSlot`, reading a slot TARGETING filled (CR 601.2c). Empty-library draw is
@@ -240,16 +257,22 @@ data Effect card
     -- which is why the rule needs an opcode of its own rather than a plain
     -- addition against a stored zero.
     --
-    -- Its one producer is Pawl.Engine.Speed's inherent triggered ability (CR
-    -- 702.179d), which is minted by the rules core from the rulebook rather than
-    -- read off a card, the way Pawl.Engine.Monarch mints BecomeMonarch. No card in
-    -- the pool prints "your speed increases by" as text of its own (#769), so this
-    -- arm is authored by nothing in data/cards today.
+    -- Two producers. Pawl.Engine.Speed's inherent triggered ability (CR 702.179d)
+    -- is minted by the rules core from the rulebook rather than read off a card,
+    -- the way Pawl.Engine.Monarch mints BecomeMonarch; card data authors one too,
+    -- at data/cards/synthetic-speed-boost.json. The second one matters for the
+    -- SHAPE it reaches rather than for the count: rule 702.179d fixes the PlayerRef
+    -- at `Relative You` and the Quantity at `Literal 1`, and it can never reach the
+    -- "has no speed" reading at all, existing as it does only for a player who
+    -- already has speed. Only a card gets to any of that.
     --
-    -- NOT a "set speed to" opcode: CR 702.179 has both readings, and only the
-    -- increase has a producer. A SET would also have to say what happens to a
-    -- player with no speed, which is exactly the question CR 702.179c answers for
-    -- this one.
+    -- NOT a "set speed to" or a "decrease" opcode. CR 702.179b does name a set --
+    -- "until a rule or effect sets their speed to a specific value" -- and CR
+    -- 704.5z is one, but that clause is the rules core's own (Pawl.Engine.Speed's
+    -- startEngines) rather than something a card asks for; no printing sets a
+    -- speed. A decrease one does want, and that is #808's. Either would also have
+    -- to say what happens to a player with no speed, which is exactly the question
+    -- CR 702.179c answers for this one.
     IncreaseSpeed PlayerRef.PlayerRef Quantity.Quantity
   | -- | CR 111: create this many tokens with the given effect-defined
     -- characteristics (CR 111.3). The `card` is the token's text, embedded
@@ -374,9 +397,9 @@ data Effect card
     -- 113.9 keeps the two apart where it belongs, in the target pool.
     --
     -- Distinct from MoveToZone slot Graveyard the way Destroy is: a keyword action
-    -- on rule 701's list, carrying the CR 113.6g can't-be-countered gate, and
-    -- recording for a SPELL a distinct "was countered" event the zone change alone
-    -- could not be told apart from.
+    -- on rule 701's list, carrying both of the funnel's can't-be-countered gates
+    -- (CR 113.6g's and CR 613.11's), and recording for a SPELL a distinct "was
+    -- countered" event the zone change alone could not be told apart from.
     Counter SlotName.SlotName
   | -- | CR 122.6: put this many counters of this kind on the slot's target
     -- permanent. A counter is persistent object state, NOT a zone change --
@@ -625,9 +648,33 @@ data Effect card
     -- No PlayerRef saying whose library, and none is expressible: the answer is
     -- the OWNER of the object the slot names, which PlayerRef's three arms cannot
     -- read off a bound OBJECT. Derived rather than named is what the card says,
-    -- and it is what makes this one opcode rather than a move plus a shuffle:
-    -- Resolve.resolveModes fixes a resolving ABILITY's bindings before its effect
-    -- fold begins, so a later effect could not read an incarnation this one had
-    -- just bound anyway.
+    -- and it is what makes this one opcode rather than a move plus a shuffle: CR
+    -- 701.24c shuffles the library even when the move did not happen, which a
+    -- second effect reading the first one's result could not say. A pair CAN be
+    -- written -- OfferCast reads a slot MoveToZone bound in the same list -- so
+    -- the reason is the rule and not a limit of the DSL.
     ShuffleIntoLibrary SlotName.SlotName
+  | -- | CR 608.2g: offer this effect's controller the cast of the object the slot
+    -- names -- "if an effect specifically instructs or allows a player to cast a
+    -- spell during resolution, they do so by following the steps in rules
+    -- 601.2a-i, except no player receives priority after it's cast". CR 310.11b's
+    -- "then you may cast it transformed without paying its mana cost" is the
+    -- producer, and the CastOffer is that sentence's two riders.
+    --
+    -- The slot is a READ, not a definition, and the one it reads is normally
+    -- bound by a MoveToZone earlier in the same instruction list -- rule 310.11b's
+    -- "exile it, THEN you may cast it" is one sentence about two incarnations of
+    -- one card (CR 400.7). Resolve reads it off the resolving object's LIVE
+    -- bindings for that reason, the way Sacrifice reads a group slot.
+    --
+    -- An OFFER and not a cast: CR 601.2b's own announcements still belong to the
+    -- player, and the "may" ahead of them is asked first (Prompt.OfferedCast).
+    -- Nothing here says the cast succeeds -- an announcement the player cannot
+    -- complete is reversed by CR 601.2, which puts the card back where it was.
+    --
+    -- NOT a permission written onto the card. CR 715.3d's exile permission lasts
+    -- "for as long as that card remains exiled" and is Object.playableFromExileBy;
+    -- this one is a single opportunity taken during a resolution, and a Siege
+    -- whose controller declines it stays in exile uncastable.
+    OfferCast SlotName.SlotName CastOffer.CastOffer
   deriving (Eq, Ord, Show)

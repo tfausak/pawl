@@ -73,8 +73,8 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
   -- StaticAbility's own per-constructor coverage, including the CR 613.6
   -- empty-modifications-array rejection, lives in Pawl.Codec.StaticAbilitySpec
   -- now. PlayerStaticAbility's own per-constructor coverage lives in
-  -- Pawl.Codec.PlayerStaticAbilitySpec now. The playerAbilities/mulliganAction/
-  -- openingHandAction round-trip-plus-byte-stability pairs formerly here needed
+  -- Pawl.Codec.PlayerStaticAbilitySpec now. The playerAbilities/mulliganActions/
+  -- openingHandActions round-trip-plus-byte-stability pairs formerly here needed
   -- no registry fixture -- a synthetic Card proves them just as well -- so they
   -- moved to Pawl.Codec.FaceSpec with the rest of a face's own coverage.
   -- TargetSpec's own per-constructor coverage (a bare pool, a filtered pool,

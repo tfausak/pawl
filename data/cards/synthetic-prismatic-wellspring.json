@@ -1,0 +1,82 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Red"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "Green"
+                        }
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "effects": [
+                  {
+                    "type": "AddMana",
+                    "value": {
+                      "type": "OfType",
+                      "value": {
+                        "type": "Colored",
+                        "value": {
+                          "type": "White"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "selection": {
+              "type": "ChooseExactly",
+              "value": 2
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Prismatic Wellspring",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Land"
+          }
+        ]
+      }
+    }
+  ]
+}

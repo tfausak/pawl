@@ -1,6 +1,7 @@
 module Pawl.Types.PlayerEffect where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -167,4 +168,91 @@ data PlayerEffect
     -- applicable permission is enough because there is nothing for a second to
     -- outvote.
     CastAsThoughItHadFlash (Filter.Filter Keyword.Keyword)
+  | -- | CR 701.6a / 613.11 / Spider-Punk: the spells and the abilities on the
+    -- stack controlled by the players this effect's scope names can't be
+    -- countered.
+    --
+    -- NOT Pawl.Types.Counterability, and the two are not redundant. That one is
+    -- CR 113.6g -- "an object's ability that states IT can't be countered ...
+    -- functions on the stack" -- a self-referential ability of the spell itself,
+    -- which is why it rides the card (Rending Volley). This one is an ability of
+    -- a BATTLEFIELD permanent about OTHER objects, so CR 113.6 leaves it
+    -- functioning from the battlefield in the ordinary way and CR 611.1's third
+    -- clause makes it a rules-modifying continuous effect. Pawl.Engine.PlayerEffect.applying
+    -- walks the battlefield, so it can gather this one and could never gather
+    -- the other: a spell on the stack is not a permanent.
+    --
+    -- BOTH subjects of CR 701.6a at once -- "to counter a spell or ability" --
+    -- and one constructor rather than two, because Spider-Punk's one sentence
+    -- says both and the Filter below already tells them apart where a card
+    -- narrows. CR 113.9 keeps an ability from being a spell for the COUNTERER's
+    -- sake (a Stifle must not reach a spell), which is the other side of the
+    -- question and is not what this constructor answers.
+    --
+    -- WHOSE spells is the carrier's scope and not this constructor's, exactly as
+    -- it is for every other arm here: Spider-Punk says "spells and abilities"
+    -- with no possessive (PlayerScope.EachPlayer), while Prowling Serpopard says
+    -- "you control" (PlayerScope.You).
+    --
+    -- WHICH spells is the Filter, the same shape IncreaseSpellCost and
+    -- CastAsThoughItHadFlash carry and read through the same
+    -- Pawl.Engine.PlayerEffect.matchesSpell. Spider-Punk narrows by nothing and
+    -- so writes `And []`; Prowling Serpopard's "creature spells" writes
+    -- HasCardType Creature.
+    --
+    -- The filter is read against BOTH of CR 701.6a's subjects and gets to decide
+    -- for itself whether it reaches an ability, because an ability on the stack
+    -- has no card behind it and so no characteristics: `And []` matches it, and
+    -- any atom naming a quality does not. That is why Spider-Punk still stops a
+    -- Stifle and Prowling Serpopard does not -- neither the type nor the engine
+    -- states a rule about abilities, the empty predicate simply happens to be
+    -- true of one.
+    CantBeCountered (Filter.Filter Keyword.Keyword)
+  | -- | CR 615.12 / 613.11 / Spider-Punk: damage can't be prevented.
+    --
+    -- CR 611.1's third clause in its purest form -- a continuous effect that
+    -- modifies the RULES OF THE GAME and no player's or object's
+    -- characteristics. That is why it sits here beside the player-axis arms
+    -- rather than in Pawl.Types.Modification: CR 613.1 computes an object's
+    -- characteristics, and "damage can't be prevented" is not a characteristic
+    -- of anything -- it is a standing edit to what CR 615.1's shields do.
+    --
+    -- WHICH damage is a Pawl.Types.DamagePattern, the same type CR 615.1's
+    -- shields and CR 614.1a's damage replacements are patterned by, because the
+    -- printed narrowings of this sentence narrow exactly what that type speaks:
+    -- Excruciator's "damage that would be dealt by this creature" is a SOURCE,
+    -- Frenzied Baloth's "combat damage" is a KIND, and Whippoorwill's "damage
+    -- that would be dealt to that creature" is a RECIPIENT. Spider-Punk's
+    -- sentence names none of the three and so carries the pattern that admits
+    -- everything, which Leyline of Punishment, Everlasting Torment and Sunspine
+    -- Lynx print too.
+    --
+    -- Pattern rather than an arm per printed clause, so this stays a
+    -- CLASSIFICATION: the engine asks the pattern whether it admits the event
+    -- and never asks which card wrote it.
+    --
+    -- Not implemented: Questing Beast's "combat damage that would be dealt by
+    -- CREATURES YOU CONTROL" narrows the source by a characteristic rather than
+    -- by identity, which is the same gap CR 615.1's shields have on that axis
+    -- (#588). Whippoorwill's recipient limb has no site to bake a recipient into
+    -- this pattern (#845). Banefire's "the damage can't be prevented" is a
+    -- different carrier again -- a self-referential clause of one resolution,
+    -- the shape Pawl.Types.Counterability takes (#844).
+    --
+    -- A DURATION is not carried, and needs nothing new: Skullcrack's
+    -- "damage can't be prevented this turn" is this same effect on the CR 611.2c
+    -- stored carrier (Pawl.Types.ActivePlayerEffect), whose expiry is the
+    -- duration, exactly as Silence's is.
+    --
+    -- WHOSE damage is not a question this arm's carrier answers, and it is the
+    -- one arm here of which that is true: CR 615.12's sentence is about a damage
+    -- EVENT, which may run between two creatures and involve no player at all,
+    -- so there is nobody for a PlayerScope to select. Spider-Punk's
+    -- possessive-free sentence accordingly writes PlayerScope.EachPlayer, and no
+    -- card may write another: Pawl.CardSpec lints the pool for a narrowed
+    -- carrier and rejects one, which is what makes
+    -- Pawl.Engine.PlayerEffect.unpreventable's board-wide fold exact rather than
+    -- approximate. The narrowing rides in the pattern above instead, where CR
+    -- 615.12's own subject is.
+    DamageCantBePrevented DamagePattern.DamagePattern
   deriving (Eq, Ord, Show)

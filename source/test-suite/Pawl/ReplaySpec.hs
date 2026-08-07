@@ -35,6 +35,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -173,6 +174,21 @@ combatReplaySpec s =
           let options = [EntryOption.MkEntryOption {EntryOption.power = 3, EntryOption.toughness = 3, EntryOption.keywords = Set.empty}]
               p = Prompt.ChooseEntryOption decider S.alice oid options
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 1)) (Just (1 :: Natural.Natural))
+        -- CR 702.136a: riot's "may", answered as a permanent enters. Its payload
+        -- has the same shape as CR 603.5's resolution-time "may", so the
+        -- transcript has to tell the two apart -- a shared Response constructor
+        -- would replay a declined riot into a declined printed "may". Both
+        -- decisions round-trip, because a codec that collapsed them would replay
+        -- a +1/+1 counter as haste.
+        Spec.it s "ChooseRiot records and replays an OptionalDecision, and rejects a resolution-time may" $ do
+          let p = Prompt.ChooseRiot decider S.alice oid
+          Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
+          Spec.assertEqWith s "a printed may is not an answer to it" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 702.136a: a transcript that runs short takes the half that puts no
+        -- counter on the board.
+        Spec.it s "defaultAnswer declines riot's counter" $
+          Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChooseRiot decider S.alice oid)) OptionalDecision.Declines
         -- CR 614.1c / 105.1: a colour chosen as a permanent enters. Every one of
         -- the five is round-tripped, because a codec that collapsed two of them
         -- would replay a Painter's Servant naming blue as one naming white --
@@ -248,13 +264,18 @@ combatReplaySpec s =
           let p = Prompt.Bottom decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8] 1
               answer = [ObjectId.MkObjectId 8]
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
-        Spec.it s "MulliganAction records and replays a Maybe ObjectId" $ do
-          let p = Prompt.MulliganAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
-              answer = Just (ObjectId.MkObjectId 8)
+        -- CR 103.5b: the two offers are the SAME card's first and second action,
+        -- so a transcript that recorded only the card would replay the wrong one.
+        Spec.it s "MulliganAction records and replays which action of which card" $ do
+          let first = (ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 0)
+              second = (ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 1)
+              p = Prompt.MulliganAction decider S.alice [first, second]
+              answer = Just second
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
-        Spec.it s "OpeningHandAction records and replays a Maybe ObjectId" $ do
-          let p = Prompt.OpeningHandAction decider S.alice [ObjectId.MkObjectId 7, ObjectId.MkObjectId 8]
-              answer = Just (ObjectId.MkObjectId 7)
+          Spec.assertEqWith s "and the same card's other action replays as itself" (Replay.decode p (Replay.encode p (Just first))) (Just (Just first))
+        Spec.it s "OpeningHandAction records and replays which action of which card" $ do
+          let p = Prompt.OpeningHandAction decider S.alice [(ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 0), (ObjectId.MkObjectId 8, HandActionIndex.MkHandActionIndex 0)]
+              answer = Just (ObjectId.MkObjectId 7, HandActionIndex.MkHandActionIndex 0)
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         -- CR 603.5: both answers to a printed "may", so the transcript is
         -- proved to distinguish them -- a codec that collapsed them would
@@ -582,6 +603,47 @@ combatReplaySpec s =
             "the coloured route round trips"
             (Replay.decode p (Replay.encode p HybridPayment.PaysTyped))
             (Just HybridPayment.PaysTyped)
+        -- CR 118.7e: which half of a hybrid REDUCTION its payer took decides how
+        -- much came off the cost, so it has to survive a transcript too.
+        Spec.it s "ChooseReductionHalf round-trips through the transcript" $ do
+          let p =
+                Prompt.ChooseReductionHalf
+                  decider
+                  S.alice
+                  oid
+                  (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black))
+                  (ManaSymbol.OfType (ManaType.Colored Color.Black) NonEmpty.:| [ManaSymbol.Generic 2])
+          Spec.assertEqWith
+            s
+            "the generic half round trips"
+            (Replay.decode p (Replay.encode p (ManaSymbol.Generic 2)))
+            (Just (ManaSymbol.Generic 2))
+          Spec.assertEqWith
+            s
+            "the coloured half round trips"
+            (Replay.decode p (Replay.encode p (ManaSymbol.OfType (ManaType.Colored Color.Black))))
+            (Just (ManaSymbol.OfType (ManaType.Colored Color.Black)))
+        -- Discriminating: fails if CR 118.7e's choice rides CR 601.2b's
+        -- announcement response rather than getting its own constructor, which
+        -- is the nearest miss -- both are a two-way question about a hybrid
+        -- symbol, asked of the same player about the same object.
+        Spec.it s "a hybrid announcement does not decode as a reduction half" $ do
+          let p =
+                Prompt.ChooseReductionHalf
+                  decider
+                  S.alice
+                  oid
+                  (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black))
+                  (ManaSymbol.OfType (ManaType.Colored Color.Black) NonEmpty.:| [ManaSymbol.Generic 2])
+              announcement =
+                Prompt.AnnounceHybridPayment
+                  decider
+                  S.alice
+                  oid
+                  (ManaType.Colored Color.Red)
+                  (HybridPayment.PaysTyped NonEmpty.:| [HybridPayment.PaysGeneric])
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Replay.encode announcement HybridPayment.PaysGeneric)) Nothing
+          Spec.assertEqWith s "nor the other way round" (Replay.decode announcement (Replay.encode p (ManaSymbol.Generic 2))) Nothing
         Spec.it s "a Phyrexian announcement does not decode as a hybrid one" $ do
           -- Discriminating: fails if AnnounceHybridPayment reuses another
           -- two-valued response rather than getting its own constructor -- and

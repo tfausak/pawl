@@ -1,6 +1,8 @@
 module Pawl.Types.TriggerCondition where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
@@ -240,4 +242,141 @@ data TriggerCondition
     -- its own first ability had nothing to do with; a card printing "prevented
     -- this way" is what must add the link (#687).
     DamageToPlayerPrevented PlayerRelation.PlayerRelation
+  | -- | CR 119.9: "whenever [a player] gains life" -- Ajani's Pridemate's. That
+    -- rule rewrites the printed sentence as "whenever a SOURCE causes [a player]
+    -- to gain life", which is why this is matched against GameEvent.LifeGained,
+    -- recorded only where a source caused the gain, rather than against any
+    -- upward movement of a life total. The PlayerRelation reads the gaining
+    -- player against CR 109.5's "you", the ability's controller (CR 603.3a).
+    --
+    -- PlayerDiscards' shape, not a Self- condition's: the bearer is a creature
+    -- watching its own controller's life total, and CR 119.9 says nothing about
+    -- which object the ability is on.
+    --
+    -- ONE fire per recorded event, which is where CR 702.15e's "simultaneous
+    -- lifelink sources cause separate life gain events" is honoured -- by
+    -- Pawl.Engine.Damage recording one event per damage event rather than by
+    -- anything here counting.
+    --
+    -- The amount is not part of the CONDITION -- CR 119.9 makes any gain greater
+    -- than 0 match, whatever its size -- but it is part of the EVENT, which is why
+    -- Pawl.Engine.Event.eventBindings binds it under
+    -- Pawl.Engine.Binding.eventAmount for Sanguine Bond's "that much" to read.
+    -- Ajani's Pridemate names no number and simply ignores the slot.
+    --
+    -- LOSING life is not the negative of this condition but a different event
+    -- entirely (GameEvent.LifeLost), so a card bearing this stays silent for a
+    -- loss, for prevented damage (CR 615.6 -- the life never left), and for a
+    -- gain by anyone the relation excludes. PlayerLosesLife below is that other
+    -- event's condition, and the two are read by different cards.
+    PlayerGainsLife PlayerRelation.PlayerRelation
+  | -- | "Whenever [a player] loses life" -- Exquisite Blood's. PlayerGainsLife
+    -- above is the mirror in shape, and matched against GameEvent.LifeLost; the
+    -- PlayerRelation reads the LOSING player against CR 109.5's "you", the
+    -- ability's controller (CR 603.3a). PlayerDiscards' shape, not a Self-
+    -- condition's: the bearer is an enchantment watching a life total that is
+    -- not its controller's.
+    --
+    -- No CR 119.9 for this direction. That rule rewrites "whenever [a player]
+    -- gains life" as "whenever a SOURCE causes [a player] to gain life" and says
+    -- a gain of 0 is no event, and the rules print no such sentence for loss --
+    -- so what this condition matches is settled by what the engine RECORDS as a
+    -- loss, and the recording sites are the citation. All three are life leaving
+    -- a player by a rule that says so:
+    --
+    --   * CR 119.3, an effect that causes a player to lose life
+    --     (Pawl.Engine.Resolve's LoseLife arm).
+    --   * CR 119.2 / 120.3a, damage dealt to a player by a source without
+    --     infect, which CAUSES that player to lose that much life
+    --     (Pawl.Engine.Damage).
+    --   * CR 119.4, life paid as a cost -- "in other words, the player loses
+    --     that much life" (Pawl.Engine.Mana.payLife).
+    --
+    -- Three life-total facts that are NOT this event, each for a rule's reason:
+    -- CR 120.3b's infect damage gives poison counters INSTEAD of the life loss;
+    -- CR 615.6's prevented damage never leaves the total (CR 615.13 is its own
+    -- trigger event); and CR 120.3c through 120.3e take a permanent's damage
+    -- somewhere no player's life total is.
+    --
+    -- CR 119.5's life-total SET would be a loss by that rule's own words --
+    -- "the player gains or loses the necessary amount of life" -- whenever the
+    -- new total is lower, but it has no producer in the pool and so records
+    -- nothing for this to match.
+    --
+    -- The zero case needs no check here. Every producer above guards its own
+    -- zero, so a GameEvent.LifeLost in the log is a loss of more than 0 by
+    -- construction; with no CR 119.9 to cite, that is an invariant of the
+    -- recording sites rather than a rule this condition restates.
+    --
+    -- ONE fire per recorded event, exactly as for PlayerGainsLife: a batch of
+    -- simultaneous damage records one loss per damage event, and nothing here
+    -- counts.
+    --
+    -- The amount is not part of the CONDITION -- any loss greater than 0 matches,
+    -- whatever its size -- but it is part of the EVENT (CR 603.2), which is why
+    -- Pawl.Engine.Event.eventBindings binds it under
+    -- Pawl.Engine.Binding.eventAmount for Exquisite Blood's "that much" to read.
+    --
+    -- The LOSING player is part of the same event, and gets a slot of their own
+    -- under Pawl.Engine.Binding.triggerPlayer -- the slot CR 701.9a's discard
+    -- condition already stamps -- for Mindcrank's "that player mills that many
+    -- cards" to read. Exquisite Blood's payload names only "you" and reads it
+    -- not at all, which is why the amount arrived one card earlier.
+    PlayerLosesLife PlayerRelation.PlayerRelation
+  | -- | CR 714.2b, generalized over the kind of counter: "when one or more [kind]
+    -- counters are put onto this permanent, if the number of [kind] counters on it
+    -- was less than N and became at least N". A THRESHOLD CROSSING, matched
+    -- against a GameEvent.CountersPut whose before/after pair straddles N.
+    --
+    -- Bearer-scoped, like SelfEnters: the event names an object and the match is a
+    -- comparison of ids.
+    --
+    -- The WHOLE sentence, intervening "if" included, rather than the event half
+    -- here and the "if" half in TriggeredAbility.intervening. Both of that
+    -- clause's conjuncts describe the counter-placement event -- what the number
+    -- WAS and what it BECAME -- and neither is a fact about the board that CR
+    -- 603.4's second check could find changed at resolution. Splitting them would
+    -- put half a sentence into a Condition that cannot express it anyway:
+    -- Pawl.Types.Condition is one measured-comparison-threshold triple, and "was
+    -- less than N and became at least N" is a conjunction of two.
+    --
+    -- The consequence is that a chapter ability already on the stack still
+    -- resolves after its Saga's lore counters are removed, which is the rule: CR
+    -- 704.5s's "isn't the source of a chapter ability that has triggered but not
+    -- yet left the stack" exists precisely because such an ability is expected to
+    -- be waiting there, and a clause that a removal could falsify would make that
+    -- exemption unreachable.
+    --
+    -- The Natural is N, the chapter number. CR 714.2c's "{rN1}, {rN2}--[Effect]"
+    -- is two abilities sharing one effect, and that is how a card writes it: two
+    -- entries in triggeredAbilities with the same modal and different N. The rule
+    -- says the shorthand MEANS that, so nothing here has to represent it.
+    --
+    -- Not restricted to Sagas, and not restricted to lore counters. CR 714.1 puts
+    -- chapter symbols on Sagas, but the shape is the counter kind's rather than the
+    -- subtype's, and Pawl.Engine.Saga is where the Saga-only rules (CR 714.2d's
+    -- final chapter number, CR 714.3c's turn-based action, CR 704.5s's state-based
+    -- action) read the subtype.
+    SelfCountersReached CounterKind.CounterKind Natural.Natural
+  | -- | CR 310.11b, generalized over the kind of counter: "when the LAST [kind]
+    -- counter is removed from this permanent". SelfCountersReached's mirror,
+    -- matched against a GameEvent.CountersRemoved whose before/after pair went from
+    -- one or more to none.
+    --
+    -- Bearer-scoped, like SelfCountersReached: the event names an object and the
+    -- match is a comparison of ids.
+    --
+    -- "The last counter is removed" is a fact about the EVENT and not about the
+    -- board, which is why the whole sentence lives here rather than half of it in
+    -- TriggeredAbility.intervening -- SelfCountersReached's Haddock argues the same
+    -- point at length. A permanent whose counters were removed and then replaced
+    -- before the ability resolved still had its last counter removed.
+    --
+    -- Takes no threshold, because rule 310.11b states none: "the last" is
+    -- after == 0, and a rule wanting "the last N" would be a different clause.
+    --
+    -- Not restricted to battles and not restricted to defense counters, for
+    -- SelfCountersReached's reason: the shape is the counter kind's, and
+    -- Pawl.Engine.Battle is where rule 310's battle-only reading lives.
+    SelfLastCounterRemoved CounterKind.CounterKind
   deriving (Eq, Ord, Show)

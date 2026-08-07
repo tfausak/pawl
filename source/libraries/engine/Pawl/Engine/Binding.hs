@@ -97,9 +97,9 @@ you = SlotName.MkSlotName (Text.pack "you")
 -- how this stays readable at resolution. `you`'s "no card's targetSpecs may
 -- name it" rule applies here too, under the same sweep. That an effect reading
 -- this slot sits under a condition that binds it is enforced by
--- Pawl.Engine.Event.eventBindingSlots: only CR 510.1b's
--- combat-damage-to-a-player condition stamps it, so reading it under any other
--- is a failing test.
+-- Pawl.Engine.Event.eventBindingSlots: only the combat-damage-to-a-player, the
+-- CR 701.9a discard and the CR 119.3 life-loss conditions stamp it, so reading it
+-- under any other is a failing test.
 triggerPlayer :: SlotName
 triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 
@@ -130,6 +130,14 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 -- rebinding the source to the arrival redirects every viewWithLastKnown
 -- quantity read onto the graveyard card's printed characteristics.
 --
+-- A SECOND writer, and the same notion of "it" from the other side: an ability
+-- whose own effect performs the move binds the arrival here too, through
+-- Effect.MoveToZone's CR 400.7 slot. Rule 310.11b's "exile it, then you may cast
+-- it" is that shape (Pawl.Engine.Battle.siegeDefeat), and the two writers cannot
+-- collide -- eventBindings stamps this slot only for the zone-change conditions
+-- listed in Event.eventBindingSlots, and a counter-removal condition is not one.
+-- No CARD may bind it, which Pawl.CardSpec's reservedBindings sweep enforces.
+--
 -- Stamped by Pawl.Engine.Event.eventBindings alongside `triggerPlayer`, and not
 -- a target -- same CR 608.2b posture as that slot, including the "no card's
 -- targetSpecs may name it" sweep and the eventBindingSlots check on reads. A
@@ -140,12 +148,27 @@ triggerPlayer = SlotName.MkSlotName (Text.pack "thatPlayer")
 became :: SlotName
 became = SlotName.MkSlotName (Text.pack "became")
 
--- CR 615.13: the reserved slot under which a prevention trigger's AMOUNT is
--- bound -- "put that many +1/+1 counters" on Selfless Squire, "you gain that much
--- life" on the same family's other cards. Stamped by
+-- CR 603.2: the reserved slot under which the AMOUNT an event trigger's event
+-- names is bound -- the printed words "that much". Stamped by
 -- Pawl.Engine.Event.eventBindings as the trigger is gathered, so the payload
--- reads an ordinary Quantity.InSlot rather than a "how much was prevented"
--- opcode.
+-- reads an ordinary Quantity.InSlot rather than a "how much was prevented" or
+-- "how much was gained" opcode.
+--
+-- ONE slot for every event that supplies a number, the way `became` is one slot
+-- for both directions of a zone change, and for the same reason: the printed word
+-- is the same word, and which rule produced the number is a fact about the
+-- CONDITION rather than about the slot. Three conditions stamp it today:
+--
+--   * CR 615.13's prevention -- "put that many +1/+1 counters" on Selfless
+--     Squire, "you gain that much life" on the same family's other cards.
+--   * CR 119.9's life gain -- Sanguine Bond's "target opponent loses that much
+--     life".
+--   * Its mirror, a player losing life -- Exquisite Blood's "you gain that much
+--     life".
+--
+-- No ability bears two conditions, so they can never collide on one object, and
+-- Pawl.Engine.Event.eventBindingSlots is what tells the card lint which of them
+-- makes the slot available.
 --
 -- A NUMBER, where triggerPlayer and became are references, so this is the first
 -- reserved slot read through Quantity rather than through a Ref. That is why
@@ -156,18 +179,20 @@ became = SlotName.MkSlotName (Text.pack "became")
 --
 -- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
 -- "no card's targetSpecs may name it" sweep as `you`, `thatPlayer` and `became`.
--- Not swept: the SlotName an effect BINDS into (Destroy's count, MoveToZone's
--- incarnation), so a card naming this one there would shadow the event's amount
--- on the source, which InSlot reads first (#691).
-preventedAmount :: SlotName
-preventedAmount = SlotName.MkSlotName (Text.pack "thatMuch")
+-- Swept on the BINDING side too, which matters here more than for any of those
+-- three: a card naming this one in an effect's bound SlotName -- Destroy's
+-- count, MoveToZone's incarnation -- would write it to the source, which
+-- evaluateFor's InSlot arm reads FIRST, shadowing the event's amount with the
+-- card's own. Pawl.CardSpec's reservedBindings is that sweep.
+eventAmount :: SlotName
+eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 
 -- CR 614.1c: the reserved slot under which an as-enters sacrifice records HOW
 -- MANY permanents were sacrificed -- Wood Elemental's "the number of Forests
 -- sacrificed as it entered". Stamped by Pawl.Engine.Event's
 -- EntryRewrite.SacrificeAnyNumber arm on the entering permanent itself, so the
 -- card reads an ordinary Quantity.InSlot rather than a "how many did I eat"
--- opcode. Second of preventedAmount's kind, and read the same way.
+-- opcode. Second of eventAmount's kind, and read the same way.
 --
 -- Stamped on the PERMANENT and not on the spell that made it: CR 400.7 mints a
 -- new object on every zone change, so the count belongs to the incarnation that
@@ -182,7 +207,7 @@ preventedAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 -- coincides.
 --
 -- Not a target, so the same CR 608.2b posture and the same "no card's
--- targetSpecs may name it" sweep as preventedAmount.
+-- targetSpecs may name it" sweep as eventAmount.
 sacrificedCount :: SlotName
 sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 
@@ -231,9 +256,9 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
 
--- Bind a number under the reserved preventedAmount slot (CR 615.13).
-setPreventedAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding
-setPreventedAmount n = Map.insert preventedAmount (toAmount n)
+-- Bind a number under the reserved eventAmount slot (CR 603.2).
+setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding
+setEventAmount n = Map.insert eventAmount (toAmount n)
 
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).

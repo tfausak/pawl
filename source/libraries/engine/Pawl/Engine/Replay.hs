@@ -62,9 +62,11 @@ encode p answer = case p of
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
+  Prompt.ChooseRiot {} -> Response.ChoseRiot answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
   Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
+  Prompt.ChooseProtector {} -> Response.ChoseProtector answer
   Prompt.ChooseBasicLandType {} -> Response.ChoseBasicLandType answer
   Prompt.OrderTriggers {} -> Response.OrderedTriggers answer
   Prompt.OrderDamage {} -> Response.OrderedDamage answer
@@ -79,9 +81,11 @@ encode p answer = case p of
   Prompt.MulliganAction {} -> Response.TookMulliganAction answer
   Prompt.OpeningHandAction {} -> Response.TookOpeningHandAction answer
   Prompt.ChooseOptional {} -> Response.ChoseOptional answer
+  Prompt.OfferedCast {} -> Response.ChoseOfferedCast answer
   Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
   Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
+  Prompt.ChooseReductionHalf {} -> Response.ChoseReductionHalf answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
 -- prompt the engine is actually asking (a stale or foreign transcript).
@@ -165,6 +169,9 @@ decode p response = case p of
   Prompt.ChooseEntryOption {} -> case response of
     Response.ChoseEntryOption n -> Just n
     _ -> Nothing
+  Prompt.ChooseRiot {} -> case response of
+    Response.ChoseRiot d -> Just d
+    _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
     _ -> Nothing
@@ -173,6 +180,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseOpponent {} -> case response of
     Response.ChoseOpponent pid -> Just pid
+    _ -> Nothing
+  Prompt.ChooseProtector {} -> case response of
+    Response.ChoseProtector pid -> Just pid
     _ -> Nothing
   Prompt.ChooseBasicLandType {} -> case response of
     Response.ChoseBasicLandType t -> Just t
@@ -216,6 +226,9 @@ decode p response = case p of
   Prompt.ChooseOptional {} -> case response of
     Response.ChoseOptional decision -> Just decision
     _ -> Nothing
+  Prompt.OfferedCast {} -> case response of
+    Response.ChoseOfferedCast decision -> Just decision
+    _ -> Nothing
   Prompt.ChooseToPay {} -> case response of
     Response.ChoseToPay decision -> Just decision
     _ -> Nothing
@@ -224,6 +237,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.AnnounceHybridPayment {} -> case response of
     Response.AnnouncedHybridPayment way -> Just way
+    _ -> Nothing
+  Prompt.ChooseReductionHalf {} -> case response of
+    Response.ChoseReductionHalf half -> Just half
     _ -> Nothing
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
@@ -289,6 +305,7 @@ defaultAnswer p = case p of
         isCreatureRecipient r = case r of
           Recipient.ToCreature _ -> True
           Recipient.ToPlaneswalker _ -> False
+          Recipient.ToBattle _ -> False
           Recipient.ToPlayer _ -> False
           Recipient.ToObject _ -> False
      in case blockers of
@@ -317,6 +334,12 @@ defaultAnswer p = case p of
   Prompt.ChooseCopyTarget {} -> Nothing
   -- CR 208.2b: asked only when the list has two or more shapes.
   Prompt.ChooseEntryOption {} -> 0
+  -- CR 702.136a: riot's "may" is a real fork, so there is no answer that changes
+  -- nothing. Declining is what the rule itself treats as the default branch --
+  -- "if you don't, it gains haste" -- and it is the half that puts no counter on
+  -- the board, which keeps a short transcript from conjuring a bigger creature
+  -- than the game had.
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
   -- THE ONE ILLEGAL ANSWER, deliberately. CR 201.4 offers every card in the
@@ -330,6 +353,9 @@ defaultAnswer p = case p of
   -- Every candidate is an opponent the card's own text offered, and the prompt
   -- is raised only when there are two or more.
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  -- CR 310.8a: the head of Battle.protectorCandidates, the same filter-not-trust
+  -- fallback Battle.designateProtector applies to a wrong answer.
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   -- CR 305.6: any of the five basic land types is legal. Mountain is what the
   -- ChooseLandTypeSwap arm above falls back to, so the two agree on which type
   -- a short transcript conjures.
@@ -366,6 +392,9 @@ defaultAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a "may" is always legal and changes nothing.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is always legal, and it leaves the card
+  -- exactly where the resolving effect put it.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is always legal, and it
   -- spends nothing -- which keeps a short transcript from tapping a payer's board.
   Prompt.ChooseToPay {} -> PaymentDecision.Declines
@@ -375,6 +404,10 @@ defaultAnswer p = case p of
   -- CR 118.13a again, for CR 107.4e's monocolored hybrid: every offered route is
   -- payable, and the prompt is raised only where two are.
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers, so the first offered one is as
+  -- deterministic a default as any -- and unlike the announcements above it can
+  -- never make a cost unpayable, since CR 601.2f floors a reduction at {0}.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: entwine is a "may", so declining is always legal. It also costs
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.

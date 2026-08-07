@@ -9,7 +9,12 @@
 -- outside the CR 613 layer system entirely.
 --
 -- The seven gate cards: Rule of Law, Thalia Guardian of Thraben, Sapphire
--- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Humility,
+-- Medallion, Edgewalker, Reliquary Tower, Silence and Null Chamber. Four more --
+-- Synthetic Phyrexian Discount, Synthetic Snow Discount, Synthetic Monocolored
+-- Hybrid Discount and Synthetic Hybrid Discount -- are the file's SYNTHETIC
+-- cards, one per reduction CR 118.7e-g describes and no card prints. Khabál
+-- Ghoul, Withered Wretch and Sol Ring are the costs the last two are aimed at.
+-- Humility,
 -- Opalescence and Titania's Song join them for CR 604.2's "and has the ability"
 -- -- the one place this axis does meet the CR 613 layer system.
 --
@@ -20,15 +25,28 @@
 -- Null Chamber also brings CR 201.4's card-name choice and CR 614.1c's entry
 -- replacement in with it, so the group covers Pawl.Engine.Replacement's
 -- EntryRewrite.ChooseCardNames arm and Pawl.Engine.Action.playableLands as well.
+--
+-- Artificial Evolution and Magical Hack join Edgewalker for CR 612.1, the second
+-- rule reaching this axis from outside it: the word naming which spells a player
+-- static ability discounts is printed text like any other, so a text change moves
+-- the discount off it.
+--
+-- Spider-Punk brings CR 701.6a onto the axis, with Cancel and Stifle as the two
+-- counterers it has to stop -- the one place this file reaches
+-- Pawl.Engine.Event's countering funnel. Prowling Serpopard is its NARROWED
+-- counterpart, and the pair is the point: one board, one Cancel, and the filter
+-- alone deciding whether the victim spell survives.
 module Pawl.PlayerEffectSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
@@ -36,6 +54,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
+import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
 -- the evaluator Pawl.Engine.Filter already claims the alias Filter.
 
@@ -45,14 +64,20 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.BeginningStep as BeginningStep
+-- Aliased Card.Type, per the project-wide convention (CardSpec): the logic
+-- module Pawl.Engine.Card may later be imported and must not collide.
+import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -62,13 +87,16 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerEffect as PlayerEffect.Type
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
 
@@ -221,7 +249,7 @@ ruleOfLawSpec s registry =
 isCast :: Action.Type.Action -> Bool
 isCast action = case action of
   Action.Type.Cast {} -> True
-  Action.Type.Play _ -> False
+  Action.Type.Play {} -> False
   Action.Type.Activate _ _ -> False
   Action.Type.Pass -> False
 
@@ -238,6 +266,14 @@ white = ManaSymbol.OfType (ManaType.Colored Color.White)
 
 black :: ManaSymbol.ManaSymbol
 black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+
+green :: ManaSymbol.ManaSymbol
+green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+
+-- CR 107.4f's {G/P}. A Color rather than a ManaType, since every Phyrexian
+-- symbol is coloured.
+phyrexianGreen :: ManaSymbol.ManaSymbol
+phyrexianGreen = ManaSymbol.Phyrexian Color.Green
 
 -- A reduction by an amount of GENERIC mana (CR 118.7a) -- the Medallion's shape,
 -- and the only shape a reduction had before Edgewalker.
@@ -339,6 +375,108 @@ adjustmentSpec s =
         "{1}{W}{B} reduced by {W}{B} twice is {1}"
         (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white, black], ManaCost.MkManaCost [white, black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
         (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+
+    -- CR 118.7f, in the small: the two SIDES of the cancellation read a
+    -- Phyrexian symbol differently. A reduction written {G/P} names green, and
+    -- a cost written {G/P} names nothing yet -- so the same pair of symbols
+    -- cancels in one direction and not the other. The board-level group below
+    -- is what proves each half against a card.
+    Spec.it s "CR 118.7f a Phyrexian reduction takes one mana of its colour" $
+      Spec.assertEqWith
+        s
+        "{1}{G} reduced by {G/P} is {1}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [phyrexianGreen]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1])
+
+    Spec.it s "a Phyrexian symbol in the COST is not what a reduction of its colour takes" $
+      Spec.assertEqWith
+        s
+        "{G/P} reduced by {G} is still {G/P}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [green]]) (ManaCost.MkManaCost [phyrexianGreen]))
+        (ManaCost.MkManaCost [phyrexianGreen])
+
+    -- CR 118.7e, in the small: WHICH TWO THINGS the payer is choosing between.
+    -- "If a colored or colorless half is chosen, the cost is reduced by one mana
+    -- of that type. If a generic half is chosen, the cost is reduced by an
+    -- amount of generic mana equal to that half's number" -- so a colour/colour
+    -- symbol offers two OfTypes and a monocolored one offers an OfType against
+    -- CR 107.4e's {2}. Cost.announceReductions puts exactly this list on the
+    -- wire, and the board-level groups below prove each half against a card.
+    Spec.it s "CR 118.7e a hybrid reduction offers its two halves" $ do
+      Spec.assertEqWith
+        s
+        "{W/U} offers {W} and {U}"
+        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.Blue)))
+        (Just [white, blue])
+      Spec.assertEqWith
+        s
+        "{2/B} offers {B} and {2}"
+        (Cost.reductionHalvesOf (ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Black)))
+        (Just [black, ManaSymbol.Generic 2])
+
+    -- The symbols CR 118.7e does NOT reach, and each for its own reason: a
+    -- printed amount of generic mana and a plain coloured symbol have one half
+    -- to begin with, CR 118.7f gives a Phyrexian reduction its colour outright,
+    -- and CR 118.7g makes an {S} reduction generic mana. A Just here would put a
+    -- prompt in front of a player with nothing to decide.
+    Spec.it s "a symbol with no halves is not asked about" $ do
+      Spec.assertEqWith s "{1}" (Cost.reductionHalvesOf (ManaSymbol.Generic 1)) Nothing
+      Spec.assertEqWith s "{G}" (Cost.reductionHalvesOf green) Nothing
+      Spec.assertEqWith s "{G/P}" (Cost.reductionHalvesOf phyrexianGreen) Nothing
+      Spec.assertEqWith s "{S}" (Cost.reductionHalvesOf ManaSymbol.Snow) Nothing
+
+    -- Pawl.Types.ManaSymbol calls `Hybrid t t` degenerate rather than illegal,
+    -- and no card prints one. Both halves are the same symbol, so there is
+    -- nothing to observe about the answer and CR 118.7e's prompt is elided --
+    -- the one elision this rule permits.
+    Spec.it s "a hybrid of one type offers one half, not the same one twice" $
+      Spec.assertEqWith
+        s
+        "{W/W} offers {W}"
+        (Cost.reductionHalvesOf (ManaSymbol.Hybrid (ManaType.Colored Color.White) (ManaType.Colored Color.White)))
+        (Just [white])
+
+    -- Both halves of a colour/colour hybrid really do bite a cost that prints
+    -- both colours, which the board groups below cannot show: their cost prints
+    -- one of the two, deliberately, so that the count tells the answers apart.
+    -- These are the symbols announceReductions leaves behind, cancelled by
+    -- applyAdjustments' ordinary typed path.
+    Spec.it s "CR 118.7e either half of a {W/B} takes its own symbol" $ do
+      Spec.assertEqWith
+        s
+        "{1}{W}{B} reduced by the white half is {1}{B}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [white]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1, black])
+      Spec.assertEqWith
+        s
+        "{1}{W}{B} reduced by the black half is {1}{W}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [black]]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1, white])
+
+    -- CR 118.7g, in the small, and the other arm where the two sides part
+    -- company. A reduction written {S} is an amount of GENERIC mana, so it
+    -- comes off the generic component exactly as a {1} would.
+    Spec.it s "CR 118.7g an {S} reduction takes that much generic mana" $
+      Spec.assertEqWith
+        s
+        "{2}{U} reduced by {S} is {1}{U}"
+        (Cost.applyAdjustments ([], [ManaCost.MkManaCost [ManaSymbol.Snow]]) (ManaCost.MkManaCost [ManaSymbol.Generic 2, blue]))
+        (ManaCost.MkManaCost [ManaSymbol.Generic 1, blue])
+
+    -- CR 107.4h's half of the same split: "Effects that reduce the amount of
+    -- generic mana you pay don't affect {S} costs." So an {S} in a COST is no
+    -- part of the generic component a reduction comes off -- were it counted
+    -- there, the {1} below would survive the reduction and re-emit as generic.
+    -- {1}{S} is Adarkar Windform's activation cost, not a printed mana cost:
+    -- Magic's three {S} mana costs are Arcum's Astrolabe's {S}, Icehide Golem's
+    -- {S} and Wowzer, the Aspirational's {C}{W}{U}{B}{R}{G}{S}, and none of them
+    -- carries the generic component that makes the two readings differ.
+    Spec.it s "CR 107.4h a generic reduction does not affect an {S} in the cost" $
+      Spec.assertEqWith
+        s
+        "{1}{S} reduced by {1} is {S}"
+        (Cost.applyAdjustments ([], [generic 1]) (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.Snow]))
+        (ManaCost.MkManaCost [ManaSymbol.Snow])
 
     -- The two halves of ONE reduction, on the two halves of one cost: CR
     -- 118.7a routes the {1} to the generic component and the {U} takes the
@@ -466,8 +604,7 @@ thaliaSpec s registry =
       thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
       panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
-      let green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-          base = S.landsInPlay forest 7
+      let base = S.landsInPlay forest 7
           (_, withThalia) = S.addCreature thalia S.alice base
           (wurm, withWurm) = S.addLibraryCard panglacialWurm S.alice withThalia
           (rol, gs) = S.addHandCard ruleOfLaw S.alice withWurm
@@ -484,7 +621,7 @@ thaliaSpec s registry =
       Spec.assertEqWith
         s
         "exactly seven Forests still afford it, so castableWhileSearching offers it"
-        (Cast.castableWhileSearching S.alice gs)
+        (fmap fst (Cast.castableWhileSearching S.alice gs))
         [wurm]
 
 -- alice controls a Sapphire Medallion and `n` untapped Islands; her hand
@@ -910,6 +1047,565 @@ edgewalkerSpec s registry =
         (totalManaCost S.bob bobEdgewalker (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) withBob)
         (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
 
+-- alice controls `copies` Synthetic Phyrexian Discounts and `n` untapped
+-- Forests; her hand holds one Longtusk Cub ({1}{G} green Cat) and one Mutagenic
+-- Growth ({G/P} green instant). Loaded fresh inside each case that needs it --
+-- equivalent because loading is deterministic and cached (batch-recipe.md).
+phyrexianDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+phyrexianDiscountBoard forest discount cub growth copies n =
+  let base = S.landsInPlay forest n
+      put g _ = snd (S.addCreature discount S.alice g)
+      withCopies = List.foldl' put base [1 .. copies]
+      (cubId, gs1) = S.addHandCard cub S.alice withCopies
+      (growthId, gs2) = S.addHandCard growth S.alice gs1
+   in ( cubId,
+        growthId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Synthetic Phyrexian Discount {2} Artifact: "Green spells you cast cost {G/P}
+-- less to cast."
+--
+-- SYNTHETIC, and the only synthetic in this file. CR 118.7f exists to say what
+-- a reduction written with a Phyrexian mana symbol does, so nothing in the
+-- rules forbids the printing -- the pool merely lacks one. All 41 cards whose
+-- oracle text carries a Phyrexian symbol (Scryfall, 2026-08-05) spend it in a
+-- COST, never as the amount of a reduction, and none of the 539 cards saying
+-- "less to cast" names one.
+--
+-- Green because Mutagenic Growth's {G/P} is the pool's one Phyrexian COST, and
+-- the third case below aims this reduction straight at it: the two sides of the
+-- cancellation read the same symbol differently, and matching the colours is
+-- what makes that visible rather than merely stipulated.
+phyrexianDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianDiscountSpec s registry =
+  Spec.describe s "SyntheticPhyrexianDiscount" $ do
+    -- THE HEADLINE FALSIFIER, and it separates all three readings of the
+    -- reduction at once. CR 118.7f takes "one mana of that symbol's color", so
+    -- {1}{G} loses its {G} and keeps its {1}. Reading the symbol as generic
+    -- would leave {G}; reading it as no type at all -- what the arm did before
+    -- -- would leave {1}{G} untouched.
+    Spec.it s "CR 118.7f a reduction written {G/P} takes one green mana off the cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (cubId, _, gs) = phyrexianDiscountBoard forest discount cub growth 1 2
+      Spec.assertEqWith
+        s
+        "{1}{G} becomes {1}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+
+    -- The control the case above needs: without the artifact the same spell is
+    -- full price, so the {G} really did leave because of the reduction.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (cubId, _, gs) = phyrexianDiscountBoard forest discount cub growth 0 2
+      Spec.assertEqWith
+        s
+        "{1}{G} stays {1}{G}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+
+    -- THE OTHER SIDE of the same symbol, and the reason CR 118.7f is a rule
+    -- about REDUCTIONS only. Mutagenic Growth's printed {G/P} is a symbol its
+    -- controller has not yet announced a route for (CR 601.2b precedes CR
+    -- 601.2f), so there is no green mana in the cost for a green reduction to
+    -- cancel -- Edgewalker's ruling read this way round, "if you choose to pay
+    -- such a cost with {W} or {B}, Edgewalker can reduce that part of the
+    -- cost". The reduction here is spent by nothing and dropped (#309).
+    --
+    -- Not hostage to that gap: CR 118.7b would instead turn the unspent green
+    -- into one GENERIC mana, and this cost has no generic component for CR
+    -- 118.7a to take it off, so {G/P} is the answer under either reading.
+    Spec.it s "an unannounced Phyrexian symbol in the COST offers nothing to cancel" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (_, growthId, gs) = phyrexianDiscountBoard forest discount cub growth 1 2
+      Spec.assertEqWith
+        s
+        "{G/P} stays {G/P}"
+        (totalManaCost S.alice growthId (ManaCost.MkManaCost [phyrexianGreen]) gs)
+        (Just (ManaCost.MkManaCost [phyrexianGreen]))
+
+    -- NO colour-criterion case here, deliberately. A non-green spell prints no
+    -- {G} either, so a {G/P} reduction would take nothing from it whatever the
+    -- Filter said -- the assertion would pass for the wrong reason, and it did
+    -- under mutation. Pawl.Engine.Filter's colour atom is proved by the
+    -- SapphireMedallion group instead, and the mutation that DOES discriminate
+    -- here (this card's HasColor Green flipped to Red) breaks the three cases
+    -- that assert a discount.
+
+    -- BOTH cost sites, one scenario, exactly as the Edgewalker group tests
+    -- them. One Forest is the amount that tells {1} apart from {1}{G}.
+    Spec.it s "CR 601.2f castability is measured against the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (discounted, _, withDiscount) = phyrexianDiscountBoard forest discount cub growth 1 1
+          (undiscounted, _, bare) = phyrexianDiscountBoard forest discount cub growth 0 1
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "one Forest cannot pay a printed {1}{G}"
+      Spec.assertBool s (S.castable S.alice discounted withDiscount) "but it can pay the discounted {1}"
+
+    Spec.it s "CR 601.2f payment spends the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Phyrexian Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      growth <- S.printingOf s registry "Mutagenic Growth"
+      let (cubId, _, gs) = phyrexianDiscountBoard forest discount cub growth 1 2
+          paid = S.runPure S.identityAnswer gs (S.cast S.alice cubId)
+      Spec.assertEqWith s "one Forest tapped, not two" (S.tappedCount S.alice paid) 1
+
+-- alice controls `copies` Synthetic Snow Discounts and `n` untapped Forests; her
+-- hand holds one Longtusk Cub ({1}{G} green Cat) and one Goblin Piker ({1}{R}
+-- red Goblin). Loaded fresh inside each case that needs it -- equivalent because
+-- loading is deterministic and cached (batch-recipe.md).
+snowDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+snowDiscountBoard forest discount cub piker copies n =
+  let base = S.landsInPlay forest n
+      put g _ = snd (S.addCreature discount S.alice g)
+      withCopies = List.foldl' put base [1 .. copies]
+      (cubId, gs1) = S.addHandCard cub S.alice withCopies
+      (pikerId, gs2) = S.addHandCard piker S.alice gs1
+   in ( cubId,
+        pikerId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Synthetic Snow Discount {2} Artifact: "Green spells you cast cost {S} less to
+-- cast."
+--
+-- SYNTHETIC, and the file's second. CR 118.7g exists to say what a reduction
+-- written with snow mana symbols does, so nothing in the rules forbids the
+-- printing -- the pool merely lacks one. All 46 cards whose oracle text carries
+-- an {S} (Scryfall, 2026-08-05, digital-only printings included) spend it in a
+-- cost or measure how much of it was spent, never as the amount of a reduction,
+-- and no card's text contains "{S} less".
+--
+-- The criterion is green, and which criterion it is does not matter to CR
+-- 118.7g: what the rule turns the {S} into is GENERIC mana, which is no more
+-- particular about the spell than about the cost. What DOES matter is the spell
+-- the reduction is aimed at, and green puts Longtusk Cub's {1}{G} in hand -- a
+-- cost with a generic component, where 0-vs-1 is directly visible. Aim the same
+-- reduction at a cost without one and both readings agree, which is the trap
+-- this group's cases are shaped to avoid.
+snowDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+snowDiscountSpec s registry =
+  Spec.describe s "SyntheticSnowDiscount" $ do
+    -- THE HEADLINE FALSIFIER. CR 118.7g reduces the cost by one GENERIC mana,
+    -- so {1}{G} loses its {1} and keeps its {G}. Reading the {S} as nothing at
+    -- all -- what the arm did before -- leaves {1}{G} untouched, and reading it
+    -- as a typed symbol would have to name a type CR 107.4h says it has not
+    -- got.
+    Spec.it s "CR 118.7g a reduction written {S} takes one generic mana off the cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (cubId, _, gs) = snowDiscountBoard forest discount cub piker 1 2
+      Spec.assertEqWith
+        s
+        "{1}{G} becomes {G}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [green]))
+
+    -- The control the case above needs: without the artifact the same spell is
+    -- full price, so the {1} really did leave because of the reduction.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (cubId, _, gs) = snowDiscountBoard forest discount cub piker 0 2
+      Spec.assertEqWith
+        s
+        "{1}{G} stays {1}{G}"
+        (totalManaCost S.alice cubId (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, green]))
+
+    -- The colour criterion, and unlike the Phyrexian group's it DISCRIMINATES:
+    -- a generic reduction does not care what the cost prints, so {1}{R} would
+    -- lose its {1} just as {1}{G} does if the Filter let the reduction reach
+    -- it. Flipping this card's HasColor Green to Red breaks this case and the
+    -- headline both.
+    Spec.it s "a red spell fails the effect's criterion, so its generic component survives" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (_, pikerId, gs) = snowDiscountBoard forest discount cub piker 1 2
+      Spec.assertEqWith
+        s
+        "{1}{R} stays {1}{R}"
+        (totalManaCost S.alice pikerId (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]) gs)
+        (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, red]))
+
+    -- BOTH cost sites, one scenario, exactly as the Edgewalker and Phyrexian
+    -- groups test them. One Forest is the amount that tells {G} apart from
+    -- {1}{G}.
+    Spec.it s "CR 601.2f castability is measured against the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (discounted, _, withDiscount) = snowDiscountBoard forest discount cub piker 1 1
+          (undiscounted, _, bare) = snowDiscountBoard forest discount cub piker 0 1
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "one Forest cannot pay a printed {1}{G}"
+      Spec.assertBool s (S.castable S.alice discounted withDiscount) "but it can pay the discounted {G}"
+
+    Spec.it s "CR 601.2f payment spends the total cost" $ do
+      forest <- S.printingOf s registry "Forest"
+      discount <- S.printingOf s registry "Synthetic Snow Discount"
+      cub <- S.printingOf s registry "Longtusk Cub"
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (cubId, _, gs) = snowDiscountBoard forest discount cub piker 1 2
+          paid = S.runPure S.identityAnswer gs (S.cast S.alice cubId)
+      Spec.assertEqWith s "one Forest tapped, not two" (S.tappedCount S.alice paid) 1
+
+-- Answers CR 118.7e's Prompt.ChooseReductionHalf with `half` whenever it is on
+-- offer, and defers everything else to S.identityAnswer -- the `announces` shape
+-- Pawl.ManaSpec uses for CR 118.13a's announcements.
+--
+-- The "whenever it is on offer" is what makes the pairs below discriminating: an
+-- interpreter that named a half the symbol does not have would silently get the
+-- first one instead, and the two cases would stop disagreeing.
+takesHalf :: ManaSymbol.ManaSymbol -> Prompt.Prompt r -> r
+takesHalf half p = case p of
+  Prompt.ChooseReductionHalf _ _ _ _ offers ->
+    if elem half offers then half else NonEmpty.head offers
+  _ -> S.identityAnswer p
+
+-- alice controls `copies` reducers and `n` untapped Swamps; her hand holds one
+-- `spell` and one Sol Ring ({1} colourless Artifact). Shared by the two
+-- hybrid-reduction groups below, which differ in which hybrid symbol their
+-- reducer is written with and in which black spell that symbol is aimed at.
+-- Loaded fresh inside each case that needs it -- equivalent because loading is
+-- deterministic and cached (batch-recipe.md).
+hybridDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+hybridDiscountBoard swamp discount spell solRing copies n =
+  let base = S.landsInPlay swamp n
+      put g _ = snd (S.addCreature discount S.alice g)
+      withCopies = List.foldl' put base [1 .. copies]
+      (spellId, gs1) = S.addHandCard spell S.alice withCopies
+      (ringId, gs2) = S.addHandCard solRing S.alice gs1
+   in ( spellId,
+        ringId,
+        gs2
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Synthetic Monocolored Hybrid Discount {2} Artifact: "Black spells you cast
+-- cost {2/B} less to cast."
+--
+-- SYNTHETIC, and the file's third. CR 118.7e exists to say what a reduction
+-- written with a hybrid mana symbol does, so nothing in the rules forbids the
+-- printing -- the pool merely lacks one. Of the 38,542 cards in Scryfall's
+-- Oracle Cards bulk (2026-08-06, which carries un-set, playtest and digital-only
+-- printings), not one states a reduction whose amount contains a hybrid symbol;
+-- the three whose text puts a hybrid symbol in the same sentence as "less"
+-- (Fiend Artisan, Eagle's Rescue, Reaping Willow) all spend it in an activation
+-- cost beside a "mana value N or less".
+--
+-- {2/B} is CR 118.7e's own worked example, and the shape whose two halves differ
+-- in the NUMBER of mana they take: "one black mana" against "two generic mana".
+-- Khabál Ghoul's {2}{B} is the cost both halves bite -- it has a black symbol
+-- for the one and a generic component of two for the other -- which is what
+-- makes the pair below disagree by a whole land. THREE SWAMPS is the board that
+-- tells the three readings apart: full price taps three, the {B} half taps two,
+-- the {2} half taps one.
+--
+-- CR 118.7b-c cannot reach this group, so none of it is hostage to #309: the {2}
+-- half is generic mana and the {B} half finds a black symbol waiting for it, so
+-- neither half is ever the excess that pawl drops and the rule would spill.
+monocoloredHybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+monocoloredHybridDiscountSpec s registry =
+  Spec.describe s "SyntheticMonocoloredHybridDiscount" $ do
+    -- THE HEADLINE FALSIFIER, and it is a GAMEPLAY-level one because CR 118.7e's
+    -- choice is only made on the path that pays: taking the {2} half leaves
+    -- {2}{B} as {B}, one Swamp. Reading the symbol as nothing at all -- what the
+    -- arm did before -- leaves all three tapped.
+    Spec.it s "CR 118.7e a {2/B} reduction taken as {2} takes two generic mana off the cost" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
+          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "one Swamp tapped, not three" (S.tappedCount S.alice paid) 1
+
+    -- THE OTHER HALF of the same symbol, on the same board, and the pair is what
+    -- proves the ANSWER is what decides: CR 118.7e's coloured half takes one
+    -- black mana, so {2}{B} becomes {2} and two Swamps pay it. An engine that
+    -- picked a half for the player could not make both cases pass.
+    Spec.it s "CR 118.7e the same reduction taken as {B} takes one black mana instead" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
+          paid = S.runPure (takesHalf black) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "two Swamps tapped, not one and not three" (S.tappedCount S.alice paid) 2
+
+    -- The control both cases above need: without the artifact the same spell is
+    -- full price whatever the interpreter would have answered, so the mana
+    -- really did leave because of the reduction.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 0 3
+          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
+      Spec.assertEqWith s "three Swamps tapped" (S.tappedCount S.alice paid) 3
+
+    -- The colour criterion, and it DISCRIMINATES here where the Phyrexian
+    -- group's could not: the {2} half is generic mana, which does not care what
+    -- the cost prints, so Sol Ring's {1} would go to {0} and tap nothing at all
+    -- if the Filter let the reduction reach a colourless spell.
+    Spec.it s "a colourless spell fails the effect's criterion, so it pays in full" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (_, ringId, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
+          paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ringId)
+      Spec.assertEqWith s "one Swamp tapped, not none" (S.tappedCount S.alice paid) 1
+
+-- Synthetic Hybrid Discount {2} Artifact: "Black spells you cast cost {W/B}
+-- less to cast."
+--
+-- SYNTHETIC, and the file's fourth, for the reason the group above gives: the
+-- same Scryfall sweep finds no printing whose reduction amount is a hybrid
+-- symbol of either shape.
+--
+-- CR 107.4e's COLOUR/COLOUR half ({W/B}), whose two ways are two colours rather
+-- than a colour against a number. That is what makes it a different question
+-- from the group above and not a relabelling of it, and why CR 118.7e's prompt
+-- answers with the resulting SYMBOL: {2/B}'s halves are an OfType and a Generic,
+-- {W/B}'s are two OfTypes.
+--
+-- Aimed at Withered Wretch's {B}{B}, which prints one of the two colours and not
+-- the other, and NO GENERIC COMPONENT. Both of those are deliberate. Printing
+-- one colour is what lets the count tell the two answers apart -- a cost
+-- printing both would take one mana either way. Printing no generic component is
+-- what keeps the white-half case out of #309's way: CR 118.7b would turn a
+-- stranded {W} into one generic mana and CR 118.7a says generic reductions reach
+-- only the generic component, so pawl DROPPING it and the rule SPILLING it give
+-- the same two Swamps here. Aim the same reduction at a cost with a generic
+-- component and the two readings part company, which is the trap this group is
+-- shaped to avoid.
+hybridDiscountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+hybridDiscountSpec s registry =
+  Spec.describe s "SyntheticHybridDiscount" $ do
+    -- THE HEADLINE FALSIFIER for CR 107.4e's colour/colour half: the black half
+    -- of {W/B} takes one black mana, so {B}{B} becomes {B} and one Swamp pays
+    -- it. Reading the symbol as nothing -- what the arm did before -- taps both.
+    Spec.it s "CR 118.7e a {W/B} reduction taken as {B} takes one black mana off the cost" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      wretch <- S.printingOf s registry "Withered Wretch"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 1 2
+          paid = S.runPure (takesHalf black) gs (S.cast S.alice wretchId)
+      Spec.assertEqWith s "one Swamp tapped, not two" (S.tappedCount S.alice paid) 1
+
+    -- THE ENGINE DOES NOT PICK THE BETTER HALF. CR 118.7e gives the choice to
+    -- the player paying with no condition attached, so a payer who names the
+    -- white half of {W/B} against a cost printing no {W} gets a reduction that
+    -- takes nothing -- and pays both Swamps. This case fails if the engine
+    -- silently takes the half the cost can use, which is exactly what a
+    -- payability filter on the offers would have made it do.
+    Spec.it s "CR 118.7e the same reduction taken as {W} finds no white mana to take" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      wretch <- S.printingOf s registry "Withered Wretch"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 1 2
+          paid = S.runPure (takesHalf white) gs (S.cast S.alice wretchId)
+      Spec.assertEqWith s "two Swamps tapped" (S.tappedCount S.alice paid) 2
+
+    -- The control the headline needs: with no reducer out, two Swamps is what
+    -- the spell costs whatever the interpreter would have answered.
+    Spec.it s "without the reducer the same spell is full price" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Hybrid Discount"
+      wretch <- S.printingOf s registry "Withered Wretch"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (wretchId, _, gs) = hybridDiscountBoard swamp discount wretch solRing 0 2
+          paid = S.runPure (takesHalf black) gs (S.cast S.alice wretchId)
+      Spec.assertEqWith s "two Swamps tapped" (S.tappedCount S.alice paid) 2
+
+-- Aims the text changer's one target slot at `oid` -- the SpellsAndPermanents
+-- pool's recipient shape, which both changers below print -- and answers whichever
+-- family's swap prompt the changer asks with (from, to). BOTH prompts are
+-- answered because the group casts an Artificial Evolution in one case and a
+-- Magical Hack in another; a changer asks only its own.
+swapAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
+swapAt oid from to p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseCreatureTypeSwap {} -> (from, to)
+  Prompt.ChooseLandTypeSwap {} -> (from, to)
+  _ -> S.identityAnswer p
+
+-- alice controls one Edgewalker, one untapped Plains and one untapped Island;
+-- her hand holds a second Edgewalker ({1}{W}{B} Human Cleric), a Whipstitched
+-- Zombie ({1}{B} Zombie) and the text changer `changerName`. With `swap`, she
+-- casts that changer at the Edgewalker ON THE BATTLEFIELD -- the Island pays the
+-- {U} -- and it resolves before anything is measured; without it the board is
+-- otherwise identical, which is what makes the two comparable.
+--
+-- Returns the state, the Edgewalker printing the discount, the Cleric spell and
+-- the Zombie spell. Loaded fresh inside each case that needs it -- equivalent
+-- because loading is deterministic and cached (batch-recipe.md).
+textChangedEdgewalkerBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  String ->
+  Maybe (Subtype.Subtype, Subtype.Subtype) ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+textChangedEdgewalkerBoard s registry changerName swap = do
+  plains <- S.printingOf s registry "Plains"
+  island <- S.printingOf s registry "Island"
+  edgewalker <- S.printingOf s registry "Edgewalker"
+  zombie <- S.printingOf s registry "Whipstitched Zombie"
+  changer <- S.printingOf s registry changerName
+  let (_, g1) = S.addCreature island S.alice (S.landsInPlay plains 1)
+      (walkerId, g2) = S.addCreature edgewalker S.alice g1
+      (clericSpell, g3) = S.addHandCard edgewalker S.alice g2
+      (zombieSpell, g4) = S.addHandCard zombie S.alice g3
+      (changerId, g5) = S.addHandCard changer S.alice g4
+      ready =
+        g5
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      after = case swap of
+        Nothing -> ready
+        Just (from, to) ->
+          S.runPure (swapAt walkerId from to) ready $ do
+            S.cast S.alice changerId
+            Stack.resolveTop
+  pure (after, walkerId, clericSpell, zombieSpell)
+
+-- CR 612.1 reaching the FILTER a player static ability's effect carries.
+--
+-- Edgewalker's "Cleric spells you cast cost {W}{B} less to cast" names which
+-- spells it discounts with a creature type word, and CR 612.1 gives a
+-- text-changing effect "any words or symbols printed on that object" -- so an
+-- Artificial Evolution ({U} Instant, "Change the text of target spell or
+-- permanent by replacing all instances of one creature type with another. The
+-- new creature type can't be Wall." -- checked against Scryfall, 2026-08-05)
+-- resolved at the Edgewalker moves the discount off Clerics and onto the new
+-- word.
+--
+-- Cleric -> Zombie rather than Cleric -> Wizard, which is the same swap with a
+-- word the discount cannot be seen through: Edgewalker reduces by {W}{B}, and
+-- pawl drops a stranded coloured reduction rather than spilling it onto the
+-- generic component (#309), so only a white or black spell shows the difference
+-- at all. Every Wizard in the pool is mono-blue; Whipstitched Zombie ({1}{B}
+-- Creature -- Zombie 2/2, "At the beginning of your upkeep, sacrifice this
+-- creature unless you pay {B}." -- checked against Scryfall, 2026-08-05) is the
+-- black Zombie that makes the new word observable, and its upkeep trigger never
+-- fires here because nothing in the group reaches an upkeep.
+--
+-- BOTH HALVES are asserted every time. "The Zombie spell is discounted" passes
+-- vacuously against a reader that discounts everything, and "the Cleric spell is
+-- not" passes vacuously against one that discounts nothing.
+textChangedEdgewalkerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedEdgewalkerSpec s registry = Spec.describe s "TextChangedEdgewalker" $ do
+  -- The premise the two changed cases are read against: with no text changer the
+  -- printed word stands, so the Cleric spell is discounted and the Zombie is not.
+  Spec.it s "CR 118.7 the printed filter discounts Clerics and not Zombies" $ do
+    (gs, _, clericSpell, zombieSpell) <- textChangedEdgewalkerBoard s registry "Artificial Evolution" Nothing
+    Spec.assertEqWith
+      s
+      "the Cleric spell's {1}{W}{B} becomes {1}"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Zombie spell's {1}{B} is untouched"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]))
+
+  Spec.it s "CR 612.1 an evolved Edgewalker discounts Zombies and no longer discounts Clerics" $ do
+    (gs, walkerId, clericSpell, zombieSpell) <-
+      textChangedEdgewalkerBoard s registry "Artificial Evolution" (Just (Subtype.Cleric, Subtype.Zombie))
+    -- The anti-vacuity check, first: every assertion below would also hold of an
+    -- Evolution that never resolved onto the Edgewalker at all.
+    Spec.assertEqWith s "the Evolution resolved onto the Edgewalker" (Projection.textChangesAffecting walkerId gs) [(Subtype.Cleric, Subtype.Zombie)]
+    Spec.assertEqWith
+      s
+      "the Zombie spell's {1}{B} becomes {1}"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Cleric spell pays its printed {1}{W}{B}"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]))
+
+  -- CR 612.2's family gate, at this read point: a text-changing effect "changes
+  -- only those words that are used in the correct way", and the rule's own
+  -- examples are "a land type word used as a land type" and "a creature type word
+  -- used as a creature type". Magical Hack ({U} Instant, "Change the
+  -- text of target spell or permanent by replacing all instances of one basic
+  -- land type with another." -- checked against Scryfall, 2026-08-05) can only
+  -- name a basic land type, so the pair it imposes reaches no creature type
+  -- position and the discount stays on Clerics.
+  Spec.it s "CR 612.2 a land-type pair leaves the creature-type filter alone" $ do
+    (gs, walkerId, clericSpell, zombieSpell) <-
+      textChangedEdgewalkerBoard s registry "Magical Hack" (Just (Subtype.Swamp, Subtype.Island))
+    Spec.assertEqWith s "the Hack resolved onto the Edgewalker" (Projection.textChangesAffecting walkerId gs) [(Subtype.Swamp, Subtype.Island)]
+    Spec.assertEqWith
+      s
+      "the Cleric spell is discounted exactly as printed"
+      (totalManaCost S.alice clericSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, white, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1]))
+    Spec.assertEqWith
+      s
+      "and the Zombie spell is still no business of the Edgewalker's"
+      (totalManaCost S.alice zombieSpell (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]) gs)
+      (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, black]))
+
+  -- The whole-card case: CR 601.2f measures castability and payment against the
+  -- TOTAL cost, so the rewritten filter decides which spell alice can actually
+  -- cast. One Plains is her only untapped mana once the Evolution has tapped the
+  -- Island, and a Plains can never pay a {B}: what makes the Zombie castable is
+  -- that the reduction removed the black SYMBOL.
+  Spec.it s "CR 601.2f whole cards: the rewritten filter decides a real cast" $ do
+    (evolved, _, evolvedCleric, evolvedZombie) <-
+      textChangedEdgewalkerBoard s registry "Artificial Evolution" (Just (Subtype.Cleric, Subtype.Zombie))
+    (printed, _, printedCleric, printedZombie) <- textChangedEdgewalkerBoard s registry "Artificial Evolution" Nothing
+    Spec.assertBool s (not (S.castable S.alice printedZombie printed)) "unevolved, the Zombie spell's {B} cannot be paid"
+    Spec.assertBool s (S.castable S.alice evolvedZombie evolved) "evolved, the discounted Zombie spell can be cast"
+    Spec.assertBool s (S.castable S.alice printedCleric printed) "unevolved, the discounted Cleric spell can be cast"
+    Spec.assertBool s (not (S.castable S.alice evolvedCleric evolved)) "evolved, the Cleric spell's {W}{B} cannot be paid"
+    -- And the payment really is the reduced one: the Island the Evolution tapped,
+    -- plus the single Plains that pays the discounted {1}.
+    let paid = S.runPure S.identityAnswer evolved (S.cast S.alice evolvedZombie)
+    Spec.assertEqWith s "one Plains tapped on top of the Evolution's Island" (S.tappedCount S.alice paid) 2
+
 -- alice holds nine Plains cards; the board is otherwise empty unless a
 -- printing is named. Loaded fresh inside each case that needs it --
 -- equivalent because loading is deterministic and cached (batch-recipe.md).
@@ -1157,7 +1853,7 @@ isSilenceActivate :: Action.Type.Action -> Bool
 isSilenceActivate action = case action of
   Action.Type.Activate _ _ -> True
   Action.Type.Cast {} -> False
-  Action.Type.Play _ -> False
+  Action.Type.Play {} -> False
   Action.Type.Pass -> False
 
 -- Silence {W} Instant: "Your opponents can't cast spells this turn."
@@ -1213,7 +1909,7 @@ silenceSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, _, landId, _, after) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (elem (Action.Type.Play landId) (Action.legalActions S.bob after)) "bob may still play a land"
+      Spec.assertBool s (elem (Action.Type.Play landId Nothing) (Action.legalActions S.bob after)) "bob may still play a land"
       Spec.assertBool s (any isSilenceActivate (Action.legalActions S.bob after)) "and still activate an ability"
 
     Spec.it s "CR 514.2 the prohibition ends at cleanup" $ do
@@ -1502,8 +2198,8 @@ nullChamberSpec s registry =
       Spec.assertBool s (elem (Action.Type.Cast bobsBolt (S.printingName lightningBolt)) (casts before)) "bob may cast his Bolt before the Chamber lands"
       Spec.assertBool s (notElem (Action.Type.Cast bobsBolt (S.printingName lightningBolt)) (casts after)) "and may not once it has"
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob (S.printingName lightningBolt) after) "bob is prohibited by alice's name"
-      Spec.assertBool s (elem bobsBarrens (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
-      Spec.assertBool s (notElem bobsBarrens (Action.playableLands S.bob after)) "and not once it has"
+      Spec.assertBool s (elem (bobsBarrens, Nothing) (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
+      Spec.assertBool s (notElem (bobsBarrens, Nothing) (Action.playableLands S.bob after)) "and not once it has"
 
     -- CR 601.3's prohibit half, now carrying a QUALITY: "no rule or effect
     -- prohibits" is asked of one named spell rather than of casting in general.
@@ -1563,10 +2259,10 @@ nullChamberSpec s registry =
           (barrensId, withBarrens) = S.addHandCard ashBarrens S.alice after
           (plainsId, gs) = S.addHandCard plains S.alice withBarrens
           playable = Action.playableLands S.alice gs
-      Spec.assertBool s (notElem barrensId playable) "the named Ash Barrens is not playable"
-      Spec.assertBool s (elem plainsId playable) "the Plains still is"
-      Spec.assertBool s (elem (Action.Type.Play plainsId) (Action.legalActions S.alice gs)) "and the Plains is offered"
-      Spec.assertBool s (notElem (Action.Type.Play barrensId) (Action.legalActions S.alice gs)) "while the Barrens is not"
+      Spec.assertBool s (notElem (barrensId, Nothing) playable) "the named Ash Barrens is not playable"
+      Spec.assertBool s (elem (plainsId, Nothing) playable) "the Plains still is"
+      Spec.assertBool s (elem (Action.Type.Play plainsId Nothing) (Action.legalActions S.alice gs)) "and the Plains is offered"
+      Spec.assertBool s (notElem (Action.Type.Play barrensId Nothing) (Action.legalActions S.alice gs)) "while the Barrens is not"
 
     -- CR 604.2: the effect is re-derived from the battlefield on every read, so
     -- destroying the Chamber lifts both halves with nothing to unwind.
@@ -1594,7 +2290,7 @@ nullChamberSpec s registry =
           Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "prohibited while it stands"
           Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gone)) "not prohibited once it is gone"
           Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.alice gone)) "and the cast is offered again"
-          Spec.assertBool s (elem barrensId (Action.playableLands S.alice gone)) "and the land may be played again"
+          Spec.assertBool s (elem (barrensId, Nothing) (Action.playableLands S.alice gone)) "and the land may be played again"
 
     -- REJECT-NOT-REPAIR on the opponent answer, which only a three-seat board
     -- can reach: an answer naming somebody who is not an opponent -- here the
@@ -1769,12 +2465,12 @@ isActivateOf :: ObjectId.ObjectId -> Action.Type.Action -> Bool
 isActivateOf oid action = case action of
   Action.Type.Activate o _ -> o == oid
   Action.Type.Cast {} -> False
-  Action.Type.Play _ -> False
+  Action.Type.Play {} -> False
   Action.Type.Pass -> False
 
 isPlay :: Action.Type.Action -> Bool
 isPlay action = case action of
-  Action.Type.Play _ -> True
+  Action.Type.Play {} -> True
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
   Action.Type.Pass -> False
@@ -2014,6 +2710,306 @@ vedalkenOrrerySpec s registry =
       Spec.assertBool s (not (any (isActivateOf equipment) (Action.legalActions S.alice board))) "still not offered"
       Spec.assertBool s (any (isActivateOf onOwnTurn) (Action.legalActions S.alice ownBoard)) "and still offered on her own turn"
 
+-- ONE board for both halves of CR 701.6a's "a spell or ability": alice has a
+-- SPELL of the caller's choosing on the stack and a settled Prodigal Sorcerer
+-- whose {T} ABILITY can join it, and bob holds a Cancel for the first and a
+-- Stifle for the second. `permanents` is the only difference between a run that
+-- counters and a run that does not.
+--
+-- Shared by the Spider-Punk and Prowling Serpopard groups below, which is why
+-- both the protecting permanents and the victim spell are parameters: the
+-- unfiltered arm and the filtered one differ only in which victim survives.
+--
+-- bob's three Islands pay for whichever of the two he casts; the runs branch
+-- from this state and never share mana.
+counteringBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  [(PlayerId.PlayerId, Printing.Printing)] ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+counteringBoard island cancel stifle sorcerer victim permanents =
+  let withLands = List.foldl' (\g _ -> snd (S.addCreature island S.bob g)) (Setup.emptyGame S.bothPlayers) [1 .. (3 :: Int)]
+      (srcId, withSorcerer) = S.addCreature sorcerer S.alice withLands
+      -- CR 302.6: settled, so the Sorcerer's {T} may be activated at all.
+      settled = S.runPure S.identityAnswer withSorcerer (Engine.settleAll S.alice)
+      addPermanent (ids, g) (who, p) = let (oid, g') = S.addCreature p who g in (oid : ids, g')
+      (permanentIds, withPermanents) = List.foldl' addPermanent ([], settled) permanents
+      (victimId, onStack) = S.spellOnStack victim S.alice withPermanents
+      (cancelId, withCancel) = S.addHandCard cancel S.bob onStack
+      (stifleId, gs) = S.addHandCard stifle S.bob withCancel
+   in (victimId, srcId, cancelId, stifleId, permanentIds, gs)
+
+-- Every target prompt answers with this object, and CR 603.5's "may" is always
+-- exercised -- so a silence below is the rule and never a declined option.
+counteringAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+counteringAnswer oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- Prodigal Sorcerer's "any target" is aimed at ALICE, so the effect that must
+-- not occur when the ability is countered is her own life total; Stifle's only
+-- legal target is the ability, which the default interpreter picks.
+counteringAtAlice :: Prompt.Prompt r -> r
+counteringAtAlice p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+counteringAtAbility :: Prompt.Prompt r -> r
+counteringAtAbility p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- bob casts his Cancel at alice's spell and lets it resolve.
+cancelRun :: ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+cancelRun victimId cancelId gs =
+  let answer :: Prompt.Prompt r -> r
+      answer = counteringAnswer victimId
+      cast = S.runPure answer gs (S.cast S.bob cancelId)
+      resolved = S.runPure answer cast Stack.resolveTop
+   in S.runPure answer resolved Engine.settleForPriority
+
+-- alice activates her Sorcerer at herself, bob casts his Stifle at the ability,
+-- and the stack is emptied down to the spell underneath. The first component is
+-- the state once the Stifle has resolved, the second once the ability under it
+-- has had its chance to resolve too.
+abilityRun ::
+  ObjectId.ObjectId ->
+  ActivatedAbility.ActivatedAbility Card.Type.Card ->
+  ObjectId.ObjectId ->
+  GameState.GameState ->
+  (GameState.GameState, GameState.GameState)
+abilityRun srcId ability stifleId gs =
+  let activated = S.runPure counteringAtAlice (gs {GameState.priority = Just S.alice}) (Activate.activateAbility S.alice srcId ability)
+      cast = S.runPure counteringAtAbility activated (S.cast S.bob stifleId)
+      stifleResolved = S.runPure counteringAtAbility cast Stack.resolveTop
+      placed = S.runPure counteringAtAbility stifleResolved Engine.settleForPriority
+   in (placed, S.runPure counteringAtAlice placed Stack.resolveTop)
+
+-- Spider-Punk {1}{R} Legendary Creature -- Spider Human Hero 2/1 (Marvel's
+-- Spider-Man, 92), "Spells and abilities can't be countered". Run four ways off
+-- counteringBoard above, with a Goblin Piker as the victim spell.
+--
+-- All four of the card's printed clauses are in its file now, and only this one
+-- is read here: nothing on this board prevents damage, no other Spider enters,
+-- and S.addCreature inserts Spider-Punk into the battlefield directly rather
+-- than raising an entry event, so CR 702.136a's riot has no CR 614.1c
+-- replacement to be. CR 615.12's clause is proved in Pawl.ReplacementSpec's
+-- "Spider-Punk (CR 615.12)" group instead, where a Mending Hands shield gives it
+-- something to defeat.
+spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spiderPunkSpec s registry =
+  let withAbility act = do
+        island <- S.printingOf s registry "Island"
+        cancel <- S.printingOf s registry "Cancel"
+        stifle <- S.printingOf s registry "Stifle"
+        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+        piker <- S.printingOf s registry "Goblin Piker"
+        punk <- S.printingOf s registry "Spider-Punk"
+        case Face.activatedAbilities (S.combinedFace sorcerer) of
+          [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+          ability : _ -> act (counteringBoard island cancel stifle sorcerer piker) punk piker ability
+   in Spec.describe s "SpiderPunk" $ do
+        -- The CONTROL for the spell half. Without it every refusal below would
+        -- also be true of a board where the Cancel never resolved at all.
+        Spec.it s "CR 701.6a without Spider-Punk bob's Cancel counters alice's spell"
+          . withAbility
+          $ \board _ piker _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board []
+                after = cancelRun victimId cancelId gs
+            Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+            Spec.assertEqWith s "the spell is in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+            Spec.assertEqWith s "and never reached the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 0
+
+        -- The SPELL half. CR 611.1's third clause makes Spider-Punk's sentence
+        -- a rules-modifying continuous effect, and CR 101.2 makes its "can't"
+        -- win: the Cancel resolves, does nothing, and CR 608.2n puts it into
+        -- bob's graveyard while the spell it named stays on the stack.
+        Spec.it s "CR 701.6a / 613.11 with Spider-Punk the same Cancel counters nothing"
+          . withAbility
+          $ \board punk _ _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, punk)]
+                after = cancelRun victimId cancelId gs
+            Spec.assertEqWith s "alice's spell is still on the stack, alone" (GameState.stack after) [victimId]
+            Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+            Spec.assertEqWith s "and the spent Cancel is bob's only graveyard card" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+
+        -- The CONTROL for the ability half, and CR 113.9's reason it needs its
+        -- own: an ability on the stack is not a spell, so nothing the spell
+        -- case proves carries over.
+        Spec.it s "CR 113.9 without Spider-Punk bob's Stifle counters alice's ability"
+          . withAbility
+          $ \board _ _ ability -> do
+            let (victimId, srcId, _, stifleId, _, gs) = board []
+                (placed, after) = abilityRun srcId ability stifleId gs
+            Spec.assertEqWith s "the ability is gone, leaving only the Piker spell" (GameState.stack placed) [victimId]
+            Spec.assertEqWith s "alice took no damage, so it never resolved" (S.lifeOf S.alice after) (Just 20)
+            Spec.assertEqWith s "and bob's graveyard holds the spent Stifle alone" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
+
+        -- THE case Spider-Punk is in the pool for, and the half no card could
+        -- reach before:
+        -- Spider-Punk's clause is an ability of a BATTLEFIELD PERMANENT about
+        -- other objects, where Pawl.Types.Counterability is CR 113.6g's
+        -- self-referential ability of the spell itself and can say nothing
+        -- about an ability at all. The ability survives the Stifle and
+        -- resolves, so alice takes the 1 damage she aimed at herself.
+        Spec.it s "CR 701.6a / 113.9 with Spider-Punk the ability survives the Stifle and resolves"
+          . withAbility
+          $ \board punk _ ability -> do
+            let (victimId, srcId, _, stifleId, _, gs) = board [(S.alice, punk)]
+                (placed, after) = abilityRun srcId ability stifleId gs
+            Spec.assertEqWith s "the ability is still on the stack, above the Piker spell" (length (GameState.stack placed)) 2
+            Spec.assertEqWith s "the spent Stifle is bob's only graveyard card" (length (Game.zoneMembers Zone.Graveyard S.bob placed)) 1
+            Spec.assertEqWith s "and resolving it deals alice the 1 damage" (S.lifeOf S.alice after) (Just 19)
+            Spec.assertEqWith s "leaving the Piker spell alone on the stack" (GameState.stack after) [victimId]
+
+        -- PlayerScope.EachPlayer, and the case that tells it from
+        -- PlayerScope.You: Spider-Punk's sentence has no possessive, so BOB's
+        -- copy protects ALICE's spell from bob's own Cancel.
+        Spec.it s "CR 109.5 EachPlayer: bob's own Spider-Punk protects alice's spell"
+          . withAbility
+          $ \board punk _ _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.bob, punk)]
+                after = cancelRun victimId cancelId gs
+            Spec.assertEqWith s "alice's spell is still on the stack" (GameState.stack after) [victimId]
+            Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+        -- CR 604.2: gathered live off the battlefield on every read, so
+        -- destroying Spider-Punk lifts the protection in the same turn with
+        -- nothing to unwind.
+        Spec.it s "CR 604.2 destroying Spider-Punk makes the spell counterable again"
+          . withAbility
+          $ \board punk _ _ -> do
+            let (victimId, _, cancelId, _, punkIds, gs) = board [(S.alice, punk)]
+                gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable punkIds)
+            Spec.assertBool s (PlayerEffect.cantBeCountered S.alice victimId gs) "protected while it stands"
+            Spec.assertEqWith s "so the same Cancel counters nothing while it stands" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
+            Spec.assertBool s (not (PlayerEffect.cantBeCountered S.alice victimId gone)) "not protected once it is gone"
+            -- The stack is the readout, not the graveyard's size: the destroyed
+            -- Spider-Punk is in that graveyard too, so a bare count could not
+            -- tell a countered spell from an uncountered one.
+            Spec.assertEqWith s "and the Cancel now counters, emptying the stack" (GameState.stack (cancelRun victimId cancelId gone)) []
+            Spec.assertEqWith s "leaving the spell beside the destroyed Spider-Punk" (length (Game.zoneMembers Zone.Graveyard S.alice (cancelRun victimId cancelId gone))) 2
+
+        -- CR 113.6g's carrier is untouched, which is what keeps the two apart:
+        -- Spider-Punk's OWN card says nothing about being countered, and the
+        -- protection it hands out comes from the CR 613.11 axis alone.
+        Spec.it s "CR 113.6g Spider-Punk's own card field is Counterable" $ do
+          punk <- S.printingOf s registry "Spider-Punk"
+          Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace punk)) Counterability.Counterable
+
+-- Prowling Serpopard {1}{G}{G} Creature -- Cat Snake 4/3 (Amonkhet, 180),
+-- "This spell can't be countered. Creature spells you control can't be
+-- countered." BOTH of the card's sentences, on the two different carriers the
+-- rules give them:
+--
+--   * "This spell can't be countered" is CR 113.6g's self-referential ability,
+--     which functions on the stack and rides the card as
+--     Pawl.Types.Counterability.
+--   * "Creature spells you control can't be countered" is an ability of a
+--     BATTLEFIELD PERMANENT about OTHER objects, so CR 611.1's third clause
+--     makes it a rules-modifying continuous effect on the CR 613.11 player
+--     axis.
+--
+-- The second sentence is why the card is in THIS file and not only among the CR
+-- 113.6g cards: it NARROWS by the victim spell's own qualities, which
+-- Spider-Punk's unfiltered "Spells and abilities can't be countered" does not.
+-- The whole group therefore turns on the same Cancel counting differently for a
+-- CREATURE spell and a NONCREATURE one on one board -- an assertion no
+-- unfiltered arm can pass.
+prowlingSerpopardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowlingSerpopardSpec s registry =
+  let withVictim name act = do
+        island <- S.printingOf s registry "Island"
+        cancel <- S.printingOf s registry "Cancel"
+        stifle <- S.printingOf s registry "Stifle"
+        sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+        victim <- S.printingOf s registry name
+        cat <- S.printingOf s registry "Prowling Serpopard"
+        case Face.activatedAbilities (S.combinedFace sorcerer) of
+          [] -> Spec.assertFailure s "Prodigal Sorcerer should declare one activated ability"
+          ability : _ -> act (counteringBoard island cancel stifle sorcerer victim) cat ability
+   in Spec.describe s "ProwlingSerpopard" $ do
+        -- The CONTROL for the creature half.
+        Spec.it s "CR 701.6a without Prowling Serpopard bob's Cancel counters alice's creature spell"
+          . withVictim "Goblin Piker"
+          $ \board _ _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board []
+            Spec.assertEqWith s "the stack is empty" (GameState.stack (cancelRun victimId cancelId gs)) []
+
+        -- The clause the card is in the pool for, in the direction the filter
+        -- ADMITS: a creature spell alice controls matches CR 613.11's effect and
+        -- CR 101.2 makes its "can't" win.
+        Spec.it s "CR 701.6a / 613.11 with Prowling Serpopard alice's creature spell survives"
+          . withVictim "Goblin Piker"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, cat)]
+                after = cancelRun victimId cancelId gs
+            Spec.assertEqWith s "alice's creature spell is still on the stack, alone" (GameState.stack after) [victimId]
+            Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+        -- The CONTROL for the noncreature half, so the refusal below is a
+        -- statement about the FILTER rather than about a Cancel that never
+        -- resolved.
+        Spec.it s "CR 701.6a without Prowling Serpopard bob's Cancel counters alice's noncreature spell"
+          . withVictim "Lightning Bolt"
+          $ \board _ _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board []
+            Spec.assertEqWith s "the stack is empty" (GameState.stack (cancelRun victimId cancelId gs)) []
+
+        -- THE case #788 is about, and the one an unfiltered arm CANNOT pass:
+        -- the very same Serpopard, on the very same board, leaves alice's
+        -- noncreature spell counterable, because CR 613.11's effect names only
+        -- creature spells.
+        Spec.it s "CR 701.6a / 613.11 the same Serpopard leaves alice's noncreature spell counterable"
+          . withVictim "Lightning Bolt"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.alice, cat)]
+                after = cancelRun victimId cancelId gs
+            Spec.assertEqWith s "the Cancel counters it, emptying the stack" (GameState.stack after) []
+            -- The stack is the readout and the graveyard only corroborates it:
+            -- alice's graveyard holds the countered spell and nothing else, so
+            -- the Serpopard on the battlefield is not being counted here.
+            Spec.assertEqWith s "leaving the countered spell in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+        -- PlayerScope.You, and the case that tells it from Spider-Punk's
+        -- EachPlayer: "creature spells YOU control", so BOB's copy protects
+        -- nothing of alice's.
+        Spec.it s "CR 109.5 You: bob's own Prowling Serpopard does not protect alice's creature spell"
+          . withVictim "Goblin Piker"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board [(S.bob, cat)]
+            Spec.assertEqWith s "the Cancel still counters, emptying the stack" (GameState.stack (cancelRun victimId cancelId gs)) []
+
+        -- CR 113.9 / 701.6a's OTHER subject. An ability on the stack has no
+        -- card behind it -- Game.faceOf answers Nothing for one -- so a Filter
+        -- naming a CARD TYPE can never match it, and alice's Prodigal Sorcerer
+        -- ability is Stifled with the Serpopard standing. That is the whole of
+        -- the answer to the wrinkle a filtered arm has and the unfiltered one
+        -- does not: this card's protection reaches spells only.
+        Spec.it s "CR 113.9 with Prowling Serpopard alice's activated ability is still counterable"
+          . withVictim "Goblin Piker"
+          $ \board cat ability -> do
+            let (victimId, srcId, _, stifleId, _, gs) = board [(S.alice, cat)]
+                (placed, after) = abilityRun srcId ability stifleId gs
+            Spec.assertEqWith s "the ability is gone, leaving only the creature spell" (GameState.stack placed) [victimId]
+            Spec.assertEqWith s "alice took no damage, so it never resolved" (S.lifeOf S.alice after) (Just 20)
+
+        -- CR 113.6g, the card's FIRST sentence, on the carrier that is not the
+        -- player axis at all: a Prowling Serpopard SPELL is uncounterable with
+        -- NO Serpopard on the battlefield, which no CR 613.11 effect could
+        -- explain.
+        Spec.it s "CR 113.6g a Prowling Serpopard spell can't be countered with none on the battlefield"
+          . withVictim "Prowling Serpopard"
+          $ \board cat _ -> do
+            let (victimId, _, cancelId, _, _, gs) = board []
+            Spec.assertEqWith s "the card field" (Face.counterability (S.combinedFace cat)) Counterability.CantBeCountered
+            Spec.assertEqWith s "and the spell is still on the stack" (GameState.stack (cancelRun victimId cancelId gs)) [victimId]
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   ruleOfLawSpec s registry
@@ -2024,9 +3020,16 @@ spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
   humilitySpec s registry
   titaniasSongSpec s registry
   edgewalkerSpec s registry
+  phyrexianDiscountSpec s registry
+  snowDiscountSpec s registry
+  monocoloredHybridDiscountSpec s registry
+  hybridDiscountSpec s registry
+  textChangedEdgewalkerSpec s registry
   reliquaryTowerSpec s registry
   storedSpec s registry
   silenceSpec s registry
   extraLandDropsSpec s registry
   matchesSpellSpec s registry
   vedalkenOrrerySpec s registry
+  spiderPunkSpec s registry
+  prowlingSerpopardSpec s registry

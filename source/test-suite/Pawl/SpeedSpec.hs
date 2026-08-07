@@ -3,14 +3,16 @@
 
 -- Covers: Pawl.Engine.Speed (CR 702.179, "start your engines!"), the CR 704.5z
 -- arm Pawl.Engine.Sba runs from it, Pawl.Types.Player's speed field,
--- Pawl.Engine.Quantity's Speed arm (CR 702.179e/702.179f), and CR 702.178a's max
+-- Pawl.Engine.Quantity's Speed arm (CR 702.179e/702.179f), CR 702.178a's max
 -- speed gate -- Pawl.Types.ActivatedAbility's condition, applied by
--- Pawl.Engine.Projection.abilitiesGiven.
+-- Pawl.Engine.Projection.abilitiesGiven -- and CR 702.178b's zone clause, applied
+-- by Pawl.Engine.Activate.graveyardAbilitiesOf.
 --
--- Gameplay-level throughout. Muraganda Raceway is the whole fixture: a Land
--- printing "Start your engines!", "{T}: Add {C}" and "Max speed — {T}: Add
--- {C}{C}", so one card supplies both halves -- the resource and something whose
--- presence depends on it.
+-- Gameplay-level throughout. Muraganda Raceway is the fixture for everything on
+-- the battlefield: a Land printing "Start your engines!", "{T}: Add {C}" and "Max
+-- speed — {T}: Add {C}{C}", so one card supplies both halves -- the resource and
+-- something whose presence depends on it. maxSpeedZoneSpec needs a second
+-- printing, because rule 702.178b is only observable off the battlefield.
 --
 -- Every case about how speed CHANGES gets there through the rules: started by the
 -- state-based action, raised by an opponent losing life to a Sign in Blood or a
@@ -18,10 +20,17 @@
 -- module writes a speed directly, and only cases about what READS speed use it --
 -- rule 702.179d admits one increase a turn, so a board at 4 is four turns of
 -- setup that would prove nothing the increase cases have not already proved.
+--
+-- cardIncreaseSpec is the other group whose subject is not Muraganda Raceway. It
+-- proves that a CARD's printed instruction reaches the same opcode rule 702.179d's
+-- ability does, through Synthetic Speed Boost -- the Raceway appears there only to
+-- give one player a speed to raise.
 module Pawl.SpeedSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
@@ -32,6 +41,7 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -40,6 +50,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Zone as Zone
 
 -- This player's speed, as Player.speed holds it -- Nothing for a player who has
 -- none (CR 702.179b), which is the state CR 704.5z looks for and is NOT the same
@@ -90,6 +101,17 @@ castResolveSettle answer pid spellId gs =
       resolved = S.runPure answer cast (Stack.resolveTop >> Engine.settleForPriority)
    in S.runPure answer resolved (Stack.resolveTop >> Engine.settleForPriority)
 
+-- castResolveSettle's shorter sibling: cast, resolve, settle, and stop. The second
+-- resolveTop above is there for the inherent trigger rule 702.179d puts on the
+-- stack, and cardIncreaseSpec's boards make sure nothing triggers at all -- so
+-- there is nothing for it to resolve, and reaching for an empty stack would be the
+-- test doing something its own premise denies. No prompts either: the spell is
+-- non-modal, untargeted and mandatory.
+castOnce :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castOnce pid spellId gs =
+  let cast = S.runPure S.identityAnswer gs (S.cast pid spellId)
+   in S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+
 -- How many mana ended up in Alice's pool after tapping this source, with every
 -- prompt answered by `answer`.
 pooledBy :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Int
@@ -105,11 +127,110 @@ biggestYield p = case p of
   Prompt.ChooseManaYield _ _ _ candidates -> last (foldr (:) [] candidates)
   _ -> S.identityAnswer p
 
+-- Alice at speed `n`, with three untapped Swamps, one Loxodon Surveyor in her
+-- graveyard and a stocked library, holding priority. Returns the graveyard card's
+-- id.
+--
+-- The library is stocked because the ability DRAWS: an empty one would set CR
+-- 704.5b's flag and lose Alice the game at the next settle, which would pass or
+-- fail these cases for a reason that has nothing to do with rule 702.178.
+--
+-- Three Swamps because the activation cost is {3}; the Surveyor's own {2}{G} is
+-- never paid, since it is in the graveyard rather than being cast.
+surveyorBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Natural.Natural -> (ObjectId.ObjectId, GameState.GameState)
+surveyorBoard surveyor swamp filler n =
+  let base = S.landsInPlay swamp 3
+      (gyId, withCard) = S.addGraveyardCard surveyor S.alice base
+      stocked = foldr (\_ g -> snd (S.addLibraryCard filler S.alice g)) withCard [1 .. (3 :: Int)]
+   in (gyId, atSpeed n S.alice (stocked {GameState.priority = Just S.alice}))
+
+-- Is this action an activation of that object's ability? Pinned to the OBJECT,
+-- since the cases below are about which zone an ability is offered from.
+isActivateOf :: ObjectId.ObjectId -> A.Action -> Bool
+isActivateOf oid action = case action of
+  A.Activate o _ -> o == oid
+  A.Pass -> False
+  A.Play {} -> False
+  A.Cast _ _ -> False
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Speed" $ do
   startYourEnginesSpec s registry
   maxSpeedSpec s registry
+  maxSpeedZoneSpec s registry
   increaseSpec s registry
+  cardIncreaseSpec s registry
+
+-- CR 702.178b: "if an ability granted by a max speed ability states which zones
+-- it functions from, the max speed ability that grants that ability functions
+-- from those zones."
+--
+-- Loxodon Surveyor {2}{G} Creature -- Elephant Scout 3/3, "Start your engines!"
+-- and "Max speed — {3}, Exile this card from your graveyard: Draw a card"
+-- (checked against Scryfall; Aetherdrift prints five of these, one per colour).
+-- The granted ability states its zone the way CR 113.6m does it -- through a cost
+-- that moves the card out of the graveyard -- so the max speed ability that
+-- grants it functions in the graveyard too, and Alice's speed is asked about a
+-- card that is nowhere near the battlefield.
+--
+-- Both directions are proved, because only the pair discriminates: at speed 4 the
+-- ability is offered from the graveyard, at speed 3 it is not. A test that only
+-- ever asked the first would pass for an engine that ignored the condition
+-- entirely.
+maxSpeedZoneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+maxSpeedZoneSpec s registry = Spec.describe s "MaxSpeedZone" $ do
+  Spec.it s "CR 702.178b at max speed the Surveyor's ability is offered from the graveyard" $ do
+    surveyor <- S.printingOf s registry "Loxodon Surveyor"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gyId, gs) = surveyorBoard surveyor swamp piker 4
+    Spec.assertEqWith s "the card really is in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice gs) [gyId]
+    Spec.assertEqWith s "and it offers one ability from there" (length (Activate.abilitiesFor gyId gs)) 1
+    Spec.assertBool s (any (isActivateOf gyId) (Action.legalActions S.alice gs)) "and the activation is a legal action"
+  -- The other direction, and the whole reason the gate is re-asked outside the
+  -- battlefield: one less speed and the same graveyard card offers nothing. The
+  -- board is identical in every other respect -- same three Swamps, same library,
+  -- same priority -- so the speed is the only thing that can account for it.
+  Spec.it s "CR 702.178a below max speed the same graveyard card offers nothing" $ do
+    surveyor <- S.printingOf s registry "Loxodon Surveyor"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gyId, gs) = surveyorBoard surveyor swamp piker 3
+    Spec.assertEqWith s "the card is still in the graveyard" (Game.zoneMembers Zone.Graveyard S.alice gs) [gyId]
+    Spec.assertEqWith s "but it offers no ability" (Activate.abilitiesFor gyId gs) []
+    Spec.assertBool s (not (any (isActivateOf gyId) (Action.legalActions S.alice gs))) "and no activation is offered"
+  -- End to end through the real engine: the activation is announced, the {3} is
+  -- paid off the three Swamps, CR 406.2's exile pays the rest of the cost, and the
+  -- ability resolves into a drawn card. The falsifier for a gate that offered the
+  -- action and could not carry it out.
+  Spec.it s "CR 702.178b whole card: activating it exiles the Surveyor and draws" $ do
+    surveyor <- S.printingOf s registry "Loxodon Surveyor"
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gyId, gs) = surveyorBoard surveyor swamp piker 4
+    case Activate.abilitiesFor gyId gs of
+      [ability] -> do
+        let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice gyId ability >> Stack.resolveTop)
+        Spec.assertEqWith s "the graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice after) []
+        Spec.assertEqWith s "the card is in exile (CR 406.2)" (length (Game.zoneMembers Zone.Exile S.alice after)) 1
+        Spec.assertEqWith s "alice drew a card" (S.handSize S.alice after) (S.handSize S.alice gs + 1)
+      abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
+  -- CR 113.6m's "functions ONLY in that zone", from the other side: the very same
+  -- printing on the BATTLEFIELD at max speed offers nothing. The projection still
+  -- hands the ability out -- CR 702.178a's condition is true, and pawl's
+  -- projection asks no zone question -- and the activation is withheld all the
+  -- same, because a cost that exiles this card from the graveyard cannot be paid
+  -- by a card that is not in one.
+  --
+  -- The falsifier for a test that passed because the ability worked on the
+  -- battlefield anyway.
+  Spec.it s "CR 113.6m the same card on the battlefield offers the ability to nobody" $ do
+    surveyor <- S.printingOf s registry "Loxodon Surveyor"
+    swamp <- S.printingOf s registry "Swamp"
+    let (bfId, board) = S.addCreature surveyor S.alice (S.landsInPlay swamp 3)
+        gs = atSpeed 4 S.alice (board {GameState.priority = Just S.alice})
+    Spec.assertEqWith s "the projection does hand it out" (length (Projection.abilitiesOf bfId gs)) 1
+    Spec.assertBool s (not (any (isActivateOf bfId) (Action.legalActions S.alice gs))) "but no activation is offered"
 
 startYourEnginesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 startYourEnginesSpec s registry = Spec.describe s "StartYourEngines" $ do
@@ -186,8 +307,9 @@ maxSpeedSpec s registry = Spec.describe s "MaxSpeed" $ do
   -- CR 604.1 makes a static ability "simply true", so CR 702.178a's clause is
   -- re-asked on every read rather than latched: dropping the same player's speed
   -- back takes the ability away again, with no event and no resolution in
-  -- between. Nothing here distinguishes "exactly 4" from "at least 4" -- speed
-  -- cannot exceed 4 (CR 702.179d), so no board tells the two apart.
+  -- between. Nothing here distinguishes "exactly 4" from "at least 4": rule
+  -- 702.179d's own climb cannot exceed 4, and whether an EFFECT may is unsettled
+  -- (#809), so no board tells the two apart.
   Spec.it s "CR 604.1 the grant is re-asked, not latched" $ do
     raceway <- S.printingOf s registry "Muraganda Raceway"
     let (racewayId, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
@@ -316,6 +438,61 @@ increaseSpec s registry = Spec.describe s "Increase" $ do
         twice = castResolveSettle atBob S.alice secondSpell withAnother
     Spec.assertEqWith s "one increase on the first turn" (speedOf S.alice once) (Just (Just 2))
     Spec.assertEqWith s "and another on the second" (speedOf S.alice twice) (Just (Just 3))
+
+-- CR 702.179c read off a CARD rather than off rule 702.179d: "if a player has no
+-- speed and they are instructed to increase their speed by a certain value, their
+-- speed becomes that value". The instruction the rule anticipates has to come from
+-- somewhere, and rule 702.179d is not it -- that ability only exists for a player
+-- who already has 1 or more speed, so its own increase can never reach the branch.
+--
+-- The proving card is a LABELED SYNTHETIC: "Synthetic Speed Boost", a {0} sorcery
+-- reading "Each player's speed increases by 2". No printing raises a speed by its
+-- own text -- a Scryfall sweep of every card whose oracle text contains "speed"
+-- turns up exactly one that changes a speed at all, Spikeshell Harrier, and it
+-- REDUCES one (#808). Nothing in rule 702.179 forbids the card written here:
+-- 702.179c names "a certain value" and no player in particular.
+--
+-- Every number here is chosen to be unreachable any other way. The increase is 2,
+-- so no reading of rule 702.179's own machinery -- CR 704.5z's "becomes 1", CR
+-- 702.179d's "+1" -- produces it; and the effect names EACH PLAYER, so bob, who
+-- controls nothing at all, is moved by the card or by nothing.
+--
+-- Every board here stays below 4. Whether an effect may push a speed past CR
+-- 702.179e's max speed is not settled (#809), and these cases decline to enshrine
+-- an answer.
+cardIncreaseSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+cardIncreaseSpec s registry = Spec.describe s "CardIncrease" $ do
+  -- CR 702.179c's FIRST reading: a player who already has speed and is instructed
+  -- to increase it by a value goes up by that value. Alice is at 1 from CR 704.5z
+  -- before the spell is cast, so 3 is arithmetic no other rule performs.
+  Spec.it s "CR 702.179c a card's own text raises the speed a player already has" $ do
+    raceway <- S.printingOf s registry "Muraganda Raceway"
+    boost <- S.printingOf s registry "Synthetic Speed Boost"
+    let (_, board) = S.addCreature raceway S.alice (Setup.emptyGame S.bothPlayers)
+        (withSpell, spellId) = S.handOne boost board
+        gs = S.settleSba withSpell
+        after = castOnce S.alice spellId gs
+    Spec.assertEqWith s "alice starts at 1 (CR 704.5z)" (speedOf S.alice gs) (Just (Just 1))
+    Spec.assertEqWith s "and bob, controlling nothing, has none (CR 702.179b)" (speedOf S.bob gs) (Just Nothing)
+    -- The control that isolates the card. Rule 702.179d's ability fires on an
+    -- opponent losing life, and nothing here loses any -- so the set of players
+    -- whose inherent trigger was spent this turn is empty, and the increases below
+    -- have no other author.
+    Spec.assertEqWith s "no inherent trigger was spent (CR 702.179d)" (foldr (:) [] (GameState.speedIncreasedThisTurn after)) []
+    Spec.assertEqWith s "alice's 1 became 3" (speedOf S.alice after) (Just (Just 3))
+    Spec.assertEqWith s "and bob's none became 2, CR 702.179c's other reading" (speedOf S.bob after) (Just (Just 2))
+  -- CR 702.179c's SECOND reading on its own, with rule 702.179's own machinery
+  -- entirely absent: no permanent with start your engines!, so CR 704.5z never
+  -- acts, and nobody has speed for CR 702.179d's ability to exist on. The speed
+  -- both players end at is the card's value and nothing else.
+  Spec.it s "CR 702.179c a player with no speed instructed to increase becomes that value" $ do
+    boost <- S.printingOf s registry "Synthetic Speed Boost"
+    let (gs, spellId) = S.handOne boost (Setup.emptyGame S.bothPlayers)
+        after = castOnce S.alice spellId gs
+    Spec.assertEqWith s "neither player has speed to begin with (CR 702.179b)" (speedOf S.alice gs) (Just Nothing)
+    Spec.assertEqWith s "nor bob" (speedOf S.bob gs) (Just Nothing)
+    Spec.assertEqWith s "alice's speed BECAME 2 rather than rising to 1 from a stand-in 0" (speedOf S.alice after) (Just (Just 2))
+    Spec.assertEqWith s "and bob's did too, the effect naming every player" (speedOf S.bob after) (Just (Just 2))
 
 -- Put this player at exactly this speed, bypassing CR 702.179d's climb. Every
 -- case that uses it is about what READS speed (CR 702.178a's gate, CR 702.179e's

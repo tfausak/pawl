@@ -84,12 +84,18 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   --     Progress' "for each permanent destroyed this way".
   --   * Event.eventBindings writes to the object CR 603.3 put ON THE STACK, as
   --     the trigger was gathered -- Selfless Squire's "that many", the amount CR
-  --     615.13's prevention supplied.
+  --     615.13's prevention supplied, and Sanguine Bond's and Exquisite Blood's
+  --     "that much", the amount a life gain (CR 119.9) or a life loss (CR 119.3)
+  --     supplied.
   --
   -- The source is asked first so the existing reading is untouched, and the two
   -- cannot collide over one name: a mid-resolution bind names a slot the CARD
-  -- declared, and an event-supplied one names a reserved slot no card may declare
-  -- (see Pawl.Engine.Binding.preventedAmount).
+  -- authored, and an event-supplied one names a reserved slot no card may name
+  -- at all -- neither as a target spec (Pawl.CardSpec's reservedDeclarations)
+  -- nor as an effect's bound SlotName (its reservedBindings). Both halves of
+  -- that sweep are load-bearing HERE: the bind side is the one that could put a
+  -- card's own write on the source, where this arm looks first (see
+  -- Pawl.Engine.Binding.eventAmount).
   --
   -- CR 601.2b's X arrives here too, since #14 retired its dedicated arm. That arm
   -- read `announcedOn` ALONE, where this reads the source first and falls back --

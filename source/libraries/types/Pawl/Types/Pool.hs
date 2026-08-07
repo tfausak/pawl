@@ -4,14 +4,15 @@ import qualified Pawl.Types.PlayerScope as PlayerScope
 
 -- | CR 115: the closed set of recipient kinds a target slot may draw from, fixing
 -- both WHICH objects are candidates and HOW they are referenced
--- (Recipient.ToCreature / ToPlaneswalker / ToPlayer / ToObject). Closed-half
--- vocabulary, like the old TargetSpec enum -- it grows only when the rules define
--- a new kind of targetable object, never per card.
+-- (Recipient.ToCreature / ToPlaneswalker / ToBattle / ToPlayer / ToObject).
+-- Closed-half vocabulary, like the old TargetSpec enum -- it grows only when the
+-- rules define a new kind of targetable object, never per card.
 data Pool
   = Creatures -- CR 115.1a: creatures on the battlefield (ToCreature).
   | Players -- CR 115: players still in the game (ToPlayer).
-  | -- | CR 115.4 names creatures, players, planeswalkers AND battles; battles are
-    -- the one it does not admit (#302).
+  | -- | CR 115.4: "target creature, player, planeswalker, or battle" -- all four,
+    -- and nothing else. "Other game objects, such as noncreature artifacts or
+    -- spells, can't be chosen."
     AnyTarget
   | Permanents -- CR 110.1: permanents on the battlefield (ToObject).
   | Spells -- CR 112.1: spells on the stack (ToObject).

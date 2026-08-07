@@ -3,6 +3,7 @@ import qualified Data.List as List
 import qualified Pawl.ActivateSpec
 import qualified Pawl.AdventureSpec
 import qualified Pawl.AuraSpec
+import qualified Pawl.BattleSpec
 import qualified Pawl.BindingSpec
 import qualified Pawl.CardSpec
 import qualified Pawl.CardsSpec
@@ -19,6 +20,7 @@ import qualified Pawl.Codec.BindingSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
+import qualified Pawl.Codec.CastOfferSpec
 import qualified Pawl.Codec.CastingPermissionSpec
 import qualified Pawl.Codec.CastingRestrictionSpec
 import qualified Pawl.Codec.ColorSpec
@@ -40,6 +42,7 @@ import qualified Pawl.Codec.DamageKindSpec
 import qualified Pawl.Codec.DamagePatternSpec
 import qualified Pawl.Codec.DamageRewriteSpec
 import qualified Pawl.Codec.DaytimeSpec
+import qualified Pawl.Codec.DefenseSpec
 import qualified Pawl.Codec.DelayedTriggerSpec
 import qualified Pawl.Codec.DestructionRewriteSpec
 import qualified Pawl.Codec.DiscardCauseSpec
@@ -116,7 +119,6 @@ import qualified Pawl.Codec.UnlessPaidSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
-import qualified Pawl.Codec.ZoneChangeSubjectSpec
 import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
 import qualified Pawl.ColorSpec
@@ -154,6 +156,7 @@ import qualified Pawl.Json.PairSpec
 import qualified Pawl.Json.StringSpec
 import qualified Pawl.Json.ValueSpec
 import qualified Pawl.ManaSpec
+import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
 import qualified Pawl.PerformanceSpec
@@ -167,6 +170,7 @@ import qualified Pawl.ReplacementSpec
 import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
 import qualified Pawl.RingSpec
+import qualified Pawl.SagaSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
@@ -222,6 +226,7 @@ spec s registry = do
   Pawl.ActivateSpec.spec s registry
   Pawl.AdventureSpec.spec s registry
   Pawl.AuraSpec.spec s registry
+  Pawl.BattleSpec.spec s registry
   Pawl.BindingSpec.spec s
   Pawl.CardSpec.spec s registry
   Pawl.CardsSpec.spec s
@@ -238,6 +243,7 @@ spec s registry = do
   Pawl.Codec.BlockRequirementSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s
+  Pawl.Codec.CastOfferSpec.spec s
   Pawl.Codec.CastingPermissionSpec.spec s
   Pawl.Codec.CastingRestrictionSpec.spec s
   Pawl.Codec.ColorSpec.spec s
@@ -259,6 +265,7 @@ spec s registry = do
   Pawl.Codec.DamagePatternSpec.spec s
   Pawl.Codec.DamageRewriteSpec.spec s
   Pawl.Codec.DaytimeSpec.spec s
+  Pawl.Codec.DefenseSpec.spec s
   Pawl.Codec.DelayedTriggerSpec.spec s
   Pawl.Codec.DestructionRewriteSpec.spec s
   Pawl.Codec.DiscardCauseSpec.spec s
@@ -335,7 +342,6 @@ spec s registry = do
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
-  Pawl.Codec.ZoneChangeSubjectSpec.spec s
   Pawl.Codec.ZoneSpec.spec s
   Pawl.CodecIntegrationSpec.spec s registry
   Pawl.ColorSpec.spec s registry
@@ -372,6 +378,7 @@ spec s registry = do
   Pawl.Json.StringSpec.spec s
   Pawl.Json.ValueSpec.spec s
   Pawl.ManaSpec.spec s registry
+  Pawl.ModalDoubleFacedSpec.spec s registry
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
   Pawl.PerformanceSpec.spec s registry
@@ -385,6 +392,7 @@ spec s registry = do
   Pawl.RingSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.SagaSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TransformSpec.spec s registry

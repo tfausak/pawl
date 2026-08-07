@@ -15,7 +15,9 @@ import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Subtype as Subtype
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
@@ -29,6 +31,7 @@ import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Face as Face
@@ -37,7 +40,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.LastKnown as LastKnown
 import Pawl.Types.Layer (Layer)
 import qualified Pawl.Types.Layer as Layer
@@ -607,6 +610,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.power = Nothing,
         PC.toughness = Nothing,
         PC.loyalty = Nothing,
+        PC.defense = Nothing,
         PC.characteristicPT = Nothing,
         PC.cardTypes = Set.empty,
         PC.subtypes = Set.empty,
@@ -647,6 +651,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- CR 306.5a: a literal number, so copied through rather than
             -- evaluated like the two fields above.
             PC.loyalty = Face.loyalty face,
+            -- CR 310.4a: a literal number, copied through for CR 306.5a's reason.
+            PC.defense = Face.defense face,
             PC.characteristicPT = seedCharacteristicPT face,
             PC.cardTypes = TypeLine.types (Face.typeLine face),
             PC.subtypes = TypeLine.subtypes (Face.typeLine face),
@@ -670,7 +676,7 @@ printedColorsOf face =
 -- CR 702.114a. The one place that decides what devoid means, so the fold and the
 -- off-battlefield card view cannot drift apart on it.
 definesColorless :: Set Keyword -> Bool
-definesColorless = Set.member Keyword.Devoid
+definesColorless = Set.member Keyword.Type.Devoid
 
 -- CR 613.3 / 613.1e: the object's own colour-defining ability, applied at the
 -- start of layer 5.
@@ -688,9 +694,11 @@ definesColorless = Set.member Keyword.Devoid
 -- empties it), and layer 6 has not applied yet. So the rule holds by construction.
 -- Humility cannot remove it either, LoseAllAbilities being layer 6.
 --
--- Not implemented: a devoid granted by a layer-6 effect does nothing to colour.
--- Per CR 604.3a(2) such a grant is an ordinary layer-5 colour effect timestamped
--- when granted (CR 613.7a), which this does not build (#675).
+-- A devoid GRANTED by another object's static ability deliberately never reaches
+-- here: CR 604.3a denies it CDA status, so grantedDevoidParts routes it into layer
+-- 5 as a timestamped colour effect instead. Pawl.ColorSpec's "CR 613.7a a granted
+-- devoid clears an OLDER 'in addition' colour" is what holds the two routes apart:
+-- widening this fold to reach a granted instance answers that case blue.
 applyColorDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applyColorDefining pc =
   if definesColorless (Map.keysSet (PC.keywords pc))
@@ -849,14 +857,13 @@ setLandSubtypeEffects gs =
       -- ability whose affected set names a basic land type, so it is the first
       -- card a Magical Hack could aim at this read-point at all.
       --
-      -- The disagreement is still NOT OBSERVABLE, and this rewrite is consistency
-      -- rather than a fix with a test behind it: no test discriminates it, checked
-      -- by mutating it away. This gate decides whose rules-text abilities CR 305.7
-      -- strips, so seeing it needs a permanent whose PRINTED type line carries a
-      -- basic land type AND which has a rules-text static ability reaching other
-      -- objects -- affectsBase reads base characteristics. Every basic land is
-      -- abilityless, and no nonbasic land in the pool carries a basic land type,
-      -- so nothing can currently be on both sides (#584).
+      -- Proved by Pawl.ProjectionSpec's "Conversion strips the Estuary's ability,
+      -- and CR 612.1 hands it back". Seeing this rewrite at all takes a permanent
+      -- whose PRINTED type line carries a basic land type AND which has a
+      -- rules-text static ability reaching other objects -- affectsBase reads base
+      -- characteristics, so both sides have to be true of one card. Synthetic
+      -- Volcanic Estuary is that card, and the spec's comment says why it is
+      -- written rather than found.
       --
       -- textChangesAffecting folds the whole effect list, and this function is
       -- hoisted out of gather's walk to keep that off the per-permanent path, so
@@ -1078,6 +1085,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PlaySubgame _ -> effect
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary _ -> effect
+  Effect.OfferCast {} -> effect
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.
@@ -1208,13 +1216,21 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfLeavesTheBattlefield -> condition
   TriggerCondition.SpellOrAbilityCounters _ -> condition
   TriggerCondition.DamageToPlayerPrevented _ -> condition
+  TriggerCondition.PlayerGainsLife _ -> condition
+  TriggerCondition.PlayerLosesLife _ -> condition
+  -- CR 714.2b names a counter KIND and a number, neither of which is a subtype
+  -- CR 612.1 can change: a text-changing effect swapping Merfolk for Knight
+  -- leaves a chapter symbol reading the same chapter.
+  TriggerCondition.SelfCountersReached _ _ -> condition
+  TriggerCondition.SelfLastCounterRemoved _ -> condition
 
--- CR 612.1 through Condition's predicate vocabulary, at the three clauses a
+-- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger
--- and its CR 603.4 intervening "if", plus a static ability's CR 604.2 "as long
--- as" clause (gatherStatic). A CR 611.2b duration is stored rather than printed,
--- so no text change reaches it here. Both sides are rewritten, both being full
--- Quantities.
+-- and its CR 603.4 intervening "if", a static ability's CR 604.2 "as long as"
+-- clause (gatherStatic), and CR 508.1c / CR 509.1b's "unless some condition is
+-- met" gate on a combat restriction (Pawl.Engine.CombatRestriction.restricted).
+-- A CR 611.2b duration is stored rather than printed, so no text change reaches
+-- it here. Both sides are rewritten, both being full Quantities.
 rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
 rewriteCondition pairs condition =
   condition
@@ -1481,6 +1497,41 @@ abilitiesRemoved cands gs oid =
          in any (\c -> affects (gSource c) oid (gAffected c) partial gs) cs
    in any removesAt (Map.toList byLowest)
 
+-- CR 702.114a: devoid is the static ability "This object is colorless". PRINTED,
+-- it is a characteristic-defining ability and applyColorDefining folds it at the
+-- start of layer 5 (CR 613.3). GRANTED by another object's static ability, it is
+-- not one: CR 604.3a's clause (2) limits CDA status to an ability printed on the
+-- card it affects, granted to a token by the effect that created the token, or
+-- acquired by a copy or text-changing effect, and clauses (3) and (4) exclude an
+-- ability that directly affects other objects and one an object grants to itself.
+-- So the granted instance's colourless is an ORDINARY colour-changing effect,
+-- applied in layer 5 (CR 613.1e) in timestamp order -- and "this object is
+-- colorless" is exactly SetColor with no colours (CR 105.3).
+--
+-- Emitted as a second PART of the granting ability rather than as an effect of its
+-- own, which is what CR 613.6 and CR 613.7a ask for: one ability, so one affected
+-- set decided once, and one timestamp -- the granting permanent's. An effect of its
+-- own would have neither, since there is no second ability to hang them on.
+--
+-- The colour half is not the last word on the object's colour. It applies in
+-- timestamp order like any other layer-5 effect, so a NEWER colour-changing effect
+-- lands on top of it and the object ends up with the devoid keyword and a colour.
+-- That is CR 613.7, not a leak.
+--
+-- Casing on a KEYWORD, which rule 702 makes part of the rulebook -- the same act
+-- as reading Keyword.Type.StartYourEngines off a projection. It is not a case on an
+-- effect's identity: the caller still routes by `layer`, and the modification this
+-- produces is the one Moonlace already stores.
+--
+-- Only a static ability's grant is expanded. A devoid granted by the resolution of
+-- a spell or ability is not (#793). counterGathered's grants need no arm at all:
+-- CR 122.1b enumerates the keywords a keyword counter can be and devoid is not
+-- among them, so no board can put one there.
+grantedDevoidParts :: Modification -> NonEmpty.NonEmpty Modification
+grantedDevoidParts m = case m of
+  Modification.GainKeyword Keyword.Type.Devoid -> m NonEmpty.:| [Modification.SetColor Set.empty]
+  _ -> m NonEmpty.:| []
+
 -- One static ability's parts, ready to fold: CR 613.6's unit. `n` is the ability's
 -- index on its source, and (src, n) is the key every part of a MULTI-part ability
 -- carries, so projectWith can tell that a layer-4 part and a layer-7b part are one
@@ -1508,7 +1559,10 @@ abilitiesRemoved cands gs oid =
 -- the effect start to apply at all.
 gatherStatic :: (Layer -> Condition.Type.Condition -> Bool) -> ObjectId -> Timestamp -> [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Bool -> Natural -> StaticAbility.StaticAbility -> [Gathered]
 gatherStatic functioning src ts changes stripped n sa =
-  let ms = fmap (rewriteModification changes) (StaticAbility.modifications sa)
+  let -- CR 612 rewrites each printed modification, and grantedDevoidParts then
+      -- expands what the rewrite produced -- in that order, since the expansion
+      -- emits an engine-minted part that is not card text for CR 612 to reach.
+      ms = StaticAbility.modifications sa >>= grantedDevoidParts . rewriteModification changes
       key = case ms of
         _ NonEmpty.:| (_ : _) -> Just (src, n)
         _ -> Nothing
@@ -1592,6 +1646,16 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- reads loyalty -- CR 704.5i and CR 606.6 count Object.counters
               -- directly instead.
               CounterKind.Loyalty -> []
+              -- CR 714.3: a lore counter grants nothing either. CR 714.2b's
+              -- chapter trigger, CR 714.3c's turn-based action and CR 704.5s's
+              -- state-based action count Object.counters directly, the same way
+              -- loyalty's readers do.
+              CounterKind.Lore -> []
+              -- Nor does a defense counter, for the reason loyalty's and lore's
+              -- arms give: no CR 613 layer reads defense. CR 310.6's removal, CR
+              -- 310.11b's trigger and CR 704.5v's state-based action all count
+              -- Object.counters directly, exactly as those two do.
+              CounterKind.Defense -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
@@ -1629,11 +1693,11 @@ data Aspect
 -- instant control or creature-ness changes, and pawl removes it at the next
 -- settle.
 --
--- The CR 506.4 clauses that remain unbuilt -- phasing (#154) and an attacked
--- battle (#302) -- would arrive by one of those same doors; the
--- attacked-planeswalker clauses are answered where the attack target is read
--- (Combat.stillAttacked) and never edit the record at all.
-filterReads :: Filter.Type.Filter Keyword.Keyword -> Set Aspect
+-- The CR 506.4 clause that remains unbuilt -- phasing (#154) -- would arrive by
+-- one of those same doors; the attacked-planeswalker and attacked-battle clauses
+-- are answered where the attack target is read (Combat.stillAttacked and
+-- Combat.stillAttackedBattle) and never edit the record at all.
+filterReads :: Filter.Type.Filter Keyword.Type.Keyword -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
   Filter.Type.HasSupertype _ -> Set.empty
@@ -2113,7 +2177,15 @@ replacementsOf oid gs =
    in PC.replacementEffects pc <> intrinsicReplacementsOf pc
 
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
--- replacement effect.
+-- replacement effect, CR 310.4b's identically shaped one for a battle's defense,
+-- and rule 702.136a's riot and CR 714.3a's Saga lore counter beside them. Those
+-- four are the whole list, and each arm below is one of them.
+--
+-- CR 310.8a's protector is NOT here, though it is also chosen as a battle enters:
+-- rule 310.8a names no ability and cites no rule 614, where CR 310.4b says
+-- outright that its ability "creates a replacement effect". It lives in
+-- Pawl.Engine.Event.designateProtector instead, which explains what minting it
+-- here cost.
 --
 -- Minted from the finished projection rather than stored on the card, the posture
 -- Mana.subtypeMana and Keyword.triggeredAbilitiesOf take. Three consequences, all
@@ -2129,7 +2201,17 @@ replacementsOf oid gs =
 --     what layer 6 would have to remove.
 --
 -- Nothing for a planeswalker with no printed loyalty, which the CardSpec lint
--- makes unrepresentable.
+-- makes unrepresentable. The battle/defense arm leans on that lint's twin the same
+-- way, and all three consequences above read across unchanged -- CR 310.4b is CR
+-- 306.5b with one characteristic swapped for another, down to the projected card
+-- type deciding and the projected number being read.
+--
+-- The riot half (CR 702.136a) is minted by Keyword.entryReplacementsOf off the
+-- SAME finished projection, and the third consequence above reads the other way
+-- for it: minting after the layer fold puts riot INSIDE LoseAllAbilities' reach,
+-- because the keyword itself is what layer 6 removes. That is the rule --
+-- Humility'd, a creature has no riot to offer a choice -- where CR 306.5b's
+-- loyalty survives because a card type is not an ability.
 intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
@@ -2138,6 +2220,19 @@ intrinsicReplacementsOf pc =
   | Set.member CardType.Planeswalker (PC.cardTypes pc),
     Loyalty.MkLoyalty n <- Maybe.maybeToList (PC.loyalty pc)
   ]
+    -- CR 310.4b's intrinsic "this permanent enters with a number of defense
+    -- counters on it equal to its printed defense number" -- CR 306.5b's clause
+    -- one rule number over, keyed on the projected card type and reading the
+    -- projected defense for the same three reasons.
+    <> [ ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Defense n)
+       | Set.member CardType.Battle (PC.cardTypes pc),
+         Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
+       ]
+    <> Keyword.entryReplacementsOf (PC.keywords pc)
+    -- CR 714.3a's intrinsic "this Saga enters with a lore counter on it", minted
+    -- off the same finished projection for CR 306.5b's reason: a subtype is not an
+    -- ability, so a Saga under Humility keeps it.
+    <> Saga.entryReplacementsOf pc
 
 -- CR 614.1: every replacement effect active on the battlefield, PAIRED WITH ITS
 -- SOURCE -- a ControllerRelation pattern (CR 109.5's "you") is unanswerable
@@ -2148,7 +2243,15 @@ intrinsicReplacementsOf pc =
 -- The short-circuit reads BASE cards while the result reads the PROJECTION, sound
 -- only because the one way to acquire an unprinted replacement effect is
 -- `EntryR AsCopy` -- and a card with that arm is itself a base card with a
--- replacement effect.
+-- replacement effect -- or a minting keyword, which the two riot disjuncts cover:
+-- one for a face that PRINTS such a keyword and one for a face whose static
+-- ability GRANTS it (Spider-Punk's "other Spiders you control have riot"). The
+-- granting card is on the battlefield whenever the grant is, which is what makes
+-- reading base faces enough.
+--
+-- Not implemented: a minting keyword that reaches a permanent through a stored
+-- continuous effect or a keyword counter is on no base face, so this gate does
+-- not see it (#833).
 --
 -- Past the short-circuit this projects per permanent rather than threading one
 -- board, so a board holding any replacement effect pays a fresh gather per
@@ -2164,10 +2267,52 @@ replacementsAffecting gs =
         Just face ->
           not (null (Face.replacementEffects face))
             || Set.member CardType.Planeswalker (TypeLine.types (Face.typeLine face))
+            -- The Saga disjunct is the planeswalker one's twin: CR 714.3a's
+            -- intrinsic replacement is minted from the projection too, so it
+            -- appears in no base face's list either.
+            || Set.member Subtype.Type.Saga (TypeLine.subtypes (Face.typeLine face))
+            -- And the battle disjunct is the third of the same shape, for CR
+            -- 310.4b's intrinsic replacement.
+            || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
+            || any Keyword.mintsEntryReplacement (Face.keywords face)
+            || any (any grantsMintingKeyword . StaticAbility.modifications) (Face.staticAbilities face)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
         else concatMap forOne onBattlefield
+
+-- Does this modification hand its affected objects a keyword the RULES turn into
+-- a replacement effect (rule 702.136a's riot)? Read only by the short-circuit
+-- above, off a BASE face, to answer "could anything on this board have a
+-- replacement effect".
+--
+-- A CLASSIFICATION of a modification's shape, not a case on an effect's identity:
+-- what it asks is "does this grant a keyword, and does rule 702 make that keyword
+-- mint a row", and both halves are the rulebook's.
+--
+-- Exhaustive rather than a catch-all, for the reason `layer` gives above: a
+-- modification added later that also hands out abilities would otherwise answer
+-- False here and take its grantee out of the gathered set, which is a MISSING
+-- replacement rather than a build failure.
+grantsMintingKeyword :: Modification.Modification -> Bool
+grantsMintingKeyword m = case m of
+  Modification.GainKeyword k -> Keyword.mintsEntryReplacement k
+  Modification.LoseAllAbilities -> False
+  Modification.SetBasePowerToughness _ _ -> False
+  Modification.ModifyPowerToughness _ _ -> False
+  Modification.SetLandSubtype _ -> False
+  Modification.SetLandSubtypeToChosen -> False
+  Modification.AddLandSubtype _ -> False
+  Modification.SetCreatureSubtype _ -> False
+  Modification.AddCreatureSubtype _ -> False
+  Modification.AddCardType _ -> False
+  Modification.ChangeSubtypeWord _ _ -> False
+  Modification.SetController _ -> False
+  Modification.SetControllerToSource -> False
+  Modification.SetColor _ -> False
+  Modification.AddColor _ -> False
+  Modification.AddChosenColor -> False
+  Modification.SwitchPowerToughness -> False
 
 -- CR 603 / 613 layer 6: an object's printed-and-granted triggered abilities after
 -- the layer system. A Humility'd creature has none.
@@ -2224,6 +2369,19 @@ isPlaneswalkerOf = isPlaneswalkerGiven Map.empty
 isPlaneswalkerGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
 isPlaneswalkerGiven pcs oid gs = Set.member CardType.Planeswalker (cardTypesGiven pcs oid gs)
 
+-- CR 613.1d a third time, for CR 115.4's fourth kind of "any target" and CR
+-- 120.3h's defense-counter removal. Projected for isCreatureOf's reason.
+--
+-- Pawl.Engine.Battle.isBattle asks the same question of an already-finished
+-- projection, and is the form rule 310's own module uses -- that module imports no
+-- Projection, deliberately. This is the id-taking form its callers on this side of
+-- the graph (Pawl.Engine.Target's pool, Pawl.Engine.Damage's classification) want.
+isBattleOf :: ObjectId -> GameState -> Bool
+isBattleOf = isBattleGiven Map.empty
+
+isBattleGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Bool
+isBattleGiven pcs oid gs = Set.member CardType.Battle (cardTypesGiven pcs oid gs)
+
 -- The same question against a PRECOMPUTED candidate list rather than a
 -- pre-projected board. For a caller asking about a handful of objects out of a
 -- whole battlefield, that is cheaper: one gather and one fold per object, where
@@ -2253,7 +2411,7 @@ totalToxic oid gs = toxicIn (keywordsOf oid gs)
 toxicIn :: Map Keyword Natural -> Natural
 toxicIn keywords =
   let value keyword count = case keyword of
-        Keyword.Toxic n -> n * count
+        Keyword.Type.Toxic n -> n * count
         _ -> 0
    in sum (Map.elems (Map.mapWithKey value keywords))
 

@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Phase as Phase
@@ -187,3 +188,50 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.DamageToPlayerPrevented PlayerRelation.Opponent)
       """ {"type":"DamageToPlayerPrevented","value":{"type":"Opponent"}} """
+  -- CR 119.9's life-gain trigger. Both relations, for the same reason.
+  Spec.it s "PlayerGainsLife round-trips both relations" $ do
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerGainsLife PlayerRelation.You)
+      """ {"type":"PlayerGainsLife","value":{"type":"You"}} """
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerGainsLife PlayerRelation.Opponent)
+      """ {"type":"PlayerGainsLife","value":{"type":"Opponent"}} """
+  -- The life-LOSS trigger. A DIFFERENT tag from PlayerGainsLife above and the
+  -- same payload shape, so the two must never decode to each other -- the same
+  -- hazard GameEvent's LifeLost/LifeGained pair carries.
+  Spec.it s "PlayerLosesLife round-trips both relations" $ do
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerLosesLife PlayerRelation.You)
+      """ {"type":"PlayerLosesLife","value":{"type":"You"}} """
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent)
+      """ {"type":"PlayerLosesLife","value":{"type":"Opponent"}} """
+  -- CR 714.2b. The payload is the counter KIND then the chapter number, in that
+  -- order, since a Saga's chapters are told apart by the number alone.
+  Spec.it s "SelfCountersReached round-trips its kind and its chapter number" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfCountersReached CounterKind.Lore 3)
+      """ {"type":"SelfCountersReached","value":[{"type":"Lore"},3]} """
+  -- CR 310.11b. The payload is the counter kind alone: "the last" needs no number.
+  Spec.it s "SelfLastCounterRemoved round-trips its kind" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfLastCounterRemoved CounterKind.Defense)
+      """ {"type":"SelfLastCounterRemoved","value":{"type":"Defense"}} """

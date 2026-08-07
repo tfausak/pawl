@@ -22,6 +22,11 @@ import qualified Pawl.Types.Keyword as Keyword
 -- 614.12b's combined-affordability check across permanents entering
 -- simultaneously is still not implemented -- the entry loop has no budget to
 -- measure a batch against (#72).
+--
+-- A permanent whose OWN text says it enters TAPPED ("This land enters tapped")
+-- has no arm here: the tap state an entering incarnation gets is written only by
+-- an effect's rider (Pawl.Types.EntryRiders), never by a replacement the card
+-- itself prints (#894).
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption.EntryOption]
@@ -124,4 +129,24 @@ data EntryRewrite
     -- constructor plus a per-permanent count. Not carried: one is what Shimatsu
     -- needs, and no devour card is in the pool.
     SacrificeAnyNumber (Filter.Filter Keyword.Keyword) (Maybe CounterKind.CounterKind)
+  | -- | CR 702.136a via CR 614.1c: riot. "You may have this permanent enter with
+    -- an additional +1/+1 counter on it. If you don't, it gains haste."
+    --
+    -- NOT written by a card. Like CR 306.5b's loyalty, this arm is minted from
+    -- the finished projection -- Pawl.Engine.Keyword.entryReplacementsOf, called
+    -- by Pawl.Engine.Projection.intrinsicReplacementsOf -- so a card says only
+    -- `Keyword.Riot` and rule 702.136a says what it means. It still round-trips
+    -- through the codec, because every arm of this type does.
+    --
+    -- NULLARY, where WithCounters carries a kind and a count: rule 702.136a
+    -- fixes both halves completely, so there is nothing for a card to vary.
+    --
+    -- The two halves land in two different places, which is why this is one arm
+    -- and not two. The counter goes through Pawl.Engine.Event.putCounters, CR
+    -- 122.6's funnel, so CR 614.16 applies to it (Doubling Season doubles riot's
+    -- counter). The haste is a stored CR 611.2 continuous effect with CR 611.2a's
+    -- "rest of the game" duration, which is what "it gains haste" with no stated
+    -- end means -- neither value is copiable (CR 707.2), so neither may be
+    -- written into the snapshot AsCopy and ChoiceOf use.
+    Riot
   deriving (Eq, Ord, Show)

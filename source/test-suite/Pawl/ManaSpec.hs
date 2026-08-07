@@ -981,6 +981,83 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
     Spec.assertEqWith s "all three sources tapped" (S.tappedCount S.alice resolved) 3
     Spec.assertEqWith s "and nothing was left over" (poolSize S.alice resolved) 0
 
+-- CR 700.2's SELECTION on a mana ability. Synthetic Prismatic Wellspring
+-- (Land, "{T}: Choose two -- * Add {R}. * Add {G}. * Add {W}.") is the pool's
+-- first mana ability whose selection is not "choose exactly one", and it is
+-- what separates "which mode" from "which COMBINATION of modes" (#449). A
+-- choose-two ability read one mode at a time under-counts its supply by half,
+-- so a cost it can afford is refused.
+--
+-- SYNTHETIC, and legitimate on the rules: CR 700.2 makes an object modal by a
+-- bulleted list plus an instruction to choose a NUMBER of those options, CR
+-- 700.2a names activated abilities explicitly, CR 700.2d covers a selection of
+-- more than one mode, and CR 605.1a admits any activated ability that doesn't
+-- target, isn't a loyalty ability, and could add mana. Nothing there bounds a
+-- mana ability's selection to one. Every component is printed separately -- a
+-- modal activated ability (Bow of Nylea), "Choose two --" (Kozilek's Command),
+-- a mana-adding mode inside a modal ability (Jeska's Will) -- and only the
+-- composite is missing. A Scryfall search across paper, Arena, MTGO, playtest
+-- and un-set printings finds no modal mana ability at all: a bulleted mode
+-- beginning "Add" matches five cards, every one a spell or a non-mana triggered
+-- ability, and a "{T}: Choose one/two/three" activated ability matches nine,
+-- none of which adds mana.
+wellspringSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
+  -- THE case, and it is taken with the pool EMPTY and the ability unactivated,
+  -- which is what makes it about the supply model rather than about the pool:
+  -- CR 118.3 counts an untapped source as the mana it could make, and one
+  -- activation of this one makes TWO. Activating first and asking afterwards
+  -- would pass either way, since by then the mana is really in the pool.
+  --
+  -- {3} is the falsifier for a model that simply credited a modal source with
+  -- all of its modes: three modes, but the selection demands two.
+  Spec.it s "CR 118.3 a lone untapped Wellspring pays {2}, though it is not activated" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    let gs = S.landsInPlay wellspring 1
+    Spec.assertEqWith s "nothing is floating" (poolSize S.alice gs) 0
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
+    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
+
+  -- CR 700.2d: "If a player is allowed to choose more than one mode ... that
+  -- player normally can't choose the same mode more than once." So the
+  -- combinations are the size-two subsets and not the size-two sequences --
+  -- {R}{G} is on offer, {R}{R} never is. This is what a model enumerating
+  -- repetitions would fail, and it fails nothing else.
+  Spec.it s "CR 700.2d two DIFFERENT modes, so a Wellspring pays {R}{G} but not {R}{R}" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    let gs = S.landsInPlay wellspring 1
+        red = ManaSymbol.OfType (ManaType.Colored Color.Red)
+        green = ManaSymbol.OfType (ManaType.Colored Color.Green)
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [red, green]) gs) "{R}{G} is affordable"
+    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
+
+  -- What one activation actually PUTS in the pool, which is the same
+  -- enumeration read through the other door: CR 106.12's tap-for-mana adds a
+  -- whole yield, and a chosen pair of modes is one yield of two mana (CR
+  -- 608.2c orders them by mode). S.identityAnswer takes the first candidate,
+  -- which is the first two modes.
+  Spec.it s "CR 605.3b tapping a Wellspring adds two mana, one per chosen mode" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    let (wellspringId, gs) = S.addCreature wellspring S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith
+      s
+      "{R} and {G}, from one activation"
+      (tappedFor S.identityAnswer wellspringId gs)
+      [ManaType.Colored Color.Red, ManaType.Colored Color.Green]
+
+  -- The gameplay-level proof (design.md section 4): a real spell cast end to
+  -- end off the one synthetic permanent. Liquimetal Coating is a plain {2}
+  -- Artifact -- no colour in the cost and nothing to target -- so quantity is
+  -- the only thing the payment can turn on.
+  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Wellspring" $ do
+    wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
+    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
+    let resolved = castOffBoard S.identityAnswer [wellspring] liquimetalCoating
+    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
+    Spec.assertEqWith s "the Wellspring is tapped" (S.tappedCount S.alice resolved) 1
+    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
@@ -993,10 +1070,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianSpec s registry
   totalCostSpec s registry
   dismemberSpec s registry
+  phyrexianTollSpec s registry
   moltensteelSpec s registry
   upwellingSpec s registry
   omnathSpec s registry
   snowSpec s registry
+  snowSymbolSpec s registry
+  wellspringSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against
@@ -1116,6 +1196,84 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     icehideGolem <- S.printingOf s registry "Icehide Golem"
     let (oid, gs) = S.addCreature icehideGolem S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertEqWith s "colorless" (Projection.colorsOf oid gs) Set.empty
+
+-- One colorless mana carrying no production tag: what CR 106.11 turns an "add
+-- {S}" into when the source is not snow, and the unit every assertion below
+-- compares against.
+plainColorless :: ManaUnit.ManaUnit
+plainColorless = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colorless, ManaUnit.tags = Set.empty}
+
+-- CR 106.11: "If an effect would add mana represented by one or more snow mana
+-- symbols to a player's mana pool, that much colorless mana is added to that
+-- player's mana pool."
+--
+-- A rewrite rule, and the two halves of the rewrite are separable. The AMOUNT
+-- and the TYPE come from this rule -- one colorless mana per symbol. Whether
+-- that mana is SNOW does not: CR 107.4h and CR 106.3 make that a fact about the
+-- source, so it is exactly as true of an "add {S}" as of an "add {C}".
+--
+-- Synthetic Snow Symbol is deliberately a NONSNOW land (search of Scryfall on
+-- 2026-08-06 with include_extras, for o:"add {S}", o:"adds {S}" and
+-- oracle:"{S}" oracle:add, finds no printing that adds {S} at all, snow or
+-- otherwise). Nonsnow is what makes these tests about CR 106.11 rather than
+-- about snow sources: a snow printing would let productionTagsGiven, which
+-- snowSpec already covers, carry the {S} assertions on its own.
+snowSymbolSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
+  -- The rewrite itself, read off the pool: two symbols, two mana, colorless, and
+  -- untagged. The first three are CR 106.11 and each is a separate way to get it
+  -- wrong; the fourth is CR 107.4h, and is here because the pool is the only
+  -- place a tag stamped by mistake would show.
+  Spec.it s "CR 106.11 tapping it adds two colorless mana, neither of them snow" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    let board = S.landsInPlay snowSymbol 1
+        tapped = case Game.zoneMembers Zone.Battlefield S.alice board of
+          [] -> []
+          oid : _ -> poolUnits (S.runPure S.identityAnswer board (Mana.tapForMana oid))
+    Spec.assertEqWith s "two untagged colorless mana" tapped [plainColorless, plainColorless]
+
+  -- CR 107.4h from the other side, and THE case this card exists for: the symbol
+  -- that produced the mana says nothing about whether the mana is snow. The
+  -- control inverts both halves at once -- a Snow-Covered Mountain is a snow
+  -- source whose mana was never written {S}, and it is the one that pays. So the
+  -- negative here cannot be passing merely because the board is short of mana:
+  -- the same board casts a {2} spell (the Liquimetal Coating case below).
+  Spec.it s "CR 107.4h {S}-produced mana from a nonsnow source does not pay {S}" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
+    icehideGolem <- S.printingOf s registry "Icehide Golem"
+    let board = S.landsInPlay snowSymbol 1
+        (g, spellId) = S.handOne icehideGolem board
+        control = S.landsInPlay snowMountain 1
+        (cg, controlSpellId) = S.handOne icehideGolem control
+    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) board) "it pays {2}"
+    Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "but it does not pay {S}"
+    Spec.assertBool s (not (S.castable S.alice spellId g)) "so the Golem cannot be cast off it"
+    Spec.assertBool s (S.castable S.alice controlSpellId cg) "though it can off a Snow-Covered Mountain"
+
+  -- CR 106.11's "colorless", pinned where a colour would show: an {S} rewritten
+  -- to a coloured mana would pay a coloured symbol, and this board pays none.
+  Spec.it s "CR 106.11 the mana is colorless, so it pays no coloured symbol" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    let board = S.landsInPlay snowSymbol 1
+        pays color = Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored color)]) board
+    Spec.assertBool s (not (any pays [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])) "no colour is payable"
+    Spec.assertBool
+      s
+      (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType ManaType.Colorless]) board)
+      "but {C} is"
+
+  -- The gameplay-level proof (design.md section 4): a real spell cast end to end
+  -- off the one synthetic permanent. Liquimetal Coating is a plain {2} Artifact,
+  -- so the two mana CR 106.11 produced are the whole of what pays for it.
+  Spec.it s "CR 601.2g Liquimetal Coating is cast off a lone Synthetic Snow Symbol" $ do
+    snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
+    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
+    let resolved = castOffBoard S.identityAnswer [snowSymbol] liquimetalCoating
+    Spec.assertEqWith s "stack empty" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "the Coating resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Liquimetal Coating") S.alice resolved) 1
+    Spec.assertEqWith s "the land is tapped" (S.tappedCount S.alice resolved) 1
+    Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
 
 -- alice controls `n` copies of `first` and `m` copies of `second`, and nothing
 -- else. Both are lands in every caller, but nothing here requires it.
@@ -1499,9 +1657,12 @@ castAndResolve answer gs oid =
 
 -- alice at `n` life and nothing else on the board.
 aliceAt :: Integer -> GameState.GameState
-aliceAt n =
-  let gs = Setup.emptyGame S.bothPlayers
-   in gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.alice (GameState.players gs)}
+aliceAt n = atLife n (Setup.emptyGame S.bothPlayers)
+
+-- alice at `n` life on a board that already has permanents on it, which aliceAt
+-- cannot build.
+atLife :: Integer -> GameState.GameState -> GameState.GameState
+atLife n gs = gs {GameState.players = Map.adjust (\p -> p {Player.life = n}) S.alice (GameState.players gs)}
 
 -- CR 107.4f: "A Phyrexian mana symbol represents a cost that can be paid either
 -- with one mana of its color or by paying 2 life."
@@ -1762,7 +1923,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     growth <- S.printingOf s registry "Mutagenic Growth"
     elves <- S.printingOf s registry "Llanowar Elves"
     let (growthId, _, board) = phyrexianBoard forest piker growth elves
-        gs = board {GameState.players = Map.adjust (\p -> p {Player.life = 1}) S.alice (GameState.players board)}
+        gs = atLife 1 board
         (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs growthId
     Spec.assertBool s (not (wasAskedHowToPayPhyrexian asked)) "no choice existed, so none was asked"
     Spec.assertEqWith s "the Growth resolved" (length (GameState.stack resolved)) 0
@@ -1980,6 +2141,91 @@ pikerOn gs =
    in case filter isPiker (Set.toAscList (GameState.battlefield gs)) of
         oid : _ -> oid
         [] -> ObjectId.MkObjectId 0
+
+-- Synthetic Phyrexian Toll ({G/P} Instant, "As an additional cost to cast this
+-- spell, pay 2 life. Target creature gets +2/+2 until end of turn.") -- Mutagenic
+-- Growth with CR 118.8's additional cost bolted on, and the card CR 118.3 was
+-- waiting for.
+--
+-- CR 107.4f's Phyrexian symbol is the only MANA symbol that spends life, so it is
+-- the only way one cost can demand life TWICE: once through the mana part and
+-- once through a component. CR 118.3 measures the demand whole -- "a player can't
+-- pay a cost without having the necessary resources to pay it fully" -- so the
+-- question this card asks, and no other card in the pool can, is whether pawl
+-- adds the two before comparing them to a life total.
+--
+-- SYNTHETIC, since no printing pairs them on one card, and legitimate because
+-- nothing in the CR keeps them apart: CR 118.8's additional cost and CR 107.4f's
+-- symbol are independent, and the Defiler cycle already puts a 2-life additional
+-- cost onto spells that may carry the symbol -- Defiler of Vigor onto Birthing
+-- Pod ({3}{G/P}, a green permanent spell by CR 202.2d). What keeps that pairing
+-- out of this spec is that the Defiler's cost is OPTIONAL (CR 118.8b, #102) and
+-- its reduction is conditional on having paid it (#101).
+--
+-- The board is phyrexianSpec's throughout -- a Goblin Piker to target, and the
+-- Toll in hand -- so the only thing that varies between these cases is alice's
+-- life total and whether a Forest is out.
+phyrexianTollSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianTollSpec s registry = Spec.describe s "SyntheticPhyrexianToll" $ do
+  -- THE case. With no green source the symbol costs 2 life and the additional
+  -- cost costs 2 more, so CR 118.3's "fully" is 4 -- and 3 is not 4, however
+  -- comfortably it covers each half on its own.
+  --
+  -- 4 life is the control, and it is what makes this about the SUM rather than
+  -- about the board: one more life and the same card off the same empty
+  -- battlefield casts. It is also CR 119.4's boundary, where the payment takes
+  -- alice to exactly 0 -- legal, with CR 704.5a's loss a state-based action
+  -- afterwards rather than a bar on the payment.
+  Spec.it s "CR 118.3 a {G/P} beside an additional 2 life costs 4, so 3 life is not enough" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
+    let inHandAt n =
+          let (_, withPiker) = S.addCreature piker S.alice (aliceAt n)
+           in S.handOne toll withPiker
+        castableAt n = let (g, tollId) = inHandAt n in S.castable S.alice tollId g
+        castsAt n =
+          let (g, tollId) = inHandAt n
+           in length (GameState.stack (snd (Engine.runGamePure S.identityAnswer g (S.cast S.alice tollId))))
+    Spec.assertBool s (not (castableAt 3)) "at 3 life it is not castable, though either half alone would be payable"
+    Spec.assertEqWith s "and it does not cast" (castsAt 3) 0
+    Spec.assertBool s (castableAt 4) "at 4 life it is"
+    Spec.assertEqWith s "and it does cast" (castsAt 4) 1
+
+  -- The same sum reaching CR 601.2b's announcement. A Forest opens the mana
+  -- route, so at 3 life the cast is legal -- but only that way, because the life
+  -- route would still want 2 on top of the component's 2. The interpreter asks
+  -- for the life route and must not be given it, exactly as the CR 119.4 floor
+  -- case in phyrexianSpec does with a bare {G/P} at 1 life.
+  Spec.it s "CR 601.2b at 3 life the additional cost closes the life route, and nothing is asked" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
+    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+        (gs, tollId) = S.handOne toll (atLife 3 withPiker)
+    Spec.assertBool s (S.castable S.alice tollId gs) "castable, by the mana route alone"
+    let (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs tollId
+    Spec.assertEqWith s "no choice existed, so none was asked" (phyrexianAnnouncements asked) []
+    Spec.assertEqWith s "the Forest paid the symbol" (S.tappedCount S.alice resolved) 1
+    Spec.assertEqWith s "so only the additional cost's 2 life was paid" (S.lifeOf S.alice resolved) (Just 1)
+    Spec.assertEqWith s "the Toll resolved" (length (GameState.stack resolved)) 0
+    Spec.assertEqWith s "and the Piker really was pumped" (Projection.powerOf (pikerOn resolved) resolved) (Just 4)
+
+  -- The control for the case above, and the guard against a floor that simply
+  -- refuses: two more life is enough for BOTH routes, so the choice comes back
+  -- and the engine asks. Answering life leaves the Forest untapped, which is the
+  -- discriminator -- a life total alone could be produced by paying life on TOP
+  -- of the mana.
+  Spec.it s "CR 118.13a at 5 life both routes are payable again, and the player is asked" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    toll <- S.printingOf s registry "Synthetic Phyrexian Toll"
+    let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
+        (gs, tollId) = S.handOne toll (atLife 5 withPiker)
+        (asked, resolved) = castAndResolve (announces PhyrexianPayment.PaysLife) gs tollId
+    Spec.assertEqWith s "the engine asked rather than deciding" (phyrexianAnnouncements asked) [PhyrexianPayment.PaysLife]
+    Spec.assertEqWith s "the Forest is untapped" (S.tappedCount S.alice resolved) 0
+    Spec.assertEqWith s "and 4 life paid the whole cost" (S.lifeOf S.alice resolved) (Just 1)
+    Spec.assertEqWith s "the Toll resolved" (length (GameState.stack resolved)) 0
 
 -- Moltensteel Dragon ({4}{R/P}{R/P}, with "{R/P}: This creature gets +1/+0 until
 -- end of turn") -- the first card in the pool with a Phyrexian mana symbol

@@ -18,6 +18,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
@@ -34,6 +35,7 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Departure as Departure.Type
@@ -45,12 +47,14 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
@@ -435,6 +439,115 @@ enchantPlayerSpec s registry = Spec.describe s "EnchantPlayer" $ do
           (Target.legalRecipients (Just S.alice) crownId theSpec gs)
           (Set.singleton (Recipient.ToObject onCreature))
 
+-- CR 702.5c: "If an Aura has multiple instances of enchant, all of them apply.
+-- The Aura's target must follow the restrictions from all the instances of
+-- enchant. The Aura can enchant only objects or players that match all of its
+-- enchant abilities." Pawl.Engine.Card.enchantSpec is the conjunction, and this
+-- group is what proves it applies at all three doors CR 702.5a opens: the cast's
+-- target legality (CR 601.2c), the state-based re-check (CR 704.5m / 303.4c) and
+-- attachment admission (CR 701.3a, through the same spec).
+--
+-- SYNTHETIC, and the last rank in design.md section 6's order: no printing has
+-- ever carried two instances of enchant, so nothing better exists. Both halves
+-- of the invented card ARE printed text, on different cards -- "enchant creature
+-- you control" (Setessan Training, in this pool) and "enchant tapped creature"
+-- (Entangling Vines, Glimmerdust Nap) -- so only their combination is new, and CR
+-- 702.5c is a rule that says what such a card DOES rather than one forbidding it.
+--
+-- The two restrictions are INDEPENDENT on purpose, and that is what makes the
+-- group discriminating rather than decorative. An Aura whose second restriction
+-- were implied by its first would behave identically on an engine that honoured
+-- only one, so each test below turns on a creature satisfying exactly ONE:
+-- alice's untapped creature and bob's tapped one at the cast, and then each
+-- restriction broken in turn while the other still holds -- untapping the host
+-- (the second fails) and Control Magic stealing it (the first fails). Dropping
+-- either instance from the fold fails one of these two.
+twoEnchantSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+twoEnchantSpec s registry = Spec.describe s "TwoEnchantAbilities" $ do
+  -- CR 601.2c through CR 702.5a's first job: what the Aura SPELL may target.
+  -- Read out of the committed card through Card.enchantSpec, never hand-built.
+  Spec.it s "CR 702.5c whole card: only a creature matching BOTH instances of enchant is a legal host" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    twofold <- S.printingOf s registry "Synthetic Twofold Enchant"
+    let base0 = S.landsInPlay plains 2
+        (mineTapped, base1) = S.addCreature piker S.alice base0
+        (mineUntapped, base2) = S.addCreature piker S.alice base1
+        (theirsTapped, base3) = S.addCreature piker S.bob base2
+        base4 = S.tapObject theirsTapped (S.tapObject mineTapped base3)
+        (gs, spellId) = S.handOne twofold base4
+        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Card.enchantSpec (S.combinedFace twofold))
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mineTapped)) gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        settled = S.settleSba after
+    Spec.assertEqWith s "alice's TAPPED creature matches both" (fmap (Set.member (Recipient.ToCreature mineTapped)) offered) (Just True)
+    Spec.assertEqWith s "her untapped one matches only 'creature you control'" (fmap (Set.member (Recipient.ToCreature mineUntapped)) offered) (Just False)
+    Spec.assertEqWith s "bob's tapped one matches only 'tapped creature'" (fmap (Set.member (Recipient.ToCreature theirsTapped)) offered) (Just False)
+    Spec.assertEqWith s "the Aura entered attached to the one creature that matched both" (length (attachedTo mineTapped after)) 1
+    Spec.assertEqWith s "the enchanted creature is a 2/1 plus +2/+2" (S.powerToughnessOf mineTapped settled) (Just (4, 3))
+    Spec.assertEqWith s "and a state-based pass leaves it alone, since both instances still hold" (length (attachedTo mineTapped settled)) 1
+  -- CR 704.5m / 303.4c with the SECOND instance broken and the first untouched:
+  -- alice still controls the creature, but CR 502.3's untap step untaps it, so
+  -- "enchant tapped creature" no longer admits it. An engine that read only the
+  -- first instance would keep the Aura here.
+  Spec.it s "CR 704.5m: the host untapping breaks the second instance, so the Aura is buried" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    twofold <- S.printingOf s registry "Synthetic Twofold Enchant"
+    let base0 = S.landsInPlay plains 2
+        (creature, base1) = S.addCreature piker S.alice base0
+        base2 = S.tapObject creature base1
+        (gs, spellId) = S.handOne twofold base2
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice spellId))
+        enchanted = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+        untapped = S.runPure S.identityAnswer enchanted (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
+        after = S.settleSba untapped
+    case attachedTo creature enchanted of
+      [aura] -> do
+        Spec.assertBool s (S.onBattlefield aura (S.settleSba enchanted)) "while the creature is tapped the Aura survives a pass"
+        Spec.assertEqWith s "the untap step really untapped it (CR 502.3)" (S.tappedCount S.alice untapped) 0
+        Spec.assertBool s (not (S.onBattlefield aura after)) "untapped, it is off the battlefield"
+        Spec.assertEqWith s "and in its owner's graveyard, not destroyed" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+        Spec.assertEqWith s "so the creature is a plain 2/1 again" (S.powerToughnessOf creature after) (Just (2, 1))
+      _ -> Spec.assertFailure s "the Aura should have entered attached to alice's tapped Piker"
+  -- The mirror image: the FIRST instance broken and the second untouched. Control
+  -- Magic moves control without untapping anything, so "enchant tapped creature"
+  -- still admits the host and "enchant creature you control" -- CR 109.5's "you"
+  -- being the Aura's controller -- no longer does. An engine that read only the
+  -- second instance would keep the Aura here.
+  Spec.it s "CR 704.5m whole cards: Control Magic breaks the first instance while the host stays tapped" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    twofold <- S.printingOf s registry "Synthetic Twofold Enchant"
+    controlMagic <- S.printingOf s registry "Control Magic"
+    -- {1}{W} for alice's Aura, {2}{U}{U} for bob's: S.landsInPlay seats alice's
+    -- lands only, so bob's Islands go in one at a time.
+    let base0 = S.landsInPlay plains 2
+        (creature, base1) = S.addCreature piker S.alice base0
+        base2 = S.tapObject creature base1
+        (_, base3) = S.addCreature island S.bob base2
+        (_, base4) = S.addCreature island S.bob base3
+        (_, base5) = S.addCreature island S.bob base4
+        (_, base6) = S.addCreature island S.bob base5
+        (gs, spellId) = S.handOne twofold base6
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) gs (S.cast S.alice spellId))
+        enchanted = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    case attachedTo creature enchanted of
+      [aura] -> do
+        let (stealId, withSteal) = S.addHandCard controlMagic S.bob enchanted
+            ready = withSteal {GameState.priority = Just S.bob, GameState.activePlayer = S.bob}
+            castSteal = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature creature)) ready (S.cast S.bob stealId))
+            stolen = snd (Engine.runGamePure S.identityAnswer castSteal Stack.resolveTop)
+            after = S.settleSba stolen
+        Spec.assertEqWith s "the steal really moved control (CR 613.1b)" (Projection.controllerOf creature stolen) (Just S.bob)
+        Spec.assertEqWith s "and left the creature tapped, so the second instance still holds" (fmap Object.tapped (Game.lookupObject creature after)) (Just TapState.Tapped)
+        Spec.assertBool s (not (S.onBattlefield aura after)) "the two-enchant Aura is off the battlefield"
+        Spec.assertEqWith s "in ALICE's graveyard, not the thief's" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+        Spec.assertEqWith s "exactly one Aura is left on the creature" (length (attachedTo creature after)) 1
+        Spec.assertEqWith s "and it is Control Magic, whose enchant spec narrows nothing" (fmap (\oid -> Game.cardOf oid after) (attachedTo creature after)) [Just (Printing.card controlMagic)]
+      _ -> Spec.assertFailure s "the Aura should have entered attached to alice's tapped Piker"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraSpec s registry
@@ -444,6 +557,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
   auraGraftSpec s registry
   enchantPlayerSpec s registry
   chosenLandTypeSpec s registry
+  twoEnchantSpec s registry
 
 -- Both of Convincing Mirage's prompts at once: its CR 303.4a enchant slot
 -- (Pool.Permanents narrowed to lands, so the recipient is tagged ToObject) and
@@ -1128,7 +1242,7 @@ auraSpec s registry = Spec.describe s "Aura" $ do
         -- attempted draw from an empty library (CR 704.5b).
         (_, base3) = S.addLibraryCard forest S.alice base2
         (gs, spellId) = S.handOne setessanTraining base3
-        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Face.enchant (S.combinedFace setessanTraining))
+        offered = fmap (\theSpec -> Target.legalRecipients (Just S.alice) spellId theSpec gs) (Card.enchantSpec (S.combinedFace setessanTraining))
         cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature mine)) gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
         -- CR 704.3: the enters trigger waits until a player would get priority,

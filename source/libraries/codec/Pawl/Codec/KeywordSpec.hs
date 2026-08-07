@@ -291,6 +291,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Devoid
       """ {"type":"Devoid"} """
+  Spec.it s "Riot" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Riot
+      """ {"type":"Riot"} """
   Spec.it s "Daybound" $
     Common.assertJsonCodec
       s

@@ -9,11 +9,14 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Battle as Battle
+import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
@@ -21,7 +24,6 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
-import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -190,8 +192,9 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 --
 -- Subtype.Fortification is the one clause of the rule with no constructor to case
 -- on, and is therefore unreachable rather than elided. The BATTLE clause is
--- written out, though nothing reaches it: CardType.Battle exists, but no card in
--- the pool carries one (#302). That is becomesUnattached's posture toward CR
+-- written out, though nothing reaches it: the pool has a battle, but CR 310.9
+-- forbids attaching one and no effect in the pool tries. That is
+-- becomesUnattached's posture toward CR
 -- 704.5n's "or to a player" -- express the clause, and let the pool decide when it
 -- fires. "Or to a player" needs no clause at all here: this rule asks only whether
 -- the attached permanent may be attached to ANYTHING, so the `Just _` below covers
@@ -228,6 +231,10 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 -- to an id that is no longer a permanent, and attached to one its own enchant
 -- ability no longer admits (CR 303.4c).
 --
+-- ABILITIES, plural, where CR 702.5c applies: Card.enchantSpec is the conjunction
+-- of every instance, so the third clause fires when the host stops matching ANY
+-- of them. Nothing here has to know how many there were.
+--
 -- CR 303.4c's own wording splits that last clause differently, and both halves
 -- land in the SAME place here because a pool's candidate list already excludes
 -- them: Target.creatureRecipients scans the battlefield of players still in the
@@ -255,7 +262,7 @@ cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
 fallsOff :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 fallsOff pcs gs oid = case Game.faceOf oid gs of
   Nothing -> False
-  Just face -> case Face.enchant face of
+  Just face -> case Card.enchantSpec face of
     Nothing -> False
     Just spec -> case Game.lookupObject oid gs of
       Nothing -> False
@@ -278,8 +285,9 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
 -- restrict targeting and nothing else -- so an Aura stays attached to a host that
 -- gains either. See Target.admittedRecipients.
 --
--- Pool.Creatures with no Filter is the shape MOST Face.enchant specs in this pool
--- carry (Unholy Strength). Target.creatureRecipients tags every candidate
+-- Pool.Creatures with no Filter is the shape MOST folded enchant specs in this
+-- pool carry (Unholy Strength) -- Card.enchantSpec leaves a lone unfiltered
+-- instance exactly as printed, which is what keeps this arm reachable at all. Target.creatureRecipients tags every candidate
 -- ToCreature, drawn from the battlefield objects owned by a still-playing player,
 -- so with no Filter to narrow that set "still legal" reduces EXACTLY to "still a
 -- creature, on the battlefield, owned by a player still in the game" -- a
@@ -294,7 +302,8 @@ fallsOff pcs gs oid = case Game.faceOf oid gs of
 -- whose ControlledBy You conjunct is unanswerable from `pcs` -- CR 109.5 makes
 -- that "you" the AURA's controller (CR 702.5a), so the answer changes when an
 -- opponent steals the enchanted creature -- and CR 702.5d's enchant-player Auras
--- carry a Pool.Players spec. The fallthrough pays the per-Aura re-projection the
+-- carry a Pool.Players spec. A CR 702.5c conjunction of several instances is a
+-- third: Filter.And is a Filter, so it lands here too. The fallthrough pays the per-Aura re-projection the
 -- reduction exists to avoid, but only for those. Serving a filtered spec off
 -- `pcs` would mean answering Filter.matches against the pre-pass projection
 -- instead of a fresh one, which is #430.
@@ -509,14 +518,74 @@ performStateBasedActions = do
       -- Pawl.Engine.Monarch keeps rule 725's settle-loop work: this module owns
       -- WHEN a state-based action is checked, not what each one means.
       revving = Speed.startingEngines pcs gs
-  -- CR 704.5j: the legend rule is the one state-based action that ASKS, and it
-  -- asks BEFORE anything below moves, so every choice is made against the state
-  -- this pass began in -- CR 704.3's simultaneity.
+      -- CR 704.5s / 714.4, from the SAME pre-pass state as everything above.
+      -- Lives in Pawl.Engine.Saga with the rest of rule 714, the way CR 704.5z
+      -- lives in Pawl.Engine.Speed.
+      --
+      -- The unscanned event log is an input because CR 704.5s exempts a Saga whose
+      -- chapter ability "has triggered but not yet left the stack", and the window
+      -- where such an ability has triggered but is not yet ON the stack is real:
+      -- Engine.performSettle runs this pass before placePendingTriggers. See
+      -- Saga.awaitingChapter.
+      told = Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs
+      -- CR 704.5v / 310.7, from the SAME pre-pass state as everything above, and
+      -- living in Pawl.Engine.Battle with the rest of rule 310 the way CR 704.5s
+      -- lives in Pawl.Engine.Saga.
+      --
+      -- The unscanned event log is an input for the reason CR 704.5s's is: the rule
+      -- exempts a battle whose ability "has triggered but not yet left the stack",
+      -- and this pass runs before placePendingTriggers. See Battle.awaitingAbility.
+      routed = Battle.defeated pcs (Event.unscannedEvents gs) gs
+      -- CR 704.5w / 704.5x: the battles whose protector designation has become
+      -- illegal, paired with the projection and controller the re-choice needs.
+      -- What "illegal" means is CR 310.10, and it lives in Pawl.Engine.Battle with
+      -- the rest of rule 310, the way CR 704.5s lives in Pawl.Engine.Saga.
+      --
+      -- Computed from the SAME pre-pass pcs/gs as every classification above, so
+      -- a battle whose protector is a player this pass is about to remove is
+      -- judged against the board the pass began in (CR 704.3).
+      undefendedOne oid = do
+        pc <- Map.lookup oid pcs
+        Monad.guard (Battle.isBattle pc)
+        controller <- Projection.controllerOf oid gs
+        Monad.guard (Battle.needsProtector pc controller (Game.stillPlaying gs) (Battle.isBeingAttacked oid gs) (Object.protector =<< Game.lookupObject oid gs))
+        pure (oid, pc, controller)
+      undefended = Maybe.mapMaybe undefendedOne onBattlefield
+  -- CR 704.5j: the legend rule is one of the two state-based actions that ASK --
+  -- CR 310.10's protector re-choice below is the other -- and both ask BEFORE
+  -- anything below moves, so every choice is made against the state this pass
+  -- began in (CR 704.3's simultaneity).
   legendVictims <- fmap concat (Monad.mapM chooseLegendVictims legendsToResolve)
+  -- CR 704.5w / 704.5x: the other state-based action that ASKS, in the same window
+  -- and for the same reason as the legend rule above. A battle for which no player
+  -- can be chosen joins the put-into-graveyard batch below, which is what the
+  -- second sentence of each of those rules, and of CR 310.10, says.
+  --
+  -- A battle this pass is ALSO about to move is still asked, which CR 704.3 is
+  -- what settles: the actions are simultaneous, so neither is conditioned on the
+  -- other having been skipped. The stamp is then erased by Object.newIncarnation
+  -- when the move lands, so the cost is a decision-log entry rather than a wrong
+  -- board -- the same posture chooseLegendVictims takes toward a member that CR
+  -- 704.5f is burying anyway.
+  redesignated <- Monad.mapM (\(oid, pc, controller) -> fmap ((,) oid) (Battle.designateProtector pc controller oid)) undefended
+  -- The chosen protectors are stamped BEFORE the batch below moves anything, so a
+  -- battle that found one is not also read as one that did not. Not a zone change
+  -- and not an event: CR 310.8a's designation is a mark on the object, and neither
+  -- rule 704.5w nor 704.5x makes it trigger anything.
+  State.modify' (\g -> g {GameState.objects = List.foldl' (\m (oid, picked) -> Map.adjust (\o -> o {Object.protector = picked}) oid m) (GameState.objects g) redesignated})
+  -- CR 310.10's second sentence: "if no player can be chosen this way, the battle
+  -- is put into its owner's graveyard". NOT EXERCISED by any test, and not for want
+  -- of trying -- a Siege's candidates are its controller's opponents still in the
+  -- game, so reaching this needs a game whose battle's controller has no opponent
+  -- left, and CR 104.2a ended that game already. Kept because the alternative is a
+  -- battle that sits at no protector forever, re-asked and unanswerable every pass
+  -- (#853).
+  let undefendable = Maybe.mapMaybe (\(oid, picked) -> if Maybe.isNothing picked then Just oid else Nothing) redesignated
   -- Every put-into-graveyard this pass performs, as ONE deduplicated batch:
   -- CR 704.5f (toughness <= 0), CR 704.5i (loyalty 0), CR 704.5j (the legend
-  -- rule's losers), CR 704.5k (the world rule's) and CR 704.5m (an Aura attached
-  -- to nothing). None of the five is a destruction, so none consults
+  -- rule's losers), CR 704.5k (the world rule's), CR 704.5m (an Aura attached to
+  -- nothing), CR 704.5v (a battle at defense 0) and CR 704.5w/704.5x (a battle no
+  -- player can protect). None of the seven is a destruction, so none consults
   -- indestructible or a regeneration shield.
   --
   -- Deduplicated because the sets overlap: a legend at 0 toughness whose
@@ -531,7 +600,7 @@ performStateBasedActions = do
   -- from the board the pass began in, so an animated Rest in Peace this pass is
   -- itself burying still exiles the cards the rest of the batch would put into
   -- graveyards. See Pawl.Engine.Replacement's applyReplacementsIn.
-  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras))
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.
@@ -554,10 +623,28 @@ performStateBasedActions = do
   -- The funnel's own CR 702.12b gate is judged against that same board too, so it
   -- asks what `destroyedBySba` asked above rather than second-guessing it from a
   -- board the buries have already changed. Only the funnel's existence filter is
-  -- live, which is what keeps a permanent the buries already moved -- CR 704.5m's
-  -- Aura, the one this line does not exclude by name -- from being offered a
-  -- destruction that never happens (CR 614.7).
+  -- live, which is what keeps a permanent the buries already moved from being
+  -- offered a destruction that never happens (CR 614.7). TWO members are left to
+  -- that filter rather than excluded by name here: CR 704.5m's Aura, and CR
+  -- 310.10's undefendable battle -- an animated Siege with lethal damage whose
+  -- protector has just left is in both `toDestroy` and `undefendable`.
   Event.destroyInBatch gs Regenerability.Regenerable (filter (\oid -> List.notElem oid legendVictims && List.notElem oid worldLosers) toDestroy)
+  -- CR 704.5s / 714.4: the Saga's controller SACRIFICES it. Neither a
+  -- put-into-graveyard nor a destruction, so it joins neither batch above -- CR
+  -- 701.21a is its own game action, ungated by indestructible and offering
+  -- regeneration nothing, and it goes through Pawl.Engine.Event.sacrifice, the one
+  -- funnel for it.
+  --
+  -- One call per Saga on the LIVE board, unlike the two batches above, because
+  -- that funnel takes one object and re-reads the state. The difference is
+  -- unobservable here in a way it would not be for the batches: a sacrifice moves
+  -- only the Saga named, and the classifier already fixed which Sagas and whose
+  -- from the pre-pass board -- so nothing this pass does can add one, and the
+  -- funnel's own existence check is what drops one another action already moved.
+  --
+  -- A board with two finished Sagas is where a batched version would differ, and
+  -- only if one of them replaced the other's move; no card in the pool does (#842).
+  Monad.mapM_ (uncurry Event.sacrifice) told
   destroyed <- State.get
   let leaving = filter (losesNow destroyed) (Game.stillPlaying destroyed)
       departed = foldr (Departure.depart Departure.Type.Lost) destroyed leaving
@@ -595,7 +682,7 @@ performStateBasedActions = do
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

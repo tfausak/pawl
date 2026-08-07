@@ -10,6 +10,7 @@
 -- than here.
 module Pawl.ReplacementSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -19,6 +20,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -46,7 +48,8 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -72,6 +75,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -88,7 +92,6 @@ import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- Every answer the engine asked for, in order -- so a test can assert that a
 -- prompt WAS raised (the engine did not decide) or was NOT (the choice was
@@ -211,7 +214,7 @@ leylineShape src ts =
   ActiveReplacement.MkActiveReplacement
     { ActiveReplacement.effect =
         ReplacementEffect.ZoneChangeR
-          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents ZoneChangeSubject.AnyObject)
+          (ZoneChangePattern.MkZoneChangePattern Zone.Graveyard ControllerRelation.Opponents (Filter.Type.And []))
           Zone.Exile,
       ActiveReplacement.source = src,
       ActiveReplacement.controller = S.alice,
@@ -729,6 +732,404 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     Spec.assertEqWith s "bob's life is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and 3 of the shield's 4 were spent, so 1 remains" (length (GameState.replacements after)) 1
 
+-- CR 615.12's damage that "can't be prevented", whose one producer in the pool
+-- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
+-- Spider-Man 92), set against the pool's one COUNTDOWN shield, Mending Hands
+-- ("Prevent the next 4 damage that would be dealt to any target this turn").
+-- Fog and Selfless Squire install prevention rows too, but CR 615.7's remaining
+-- amount is what clause 3 is about, and Mending Hands is its one producer.
+--
+-- Two of the rule's three clauses, which are the two that are reachable: the
+-- damage is dealt in full though an applicable shield is there, and "existing
+-- damage prevention shields won't be reduced by damage that can't be prevented".
+-- The middle clause -- the applied effect's additional effect still happening --
+-- has no producer, since no prevention row can carry one (#689).
+--
+-- EVERY case here has a CONTROL on a board that differs in Spider-Punk and in
+-- nothing else, so no assertion can pass because the damage would have got
+-- through anyway: the control board's shield genuinely prevents it. The first
+-- two cases are the two halves of one comparison, one board each; the third runs
+-- literally the same script over both.
+--
+-- The DAMAGE BATCHES are hand-built and the SPELL is not, for mendingHandsSpec's
+-- reason: casting Mending Hands for real is what proves the card, while reaching
+-- a real two-attacker combat batch would mean driving a whole combat phase to
+-- produce a fixture these assertions read straight off.
+spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      -- What each COUNTDOWN shield on the board has left (CR 615.7), read off
+      -- the rows themselves. An empty list is a shield spent to 0 and dropped,
+      -- which is why the count of rows would not say the same thing. A Fog-shaped
+      -- row would not appear here at all -- shieldRemaining answers Nothing for
+      -- one -- and none of these boards has one.
+      shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
+      wasAskedToOrderDamage responses =
+        let isOrder r = case r of
+              Response.OrderedDamage _ -> True
+              _ -> False
+         in any isOrder responses
+      -- alice's Piker is shielded by a Mending Hands she really casts on it;
+      -- bob's TWO Pikers are the sources of the hand-built events. Two of them
+      -- rather than one because CR 615.7's choice clause is conditioned on
+      -- "damage ... by two or more applicable sources at the same time", which
+      -- one source repeated does not satisfy on the rule's letter.
+      --
+      -- The Spider-Punks ride out as a LIST -- singleton or empty -- so both
+      -- boards can be driven by one script, and destroying "the Punks" is a
+      -- no-op on the control.
+      withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        mendingHands <- S.printingOf s registry "Mending Hands"
+        punkPrinting <- S.printingOf s registry "Spider-Punk"
+        let build withPunk =
+              let base = S.landsInPlay plains 1
+                  (victim, g1) = S.addCreature pikerPrinting S.alice base
+                  (attacker, g2) = S.addCreature pikerPrinting S.bob g1
+                  (other, g3) = S.addCreature pikerPrinting S.bob g2
+                  (punk, g4) = S.addCreature punkPrinting S.alice g3
+                  (punks, g5) = if withPunk then ([punk], g4) else ([], g3)
+                  (g6, spellId) = S.handOne mendingHands g5
+               in (victim, attacker, other, punks, castAndResolve (aimCreature victim) g6 spellId)
+        act build
+  -- THE CONTROL. Without Spider-Punk the shield does its ordinary CR 615.7 job:
+  -- the whole 3 is prevented, the event never happens (CR 615.6), and 1 of the
+  -- shield's 4 is left. Every refusal below would be true of a board whose
+  -- shield had never been there at all if this case did not pass.
+  Spec.it s "CR 615.7 without Spider-Punk the shield prevents the whole 3"
+    . withBoard
+    $ \build -> do
+      let (victim, attacker, _, _, shielded) = build False
+          after = settleDamage S.identityAnswer shielded [hit attacker (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the shield is a floating replacement" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "nothing is marked on the shielded creature" (S.damageOf victim after) (Just 0)
+      Spec.assertEqWith s "and no damage event happened at all" (amounts after) []
+      Spec.assertEqWith s "3 of the shield's 4 were spent, so 1 remains" (shieldsLeft after) [1]
+  -- CR 615.12's first and third clauses on one board. The shield is applicable
+  -- and is still applied -- CR 615.12a gives it exactly one application, which
+  -- is why this terminates -- but it prevents none of the damage, and it is not
+  -- reduced by damage it could not prevent.
+  Spec.it s "CR 615.12 with Spider-Punk the same 3 lands in full, and the shield is not reduced"
+    . withBoard
+    $ \build -> do
+      let (victim, attacker, _, _, shielded) = build True
+          after = settleDamage S.identityAnswer shielded [hit attacker (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the same shield is on the same creature" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim after) (Just 3)
+      Spec.assertEqWith s "and the event happened, at its full amount" (amounts after) [3]
+      Spec.assertEqWith s "the shield still holds all 4" (shieldsLeft after) [4]
+  -- The third clause made GAMEPLAY-observable, which the row read above is not:
+  -- one script over both boards -- take 3, lose the Punks (CR 604.2), take 2 --
+  -- and the shield that was never reduced still covers the 2, where the control's
+  -- spent shield cannot.
+  Spec.it s "CR 615.12 the unreduced shield still covers the next 2 once Spider-Punk is gone"
+    . withBoard
+    $ \build -> do
+      let script (victim, attacker, _, punks, shielded) =
+            let first_ = settleDamage S.identityAnswer shielded [hit attacker (Recipient.ToCreature victim) 3]
+                gone = S.runPure S.identityAnswer first_ (Event.destroy Regenerability.Regenerable punks)
+             in settleDamage S.identityAnswer gone [hit attacker (Recipient.ToCreature victim) 2]
+          punkBoard@(punkVictim, _, _, _, _) = build True
+          control@(controlVictim, _, _, _, _) = build False
+      Spec.assertEqWith s "with Spider-Punk only the first 3 is marked: the 2 is prevented whole" (S.damageOf punkVictim (script punkBoard)) (Just 3)
+      Spec.assertEqWith s "and 2 of the shield's untouched 4 are left" (shieldsLeft (script punkBoard)) [2]
+      Spec.assertEqWith s "without it the first 3 was prevented, so only 1 of the 2 is" (S.damageOf controlVictim (script control)) (Just 1)
+      Spec.assertEqWith s "and that shield is spent to 0 and gone" (shieldsLeft (script control)) []
+  -- The ELISION half, and the CR 615.7 prompt's other gate: two applicable
+  -- sources deal damage to the shielded creature at the same time, and the rule
+  -- gives its controller the choice of which the shield prevents -- but only
+  -- when that choice can change the board. It cannot here, since an
+  -- unpreventable batch costs the shield nothing in any order, so nothing is
+  -- asked and the whole 8 lands either way.
+  Spec.it s "CR 615.12 / 615.7 an unpreventable batch asks the shielded creature's controller nothing"
+    . withBoard
+    $ \build -> do
+      let (victim, attacker, other, _, shielded) = build True
+          (controlVictim, controlAttacker, controlOther, _, controlShielded) = build False
+          batch = [hit attacker (Recipient.ToCreature victim) 5, hit other (Recipient.ToCreature victim) 3]
+          controlBatch = [hit controlAttacker (Recipient.ToCreature controlVictim) 5, hit controlOther (Recipient.ToCreature controlVictim) 3]
+      Spec.assertBool
+        s
+        (wasAskedToOrderDamage (answersFor S.identityAnswer controlShielded (Damage.applyDamage controlBatch)))
+        "setup: without Spider-Punk 4 cannot cover 5 and 3, so alice is asked"
+      Spec.assertBool
+        s
+        (not (wasAskedToOrderDamage (answersFor S.identityAnswer shielded (Damage.applyDamage batch))))
+        "no OrderDamage was raised: no order of unpreventable damage spends the shield"
+      let after = settleDamage S.identityAnswer shielded batch
+      Spec.assertEqWith s "both events happened in full" (amounts after) [5, 3]
+      Spec.assertEqWith s "the whole 8 is marked" (S.damageOf victim after) (Just 8)
+      Spec.assertEqWith s "and the shield is untouched" (shieldsLeft after) [4]
+
+-- The players asked to decide something while a damage batch settles, in the
+-- order they were asked. Both batch-level questions count: CR 616.1's "which
+-- effect applies next" and CR 615.7's "which damage does the shield prevent".
+--
+-- The prompt STREAM rather than the board, because there is no board that can
+-- tell these two apart: the two players choose about DIFFERENT objects -- each
+-- orders the effects hitting their own creature -- so neither answer constrains
+-- the other and the same permanents end up in the same state whoever was asked
+-- first. What CR 616.1's last sentence governs is which player is asked, and
+-- under CR 101.4b that is information the later chooser gets to have.
+--
+-- Not a claim about Magic: an effect reachable from two players' events at once
+-- and spendable only once WOULD make this board-visible, and pawl has no such
+-- effect to build with today. Every replacement the pool can produce is either
+-- unlimited (Furnace of Rath) or names one recipient (Mending Hands).
+choosersAsked :: GameState.GameState -> [DamageEvent.DamageEvent] -> [PlayerId.PlayerId]
+choosersAsked gs batch =
+  let step :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      step p = case p of
+        Prompt.ChooseReplacement _ pid _ -> do
+          State.modify' (<> [pid])
+          pure 0
+        Prompt.OrderDamage _ pid events -> do
+          State.modify' (<> [pid])
+          pure (zipWith const [0 ..] events)
+        _ -> pure (S.identityAnswer p)
+   in State.execState (Engine.runGame step gs (Damage.applyDamage batch)) []
+
+-- A Furnace of Rath under alice, one Goblin Piker each side, and a Mending Hands
+-- shield on both creatures -- so every event addressed to either creature has
+-- two applicable effects that differ, and both controllers owe a CR 616.1
+-- choice. Answers the state, alice's creature and bob's.
+doubledAndShielded :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+doubledAndShielded plains piker furnace mendingHands =
+  let base = S.landsInPlay plains 2
+      (_, g1) = S.addCreature furnace S.alice base
+      (hers, g2) = S.addCreature piker S.alice g1
+      (his, g3) = S.addCreature piker S.bob g2
+      (g4, firstShield) = S.handOne mendingHands g3
+      (g5, secondShield) = S.handOne mendingHands g4
+   in (castAndResolve (aimCreature his) (castAndResolve (aimCreature hers) g5 firstShield) secondShield, hers, his)
+
+-- Spend a prevention shield on `src`'s hit first (CR 615.7), and take the shield
+-- over `furnace` whenever both are offered (CR 616.1). The second half is named
+-- as "not the Furnace" because a floating row's `source` is the spell that
+-- installed it -- a CR 608.2n object no fixture holds an id for -- while the
+-- permanent's row is the Furnace itself. Pinning it is what makes the amounts
+-- the rule's rather than an artefact of which candidate is canonical.
+--
+-- Top-level rather than a `where` binding, for settleDamage's reason and one
+-- more: MonoLocalBinds (implied by GADTs, on at the top of this module) declines
+-- to generalize a local binding that closes over a local, which `furnace` is.
+allocateShield :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+allocateShield furnace src p = case p of
+  Prompt.OrderDamage _ _ events ->
+    let key e = (DamageEvent.source e /= src, DamageEvent.source e)
+     in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
+  Prompt.ChooseReplacement _ _ sources ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex (/= furnace) sources)
+  _ -> S.identityAnswer p
+
+-- CR 616.1's last sentence: "If two or more players have to make these choices
+-- at the same time, choices are made in APNAP order (see rule 101.4)."
+--
+-- The board that reaches it needs one batch whose events are addressed to two
+-- players' objects, and TWO DISTINGUISHABLE applicable effects per event --
+-- otherwise `choose` elides the prompt and nobody is asked anything. Furnace of
+-- Rath ({1}{R}{R}{R} Enchantment, "If a source would deal damage to a permanent
+-- or player, it deals double that damage to that permanent or player instead")
+-- is symmetric, so it supplies one candidate to every event in the batch; a
+-- Mending Hands on each creature supplies the second, and a doubler and a shield
+-- differ in `effect`, so neither pair is elided.
+--
+-- Two Furnaces would NOT do it, which is the trap this fixture avoids: two
+-- copies carry the same ReplacementEffect.DamageR, `distinguishing` finds them
+-- interchangeable and the prompt is correctly elided. The rule needs candidates
+-- that differ, not merely candidates that are several.
+--
+-- The DAMAGE BATCH is hand-built and the SPELLS are not, for mendingHandsSpec's
+-- reason -- and here the batch's ORDER is the input under test, which only a
+-- hand-built batch can state.
+apnapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+apnapSpec s registry = Spec.describe s "APNAP (CR 616.1)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+  -- Both batch orders, because only the PAIR discriminates: settling the batch
+  -- in gather order already answers [alice, bob] when alice's event happens to
+  -- come first, and would answer [bob, alice] when it does not.
+  Spec.it s "CR 616.1 two players choosing for one batch are asked in APNAP order" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let (shielded, hers, his) = doubledAndShielded plains pikerPrinting furnace mendingHands
+        toHers = hit his (Recipient.ToCreature hers) 1
+        toHis = hit hers (Recipient.ToCreature his) 1
+    Spec.assertEqWith s "setup: alice is the active player" (Game.apnapOrder shielded) [S.alice, S.bob]
+    Spec.assertEqWith s "setup: both creatures are shielded" (length (GameState.replacements shielded)) 2
+    Spec.assertEqWith
+      s
+      "alice chooses before bob when her event is gathered first"
+      (choosersAsked shielded [toHers, toHis])
+      [S.alice, S.bob]
+    Spec.assertEqWith
+      s
+      "and still before bob when his event is gathered first"
+      (choosersAsked shielded [toHis, toHers])
+      [S.alice, S.bob]
+  -- The reason CR 615.7 and CR 616.1's APNAP clause do not contend for the same
+  -- ordering, stated as a board. They order DIFFERENT LEVELS: APNAP orders the
+  -- choosers, CR 615.7 orders one chooser's own events among themselves, and CR
+  -- 101.4c is what licenses the second ("If a player would make more than one
+  -- choice at the same time, the player makes the choices in the order
+  -- specified"). Nothing forces a pick between them.
+  --
+  -- What makes that structural rather than lucky: a shield names ONE recipient,
+  -- so every event a shield contests is addressed to one player's object -- and
+  -- that is the same player CR 616.1 asks about those events, since `contested`
+  -- and `choose` read the chooser off the recipient through one `chooserOf`. A
+  -- CR 615.7 group can therefore never straddle two CR 616.1 choosers, which is
+  -- exactly the shape a genuine collision would need.
+  --
+  -- Two events at alice's creature and one at bob's, with alice's shield too
+  -- small for both of hers: she is asked to allocate it (CR 615.7) and asked
+  -- twice which effect applies (CR 616.1), and all three of her questions come
+  -- before bob's. That her allocation is then HONOURED is mendingHandsSpec's
+  -- "the shielded PLAYER chooses which of two simultaneous damages the shield
+  -- prevents", which this fixture does not restate.
+  Spec.it s "CR 615.7's order sits INSIDE one chooser's APNAP turn, not across choosers" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let (shielded, hers, his) = doubledAndShielded plains pikerPrinting furnace mendingHands
+        -- 1 and 4 against a shield of 4: their total exceeds it, so CR 615.7 has
+        -- something to ask. The small one first is load-bearing -- doubled by the
+        -- Furnace it still costs the shield at most 2, so the shield is still
+        -- standing for the 4 and alice's SECOND CR 616.1 choice is a real
+        -- question rather than a lone candidate `choose` would elide.
+        batch = [hit hers (Recipient.ToCreature his) 1, hit his (Recipient.ToCreature hers) 1, hit his (Recipient.ToCreature hers) 4]
+    Spec.assertEqWith
+      s
+      "alice allocates her shield and settles both her events before bob is asked anything"
+      (choosersAsked shielded batch)
+      [S.alice, S.alice, S.alice, S.bob]
+  -- The other half of "they compose": alice's CR 615.7 answer must still land on
+  -- the events she was asked about. `contested` reports BATCH POSITIONS and
+  -- `askOne` splices by position, so the sort has to happen before the positions
+  -- are computed -- sorting afterwards would leave alice permuting whatever now
+  -- sits at her old indices, which here includes bob's event.
+  --
+  -- The assertion is which event SURVIVED rather than how much damage landed,
+  -- because the total cannot tell the two answers apart: the shield prevents 4
+  -- either way and the Furnace doubles what is left of 5, so alice takes 2
+  -- whichever event she spends it on. What differs is WHICH source dealt it (CR
+  -- 615.6: a fully prevented event never happens), which is why the two hits at
+  -- her creature come from two different creatures of bob's.
+  Spec.it s "CR 615.7's allocation lands on the events it was asked about, after the sort" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    furnace <- S.printingOf s registry "Furnace of Rath"
+    mendingHands <- S.printingOf s registry "Mending Hands"
+    let base = S.landsInPlay plains 1
+        (theFurnace, g1) = S.addCreature furnace S.alice base
+        (hers, g2) = S.addCreature pikerPrinting S.alice g1
+        (small, g3) = S.addCreature pikerPrinting S.bob g2
+        (big, g4) = S.addCreature pikerPrinting S.bob g3
+        (g5, shieldSpell) = S.handOne mendingHands g4
+        shielded = castAndResolve (aimCreature hers) g5 shieldSpell
+        -- Bob's event FIRST, so alice's two sit at positions 1 and 2 before the
+        -- sort and at 0 and 1 after it.
+        batch =
+          [ hit hers (Recipient.ToCreature small) 1,
+            hit small (Recipient.ToCreature hers) 1,
+            hit big (Recipient.ToCreature hers) 4
+          ]
+        survivors gs = fmap DamageEvent.source (S.damageEventsOf gs)
+    Spec.assertEqWith s "setup: alice's creature is the shielded one" (length (GameState.replacements shielded)) 1
+    -- Shield on the 1: it is prevented whole and never happens, and the 4 keeps
+    -- the remaining 3 off, leaving 1 for the Furnace to double.
+    Spec.assertEqWith
+      s
+      "alice spends the shield on the small hit: the big one is what gets through"
+      (survivors (settleDamage (allocateShield theFurnace small) shielded batch))
+      [big, hers]
+    -- Shield on the 4: 4 covers it whole, and the 1 is then unshielded.
+    Spec.assertEqWith
+      s
+      "alice spends it on the big hit instead: the small one gets through"
+      (survivors (settleDamage (allocateShield theFurnace big) shielded batch))
+      [small, hers]
+
+-- CR 615.12 NARROWED, whose producer is Excruciator ({6}{R}{R} Creature --
+-- Avatar 7/7, Ravnica: City of Guilds 121, "Damage that would be dealt by this
+-- creature can't be prevented"). Spider-Punk's sentence names no quality of the
+-- damage and this one names its SOURCE -- CR 120.1's "an object that deals
+-- damage is the source of that damage", which is Pawl.Types.DamagePattern's
+-- `whichSource`.
+--
+-- ONE board carries both directions, and that is the whole point of the group:
+-- alice's Goblin Piker is shielded by a Mending Hands she really casts on it,
+-- and bob controls Excruciator AND a Goblin Piker. The first two cases send the
+-- same 3 from each of them into that one shield -- the Excruciator's lands whole
+-- and costs the shield nothing, the Piker's is prevented whole and spends 3 of
+-- the shield's 4 -- so nothing but the damage's SOURCE differs between them, and
+-- neither can pass because the damage would have got through anyway. The third
+-- puts both in one batch.
+--
+-- The DAMAGE BATCHES are hand-built and the SPELL is not, for spiderPunkSpec's
+-- reason.
+excruciatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
+  let hit src recipient n =
+        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
+      withBoard act = do
+        plains <- S.printingOf s registry "Plains"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        mendingHands <- S.printingOf s registry "Mending Hands"
+        excruciator <- S.printingOf s registry "Excruciator"
+        let base = S.landsInPlay plains 1
+            (victim, g1) = S.addCreature pikerPrinting S.alice base
+            (piker, g2) = S.addCreature pikerPrinting S.bob g1
+            (avatar, g3) = S.addCreature excruciator S.bob g2
+            (g4, spellId) = S.handOne mendingHands g3
+        act victim piker avatar (castAndResolve (aimCreature victim) g4 spellId)
+  -- THE CONTROL, and it shares its board with the case below rather than
+  -- standing on a second one: the shield is applicable to the Piker's damage and
+  -- prevents the whole of it, though an Excruciator is on the battlefield the
+  -- entire time. A pattern that admitted every source would fail here.
+  Spec.it s "CR 615.7 the shield still prevents the Goblin Piker's 3 whole"
+    . withBoard
+    $ \victim piker _ shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit piker (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the shield is a floating replacement" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "nothing is marked on the shielded creature" (S.damageOf victim after) (Just 0)
+      Spec.assertEqWith s "and no damage event happened at all" (amounts after) []
+      Spec.assertEqWith s "3 of the shield's 4 were spent, so 1 remains" (shieldsLeft after) [1]
+  -- CR 615.12 for the source the clause names: the same shield, on the same
+  -- creature, on the same board, prevents none of the Excruciator's 3 and is not
+  -- reduced by it.
+  Spec.it s "CR 615.12 the Excruciator's 3 lands in full, and the shield is not reduced"
+    . withBoard
+    $ \victim _ avatar shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit avatar (Recipient.ToCreature victim) 3]
+      Spec.assertEqWith s "setup: the same shield is on the same creature" (shieldsLeft shielded) [4]
+      Spec.assertEqWith s "the whole 3 is marked on the shielded creature" (S.damageOf victim after) (Just 3)
+      Spec.assertEqWith s "and the event happened, at its full amount" (amounts after) [3]
+      Spec.assertEqWith s "the shield still holds all 4" (shieldsLeft after) [4]
+  -- Both directions in ONE batch, which is what makes the narrowing a per-EVENT
+  -- fact rather than a per-board one: CR 615.12's clause reaches the
+  -- Excruciator's event and leaves the Piker's alone, in a batch the engine
+  -- settles together.
+  --
+  -- The two amounts DIFFER, and that is what makes the case discriminate: with
+  -- 3 and 3 an engine that had the two events exactly backwards would leave the
+  -- same board, and every assertion here would pass on it.
+  Spec.it s "CR 615.12 one batch: the Excruciator's 3 lands and the Piker's 2 is prevented"
+    . withBoard
+    $ \victim piker avatar shielded -> do
+      let after = settleDamage S.identityAnswer shielded [hit avatar (Recipient.ToCreature victim) 3, hit piker (Recipient.ToCreature victim) 2]
+      Spec.assertEqWith s "only the Excruciator's event happened" (amounts after) [3]
+      Spec.assertEqWith s "so only its 3 is marked" (S.damageOf victim after) (Just 3)
+      Spec.assertEqWith s "and only the Piker's 2 came off the shield" (shieldsLeft after) [2]
+
 -- CR 615.13's trigger, whose one producer in the pool is Selfless Squire ({3}{W}
 -- Creature -- Human Soldier 1/1, Flash, "When this creature enters, prevent all
 -- damage that would be dealt to you this turn. Whenever damage that would be
@@ -930,7 +1331,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     Spec.assertBool s (not (wasAskedToReplace asked)) "no ChooseReplacement was raised"
   -- The other side of Replacement.readsApplier, and the reason it exists rather
   -- than a blanket "compare the controller too". Rest in Peace's pattern is
-  -- ZoneChangeSubject.AnyObject under ControllerRelation.Anyones, so alice's copy
+  -- the trivial Filter under ControllerRelation.Anyones, so alice's copy
   -- and bob's are both applicable to bob's dying Piker at once, equal in `effect`
   -- and differing only in who controls the row. Applying either exiles the same
   -- card, so there is nothing to decide and nothing to ask -- where comparing
@@ -1097,13 +1498,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         -- attack is disproportionate to what this asserts, so seed
         -- GameState.combat's attacker map directly -- the same shortcut
         -- Support.addRegenShield takes for the shield itself.
-        attacking = armed {GameState.combat = (GameState.combat armed) {Combat.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
+        attacking = armed {GameState.combat = (GameState.combat armed) {Combat.Type.attackers = Map.singleton skel (AttackTarget.OfPlayer S.bob)}}
         once = S.runPure S.identityAnswer attacking (Event.destroy Regenerability.Regenerable [skel])
         twice = S.runPure S.identityAnswer once (Event.destroy Regenerability.Regenerable [skel])
-    Spec.assertBool s (Map.null (Combat.attackers (GameState.combat armed))) "combat started with no attackers"
+    Spec.assertBool s (Map.null (Combat.Type.attackers (GameState.combat armed))) "combat started with no attackers"
     Spec.assertBool s (Set.member skel (GameState.battlefield once)) "survived the first destruction"
     Spec.assertEqWith s "the shield was spent" (GameState.replacements once) []
-    Spec.assertBool s (not (Map.member skel (Combat.attackers (GameState.combat once)))) "removed from combat by the regeneration (CR 701.19a)"
+    Spec.assertBool s (not (Map.member skel (Combat.Type.attackers (GameState.combat once)))) "removed from combat by the regeneration (CR 701.19a)"
     Spec.assertBool s (not (Set.member skel (GameState.battlefield twice))) "the second destruction kills it"
   -- CR 701.19c: "Effects that say that a permanent can't be regenerated
   -- don't preclude such abilities from being activated or such spells from
@@ -1508,9 +1909,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   stonehornSpec s registry
   galvanicBlastSpec s registry
   mendingHandsSpec s registry
+  spiderPunkSpec s registry
+  apnapSpec s registry
+  excruciatorSpec s registry
   selflessSquireSpec s registry
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
+  riotSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -2067,3 +2472,216 @@ shimatsuSpec s registry =
         Just shimatsuId -> do
           Spec.assertEqWith s "six counters, one per OTHER permanent" (countersOn CounterKind.PlusOnePlusOne shimatsuId after) 6
           Spec.assertEqWith s "nothing else of alice's is left" (Set.toList (GameState.battlefield after)) [shimatsuId]
+
+-- alice controls `mountains` untapped Mountains and `forests` untapped Forests
+-- in a precombat main phase with priority, holding one card per printing in
+-- `hand`. Returns the state and the hand ids in the order given.
+--
+-- Two land printings rather than blueBoard's one, because riot's producers are
+-- Gruul: Zhur-Taa Goblin is {R}{G}.
+riotBoard :: Printing.Printing -> Int -> Printing.Printing -> Int -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
+riotBoard mountain mountains forest forests hand =
+  let base = S.landsInPlay mountain mountains
+      -- S.addCreature puts one permanent of a printing onto the battlefield,
+      -- settled; nothing in it is creature-specific, which is what lets a second
+      -- land printing join a board S.landsInPlay built from one.
+      addLand g _ = snd (S.addCreature forest S.alice g)
+      withForests = List.foldl' addLand base (replicate forests ())
+      addOne (ids, g) p = let (oid, g1) = S.addHandCard p S.alice g in (ids <> [oid], g1)
+      (held, gs) = List.foldl' addOne ([], withForests) hand
+   in ( gs
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          },
+        held
+      )
+
+-- Answer riot's "may" one way, and everything else the way S.aggressiveAnswer
+-- does -- which declares every attacker it is offered, so one answerer carries
+-- both halves of a case that casts a creature and then attacks with it.
+riotChoosing :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+riotChoosing choice p = case p of
+  Prompt.ChooseRiot {} -> choice
+  _ -> S.aggressiveAnswer p
+
+wasAskedForRiot :: [Response.Response] -> Bool
+wasAskedForRiot responses =
+  let isRiot r = case r of
+        Response.ChoseRiot _ -> True
+        _ -> False
+   in any isRiot responses
+
+-- The board moved to alice's declare-attackers step, with bob defending. Stated
+-- rather than played out, exactly as S.combatBoardOf states it: a direct-call
+-- test never runs the turn-based action that would settle CR 506.2's defending
+-- player.
+--
+-- Nothing else is touched, so a creature cast in the main phase is still as new
+-- to the battlefield as CR 302.6 finds it.
+atDeclareAttackers :: GameState.GameState -> GameState.GameState
+atDeclareAttackers gs =
+  gs
+    { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+      GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob}
+    }
+
+attackersIn :: GameState.GameState -> [ObjectId.ObjectId]
+attackersIn gs = Map.keys (Combat.Type.attackers (GameState.combat gs))
+
+riotSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
+  -- Zhur-Taa Goblin and not Spider-Punk, whose file also carries "spells and
+  -- abilities can't be countered" and a riot-granting static ability: the
+  -- keyword is what is under test, and this printing is nothing but the keyword.
+  Spec.it s "CR 702.136a taking the counter enters a 3/3 with no haste" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+    case held of
+      goblinCard : _ ->
+        let after = S.runPure (riotChoosing OptionalDecision.Exercises) gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> do
+                Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne goblin after) 1
+                -- Printed 2/2, so the counter is visible in the projection (CR
+                -- 613.4d, layer 7d).
+                Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 3)
+                Spec.assertEqWith s "toughness" (Projection.toughnessOf goblin after) (Just 3)
+                -- CR 702.136a's "if you don't" is what grants haste, so taking
+                -- the counter must not.
+                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste goblin after)) "no haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  Spec.it s "CR 702.136a declining the counter grants haste instead" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+    case held of
+      goblinCard : _ ->
+        let after = S.runPure (riotChoosing OptionalDecision.Declines) gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> do
+                Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne goblin after) 0
+                Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 2)
+                Spec.assertBool s (Projection.hasKeyword Keyword.Haste goblin after) "haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- THE PAIR THAT MAKES THE HASTE REAL. CR 302.6 keeps a creature that entered
+  -- this turn from attacking, and CR 702.10b is the exception riot buys.
+  Spec.it s "CR 702.10b the goblin that took haste attacks the turn it entered" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      goblinCard : _ ->
+        let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.alice)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> Spec.assertEqWith s "attacks" (attackersIn after) [goblin]
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  Spec.it s "CR 302.6 the goblin that took the counter cannot attack that turn" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+        answer = riotChoosing OptionalDecision.Exercises
+    case held of
+      goblinCard : _ ->
+        let entered = S.runPure answer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+            after = S.runPure answer (atDeclareAttackers entered) (Combat.declareAttackers S.alice)
+         in Spec.assertEqWith s "no attackers" (attackersIn after) []
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- THE CHOICE IS THE ANSWERER'S. Both outcomes above are reachable only through
+  -- a prompt, and the prompt is never elided: CR 702.136a's two halves are
+  -- distinguishable on every board.
+  Spec.it s "CR 702.136a the controller is asked, and the engine chooses nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+    case held of
+      goblinCard : _ ->
+        let asked = answersFor S.identityAnswer gs (S.cast S.alice goblinCard >> Stack.resolveTop)
+         in Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- The control that keeps the case above from passing for the wrong reason: a
+  -- creature WITHOUT riot enters through the same funnel and is asked nothing.
+  Spec.it s "CR 702.136a a creature without riot raises no riot prompt" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (gs, held) = riotBoard mountain 3 forest 0 [pikerPrinting]
+    case held of
+      pikerCard : _ ->
+        let asked = answersFor S.identityAnswer gs (S.cast S.alice pikerCard >> Stack.resolveTop)
+         in Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- CR 702.136a through a GRANT rather than a printing: Spider-Punk's "other
+  -- Spiders you control have riot". The keyword reaches the entering Giant
+  -- Spider through layer 6 (CR 613.1f), and the replacement is minted off that
+  -- post-layer projection -- which is the whole reason the mint lives there.
+  Spec.it s "CR 702.136a Spider-Punk gives another Spider riot as it enters" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    spiderPunk <- S.printingOf s registry "Spider-Punk"
+    giantSpider <- S.printingOf s registry "Giant Spider"
+    let (gs, held) = riotBoard mountain 3 forest 1 [giantSpider]
+        (_, board) = S.addCreature spiderPunk S.alice gs
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      spiderCard : _ ->
+        let asked = answersFor answer board (S.cast S.alice spiderCard >> Stack.resolveTop)
+            after = S.runPure answer board (S.cast S.alice spiderCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Giant Spider") after of
+              Nothing -> Spec.assertFailure s "Giant Spider did not reach the battlefield"
+              Just spider -> do
+                Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised for the granted riot"
+                Spec.assertBool s (Projection.hasKeyword Keyword.Haste spider after) "haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- The grant from a permanent that has no riot of its own: Rhythm of the Wild
+  -- is an enchantment whose whole riot contribution is "nontoken creatures you
+  -- control have riot", so it is the case Spider-Punk cannot make -- the
+  -- entering creature's base face prints no riot AND the granting permanent's
+  -- prints none either, which is what Projection.grantsMintingKeyword is for.
+  Spec.it s "CR 702.136a Rhythm of the Wild gives an entering creature riot" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    rhythm <- S.printingOf s registry "Rhythm of the Wild"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (gs, held) = riotBoard mountain 2 forest 0 [pikerPrinting]
+        (_, board) = S.addCreature rhythm S.alice gs
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      pikerCard : _ ->
+        let asked = answersFor answer board (S.cast S.alice pikerCard >> Stack.resolveTop)
+            after = S.runPure answer board (S.cast S.alice pikerCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Goblin Piker") after of
+              Nothing -> Spec.assertFailure s "Goblin Piker did not reach the battlefield"
+              Just piker -> do
+                Spec.assertBool s (wasAskedForRiot asked) "a ChooseRiot was raised for the granted riot"
+                Spec.assertBool s (Projection.hasKeyword Keyword.Haste piker after) "haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- The control for the grant: the same Spider on the same board with no
+  -- Spider-Punk is asked nothing and gains nothing.
+  Spec.it s "CR 702.136a without Spider-Punk that Spider has no riot" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    giantSpider <- S.printingOf s registry "Giant Spider"
+    let (gs, held) = riotBoard mountain 3 forest 1 [giantSpider]
+        answer = riotChoosing OptionalDecision.Declines
+    case held of
+      spiderCard : _ ->
+        let asked = answersFor answer gs (S.cast S.alice spiderCard >> Stack.resolveTop)
+            after = S.runPure answer gs (S.cast S.alice spiderCard >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Giant Spider") after of
+              Nothing -> Spec.assertFailure s "Giant Spider did not reach the battlefield"
+              Just spider -> do
+                Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
+                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste spider after)) "no haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"

@@ -8,6 +8,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Loyalty as Loyalty
 import qualified Pawl.Types.Quantity as Quantity
@@ -67,6 +68,17 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- counters -- so this field answers only CR 306.5a's question, and the one
     -- reader is CR 306.5b's intrinsic enters-with replacement.
     loyalty :: Maybe Loyalty.Loyalty,
+    -- | CR 310.4 / 109.3: the object's PRINTED defense -- so a Clone entering as a
+    -- copy of a battle has the copy's defense here. The loyalty field above in
+    -- every respect except its authority: CR 707.2's list of copiable values names
+    -- loyalty and not defense (see Pawl.Types.Defense).
+    --
+    -- Seeded from the card and touched by NO layer: the CR 613 layer system has
+    -- no sublayer for defense either. What a permanent's defense actually is comes
+    -- from CR 310.4c -- its CounterKind.Defense counters -- so this field answers
+    -- only CR 310.4a's question, and the one reader is CR 310.4b's intrinsic
+    -- enters-with replacement.
+    defense :: Maybe Defense.Defense,
     -- | CR 613.4a layer 7a: the object's characteristic-defining P/T, as the pair
     -- of UNEVALUATED quantities with the printed star already substituted. Seeded
     -- from the card, so it rides copiableCharacteristics and a Clone acquires the

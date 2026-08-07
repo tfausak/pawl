@@ -69,6 +69,12 @@ subtypeMana subtype = case subtype of
 -- Written out rather than derived from a Bounded Color: the five are CR 105.1's
 -- closed enumeration, and spelling them here keeps the rule citation next to the
 -- list.
+--
+-- CR 106.11 is a rewrite and this is where it happens: an effect that would add
+-- mana represented by a snow mana symbol adds colorless mana instead, one per
+-- symbol. ONE option and not a choice, so nothing here prompts -- and no snow
+-- tag, because CR 107.4h reads the SOURCE (productionTagsGiven) and never the
+-- symbol the effect was written with.
 producedTypes :: ManaProduction -> [ManaType]
 producedTypes production = case production of
   ManaProduction.OfType manaType -> [manaType]
@@ -76,6 +82,7 @@ producedTypes production = case production of
     fmap
       ManaType.Colored
       [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
+  ManaProduction.SnowSymbol -> [ManaType.Colorless]
 
 -- Every ROUTE by which this object could be activated for mana, as the mana ONE
 -- activation of it adds: its intrinsic subtype mana (CR 305.6), one route per
@@ -101,11 +108,12 @@ producedTypes production = case production of
 -- swaps a Blood Moon'd Reliquary Tower's printed "{T}: Add {C}" for the
 -- Mountain's {R} rather than adding to it.
 --
--- One route per mode, rather than one per combination of modes, because CR
--- 700.2's selection is "choose exactly one" for every mana ability in the pool.
--- An ability that chose two modes at once would make a route the CONCATENATION
--- of the chosen modes' yields (#449). A mode adding no mana contributes an empty
--- route, which the supply model ignores.
+-- One route per SELECTION (Modal.selectionEffects), not per mode: CR 700.2's
+-- selection is what a player actually makes, so a choose-two ability's route is
+-- the CONCATENATION of a legal pair of modes' yields and its options are the
+-- pairs. For "choose exactly one", which is every printed mana ability, that is
+-- one route per mode. A mode adding no mana contributes an empty route, which
+-- the supply model ignores.
 --
 -- Takes a PRE-PROJECTED board, because every caller asks this of every source a
 -- player controls, and each of the two projection reads here was a fresh gather
@@ -116,9 +124,9 @@ manaRoutesOfGiven pcs oid gs =
         fmap
           (\manaType -> [ManaProduction.OfType manaType])
           (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
-      modeRoutes ability =
-        fmap (Maybe.mapMaybe ManaAbility.manaProduced) (Modal.modeEffects (ActivatedAbility.modal ability))
-      fromAbilities = concatMap modeRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
+      selectionRoutes ability =
+        fmap (Maybe.mapMaybe ManaAbility.manaProduced) (Modal.selectionEffects (ActivatedAbility.modal ability))
+      fromAbilities = concatMap selectionRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
 
 -- What tapping this object for mana could actually put in a pool: every route
@@ -694,9 +702,17 @@ monocoloredHybridGeneric = 2
 -- then taps it for something else fails the payment, which is CR 601.2h's
 -- business and not this function's -- announcing is not producing.
 --
+-- `outside` is the life the REST of the cost owes -- CR 119.4 payments that are
+-- no part of this mana cost, which Pawl.Engine.Cost.lifeOwedBy sums off the
+-- components. CR 118.3 makes them one demand on one life total, so a route this
+-- function offers has to be payable alongside them: a {G/P} beside an additional
+-- cost of 2 life is a 4-life route and must not be offered at 3. Zero for a cost
+-- whose components spend no life, which is every cost that reached here before
+-- one did.
+--
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: PlayerId -> ObjectId -> (ManaCost -> ManaCost) -> ManaCost -> Game (ManaCost, Natural)
-announce pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
+announce :: PlayerId -> ObjectId -> (ManaCost -> ManaCost) -> Natural -> ManaCost -> Game (ManaCost, Natural)
+announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
     -- "Payable" here means SOME completion of the remaining announcements pays
     -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
@@ -705,10 +721,11 @@ announce pid oid total (ManaCost.MkManaCost symbols) = go [] 0 symbols
     --
     -- `done` is the reversed prefix already announced, `ways` the symbols this
     -- route would leave in place of the one being asked about, and `extra` the
-    -- life it would commit on top of what is committed already.
+    -- life it would commit on top of what is committed already. `outside` rides
+    -- on every one of them, for the reason the haddock gives.
     stillPayable done rest gs extra ways =
       let candidate (tail_, life) =
-            canPayCommitting pid (extra + life) (total (ManaCost.MkManaCost (reverse done <> ways <> tail_))) gs
+            canPayCommitting pid (outside + extra + life) (total (ManaCost.MkManaCost (reverse done <> ways <> tail_))) gs
        in any candidate (completions rest)
     -- One symbol's announcement. Asked only where two routes are payable, and
     -- FILTERED, NOT TRUSTED where it is asked.
@@ -800,22 +817,29 @@ completions symbols = case symbols of
       <> [(ManaSymbol.Generic monocoloredHybridGeneric : tail_, life) | (tail_, life) <- completions rest]
   other : rest -> [(other : tail_, life) | (tail_, life) <- completions rest]
 
--- CR 118.3: can this cost be paid at all? Pure, because Action.legalActions asks
--- it while merely ENUMERATING actions, where prompting would be absurd -- so it
--- cannot simply walk tapForMana, which now asks a question.
+-- CR 118.3: can this MANA cost be paid at all, with nothing else claiming the
+-- resources? Pure, because Action.legalActions reaches it (through
+-- Pawl.Engine.Cost.canPay) while merely ENUMERATING actions, where prompting
+-- would be absurd -- so it cannot simply walk tapForMana, which now asks a
+-- question.
 --
 -- A cost is payable exactly when SOME resolution of it is: `resolutions` has
 -- already turned CR 107.4e's {2/B} and CR 107.4f's {G/P} into their nonhybrid
 -- equivalents, so this asks nothing about hybrid-ness. payableResolutions is
 -- where the per-resolution test lives.
+--
+-- A mana cost that is part of a whole COST goes through canPayCommitting below
+-- instead, because its components may want life too (CR 118.3 again). What is
+-- left here is the mana cost asked about on its own.
 canPay :: PlayerId -> ManaCost -> GameState -> Bool
 canPay pid = canPayCommitting pid 0
 
--- The same question asked mid-announcement, where CR 118.13a's choices -- both
--- those already made and those a `completions` entry is standing in for -- have
--- committed `committed` life that CR 119.4's floor must still admit alongside
--- whatever the rest of the cost costs. Zero everywhere else, which is what
--- `canPay` is.
+-- The same question with `committed` life already spoken for, which CR 119.4's
+-- floor must still admit alongside whatever the rest of this cost costs. Two
+-- callers commit life: `announce`, for CR 118.13a's choices -- both those already
+-- made and those a `completions` entry is standing in for -- and
+-- Pawl.Engine.Cost.canPay, for the CR 119.4 payments the cost's COMPONENTS owe.
+-- Zero everywhere else, which is what `canPay` is.
 canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
 canPayCommitting pid committed cost gs = not (null (payableResolutions pid committed cost gs))
 
@@ -894,11 +918,12 @@ sourceOptions yields =
 --      count does not depend on WHICH matching, and this is a plain comparison;
 --      and
 --   3. CR 119.4's floor admits the life -- this resolution's own, PLUS whatever
---      an announcement in progress has already committed (`committed`, zero for
---      every caller but `announce`). The clause that reads the PLAYER
---      rather than the board, and the only one a Phyrexian-free cost can never
---      fail: every resolution of such a cost costs 0 life, and CR 119.4b lets
---      anyone pay that -- see canPayLife.
+--      is already spoken for (`committed`: an announcement in progress, or the
+--      life the whole cost's components owe; see canPayCommitting). The clause
+--      that reads the PLAYER rather than the board, and the only one a cost that
+--      spends no life anywhere can never fail: every resolution of such a cost
+--      costs 0 life and commits none, and CR 119.4b lets anyone pay 0 -- see
+--      canPayLife.
 --
 -- Clauses 1 and 2 are asked of ONE board at a time, and that is the whole of
 -- #450's fix. Asking them of a per-source union instead lets one source's first
@@ -983,10 +1008,10 @@ lifeNeeded pid cost gs = case payableResolutions pid 0 cost gs of
 -- CR 119.4b is answered BEFORE the lookup, not by the `>=` that would usually
 -- absorb it: players can ALWAYS pay 0 life, whatever their total and even where
 -- an effect says they can't pay life. So a player the map does not hold must not
--- turn a zero payment into an unpayable one -- and every resolution of a cost
--- with no Phyrexian symbol is a zero payment, so this is also what keeps
--- payableResolutions' life clause unable to change any answer such a cost used
--- to give.
+-- turn a zero payment into an unpayable one -- and a cost with no Phyrexian
+-- symbol and no PayLife component asks payableResolutions' life clause about 0
+-- and nothing else, so that clause cannot change any answer such a cost used to
+-- give.
 canPayLife :: PlayerId -> Natural -> GameState -> Bool
 canPayLife pid n gs =
   n == 0 || case Map.lookup pid (GameState.players gs) of

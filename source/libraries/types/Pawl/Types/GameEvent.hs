@@ -1,6 +1,7 @@
 module Pawl.Types.GameEvent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -135,17 +136,21 @@ data GameEvent
     -- a discard or a mill lands a card in a graveyard too. What happened is not
     -- derivable from where the card went, so it is recorded.
     --
-    -- Emitted ONLY where a countering actually happened. CR 113.6g's "can't be
-    -- countered" functions on the stack and CR 101.2 makes the "can't" win, so a
-    -- spell printing that clause is never countered at all -- Event.counter
-    -- returns before this is recorded, which CR 603.2g makes mandatory.
+    -- Emitted ONLY where a countering actually happened. Both of Event.counter's
+    -- "can't be countered" gates -- CR 113.6g's, printed on the spell, and CR
+    -- 613.11's, handed out by a permanent's static ability -- return before this
+    -- is recorded, since CR 101.2 makes either "can't" win and CR 603.2g makes
+    -- the silence mandatory rather than tidy.
     SpellCountered Countering.Countering
   | -- | CR 119.3: a player LOST LIFE, and how much. Greater than 0 by
     -- construction: every producer guards its own zero. The rules state that
     -- explicitly only for the other direction -- CR 119.9's "if a player gains 0
     -- life, no life gain event has occurred" -- so reading it back onto loss is an
-    -- inference, not a citation; what makes the guard safe here is that nothing
-    -- reads this constructor except CR 702.179d, which a zero must not fire.
+    -- inference, not a citation; what makes the guard safe is that both of this
+    -- constructor's readers want a zero to be silent. CR 702.179d's speed
+    -- increase must not fire on one, and neither must a card's "whenever an
+    -- opponent loses life" (TriggerCondition.PlayerLosesLife), whose payload
+    -- would otherwise read a 0 out of the amount slot.
     --
     -- Recorded at all three places life leaves a player, which is a fact about the
     -- RULES and not about the engine's plumbing: CR 119.3 for a loss an effect
@@ -156,11 +161,42 @@ data GameEvent
     -- a different question. CR 119.5's life-total set has no producer in the pool
     -- and so no site here.
     --
-    -- LIFE GAIN gets no sibling constructor: nothing reads one (#768). Not one
-    -- "life total changed" constructor covering both, though CR 119.3 does state
-    -- the two directions in a single sentence: they are distinct EVENTS for
-    -- triggers, and every card that cares says which.
+    -- LifeGained below is the sibling, and deliberately NOT one "life total
+    -- changed" constructor covering both, though CR 119.3 does state the two
+    -- directions in a single sentence: they are distinct EVENTS for triggers, and
+    -- every card that cares says which.
     LifeLost PlayerId.PlayerId Natural.Natural
+  | -- | CR 119.3's other direction: a player GAINED life, and how much. LifeLost
+    -- above is the mirror, and the two are read by different cards.
+    --
+    -- Greater than 0 by construction, and here the rules SAY so rather than it
+    -- being an inference: CR 119.9's "if a player gains 0 life, no life gain event
+    -- has occurred, and these abilities won't trigger". Every producer guards its
+    -- own zero, so a reader never has to.
+    --
+    -- Recorded at both places a source causes a player's life total to go up, which
+    -- is a fact about the RULES and not about the engine's plumbing: CR 119.3 for a
+    -- gain an effect instructs (Pawl.Engine.Resolve's GainLife arm), and CR 120.3f
+    -- for lifelink damage, which gains its SOURCE'S CONTROLLER life rather than the
+    -- damaged player (Pawl.Engine.Damage). A reader asking "did this player gain
+    -- life" must find both.
+    --
+    -- Three life-total facts are deliberately NOT recorded here, each for a reason
+    -- in the rules rather than an omission:
+    --
+    --   * A starting life total (CR 119.1) is not a gain. No source caused it, so
+    --     CR 119.9's rewriting -- "whenever a source causes [a player] to gain
+    --     life" -- has nothing to name.
+    --   * Prevented damage (CR 615.6) is not a gain. The life was never lost, and a
+    --     total that did not go DOWN did not go up; GameEvent.DamagePrevented is
+    --     what records that, and CR 615.13 is its own separate trigger event.
+    --   * Paying life (CR 119.4) only ever goes the other way -- that rule calls it
+    --     losing life -- so the cost site records LifeLost and nothing here.
+    --
+    -- CR 119.5's life-total SET would record one, being a gain by that rule's own
+    -- words whenever the new total is higher, but it has no producer in the pool
+    -- and so no site here -- the same standing LifeLost's comment gives it.
+    LifeGained PlayerId.PlayerId Natural.Natural
   | -- | CR 606.3: a LOYALTY ability of this permanent was activated -- the record
     -- that rule's once-per-permanent-per-turn limit is read out of.
     --
@@ -180,4 +216,42 @@ data GameEvent
     -- one count against CR 606.3, and no rule asks whether a permanent activated
     -- any ability this turn.
     LoyaltyAbilityActivated ObjectId.ObjectId
+  | -- | CR 122.6: one or more counters were PUT onto an object -- the object, the
+    -- kind, and the counts of that kind on it BEFORE and AFTER. Emitted by
+    -- Pawl.Engine.Event.putCounters, the one placement funnel, and only once the
+    -- CR 616.1 loop has settled how many of what kind actually land, so the pair
+    -- describes the resolved event rather than the proposal.
+    --
+    -- The two counts rather than one amount, and the whole reason this constructor
+    -- is shaped as it is: CR 714.2b's chapter ability asks whether the number "was
+    -- less than N and became at least N", a THRESHOLD CROSSING that neither the
+    -- amount alone nor the resulting total alone can answer. A Saga going from one
+    -- lore counter to three crosses two thresholds at once, and one going from
+    -- three to five crosses neither of those again.
+    --
+    -- BEFORE is strictly less than AFTER: putCounters returns early on a settled
+    -- count of 0, so an event that placed nothing is never recorded. That matches
+    -- CR 714.2b's "one or more" and keeps a would-be trigger from firing on a
+    -- replacement that reduced the placement to nothing.
+    --
+    -- Removal is a record of its OWN -- CountersRemoved below -- rather than a
+    -- before > after pair here. CR 122.6 is about putting counters on and every
+    -- rule reading this constructor is phrased that way, so widening the pair
+    -- would make every such reader ask which direction it went.
+    CountersPut ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
+  | -- | Counters were REMOVED from an object -- the object, the kind, and the
+    -- counts of that kind on it BEFORE and AFTER. CountersPut's mirror, and shaped
+    -- the same way for the same reason: CR 310.11b's Siege ability asks whether the
+    -- LAST counter came off, which is a fact about the pair (before > 0, after ==
+    -- 0) and not about the amount alone.
+    --
+    -- BEFORE is strictly greater than AFTER: a removal that took nothing is not
+    -- recorded, which is CountersPut's "one or more" read the other way.
+    --
+    -- Recorded ONLY for CR 120.3h's damage to a battle (Pawl.Engine.Damage), which
+    -- is the one removal a rule asks a trigger about. NOT IMPLEMENTED: the engine's
+    -- other counter removals -- a loyalty cost, CR 306.8's damage to a
+    -- planeswalker, CR 704.5q's annihilation -- stay direct writes and emit
+    -- nothing, so a card triggering off one of those would not see it (#900).
+    CountersRemoved ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
   deriving (Eq, Ord, Show)

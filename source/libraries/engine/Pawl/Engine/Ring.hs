@@ -79,6 +79,7 @@ theRingEmblem =
               Face.power = Nothing,
               Face.toughness = Nothing,
               Face.loyalty = Nothing,
+              Face.defense = Nothing,
               Face.keywords = Set.empty,
               Face.colorIndicator = Set.empty,
               Face.characteristicPT = Nothing,
@@ -90,7 +91,7 @@ theRingEmblem =
               Face.delayedAbilities = Map.empty,
               Face.castingPermissions = [],
               Face.castingRestrictions = [],
-              Face.enchant = Nothing,
+              Face.enchant = [],
               Face.counterability = Counterability.Counterable,
               Face.additionalCosts = [],
               Face.alternativeCosts = [],
@@ -99,8 +100,8 @@ theRingEmblem =
               Face.attackRequirements = [],
               Face.combatRestrictions = [],
               Face.attackCosts = [],
-              Face.mulliganAction = [],
-              Face.openingHandAction = []
+              Face.mulliganActions = [],
+              Face.openingHandActions = []
             }
     }
 

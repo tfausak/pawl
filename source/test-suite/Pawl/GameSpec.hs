@@ -180,7 +180,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.face = Nothing,
               Object.turnedOverAt = Nothing,
               Object.playableFromExileBy = Nothing,
-              Object.ringBearerFor = Nothing
+              Object.ringBearerFor = Nothing,
+              Object.protector = Nothing
             }
       )
 
@@ -227,7 +228,7 @@ actionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 actionSpec s registry = Spec.describe s "Action" $ do
   Spec.it s "a land in hand is playable in a main phase" $ do
     mountain <- S.printingOf s registry "Mountain"
-    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)) "play"
+    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) Nothing `elem` Action.legalActions S.alice (S.oneMountainState mountain Phase.PrecombatMain)) "play"
 
   Spec.it s "passing is always legal" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -247,7 +248,7 @@ actionSpec s registry = Spec.describe s "Action" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let base = S.oneMountainState mountain Phase.PrecombatMain
         (_, withSpell) = S.spellOnStack piker S.alice base
-    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) `elem` Action.legalActions S.alice base) "playable while the stack is empty"
+    Spec.assertBool s (A.Play (ObjectId.MkObjectId 0) Nothing `elem` Action.legalActions S.alice base) "playable while the stack is empty"
     Spec.assertEqWith s "only pass while a spell is on it" (Action.legalActions S.alice withSpell) [A.Pass]
 
   -- CR 305.2b: with the normal allowance of one already spent, no further play
@@ -382,9 +383,11 @@ recordingAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> pure (Set.fromList (List.genericTake count (Set.toAscList legal)))
   Prompt.ChooseCopyTarget {} -> pure Nothing
   Prompt.ChooseEntryOption {} -> pure 0
+  Prompt.ChooseRiot {} -> pure OptionalDecision.Declines
   Prompt.ChooseColor {} -> pure Color.White
   Prompt.ChooseCardName {} -> pure (CardName.MkCardName mempty)
   Prompt.ChooseOpponent _ _ _ opponents -> pure (NonEmpty.head opponents)
+  Prompt.ChooseProtector _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseBasicLandType {} -> pure Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> pure (zipWith const [0 ..] entries)
   Prompt.OrderDamage _ _ events -> pure (zipWith const [0 ..] events)
@@ -400,6 +403,7 @@ recordingAnswer p = case p of
   Prompt.OpeningHandAction {} -> pure Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> pure OptionalDecision.Declines
+  Prompt.OfferedCast {} -> pure OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -409,6 +413,9 @@ recordingAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> pure (NonEmpty.head offers)
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> pure (NonEmpty.head offers)
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> pure EntwineDecision.Declines
@@ -1033,7 +1040,7 @@ concedeSpec s registry = Spec.describe s "concede (CR 104.3a)" $ do
             if pid == S.bob
               then do
                 State.modify' (\(ds, cs) -> (ds <> [decider], cs))
-                pure (A.Play mountainOid)
+                pure (A.Play mountainOid Nothing)
               else pure (S.identityAnswer p)
           Prompt.Concede asked -> do
             (_, asksSoFar) <- State.get
@@ -1742,7 +1749,8 @@ handBobBolt lightningBolt gs =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1802,9 +1810,11 @@ slaveAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -1820,6 +1830,7 @@ slaveAnswer p = case p of
   Prompt.OpeningHandAction {} -> Nothing
   -- CR 603.5: declining a printed "may" is the least-eventful answer.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -1829,6 +1840,9 @@ slaveAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -1881,6 +1895,7 @@ isPlayerRecipient r = case r of
   Recipient.ToPlayer _ -> True
   Recipient.ToCreature _ -> False
   Recipient.ToPlaneswalker _ -> False
+  Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
 
 pickPlayerRecipient :: Set.Set Recipient.Recipient -> Maybe Recipient.Recipient
@@ -2101,7 +2116,8 @@ restartOnStack mountain =
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

@@ -25,3 +25,10 @@ spec s = Spec.describe s "Pawl.Codec.ManaProduction" $ do
       ManaProduction.fromJson
       ManaProduction.AnyColor
       """ {"type":"AnyColor"} """
+  Spec.it s "SnowSymbol" $
+    Common.assertJsonCodec
+      s
+      ManaProduction.toJson
+      ManaProduction.fromJson
+      ManaProduction.SnowSymbol
+      """ {"type":"SnowSymbol"} """

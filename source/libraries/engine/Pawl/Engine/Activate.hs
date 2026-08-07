@@ -3,12 +3,16 @@ module Pawl.Engine.Activate where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.EffectZone as EffectZone
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
@@ -69,10 +73,12 @@ sicknessOkGiven pcs pid srcId ability gs =
 -- hand: the ones rule 702 mints for the card's printed keywords, which is
 -- cycling (CR 702.29a) and nothing else today, read off the PRINTED card
 -- because pawl's projection does not reach a hand (#160); CR 113.6b is the rule
--- that lets an ability name its own zone. Anywhere else: nothing -- flashback
--- and rule 702's other zone abilities are CASTING permissions (CR 702.34a), so
--- they reach Pawl.Engine.Cast instead. The first ability ACTIVATED from a third
--- zone adds an arm here.
+-- that lets an ability name its own zone. In a graveyard: the PRINTED abilities
+-- whose own cost or effect names the graveyard, per CR 113.6m -- see
+-- graveyardAbilitiesOf. Anywhere else: nothing -- flashback and rule 702's other
+-- zone abilities are CASTING permissions (CR 702.34a), so they reach
+-- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fourth zone adds
+-- an arm here.
 --
 -- CR 702.29b is why this gates ACTIVATION and not existence: a cycling ability
 -- keeps existing in every zone, so an effect counting activated abilities sees
@@ -89,21 +95,122 @@ abilitiesFor = abilitiesForGiven Map.empty
 -- The ...Given half of the pair, and the one the enumeration calls:
 -- Action.legalActions hands it the board it projected once, so nothing here
 -- re-derives a projection per object. Only the battlefield arm reads that board
--- at all -- a hand object's absence from it is not a miss (#160; see
+-- at all -- a hand or graveyard object's absence from it is not a miss (#160; see
 -- Projection.projectGiven).
 abilitiesForGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
 abilitiesForGiven pcs oid gs = case fmap Object.zone (Game.lookupObject oid gs) of
-  Just Zone.Battlefield -> Projection.abilitiesGiven pcs oid gs
+  -- Filtered by CR 113.6m's "functions ONLY in that zone", exactly as the
+  -- graveyard arm below is. For an ability whose COST names another zone the
+  -- filter changes nothing observable -- such a cost is unpayable here
+  -- (Cost.canPayComponent asks the zone), so `activatable`'s cost conjunct was
+  -- already withholding it, which is what a Loxodon Surveyor ON the battlefield
+  -- proves in Pawl.SpeedSpec. For an ability whose EFFECT names it there is no
+  -- such second gate: Reassembling Skeleton's "{1}{B}: Return this card from
+  -- your graveyard to the battlefield" is payable by a Skeleton standing on the
+  -- battlefield, and only this filter stops it being offered there.
+  Just Zone.Battlefield -> filter (functionsIn Zone.Battlefield) (Projection.abilitiesGiven pcs oid gs)
   Just Zone.Hand -> case Game.faceOf oid gs of
     Nothing -> []
     Just face -> Keyword.handAbilitiesOf (Face.keywords face)
+  Just Zone.Graveyard -> graveyardAbilitiesOf oid gs
   _ -> []
+
+-- CR 113.6m + CR 702.178b: the abilities a card in a GRAVEYARD offers.
+--
+-- CR 113.6m -- "an ability whose cost or effect specifies that it moves the
+-- object it's on out of a particular zone functions only in that zone" -- is why
+-- Loxodon Surveyor's "{3}, Exile this card from your graveyard: Draw a card" and
+-- Reassembling Skeleton's "{1}{B}: Return this card from your graveyard to the
+-- battlefield tapped" function in the graveyard at all. One states the zone in
+-- its cost and the other in its effect, which is the rule's two halves and the
+-- two the zoneFunctionedFrom below reads. DERIVED from the ability either way,
+-- never declared by the card, so no card file teaches the closed half a rule it
+-- already has.
+--
+-- CR 702.178b is a second rule, and the reason the CONDITION is re-asked here:
+-- "if an ability granted by a max speed ability states which zones it functions
+-- from, the max speed ability that grants that ability functions from those
+-- zones". The Surveyor's ability is granted by a max speed ability (CR 702.178a
+-- spells that grant as ActivatedAbility.condition), and it states the graveyard,
+-- so the GRANT functions in the graveyard too -- which is exactly this gate being
+-- asked of a card that is not on the battlefield.
+--
+-- The PRINTED abilities, not the projection's: pawl's projection walks the
+-- battlefield only (#160), the Face.castingPermissions precedent. Not a claim
+-- about the rules -- CR 613.1f does reach a card outside the battlefield -- and
+-- observationally identical while nothing can rewrite a graveyard card's text.
+--
+-- The condition's perspective is the OWNER. CR 109.5's "your" is the ability's
+-- controller, and the Max Speed glossary entry says which player that is for a
+-- card that is not on the battlefield: "that permanent's controller (or that
+-- card's owner, if it isn't on the battlefield)". CR 108.4 leaves such a card
+-- with no controller to ask about, so activatorOf below answers the owner for the
+-- same reason and the two cannot disagree.
+--
+-- The VIEW is Projection.fullView, matching Projection.abilitiesGiven: nothing
+-- here is inside the layer fold, so there is no circularity to bound against.
+graveyardAbilitiesOf :: ObjectId -> GameState -> [ActivatedAbility.ActivatedAbility Card.Card]
+graveyardAbilitiesOf oid gs = case (Game.faceOf oid gs, Game.lookupObject oid gs) of
+  (Just face, Just obj) ->
+    let functionsHere = functionsIn Zone.Graveyard
+        granted ability = case ActivatedAbility.condition ability of
+          Nothing -> True
+          Just cond -> Condition.holds (Projection.fullView gs) (Filter.MkContext (Just (Object.owner obj)) (Just oid)) gs oid cond
+     in filter (\ability -> functionsHere ability && granted ability) (Face.activatedAbilities face)
+  _ -> []
+
+-- CR 113.6m in full: "an ability whose cost OR EFFECT specifies that it moves
+-- the object it's on out of a particular zone functions only in that zone".
+-- Nothing for an ability that specifies neither, which leaves CR 113.6's own
+-- default in place -- an instant or sorcery spell's abilities function on the
+-- stack, everything else's on the battlefield.
+--
+-- The two halves are read by the two modules that own the two shapes:
+-- Pawl.Engine.Cost walks the cost's components, Pawl.Engine.EffectZone
+-- classifies one effect. Neither is a case on which ability this is, and this
+-- function is not one either -- it asks the same question of both halves of the
+-- rule's own sentence and takes whichever answers.
+--
+-- The COST answer wins a disagreement, and the choice is arbitrary because the
+-- disagreement is: an ability whose cost names one zone and whose effect names
+-- another functions in neither, since the cost is unpayable outside the first
+-- and CR 113.6m gives one zone. No printing writes such an ability, and pawl
+-- reports the cost's zone rather than inventing a "functions nowhere" answer no
+-- reader has a use for.
+--
+-- ALL MODES, and their effects in printed order: CR 700.2 makes a modal
+-- ability's modes alternatives, so a zone stated by any of them is a zone the
+-- ability can move its object out of. No modal ability in the pool states one.
+--
+-- This is the ACTIVATED reading of a rule that says "an ability";
+-- Pawl.Engine.Event.zoneFunctionedFrom is the triggered one, and has only the
+-- effect half to fold, CR 603.1 giving a triggered ability no cost.
+--
+-- Not implemented: CR 113.6m's "unless" clause, its Aura half, and its
+-- delayed-triggered-ability sentence (#819).
+zoneFunctionedFrom :: ActivatedAbility.ActivatedAbility Card.Card -> Maybe Zone.Zone
+zoneFunctionedFrom ability =
+  case Cost.zoneFunctionedFrom (ActivatedAbility.cost ability) of
+    Just zone -> Just zone
+    Nothing ->
+      Maybe.listToMaybe
+        (Maybe.mapMaybe EffectZone.zoneFunctionedFrom (Modal.allEffects (ActivatedAbility.modal ability)))
+
+-- CR 113.6m's "functions only in that zone", asked of one zone: does this
+-- ability function from there? True for an ability that names no zone at all,
+-- which CR 113.6's default puts on the battlefield -- so this is only ever asked
+-- of a zone abilitiesForGiven has already decided is a zone abilities are read
+-- from, and never of a library or a stack.
+functionsIn :: Zone.Zone -> ActivatedAbility.ActivatedAbility Card.Card -> Bool
+functionsIn zone ability = case zoneFunctionedFrom ability of
+  Nothing -> zone == Zone.Battlefield
+  Just named -> zone == named
 
 -- CR 602.2: only an object's controller, or its owner if it has no controller,
 -- may activate its activated ability. Both halves of that parenthetical are live
 -- here, which is why this cannot simply be Projection.controllerOf: a card in a
--- hand has no controller at all (CR 108.4), and CR 400.3 puts every card in a
--- hand in its owner's.
+-- hand or a graveyard has no controller at all (CR 108.4), and CR 400.3 puts
+-- every card in either in its owner's.
 --
 -- Nothing for every other zone, matching abilitiesFor's silence there.
 activatorOf :: ObjectId -> GameState -> Maybe PlayerId
@@ -118,6 +225,7 @@ activatorOfGiven grants oid gs = case Game.lookupObject oid gs of
   Just obj -> case Object.zone obj of
     Zone.Battlefield -> Projection.controllerOfGiven grants Set.empty oid gs
     Zone.Hand -> Just (Object.owner obj)
+    Zone.Graveyard -> Just (Object.owner obj)
     _ -> Nothing
 
 -- CR 307.5: does this ability's timing rider permit activating it right now?
@@ -259,9 +367,11 @@ activatableGiven grants pcs pid srcId ability gs =
 -- a hand in its owner's, and Activate.activatorOf gives a card in a hand to that
 -- owner precisely because CR 108.4 leaves it with no controller.
 --
--- Reaches exactly the hand today: abilitiesFor serves the battlefield and the
--- hand and answers [] elsewhere, so the library offers nothing to activate, and
--- mana abilities never reach this function (CR 605.3b keeps them off the stack).
+-- Reaches exactly the hand today: abilitiesFor serves the battlefield, the hand
+-- and the graveyard and answers [] elsewhere -- and of those three only a hand is
+-- hidden (CR 400.2 makes a graveyard a public zone), so the library offers
+-- nothing to activate, and mana abilities never reach this function (CR 605.3b
+-- keeps them off the stack).
 --
 -- CR 701.20a's duration -- revealed until the ability leaves the stack -- is not
 -- modeled, and is vacuous for every card in the pool: cycling discards the card
@@ -319,7 +429,8 @@ activateAbility pid srcId ability = do
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
-            Object.ringBearerFor = Nothing
+            Object.ringBearerFor = Nothing,
+            Object.protector = Nothing
           }
       onStack =
         gs2

@@ -30,7 +30,6 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.TokenPattern as TokenPattern
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
@@ -42,7 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ( ReplacementEffect.ZoneChangeR
           ZoneChangePattern.MkZoneChangePattern
             { ZoneChangePattern.whenDestination = Zone.Graveyard,
-              ZoneChangePattern.whichObject = ZoneChangeSubject.AnyObject,
+              ZoneChangePattern.whatObject = Filter.And [],
               ZoneChangePattern.whoseObject = ControllerRelation.Anyones
             }
           Zone.Exile
@@ -58,7 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ( ReplacementEffect.ZoneChangeR
           ZoneChangePattern.MkZoneChangePattern
             { ZoneChangePattern.whenDestination = Zone.Graveyard,
-              ZoneChangePattern.whichObject = ZoneChangeSubject.AnyObject,
+              ZoneChangePattern.whatObject = Filter.And [],
               ZoneChangePattern.whoseObject = ControllerRelation.Opponents
             }
           Zone.Exile

@@ -32,6 +32,7 @@ isCreatureRecipient :: Recipient.Recipient -> Bool
 isCreatureRecipient r = case r of
   Recipient.ToCreature _ -> True
   Recipient.ToPlaneswalker _ -> False
+  Recipient.ToBattle _ -> False
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
 
@@ -46,7 +47,7 @@ castElsePlay actions =
         Action.Cast {} -> True
         _ -> False
       isPlay a = case a of
-        Action.Play _ -> True
+        Action.Play {} -> True
         _ -> False
    in case filter isCast actions of
         h : _ -> h
@@ -95,9 +96,11 @@ alwaysPass p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -116,6 +119,10 @@ alwaysPass p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -125,6 +132,9 @@ alwaysPass p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -160,9 +170,11 @@ castAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -181,6 +193,10 @@ castAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -190,6 +206,9 @@ castAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
@@ -226,9 +245,11 @@ fightAnswer p = case p of
   Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
   Prompt.ChooseCopyTarget {} -> Nothing
   Prompt.ChooseEntryOption {} -> 0
+  Prompt.ChooseRiot {} -> OptionalDecision.Declines
   Prompt.ChooseColor {} -> Color.White
   Prompt.ChooseCardName {} -> CardName.MkCardName mempty
   Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
+  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseBasicLandType {} -> Subtype.Mountain
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
@@ -247,6 +268,10 @@ fightAnswer p = case p of
   -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
   -- the benchmark's script deterministic.
   Prompt.ChooseOptional {} -> OptionalDecision.Declines
+  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
+  -- resolving effect put it -- the least-eventful default, as above. A test that
+  -- wants the cast TAKEN says so with its own interpreter.
+  Prompt.OfferedCast {} -> OptionalDecision.Declines
   -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
   -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
   -- test that wants the cost PAID says so with its own interpreter, which is
@@ -256,6 +281,9 @@ fightAnswer p = case p of
   -- and is the least eventful default, matching Replay.defaultAnswer.
   Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.7e: both halves are legal answers whatever the board, so the head
+  -- is a deterministic default rather than the only payable route.
+  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 702.42a: declining entwine is always legal, costs nothing and changes
   -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines

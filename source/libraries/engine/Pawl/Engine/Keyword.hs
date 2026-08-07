@@ -22,6 +22,7 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Keyword (Keyword)
@@ -45,7 +46,6 @@ import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 -- Rule 702 in its OTHER voice. Most keywords this pool has are read where they
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
@@ -116,6 +116,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -168,6 +169,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -226,18 +228,33 @@ cycling cost searchFor =
 -- Taken over the card's PRINTED keywords rather than a projection's post-layer
 -- ones: this permission functions in the GRAVEYARD (CR 113.6), which pawl's
 -- projection does not reach (#160).
-castingPermissionsOf :: Set Keyword -> [CastingPermission]
-castingPermissionsOf = concatMap permissionsFor . Set.toAscList
+--
+-- The card types come along because rule 702.34a's permission is CONDITIONAL on
+-- them. They are the types of the one FACE being proposed, which is the caller's
+-- doing -- see Pawl.Engine.Cast.permissionsOf for why that is the right face.
+castingPermissionsOf :: Set CardType.CardType -> Set Keyword -> [CastingPermission]
+castingPermissionsOf cardTypes = concatMap (permissionsFor cardTypes) . Set.toAscList
 
 -- Exhaustive, exactly as abilitiesFor is, and for the same reason: rule 702 is
 -- full of keywords that grant a zone permission (madness, retrace, escape,
 -- disturb), so the next one added must break this build rather than silently
 -- grant nothing.
-permissionsFor :: Keyword -> [CastingPermission]
-permissionsFor keyword = case keyword of
-  -- CR 702.34a. Its "if the resulting spell is an instant or sorcery spell"
-  -- clause is not checked (#295).
-  Keyword.Flashback _ -> [CastingPermission.CastFromGraveyard]
+permissionsFor :: Set CardType.CardType -> Keyword -> [CastingPermission]
+permissionsFor cardTypes keyword = case keyword of
+  -- CR 702.34a: "You may cast this card from your graveyard IF THE RESULTING
+  -- SPELL IS AN INSTANT OR SORCERY SPELL by paying [cost] rather than paying its
+  -- mana cost." The clause gates the permission itself, so a card that fails it
+  -- gets no permission at all rather than a permission it cannot use --
+  -- Pawl.CastSpec's "FlashbackCardType" group proves both directions.
+  --
+  -- Gated HERE rather than in Pawl.Engine.Cast.permitsCastFromGraveyard because
+  -- the condition belongs to rule 702.34a, not to CastFromGraveyard: a card that
+  -- PRINTS the same permission need not restrict itself to instants and
+  -- sorceries, and must not inherit flashback's clause.
+  Keyword.Flashback _
+    | Set.member CardType.Instant cardTypes || Set.member CardType.Sorcery cardTypes ->
+        [CastingPermission.CastFromGraveyard]
+    | otherwise -> []
   -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling
   -- discards the card, it never casts it. See handAbilitiesOf above.
   Keyword.Cycling _ _ -> []
@@ -272,6 +289,7 @@ permissionsFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
+  Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -360,8 +378,10 @@ entwineCost keywords =
 
 -- CR 702.34a's SECOND static ability, the one functioning while the card is on
 -- the stack: exile it instead of putting it anywhere else as it leaves.
--- TheSource, because the rule says "this card" -- the spell itself and no other
--- object.
+-- Filter.IsSource, because the rule says "this card" -- the spell itself and no
+-- other object. Evaluated against the spell's own projected view, which exists
+-- for as long as the spell does; Pawl.Engine.Event proposes the move before it
+-- performs one, so the object is still on the stack when this is asked.
 --
 -- The destination is Graveyard rather than "anywhere else": a
 -- Pawl.Types.ZoneChangePattern names ONE destination, and the graveyard is the
@@ -384,9 +404,86 @@ flashbackExile =
     ZoneChangePattern.MkZoneChangePattern
       { ZoneChangePattern.whenDestination = Zone.Graveyard,
         ZoneChangePattern.whoseObject = ControllerRelation.Anyones,
-        ZoneChangePattern.whichObject = ZoneChangeSubject.TheSource
+        ZoneChangePattern.whatObject = Filter.IsSource
       }
     Zone.Exile
+
+-- CR 702.136a: the AS-ENTERS REPLACEMENT rule 702 gives a permanent for holding
+-- riot -- "You may have this permanent enter with an additional +1/+1 counter on
+-- it. If you don't, it gains haste." The same voice the minted triggered
+-- abilities (rule 702.70a), the minted hand ability (rule 702.29a) and
+-- flashback's exile replacement (rule 702.34a) speak in: the card says which
+-- keyword, the rule says what it means.
+--
+-- The FIRST minted replacement that functions on the battlefield, where
+-- flashbackExile's is installed by Pawl.Engine.Cast on a spell -- which is why
+-- this one is gathered by the projection and that one is not.
+--
+-- POST-LAYER keyword COUNTS, like triggeredAbilitiesOf and unlike
+-- handAbilitiesOf's printed set -- rule 702.136a functions on the battlefield, so
+-- Humility takes it away and a static ability that grants riot (Spider-Punk's
+-- "other Spiders you control have riot") adds it, both for free.
+--
+-- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately:
+-- a creature with riot twice should be asked twice, and may take a counter for
+-- one instance and haste for the other.
+--
+-- Not implemented: the two rows are EQUAL VALUES, and CR 614.5's identity here is
+-- (source, effect value), so a second instance gets no second opportunity and the
+-- second ask never happens (#75). The replication is written the rule's way
+-- anyway, so that closing #75 makes rule 702.136b right with no change here.
+--
+-- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's
+-- own.
+entryReplacementsOf :: Map Keyword Natural -> [ReplacementEffect]
+entryReplacementsOf counts = concatMap (uncurry entryReplacementsFor) (Map.toAscList counts)
+
+-- Exhaustive for abilitiesFor's reason: rule 702 keeps adding abilities that
+-- rewrite an entry, and the next one must break this build rather than silently
+-- produce nothing.
+entryReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
+entryReplacementsFor keyword count = case keyword of
+  Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Riot)
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flash -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Hexproof _ -> []
+  Keyword.Indestructible -> []
+  Keyword.Landwalk _ -> []
+  Keyword.Lifelink -> []
+  Keyword.Reach -> []
+  Keyword.Shroud -> []
+  Keyword.Trample -> []
+  Keyword.Vigilance -> []
+  Keyword.Banding -> []
+  Keyword.Fear -> []
+  Keyword.Menace -> []
+  Keyword.Cycling _ _ -> []
+  Keyword.Flashback _ -> []
+  Keyword.Entwine _ -> []
+  Keyword.Poisonous _ -> []
+  Keyword.BattleCry -> []
+  Keyword.Infect -> []
+  Keyword.Devoid -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
+  Keyword.Toxic _ -> []
+  Keyword.StartYourEngines -> []
+
+-- CR 702.136a again, in the SHORT-CIRCUIT's voice:
+-- Pawl.Engine.Projection.replacementsAffecting skips the whole board when no
+-- permanent's BASE card could hold a replacement effect, and a riot row is minted
+-- from the projection rather than printed in a face's list -- so, like the
+-- planeswalker disjunct beside it, the gate has to be told which keywords mint
+-- one.
+--
+-- Membership rather than a count, because the gate asks whether there is any.
+mintsEntryReplacement :: Keyword -> Bool
+mintsEntryReplacement keyword = not (null (entryReplacementsFor keyword 1))
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.

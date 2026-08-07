@@ -1,0 +1,43 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Synthetic Snow Discount",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "ReduceSpellCost",
+            "value": [
+              {
+                "type": "HasColor",
+                "value": {
+                  "type": "Green"
+                }
+              },
+              [
+                {
+                  "type": "Snow"
+                }
+              ]
+            ]
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

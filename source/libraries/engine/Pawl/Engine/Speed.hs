@@ -17,8 +17,10 @@
 -- Rule 702.178's max speed is NOT here. CR 702.178a is a static ability -- "as
 -- long as your speed is 4, this object has '[Ability]'" -- so it is card data and
 -- not rules-core machinery: it rides Pawl.Types.ActivatedAbility.condition, read
--- back by Pawl.Engine.Projection.abilitiesGiven. All this module owes it is the
--- number the clause compares against, and Pawl.Engine.Quantity's Speed arm.
+-- back by Pawl.Engine.Projection.abilitiesGiven on the battlefield and by
+-- Pawl.Engine.Activate.graveyardAbilitiesOf where CR 702.178b's zone clause sends
+-- it. All this module owes it is the number the clause compares against, and
+-- Pawl.Engine.Quantity's Speed arm.
 module Pawl.Engine.Speed where
 
 import qualified Data.List as List
@@ -185,7 +187,7 @@ inherentPending events gs =
       -- CR 603.4: the intervening "if" is checked here, as the event occurs. A
       -- player already at max speed does not trigger at all, so the turn's one
       -- trigger is still theirs to spend -- which is moot today, nothing being
-      -- able to lower speed, and stated because the rule states it.
+      -- able to lower speed (#808), and stated because the rule states it.
       below = Maybe.maybe False (< maxSpeed) (speedOf you gs)
       alreadyTriggered = Set.member you (GameState.speedIncreasedThisTurn gs)
    in [ PendingTrigger.MkPendingTrigger TriggerSource.Sourceless you increaseAbility Map.empty

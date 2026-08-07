@@ -37,6 +37,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
@@ -87,7 +88,6 @@ import qualified Pawl.Types.Uses as Uses
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
-import qualified Pawl.Types.ZoneChangeSubject as ZoneChangeSubject
 
 asZoneChange :: ProposedEvent -> Maybe ZoneChange
 asZoneChange event = case event of
@@ -193,19 +193,18 @@ applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 applies gs event candidate =
   let src = ReplacementCandidate.source candidate
    in case (ReplacementCandidate.effect candidate, event) of
+        -- CR 614.1a: which zone changes this redirect intercepts -- the
+        -- destination, the moving object's OWNER, and (Anafenza, the Foremost's
+        -- "a nontoken creature") what the moving object IS.
         (ReplacementEffect.ZoneChangeR pat _, ProposedEvent.WouldChangeZone zc) ->
           ZoneChange.to zc == ZoneChangePattern.whenDestination pat
-            && matchesZoneSubject src (ZoneChangePattern.whichObject pat) (ZoneChange.object zc)
             && matchesZoneOwner gs src (ZoneChangePattern.whoseObject pat) (ZoneChange.object zc)
-        -- CR 615.1: a pattern naming no kind admits every damage event. CR
-        -- 614.15: one naming TheSource admits only the damage its own source is
-        -- dealing. CR 615.7: one naming a RECIPIENT admits only the damage
-        -- addressed to the permanent or player it shields.
+            && matchesFiltered gs candidate (ZoneChangePattern.whatObject pat) (ZoneChange.object zc)
+        -- CR 615.1: which events the pattern admits (see matchesDamagePattern),
+        -- plus the one fact about the ROW rather than the event -- a shield
+        -- spent to nothing is no longer a prevention effect.
         (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) ->
-          maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
-            && matchesDamageSource src (DamagePattern.whichSource pat) de
-            && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
-            && unspent rewrite
+          matchesDamagePattern (Just src) pat de && unspent rewrite
         -- CR 201.5 / 201.5c / 701.19a: "regenerate THIS creature" names the
         -- ability's own source, so a destruction replacement is self-only.
         -- DestructionR carries no pattern because the only producer in the
@@ -251,7 +250,7 @@ applies gs event candidate =
         -- Filter over the entering object (see Pawl.Types.ReplacementEffect).
         -- 614.1c's self-scope is Filter.IsSource; 614.1d's is a characteristic
         -- filter.
-        (ReplacementEffect.EntryR pat _, ProposedEvent.WouldEnter oid) -> matchesEntering gs candidate pat oid
+        (ReplacementEffect.EntryR pat _, ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -286,24 +285,40 @@ matchesController gs src rel oid = case rel of
 -- characteristic one, like matchesZoneSubject.
 --
 -- Not implemented: CR 615.1's shields that name a source by CHARACTERISTIC
--- (Circle of Protection: Red) rather than by identity (#588).
-matchesDamageSource :: ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
+-- (Circle of Protection: Red, Questing Beast's "creatures you control") rather
+-- than by identity (#588).
+--
+-- The source is a MAYBE because CR 615.12's carrier has one: a "damage can't be
+-- prevented" effect stored by a resolution has no permanent behind it. Nothing
+-- names no object, so TheSource -- which is the "THIS creature" of a printed
+-- clause -- cannot be satisfied by it, and no printing writes that pair anyway.
+matchesDamageSource :: Maybe ObjectId -> SourceRelation.SourceRelation -> DamageEvent.DamageEvent -> Bool
 matchesDamageSource src relation de = case relation of
   SourceRelation.AnySource -> True
-  SourceRelation.TheSource -> src == DamageEvent.source de
+  SourceRelation.TheSource -> src == Just (DamageEvent.source de)
 
--- CR 614.1: is this ZONE CHANGE about the object the pattern names? AnyObject
--- always is; TheSource is CR 702.34a's "exile THIS card", the self-scoping EntryR
--- (CR 614.1c) and DestructionR (CR 201.5) carry by having no pattern at all.
+-- CR 615.1 / 614.1a: does this damage event have the qualities the pattern
+-- names? Three of them, and they are the three a printed clause narrows by: a
+-- pattern naming no KIND admits combat and noncombat alike (CR 510.2's dealing
+-- versus CR 608's), one naming TheSource admits only the damage its own source
+-- is dealing (CR 120.1's "an object that deals damage is the source of that
+-- damage", keyed as CR 614.15 keys it), and one naming a RECIPIENT admits only
+-- the damage addressed to the permanent or player it names (CR 615.7).
 --
--- The id compared is the event's own subject, which Pawl.Engine.Event proposes
--- as the PRE-move id -- the id the effect's source still has while it sits on
--- the stack. Board-free, so no GameState: an identity test, not a characteristic
--- one.
-matchesZoneSubject :: ObjectId -> ZoneChangeSubject.ZoneChangeSubject -> ObjectId -> Bool
-matchesZoneSubject src subject oid = case subject of
-  ZoneChangeSubject.AnyObject -> True
-  ZoneChangeSubject.TheSource -> src == oid
+-- ONE reading of what a DamagePattern means, shared by the two questions that
+-- ask it: `applies` above, for CR 615.1's shields and CR 614.1a's replacements,
+-- and `preventable` below, for CR 615.12's narrowed "can't be prevented"
+-- (Excruciator). A second reading would let Excruciator's clause and Fog's
+-- disagree about what "combat damage from this source" means.
+--
+-- The rewrite is NOT asked about here, though `applies` asks `unspent` right
+-- after: a spent shield is a row that no longer exists as a prevention effect,
+-- which is a fact about the ROW and not about which events the pattern admits.
+matchesDamagePattern :: Maybe ObjectId -> DamagePattern.DamagePattern -> DamageEvent.DamageEvent -> Bool
+matchesDamagePattern src pat de =
+  maybe True (== DamageEvent.kind de) (DamagePattern.whichKind pat)
+    && matchesDamageSource src (DamagePattern.whichSource pat) de
+    && maybe True (== DamageEvent.target de) (DamagePattern.whichRecipient pat)
 
 -- CR 614.1: does this ZONE CHANGE's object satisfy the pattern's relation?
 --
@@ -314,8 +329,12 @@ matchesZoneSubject src subject oid = case subject of
 -- graveyard, which a controller-based test would get backwards.
 --
 -- Split out of matchesController, which stays controller-based for CR 109.5's
--- "you" on a counter or token pattern. No committed card pairs a ZoneChangeR
--- with anything but Anyones, which answers True either way.
+-- "you" on a counter or token pattern. Leyline of the Void and Anafenza, the
+-- Foremost both name Opponents, and Pawl.EventSpec's Anafenza group is what makes
+-- the relation observable: her controller's own dying creature reaches her own
+-- graveyard where an opponent's is exiled. What is NOT exercised is the owner /
+-- controller difference itself -- no test steals a creature and then kills it --
+-- so the argument for reading the owner stays the rules one above.
 matchesZoneOwner :: GameState -> ObjectId -> ControllerRelation -> ObjectId -> Bool
 matchesZoneOwner gs src rel oid =
   let ownerOf o = fmap Object.owner (Game.lookupObject o gs)
@@ -355,23 +374,35 @@ sacrificeCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> Ga
 sacrificeCandidates pid filter_ gs =
   List.sort (filter (matchesPermanent gs filter_) (Projection.controls pid gs))
 
--- CR 614.1c-d: does the entering object satisfy this entry replacement's Filter?
+-- CR 614.1a / 614.1c-d: does the event's subject satisfy this replacement's
+-- Filter? Both the ENTERING object of an entry replacement and the MOVING object
+-- of a zone-change redirect, which is one question asked of one candidate --
+-- CR 614.1a puts no restriction on what a replacement may look at, so the two
+-- classes narrow by the same predicate language.
 --
 -- The same evaluator matchesPermanent uses, over the same projected view, but
--- with a FRAMED Context rather than an empty one, because both of the entry
--- filters in the pool read it: CR 614.1c's `IsSource` asks whether the candidate
--- IS the effect's source (Clone, Primal Plasma, CR 306.5b's loyalty), and CR
--- 614.1d's `ControlledBy Opponent` asks who the candidate's controller is
--- relative to CR 109.5's "you" (Gather Specimens). The perspective is the
--- CANDIDATE's controller, which for a floating row is the baked one -- deriving
--- it from `src` here would answer Nothing for every row whose spell has
--- resolved, and a Nothing perspective makes ControlledBy vacuously False.
+-- with a FRAMED Context rather than an empty one, because every filter in the
+-- pool that reaches here reads it: CR 614.1c's `IsSource` asks whether the
+-- candidate IS the effect's source (Clone, Primal Plasma, CR 306.5b's loyalty,
+-- and CR 702.34a's "exile THIS card" on the zone-change side), and CR 614.1d's
+-- `ControlledBy Opponent` asks who the candidate's controller is relative to CR
+-- 109.5's "you" (Gather Specimens). The perspective is the CANDIDATE's
+-- controller, which for a floating row is the baked one -- deriving it from the
+-- source here would answer Nothing for every row whose spell has resolved, and a
+-- Nothing perspective makes ControlledBy vacuously False.
 --
 -- CR 614.12 is why the view is the LIVE projection of the materialized object
 -- rather than of the card it came from: a previous iteration's rewrite has to be
 -- visible to this one, including CR 616.1b's own change to who would control it.
-matchesEntering :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesEntering gs candidate filter_ oid =
+--
+-- CR 608.2h never fires on the zone-change side, and that is why the plain
+-- projection is right for a creature that "would die": Pawl.Engine.Event runs
+-- this loop BEFORE the move, so the dying creature is still on the battlefield in
+-- `gs` and is read as it last existed there rather than as the card it becomes in
+-- the graveyard (CR 400.7). For a CR 608.2f batch `gs` is the pre-batch board
+-- Replacement.applicable passed down, which is that same reading.
+matchesFiltered :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesFiltered gs candidate filter_ oid =
   let context = Filter.MkContext (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
    in Filter.matches context (Projection.viewOfObject oid gs) filter_
 
@@ -429,6 +460,9 @@ bucketOfEffect re = case re of
   ReplacementEffect.EntryR _ (EntryRewrite.ChooseCardNames _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.WithCounters _ _) -> ReplacementBucket.Other
   ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> ReplacementBucket.Other
+  -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
+  -- enters WITH, never whose it is, what it copies or which face is up.
+  ReplacementEffect.EntryR _ EntryRewrite.Riot -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -489,6 +523,13 @@ readsApplier re = case re of
   -- 614.12a's moment for AsCopy's reason, and the criterion and counter kind ride
   -- the effect. Two such rows would offer the same player the same permanents.
   ReplacementEffect.EntryR _ (EntryRewrite.SacrificeAnyNumber _ _) -> False
+  -- CR 702.136a: riot's chooser is the ENTERING object's controller, read live
+  -- off the board for AsCopy's reason, and the rewrite carries no payload at all
+  -- -- rule 702.136a fixes both halves. Two riot rows are always on the SAME
+  -- object, since CR 614.1c's ability is the entering permanent's own, and they
+  -- offer that permanent's controller the same two outcomes -- so which applies
+  -- first is not a board difference.
+  ReplacementEffect.EntryR _ EntryRewrite.Riot -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are
@@ -583,9 +624,11 @@ at xs i fallback = case List.genericDrop i xs of
 -- CR 616.1 / 108.4: who decides. Projection.controllerOf already falls back to
 -- the owner, so CR 616.1's owner clause is free.
 --
--- CR 616.1's APNAP clause has no producer here: one proposed event has exactly
--- one affected object and therefore one chooser, and the damage batch runs each
--- event's loop independently (#71).
+-- One answer per event, because one proposed event has exactly one affected
+-- object. CR 616.1's APNAP clause therefore has nothing to say at this scale and
+-- is honoured a level up, where a whole batch of simultaneous events can present
+-- choices to two players at once: `orderBatch` sorts the batch by this
+-- function's answer before any of it is asked.
 chooserOf :: GameState -> ProposedEvent -> Maybe PlayerId
 chooserOf gs event = case event of
   ProposedEvent.WouldChangeZone zc -> Projection.controllerOf (ZoneChange.object zc) gs
@@ -597,6 +640,10 @@ chooserOf gs event = case event of
     Recipient.ToPlayer pid -> Just pid
     Recipient.ToCreature oid -> Projection.controllerOf oid gs
     Recipient.ToPlaneswalker oid -> Projection.controllerOf oid gs
+    -- The battle's CONTROLLER, not its protector. CR 616.1 asks for the affected
+    -- object's controller and CR 310.8d substitutes the protector only for the
+    -- "defending player", which rule 616 nowhere says.
+    Recipient.ToBattle oid -> Projection.controllerOf oid gs
     Recipient.ToObject oid -> Projection.controllerOf oid gs
   ProposedEvent.WouldBeDestroyed oid _ -> Projection.controllerOf oid gs
   ProposedEvent.WouldPutCounters oid _ _ -> Projection.controllerOf oid gs
@@ -694,15 +741,69 @@ setShield identity_ pat left = case identity_ of
 -- One arm per constructor, no wildcard, so a new rewrite that prevents damage
 -- breaks the build here rather than silently going unreported.
 --
--- Not implemented: CR 615.12's damage that "can't be prevented", which asks a
--- second question this predicate cannot -- a prevention still APPLIES to such an
--- event, prevents none of it, and leaves its shield unspent (#690).
+-- A question about the REWRITE alone, and deliberately not about the event: CR
+-- 615.12's unpreventable damage is still met by a prevention effect, which is
+-- still a prevention effect for having prevented nothing of it. `preventable`
+-- below is the other half, and `inertPrevention` asks them together.
 prevents :: DamageRewrite.DamageRewrite -> Bool
 prevents rewrite = case rewrite of
   DamageRewrite.PreventNext _ -> True
   DamageRewrite.PreventAll -> True
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
+
+-- CR 615.12: could a prevention effect prevent any of this damage event, or is
+-- this damage that "can't be prevented" (Spider-Punk)?
+--
+-- FALSE does not mean the prevention effect is inapplicable, and the rule is
+-- emphatic about the difference: "any applicable prevention effects are STILL
+-- APPLIED to it. Those effects won't prevent any damage, but any additional
+-- effects they have will take place." So `applies` is untouched by this
+-- question, the CR 616.1 loop still offers the row and still marks it applied --
+-- which is CR 615.12a's "just once", falling straight out of the applied-set the
+-- loop already carries -- and what changes is only that the application does
+-- nothing and the shield is not spent ("existing damage prevention shields won't
+-- be reduced by damage that can't be prevented").
+--
+-- Asked per EVENT, because that is what the rule's own subject is and what the
+-- printed clauses narrow: Spider-Punk's sentence admits every event, and
+-- Excruciator's admits only the ones its own 7/7 is the source of, on the same
+-- board and in the same batch.
+--
+-- A DISJUNCTION over the standing effects, for CR 101.2's reason and the shape
+-- every prohibition takes: one applicable "can't" is enough and nothing outvotes
+-- it. `any` rather than a count because EachPlayer puts one effect on the list
+-- once per seat.
+--
+-- Delegated to Pawl.Engine.PlayerEffect, which owns the CR 613.10/613.11 axis
+-- this lives on, so this module never sees a PlayerEffect constructor -- it
+-- reads only the DamagePattern each effect hands back, with the same
+-- matchesDamagePattern that reads a shield's.
+preventable :: GameState -> DamageEvent.DamageEvent -> Bool
+preventable gs de =
+  not (any (\(src, pat) -> matchesDamagePattern src pat de) (PlayerEffect.unpreventable gs))
+
+-- CR 615.12: is this the pairing the rule describes -- a PREVENTION effect
+-- chosen against damage that CAN'T BE PREVENTED? True means the application
+-- happens and changes nothing: Pawl.Engine.Event's CR 616.1 loop hands the event
+-- back untouched and marks the row applied, spending neither a use nor a point
+-- of shield.
+--
+-- The two halves above, asked together, and asked HERE so that the loop reads
+-- one classification rather than composing two. `prevents` is the effect half
+-- and refuses CR 614.1a's SetAmount and Scale, which prevent nothing and are not
+-- what the rule is about: Furnace of Rath doubles unpreventable damage like any
+-- other.
+--
+-- The wildcard is over (effect, event) PAIRS, where it is the only way to say
+-- "this pair is not a prevention of damage" -- preventionBy's arrangement, for
+-- preventionBy's reason: the per-constructor obligation is discharged by
+-- `prevents`, which this delegates to.
+inertPrevention :: GameState -> ReplacementCandidate -> ProposedEvent -> Bool
+inertPrevention gs candidate event = case (ReplacementCandidate.effect candidate, event) of
+  (ReplacementEffect.DamageR _ rewrite, ProposedEvent.WouldDealDamage de) ->
+    prevents rewrite && not (preventable gs de)
+  _ -> False
 
 -- CR 615.13: how much of this event the candidate just applied PREVENTED, or
 -- Nothing when it prevented nothing.
@@ -764,13 +865,50 @@ groupPreventions ps =
 -- as the shield has left and no more, which nobody may decline or divide, so the
 -- only freedom the rule grants is which event the shield reaches first.
 --
--- CR 616.1's APNAP clause is honoured across choosers here, which is the one
--- place in this module that can honour it: a lone ProposedEvent has exactly one
--- affected object and therefore one chooser (#71).
-orderForShields :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
-orderForShields events = do
+-- CR 616.1's APNAP clause is honoured here too, and over the WHOLE batch rather
+-- than only over the shield questions: `byApnap` groups the batch by chooser
+-- before anything is asked, so every question one player is owed -- CR 615.7's
+-- allocation and each of their events' CR 616.1 choices alike -- is asked before
+-- the next player's. A lone ProposedEvent still has exactly one affected object
+-- and therefore one chooser, which is why the batch is the only place the clause
+-- can be honoured at all.
+--
+-- The two rules order DIFFERENT LEVELS and so cannot contend for this list. CR
+-- 615.7's freedom is entirely within one chooser: a shield names one recipient,
+-- so every event it contests is addressed to one player's object, and that is
+-- the same player CR 616.1 asks about those events -- `contested` and `choose`
+-- both read the chooser off the recipient through `chooserOf`. `askOne` then
+-- permutes only within that player's own positions. CR 101.4c is the rule that
+-- licenses it: a player making several simultaneous choices makes them in the
+-- order specified, or chooses the order themselves.
+orderBatch :: [DamageEvent.DamageEvent] -> Game [DamageEvent.DamageEvent]
+orderBatch events = do
   gs <- State.get
-  Monad.foldM askOne events (contested gs events)
+  -- Sorted FIRST: `contested` reports batch positions, so it has to see the list
+  -- `askOne` will splice into.
+  let sorted = byApnap gs events
+  Monad.foldM askOne sorted (contested gs sorted)
+
+-- CR 616.1 / 101.4: group a batch by whose CR 616.1 choice each event is, active
+-- player first. A stable sort, so events sharing a chooser keep their gather
+-- order and CR 615.7's within-chooser permutation is left to `askOne`.
+--
+-- An event with no chooser -- its affected object has left -- sorts last with
+-- the unseated, since `choose` will not prompt for it either.
+byApnap :: GameState -> [DamageEvent.DamageEvent] -> [DamageEvent.DamageEvent]
+byApnap gs =
+  let rank de = maybe (unseated gs) (seatOf gs) (chooserOf gs (ProposedEvent.WouldDealDamage de))
+   in List.sortOn rank
+
+-- CR 101.4: how far down APNAP order a player sits. A player off the seating
+-- roster sorts last, the fallback Resolve.objectRefObjects takes for the same
+-- lookup.
+seatOf :: GameState -> PlayerId -> Int
+seatOf gs pid = Maybe.fromMaybe (unseated gs) (List.elemIndex pid (Game.apnapOrder gs))
+
+-- The seat index that sorts after every real one.
+unseated :: GameState -> Int
+unseated = length . Game.apnapOrder
 
 -- Ask one chooser for the order of the positions their shields are contested
 -- over, and splice the answer back into the batch.
@@ -809,6 +947,11 @@ askOne batch (pid, positions) = do
 -- unit is the amount. A shield large enough to cover the lot prevents all of it
 -- whatever the order, so there is nothing to ask.
 --
+-- Not implemented: a shield is the only contested resource this asks about, so a
+-- limited replacement of any other shape that two of one chooser's simultaneous
+-- events could each spend is spent by whichever is settled first, rather than by
+-- CR 101.4c's answer from that chooser (#839).
+--
 -- Several shields contribute ONE question per CHOOSER, over the union of what
 -- they contest: the order the batch is settled in is a single fact about the
 -- batch, and asking twice would ask the same player to state it twice.
@@ -818,11 +961,20 @@ askOne batch (pid, positions) = do
 -- WIDER question than either shield needs -- neither shield can reach the
 -- other's events -- but a superset of a question is still the player's answer,
 -- and splitting it would ask the same player twice about one batch.
+--
+-- CR 615.12's damage is left out of the union, and that is an elision the rule
+-- itself licenses rather than a shortcut: a shield prevents none of an
+-- unpreventable event and is not reduced by it, so every order of a batch of
+-- them leads to the same board and there is nothing for the shielded player to
+-- decide. Filtered per EVENT rather than per batch, so a batch mixing
+-- preventable and unpreventable damage still asks about the part the shield can
+-- reach -- which a narrowed clause reaches: an Excruciator and an ordinary
+-- creature hitting one shielded permanent at once is exactly that batch.
 contested :: GameState -> [DamageEvent.DamageEvent] -> [(PlayerId, [Natural])]
 contested gs events =
   let indexed :: [(Natural, DamageEvent.DamageEvent)]
       indexed = zip [0 ..] events
-      hitsOf candidate = filter (\entry -> applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate) indexed
+      hitsOf candidate = filter (\entry -> preventable gs (snd entry) && applies gs (ProposedEvent.WouldDealDamage (snd entry)) candidate) indexed
       contestedBy candidate = do
         remaining <- shieldRemaining (ReplacementCandidate.effect candidate)
         case hitsOf candidate of
@@ -838,12 +990,8 @@ contested gs events =
           _ -> Nothing
       groups = Maybe.mapMaybe contestedBy (collect gs (GameState.replacements gs))
       merged = Map.fromListWith (<>) groups
-      order = Game.apnapOrder gs
-      -- A chooser off the seating roster sorts last, the fallback
-      -- Resolve.objectRefObjects takes for the same lookup.
-      seated pid = Maybe.fromMaybe (length order) (List.elemIndex pid order)
    in [ (pid, List.sort (List.nub positions))
-      | (pid, positions) <- List.sortOn (seated . fst) (Map.toList merged)
+      | (pid, positions) <- List.sortOn (seatOf gs . fst) (Map.toList merged)
       ]
 
 -- CR 615.7: how much of a prevention shield is left, or Nothing for an effect

@@ -10,9 +10,11 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -72,9 +74,11 @@ data Response
     ChoseBasicLandType Subtype.Subtype
   | -- | CR 701.23: the library card a search found (Nothing = failed to find).
     Searched (Maybe ObjectId.ObjectId)
-  | -- | CR 601.3 (Panglacial): the library card cast while searching (Nothing =
-    -- declined).
-    CastWhileSearched (Maybe ObjectId.ObjectId)
+  | -- | CR 601.3 (Panglacial): the library card cast while searching, paired with
+    -- the CR 709.3 half being cast (Nothing = declined). The name is part of the
+    -- answer for ChoseAction's reason: a transcript that recorded only the card
+    -- would replay a split card's other half.
+    CastWhileSearched (Maybe (ObjectId.ObjectId, CardName.CardName))
   | -- | CR 601.2b: the value of X a caster chose.
     ChoseX Natural.Natural
   | -- | CR 601.2b: the mode(s) a caster chose for a modal spell.
@@ -84,6 +88,11 @@ data Response
   | -- | CR 208.2b: the index of the entry shape a player chose as an object
     -- entered.
     ChoseEntryOption Natural.Natural
+  | -- | CR 702.136a: whether a riot permanent's controller took the additional
+    -- +1/+1 counter (Exercises) or the haste (Declines). Distinct from
+    -- ChoseOptional, which records CR 603.5's "may" during a RESOLUTION: this one
+    -- is answered inside a zone change, as the permanent enters.
+    ChoseRiot OptionalDecision.OptionalDecision
   | -- | CR 614.1c: the colour a player chose as an object entered.
     ChoseColor Color.Color
   | -- | CR 201.4 / 614.1c: the card name a player chose as an object entered.
@@ -93,6 +102,12 @@ data Response
     -- Unlike ChoseDefender, which also carries an opponent, this answers no
     -- combat question.
     ChoseOpponent PlayerId.PlayerId
+  | -- | CR 310.8a / 704.5w / 704.5x: the player chosen to protect a battle,
+    -- either as it entered or when a state-based action found the standing
+    -- designation illegal. Distinct from ChoseOpponent above for the reason
+    -- Prompt.ChooseProtector gives: a battle with no battle types takes its own
+    -- controller, so this does not always carry an opponent.
+    ChoseProtector PlayerId.PlayerId
   | -- | CR 603.3b: the order a player chose for their simultaneous triggers, as
     -- a permutation of the offered indices.
     OrderedTriggers [Natural.Natural]
@@ -117,15 +132,20 @@ data Response
   | -- | CR 103.5: the cards a player put on the bottom of their library after a
     -- mulligan, in chosen order.
     PutOnBottom [ObjectId.ObjectId]
-  | -- | CR 103.5b: the hand card whose mulligan-window action a player took
-    -- (Nothing = declined).
-    TookMulliganAction (Maybe ObjectId.ObjectId)
-  | -- | CR 103.6: the hand card whose opening-hand action a player took (Nothing
-    -- = declined).
-    TookOpeningHandAction (Maybe ObjectId.ObjectId)
+  | -- | CR 103.5b: the hand card whose mulligan-window action a player took, and
+    -- WHICH of that card's actions it was (Nothing = declined).
+    TookMulliganAction (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
+  | -- | CR 103.6: the hand card whose opening-hand action a player took, and which
+    -- of that card's actions it was (Nothing = declined).
+    TookOpeningHandAction (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   | -- | CR 603.5: whether the controller of a resolving spell or ability
     -- exercised a printed "may".
     ChoseOptional OptionalDecision.OptionalDecision
+  | -- | CR 608.2g: whether a player took a cast a resolving effect offered them.
+    -- Distinct from ChoseOptional, which records CR 603.5's "may" over a whole
+    -- mode, and from CastWhileSearched, which records the same rule's
+    -- library-search producer and names which card was cast.
+    ChoseOfferedCast OptionalDecision.OptionalDecision
   | -- | CR 118.12a: whether the player a resolving spell or ability offered a
     -- cost to chose to pay it. Distinct from ChoseOptional, which records CR
     -- 603.5's "may" and is always answered by the resolving controller.
@@ -138,6 +158,10 @@ data Response
     -- monocolored hybrid mana symbol, so a Flame Javelin cast for {6} replays as
     -- that and not as {R}{R}{R}.
     AnnouncedHybridPayment HybridPayment.HybridPayment
+  | -- | CR 118.7e: which half of a hybrid mana symbol in a cost REDUCTION its
+    -- payer chose as CR 601.2f applied it. The symbol the half resolved to, so a
+    -- {2/B} reduction taken as {2} replays as that and not as one black mana.
+    ChoseReductionHalf ManaSymbol.ManaSymbol
   | -- | CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
     -- ability.
     AnnouncedEntwine EntwineDecision.EntwineDecision

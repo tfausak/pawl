@@ -27,7 +27,10 @@
 -- ability staying indistinguishable, with Hero of Bladehold -- `battleCrySpec`.
 -- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
--- Narcomoeba -- `graveyardTriggerSpec`. CR 400.7e's OTHER reference inside a
+-- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
+-- zone off a triggered ability's EFFECT rather than its condition, with Squee,
+-- Goblin Nabob against a Bitterblossom in the same graveyard --
+-- `graveyardEffectZoneTriggerSpec`. CR 400.7e's OTHER reference inside a
 -- look-back trigger, the card it became in the first zone it went to, with
 -- Endless Cockroaches -- `becameSlotSpec`, which also pins
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
@@ -37,7 +40,10 @@
 -- -- `lookBackInterveningSpec`. CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
--- and Khabál Ghoul -- `bystanderSpec`. The same CR 400.7e slot read from the ENTRY
+-- and Khabál Ghoul -- `bystanderSpec`, and CR 113.6m read off that same
+-- bystander, so a graveyard-functioning trigger does not fire from the
+-- battlefield it just left, with Squee, Goblin Nabob against a Bitterblossom
+-- leaving beside it -- `bystanderZoneSpec`. The same CR 400.7e slot read from the ENTRY
 -- direction, where the entrant is a different card from the bearer, with Aether
 -- Flash -- `aetherFlashSpec`. CR 308's kindred card type, whose one observable
 -- consequence (CR 308.2: a noncreature card carrying creature types) is read
@@ -56,7 +62,18 @@
 -- BYSTANDER -- "whenever another creature you control dies", where the bearer
 -- watches a permanent other than itself leave the battlefield -- with Meren of
 -- Clan Nel Toth, which is also the pool's producer for CR 122's experience
--- counters -- `permanentDiesSpec`.
+-- counters -- `permanentDiesSpec`. CR 119.9's life-gain trigger, from both
+-- producers (CR 119.3's instructed gain and CR 120.3f's lifelink) with the
+-- controls that keep it from being a "life total moved" trigger, with Ajani's
+-- Pridemate -- `lifeGainTriggerSpec`. That event read for its NUMBER, which CR
+-- 603.2 makes part of it and Sanguine Bond's "that much" is the pool's first
+-- reader of -- `lifeGainAmountSpec`. That event's mirror, a player LOSING life,
+-- from all three recording sites (CR 119.3's instructed loss, CR 119.2's damage
+-- and CR 119.4's paid life) with the controls that keep it from being a "life
+-- total moved" trigger, with Exquisite Blood -- `lifeLossTriggerSpec`. That
+-- event read for BOTH the halves CR 603.2 makes part of it -- the amount and the
+-- player who lost it -- on a three-seat board where "that player" and "an
+-- opponent" come apart, with Mindcrank -- `mindcrankSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -75,6 +92,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -535,9 +553,9 @@ stateTriggerSpec s registry =
                 [] -> settled
               again = settle removed
           Spec.assertEqWith s "a fresh instance" (length (triggerIds again)) 1
-        -- IMPORTANT-2 (review): the suppression check in Event.stateTriggers
-        -- compares BOTH the source object's id and the ability (`Object.source
-        -- obj == Source.OfTrigger srcId ab`). Every test above uses exactly one
+        -- IMPORTANT-2 (review): Event.stateTriggers' instancesOnStack count
+        -- keys on BOTH the source object's id and the ability (`Source.OfTrigger
+        -- srcId ab`). Every test above uses exactly one
         -- Barbarian Outcast, so all of them would still pass a weaker
         -- implementation that compared only the TriggeredAbility and ignored
         -- srcId -- and that weaker version would wrongly suppress a second,
@@ -599,6 +617,58 @@ stateTriggerSpec s registry =
               resolved = snd (Engine.runGamePure S.identityAnswer settled Stack.resolveTop)
           Spec.assertBool s (not (Set.member outcast (GameState.battlefield resolved))) "the Outcast is off the battlefield"
           Spec.assertEqWith s "and in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+        -- CR 603.2 / 603.8: ONE object carrying TWO identical state-triggered
+        -- abilities. Each ability is its own ability, so each triggers, and CR
+        -- 603.8's suppression ("a state-triggered ability doesn't trigger again
+        -- until the ability has resolved...") is scoped to *the* ability -- it
+        -- says nothing about a different ability that happens to read the same.
+        --
+        -- Synthetic Twofold Outcast (synthetic-twofold-outcast.json) is
+        -- Barbarian Outcast with its one line printed twice and a life payment
+        -- bolted on: "When you control no Swamps, you lose 1 life. Sacrifice
+        -- this creature." x2. No printed card has two identical trigger lines
+        -- (checked against Scryfall's whole oracle-cards bulk export, funny and
+        -- alchemy sets included: zero hits), and nothing in CR 603 forbids one.
+        --
+        -- The life payment is what makes this test DISCRIMINATE. Counting stack
+        -- objects alone would be weak; two identical abilities produce two
+        -- indistinguishable trigger objects, so the effect COUNT is the real
+        -- evidence. Alice is at 20; both instances resolving costs 2, one
+        -- instance costs 1. The sacrifice is what makes it terminate: with the
+        -- source off the battlefield the condition can never re-arm, so this is
+        -- not the CR 603.8 loop a bare "lose 1 life" would be.
+        Spec.it s "CR 603.2/603.8 two identical state triggers on ONE permanent each trigger" $ do
+          twofoldOutcast <- S.printingOf s registry "Synthetic Twofold Outcast"
+          swamp <- S.printingOf s registry "Swamp"
+          let (_, gs) = outcastBoard twofoldOutcast swamp 0
+              settled = settle gs
+              resolveTop g = snd (Engine.runGamePure S.identityAnswer g Stack.resolveTop)
+              both = resolveTop (resolveTop settled)
+          Spec.assertEqWith s "two instances, one per ability" (length (triggerIds settled)) 2
+          Spec.assertEqWith s "both resolved, so two life paid" (S.lifeOf S.alice both) (Just 18)
+          Spec.assertEqWith s "and the stack is empty again" (length (triggerIds both)) 0
+        -- CR 603.8's second half, on the same two-ability source: "A
+        -- state-triggered ability doesn't trigger again until THE ABILITY has
+        -- resolved, has been countered, or has otherwise left the stack." The
+        -- rule is about the ability whose instance left -- an instance of the
+        -- OTHER, identical ability is not that ability's instance and must not
+        -- hold it back.
+        --
+        -- Game.cease is the "otherwise left the stack" path the sibling
+        -- single-Outcast test above uses, and it is the only one that reaches
+        -- this: resolving an instance sacrifices the source, which takes it off
+        -- the battlefield and out of Event.stateTriggers' scan entirely.
+        Spec.it s "CR 603.8 one instance leaving re-arms ITS ability, not held back by the twin's instance" $ do
+          twofoldOutcast <- S.printingOf s registry "Synthetic Twofold Outcast"
+          swamp <- S.printingOf s registry "Swamp"
+          let (_, gs) = outcastBoard twofoldOutcast swamp 0
+              settled = settle gs
+              removed = case triggerIds settled of
+                abilId : _ -> Game.cease abilId settled
+                [] -> settled
+              again = settle removed
+          Spec.assertEqWith s "one of the two is gone" (length (triggerIds removed)) 1
+          Spec.assertEqWith s "and the freed ability triggers again, alongside the survivor" (length (triggerIds again)) 2
 
 -- Answers the Hack: it targets `oid` and swaps `from` for `to`. Everything else
 -- falls through to the identity answer.
@@ -766,7 +836,9 @@ historySpec s registry =
 
 -- Tidal Wave {2}{U} Instant: "Create a 5/5 blue Wall creature token with defender.
 -- Sacrifice it at the beginning of the next end step." CR 603.7c's object-bound
--- delayed ability -- "it" must survive the resolution that armed it.
+-- delayed ability -- "it" must survive the resolution that armed it. Synthetic
+-- Deferred Rally joins it for the one shape Tidal Wave cannot reach: a delayed
+-- ability with an intervening "if".
 delayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 delayedSpec s registry =
   let endStep = Phase.Ending EndingStep.EndStep
@@ -848,6 +920,38 @@ delayedSpec s registry =
               (fired, survivors) = Event.delayedPending [GameEvent.StepBegan endStep S.alice] armed
           Spec.assertEqWith s "it fired" (length fired) 1
           Spec.assertEqWith s "and was evicted" (Seq.length survivors) 0
+        -- Synthetic Deferred Rally {W} Instant: "At the beginning of the next
+        -- end step, if you control a creature, you gain 2 life." A LABELED
+        -- CRUTCH (#851): every printed delayed ability with an intervening "if"
+        -- asks whether a named card was cast, played or is still in some zone,
+        -- and neither Quantity nor Filter can name a card. CR 603.4 and
+        -- CR 603.7b meeting on one ability: the first end step's event matches,
+        -- but the intervening "if" is false, so the ability does not TRIGGER --
+        -- and CR 603.7b bounds how many times it triggers, not how many events
+        -- it watches, so nothing was spent and it is still waiting for the next
+        -- end step.
+        --
+        -- The STORE is where the difference shows, and the two assertions on it
+        -- are the discriminating pair: still armed after the false occurrence,
+        -- spent after the true one. The life total alone would not discriminate
+        -- in the first half -- an entry that wrongly triggered at the first end
+        -- step still gains nothing, because Pawl.Engine.Stack's CR 608.2a
+        -- re-check removes it from the stack for the same false condition, so
+        -- the one shot would be spent invisibly.
+        Spec.it s "CR 603.4 a false intervening \"if\" leaves the delayed ability armed for the next end step" $ do
+          rally <- S.printingOf s registry "Synthetic Deferred Rally"
+          plains <- S.printingOf s registry "Plains"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (gs0, oid) = S.handOne rally (S.landsInPlay plains 1)
+              armed = resolveAll (snd (Engine.runGamePure S.identityAnswer gs0 (S.cast S.alice oid)))
+              firstEnd = resolveAll (settle (beginEndStep armed))
+              withCreature = snd (S.addCreature piker S.alice firstEnd)
+              secondEnd = resolveAll (settle (beginEndStep withCreature))
+          Spec.assertEqWith s "the resolution armed it" (Seq.length (GameState.delayedTriggers armed)) 1
+          Spec.assertEqWith s "no life gained while the condition is false" (S.lifeOf S.alice firstEnd) (Just 20)
+          Spec.assertEqWith s "and the entry is still armed" (Seq.length (GameState.delayedTriggers firstEnd)) 1
+          Spec.assertEqWith s "the next end step fires it" (S.lifeOf S.alice secondEnd) (Just 22)
+          Spec.assertEqWith s "and that spends it" (Seq.length (GameState.delayedTriggers secondEnd)) 0
         -- CR 514.2: "all 'until end of turn' and 'this turn' effects end"
         -- during the cleanup step -- which is what ends the stated duration,
         -- and the reason an armed entry cannot outlive the turn that made it.
@@ -2585,6 +2689,95 @@ graveyardTriggerSpec s registry =
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
           Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents entered) entered))) []
 
+-- CR 113.6m for a TRIGGERED ability: "an ability whose cost or effect specifies
+-- that it moves the object it's on out of a particular zone functions only in
+-- that zone". The rule says "an ability", not "an activated ability", and
+-- Pawl.ActivateSpec's Reassembling Skeleton is the same sentence read off an
+-- activated one.
+--
+-- Squee, Goblin Nabob {2}{R} Legendary Creature -- Goblin 1/1, "At the beginning
+-- of your upkeep, you may return this card from your graveyard to your hand."
+-- (name, cost, type line, P/T and oracle text checked against Scryfall.) The
+-- printing that makes the rule bite, because CR 113.6k cannot reach it: "at the
+-- beginning of your upkeep" is a condition that triggers perfectly well from the
+-- battlefield, so the only thing that says "graveyard" is the effect's own
+-- words.
+--
+-- The controls are built to leave the zone derivation as the sole difference:
+--
+--   * Bitterblossom sits in the SAME graveyard, with the SAME condition, and its
+--     effect names no zone. CR 113.6's default keeps it on the battlefield, so
+--     the upkeep that fires Squee must pass it over. Without it, a scan that
+--     simply offered every graveyard card's every ability would pass.
+--   * Squee ON the battlefield at the same upkeep fires nothing, which is the
+--     "functions ONLY in that zone" half.
+graveyardEffectZoneTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+graveyardEffectZoneTriggerSpec s registry =
+  let squeeName = CardName.MkCardName (Text.pack "Squee, Goblin Nabob")
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      beginUpkeep gs = Event.recordEvent (GameEvent.StepBegan upkeep S.alice) (gs {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+      settle :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      settle answer gs = S.runPure answer gs Engine.settleForPriority
+      namesIn zone pid gs =
+        Set.fromList (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone pid gs))
+      -- Takes every "may". Squee's is the only one `buriedBoard` can raise --
+      -- Bitterblossom's mode is mandatory -- so this is not a blanket yes
+      -- standing in for a specific answer.
+      takeOptional :: Prompt.Prompt r -> r
+      takeOptional p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      -- alice's graveyard: Squee, and Bitterblossom as the control. Returns
+      -- Squee's graveyard id and the board with alice's upkeep begun.
+      buriedBoard = do
+        squee <- S.printingOf s registry "Squee, Goblin Nabob"
+        bitterblossom <- S.printingOf s registry "Bitterblossom"
+        let (_, g1) = S.addGraveyardCard bitterblossom S.alice (Setup.emptyGame S.bothPlayers)
+            (squeeId, g2) = S.addGraveyardCard squee S.alice g1
+        pure (squeeId, beginUpkeep g2)
+   in Spec.describe s "GraveyardEffectZoneTrigger" $ do
+        -- The gathering itself: one trigger, and it is Squee's. The count is what
+        -- the Bitterblossom control turns on -- two would mean the scan read the
+        -- graveyard indiscriminately.
+        Spec.it s "CR 113.6m Squee's upkeep trigger is gathered from the graveyard, on its effect's word alone" $ do
+          (squeeId, gs) <- buriedBoard
+          Spec.assertEqWith
+            s
+            "exactly one trigger, from Squee"
+            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs)))
+            [TriggerSource.OfObject squeeId]
+        -- End to end through the real engine: the trigger is placed, resolves,
+        -- and CR 400.7's funnel moves the card to alice's hand.
+        Spec.it s "CR 113.6m whole card: it resolves and Squee returns to its owner's hand" $ do
+          (_, gs) <- buriedBoard
+          let placed = settle takeOptional gs
+              after = S.runPure takeOptional placed Stack.resolveTop
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member squeeName (namesIn Zone.Hand S.alice after)) "Squee is in hand"
+          Spec.assertBool s (not (Set.member squeeName (namesIn Zone.Graveyard S.alice after))) "and no longer in the graveyard"
+          -- The control, in the same graveyard and under the same condition:
+          -- Bitterblossom's effect names no zone, so CR 113.6's default leaves it
+          -- on the battlefield and its "you lose 1 life" never runs.
+          Spec.assertEqWith s "the Bitterblossom in the graveyard cost alice nothing" (S.lifeOf S.alice after) (Just 20)
+        -- CR 603.5: the "may" is a real choice. The trigger is placed either way,
+        -- so declining tells the zone gate apart from the mode gate.
+        Spec.it s "CR 603.5 declining the may leaves Squee in the graveyard" $ do
+          (_, gs) <- buriedBoard
+          let placed = settle S.identityAnswer gs
+              after = S.runPure S.identityAnswer placed Stack.resolveTop
+          Spec.assertEqWith s "the trigger reached the stack anyway" (length (GameState.stack placed)) 1
+          Spec.assertBool s (Set.member squeeName (namesIn Zone.Graveyard S.alice after)) "Squee is still in the graveyard"
+          Spec.assertBool s (not (Set.member squeeName (namesIn Zone.Hand S.alice after))) "and not in hand"
+        -- "Functions ONLY in that zone", the other direction: the same card, the
+        -- same upkeep, one zone away. Nothing but CR 113.6m can withhold it --
+        -- the condition matches a battlefield permanent perfectly well, which is
+        -- exactly what Bitterblossom does from there.
+        Spec.it s "CR 113.6m the same card on the battlefield triggers for nobody" $ do
+          squee <- S.printingOf s registry "Squee, Goblin Nabob"
+          let (_, gs) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
+              begun = beginUpkeep gs
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents begun) begun))) []
+
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), second line: "When
 -- Serra Avatar is put into a graveyard from anywhere, shuffle it into its
 -- owner's library." Oracle text verified against Scryfall. Its first line, the
@@ -3200,6 +3393,19 @@ representativeEvents cond =
         -- scoped to damage that would be dealt to one -- an event naming a
         -- creature matches nothing and would pin the floor at empty.
         TriggerCondition.DamageToPlayerPrevented _ -> one (GameEvent.DamagePrevented (Recipient.ToPlayer S.bob) 2)
+        -- CR 119.9's own event, and the only one this condition admits: the
+        -- payload is a player and an amount, and the amount is the floor.
+        TriggerCondition.PlayerGainsLife _ -> one (GameEvent.LifeGained S.bob 2)
+        -- The loss condition's own event, and the only one it admits, on the
+        -- gain arm's reasoning: same payload shape, same amount floor.
+        TriggerCondition.PlayerLosesLife _ -> one (GameEvent.LifeLost S.bob 2)
+        -- CR 714.2b: a placement on the BEARER that crosses the chapter. The
+        -- bearer here is `departed`, the id Event.matchesTrigger is asked about
+        -- below, and the counts straddle N so the event really matches.
+        TriggerCondition.SelfCountersReached kind n -> one (GameEvent.CountersPut departed kind 0 n)
+        -- CR 310.11b: a removal on the BEARER that took the last counter, so the
+        -- event really matches the condition Event.matchesTrigger is asked about.
+        TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved departed kind 1 0)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3222,7 +3428,11 @@ everyTriggerCondition =
     TriggerCondition.SelfDies,
     TriggerCondition.SelfLeavesTheBattlefield,
     TriggerCondition.SpellOrAbilityCounters PlayerRelation.You,
-    TriggerCondition.DamageToPlayerPrevented PlayerRelation.You
+    TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
+    TriggerCondition.PlayerGainsLife PlayerRelation.You,
+    TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
+    TriggerCondition.SelfCountersReached CounterKind.Lore 1,
+    TriggerCondition.SelfLastCounterRemoved CounterKind.Defense
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -3551,6 +3761,85 @@ bystanderSpec s registry =
           triggers = fst (Event.gatherTriggers (Event.unscannedEvents began) began)
       Spec.assertEqWith s "the Ghoul is gone" (Game.lookupObject ghoul began) Nothing
       Spec.assertEqWith s "and nothing triggered" (fmap PendingTrigger.source triggers) []
+
+-- CR 113.6m read off a BYSTANDER: the half of CR 603.10's first sentence
+-- `bystanderSpec` above recovers, asked of a permanent whose ability functions
+-- only in a graveyard.
+--
+-- The rule the recovery is not allowed to lose: "an ability whose cost or effect
+-- specifies that it moves the object it's on out of a particular zone functions
+-- only in that zone". A bystander is recovered from CR 608.2h last known
+-- information, but what it is recovered AS is a permanent that was ON THE
+-- BATTLEFIELD when the event happened -- so one of its abilities that functions
+-- only in a graveyard was no more watching then than it would be now.
+--
+-- CR 603.10a is deliberately NOT this case. There the rule's own "unless its
+-- trigger condition ... specifies that the object is put into that zone" arm
+-- decides, and it is unimplemented (#819); a bystander carries any condition at
+-- all, so nothing about that arm reaches here.
+--
+-- The pair, chosen so that ONE derivation is the only difference between them:
+--
+--   * Squee, Goblin Nabob ({2}{R} Legendary Creature -- Goblin 1/1, "At the
+--     beginning of your upkeep, you may return this card from your graveyard to
+--     your hand"). CR 113.6k cannot reach it -- an upkeep condition triggers
+--     perfectly well from the battlefield -- so only the effect's own words say
+--     graveyard.
+--   * Bitterblossom ({1}{B} Kindred Enchantment -- Faerie, "At the beginning of
+--     your upkeep, create a 1/1 black Faerie Rogue creature token with flying and
+--     you lose 1 life") as the control: the SAME trigger condition, on the same
+--     battlefield, leaving in the same batch, with an effect that names no zone.
+--     CR 113.6's default keeps it functioning on the battlefield.
+--
+-- (Both names, costs, type lines, P/T and oracle texts checked against Scryfall.)
+--
+-- Both leave the battlefield AFTER the upkeep begins and inside one unscanned
+-- batch, which is `bystanderSpec`'s Khabál Ghoul shape: the step event comes
+-- first, so nothing about either permanent's own departure event can be what
+-- offers it.
+bystanderZoneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+bystanderZoneSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- alice's upkeep begins with Squee and Bitterblossom on her battlefield;
+      -- `remove` then takes both off inside the same batch. Answers with the two
+      -- battlefield ids and the sources the gather produced.
+      board remove = do
+        squee <- S.printingOf s registry "Squee, Goblin Nabob"
+        bitterblossom <- S.printingOf s registry "Bitterblossom"
+        let (squeeId, g1) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
+            (blossomId, g2) = S.addCreature bitterblossom S.alice g1
+            began =
+              S.withEvents
+                [GameEvent.StepBegan upkeep S.alice]
+                (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+            after = S.runPure S.identityAnswer began (remove [squeeId, blossomId])
+        pure (squeeId, blossomId, after, fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents after) after)))
+   in Spec.describe s "BystanderZone" $ do
+        -- The proving leg. EXILE rather than a graveyard on purpose: it leaves
+        -- the bystander reading as the only source that could offer Squee's
+        -- ability at all, so the assertion cannot pass on the strength of the
+        -- graveyard filtering that already landed with CR 113.6m's trigger half.
+        Spec.it s "CR 113.6m a bystander's graveyard-functioning trigger does not fire from the battlefield it just left" $ do
+          (squeeId, blossomId, after, sources) <- board (mapM_ (\oid -> Event.changeZone oid Zone.Exile))
+          Spec.assertEqWith s "Squee really left the battlefield" (Game.lookupObject squeeId after) Nothing
+          Spec.assertEqWith s "and so did the Bitterblossom" (Game.lookupObject blossomId after) Nothing
+          Spec.assertBool s (null (Game.zoneMembers Zone.Graveyard S.alice after)) "neither card is in a graveyard, so no graveyard reading can be doing this"
+          Spec.assertEqWith
+            s
+            "only the Bitterblossom, whose effect names no zone, is recovered as a bystander"
+            sources
+            [TriggerSource.OfObject blossomId]
+        -- The same board with the ordinary destination. The battlefield
+        -- incarnation still gets nothing, which is what this change is; the
+        -- graveyard incarnation CR 400.7 mints is a different object under a
+        -- different id, and whether IT should be offered to an event that
+        -- predates its arrival is a separate question this says nothing about
+        -- (#824).
+        Spec.it s "CR 113.6m the same holds when the bystander dies to a graveyard" $ do
+          (squeeId, blossomId, after, sources) <- board (Event.destroy Regenerability.Regenerable)
+          Spec.assertEqWith s "Squee really left the battlefield" (Game.lookupObject squeeId after) Nothing
+          Spec.assertBool s (TriggerSource.OfObject squeeId `notElem` sources) "the battlefield incarnation triggered nothing"
+          Spec.assertBool s (TriggerSource.OfObject blossomId `elem` sources) "and the control still did"
 
 -- CR 400.7e's slot read from the OTHER direction of a zone change: an entry.
 -- "Abilities that trigger when an object moves from one zone to another ... can
@@ -3945,6 +4234,471 @@ runToTurnStep turn phase answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 64 gs0
 
+-- CR 119.9: "Some triggered abilities are written, 'Whenever [a player] gains
+-- life, . . . .' Such abilities are treated as though they are written, 'Whenever
+-- a source causes [a player] to gain life, . . . .' If a player gains 0 life, no
+-- life gain event has occurred, and these abilities won't trigger."
+--
+-- Ajani's Pridemate, {1}{W} Creature -- Cat Soldier 2/2, "Whenever you gain life,
+-- put a +1/+1 counter on this creature", the card that proves it. Its payload
+-- names only its own source, so every case here isolates the CONDITION.
+--
+-- What makes the group a proof rather than a demonstration is that each positive
+-- has a control differing in ONE thing:
+--
+--   * the same Soul Warden, the same entering creature, the same 1 life gained --
+--     and the Warden under the OTHER player. Only the GAINER differs, and the
+--     Pridemate is silent (CR 109.5 / 603.3a's "you").
+--   * one combat damage event, two life totals moving in opposite directions, and
+--     a Pridemate on each side. Only the DIRECTION differs, and only the gainer's
+--     fires: CR 120.3f's lifelink gain is a life gain event and CR 119.2's damage
+--     loss is not (GameEvent.LifeLost is a different constructor entirely).
+--
+-- The zero case is CR 119.9's own last sentence, asserted on the CR 608.2i record
+-- rather than through a counter: a 0-damage lifelink event is a real damage event
+-- that gains 0 life, so the log must hold no life gain for it to match.
+lifeGainTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lifeGainTriggerSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- A Maybe rather than a defaulted 0, so a Pridemate that is no longer
+      -- there reads as Nothing and cannot be mistaken for one that took no
+      -- counter.
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- alice always holds the Pridemate and casts the creature; `wardenOwner`
+      -- decides who gains the life the entering creature causes. That is the only
+      -- difference between the two cases below.
+      wardenBoard plains pridemate soulWarden wardenOwner =
+        let (_, b0) = S.addCreature soulWarden wardenOwner (S.landsInPlay plains 1)
+            (mateId, b1) = S.addCreature pridemate S.alice b0
+            (gs, spellId) = S.handOne soulWarden b1
+            cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+         in (mateId, resolveAll cast)
+      -- Only `attacker` attacks, and nobody blocks, so the life totals move by
+      -- exactly the one damage event under test. Declining the block is what puts
+      -- the damage on the PLAYER: bob's own Pridemate would otherwise block, and
+      -- CR 120.3e's marked damage would leave his life total alone -- costing the
+      -- lifelink case its "and bob lost two" control.
+      attacksWith attacker p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+   in Spec.describe s "PlayerGainsLife" $ do
+        -- The gameplay-level proof, cast to resolution. alice's Soul Warden sees
+        -- the second Warden enter (CR 603.6a), gains her 1 life on resolution (CR
+        -- 119.3), and THAT is the event the Pridemate matches -- a second CR 117.5
+        -- boundary later, off GameEvent.LifeGained.
+        --
+        -- Exactly one counter, not two: the newcomer's own "another" declines its
+        -- own entry, so exactly one life gain event happened.
+        Spec.it s "CR 119.9 whole cards: alice gains 1 life from Soul Warden and her Pridemate grows" $ do
+          plains <- S.printingOf s registry "Plains"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          let (mateId, settled) = wardenBoard plains pridemate soulWarden S.alice
+          Spec.assertEqWith s "alice gained exactly 1" (S.lifeOf S.alice settled) (Just 21)
+          Spec.assertEqWith s "the Pridemate took exactly one +1/+1 counter" (countersOn mateId settled) (Just 1)
+        -- The control twin, differing in ONE thing: bob controls the Soul Warden,
+        -- so bob is the one who gains. The same creature enters, the same 1 life
+        -- is gained, the same log entry is written -- and CR 109.5's "you" is
+        -- alice, so her Pridemate stays silent.
+        --
+        -- bob's gain is asserted too, or the case would pass for the wrong reason:
+        -- an engine that recorded no event at all would also show no counter.
+        Spec.it s "CR 109.5/603.3a the control: BOB gains the life, and alice's Pridemate stays silent" $ do
+          plains <- S.printingOf s registry "Plains"
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          let (mateId, settled) = wardenBoard plains pridemate soulWarden S.bob
+          Spec.assertEqWith s "bob really gained the life" (S.lifeOf S.bob settled) (Just 21)
+          Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice settled) (Just 20)
+          Spec.assertEqWith s "so the Pridemate took no counter" (countersOn mateId settled) (Just 0)
+        -- CR 120.3f: "damage dealt by a source with lifelink causes that source's
+        -- controller to gain that much life, in addition to the damage's other
+        -- results". The second producer, and the one CR 119.9's rewriting is aimed
+        -- at -- no effect said "gain life"; a keyword did.
+        --
+        -- ONE board carries the control. bob has a Pridemate too, and the single
+        -- combat damage event moves both life totals: alice's UP by 2 (CR 120.3f)
+        -- and bob's DOWN by 2 (CR 119.2 / 120.3a). Only alice's fires, so the
+        -- trigger is keyed on gaining life rather than on a life total moving.
+        Spec.it s "CR 120.3f lifelink gains life, so the attacker's Pridemate grows and the defender's does not" $ do
+          pridemate <- S.printingOf s registry "Ajani's Pridemate"
+          childOfNight <- S.printingOf s registry "Child of Night"
+          let (gs0, mine, _) = S.combatBoardOf [childOfNight] []
+              (aliceMate, gs1) = S.addCreature pridemate S.alice gs0
+              (bobMate, gs2) = S.addCreature pridemate S.bob gs1
+          case mine of
+            [] -> Spec.assertFailure s "fixture should have given alice a Child of Night"
+            vampire : _ -> do
+              let settled = resolveAll (S.fightWith (attacksWith vampire) gs2)
+              Spec.assertEqWith s "alice gained two" (S.lifeOf S.alice settled) (Just 22)
+              Spec.assertEqWith s "and bob lost two" (S.lifeOf S.bob settled) (Just 18)
+              Spec.assertEqWith s "alice's Pridemate grew" (countersOn aliceMate settled) (Just 1)
+              Spec.assertEqWith s "bob's Pridemate did not -- losing life is not gaining it" (countersOn bobMate settled) (Just 0)
+        -- CR 119.9's last sentence: "if a player gains 0 life, no life gain event
+        -- has occurred".
+        --
+        -- Hand-built, and honestly so: no card in the pool can hand applyDamage a
+        -- 0-amount event, CR 510.1a dropping a creature that assigns 0 or less and
+        -- Resolve's DealDamage arm guarding its own quantity. What this pins is
+        -- therefore applyDamage's own contract -- the door a future producer would
+        -- come through -- rather than a board a player could sit at.
+        --
+        -- Asserted on the LOG rather than through a counter, because the claim is
+        -- about the RECORD: a counter assertion would also pass for an engine that
+        -- recorded the zero and then declined to match it, which is not what the
+        -- rule says. The 2-damage half is the paired control, so an empty answer
+        -- cannot pass for the wrong reason.
+        Spec.it s "CR 119.9 a 0-damage lifelink event records no life gain at all" $ do
+          childOfNight <- S.printingOf s registry "Child of Night"
+          let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
+              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False 0 (Just S.alice) DamageKind.Combat
+              gainsIn gs = [p | GameEvent.LifeGained p _ <- Foldable.toList (GameState.events gs)]
+              after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
+          Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
+          Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []
+
+-- CR 119.9 read for its NUMBER, which the group above never asks for: Ajani's
+-- Pridemate's payload names no amount, so nothing there could tell a bound amount
+-- from an unbound one.
+--
+-- Sanguine Bond, {3}{B}{B} Enchantment, "Whenever you gain life, target opponent
+-- loses that much life." CR 603.2 makes the amount part of the event that fired
+-- the trigger, and Pawl.Engine.Event.eventBindings stamps it under
+-- Pawl.Engine.Binding.eventAmount, which the card's LoseLife reads as an ordinary
+-- Quantity.InSlot.
+--
+-- What makes this a proof rather than a demonstration is that the two gameplay
+-- cases carry DIFFERENT amounts, from different producers:
+--
+--   * Renewed Faith's "you gain 6 life" -- 6, a number nothing else on that board
+--     is (three Plains, a mana value of 3, two life totals of 20).
+--   * Radiant Fountain's entry trigger -- 2.
+--
+-- One constant bound in place of the real amount therefore fails one of the two,
+-- and a binding that read the gainer's LIFE TOTAL rather than the gain (26 and 22
+-- respectively) fails both.
+lifeGainAmountSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lifeGainAmountSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      -- The same staging strippedTriggerSpec's entry fixture uses: the permanent
+      -- is placed, its Moved event recorded, and CR 603.6a's scan run at the next
+      -- settle.
+      entering oid gs =
+        let moved = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+         in resolveAll (settle (S.withEvents [GameEvent.Moved moved (Projection.project oid gs)] gs))
+   in Spec.describe s "CR 119.9 that much life" $ do
+        -- The gameplay-level proof, cast to resolution. alice's Renewed Faith
+        -- gains her 6 (CR 119.3), the Bond's trigger matches that event, and its
+        -- payload reads the SIX out of the slot -- bob's 20 becomes 14.
+        --
+        -- alice's own total is asserted too: an engine that made the Bond drain
+        -- its controller would show the same 14 on bob only if it also failed
+        -- here.
+        Spec.it s "CR 603.2 whole cards: alice gains 6 from Renewed Faith and Sanguine Bond drains bob for 6" $ do
+          plains <- S.printingOf s registry "Plains"
+          sanguineBond <- S.printingOf s registry "Sanguine Bond"
+          renewedFaith <- S.printingOf s registry "Renewed Faith"
+          let (_, board) = S.addCreature sanguineBond S.alice (S.landsInPlay plains 3)
+              (gs, spellId) = S.handOne renewedFaith board
+              settled = resolveAll (snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId)))
+          Spec.assertEqWith s "alice gained exactly 6" (S.lifeOf S.alice settled) (Just 26)
+          Spec.assertEqWith s "and bob lost exactly that much" (S.lifeOf S.bob settled) (Just 14)
+        -- The SECOND amount, from the other producer, on a board where nothing is
+        -- 6: a Bond that bound a constant, or bound the amount from the wrong
+        -- event, cannot pass both this and the case above.
+        Spec.it s "CR 603.2 a gain of 2 drains 2, not the previous case's 6" $ do
+          sanguineBond <- S.printingOf s registry "Sanguine Bond"
+          radiantFountain <- S.printingOf s registry "Radiant Fountain"
+          let (_, withBond) = S.addCreature sanguineBond S.alice (Setup.emptyGame S.bothPlayers)
+              (fountainId, gs) = S.addCreature radiantFountain S.alice withBond
+              settled = entering fountainId gs
+          Spec.assertEqWith s "alice gained exactly 2" (S.lifeOf S.alice settled) (Just 22)
+          Spec.assertEqWith s "and bob lost exactly that much" (S.lifeOf S.bob settled) (Just 18)
+        -- eventBindings in isolation, so the binding is pinned to the RULE rather
+        -- than to one card's payload -- becameSlotSpec's shape. The 7 is neither
+        -- life total nor any other number in reach, so an arm binding anything but
+        -- the event's own amount fails here.
+        Spec.it s "CR 603.2 eventBindings binds the amount the event carries" $
+          Spec.assertEqWith
+            s
+            "thatMuch is the gain"
+            (Event.eventBindings (TriggerCondition.PlayerGainsLife PlayerRelation.You) (GameEvent.LifeGained S.alice 7))
+            (Map.singleton Binding.eventAmount (Binding.toAmount 7))
+
+-- The life-GAIN group's mirror: "whenever an opponent loses life", which the
+-- rules give no CR 119.9 of its own. What counts as a loss is therefore fixed by
+-- the three sites that RECORD one, and this group walks all three:
+--
+--   * CR 119.3, an effect that causes a player to lose life -- Sign in Blood's
+--     "target player draws two cards and loses 2 life".
+--   * CR 119.2 / 120.3a, damage dealt to a player by a source without infect --
+--     Hill Giant's three.
+--   * CR 119.4, life paid as a cost: "in other words, the player loses that much
+--     life" -- Greed's "{B}, Pay 2 life: Draw a card".
+--
+-- Exquisite Blood, {4}{B} Enchantment, "Whenever an opponent loses life, you gain
+-- that much life", is the card that proves it, and the first LIFE condition in the
+-- pool whose relation is Opponent rather than You (Megrim's discard trigger is the
+-- other one) -- so the loser and CR 109.5's "you" are never the same player, and a
+-- matcher that ignored the relation would gain alice life off her own losses.
+--
+-- What makes the group a proof rather than a demonstration:
+--
+--   * the amounts DIFFER between the damage case (3) and the two others (2), and
+--     no life total on any of these boards is 3 or 2 -- so a constant binding
+--     fails one case and a total-reading binding fails all of them.
+--   * the CR 109.5 control changes only WHO lost the life, on the same card, the
+--     same spell and the same amount.
+--   * the CR 120.3b control is on the SAME board and the SAME attack as the
+--     damage case: Glistener Elf's infect damage gives poison counters INSTEAD of
+--     causing life loss, so alice gains the Hill Giant's 3 and not the Elf's 1.
+lifeLossTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lifeLossTriggerSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- Sign in Blood's one target slot, answered with `who` rather than left to
+      -- identityAnswer's lowest-sorting candidate -- which is alice, and so is
+      -- the control case rather than the positive one.
+      aimAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        _ -> S.identityAnswer p
+      -- alice: two Swamps for the {B}{B}, an Exquisite Blood, and Sign in Blood
+      -- in hand.
+      --
+      -- BOTH players get two library cards, not only the one the positive case
+      -- aims at, and this is load-bearing rather than tidy: Sign in Blood draws
+      -- its target two cards as well as costing them the life, so a target with
+      -- an empty library loses the game to CR 104.3c the next time a player would
+      -- get priority -- before any trigger could resolve. The CR 109.5 control
+      -- below would then be silent for THAT reason instead of the relation's, and
+      -- would pass however the matcher read the relation. With a library on each
+      -- side the two cases differ in the target and in nothing else.
+      signInBloodBoard swamp blood signInBlood =
+        let (_, withBlood) = S.addCreature blood S.alice (S.landsInPlay swamp 2)
+            stock pid gs =
+              let (_, one) = S.addLibraryCard swamp pid gs
+                  (_, two) = S.addLibraryCard swamp pid one
+               in two
+         in S.handOne signInBlood (stock S.bob (stock S.alice withBlood))
+   in Spec.describe s "PlayerLosesLife" $ do
+        -- The gameplay-level proof, cast to resolution. bob loses 2 (CR 119.3),
+        -- Exquisite Blood matches THAT event and gains alice the 2 it carried.
+        Spec.it s "CR 119.3 whole cards: Sign in Blood costs bob 2 life and Exquisite Blood gains alice that much" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          signInBlood <- S.printingOf s registry "Sign in Blood"
+          let (gs, spellId) = signInBloodBoard swamp blood signInBlood
+              cast = snd (Engine.runGamePure (aimAt S.bob) gs (S.cast S.alice spellId))
+              settled = resolveAll cast
+          Spec.assertEqWith s "bob lost exactly 2" (S.lifeOf S.bob settled) (Just 18)
+          Spec.assertEqWith s "and alice gained exactly that much" (S.lifeOf S.alice settled) (Just 22)
+        -- The control twin, differing in ONE thing: the spell targets ALICE, so
+        -- alice is the one who loses. The same card, the same 2 life, the same
+        -- GameEvent.LifeLost written -- and "an opponent" is bob, so Exquisite
+        -- Blood stays silent.
+        --
+        -- alice's loss is asserted too, or the case would pass for the wrong
+        -- reason: an engine that recorded no loss at all would also show no gain.
+        Spec.it s "CR 109.5/603.3a the control: ALICE loses the life, and her own Exquisite Blood stays silent" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          signInBlood <- S.printingOf s registry "Sign in Blood"
+          let (gs, spellId) = signInBloodBoard swamp blood signInBlood
+              cast = snd (Engine.runGamePure (aimAt S.alice) gs (S.cast S.alice spellId))
+              settled = resolveAll cast
+          Spec.assertEqWith s "alice really lost the 2" (S.lifeOf S.alice settled) (Just 18)
+          Spec.assertEqWith s "bob lost nothing" (S.lifeOf S.bob settled) (Just 20)
+        -- CR 119.2 / 120.3a: "damage dealt to a player by a source without infect
+        -- causes that player to lose that much life". The second producer, and
+        -- the one no effect says the words for -- combat did.
+        --
+        -- ONE board carries the control. Both of alice's creatures connect, and
+        -- CR 120.3b sends Glistener Elf's damage to poison counters INSTEAD of a
+        -- life loss, so the 3 alice gains is the Hill Giant's alone. An engine
+        -- that read "a life total moved" would gain her 4.
+        Spec.it s "CR 119.2 damage loses life and CR 120.3b infect does not, on one attack" $ do
+          blood <- S.printingOf s registry "Exquisite Blood"
+          hillGiant <- S.printingOf s registry "Hill Giant"
+          glistenerElf <- S.printingOf s registry "Glistener Elf"
+          let (gs0, _, _) = S.combatBoardOf [hillGiant, glistenerElf] []
+              (_, gs1) = S.addCreature blood S.alice gs0
+              settled = resolveAll (S.fightWith S.aggressiveAnswer gs1)
+          Spec.assertEqWith s "bob lost the Giant's 3 and none of the Elf's 1" (S.lifeOf S.bob settled) (Just 17)
+          Spec.assertEqWith s "the Elf really connected" (S.playerCounterOf PlayerCounterKind.Poison S.bob settled) 1
+          Spec.assertEqWith s "so alice gained 3, not 4" (S.lifeOf S.alice settled) (Just 23)
+        -- CR 119.4's "in other words, the player loses that much life". The third
+        -- producer, and the only one that happens while paying a COST rather than
+        -- while an effect resolves -- so the record is written outside resolution
+        -- and the CR 117.5 trigger scan still has to find it.
+        Spec.it s "CR 119.4 bob pays 2 life for Greed and Exquisite Blood gains alice that much" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          blood <- S.printingOf s registry "Exquisite Blood"
+          greed <- S.printingOf s registry "Greed"
+          case Face.activatedAbilities (S.combinedFace greed) of
+            [] -> Spec.assertFailure s "Greed should carry an activated ability"
+            ability : _ -> do
+              let (_, withBlood) = S.addCreature blood S.alice (Setup.emptyGame S.bothPlayers)
+                  (_, withSwamp) = S.addCreature swamp S.bob withBlood
+                  (greedId, withGreed) = S.addCreature greed S.bob withSwamp
+                  (_, gs1) = S.addLibraryCard swamp S.bob withGreed
+                  gs =
+                    gs1
+                      { GameState.phase = Phase.PrecombatMain,
+                        GameState.activePlayer = S.alice,
+                        GameState.priority = Just S.alice
+                      }
+                  activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.bob greedId ability)
+                  settled = resolveAll activated
+              Spec.assertEqWith s "bob paid exactly 2" (S.lifeOf S.bob settled) (Just 18)
+              Spec.assertEqWith s "and alice gained exactly that much" (S.lifeOf S.alice settled) (Just 22)
+        -- eventBindings in isolation, so the binding is pinned to the RULE rather
+        -- than to one card's payload -- the gain group's last case, mirrored. The
+        -- 7 is no life total and no other number in reach, so an arm binding
+        -- anything but the event's own amount fails here.
+        --
+        -- Both slots at once, and as a WHOLE map rather than a lookup: CR 603.2
+        -- makes the amount and the player one environment, and an equality on the
+        -- whole map is what would catch an arm that bound a third thing.
+        Spec.it s "CR 603.2 eventBindings binds the amount the loss event carries and the loser" $
+          Spec.assertEqWith
+            s
+            "thatMuch is the loss and thatPlayer is who lost it"
+            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.Opponent) (GameEvent.LifeLost S.bob 7))
+            (Map.fromList [(Binding.eventAmount, Binding.toAmount 7), (Binding.triggerPlayer, Binding.toPlayer S.bob)])
+        -- The loser is bound under the OTHER relation too, and that is a claim
+        -- about the event rather than about the relation: CR 603.2's environment
+        -- is what the event named, and Event.eventBindingSlots answers per
+        -- CONDITION with no relation in hand, so a slot it promises has to hold
+        -- for every relation the condition admits.
+        Spec.it s "CR 603.2 the loser is bound under the You relation as well" $
+          Spec.assertEqWith
+            s
+            "thatPlayer names the loser whichever relation matched"
+            (Event.eventBindings (TriggerCondition.PlayerLosesLife PlayerRelation.You) (GameEvent.LifeLost S.alice 3))
+            (Map.fromList [(Binding.eventAmount, Binding.toAmount 3), (Binding.triggerPlayer, Binding.toPlayer S.alice)])
+
+-- CR 603.2's other half of a life-loss event: the PLAYER it named, not only the
+-- amount. Mindcrank, {2} Artifact, "Whenever an opponent loses life, that player
+-- mills that many cards" (CR 701.17a) -- the pool's first life trigger whose
+-- payload acts on the player the event named rather than on CR 109.5's "you",
+-- which is what makes `Binding.triggerPlayer` on this condition a slot something
+-- reads rather than speculative construction.
+--
+-- THREE SEATS, and that is the whole design of the fixture. On a two-seat board
+-- "that player" and "an opponent" name the same person, so an implementation that
+-- milled SOME opponent -- the first one, say -- would pass with the binding
+-- wrong. With bob and carol both opponents of alice, the two cases below differ
+-- only in WHICH of them Sign in Blood targets, so a binding that answers a fixed
+-- opponent fails whichever case is not that opponent, and a binding that answers
+-- CR 109.5's "you" fails both. Confirmed by mutating each of the two in turn.
+--
+-- Every seat is stocked with six cards, which is load-bearing rather than tidy --
+-- the lesson `lifeLossTriggerSpec`'s fixture already carries. Sign in Blood draws
+-- its target two cards before it costs them the life, so a target whose library
+-- ran out would lose to CR 104.3c the next time a player would get priority,
+-- before the trigger could resolve, and the case would pass for that reason
+-- instead of for the binding's.
+mindcrankSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mindcrankSpec s registry =
+  let resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- Sign in Blood's one target slot, answered with `who` -- as the Exquisite
+      -- Blood group's helper does, and for the same reason.
+      aimAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        _ -> S.identityAnswer p
+      sizeOf zone pid gs = length (Game.zoneMembers zone pid gs)
+      -- alice: two Swamps for the {B}{B}, a Mindcrank, and Sign in Blood in hand.
+      -- bob and carol: nothing but libraries, so neither is distinguishable from
+      -- the other by anything except being targeted.
+      board swamp mindcrank signInBlood =
+        let withMana = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (2 :: Int)]
+            (_, withCrank) = S.addCreature mindcrank S.alice withMana
+            stock pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard swamp pid g)) gs [1 .. (6 :: Int)]
+         in S.handOne signInBlood (stock S.carol (stock S.bob (stock S.alice withCrank)))
+      cases =
+        [ ("bob", S.bob, S.carol),
+          ("carol", S.carol, S.bob)
+        ]
+   in Spec.describe s "Mindcrank names the player who lost the life"
+        . Foldable.for_ cases
+        $ \(label, loser, bystander) ->
+          -- CR 603.2: the targeted player takes the loss, and the SAME player
+          -- mills 2. Six cards, less the two Sign in Blood draws them, less the
+          -- two milled, leaves two -- while the other opponent's six are
+          -- untouched, which is what a binding naming "an opponent" rather than
+          -- THE opponent fails.
+          Spec.it s ("CR 701.17a the player who lost the life is the player who mills, with " <> label <> " targeted") $ do
+            swamp <- S.printingOf s registry "Swamp"
+            mindcrank <- S.printingOf s registry "Mindcrank"
+            signInBlood <- S.printingOf s registry "Sign in Blood"
+            let (gs, spellId) = board swamp mindcrank signInBlood
+                cast = snd (Engine.runGamePure (aimAt loser) gs (S.cast S.alice spellId))
+                settled = resolveAll cast
+            Spec.assertEqWith s "the targeted player really lost the 2" (S.lifeOf loser settled) (Just 18)
+            Spec.assertEqWith s "and milled 2 into their own graveyard" (sizeOf Zone.Graveyard loser settled) 2
+            Spec.assertEqWith s "leaving 6 - 2 drawn - 2 milled" (sizeOf Zone.Library loser settled) 2
+            Spec.assertEqWith s "the OTHER opponent milled nothing" (sizeOf Zone.Graveyard bystander settled) 0
+            Spec.assertEqWith s "and their library is whole" (sizeOf Zone.Library bystander settled) 6
+            -- alice's graveyard holds Sign in Blood and nothing else: CR 109.5's
+            -- "you" is the wrong answer here, and this is what says so.
+            Spec.assertEqWith s "alice, who controls Mindcrank, milled nothing" (sizeOf Zone.Graveyard S.alice settled) 1
+            Spec.assertEqWith s "and lost no life either" (S.lifeOf S.alice settled) (Just 20)
+
+-- CR 508.3a / 603.3d: Anafenza, the Foremost's OTHER ability -- "whenever this
+-- creature attacks, put a +1/+1 counter on another target tapped creature you
+-- control". Here because the card was added for its CR 614.1a redirect
+-- (Pawl.EventSpec's Anafenza group), and a card's second ability is not exercised
+-- by the first one's tests.
+--
+-- The target filter is `And [Not IsSource, IsTapped, ControlledBy You]`, and the
+-- board gives each conjunct exactly one thing to reject: Anafenza herself is
+-- tapped and hers, so only "another" keeps her out; the Wall of Stone is hers and
+-- not her, so only being untapped does (CR 702.3b keeps it home, so declaring
+-- attackers never taps it); and bob's Piker is tapped and not her, so only its
+-- controller does. The Piker attacking beside her satisfies all three -- CR
+-- 508.1f taps a declared attacker -- and is the only legal target.
+anafenzaAttackSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+anafenzaAttackSpec s registry =
+  let countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- Records every CR 601.2c legal-recipient set offered, verbatim, and
+      -- answers everything aggressively -- which declares every legal attacker,
+      -- so the declaration really happens.
+      --
+      -- The LEGAL SET is what this asserts on rather than only the outcome, and
+      -- that is the difference between a discriminating test and a passing one:
+      -- with the Piker the lowest-id candidate, an answerer that takes the first
+      -- offer reaches the same board whether or not the filter rejected anything.
+      recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)] r
+      recordTargets p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> do
+          State.modify' (<> [sets])
+          pure (S.aggressiveAnswer p)
+        _ -> pure (S.aggressiveAnswer p)
+   in Spec.describe s "Anafenza attacks" . Spec.it s "CR 508.3a the attack trigger counters another tapped creature its controller controls" $ do
+        anafenza <- S.printingOf s registry "Anafenza, the Foremost"
+        piker <- S.printingOf s registry "Goblin Piker"
+        wallOfStone <- S.printingOf s registry "Wall of Stone"
+        case S.combatBoardOf [anafenza, piker, wallOfStone] [piker] of
+          (gs0, [anafenzaId, pikerId, wallId], [theirs]) -> do
+            -- bob's Piker is TAPPED, so `ControlledBy You` is the only conjunct
+            -- keeping it out of the offer. Left untapped it would be rejected by
+            -- IsTapped instead, and the assertion would hold with the
+            -- controller clause deleted.
+            let gs = S.tapObject theirs gs0
+                ((_, settled), offered) =
+                  State.runState (Engine.runGame recordTargets gs (Engine.runStep >> Engine.priorityLoop)) []
+            Spec.assertEqWith
+              s
+              "the Piker attacking beside her is the only legal target"
+              (fmap Map.elems offered)
+              [[Set.singleton (Recipient.ToCreature pikerId)]]
+            Spec.assertEqWith s "and it took the counter" (countersOn pikerId settled) (Just 1)
+            Spec.assertEqWith s "\"another\" keeps Anafenza off her own trigger" (countersOn anafenzaId settled) (Just 0)
+            Spec.assertEqWith s "an untapped creature is not a legal target" (countersOn wallId settled) (Just 0)
+            Spec.assertEqWith s "and neither is a creature bob controls" (countersOn theirs settled) (Just 0)
+          _ -> Spec.assertFailure s "fixture should give alice Anafenza, a Piker and a Wall, and bob a Piker"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -3966,6 +4720,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   battleCrySpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
+  graveyardEffectZoneTriggerSpec s registry
   serraAvatarSpec s registry
   diesTriggerSpec s registry
   permanentDiesSpec s registry
@@ -3974,8 +4729,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lookBackInterveningSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
+  bystanderZoneSpec s registry
   aetherFlashSpec s registry
   kindredSpec s registry
   discardTriggerSpec s registry
   controllerAtTriggerSpec s registry
   counterTriggerSpec s registry
+  lifeGainTriggerSpec s registry
+  lifeGainAmountSpec s registry
+  lifeLossTriggerSpec s registry
+  mindcrankSpec s registry
+  anafenzaAttackSpec s registry

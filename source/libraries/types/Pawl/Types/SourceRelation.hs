@@ -7,9 +7,11 @@ module Pawl.Types.SourceRelation where
 -- replaces the damage its first line deals and nothing else. Without it a
 -- floating self-replacement would be offered every damage event in the game.
 --
--- The damage-side sibling of Pawl.Types.ZoneChangeSubject, kept a separate type
--- because the ROLE of the compared id differs -- there the event's SUBJECT, here
--- its SOURCE -- and a pattern can scope either without the other.
+-- Not Filter.IsSource, which is how a zone-change or entry pattern spells its
+-- own self-scope: the ROLE of the compared id differs. A Filter is a predicate
+-- over the event's SUBJECT, and this asks about the damage's SOURCE, which is a
+-- different object -- so there is no candidate for a Filter to be evaluated
+-- against here.
 data SourceRelation
   = AnySource
   | TheSource

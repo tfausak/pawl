@@ -37,6 +37,7 @@ bareFace n =
       Face.power = Nothing,
       Face.toughness = Nothing,
       Face.loyalty = Nothing,
+      Face.defense = Nothing,
       Face.keywords = Set.empty,
       Face.colorIndicator = Set.empty,
       Face.characteristicPT = Nothing,
@@ -48,7 +49,7 @@ bareFace n =
       Face.delayedAbilities = Map.empty,
       Face.castingPermissions = [],
       Face.castingRestrictions = [],
-      Face.enchant = Nothing,
+      Face.enchant = [],
       Face.counterability = Counterability.Counterable,
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
@@ -57,8 +58,8 @@ bareFace n =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.attackCosts = [],
-      Face.mulliganAction = [],
-      Face.openingHandAction = []
+      Face.mulliganActions = [],
+      Face.openingHandActions = []
     }
 
 -- | A basic land, which is what every file in the corpus but @wax-wane.json@

@@ -17,9 +17,11 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
@@ -253,12 +255,18 @@ data Prompt r where
   -- | CR 608.2g: the re-entrant cast opportunity during a library search (Panglacial
   -- Wurm) -- an effect that "specifically instructs or allows a player to cast a
   -- spell during resolution", following CR 601.2a-i except that no player receives
-  -- priority after it is cast. The [ObjectId] is the searcher's library cards
-  -- castable-while-searching (the engine pre-filters to permitted, affordable,
-  -- fillable). Nothing = decline / done. Offered in a loop before the search finds
-  -- (per the ruling), so multiple copies may be cast. CR 605.3a permits mana
-  -- activation to pay.
-  CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  -- priority after it is cast. Nothing = decline / done. Offered in a loop before
+  -- the search finds (per the ruling), so multiple copies may be cast. CR 605.3a
+  -- permits mana activation to pay.
+  --
+  -- ONE ENTRY PER CASTABLE HALF, paired with the name of the half being proposed
+  -- (the engine pre-filters to permitted, affordable, fillable). The name is what
+  -- CR 709.3 needs -- "A player chooses which half of a split card they are
+  -- casting before putting it onto the stack" -- and it is carried here rather
+  -- than derived at the cast, because a bare object id would present a split
+  -- card's two halves as one indistinguishable option and leave the engine to
+  -- pick. Same shape and same reason as Action.Cast.
+  CastWhileSearching :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, CardName.CardName)] -> Prompt (Maybe (ObjectId.ObjectId, CardName.CardName))
   -- | CR 601.2b: choose the value of X while casting a spell -- or, through CR
   -- 602.2b, while activating an ability, which is the same rule reached by "the
   -- remainder of the process for activating an ability is identical to the
@@ -329,6 +337,21 @@ data Prompt r where
   --
   -- Asked only when two or more options are offered; one option is not a choice.
   ChooseEntryOption :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [EntryOption.EntryOption] -> Prompt Natural.Natural
+  -- | CR 702.136a / 614.1c: as a permanent with riot enters, its controller
+  -- decides whether to have it enter with an additional +1/+1 counter; if they
+  -- don't, it gains haste. The ObjectId is the entering object.
+  --
+  -- An OptionalDecision and not a two-option list, because rule 702.136a states
+  -- it as a "may" with a stated consequence for declining rather than as a menu.
+  -- Exercises is the counter and Declines is the haste, which is the rule's own
+  -- reading order.
+  --
+  -- NEVER ELIDED. The two outcomes are as distinguishable as outcomes get -- a
+  -- 3/3 that cannot attack this turn against a 2/2 that can -- so there is no
+  -- indistinguishable-options case here, unlike ChooseEntryOption's single-option
+  -- one. Pawl.Engine.Event's arm has an unreachable no-controller fallback beside
+  -- it, the same shape ChooseEntryOption's carries; see there.
+  ChooseRiot :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 614.1c: as an object enters, its controller chooses a colour
   -- ("As this creature enters, choose a color" -- Painter's Servant). The
   -- ObjectId is the entering object.
@@ -383,6 +406,33 @@ data Prompt r where
   -- names. Asked only when there are two or more: CR 102.2's two-player game
   -- leaves exactly one opponent and nothing to ask.
   ChooseOpponent :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
+  -- | CR 310.8a: which player protects a battle. The PlayerId is the chooser --
+  -- CR 310.8a assigns it to the battle's controller, so this one is the rule's
+  -- and not pawl's reading, unlike ChooseOpponent above. The ObjectId is the
+  -- battle, and the NonEmpty is Pawl.Engine.Battle.protectorCandidates: for a
+  -- Siege, CR 310.11a's opponents of its controller.
+  --
+  -- Asked from TWO places, which is why it carries the battle rather than
+  -- assuming an entry. CR 310.8a asks as the battle enters, through the CR 614.12a
+  -- as-enters route (EntryRewrite.ChooseProtector); CR 310.10 -- listed as CR
+  -- 704.5w and CR 704.5x -- asks again as a state-based action when the
+  -- designation has become illegal, on a battle that has been on the battlefield
+  -- for turns.
+  --
+  -- Its own prompt rather than a reuse of ChooseOpponent, by that arm's own
+  -- argument: a responder that knows which prompt it is answering knows which
+  -- question it was asked, and "who protects this battle" is not "which opponent
+  -- does this card's text name". Reusing it would also be wrong on candidates --
+  -- a battle with no battle types takes its own controller (CR 310.8a), whom
+  -- ChooseOpponent by construction never offers.
+  --
+  -- Asked only when there are two or more candidates, the elision ChooseDefender
+  -- and ChooseCardNames both take: one candidate is one outcome, so the options
+  -- are indistinguishable and there is nothing to decide. CR 102.2's two-player
+  -- game leaves a Siege exactly one legal protector, so the ask is a multiplayer
+  -- one in practice -- which is what makes Pawl.BattleSpec's protector cases
+  -- three-seated.
+  ChooseProtector :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 603.3b: each player, in APNAP order, puts the triggered abilities they
   -- control on the stack in any order they choose. The [TriggerEntry] is that
   -- player's pending triggers in the engine's canonical order; the answer is a
@@ -553,8 +603,10 @@ data Prompt r where
   -- where the rules leave nothing to ask, don't prompt.
   Bottom :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt [ObjectId.ObjectId]
   -- | CR 103.5b: an action a card lets a player take "any time they could
-  -- mulligan". The [ObjectId] is the cards in hand granting one; the answer is
-  -- which to use, or Nothing to decline.
+  -- mulligan". Each entry is one action a card in hand grants -- the card, and
+  -- WHICH of its actions (Pawl.Types.HandActionIndex), since a face may print
+  -- more than one and the two are different offers. The answer is which to take,
+  -- or Nothing to decline.
   --
   -- Offered immediately BEFORE each DeclareMulligan and again after each action
   -- taken -- that rule makes the declaration follow, and nothing in it limits a
@@ -565,10 +617,11 @@ data Prompt r where
   -- bottomed, so it feeds neither the bottom count nor CR 103.5c's free allowance.
   --
   -- Not asked when the list is empty.
-  MulliganAction :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  MulliganAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   -- | CR 103.6 / 103.6a: an action a card in this player's opening hand lets them
-  -- take once the mulligan process is complete. The [ObjectId] is the cards in hand
-  -- offering one; the answer is which to take, or Nothing to decline.
+  -- take once the mulligan process is complete. The entries are shaped exactly as
+  -- MulliganAction's -- the card and which of its actions; the answer is which to
+  -- take, or Nothing to decline.
   --
   -- Offered in turn order, starting player first, and repeatedly to the same player
   -- until they decline: CR 103.6 lets them take any such actions in any order.
@@ -576,7 +629,7 @@ data Prompt r where
   -- A SEPARATE channel from MulliganAction rather than a reuse: that window sits AT
   -- a mulligan declaration and this one opens once the process is complete, so an
   -- interpreter that could not tell them apart could not answer either well.
-  OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt (Maybe ObjectId.ObjectId)
+  OpeningHandAction :: Decider.Decider -> PlayerId.PlayerId -> [(ObjectId.ObjectId, HandActionIndex.HandActionIndex)] -> Prompt (Maybe (ObjectId.ObjectId, HandActionIndex.HandActionIndex))
   -- | CR 603.5 / 608.2d: whether the controller of a resolving spell or ability
   -- exercises a printed "may". The ObjectId is the object RESOLVING (the spell,
   -- or the ability object on the stack -- not its source, since two triggers off
@@ -598,6 +651,34 @@ data Prompt r where
   -- all single-mode; a modal payload mixing a live mode with a dead optional one
   -- would reach this prompt with nothing to decide (#336).
   ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 608.2g: a cast that a RESOLVING effect specifically allows -- "if an
+  -- effect specifically instructs or allows a player to cast a spell during
+  -- resolution, they do so by following the steps in rules 601.2a-i". CR
+  -- 310.11b's "then you may cast it transformed without paying its mana cost" is
+  -- the producer: Exercises casts it, Declines leaves the card where it is.
+  --
+  -- The ObjectId is the CARD being offered -- the exiled incarnation CR 400.7
+  -- minted, not the ability resolving -- and the CardName is the half CR 712.11a
+  -- puts on the stack, the same pair Action.Cast and CastWhileSearching carry and
+  -- for the same reason: a bare id would leave which face is being offered
+  -- invisible to the answerer.
+  --
+  -- Distinct from CastWhileSearching, which is the same rule's other producer.
+  -- That one offers a LIST and loops, because CR 601.3's Panglacial permission
+  -- ranges over a whole library and several cards may hold it; this one offers
+  -- exactly the one object the resolving effect named, so the question is
+  -- yes-or-no and is asked once.
+  --
+  -- Distinct from ChooseOptional, which is CR 603.5's printed "may" over a whole
+  -- MODE. CR 310.11b's "may" governs one clause of a mandatory ability -- the
+  -- exile before it is not optional -- so a mode-wide question would make
+  -- declining the cast decline the exile too.
+  --
+  -- NEVER elided: CR 601.2b's own decisions aside, casting and not casting reach
+  -- plainly different boards. The offer is not made at all when the rules leave
+  -- nothing to ask -- the card is no longer where the effect left it (CR 608.2h),
+  -- or the cast is one Cast.castableWhenOffered says cannot legally happen.
+  OfferedCast :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> CardName.CardName -> Prompt OptionalDecision.OptionalDecision
   -- | CR 118.12 / 118.12a: whether this player pays a cost a RESOLVING spell or
   -- ability offers them -- Mana Leak's "unless its controller pays {3}", which CR
   -- 118.12a rewrites as "its controller may pay {3}. If they don't, counter it."
@@ -667,3 +748,34 @@ data Prompt r where
   -- Elided when only one route is payable -- no source of the symbol's type, or
   -- too few mana on the board for the {2}.
   AnnounceHybridPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaType.ManaType -> NonEmpty.NonEmpty HybridPayment.HybridPayment -> Prompt HybridPayment.HybridPayment
+  -- | CR 118.7e: "If a cost is reduced by an amount of mana represented by a
+  -- hybrid mana symbol, the player paying that cost chooses one half of that
+  -- symbol at the time the cost reduction is applied (see rule 601.2f)."
+  --
+  -- A DIFFERENT QUESTION from AnnounceHybridPayment above, and that is why it is
+  -- a different constructor rather than a reuse. That one is CR 601.2b's
+  -- announcement about a symbol in the cost being PAID, made before CR 601.2f
+  -- totals anything; this one is about a symbol in a REDUCTION, made as CR
+  -- 601.2f applies it, and nothing about the answer constrains what the spell's
+  -- own symbols may still be announced as. Sharing a constructor would also
+  -- leave Pawl.Engine.Replay unable to tell a transcript's two answers apart.
+  --
+  -- The ManaSymbol payload is the hybrid symbol being reduced BY, so a {2/B} and
+  -- a {W/U} in one player's reductions put distinguishable questions on the
+  -- wire; the NonEmpty is that symbol's two halves written as CR 118.7e's own
+  -- outcomes -- an OfType for "one mana of that type", a Generic for "an amount
+  -- of generic mana equal to that half's number". Answering with the resulting
+  -- SYMBOL rather than with a left/right flag is what lets both of CR 107.4e's
+  -- shapes use one prompt: {W/U}'s halves are two types, {2/B}'s are a type and
+  -- a number, and neither fits the other's payload.
+  --
+  -- One prompt per symbol, in the order the reductions are read. Two identical
+  -- reductions ask two identical questions, which is sound because the answers
+  -- are interchangeable: the pooled bag applyAdjustments cancels against does not
+  -- record which prompt contributed which symbol.
+  --
+  -- NOT filtered by payability, unlike the two announcements above. CR 118.7e
+  -- puts no such condition on the choice -- a player may take the half that
+  -- reduces nothing -- and CR 601.2f's own floor is what keeps that legal.
+  -- Elided only for the degenerate `Hybrid t t`, whose halves are one symbol.
+  ChooseReductionHalf :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaSymbol.ManaSymbol -> NonEmpty.NonEmpty ManaSymbol.ManaSymbol -> Prompt ManaSymbol.ManaSymbol

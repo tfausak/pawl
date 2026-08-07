@@ -11,13 +11,15 @@
 --
 -- The SOLE casing home for Pawl.Types.CostComponent. Pawl.Engine.Cast,
 -- Pawl.Engine.Activate and Pawl.Engine.Resolve learn nothing about which
--- components exist: they ask "can this be paid" and "pay it", and read one
--- classification (requiresSicknessCheck) for CR 302.6.
+-- components exist: they ask "can this be paid" and "pay it", and read the
+-- classifications this module derives -- requiresSicknessCheck for CR 302.6,
+-- isLoyaltyCost for CR 606.2/606.3, and zoneFunctionedFrom for CR 113.6m.
 module Pawl.Engine.Cost where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -44,6 +46,7 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -62,6 +65,32 @@ import qualified Pawl.Types.Zone as Zone
 -- candidates, and an answer outside the offered set is rejected anyway.
 unpayable :: Cost Keyword.Type.Keyword
 unpayable = Cost.MkCost {Cost.mana = Nothing, Cost.components = []}
+
+-- CR 118.9: the alternative cost "applied to it from another effect" that the
+-- rule's own second phrasing names -- "You may cast [this object] without paying
+-- its mana cost". Everything about the printed cost survives except the mana
+-- part, which becomes {0}.
+--
+-- Just an EMPTY ManaCost and never Nothing, which is the whole of what makes it
+-- payable: Pawl.Types.Cost's Nothing is CR 118.6's unpayable cost, and
+-- `Just (MkManaCost [])` is {0} (CR 118.5, CR 118.5a). Ornithopter and Ancestral
+-- Vision are the two spellings, and this rule produces the first.
+--
+-- The additional costs ride along, which is CR 118.9d in as many words: "an
+-- alternative cost doesn't change a spell's mana cost, only what its controller
+-- has to pay", and "if an alternative cost is being paid to cast a spell, any
+-- additional costs ... that affect that spell are applied to that alternative
+-- cost". `costsFor`'s `withAdditional` wraps the card's own alternatives the
+-- same way, for the same rule.
+--
+-- The face is the one being CAST (CR 709.3a / 712.11a), so an offer to cast a
+-- back face free carries that face's additional costs and not the front's.
+withoutPayingManaCost :: Face.Face card -> Cost Keyword.Type.Keyword
+withoutPayingManaCost face =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components = Face.additionalCosts face
+    }
 
 -- The first offered candidate, or `unpayable` when none was offered. The one
 -- total, documented answer every ChooseCost fallback uses.
@@ -106,6 +135,12 @@ costsFor name oid gs = case Game.lookupObject oid gs of
           withAdditional alternative =
             alternative {Cost.components = Cost.components alternative <> Face.additionalCosts face}
        in case Object.zone obj of
+            -- Rule 702.34a's "if the resulting spell is an instant or sorcery
+            -- spell" is NOT re-asked here. It gates the PERMISSION
+            -- (Pawl.Engine.Keyword.permissionsFor), and Pawl.Engine.Cast.castable
+            -- demands that permission alongside an affordable candidate from this
+            -- list, so a candidate offered here can never carry a graveyard cast
+            -- on its own.
             Zone.Graveyard -> fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
             _ -> printed : fmap withAdditional (Face.alternativeCosts face)
     Source.OfToken _ -> []
@@ -128,7 +163,16 @@ costsFor name oid gs = case Game.lookupObject oid gs of
 -- CR 118.6a's first sentence needs no special case: fmap over the Maybe leaves
 -- Nothing as Nothing.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
-total pid oid cost gs = cost {Cost.mana = fmap (totalMana pid oid gs) (Cost.mana cost)}
+total pid oid cost gs = totalWith (PlayerEffect.costAdjustments pid oid gs) cost
+
+-- The same totalling over adjustments the CALLER already has, which is what CR
+-- 118.7e's prompt needs: `announceReductions` asks the payer which half of each
+-- hybrid symbol in a reduction it takes, and the answers have to reach
+-- applyAdjustments rather than being read out of the game state a second time.
+-- `total` above is this over the adjustments as they stand unannounced, which is
+-- the CASTABILITY GATE's reading of them (#813).
+totalWith :: ([Natural], [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
+totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustments) (Cost.mana cost)}
 
 -- CR 601.2f's totalling of the MANA part alone, curried so that it is a function
 -- of one mana cost. `total` above is this fmapped over a whole Cost's mana part;
@@ -214,9 +258,16 @@ greatestPayableX payableAt cost =
 -- symbol and CR 119.4 governs paying life wherever it comes from. That makes the
 -- returned cost CR 601.2b's "nonhybrid equivalent cost" in full. Omitted entirely
 -- at zero, so a cost with no Phyrexian symbol comes back untouched. APPENDED
--- rather than merged into a PayLife the cost already carries, so #365 survives
--- unaltered: Cost.canPay measures each component separately, and two PayLife
--- components of one cost can together outrun a life total admitting each.
+-- rather than merged into a PayLife the cost already carries, which costs nothing
+-- now that both are measured against one life total: `lifeOwedBy` sums them, and
+-- CR 118.3 is asked of the sum.
+--
+-- That sum is also what goes IN, as the life this cost owes OUTSIDE its mana
+-- part. Without it CR 601.2b's offer is measured against a cost half as
+-- expensive as the one that will be paid, and a route the player cannot afford
+-- gets offered -- the same failure the `total` parameter below exists to prevent,
+-- one resource over. It is the components as they arrive that are summed, since
+-- the PayLife appended above is precisely the announcement being measured.
 --
 -- `total` is CR 601.2f's totalling, the CALLER's to supply because the two
 -- callers genuinely differ. Pawl.Engine.Cast passes `totalMana`, so a spell's
@@ -234,13 +285,93 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announce pid oid total_ manaCost
+    (announced, life) <- Mana.announce pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
     pure
       cost
         { Cost.mana = Just announced,
           Cost.components =
             Cost.components cost <> (if life > 0 then [CostComponent.PayLife life] else [])
         }
+
+-- CR 118.7e: "If a cost is reduced by an amount of mana represented by a hybrid
+-- mana symbol, the player paying that cost chooses one half of that symbol at
+-- the time the cost reduction is applied (see rule 601.2f)." This is that
+-- choice, made for every hybrid symbol in every reduction that applies to `oid`,
+-- and the answers come back as the adjustments `totalWith` then applies.
+--
+-- A SECOND SEAM rather than part of `announce` above, because the two are two
+-- rules at two moments. CR 601.2b's announcement is about the symbols of the
+-- cost being paid and happens before the total exists; this is about the symbols
+-- of a REDUCTION and happens as CR 601.2f applies it, which the rule says
+-- outright. Pawl.Engine.Cast calls them in that order.
+--
+-- The answer is the nonhybrid symbol the chosen half resolves to, so what
+-- reaches applyAdjustments is a reduction with no hybrid symbol left in it --
+-- the same posture Mana.announce takes toward a cost, leaving an OfType behind
+-- where a {2/R} stood. That is why applyAdjustments' own Hybrid arms still take
+-- nothing: by the time a cost is PAID there is nothing there for them to read,
+-- and what still arrives spelled {2/B} is the castability gate's reduction,
+-- which no announcement precedes (#813).
+--
+-- NOT FILTERED BY PAYABILITY, unlike `announce`. CR 118.7e attaches no condition
+-- to the choice -- a player may take the half that reduces nothing -- and none
+-- is needed: a reduction only ever lowers a cost the gate already priced without
+-- it, so no answer here can strand a payment.
+--
+-- The INCREASES ride through untouched. CR 118.7e is a rule about reductions,
+-- and pawl's increases are amounts of generic mana with no symbol to choose
+-- halves of.
+announceReductions :: PlayerId -> ObjectId -> GameState -> Game ([Natural], [ManaCost.ManaCost])
+announceReductions pid oid gs =
+  let (increases, reductions) = PlayerEffect.costAdjustments pid oid gs
+      chooseOne symbol = case reductionHalvesOf symbol of
+        -- Not a hybrid symbol, so CR 118.7e has nothing to ask about it.
+        Nothing -> pure symbol
+        -- Unreachable: reductionHalvesOf answers Just only where it has halves
+        -- to offer. Left rather than made partial, and the symbol survives.
+        Just [] -> pure symbol
+        -- One half, which is the degenerate `Hybrid t t` no card prints. Both
+        -- halves are the same symbol, so the answer cannot be observed and
+        -- asking would be a prompt with one button.
+        Just [only] -> pure only
+        Just halves@(first : others) -> do
+          answer <-
+            Game.choose
+              (Prompt.ChooseReductionHalf (Decide.deciderFor pid gs) pid oid symbol (first NonEmpty.:| others))
+          -- FILTERED, NOT TRUSTED, the Mana.announce posture: an answer that is
+          -- not one of the offered halves falls back to the first.
+          pure (if elem answer halves then answer else first)
+      chooseAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse chooseOne symbols)
+   in fmap ((,) increases) (traverse chooseAll reductions)
+
+-- CR 118.7e's "one half of that symbol", written as the reduction each half
+-- would be: "if a colored or colorless half is chosen, the cost is reduced by
+-- one mana of that type" is an OfType, and "if a generic half is chosen, the
+-- cost is reduced by an amount of generic mana equal to that half's number" is a
+-- Generic. Nothing for a symbol with no halves to choose between, which is every
+-- symbol CR 107.4e does not call hybrid.
+--
+-- DEDUPLICATED, so `Hybrid t t` -- degenerate rather than illegal, per
+-- Pawl.Types.ManaSymbol -- offers one half instead of the same one twice.
+--
+-- CR 107.4f's Phyrexian symbol is NOT here, and needs no issue for it: CR 118.7f
+-- gives such a reduction one mana of the symbol's colour with no choice at all,
+-- which reducingManaTypeOf reads directly. The ten HYBRID Phyrexian symbols that
+-- rule also names would have a half to choose, and Pawl.Types.ManaSymbol cannot
+-- say one: its Phyrexian carries a single Color.
+reductionHalvesOf :: ManaSymbol.ManaSymbol -> Maybe [ManaSymbol.ManaSymbol]
+reductionHalvesOf symbol = case symbol of
+  ManaSymbol.Generic _ -> Nothing
+  ManaSymbol.OfType _ -> Nothing
+  ManaSymbol.Hybrid a b -> Just (List.nub [ManaSymbol.OfType a, ManaSymbol.OfType b])
+  ManaSymbol.MonocoloredHybrid manaType ->
+    Just [ManaSymbol.OfType manaType, ManaSymbol.Generic Mana.monocoloredHybridGeneric]
+  ManaSymbol.Phyrexian _ -> Nothing
+  ManaSymbol.Snow -> Nothing
+  -- Unreachable for the reason applyAdjustments' Variable arms give: CR 601.2b
+  -- precedes CR 601.2f, so no {X} survives into a total cost. It names no halves
+  -- either way.
+  ManaSymbol.Variable -> Nothing
 
 -- CR 302.6: does paying this cost put the object's ability behind the
 -- summoning-sickness gate? The CLASSIFICATION Pawl.Engine.Activate reads, so that
@@ -278,6 +409,47 @@ isLoyaltyComponent component = case component of
   CostComponent.DiscardCards _ -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
+  CostComponent.ExileThisFromGraveyard -> False
+
+-- CR 113.6m's COST half: "an ability whose cost or effect specifies that it
+-- moves the object it's on out of a particular zone functions only in that
+-- zone". The CLASSIFICATION Pawl.Engine.Activate reads to decide WHERE an
+-- ability may be activated from, the requiresSicknessCheck shape -- so that
+-- module still learns nothing about which components exist. The "or effect" half
+-- is Pawl.Engine.EffectZone, and Pawl.Engine.Activate.zoneFunctionedFrom is
+-- where the two meet.
+--
+-- Nothing means the cost names no zone, which leaves the effect half to answer
+-- and CR 113.6's own default in place if it does not: the ability functions on
+-- the battlefield. That is the answer for SacrificeThis too, and deliberately --
+-- CR 701.21a moves the object off the battlefield, which is where CR 113.6
+-- already had it, so naming it here would change no reader's answer while
+-- claiming a rule this cost does not need.
+--
+-- One zone and never a set: every component that names a zone names exactly one,
+-- and CR 113.6m is about "a particular zone". Two components naming DIFFERENT
+-- zones would make the ability unpayable in either, so the FIRST one found is the
+-- answer and a disagreement is a card-data error rather than a rules question.
+zoneFunctionedFrom :: Cost Keyword.Type.Keyword -> Maybe Zone.Zone
+zoneFunctionedFrom cost = Maybe.listToMaybe (Maybe.mapMaybe zoneOfComponent (Cost.components cost))
+
+zoneOfComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Zone.Zone
+zoneOfComponent component = case component of
+  -- CR 702.29a's "Discard this card": the hand, which is where cycling functions.
+  -- Not read by anything today -- Pawl.Engine.Keyword.handAbilitiesOf mints the
+  -- cycling ability into the hand from rule 702.29a directly, which is the same
+  -- answer by a shorter route -- and written because CR 113.6m says it.
+  CostComponent.DiscardThis -> Just Zone.Hand
+  CostComponent.ExileThisFromGraveyard -> Just Zone.Graveyard
+  CostComponent.TapThis -> Nothing
+  CostComponent.UntapThis -> Nothing
+  CostComponent.SacrificeThis -> Nothing
+  CostComponent.PayLife _ -> Nothing
+  CostComponent.Sacrifice _ _ -> Nothing
+  CostComponent.DiscardCards _ -> Nothing
+  CostComponent.PayEnergy _ -> Nothing
+  CostComponent.AddLoyaltyToThis _ -> Nothing
+  CostComponent.RemoveLoyaltyFromThis _ -> Nothing
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i then reads as loyalty 0 -- so
@@ -311,16 +483,52 @@ discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid g
 --
 -- CR 118.6: an unpayable cost is never payable.
 --
--- The mana part and the components are measured SEPARATELY, so a resource both
--- could claim is counted twice. CR 107.4f's Phyrexian symbol is the first mana
--- symbol that spends life, so a cost holding one alongside a PayLife component
--- can read as payable when CR 118.3 says it is not (#365).
+-- LIFE is the one resource measured across the two halves rather than within
+-- each, and CR 107.4f's Phyrexian symbol is why it has to be: it is the only MANA
+-- symbol that spends life, so it is the only way one cost can demand life twice.
+-- Measured separately, a cost of {G/P} plus "pay 2 life" reads as payable at 3
+-- life, because 3 covers each 2 -- and CR 118.3's "fully" is about the whole cost,
+-- not about its parts. So the components' life is handed to the mana side as
+-- already committed, which is exactly what CR 119.4's floor is then asked of. It
+-- subsumes the per-component check the loop below still makes, and two PayLife
+-- components of one cost are added the same way.
+--
+-- Every OTHER resource is still counted twice over, and no card in the pool makes
+-- that observable: the mana part spends nothing but mana and life, so what would
+-- have to exist is a component that spends mana -- which is not one of them --
+-- or two components claiming one permanent, which is CR 118.10's own business
+-- (#104).
 canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
-    Mana.canPay pid manaCost gs
+    Mana.canPayCommitting pid (lifeOwedBy (Cost.components cost)) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
+
+-- CR 119.4's payments a cost owes OUTSIDE its mana part, added up -- what CR
+-- 118.3 makes the mana part's own life share a total with. A cost with no PayLife
+-- component owes 0, which is what leaves every such cost's answer exactly as it
+-- was.
+--
+-- The only component that spends life: this module is the one place that matches
+-- a CostComponent constructor, and the match is total so a new life-spending
+-- component cannot be added without answering here.
+lifeOwedBy :: [CostComponent.CostComponent Keyword.Type.Keyword] -> Natural
+lifeOwedBy = sum . fmap lifeOwedByComponent
+
+lifeOwedByComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Natural
+lifeOwedByComponent component = case component of
+  CostComponent.PayLife n -> n
+  CostComponent.TapThis -> 0
+  CostComponent.UntapThis -> 0
+  CostComponent.SacrificeThis -> 0
+  CostComponent.Sacrifice _ _ -> 0
+  CostComponent.DiscardCards _ -> 0
+  CostComponent.DiscardThis -> 0
+  CostComponent.PayEnergy _ -> 0
+  CostComponent.AddLoyaltyToThis _ -> 0
+  CostComponent.RemoveLoyaltyFromThis _ -> 0
+  CostComponent.ExileThisFromGraveyard -> 0
 
 canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent pid oid component gs = case component of
@@ -340,6 +548,12 @@ canPayComponent pid oid component gs = case component of
   -- CR 119.4: payable only if the life total is at least the amount. Shared with
   -- CR 107.4f's Phyrexian mana symbol, which pays life for a MANA symbol and so
   -- reads the same floor from inside Pawl.Engine.Mana.
+  --
+  -- This component ALONE, which is not CR 118.3's question and is not what
+  -- decides it: canPay above hands `lifeOwedBy`'s sum to the mana side, where the
+  -- same floor is read of the whole cost's life at once. Kept because a component
+  -- is asked about on its own terms here, and it can only ever be the weaker of
+  -- the two.
   CostComponent.PayLife n -> Mana.canPayLife pid n gs
   -- CR 701.21a: this player must control at least `n` matching permanents.
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
@@ -367,6 +581,18 @@ canPayComponent pid oid component gs = case component of
   CostComponent.DiscardThis -> case Game.lookupObject oid gs of
     Nothing -> False
     Just obj -> Object.zone obj == Zone.Hand && Object.owner obj == pid
+  -- CR 406.2: payable only while the card is in the paying player's graveyard.
+  -- DiscardThis's shape verbatim, and for its reason: CR 108.4 gives a card in a
+  -- graveyard no controller, and CR 400.3 puts it in its OWNER's graveyard, so the
+  -- pair of facts to ask about is the zone and the owner.
+  --
+  -- This is the whole of CR 113.6m's enforcement for the COST: an ability whose
+  -- cost names the graveyard is unpayable anywhere else, so the zone gate
+  -- Pawl.Engine.Activate applies to the OFFER cannot be the only thing standing
+  -- between a Loxodon Surveyor on the battlefield and a free draw.
+  CostComponent.ExileThisFromGraveyard -> case Game.lookupObject oid gs of
+    Nothing -> False
+    Just obj -> Object.zone obj == Zone.Graveyard && Object.owner obj == pid
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters. GainPlayerCounters (#37) adds them; this spends them.
   CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
@@ -561,6 +787,17 @@ payComponent pid oid component = case component of
   CostComponent.RemoveLoyaltyFromThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (removeLoyalty n) oid (GameState.objects gs)})
     pure Payment.Paid
+  -- CR 406.2's move, through Event.changeZone -- the shared zone-change funnel, so
+  -- the card gets a CR 400.7 incarnation and anything watching a graveyard-to-exile
+  -- move sees it. No prompt: the cost names this card, exactly as DiscardThis does.
+  --
+  -- The card is in EXILE by the time the ability resolves, which is what makes CR
+  -- 113.7a's "once activated, an ability exists on the stack independently of its
+  -- source" load-bearing here: Loxodon Surveyor's draw resolves off a source that
+  -- has already left the graveyard the cost read.
+  CostComponent.ExileThisFromGraveyard -> do
+    Event.changeZone oid Zone.Exile
+    pure Payment.Paid
 
 -- The arithmetic half, pure and board-free.
 --
@@ -570,13 +807,26 @@ payComponent pid oid component = case component of
 --    part comes off the generic component only (CR 118.7a), floored at zero -- a
 --    generic reduction with no generic left to take is simply lost. Its TYPED
 --    part cancels matching typed symbols in the cost, one for one (Edgewalker: a
---    {W}{B} reduction takes one white and one black out of a Cleric's cost).
+--    {W}{B} reduction takes one white and one black out of a Cleric's cost). CR
+--    118.7f puts a PHYREXIAN symbol on that typed side as well -- a reduction
+--    written {G/P} takes one green mana, and needs no announcement to do it --
+--    which is where the two sides of the cancellation stop agreeing. CR 118.7g
+--    sends a SNOW symbol the other way: an {S} in a reduction is that much
+--    generic mana, even though an {S} in a cost is no part of the generic
+--    component at all (CR 107.4h). Both readings of both symbols depend on which
+--    SIDE the symbol is on, which is why each of the two questions this function
+--    asks is asked by two functions.
 -- 3. An EXCESS typed symbol -- one whose type the cost has already run out of --
 --    is DROPPED, not spilled onto the generic component. That is the card text
---    CR 101.1 lets override the rules, not CR 118.7b-d: every reducer that names
---    a type reduces only coloured mana, and Edgewalker's reminder text settles
---    what that means -- a {1}{W} Cleric spell costs {1}, so the stranded {B}
---    leaves the {1} alone. CR 118.7b-d's spill has no producer here (#309).
+--    CR 101.1 lets override the rules, not CR 118.7b-d: every PRINTED reducer
+--    that names a type reduces only coloured mana, and Edgewalker's reminder
+--    text settles what that means -- a {1}{W} Cleric spell costs {1}, so the
+--    stranded {B} leaves the {1} alone. CR 118.7b-d's spill has no printed
+--    producer (#309). The pool's reducers WITHOUT that sentence are the four
+--    synthetics CR 118.7e-g needed, and no test aims a TYPED one at a cost the
+--    spill would reach: the {S} and {2/B} reductions name no type for the spill
+--    to strand, and the {G/P} and {W/B} ones are aimed at costs with no generic
+--    component for CR 118.7b-c to move the stranded mana onto.
 -- 4. CR 601.2f's floor at {0} needs no special case: ManaCost is a list of
 --    symbols and the empty list IS {0}.
 --
@@ -597,7 +847,7 @@ applyAdjustments :: ([Natural], [ManaCost.ManaCost]) -> ManaCost.ManaCost -> Man
 applyAdjustments adjustments cost =
   let (increases, reductions) = adjustments
       ManaCost.MkManaCost symbols = cost
-      genericOf symbol = case symbol of
+      costGenericOf symbol = case symbol of
         ManaSymbol.Generic n -> n
         ManaSymbol.OfType _ -> 0
         -- CR 107.4e: a colour/colour hybrid is paid with one mana of a stated
@@ -620,21 +870,54 @@ applyAdjustments adjustments cost =
         -- for CR 118.7a's reduction to come off either way.
         ManaSymbol.Phyrexian _ -> 0
         -- CR 107.4h says outright that generic reductions don't affect {S} costs,
-        -- which is the whole reason it is not spelled Generic 1.
-        --
-        -- Right for the COST and wrong for a REDUCTION, the split the Phyrexian
-        -- arm below carries: CR 118.7g makes an {S} in a reduction reduce the cost
-        -- by that much generic mana, so this arm owes 1 there and gives 0 (#516).
+        -- which is the whole reason it is not spelled Generic 1. The one arm
+        -- where this function and reducingGenericOf part company, and the
+        -- Adjustments case "CR 107.4h a generic reduction does not affect an {S}
+        -- in the cost" is what proves this side of it.
         ManaSymbol.Snow -> 0
         -- Unreachable: CR 601.2b precedes 601.2f, so Mana.substituteX has
         -- already replaced every Variable before a total cost is computed. The
         -- match must be total, so a bare {X} contributes 0 generic.
         ManaSymbol.Variable -> 0
+      -- The REDUCTION's generic amount, and two functions rather than one for
+      -- the reason costManaTypeOf and reducingManaTypeOf are two: CR 118.7g
+      -- makes the two sides read an {S} differently. Every other arm agrees with
+      -- costGenericOf's, and agreeing is not sharing -- which side a symbol is
+      -- on is not a property of the symbol.
+      reducingGenericOf symbol = case symbol of
+        -- CR 118.7a's amount of generic mana, which is what this whole side is.
+        ManaSymbol.Generic n -> n
+        -- CR 118.7b-d would turn a typed reduction the cost cannot use into
+        -- generic mana; pawl drops it instead, for the reason the header gives
+        -- (#309). Either way it is the typed side, not this one, that reads an
+        -- OfType.
+        ManaSymbol.OfType _ -> 0
+        -- CR 107.4e's colour/colour hybrid has no generic half at all, so
+        -- whichever way CR 118.7e's choice went it is the typed side below that
+        -- reads the answer.
+        ManaSymbol.Hybrid _ _ -> 0
+        -- A symbol still spelled {2/R} HERE is one CR 118.7e's choice has not
+        -- been made for -- announceReductions leaves a Generic behind when the
+        -- {2} half is taken, which the arm above reads. What reaches this arm is
+        -- the castability gate's reduction, which no announcement precedes
+        -- (#813).
+        ManaSymbol.MonocoloredHybrid _ -> 0
+        -- CR 118.7f gives a Phyrexian reduction to the typed side whole --
+        -- "one mana of that symbol's color" -- so it takes no generic mana.
+        ManaSymbol.Phyrexian _ -> 0
+        -- CR 118.7g: "If a cost is reduced by an amount of mana represented by
+        -- one or more snow mana symbols, the cost is reduced by that much
+        -- generic mana." THE arm this side exists for. CR 107.4h's sentence
+        -- about {S} costs is about the other side and does not reach here.
+        ManaSymbol.Snow -> 1
+        -- Unreachable for the reason costGenericOf's Variable arm gives; {X} is
+        -- no amount of mana until CR 601.2b names one.
+        ManaSymbol.Variable -> 0
       -- "Typed" for this function's purpose means "not generic": everything but
       -- Generic survives the filter and keeps its printed position, which is what
       -- "the SURVIVING printed typed symbols in their original order" above
       -- promises and the only way an unreducible symbol reaches Mana.spend
-      -- intact. Variable is unreachable for the reason genericOf's arm gives, and
+      -- intact. Variable is unreachable for the reason costGenericOf's arm gives, and
       -- is kept rather than stripped so that it would still survive if it were.
       isTyped symbol = case symbol of
         ManaSymbol.Generic _ -> False
@@ -644,51 +927,78 @@ applyAdjustments adjustments cost =
         ManaSymbol.Phyrexian _ -> True
         ManaSymbol.Snow -> True
         ManaSymbol.Variable -> True
-      -- Which ONE mana type a symbol names, for both sides of the cancellation:
-      -- in a reduction it is the type being taken away, and in the cost it is
-      -- the type that can be taken. Nothing means the symbol is not a
-      -- one-type-one-mana symbol and so plays no part in it.
-      manaTypeOf symbol = case symbol of
+      -- The two SIDES of the cancellation, and they are two functions because CR
+      -- 118.7f makes them disagree: which one mana type a printed COST symbol
+      -- offers up, and which one a REDUCTION's symbol takes away. Nothing means
+      -- the symbol plays no part in the cancellation from that side.
+      --
+      -- Which side a symbol is on is not a property of the symbol, so nothing
+      -- here can be shared: {G/P} names green when a reduction says it and names
+      -- nothing yet when a cost does, and the group SyntheticPhyrexianDiscount
+      -- in Pawl.PlayerEffectSpec proves both halves against cards. The
+      -- costGenericOf/reducingGenericOf pair above splits the generic question
+      -- the same way, for CR 118.7g's sake.
+      costManaTypeOf symbol = case symbol of
         ManaSymbol.Generic _ -> Nothing
         ManaSymbol.OfType manaType -> Just manaType
-        -- CR 107.4e names TWO types, so neither side of the cancellation can read
-        -- one off it. In the COST that is the same elision genericOf's
-        -- MonocoloredHybrid arm makes -- pawl announces no choice of half for a
-        -- colour/colour hybrid (#729) -- and Edgewalker's ruling is what the
-        -- elision costs. In a REDUCTION it is CR 118.7e, where the choice belongs
-        -- to the player paying, and which nothing produces (#309).
+        -- CR 107.4e names TWO types, so no one type can be read off it. The same
+        -- elision costGenericOf's MonocoloredHybrid arm makes -- pawl announces no
+        -- choice of half for a colour/colour hybrid (#729) -- and Edgewalker's
+        -- ruling is what the elision costs.
         ManaSymbol.Hybrid _ _ -> Nothing
-        -- Same two reasons: the {2} half is generic mana and the other half is one
-        -- colour. A symbol still spelled {2/R} here is one CR 601.2b has not named
-        -- -- Pawl.Engine.Mana.announce leaves an OfType behind when it does, which
-        -- the arm above reads -- so there is nothing yet to cancel against.
+        -- Same reason: a symbol still spelled {2/R} here is one CR 601.2b has not
+        -- named -- Pawl.Engine.Mana.announce leaves an OfType behind when it
+        -- does, which the arm above reads -- so there is nothing yet to cancel
+        -- against.
         ManaSymbol.MonocoloredHybrid _ -> Nothing
-        -- Nothing for two different reasons, one per side. In the COST the symbol
-        -- is necessarily UNANNOUNCED, or it would not be a Phyrexian symbol any
-        -- more: CR 601.2b's announcement precedes CR 601.2f's total. Neither
-        -- caller that reaches this arm has established that there is a green mana
-        -- here to cancel, and Edgewalker's ruling read the right way round makes
-        -- an uncommitted symbol getting no reduction the rule rather than an
-        -- elision. In a REDUCTION, CR 118.7f needs no announcement at all and
-        -- this arm is simply wrong for it, which nothing in the pool can show
-        -- because no card emits a reduction containing a Phyrexian symbol (#362).
+        -- EXACT rather than an elision. The symbol is necessarily UNANNOUNCED, or
+        -- it would not be a Phyrexian symbol any more: CR 601.2b's announcement
+        -- precedes CR 601.2f's total, and it leaves behind either an OfType or a
+        -- payment of life. No caller that reaches this arm has established that
+        -- there is a green mana here to cancel, and Edgewalker's ruling read the
+        -- right way round says so outright -- "if you choose to pay such a cost
+        -- with {W} or {B}, Edgewalker can reduce that part of the cost".
         ManaSymbol.Phyrexian _ -> Nothing
         -- CR 107.4h: {S} is paid with one mana of ANY type, so it names no one
-        -- type on either side of the cancellation. In a COST that is exact rather
-        -- than an elision: a reduction of one white mana cannot single out an {S}
-        -- the way it singles out a {W}. In a REDUCTION it is right too, but for a
-        -- different reason -- CR 118.7g makes an {S} there a GENERIC reduction, so
-        -- it belongs to genericOf above, whose own Snow arm answers 0 and is wrong
-        -- for a reduction (#516). That gap looks INERT rather than merely
-        -- unreached: no printed card states a reduction in {S} (Scryfall, all 44
-        -- cards carrying {S} in oracle text state a cost).
+        -- type. Exact rather than an elision too: a reduction of one white mana
+        -- cannot single out an {S} the way it singles out a {W}.
         ManaSymbol.Snow -> Nothing
-        -- Unreachable for the reason genericOf's Variable arm gives; {X} names
-        -- no mana type either way.
+        -- Unreachable for the reason costGenericOf's Variable arm gives; {X} names
+        -- no mana type.
+        ManaSymbol.Variable -> Nothing
+      reducingManaTypeOf symbol = case symbol of
+        -- CR 118.7a's half of a reduction, which reducingGenericOf above already
+        -- counted.
+        ManaSymbol.Generic _ -> Nothing
+        ManaSymbol.OfType manaType -> Just manaType
+        -- CR 118.7e: the choice of half belongs to the PLAYER PAYING the cost,
+        -- so answering it here would be the engine making it. A symbol still
+        -- spelled {W/U} at this point is one nobody has been asked about --
+        -- announceReductions leaves the chosen half's OfType behind when they
+        -- have -- and what reaches this arm is the castability gate's reduction,
+        -- which no announcement precedes (#813).
+        ManaSymbol.Hybrid _ _ -> Nothing
+        -- CR 118.7e's other shape, unread here for the same reason. Whichever
+        -- half of a {2/R} the payer takes, announceReductions leaves behind the
+        -- symbol that half is -- an OfType this arm reads, or a Generic
+        -- reducingGenericOf does (#813).
+        ManaSymbol.MonocoloredHybrid _ -> Nothing
+        -- CR 118.7f: "If a cost is reduced by an amount of mana represented by a
+        -- Phyrexian mana symbol, the cost is reduced by one mana of that symbol's
+        -- color." The one arm where the two sides part company -- unlike CR
+        -- 118.7e's hybrid this asks the player nothing, because the symbol names
+        -- exactly one colour and the life half is no part of a reduction.
+        ManaSymbol.Phyrexian color -> Just (ManaType.Colored color)
+        -- CR 118.7g turns an {S} reduction into that much GENERIC mana, so it is
+        -- no part of the typed cancellation: reducingGenericOf's Snow arm is
+        -- where such a reduction lands.
+        ManaSymbol.Snow -> Nothing
+        -- Unreachable for the reason costGenericOf's Variable arm gives; {X} is no
+        -- amount of mana until CR 601.2b names one.
         ManaSymbol.Variable -> Nothing
       reducingSymbols = concatMap (\(ManaCost.MkManaCost xs) -> xs) reductions
-      raised = sum (fmap genericOf symbols) + sum increases
-      taken = sum (fmap genericOf reducingSymbols)
+      raised = sum (fmap costGenericOf symbols) + sum increases
+      taken = sum (fmap reducingGenericOf reducingSymbols)
       -- Natural subtraction is PARTIAL (it throws on underflow), so the CR
       -- 601.2f floor is also what keeps this total.
       lowered = if raised >= taken then raised - taken else 0
@@ -700,7 +1010,7 @@ applyAdjustments adjustments cost =
       -- drops rather than spilling onto `lowered`.
       cancel unspent remaining = case remaining of
         [] -> []
-        symbol : rest -> case manaTypeOf symbol of
+        symbol : rest -> case costManaTypeOf symbol of
           Just manaType | elem manaType unspent -> cancel (List.delete manaType unspent) rest
           _ -> symbol : cancel unspent rest
-   in ManaCost.MkManaCost (leading <> cancel (Maybe.mapMaybe manaTypeOf reducingSymbols) (filter isTyped symbols))
+   in ManaCost.MkManaCost (leading <> cancel (Maybe.mapMaybe reducingManaTypeOf reducingSymbols) (filter isTyped symbols))

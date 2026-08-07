@@ -1,0 +1,50 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Synthetic Stack Interdiction",
+      "replacementEffects": [
+        {
+          "type": "ZoneChangeR",
+          "value": [
+            {
+              "whatObject": {
+                "type": "HasColor",
+                "value": {
+                  "type": "Green"
+                }
+              },
+              "whenDestination": {
+                "type": "Stack"
+              }
+            },
+            {
+              "type": "Exile"
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
