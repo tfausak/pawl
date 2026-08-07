@@ -1544,24 +1544,39 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     Spec.assertEqWith s "the Javelin resolved" (length (GameState.stack resolved)) 0
     Spec.assertEqWith s "off all three Mountains" (S.tappedCount S.alice resolved) 3
 
-  -- The remaining gap, made visible rather than left implied. CR 601.2f's
-  -- reduction reaches the cost that is PAID, because the announcement
-  -- names a {2} for CR 118.7a to come off -- but castability is measured
-  -- one step earlier, on the printed cost, where the symbol is still
-  -- {2/R} and CR 118.7a has nothing to bite. So a Javelin payable only
-  -- through the reduced generic route is never offered (#730).
-  Spec.it s "CR 601.2f Baral's reduction does not reach the castability gate for a {2/R} (#730)" $ do
+  -- CR 601.2b names the nonhybrid equivalent cost, and CR 601.2f totals
+  -- THAT minus every reduction: announced as {2}{2}{2} the Javelin is
+  -- {6}, which Baral takes to {5}. The castability gate asks the same
+  -- question over the same completions, so a Javelin payable only through
+  -- the reduced generic route is offered -- and the reduction the gate
+  -- sees is the one the payment takes. Flame Javelin's own ruling is that
+  -- side of it: a generic cost reduction applies to a monocolored hybrid
+  -- only where the announced payment includes generic mana.
+  Spec.it s "CR 601.2f Baral's reduction reaches the castability gate for a {2/R}" $ do
     island <- S.printingOf s registry "Island"
     baral <- S.printingOf s registry "Baral, Chief of Compliance"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     let withBaral n = S.handOne flameJavelin (snd (S.addCreature baral S.alice (S.landsInPlay island n)))
+        (four, fourId) = withBaral 4
         (five, fiveId) = withBaral 5
         (six, sixId) = withBaral 6
-    Spec.assertBool s (not (S.castable S.alice fiveId five)) "five Islands: not offered, though CR 601.2f's total is {5}"
-    -- The control, and it is what makes the leg above about the gate
-    -- rather than about the board: one more Island and the cast happens,
-    -- and it happens for FIVE -- the reduction the gate could not see is
-    -- the one the payment takes.
+    Spec.assertBool s (S.castable S.alice fiveId five) "five Islands: offered, since CR 601.2f's total is {5}"
+    -- The gate is EXACT and not merely looser: the cast it admits
+    -- completes, and it completes off all five Islands and no more.
+    let (_, offFive) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) five fiveId
+    Spec.assertEqWith s "and the Javelin resolved" (length (GameState.stack offFive)) 0
+    Spec.assertEqWith s "off exactly five Islands" (S.tappedCount S.alice offFive) 5
+    -- The discriminating negative on the same axis. One Island fewer and
+    -- {5} is out of reach through EVERY completion -- {6} through the
+    -- generic route, {2}{2}{R} and its siblings through the typed ones,
+    -- none of which four Islands pay -- so the gate still refuses, and the
+    -- attempted cast still puts nothing on the stack.
+    Spec.assertBool s (not (S.castable S.alice fourId four)) "four Islands: still refused, since CR 601.2f's total is {5}"
+    let (_, offFour) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) four fourId
+    Spec.assertEqWith s "and nothing was cast" (length (GameState.stack offFour)) 0
+    -- The control, and it is what makes the legs above about the
+    -- reduction rather than about the board: one more Island and the cast
+    -- still pays FIVE, leaving the sixth untapped.
     Spec.assertBool s (S.castable S.alice sixId six) "six Islands: offered"
     let (_, resolved) = castAndResolve (announcesHybrid HybridPayment.PaysGeneric) six sixId
     Spec.assertEqWith s "and only five of the six are tapped" (S.tappedCount S.alice resolved) 5

@@ -201,8 +201,16 @@ payableCost = payableCostAt 0
 -- The same question asked at some OTHER value of X. `payableCost` is this at CR
 -- 601.2b's floor, and `affordableX` is this climbed; one predicate, so what the
 -- gate measures and what the bound reports cannot drift apart.
+--
+-- CR 601.2b's COMPLETION comes before CR 601.2f's totalling, which is why this is
+-- Cost.canPaySomeCompletion and not Cost.canPay over Cost.total: a {2/R} totalled
+-- while still spelled {2/R} hides the generic reduction the announcement would
+-- expose. Cost.totalMana is the totalling, and it is the same function castSpell
+-- hands Cost.announce, so the gate and the offer read the adjustments through one
+-- function.
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x pid oid gs cost = Cost.canPay pid oid (Cost.total pid oid (Cost.substituteX x cost) gs) gs
+payableCostAt x pid oid gs cost =
+  Cost.canPaySomeCompletion pid oid (Cost.totalMana pid oid gs) (Cost.substituteX x cost) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
