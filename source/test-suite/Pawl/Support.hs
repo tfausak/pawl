@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Sba as Sba
+import qualified Pawl.Engine.Script as Script
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Registry as Registry
@@ -233,250 +234,28 @@ isCreatureRecipient r = case r of
 -- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
 identityAnswer :: Prompt.Prompt r -> r
 identityAnswer p = case p of
-  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  Prompt.DeclareAttackers {} -> []
-  -- CR 508.1b: the defending player, which Combat.attackTargets puts first --
-  -- the answer every attack in a planeswalker-less pool gets anyway. A test that
-  -- wants a planeswalker attacked says so with its own interpreter, which is what
-  -- makes that answer discriminating.
-  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
-  Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.Shuffle ids -> ids
-  Prompt.RandomFirstPlayer order -> NonEmpty.head order
-  Prompt.ChooseAction {} -> A.Pass
-  Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  Prompt.SearchLibrary {} -> Nothing
-  Prompt.CastWhileSearching {} -> Nothing
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  Prompt.ChooseCopyTarget {} -> Nothing
-  Prompt.ChooseEntryOption {} -> 0
-  Prompt.ChooseRiot {} -> OptionalDecision.Declines
-  Prompt.ChooseColor {} -> Color.White
-  -- CR 201.2a: an object with no name doesn't have the same name as any other
-  -- object, so the empty name is the least eventful answer -- a Null Chamber
-  -- entering under this interpreter prohibits nothing. A test about a NAMED
-  -- card supplies its own answer, which is what makes that answer
+  -- CR 601.2: taking no action is always legal, and a fixture that wants one
+  -- taken says so with its own interpreter -- which is what makes that answer
   -- discriminating.
-  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
-  -- CR 102.2: raised only where there are two or more opponents to pick from,
-  -- which no two-player board reaches.
-  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
-  -- permanent away. The engine's own replay fallback takes the maximal one.
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  Prompt.MulliganAction {} -> Nothing
-  Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
-  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
-  -- so with its own interpreter, which is what makes that answer discriminating.
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
-  -- resolving effect put it -- the least-eventful default, as above. A test that
-  -- wants the cast TAKEN says so with its own interpreter.
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
-  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
-  -- test that wants the cost PAID says so with its own interpreter, which is
-  -- what makes that answer discriminating.
-  Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
-  -- and is the least eventful default, matching Replay.defaultAnswer.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.7e: both halves are legal answers whatever the board, so the head
-  -- is a deterministic default rather than the only payable route.
-  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
+  Prompt.ChooseAction {} -> A.Pass
+  _ -> Script.declining p
 
 -- Casts when legal, otherwise plays a land, otherwise passes.
 castAnswer :: Prompt.Prompt r -> r
 castAnswer p = case p of
-  Prompt.Shuffle ids -> ids
-  Prompt.RandomFirstPlayer order -> NonEmpty.head order
-  Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  Prompt.DeclareAttackers {} -> []
-  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
-  Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
-  Prompt.ChooseAction _ _ actions ->
-    let isCast a = case a of
-          A.Cast {} -> True
-          _ -> False
-        isPlay a = case a of
-          A.Play {} -> True
-          _ -> False
-     in case filter isCast actions of
-          h : _ -> h
-          [] -> case filter isPlay actions of
-            h : _ -> h
-            [] -> A.Pass
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  Prompt.SearchLibrary {} -> Nothing
-  Prompt.CastWhileSearching {} -> Nothing
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  Prompt.ChooseCopyTarget {} -> Nothing
-  Prompt.ChooseEntryOption {} -> 0
-  Prompt.ChooseRiot {} -> OptionalDecision.Declines
-  Prompt.ChooseColor {} -> Color.White
-  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
-  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
-  -- permanent away. The engine's own replay fallback takes the maximal one.
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  Prompt.MulliganAction {} -> Nothing
-  Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
-  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
-  -- so with its own interpreter, which is what makes that answer discriminating.
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
-  -- resolving effect put it -- the least-eventful default, as above. A test that
-  -- wants the cast TAKEN says so with its own interpreter.
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
-  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
-  -- test that wants the cost PAID says so with its own interpreter, which is
-  -- what makes that answer discriminating.
-  Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
-  -- and is the least eventful default, matching Replay.defaultAnswer.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.7e: both halves are legal answers whatever the board, so the head
-  -- is a deterministic default rather than the only payable route.
-  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
+  Prompt.ChooseAction _ _ actions -> Script.castElsePlay actions
+  _ -> identityAnswer p
 
 -- Attacks with everything and blocks the first attacker with everything.
 -- Deliberately maximal: it makes combat happen without the test having to
 -- hand-build a Combat record.
 aggressiveAnswer :: Prompt.Prompt r -> r
 aggressiveAnswer p = case p of
-  Prompt.Shuffle ids -> ids
-  Prompt.RandomFirstPlayer order -> NonEmpty.head order
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseAction {} -> A.Pass
-  Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
-  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
   Prompt.DeclareAttackers _ _ ids -> ids
-  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
     a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  Prompt.SearchLibrary {} -> Nothing
-  Prompt.CastWhileSearching {} -> Nothing
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  Prompt.ChooseCopyTarget {} -> Nothing
-  Prompt.ChooseEntryOption {} -> 0
-  Prompt.ChooseRiot {} -> OptionalDecision.Declines
-  Prompt.ChooseColor {} -> Color.White
-  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
-  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
-  -- permanent away. The engine's own replay fallback takes the maximal one.
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  Prompt.MulliganAction {} -> Nothing
-  Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
-  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
-  -- so with its own interpreter, which is what makes that answer discriminating.
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
-  -- resolving effect put it -- the least-eventful default, as above. A test that
-  -- wants the cast TAKEN says so with its own interpreter.
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
-  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
-  -- test that wants the cost PAID says so with its own interpreter, which is
-  -- what makes that answer discriminating.
-  Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
-  -- and is the least eventful default, matching Replay.defaultAnswer.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.7e: both halves are legal answers whatever the board, so the head
-  -- is a deterministic default rather than the only payable route.
-  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
+  _ -> identityAnswer p
 
 -- castAnswer's actions with aggressiveAnswer's combat: plays lands and casts
 -- what it can afford, then attacks with everything and blocks with everything.

@@ -365,6 +365,7 @@ library engine
     Pawl.Engine.Room
     Pawl.Engine.Saga
     Pawl.Engine.Sba
+    Pawl.Engine.Script
     Pawl.Engine.Setup
     Pawl.Engine.Speed
     Pawl.Engine.Stack
