@@ -42,14 +42,33 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-        in
-        {
+
           # Every non-test dependency is a GHC boot library, so this builds
           # without fetching anything from Hackage. doBenchmark compiles the
           # benchmark too, which `cabal test` would not.
-          default = pkgs.haskell.lib.compose.doBenchmark (
-            pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { }
-          );
+          pawl =
+            pkgs.haskell.lib.compose.overrideCabal
+              (old: {
+                # nixpkgs installs executables but not benchmarks, so the compiled
+                # benchmark binary would be discarded. Keep it, so it can be run.
+                postInstall = (old.postInstall or "") + ''
+                  install -D -m 755 dist/build/pawl-benchmark/pawl-benchmark "$out/bin/pawl-benchmark"
+                '';
+              })
+              (
+                pkgs.haskell.lib.compose.doBenchmark (pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { })
+              );
+        in
+        {
+          default = pawl;
+
+          # Deliberately its own derivation rather than a phase of the build. A
+          # timing run inside the package would be skipped silently whenever the
+          # build cache hit, and a flaky measurement would fail the build.
+          benchmark = pkgs.runCommand "pawl-benchmark-results" { } ''
+            mkdir -p "$out"
+            ${pawl}/bin/pawl-benchmark --csv "$out/bench.csv" +RTS -T
+          '';
         }
       );
 
