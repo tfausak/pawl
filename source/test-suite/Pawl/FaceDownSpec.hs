@@ -304,9 +304,10 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
   -- the lowest-sorting candidate -- alice, the controller, which would make the
   -- positive case indistinguishable from the "no target was chosen" control.
   --
-  -- THE BEFORE assertion is CR 708.3 and CR 708.8's last sentence: the face-down
-  -- cast and the battlefield entry it resolved into fired nothing at all, which
-  -- is what makes 18 the TURNING's doing rather than the entry's.
+  -- THE BEFORE assertion is CR 708.4 through CR 708.2a: the face-down spell became
+  -- a face-down permanent, which has no text at all, so neither the cast nor the
+  -- battlefield entry could fire anything. That is what makes 18 the TURNING's
+  -- doing rather than the entry's.
   Spec.it s "CR 708.7 turning Skirk Marauder face up deals its 2 to the chosen target" $ do
     mountain <- S.printingOf s registry "Mountain"
     marauder <- S.printingOf s registry "Skirk Marauder"
@@ -331,10 +332,10 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- CR 702.37e's "a FACE-DOWN permanent you control", and the guard on the
         -- whole action: the permanent is face up now, so there is nothing left to
         -- turn over and asking again is a no-op. THE DISCRIMINATOR for the event
-        -- being recorded inside
-        -- FaceDown.turnFaceUp's paid branch rather than on entry -- record it
-        -- unconditionally and this second call fires the ability a second time,
-        -- since by now the permanent has its text back to see it with.
+        -- being recorded inside FaceDown.turnFaceUp's paid branch rather than on
+        -- entry -- record it unconditionally and this second call fires the
+        -- ability again, since by now the permanent has its text back to see it
+        -- with.
         let again = S.runPure (aimAt S.bob) after (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
         Spec.assertEqWith s "CR 702.37e asking again turns nothing over and fires nothing" (S.lifeOf S.bob again) (Just 18)
 
