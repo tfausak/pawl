@@ -76,6 +76,20 @@
             touch "$out"
           '';
 
+          # Pinned to the same attribute the dev shell uses. cabal-gild's output
+          # changes between versions, so a check on a different one would
+          # disagree with what a contributor's `cabal-gild pawl.cabal` produces.
+          # Runs from the source root because the `discover` directives are
+          # resolved against source/.
+          gild =
+            pkgs.runCommand "pawl-gild-check"
+              { nativeBuildInputs = [ pkgs.haskellPackages.cabal-gild_1_8_4_1 ]; }
+              ''
+                cd ${source}
+                cabal-gild --mode check pawl.cabal
+                touch "$out"
+              '';
+
           # .hlint.yaml is passed explicitly rather than added to the source
           # fileset: hlint only finds it by walking up from the target, and
           # putting it in the fileset would rebuild the package whenever a

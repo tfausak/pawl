@@ -69,11 +69,10 @@ jobs:
   gild:
     name: Gild
     runs-on: ubuntu-latest
-    needs: meta
     steps:
       - uses: actions/checkout@v7
-      - uses: tfausak/cabal-gild-setup-action@v2
-      - run: cabal-gild --mode check ${{ needs.meta.outputs.name }}.cabal
+      - uses: nixbuild/nix-quick-install-action@v35
+      - run: nix build --print-build-logs .#checks.x86_64-linux.gild
   hlint:
     name: HLint
     runs-on: ubuntu-latest
