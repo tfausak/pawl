@@ -50,9 +50,9 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- modes WOULD be unsatisfiable, because Resolve.slotsOf returns this slot for
 -- an effect that reads it while the rule forbids the matching targetSpecs
 -- entry. Such a lint must subtract the reserved names (this one, variableX,
--- chosenModes, copySource, you, thatPlayer, became) from the read side;
--- loosening it to a subset check instead would silently retire its "declared
--- but never read" half.
+-- chosenModes, copySource, you, thatPlayer, became, thatSpell) from the read
+-- side; loosening it to a subset check instead would silently retire its
+-- "declared but never read" half.
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
@@ -211,6 +211,45 @@ eventAmount = SlotName.MkSlotName (Text.pack "thatMuch")
 sacrificedCount :: SlotName
 sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 
+-- CR 601.2i: the reserved slot under which a cast trigger's WATCHED SPELL is
+-- bound -- the printed "it" in Presence of the Master's "whenever a player casts
+-- an enchantment spell, counter it", and "that spell" wherever a card spells the
+-- word out. Stamped by Pawl.Engine.Event.eventBindings as the trigger is
+-- gathered, alongside `triggerPlayer` and `became`, so the payload reads an
+-- ordinary slot rather than a "the spell that was cast" opcode.
+--
+-- NOT `became`, though both name an object an event produced, and the reason is
+-- the word itself: CR 400.7e's `became` is the incarnation a card BECAME on
+-- changing zones, and a spell being cast is not a zone change at all. CR 601.2a
+-- moved the card to the stack earlier in the casting process and CR 601.2i's
+-- event is the spell becoming CAST, at which point the object has become
+-- nothing -- it is the same stack object it already was. Reusing the name would
+-- also have to argue away a collision that is real rather than theoretical: an
+-- ability whose condition is a zone change and whose payload names the cast
+-- spell is not writable today, but the two writers are independent, and one slot
+-- for two unrelated rules is what forces such an argument every time a reader is
+-- added.
+--
+-- Distinct from `triggerSource` (CR 113.7a) for the same reason `became` is:
+-- under this condition the bearer is a permanent watching the stack while the
+-- spell is a separate object on it, controlled by another player as often as
+-- not.
+--
+-- Not a target -- nothing was chosen -- so the same CR 608.2b posture as
+-- `triggerPlayer` and `became`: Resolve's legalSlot answers True for a slot with
+-- no target spec, which is how CR 701.6a's countering reaches it at resolution.
+-- The "no card's targetSpecs may name it" rule applies here too, under the same
+-- Pawl.CardSpec sweep, and the binding side of that sweep matters just as much:
+-- a card writing this name into an effect's bound SlotName would shadow the
+-- event's spell with its own object.
+--
+-- A dead id is possible and is the payload's problem, exactly as it is for
+-- `became`: the spell can leave the stack before the trigger resolves (another
+-- counterspell, or a second Presence of the Master), which is the case CR 608.2h
+-- is about, and CR 701.6a's funnel no-ops on an id that names nothing.
+castSpell :: SlotName
+castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -255,6 +294,10 @@ setTriggerPlayer pid = Map.insert triggerPlayer (toPlayer pid)
 -- Bind an object under the reserved became slot (CR 400.7e).
 setBecame :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBecame oid = Map.insert became (toObject oid)
+
+-- Bind an object under the reserved castSpell slot (CR 601.2i).
+setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setCastSpell oid = Map.insert castSpell (toObject oid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

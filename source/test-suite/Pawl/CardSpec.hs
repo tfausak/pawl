@@ -1066,7 +1066,8 @@ reservedSlots =
       Binding.triggerPlayer,
       Binding.became,
       Binding.eventAmount,
-      Binding.sacrificedCount
+      Binding.sacrificedCount,
+      Binding.castSpell
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T

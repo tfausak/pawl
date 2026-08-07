@@ -407,7 +407,9 @@ data TriggerCondition
     -- applies the effects that modify the spell's characteristics BEFORE it
     -- becomes cast, so a card in the hand is the wrong thing to read.
     --
-    -- Nothing about the spell is bound for the payload to name, so a card saying
-    -- "copy that spell" is not expressible through this condition (#910).
+    -- The spell itself is bound for the payload to name, under the reserved
+    -- Pawl.Engine.Binding.castSpell slot: Presence of the Master's "counter it"
+    -- is CR 701.6a acting on that slot. The CASTER is not separately bound,
+    -- being CR 112.2's controller of the spell already there (#913).
     SpellCast (Filter.Filter Keyword.Keyword)
   deriving (Eq, Ord, Show)
