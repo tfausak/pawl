@@ -137,8 +137,9 @@ roomPermanent gs =
     elem (Projection.nameOf o gs) [furnaceName, saunaName, joinedName, CardName.MkCardName Text.empty]
   ]
 
--- CR 110.5b's default entry: untapped, not attacking, not transformed -- what an
--- effect that merely puts a permanent onto the battlefield asks for.
+-- The riders an effect that merely puts a permanent onto the battlefield asks
+-- for: CR 110.5b's untapped, no CR 508.1 attacking entry, and CR 712.14's
+-- untransformed default.
 plainEntry :: EntryRiders.EntryRiders
 plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False}
 

@@ -2,8 +2,9 @@
 -- CR 116.2m's special action that pays a locked door's mana cost to open it.
 --
 -- Everything ELSE rule 709.5 says is arranged so that no module has to know this
--- one exists. CR 709.5's subtraction lives at Pawl.Engine.Game.faceOf, so every
--- characteristic read gets it for free; CR 709.5d's entering designation lives
+-- one exists. CR 709.5's subtraction lives at Pawl.Engine.Game.resolveFaceFor,
+-- which every characteristic read reaches through Game.faceOf, so they all get it
+-- for free; CR 709.5d's entering designation lives
 -- at Pawl.Engine.Event.changeZoneAttaching, inside the move; CR 709.5h's trigger
 -- is an ordinary Pawl.Types.TriggerCondition matched against a
 -- Pawl.Types.GameEvent. What is left is an action a player takes, and an action

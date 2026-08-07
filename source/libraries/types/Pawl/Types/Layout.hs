@@ -7,7 +7,7 @@ module Pawl.Types.Layout where
 
 data Layout
   = -- | A card with exactly one face: every card printed without a second set
-    -- of characteristics, which is the whole pool today.
+    -- of characteristics, which is all but a handful of the pool.
     Normal
   | -- | CR 709.1: "Split cards have two card faces on a single card. The back
     -- of a split card is the normal Magic card back."

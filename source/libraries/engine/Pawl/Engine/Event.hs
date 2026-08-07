@@ -1223,15 +1223,20 @@ changeZoneEntering oid requestedDest riders under = do
     then pure Nothing
     else changeZoneAttaching Nothing oid requestedDest Nothing (EntryRiders.tapped riders) under shown Facing.FaceUp
 
--- changeZoneReturning for a move that puts the object into its destination
--- SHOWING one named face: CR 709.3's choice of which half of a split card is
--- being cast, which the rule makes "before putting it onto the stack", so the
--- move is what carries it. CR 712.11b words the modal double-faced card's
--- version of the same choice identically, and CR 712.11c its version of CR
--- 709.3a, so both layouts come through this door.
+-- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
+-- its destination: CR 709.3's choice of which half of a split card is being
+-- cast, which the rule makes "before putting it onto the stack", so the move is
+-- what carries it. CR 712.11b words the modal double-faced card's version of the
+-- same choice identically, and CR 712.11c its version of CR 709.3a, so both
+-- layouts come through this door.
 --
--- The face is a MAYBE, because the third rule asking for this door does not
--- always have one to name: CR 712.13 carries a resolving double-faced spell's
+-- A HALF and not always a face that is up, which is CR 709.5d's use of the same
+-- parameter: a Room permanent shows both halves at once, so changeZoneAttaching
+-- spends the name on an unlocked designation and leaves Object.face empty. Every
+-- other caller's half IS the face the object arrives showing.
+--
+-- The name is a MAYBE, because the third rule asking for this door does not
+-- always have one to give: CR 712.13 carries a resolving double-faced spell's
 -- face onto the battlefield, and Pawl.Engine.Stack asks that of every permanent
 -- spell it resolves, most of which show nothing (Pawl.Engine.Card.enteringFace).
 -- Nothing here is exactly changeZoneReturning.
@@ -1445,11 +1450,17 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown facing = do
               -- DESIGNATION where a double-faced card spends it on `face`, and
               -- the two are mutually exclusive below.
               --
-              -- Written INSIDE the move for CR 709.3a's reason, one rule over:
-              -- "as it enters" means the CR 400.7 incarnation must never exist
-              -- without it, so nothing in the CR 616.1 entry loop or the CR
-              -- 709.5h trigger scan can see a Room whose doors are all shut when
-              -- one of them was cast.
+              -- Written INSIDE the move rather than stamped onto what it hands
+              -- back, which is CR 709.5d's own "as it enters the battlefield":
+              -- the CR 400.7 incarnation must never exist without the
+              -- designation, so nothing in the CR 616.1 entry loop and nothing
+              -- in the CR 709.5h trigger scan can see a Room whose doors are all
+              -- shut when one of them was cast. CR 614.12 is what makes the
+              -- first of those observable rather than merely tidy -- an entry
+              -- replacement reads the object's characteristics "as it would
+              -- exist on the battlefield", and a Room with every door shut has
+              -- no text for such a replacement to be printed in. `face` above
+              -- takes the same position for CR 709.3a's chosen half.
               --
               -- Gated on the BATTLEFIELD rather than on the move arriving where
               -- it was headed, which the two clauses of the rule name in as many

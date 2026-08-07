@@ -66,11 +66,15 @@ resolveTopWith runSubgame = do
           -- fallback; unreachable here since `obj` already resolved via this
           -- same `oid`.
           let face = Maybe.fromMaybe (Card.combined (Printing.card printing)) (Game.faceOf oid gs)
-              -- CR 712.13: the face this spell showed on the stack, carried onto
-              -- the permanent for the layouts whose rules say so and dropped for
-              -- the rest (Card.enteringFace). Read off `obj` rather than off
-              -- `face`, because what the rule carries is the object's own record
-              -- of which face is up and not the face a fallback resolved to.
+              -- CR 712.13 / 709.5d: the half this spell showed on the stack,
+              -- carried onto the permanent for the layouts whose rules say so and
+              -- dropped for the rest (Card.enteringFace). What the permanent then
+              -- does with it is the MOVE's question and not this one -- CR 712.13
+              -- leaves a double-faced permanent showing the face, CR 709.5d turns
+              -- a Room's into an unlocked designation. Read off `obj` rather than
+              -- off `face`, because what the rules carry is the object's own
+              -- record of which half is up and not the face a fallback resolved
+              -- to.
               entering = Card.enteringFace (Printing.card printing) (Object.face obj)
               -- CR 708.4's last sentence: "the permanent the spell becomes will
               -- be a face-down permanent". A STATUS carried across a zone change,

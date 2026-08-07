@@ -96,9 +96,9 @@ legalActions pid gs =
       -- CR 116.2b / 702.37e: turning a face-down permanent face up is a special
       -- action a player may take any time they have priority, so it joins the
       -- menu beside CR 116.2a's land play rather than going through the stack.
-      -- Ungated by phase or by an empty stack, which is the whole difference
-      -- between the two special actions pawl offers -- CR 116.2a states both
-      -- restrictions and CR 116.2b states neither.
+      -- Ungated by phase or by an empty stack, and the ONLY one of the three
+      -- special actions pawl offers that is: CR 116.2a and CR 116.2m both state
+      -- those restrictions and CR 116.2b states neither.
       turnUps = fmap Action.TurnFaceUp (FaceDown.turnableFaceUp pid gs)
       -- CR 116.2m / 709.5e: the third special action, and the one whose window is
       -- CR 116.2a's rather than CR 116.2b's -- "any time they have priority and

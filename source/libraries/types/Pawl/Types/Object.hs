@@ -352,8 +352,8 @@ data Object = MkObject
     -- STORED rather than projected, for protector's reason: CR 709.5e's special
     -- action and CR 709.5f/709.5g's unlock and lock all WRITE it, so nothing a
     -- layer computes may be allowed to move it. What it feeds is the substitution
-    -- at Pawl.Engine.Game.faceOf (Pawl.Engine.Card.roomFace), which sits before
-    -- layer 1 rather than in it.
+    -- at Pawl.Engine.Game.resolveFaceFor (Pawl.Engine.Card.roomFace), which sits
+    -- before layer 1 rather than in it.
     --
     -- NOT a copiable value, and CR 709.5 draws that line itself: the two static
     -- abilities and "which half of that permanent a characteristic is in" are

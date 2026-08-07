@@ -252,8 +252,8 @@ cardOfSource mSource = case mSource of
     Source.OfInherentTrigger _ _ -> Nothing
 
 -- Narrow a card down to the face a (possibly absent) chosen name picks out --
--- the one resolution step faceOf and faceOfWithLastKnown share, so the two
--- cannot drift on what the fallback is.
+-- CR 709.3b's half of resolveFaceFor below, which faceOf and faceOfWithLastKnown
+-- both reach through, so the two cannot drift on what the fallback is.
 --
 -- Nothing (no face singled out) answers with the layout's own view (CR 709.4 /
 -- 712.8a): a split card's characteristics are its two halves combined in every
@@ -322,8 +322,10 @@ faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
   Just Facing.FaceDown -> Just Card.faceDownFace
   _ -> faceUpFaceOf oid gs
 
--- `faceOf` IGNORING CR 708.2's substitution: the face the object's own card
--- shows, whichever way up the object is.
+-- `faceOf` IGNORING CR 708.2's substitution: what the object's own card shows,
+-- whichever way up the object is -- CR 709.3b's chosen half, CR 709.4's combined
+-- view or CR 709.5's subtracted one, whichever resolveFaceFor answers with, but
+-- never Card.faceDownFace.
 --
 -- Two rules want it, and both are about a face-down object without being about
 -- its characteristics. CR 702.37e reads "what the permanent's morph cost WOULD

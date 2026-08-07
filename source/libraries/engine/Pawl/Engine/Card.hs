@@ -129,8 +129,17 @@ faceDownFace =
 -- NORMAL characteristics alone. Under Normal there is one face and all three name
 -- it; the layouts that make them differ each have their arm below.
 --
+-- A ROOM PERMANENT is the one object this does not answer for, and CR 709.5 is
+-- why: it singles out no half either, but its LOCKED halves are subtracted from
+-- the combined view rather than folded into it. `roomFace` below is that answer,
+-- built from the same foldSplit this function's Room arm takes; the seam that
+-- chooses between the two is Pawl.Engine.Game.resolveFaceFor. The Room arm here
+-- is the card OFF the battlefield, where CR 709.5c leaves it no designations to
+-- subtract by.
+--
 -- TOTAL, which is what Card.faces being NonEmpty buys: every characteristic read
--- in the engine funnels through here, and a Maybe would spread to all of them.
+-- in the engine funnels through here or through roomFace, and a Maybe would
+-- spread to all of them.
 combined :: Card.Card -> Face.Face Card.Card
 combined card = case Card.layout card of
   Layout.Normal -> NonEmpty.head (Card.faces card)
@@ -186,6 +195,10 @@ combined card = case Card.layout card of
 
 -- CR 709.4, one pair at a time. Left-associated over the NonEmpty, so printed
 -- order decides the joined name and the concatenated mana cost.
+--
+-- Also the engine of CR 709.5's subtraction: roomFace below folds the SAME way
+-- over halves it has already emptied, so a Room's open doors combine exactly as a
+-- split card's two halves do and the locked ones contribute nothing.
 foldSplit :: NonEmpty.NonEmpty (Face.Face Card.Card) -> Face.Face Card.Card
 foldSplit faces = List.foldl' merge2 (NonEmpty.head faces) (NonEmpty.tail faces)
 
@@ -382,9 +395,12 @@ landFaces card =
       offered = case Card.layout card of
         Layout.Normal -> byDefault
         Layout.Split -> byDefault
-        -- CR 709.5 makes a Room a PERMANENT card, and every printing's shared
-        -- type line reads "Enchantment - Room", so the filter below drops the
-        -- pair whichever view is offered.
+        -- CR 709.5 names a Room among the split cards that are "permanent
+        -- cards", and every printing's shared type line reads
+        -- "Enchantment - Room", so the filter below drops the pair whichever
+        -- view is offered. That last clause is a fact about the pool and not
+        -- something the rule requires (see hasSharedTypeLine below); a Room with
+        -- a land in its type line would want the arm castableFaces has.
         Layout.Room -> byDefault
         Layout.Adventure -> byDefault
         -- CR 712.8a again, and CR 712.12 names the MODAL kind alone: a nonmodal
@@ -754,9 +770,14 @@ subtractHalf face =
 -- Nothing when no face is so named, and the FIRST match otherwise -- so a hit is
 -- unique only where a card's face names are pairwise distinct. That is a
 -- requirement on card DATA rather than something this function can check: the
--- corpus lint in Pawl.CardSpec is what holds it, and since the pool now prints a
--- two-faced card (Wax // Wane) that lint compares two names rather than passing
--- vacuously over a pool of one-face cards.
+-- corpus lint in Pawl.CardSpec is what holds it, and since the pool prints
+-- two-faced cards (Wax // Wane, Roaring Furnace // Steaming Sauna) that lint
+-- compares two names rather than passing vacuously over a pool of one-face cards.
+--
+-- CR 709.5 is what raised the stakes on that uniqueness: an unlocked designation
+-- (Object.unlockedHalves) and CR 709.5h's trigger both pick a half out by name,
+-- so two halves sharing one name would open and fire the wrong door rather than
+-- merely reading the wrong characteristics.
 faceNamed :: CardName.CardName -> Card.Card -> Maybe (Face.Face Card.Card)
 faceNamed n card = List.find (\f -> Face.name f == n) (NonEmpty.toList (Card.faces card))
 
