@@ -5,22 +5,31 @@
 -- gate (alreadyTurnedFor over Object.turnedOverAt), and
 -- Pawl.Engine.Game.manaCostFaceOf (CR 712.8e).
 --
--- Every case runs against the printed Thraben Gargoyle // Stonewing Antagonizer,
--- a nonmodal double-faced card (CR 712.2) whose front face is a {1} 2/2 Artifact
--- Creature -- Gargoyle with defender and "{6}: Transform this creature", and
--- whose back face is a 4/2 Artifact Creature -- Gargoyle Horror with flying and
--- no text. It was picked because its whole text IS the transform: every
--- characteristic that differs across the two faces is one pawl already reads, so
--- a case that fails here fails about transform and about nothing else.
+-- Also CR 712.14a's enter-transformed instruction, which reaches the same back
+-- face by a different road: Pawl.Types.EntryRiders carries it and
+-- Pawl.Engine.Event.changeZoneEntering applies it. See enterTransformedSpec.
+--
+-- Every case but that group runs against the printed Thraben Gargoyle //
+-- Stonewing Antagonizer, a nonmodal double-faced card (CR 712.2) whose front
+-- face is a {1} 2/2 Artifact Creature -- Gargoyle with defender and "{6}:
+-- Transform this creature", and whose back face is a 4/2 Artifact Creature --
+-- Gargoyle Horror with flying and no text. It was picked because its whole text
+-- IS the transform: every characteristic that differs across the two faces is
+-- one pawl already reads, so a case that fails here fails about transform and
+-- about nothing else. CR 712.14a's group needs an effect that instructs the
+-- move, so it adds Befriending the Moths // Imperial Moth.
 module Pawl.TransformSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -36,6 +45,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
@@ -43,6 +53,8 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Zone as Zone
@@ -100,6 +112,7 @@ sweep = sweepFrom S.noSource
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Transform" $ do
+  enterTransformedSpec s registry
   -- CR 712.8d: "While a double-faced permanent has its front face up, it has
   -- only the characteristics of its front face." Nothing has turned this one
   -- over, so CR 712.8a's front face is what Pawl.Engine.Card.combined answers
@@ -309,3 +322,87 @@ spec s registry = Spec.describe s "Transform" $ do
     -- 4/2 from the back face plus the counter layer 7d still applies (CR 712.18).
     Spec.assertEqWith s "so the back face reads 5/3, not the printed 4/2" (S.powerToughnessOf oid after) (Just (5, 3))
     Spec.assertEqWith s "and the battlefield holds one permanent, not a replacement" (length (Game.zoneMembers Zone.Battlefield S.alice after)) 1
+
+-- The name of the one face that reaches the battlefield below. CR 712.8a keeps
+-- it off every reading of the card in a hand or a graveyard, so a permanent that
+-- answers to it can only have entered showing its back face.
+mothName :: CardName.CardName
+mothName = CardName.MkCardName (Text.pack "Imperial Moth")
+
+-- A board sitting in `pid`'s precombat main phase, the moment CR 505.4 / 714.3c
+-- puts a lore counter on each of their Sagas.
+precombatMainOf :: PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+precombatMainOf pid gs =
+  gs
+    { GameState.phase = Phase.PrecombatMain,
+      GameState.activePlayer = pid,
+      GameState.priority = Just pid
+    }
+
+-- CR 712.14a: "If a spell or ability puts a double-faced card onto the
+-- battlefield 'transformed' or 'converted', it enters the battlefield with its
+-- back face up. If a player is instructed to put a card that isn't a
+-- double-faced card onto the battlefield transformed or converted, that card
+-- stays in its current zone."
+--
+-- Both sentences, and Pawl.Engine.Event.changeZoneEntering is where both live --
+-- the rider itself is Pawl.Types.EntryRiders' `transformed`, which
+-- Pawl.Engine.Resolve's MoveToZone arm hands to that door without reading.
+--
+-- The producer is Befriending the Moths // Imperial Moth, a Kamigawa: Neon
+-- Dynasty Saga whose chapter III reads "Exile this Saga, then return it to the
+-- battlefield transformed under your control" -- CR 712.14a's wording on a card
+-- rather than on a spell, which is what makes it this rule's producer and not CR
+-- 712.13a's. Its back face is a 2/4 white Enchantment Creature -- Insect with
+-- flying, and every one of those readings belongs to that face alone: the front
+-- face is a Saga enchantment with no power, no toughness, no flying and no
+-- creature type. A case that passed with the FRONT face up would fail every line.
+enterTransformedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+enterTransformedSpec s registry = Spec.describe s "Entering the battlefield transformed" $ do
+  Spec.it s "CR 712.14a a Saga returned transformed comes back as its back face" $ do
+    moths <- S.printingOf s registry "Befriending the Moths"
+    let (sagaId, base) = S.addCreature moths S.alice emptyBoard
+        -- Two lore counters placed outright, so nothing has crossed a chapter
+        -- yet: CR 714.3c's turn-based action then takes the count from two to
+        -- three, and CR 714.2b's "was less than N and became at least N" makes
+        -- chapter III the only one that fires.
+        withCounters = S.addCounter CounterKind.Lore 2 sagaId base
+        advanced = S.runPure S.identityAnswer (precombatMainOf S.alice withCounters) (Engine.runTurnBasedActions Phase.PrecombatMain)
+        after = S.runPure S.identityAnswer advanced Engine.priorityLoop
+    Spec.assertEqWith s "the turn-based action took it to its final chapter" (S.counterOf CounterKind.Lore sagaId advanced) 3
+    -- CR 400.7: the exile and the return each mint a new object, so the id the
+    -- Saga had is gone rather than turned over in place. That is the whole
+    -- difference between this rule and CR 701.27a's transform.
+    Spec.assertBool s (not (S.onBattlefield sagaId after)) "the Saga's own object is gone"
+    case Game.zoneMembers Zone.Battlefield S.alice after of
+      [oid] -> do
+        Spec.assertEqWith s "the permanent is the BACK face" (Projection.nameOf oid after) mothName
+        Spec.assertEqWith s "recorded as the face it shows" (fmap Object.face (Game.lookupObject oid after)) (Just (Just mothName))
+        Spec.assertEqWith s "a 2/4, where the Saga face has no P/T box at all" (S.powerToughnessOf oid after) (Just (2, 4))
+        Spec.assertEqWith s "an Insect, and no longer a Saga" (Projection.subtypesOf oid after) (Set.singleton Subtype.Insect)
+        Spec.assertEqWith s "an enchantment CREATURE" (Projection.cardTypesOf oid after) (Set.fromList [CardType.Creature, CardType.Enchantment])
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying oid after) "with the back face's flying"
+      other -> Spec.assertFailure s ("expected exactly one permanent, got " <> show (length other))
+  -- CR 712.14a's second sentence, which has no printing: every card that prints
+  -- the "transformed" wording returns ITSELF, and each of them is double-faced.
+  -- So the instruction is issued straight at the door, once per layout.
+  --
+  -- Goblin Piker is the single-faced card, and it appears TWICE -- once
+  -- transformed and once not -- so "nothing was ever put onto the battlefield by
+  -- this call" cannot be why the refusal reads as one. Thraben Gargoyle is the
+  -- other control: the same call, the same board shape, a double-faced card, and
+  -- it enters showing the face CR 712.14a names.
+  Spec.it s "CR 712.14a a card that isn't double-faced stays in its current zone" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    let transformed = EntryRiders.defaultValue {EntryRiders.transformed = True}
+        put riders printing =
+          let (board, oid) = S.handOne printing emptyBoard
+           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid Zone.Battlefield riders (Just S.alice))))
+        (refusedId, refused) = put transformed piker
+        (_, entered) = put EntryRiders.defaultValue piker
+        (_, turned) = put transformed gargoyle
+    Spec.assertEqWith s "the single-faced card is the same object, still in hand" (fmap Object.zone (Game.lookupObject refusedId refused)) (Just Zone.Hand)
+    Spec.assertEqWith s "so nothing entered the battlefield" (Game.zoneMembers Zone.Battlefield S.alice refused) []
+    Spec.assertEqWith s "the same card put there UNtransformed does enter" (fmap (\oid -> Projection.nameOf oid entered) (Game.zoneMembers Zone.Battlefield S.alice entered)) [CardName.MkCardName (Text.pack "Goblin Piker")]
+    Spec.assertEqWith s "and a double-faced card enters showing its back face" (fmap (\oid -> Projection.nameOf oid turned) (Game.zoneMembers Zone.Battlefield S.alice turned)) [antagonizerName]
