@@ -23,7 +23,7 @@
 -- this Siege enters, you gain 4 life and draw a card", transforming into a 4/4
 -- Angel with flying and vigilance.
 --
--- It is NOT the card #302 nominates. Invasion of Kaladesh's front face is simpler
+-- It is deliberately not Invasion of Kaladesh. That card's front face is simpler
 -- still, but its BACK face is a Legendary Artifact -- Vehicle with a
 -- characteristic-defining power and crew, and a card file must carry both faces
 -- honestly. Serra Faithkeeper is two printed keywords, so every line of this card

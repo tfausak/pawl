@@ -1505,8 +1505,11 @@ playGame =
 -- roughly |library| / 7 (the CR 729.6 gate rests on this bound).
 --
 -- Cards brought into a subgame from the main game, and the main-game triggers
--- their removal queues, are not implemented (#152). Nontraditional/Vanguard/
--- Commander subgame movement is not implemented (#131).
+-- their removal queues, are not implemented (#152). Neither is CR 729.5's other
+-- half, the command-zone residents moving into and back out of a subgame: none of
+-- them exists to move. Commanders are #127, and the five kinds of card that would
+-- ride along with them are #933 (dungeons), #934 (planes and phenomena), #935
+-- (schemes), #936 (vanguards) and #937 (conspiracies).
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get
