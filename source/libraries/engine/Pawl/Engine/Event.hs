@@ -984,6 +984,36 @@ designateProtector oid = do
         let stamp o = o {Object.protector = picked}
          in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
 
+-- CR 709.5f / 709.5c: give this permanent the unlocked designation for one of
+-- its halves -- the single door every unlock goes through, and the only writer of
+-- Object.unlockedHalves after the entry designation the move itself writes (CR
+-- 709.5d, changeZoneAttaching's mkObj).
+--
+-- IDEMPOTENT, and that is CR 709.5h rather than defensiveness: the trigger fires
+-- "when that permanent IS GIVEN the appropriate unlocked designation", so a
+-- permanent that already has it is given nothing and nothing fires. CR 709.5e's
+-- special action and CR 709.5f's keyword action both choose a LOCKED half, so
+-- neither reaches this with a door already open; an effect that unlocks without
+-- choosing would.
+--
+-- The EVENT is recorded here rather than by the caller, so the two cannot drift:
+-- CR 709.5h is a fact about the designation being given, and this is where it is
+-- given.
+--
+-- CR 709.5g's LOCK -- taking a designation back away -- has no counterpart
+-- function: no card in the pool locks a door (#N).
+unlockHalf :: ObjectId -> CardName.CardName -> Game ()
+unlockHalf oid half = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just obj ->
+      Monad.unless (Set.member half (Object.unlockedHalves obj)) $ do
+        State.modify' $ \g ->
+          let open o = o {Object.unlockedHalves = Set.insert half (Object.unlockedHalves o)}
+           in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
+        State.modify' (recordEvent (GameEvent.HalfUnlocked oid half))
+
 -- CR 615: settle one proposed damage event. Nothing means it does not happen;
 -- the second answer is CR 615.13's, one entry per prevention effect that applied
 -- to THIS event and prevented some of it.
@@ -1481,6 +1511,23 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown facing = do
           -- same-batch siblings (CR 614.12a; see applyReplacementsIn
           -- for why 614.12a and not 614.13a).
           Monad.when (dest == Zone.Battlefield) (runEntry Set.empty newId)
+          -- CR 709.5h: an ability that triggers on a door opening fires "regardless
+          -- of whether it was given that designation while entering the
+          -- battlefield or after entering the battlefield", so the entry
+          -- designation `unlocking` wrote into mkObj above needs its event too.
+          -- Recorded rather than routed through unlockHalf, which would find the
+          -- door already open and record nothing: writing the designation inside
+          -- the move is what CR 709.5d's "as it enters" asks for, and the event is
+          -- what CR 709.5h asks for -- two rules, and the entry is the one place
+          -- they are not the same write.
+          --
+          -- BEFORE the Moved event, so a Room's own "when you unlock this door"
+          -- and its "when this enters" are gathered in one scan with the door's
+          -- event first. The two are simultaneous and CR 603.3b lets their
+          -- controller order them on the stack, so nothing observable rides on
+          -- which is logged first.
+          Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
+            State.modify' (recordEvent (GameEvent.HalfUnlocked newId half))
           -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
           -- what an enters trigger scans -- alongside the id it had in `fromZone`,
           -- which is the key `lastKnown` is filed under and so the only route back

@@ -535,6 +535,7 @@ playLandAnswer p = case p of
           A.Pass -> False
           A.Cast {} -> False
           A.TurnFaceUp _ -> False
+          A.Unlock _ _ -> False
           A.Activate _ _ -> False
      in case filter isPlay actions of
           h : _ -> h
@@ -1689,6 +1690,7 @@ isCastOf oid action = case action of
   A.Play {} -> False
   A.Activate _ _ -> False
   A.TurnFaceUp _ -> False
+  A.Unlock _ _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
 -- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only

@@ -253,6 +253,7 @@ isCast action = case action of
   Action.Type.Play {} -> False
   Action.Type.Activate _ _ -> False
   Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
   Action.Type.Pass -> False
 
 -- The CR 601.2f arithmetic, with no board at all. The unit half of the cost
@@ -1857,6 +1858,7 @@ isSilenceActivate action = case action of
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
   Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
   Action.Type.Pass -> False
 
 -- Silence {W} Instant: "Your opponents can't cast spells this turn."
@@ -2470,6 +2472,7 @@ isActivateOf oid action = case action of
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
   Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
   Action.Type.Pass -> False
 
 isPlay :: Action.Type.Action -> Bool
@@ -2478,6 +2481,7 @@ isPlay action = case action of
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
   Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
   Action.Type.Pass -> False
 
 -- Exploration {G} Enchantment: "You may play an additional land on each of your
