@@ -10,8 +10,10 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.ManaCost as ManaCost
@@ -20,10 +22,13 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.TurnScope as TurnScope
 
 -- | The `card` parameter is instantiated at 'Text.Text' throughout.
 -- 'ActivatedAbility.toJson'/'ActivatedAbility.fromJson' reach it only through
@@ -40,9 +45,10 @@ toJson = ActivatedAbility.toJson cardToJson
 fromJson :: Value.Value -> Either Text.Text (ActivatedAbility.ActivatedAbility Text.Text)
 fromJson = ActivatedAbility.fromJson cardFromJson
 
--- One constructor, so two cases: an equip ability (CR 702.6a) carrying
--- CR 307.5's printed SorcerySpeed rider, and CR 117.1b's default AnyTime,
--- whose key is elided.
+-- One constructor, so three cases: an equip ability (CR 702.6a) carrying CR
+-- 602.5d's printed SorcerySpeed clause, CR 602.2's default of no clause at all,
+-- whose key is elided, and Kongming's Contraptions' TWO clauses, which is what
+-- the key being an array is for.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
   Spec.it s "MkActivatedAbility, Bonesplitter's Equip ability" $
@@ -63,13 +69,29 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
               )
               (ModeSelection.ChooseExactly 1)
           )
-          ActivationTiming.SorcerySpeed
+          [ActivationRestriction.SorcerySpeed]
           Nothing
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"timing":{"type":"SorcerySpeed"}} """
-  -- CR 117.1b: AnyTime is the default for every ability but equip, so its key
-  -- stays out of the JSON.
-  Spec.it s "an AnyTime ability omits the timing key, and an absent key decodes to AnyTime" $
+      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"restrictions":[{"type":"SorcerySpeed"}]} """
+  -- CR 602.5's conjunction, in the JSON: two clauses in printed order, which is
+  -- the shape a single tagged object could not hold.
+  Spec.it s "MkActivatedAbility, Kongming's Contraptions' two clauses" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( ActivatedAbility.MkActivatedAbility
+          (Cost.MkCost Nothing [CostComponent.TapThis])
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+          [ ActivationRestriction.DuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers)) TurnScope.EachTurn,
+            ActivationRestriction.AttackedThisStep
+          ]
+          Nothing
+      )
+      """ {"cost":{"mana":null,"components":[{"type":"TapThis"}]},"modal":{"modes":[{}]},"restrictions":[{"type":"DuringPhase","value":[{"type":"Step","value":{"type":"Combat","value":{"type":"DeclareAttackers"}}},{"type":"EachTurn"}]},{"type":"AttackedThisStep"}]} """
+  -- CR 602.2: no rider is the default for nearly every ability, so the key stays
+  -- out of the JSON.
+  Spec.it s "an unrestricted ability omits the restrictions key, and an absent key decodes to none" $
     Common.assertJsonCodec
       s
       toJson
@@ -77,7 +99,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [])
           (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
-          ActivationTiming.AnyTime
+          []
           Nothing
       )
       """ {"cost":{"mana":null},"modal":{"modes":[{}]}} """

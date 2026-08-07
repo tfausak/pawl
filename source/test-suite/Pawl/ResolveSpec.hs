@@ -44,7 +44,6 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
@@ -675,7 +674,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         ability = case Face.activatedAbilities (S.combinedFace prodigalSorcerer) of
           ab : _ -> ab
-          [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime Nothing
+          [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g1) = Game.freshObjectId g0
         (ts, g2) = Game.freshTimestamp g1
         slot = SlotName.MkSlotName (Text.pack "target")
@@ -722,7 +721,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
-            ActivationTiming.AnyTime
+            []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
@@ -737,7 +736,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) ActivationTiming.AnyTime Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
@@ -761,7 +760,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
-            ActivationTiming.AnyTime
+            []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
@@ -785,7 +784,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
-            ActivationTiming.AnyTime
+            []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
@@ -868,7 +867,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                 Modal.MkModal
                   (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
-              ActivatedAbility.timing = ActivationTiming.AnyTime,
+              ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
         (abilId, g2) = Game.freshObjectId g1
@@ -943,7 +942,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                 Modal.MkModal
                   (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
-              ActivatedAbility.timing = ActivationTiming.AnyTime,
+              ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
         abilObj =
@@ -1304,7 +1303,7 @@ installControlBy mindslaver controller target gs0 =
               Modal.MkModal
                 (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
-            ActivatedAbility.timing = ActivationTiming.AnyTime,
+            ActivatedAbility.restrictions = [],
             ActivatedAbility.condition = Nothing
           }
       (abilId, gs2) = Game.freshObjectId gs1

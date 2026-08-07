@@ -28,8 +28,8 @@ data CastingRestriction
     -- act here. A phase that HAS steps is not nameable -- "Cast this spell only
     -- during combat" would have to name five steps at once.
     -- Pawl.Types.PhaseSelector is the type that already says it, and
-    -- Pawl.Types.ActivationTiming.DuringPhase already carries one; this arm does
-    -- not (#527).
+    -- Pawl.Types.ActivationRestriction.DuringPhase already carries one; this arm
+    -- does not (#527).
     --
     -- The change is small; the CARD is the obstacle. Every one of the five cards
     -- printing "Cast this spell only during combat" (checked against Scryfall
@@ -49,8 +49,9 @@ data CastingRestriction
     DuringPhase Phase.Phase
   | -- | "and only if you've been attacked this step" -- the second clause
     -- fourteen cards carry on a CAST, Rally the Troops among them. (Kongming's
-    -- Contraptions prints the same words on an activated ability, which is the
-    -- ability-side type's problem and not this one's -- #456.)
+    -- Contraptions prints the same words on an activated ability, where the arm
+    -- of this name lives on Pawl.Types.ActivationRestriction; the two share
+    -- Pawl.Engine.Combat.attackedThisStep as their reader.)
     --
     -- Not a timing window at all, which is why it is its own arm rather than a
     -- field on DuringPhase: it is a question about what the combat record already
