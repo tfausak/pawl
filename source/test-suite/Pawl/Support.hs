@@ -24,7 +24,6 @@ import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
-import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
@@ -50,11 +49,9 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
-import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
-import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Count as Count.Type
@@ -63,7 +60,6 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndingStep as EndingStep
-import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -74,11 +70,8 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -290,24 +283,6 @@ attackTo who p = case p of
 -- Always plays a land when one is legal, otherwise passes.
 playLandAnswer :: Prompt.Prompt r -> r
 playLandAnswer p = case p of
-  Prompt.Shuffle ids -> ids
-  Prompt.RandomFirstPlayer order -> NonEmpty.head order
-  Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  Prompt.DeclareAttackers {} -> []
-  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
-  Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   Prompt.ChooseAction _ _ actions ->
     let isPlay a = case a of
           A.Play {} -> True
@@ -319,64 +294,7 @@ playLandAnswer p = case p of
      in case filter isPlay actions of
           h : _ -> h
           [] -> A.Pass
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  Prompt.SearchLibrary {} -> Nothing
-  Prompt.CastWhileSearching {} -> Nothing
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  Prompt.ChooseCopyTarget {} -> Nothing
-  Prompt.ChooseEntryOption {} -> 0
-  Prompt.ChooseRiot {} -> OptionalDecision.Declines
-  Prompt.ChooseColor {} -> Color.White
-  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
-  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
-  -- permanent away. The engine's own replay fallback takes the maximal one.
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  -- CR 702.122a: every candidate, the MAXIMAL subset and the opposite of the
-  -- arm above. Tapping is not throwing a permanent away, and the minimal
-  -- answer -- the empty set -- fails to reach any threshold above 0, so a
-  -- default answerer choosing it would make every crew activation it was ever
-  -- offered go Unpaid. A test that cares which creatures crew says so with its
-  -- own interpreter.
-  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
-  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  Prompt.MulliganAction {} -> Nothing
-  Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a "may" changes nothing, the least-eventful default
-  -- (mirrors MulliganAction -> Nothing). A test that wants the option TAKEN says
-  -- so with its own interpreter, which is what makes that answer discriminating.
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
-  -- resolving effect put it -- the least-eventful default, as above. A test that
-  -- wants the cast TAKEN says so with its own interpreter.
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
-  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
-  -- test that wants the cost PAID says so with its own interpreter, which is
-  -- what makes that answer discriminating.
-  Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
-  -- and is the least eventful default, matching Replay.defaultAnswer.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.7e: both halves are legal answers whatever the board, so the head
-  -- is a deterministic default rather than the only payable route.
-  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
+  _ -> identityAnswer p
 
 -- Any printing, on the battlefield under pid's control, untapped and Settled.
 addCreature :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
