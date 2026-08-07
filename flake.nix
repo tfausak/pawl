@@ -22,8 +22,7 @@
 
       inherit (nixpkgs.lib) fileset;
 
-      # An allowlist rather than a whole-tree copy, so that editing docs/,
-      # script/ or .github/ does not change the derivation and force a rebuild.
+      # An allowlist, so editing docs/ or .github/ does not force a rebuild.
       source = fileset.toSource {
         root = ./.;
         fileset = fileset.unions [
@@ -43,16 +42,15 @@
         let
           pkgs = nixpkgs.legacyPackages.${system};
 
-          # Every non-test dependency is a GHC boot library, so this builds
-          # without fetching anything from Hackage.
+          # Every non-test dependency is a GHC boot library, so nothing is
+          # fetched from Hackage.
           pawl = pkgs.lib.pipe (pkgs.haskell.packages.ghc9141.callCabal2nix "pawl" source { }) [
-            # Compiles the benchmark, which `cabal test` would not.
             pkgs.haskell.lib.compose.doBenchmark
-            # -Werror, matching what CI used to get from the cabal build job.
+            # -Werror.
             (pkgs.haskell.lib.compose.enableCabalFlag "pedantic")
             (pkgs.haskell.lib.compose.overrideCabal (old: {
-              # nixpkgs installs executables but not benchmarks, so the compiled
-              # benchmark binary would be discarded. Keep it, so it can be run.
+              # nixpkgs installs executables but not benchmarks, so the binary
+              # would otherwise be discarded.
               postInstall = (old.postInstall or "") + ''
                 install -D -m 755 dist/build/pawl-benchmark/pawl-benchmark "$out/bin/pawl-benchmark"
               '';
@@ -62,9 +60,8 @@
         {
           default = pawl;
 
-          # Deliberately its own derivation rather than a phase of the build. A
-          # timing run inside the package would be skipped silently whenever the
-          # build cache hit, and a flaky measurement would fail the build.
+          # Its own derivation: inside the build, a cache hit would silently
+          # skip the run and a flaky measurement would fail the build.
           benchmark = pkgs.runCommand "pawl-benchmark-results" { } ''
             mkdir -p "$out"
             ${pawl}/bin/pawl-benchmark --csv "$out/bench.csv" +RTS -T
@@ -72,9 +69,6 @@
         }
       );
 
-      # Duplicates of CI's lint jobs, so that one `nix flake check` covers what
-      # the pipeline covers. They are cheap, and running them before the build
-      # means a lint failure costs seconds rather than a full compile.
       checks = forAllSystems (
         system:
         let
@@ -87,19 +81,16 @@
             touch "$out"
           '';
 
-          # Run from the source root so ormolu finds pawl.cabal and picks up
-          # default-extensions, as it does in the dev shell.
+          # From the source root, so ormolu reads default-extensions from
+          # pawl.cabal.
           ormolu = pkgs.runCommand "pawl-ormolu-check" { nativeBuildInputs = [ pkgs.ormolu ]; } ''
             cd ${source}
             find source -name '*.hs' -print0 | xargs -0 ormolu --mode check
             touch "$out"
           '';
 
-          # Pinned to the same attribute the dev shell uses. cabal-gild's output
-          # changes between versions, so a check on a different one would
-          # disagree with what a contributor's `cabal-gild pawl.cabal` produces.
-          # Runs from the source root because the `discover` directives are
-          # resolved against source/.
+          # Pinned to the dev shell's version, since cabal-gild's output changes
+          # between them. From the source root, for the `discover` directives.
           gild =
             pkgs.runCommand "pawl-gild-check"
               { nativeBuildInputs = [ pkgs.haskellPackages.cabal-gild_1_8_4_1 ]; }
@@ -109,15 +100,16 @@
                 touch "$out"
               '';
 
-          # .hlint.yaml is passed explicitly rather than added to the source
-          # fileset: hlint only finds it by walking up from the target, and
-          # putting it in the fileset would rebuild the package whenever a
-          # lint rule changed.
+          # --hint because .hlint.yaml is not in source; -j because hlint is
+          # single-threaded by default, which costs 67s against 24s here.
           hlint = pkgs.runCommand "pawl-hlint-check" { nativeBuildInputs = [ pkgs.hlint ]; } ''
             cd ${source}
-            # hlint defaults to one thread, and 543 files is enough for that
-            # to dominate: measured 67s serial against 24s across 8 cores.
             hlint --hint=${./.hlint.yaml} -j"$NIX_BUILD_CORES" source
+            touch "$out"
+          '';
+
+          nixfmt = pkgs.runCommand "pawl-nixfmt-check" { nativeBuildInputs = [ pkgs.nixfmt ]; } ''
+            nixfmt --check ${./flake.nix}
             touch "$out"
           '';
         }

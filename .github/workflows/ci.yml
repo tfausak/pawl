@@ -7,9 +7,6 @@ on:
     branches:
       - main
 jobs:
-  # The lint jobs below are flake checks. None of them caches the Nix store:
-  # each pulls a prebuilt tool from cache.nixos.org and runs it, so there is
-  # nothing worth carrying between runs.
   cabal:
     name: Cabal
     runs-on: ubuntu-latest
@@ -36,33 +33,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # Not cachix/install-nix-action: that installs the multi-user daemon,
-      # which leaves /nix root-owned, and the cache restore then cannot untar
-      # into it. This is the single-user install cache-nix-action expects.
+      # The single-user install: the daemon one leaves /nix root-owned, and the
+      # cache restore cannot untar into it. max-jobs otherwise defaults to 1.
       - uses: nixbuild/nix-quick-install-action@v35
         with:
-          # Flakes are on by default for nix > 2.13, so only max-jobs is worth
-          # setting: it is what lets the dependency closure build concurrently.
           nix_conf: max-jobs = auto
       - uses: nix-community/cache-nix-action@v7
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'pawl.cabal') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 5G
-          purge: true
-          purge-prefixes: nix-${{ runner.os }}-
-          purge-created: 0
-          purge-primary-key: never
-      # Builds the library, executable and benchmark, and runs the test suite
-      # in the derivation's check phase.
+          primary-key: nix-${{ hashFiles('flake.lock', 'pawl.cabal') }}
+          restore-prefixes-first-match: nix-
       - run: nix build
-      # A separate derivation, so the timing run is not cached with the build.
       - run: nix build --print-build-logs --out-link benchmark .#benchmark
       - run: cp benchmark/bench.csv .
       - uses: actions/upload-artifact@v7
         with:
           name: pawl-${{ github.sha }}-bench
           path: bench.csv
+  nixfmt:
+    name: Nixfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: nixbuild/nix-quick-install-action@v35
+      - run: nix build --print-build-logs .#checks.x86_64-linux.nixfmt
   ormolu:
     name: Ormolu
     runs-on: ubuntu-latest
