@@ -91,6 +91,14 @@ jobs:
     outputs:
       name: ${{ steps.name.outputs.name }}
       version: ${{ steps.version.outputs.version }}
+  nix:
+    name: Nix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - run: nix develop --command cabal update
+      - run: nix develop --command cabal build
   ormolu:
     name: Ormolu
     runs-on: ubuntu-latest
