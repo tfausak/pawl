@@ -142,7 +142,7 @@ movedOf event = case event of
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
-  GameEvent.SpellCast _ -> Nothing
+  GameEvent.SpellCast {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- The Moved event emitted by the same discard is the zone change; this one
   -- says the move WAS a discard (CR 701.9a).
@@ -167,7 +167,7 @@ damageOf event = case event of
   GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.Moved _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
-  GameEvent.SpellCast _ -> Nothing
+  GameEvent.SpellCast {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Revealed _ _ -> Nothing
@@ -187,7 +187,7 @@ revealOf event = case event of
   GameEvent.DamageDealt _ -> Nothing
   GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
-  GameEvent.SpellCast _ -> Nothing
+  GameEvent.SpellCast {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
@@ -1788,7 +1788,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved zc _ -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -1831,7 +1831,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -1851,7 +1851,7 @@ matchesTrigger gs bearer you cond event = case cond of
         TurnScope.ControllersTurn -> active == you
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -1875,7 +1875,7 @@ matchesTrigger gs bearer you cond event = case cond of
         && isPlayerRecipient (DamageEvent.target ev)
     GameEvent.Moved _ _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -1907,7 +1907,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed _ _ -> False
@@ -1942,7 +1942,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Revealed _ _ -> False
@@ -1971,7 +1971,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -1996,7 +1996,7 @@ matchesTrigger gs bearer you cond event = case cond of
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -2025,7 +2025,7 @@ matchesTrigger gs bearer you cond event = case cond of
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -2054,7 +2054,7 @@ matchesTrigger gs bearer you cond event = case cond of
         && ZoneChange.to zc == Zone.Graveyard
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -2096,7 +2096,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -2128,7 +2128,7 @@ matchesTrigger gs bearer you cond event = case cond of
         && ZoneChange.to zc /= Zone.Battlefield
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -2160,7 +2160,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
@@ -2202,7 +2202,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -2240,7 +2240,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -2284,7 +2284,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -2317,7 +2317,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -2341,7 +2341,48 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
     GameEvent.StepBegan _ _ -> False
-    GameEvent.SpellCast _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 601.2i's "any abilities that trigger when a spell is cast": a spell the
+  -- Filter admits became cast. The bearer frames the match rather than being it,
+  -- as for PermanentEnters -- it is the Filter.Context's source, and its
+  -- controller is the perspective CR 109.5 gives "you" in "whenever YOU CAST an
+  -- instant or sorcery spell".
+  --
+  -- The CASTER comes from the event and is handed to the view as the spell's
+  -- controller, which is what makes Filter.ControlledBy You answer the printed
+  -- "you". Not read off the object: Event.changeZone stamps Object.enteredUnder
+  -- only for a battlefield entry, so a stack object falls back to its OWNER
+  -- (Projection.defaultControllerOf) -- the same player for every cast in the
+  -- pool today, and the wrong one the moment a card lets somebody cast a card
+  -- they do not own. CR 601.2a settles it the other way: the player casting the
+  -- spell is its controller.
+  --
+  -- The spell is read LIVE off the stack rather than from a snapshot, which is
+  -- what separates this arm from PermanentDies'. CR 601.2i's trigger event is
+  -- the spell BECOMING cast, and CR 601.2a leaves it on the stack "until it
+  -- resolves, it's countered, or a rule or effect moves it elsewhere" -- none of
+  -- which can have happened before the scan, since the cast is the last thing
+  -- Cast.castSpell does. So no CR 608.2h fallback is reachable, and the `Nothing`
+  -- below is the id naming nothing at all, about which no Filter can honestly
+  -- answer.
+  TriggerCondition.SpellCast f -> case event of
+    GameEvent.SpellCast caster spell -> case Game.lookupObject spell gs of
+      Nothing -> False
+      Just _ -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
     GameEvent.BecameMonarch _ -> False
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
@@ -2601,6 +2642,12 @@ eventBindingSlots cond = case cond of
   -- print says "that many", and eventBindings has no arm for this condition.
   TriggerCondition.SelfCountersReached _ _ -> Set.empty
   TriggerCondition.SelfLastCounterRemoved _ -> Set.empty
+  -- Empty, and NOT the spell's id under some slot of its own, though CR 601.2i's
+  -- event names one and it is nobody the bearer already names. PermanentDies'
+  -- answer for PermanentDies' reason: no card in the pool says anything about the
+  -- spell it watched being cast, and binding a slot nothing reads is speculative
+  -- construction. Thousand-Year Storm's "copy it" is what would add one (#910).
+  TriggerCondition.SpellCast _ -> Set.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -2778,7 +2825,7 @@ eventTriggers events gs =
         GameEvent.DamageDealt _ -> Map.empty
         GameEvent.DamagePrevented _ _ -> Map.empty
         GameEvent.StepBegan _ _ -> Map.empty
-        GameEvent.SpellCast _ -> Map.empty
+        GameEvent.SpellCast {} -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         GameEvent.Discarded {} -> Map.empty
         GameEvent.Revealed _ _ -> Map.empty
@@ -2846,7 +2893,7 @@ eventTriggers events gs =
         GameEvent.DamageDealt _ -> Map.empty
         GameEvent.DamagePrevented _ _ -> Map.empty
         GameEvent.StepBegan _ _ -> Map.empty
-        GameEvent.SpellCast _ -> Map.empty
+        GameEvent.SpellCast {} -> Map.empty
         GameEvent.BecameMonarch _ -> Map.empty
         -- A reveal names no object at all, so there is nothing to hang an ability
         -- on; a card triggering on a reveal would need a condition first (#322).
@@ -3029,6 +3076,9 @@ functionsInGraveyard cond = case cond of
   -- chapter ability functions from the battlefield alone.
   TriggerCondition.SelfCountersReached _ _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
+  -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
+  -- and a card in a graveyard sees nothing cast.
+  TriggerCondition.SpellCast _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -3095,6 +3145,10 @@ controllerTurnScoped cond = case cond of
   -- action's restriction rather than this condition's.
   TriggerCondition.SelfCountersReached _ _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
+  -- CR 601.2i says nothing about whose turn it is, and CR 117.1a lets an instant
+  -- be cast on anybody's. A card printing "during an opponent's turn" would be
+  -- narrowing this condition, and none does (#911).
+  TriggerCondition.SpellCast _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -3178,6 +3232,7 @@ stateTriggers gs
               -- not re-run its final chapter for as long as it sits there.
               TriggerCondition.SelfCountersReached _ _ -> False
               TriggerCondition.SelfLastCounterRemoved _ -> False
+              TriggerCondition.SpellCast _ -> False
             lives = filter live (Projection.triggeredAbilitiesOf oid gs)
             -- Each live copy against the copies of itself that came earlier in
             -- the list, which gives it a 1-based ordinal among its equals: the

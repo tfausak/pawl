@@ -201,7 +201,10 @@ snapshotView shape event = case event of
   -- characteristics, so there is nothing for a Filter to look at.
   GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
-  GameEvent.SpellCast _ -> Nothing
+  -- CR 601.2i's cast names the spell by id and snapshots no characteristics: an
+  -- EventShape matches against a snapshot, and the spell is still on the stack to
+  -- be read live (TriggerCondition.SpellCast is what reads it).
+  GameEvent.SpellCast {} -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
   -- the same discard emits is what carries one -- so there is nothing here for

@@ -22,7 +22,7 @@ toJson e = case e of
   GameEvent.DamageDealt ev -> Common.tagged "DamageDealt" . Just $ DamageEvent.toJson ev
   GameEvent.DamagePrevented r n -> Common.tagged "DamagePrevented" . Just . Common.array $ [Recipient.toJson r, Common.encodeNatural n]
   GameEvent.StepBegan p pid -> Common.tagged "StepBegan" . Just . Common.array $ [Phase.toJson p, PlayerId.toJson pid]
-  GameEvent.SpellCast pid -> Common.tagged "SpellCast" . Just $ PlayerId.toJson pid
+  GameEvent.SpellCast pid oid -> Common.tagged "SpellCast" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid]
   GameEvent.BecameMonarch pid -> Common.tagged "BecameMonarch" . Just $ PlayerId.toJson pid
   GameEvent.Discarded pid oid cause ->
     Common.tagged "Discarded" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid, DiscardCause.toJson cause]
@@ -45,7 +45,7 @@ fromJson value = do
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> DamageEvent.fromJson v
     ("DamagePrevented", Just (Value.Array (Array.MkArray [r, n]))) -> GameEvent.DamagePrevented <$> Recipient.fromJson r <*> Common.decodeNatural n
     ("StepBegan", Just (Value.Array (Array.MkArray [p, pid]))) -> GameEvent.StepBegan <$> Phase.fromJson p <*> PlayerId.fromJson pid
-    ("SpellCast", Just v) -> GameEvent.SpellCast <$> PlayerId.fromJson v
+    ("SpellCast", Just (Value.Array (Array.MkArray [pid, oid]))) -> GameEvent.SpellCast <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> PlayerId.fromJson v
     ("Discarded", Just (Value.Array (Array.MkArray [pid, oid, cause]))) ->
       GameEvent.Discarded <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid <*> DiscardCause.fromJson cause

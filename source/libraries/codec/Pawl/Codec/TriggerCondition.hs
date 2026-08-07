@@ -37,6 +37,7 @@ toJson c = case c of
   TriggerCondition.PlayerLosesLife r -> Common.tagged "PlayerLosesLife" . Just $ PlayerRelation.toJson r
   TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Common.array $ [CounterKind.toJson kind, Common.encodeNatural n]
   TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ CounterKind.toJson kind
+  TriggerCondition.SpellCast f -> Common.tagged "SpellCast" . Just $ Filter.toJson Keyword.toJson f
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
 fromJson value = do
@@ -63,4 +64,5 @@ fromJson value = do
     ("PlayerLosesLife", Just v) -> TriggerCondition.PlayerLosesLife <$> PlayerRelation.fromJson v
     ("SelfCountersReached", Just (Value.Array (Array.MkArray [kind, n]))) -> TriggerCondition.SelfCountersReached <$> CounterKind.fromJson kind <*> Common.decodeNatural n
     ("SelfLastCounterRemoved", Just v) -> TriggerCondition.SelfLastCounterRemoved <$> CounterKind.fromJson v
+    ("SpellCast", Just v) -> TriggerCondition.SpellCast <$> Filter.fromJson Keyword.fromJson v
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t
