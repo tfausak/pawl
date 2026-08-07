@@ -3407,6 +3407,93 @@ youngPyromancerSpec s registry =
           -- proves the seat is the only thing the silence above turns on.
           Spec.assertEqWith s "the same board fires for alice's own cast" (elementalsOf S.alice byAlice) 1
 
+-- CR 601.2i's trigger reading back the spell it watched: the reserved slot
+-- Event.eventBindings stamps for that condition (Binding.castSpell), and the
+-- first payload that acts on the WATCHED OBJECT rather than merely counting the
+-- event.
+--
+-- Presence of the Master, {3}{W} Enchantment: "Whenever a player casts an
+-- enchantment spell, counter it." Chosen over Thousand-Year Storm's "copy it for
+-- each other instant and sorcery spell you've cast before it this turn" because
+-- the payload is a rule 701 keyword action pawl already has (Effect.Counter, CR
+-- 701.6a) rather than CR 707.10's copy-a-spell, and the printed "it" is the bound
+-- spell with nothing else attached -- no count, no new targets.
+--
+-- WHAT THE BOARD KEEPS APART. The bearer and the watched spell must be
+-- observably different objects, or a payload that acted on its own source would
+-- pass: alice's Presence sits on the BATTLEFIELD while the spell it counters is
+-- bob's, on the STACK, and the assertions name Presence's survival alongside the
+-- spell's removal. Countering the bearer is not merely wrong here, it is
+-- impossible -- CR 701.6a acts on the stack -- so a bearer-bound slot leaves the
+-- enchantment spell to resolve and the first case below fails.
+--
+-- THREE SEATS, and the printed subject is why: "a player casts" is not "you
+-- cast" and not "an opponent casts", and at two players those three readings all
+-- coincide on any single cast. bob's cast rules out ControlledBy You, alice's own
+-- cast rules out ControlledBy Opponent, and carol is the seat that makes
+-- "opponent" more than a synonym for "the other player".
+presenceOfTheMasterSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+presenceOfTheMasterSpec s registry =
+  let graveyardOf pid gs = length (Game.zoneMembers Zone.Graveyard pid gs)
+      -- alice bears Presence; alice and bob each get three Swamps and three
+      -- Mountains, which is Bad Moon's {1}{B} and Goblin Piker's {1}{R} with
+      -- room to spare. carol gets nothing: she is the third seat, not a caster.
+      board swamp mountain presence =
+        let addLands pid n printing g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+            withLands =
+              addLands S.bob 3 mountain
+                . addLands S.bob 3 swamp
+                . addLands S.alice 3 mountain
+                $ addLands S.alice 3 swamp S.threePlayerGame
+            (_, withPresence) = S.addCreature presence S.alice withLands
+         in withPresence
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+   in Spec.describe s "SpellCast binds the spell" $ do
+        -- THE case: the trigger reaches the object the event named. Bad Moon is
+        -- an inert static enchantment, so nothing but the counter can move it.
+        Spec.it s "CR 701.6a Presence of the Master counters the enchantment spell it watched" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          presence <- S.printingOf s registry "Presence of the Master"
+          badMoon <- S.printingOf s registry "Bad Moon"
+          let (moonId, gs) = S.addHandCard badMoon S.bob (board swamp mountain presence)
+              after = castAndResolve S.bob moonId gs
+          Spec.assertEqWith s "nothing in bob's graveyard before the cast" (graveyardOf S.bob gs) 0
+          Spec.assertEqWith s "Bad Moon never reaches the battlefield" (S.countOnBattlefieldByName (S.printingName badMoon) S.bob after) 0
+          Spec.assertEqWith s "CR 701.6a puts it in its owner's graveyard" (graveyardOf S.bob after) 1
+          -- The bearer, unharmed: the slot named the spell and not the source.
+          Spec.assertEqWith s "and Presence of the Master is still on the battlefield" (S.countOnBattlefieldByName (S.printingName presence) S.alice after) 1
+        -- The Filter half, moved on its own: the same caster, a spell of the
+        -- wrong card type. Without it a condition that admitted every cast and
+        -- one that read the type would be indistinguishable.
+        Spec.it s "CR 601.2i a CREATURE spell is not countered" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          presence <- S.printingOf s registry "Presence of the Master"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, gs) = S.addHandCard piker S.bob (board swamp mountain presence)
+              after = castAndResolve S.bob pikerId gs
+          Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.bob after) 1
+          Spec.assertEqWith s "and nothing went to bob's graveyard" (graveyardOf S.bob after) 0
+        -- "A player", not "you" and not "an opponent": the bearer's own
+        -- controller is a player too, so alice's enchantment dies to her own
+        -- Presence. The case bob's cast above cannot make.
+        Spec.it s "CR 601.2i 'a player casts' includes the bearer's controller" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          mountain <- S.printingOf s registry "Mountain"
+          presence <- S.printingOf s registry "Presence of the Master"
+          badMoon <- S.printingOf s registry "Bad Moon"
+          let (moonId, gs) = S.addHandCard badMoon S.alice (board swamp mountain presence)
+              after = castAndResolve S.alice moonId gs
+          Spec.assertEqWith s "alice's own Bad Moon never reaches the battlefield" (S.countOnBattlefieldByName (S.printingName badMoon) S.alice after) 0
+          Spec.assertEqWith s "it is in alice's graveyard" (graveyardOf S.alice after) 1
+          Spec.assertEqWith s "bob's graveyard is untouched" (graveyardOf S.bob after) 0
+          Spec.assertEqWith s "and carol's" (graveyardOf S.carol after) 0
+
 -- The events a trigger condition GENUINELY fires on (Event.matchesTrigger's own
 -- arms are the spec), so eventBindings is exercised through its matching arm
 -- rather than through its `_ -> Map.empty` fallthrough. A pair that did not
@@ -3494,8 +3581,8 @@ representativeEvents cond =
         -- event really matches the condition Event.matchesTrigger is asked about.
         TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved departed kind 1 0)
         -- CR 601.2i's own event, and the only one this condition admits. The
-        -- payload is a caster and the spell, and neither is bound, so the floor
-        -- is empty whichever spell it names.
+        -- spell is bound whichever id it names, the caster is not, so the two
+        -- sides agree on `thatSpell` alone.
         TriggerCondition.SpellCast _ -> one (GameEvent.SpellCast S.alice arrived)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
@@ -4992,3 +5079,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anafenzaAttackSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
+  presenceOfTheMasterSpec s registry

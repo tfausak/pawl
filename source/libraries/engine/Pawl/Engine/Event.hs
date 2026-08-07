@@ -2516,6 +2516,31 @@ eventBindings cond event = case (cond, event) of
   -- Opponent -- would make the promise depend on the relation.
   (TriggerCondition.PlayerLosesLife _, GameEvent.LifeLost pid amount) ->
     Binding.setTriggerPlayer pid (Binding.setEventAmount amount Map.empty)
+  -- CR 601.2i's "it": the spell that became cast, which the event names and
+  -- which nothing else on the ability does. Presence of the Master's "whenever a
+  -- player casts an enchantment spell, counter it" is the reader.
+  --
+  -- The STACK object, not a card in a hand or a library -- see GameEvent.SpellCast
+  -- for why the two are different objects and why this is the one the rule is
+  -- about. Guaranteed to be a real id when the binding is made: CR 601.2a leaves
+  -- the spell on the stack "until it resolves, it's countered, or a rule or
+  -- effect moves it elsewhere", and none of those can have happened before the
+  -- gather, the cast being the last thing Pawl.Engine.Cast does. By RESOLUTION
+  -- it can be gone -- the case CR 608.2h is about -- which is the payload's
+  -- business rather than this function's: CR 701.6a's funnel no-ops on a dead id.
+  --
+  -- The CASTER gets no slot alongside it. Every card in the pool that names a
+  -- player under this condition means the spell's controller, which CR 112.2
+  -- makes derivable from the spell itself; a slot would be a second name for
+  -- one player until a card says otherwise (#913).
+  --
+  -- Bound whatever the Filter admitted, which is what eventBindingSlots'
+  -- per-condition promise needs -- that function answers with no event and no
+  -- Filter in hand, so a slot it names has to hold for every cast the condition
+  -- can match. It does: GameEvent.SpellCast carries an ObjectId
+  -- unconditionally, so no shape of the event withholds it.
+  (TriggerCondition.SpellCast _, GameEvent.SpellCast _ spell) ->
+    Binding.setCastSpell spell Map.empty
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -2642,12 +2667,17 @@ eventBindingSlots cond = case cond of
   -- print says "that many", and eventBindings has no arm for this condition.
   TriggerCondition.SelfCountersReached _ _ -> Set.empty
   TriggerCondition.SelfLastCounterRemoved _ -> Set.empty
-  -- Empty, and NOT the spell's id under some slot of its own, though CR 601.2i's
-  -- event names one and it is nobody the bearer already names. PermanentDies'
-  -- answer for PermanentDies' reason: no card in the pool says anything about the
-  -- spell it watched being cast, and binding a slot nothing reads is speculative
-  -- construction. Thousand-Year Storm's "copy it" is what would add one (#910).
-  TriggerCondition.SpellCast _ -> Set.empty
+  -- CR 601.2i's spell, the object the event names and nobody the bearer already
+  -- does. Guaranteed given a match for the reason CR 615.13's amount is:
+  -- GameEvent.SpellCast carries an ObjectId unconditionally, so no shape of the
+  -- event withholds it, and unlike SelfLeavesTheBattlefield's `became` there is
+  -- no CR 400.7e proviso to fail. Presence of the Master's "counter it" is what
+  -- reads it.
+  --
+  -- The CASTER gets no slot: under every card in the pool the player that
+  -- condition names is the spell's controller (CR 112.2), derivable from the
+  -- spell already bound here (#913).
+  TriggerCondition.SpellCast _ -> Set.singleton Binding.castSpell
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
