@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
@@ -21,13 +22,11 @@ import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
-import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
-import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
@@ -58,7 +57,7 @@ import qualified Pawl.Types.Zone as Zone
 -- The window the CARD TYPE gets, which is not always the window the card gets:
 -- CR 702.8a's flash lifts a card out of it (instantSpeed below).
 --
--- Shared with the CR 307.5 window an ability can carry (Activate.timingOk) --
+-- Shared with the CR 307.5 window an ability can carry (Activate.restrictionsOk) --
 -- see Turn.sorcerySpeedWindow for why there is one copy.
 sorcerySpeed :: PlayerId -> GameState -> Bool
 sorcerySpeed = Turn.sorcerySpeedWindow
@@ -402,34 +401,10 @@ restrictionMet pid gs restriction = case restriction of
   -- CR 500.1: a step or a stepless phase, compared against the one the game is
   -- in.
   CastingRestriction.DuringPhase phase -> GameState.phase gs == phase
-  CastingRestriction.AttackedThisStep -> attackedThisStep pid gs
-
--- "only if you've been attacked this step", asked of the CASTING player.
---
--- CR 506.2 makes the nonactive player the defending player, so the question is
--- whether any creature was DECLARED attacking THIS PLAYER rather than a
--- planeswalker of theirs -- exactly membership in Combat.declaredAttacked.
--- DECLARED, and not "or put onto the battlefield attacking": CR 508.4 says such
--- creatures never "attacked", and CR 508.3b spells out the player side. So this
--- reads Combat.declaredAttacked and NOT Combat.attacked, CR 508.8's wider set;
--- the two fields exist because the two rules disagree (see Pawl.Types.Combat).
--- Eightfold Maze's ruling pins the reading: a creature needs to have attacked
--- YOU, which is why this cannot be emptiness of the record, and CR 306.6 is what
--- made it observable.
---
--- Membership in the HISTORICAL set rather than a search of Combat.attackers,
--- because CR 506.4 removing the lone attacker from combat does not un-attack
--- anybody. No separate Combat.defender test either: only a defending player can
--- be attacked, so an OfPlayer entry naming this player IS that conjunct.
---
--- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
--- combat PHASE. The two spans coincide for every card in the pool because this
--- set is written ONLY by Pawl.Engine.Combat.declareAttackers, CR 508.1's
--- turn-based action. That is a fact about the pool rather than a rule (#447):
--- what remains open is a second declaration inside one phase.
-attackedThisStep :: PlayerId -> GameState -> Bool
-attackedThisStep pid gs =
-  Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
+  -- CR 508.3b's question, and it lives in Pawl.Engine.Combat because the ability
+  -- side's clause of the same name asks exactly it: one question about the combat
+  -- record, two gates that differ in what ELSE they may read (CR 307.5).
+  CastingRestriction.AttackedThisStep -> Combat.attackedThisStep pid gs
 
 -- CR 709.3a / 715.3a: the half being cast, RECORDED ON THE OBJECT, so that every
 -- characteristic read of it resolves through Game.resolveFace to that half alone

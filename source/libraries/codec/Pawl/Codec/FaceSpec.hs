@@ -14,7 +14,6 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
@@ -190,7 +189,7 @@ populatedFace =
   baseFace
     { Face.keywords = Set.singleton Keyword.Deathtouch,
       Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
-      Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal ActivationTiming.AnyTime Nothing],
+      Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
       Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy],
       Face.triggeredAbilities = [minimalTriggeredAbility],
       Face.castingPermissions = [CastingPermission.CastFromLibraryWhileSearching],

@@ -31,8 +31,8 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -92,7 +92,7 @@ chooseNoModes p = case p of
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) ActivationTiming.AnyTime Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (singleModeAbility [] Map.empty) [] Nothing
 
 -- A single forced mode (ChooseExactly 1, M4g's non-modal shape) -- the fixture
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
@@ -102,7 +102,8 @@ singleModeAbility effects specs =
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
-  printedActivationTimingSpec s registry
+  printedActivationRestrictionSpec s registry
+  printedActivationConjunctionSpec s registry
   printedActivationWholePhaseSpec s registry
   printedActivationTurnScopeSpec s registry
   variableActivationCostSpec s registry
@@ -188,7 +189,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "no equip with a spell on the stack"
 
   -- CR 702.8a's window is the SPELL's, not an ability's. Rule 307.5's window is
-  -- shared between Pawl.Engine.Cast.sorcerySpeed and this module's timingOk, so
+  -- shared between Pawl.Engine.Cast.sorcerySpeed and Activate.restrictionsOk, so
   -- the way to lift it for a flash spell and not for an activated ability is to
   -- lift it in Cast's disjunction and leave Turn.sorcerySpeedWindow alone; this
   -- is the case that says the shared window really did stay put.
@@ -293,7 +294,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
                     Cost.Type.components = []
                   },
               ActivatedAbility.modal = singleModeAbility [] Map.empty,
-              ActivatedAbility.timing = ActivationTiming.AnyTime,
+              ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
     Spec.assertBool s (not (Activate.activatable S.alice srcId costlyAbility gs1)) "one Mountain cannot pay {2}"
@@ -532,7 +533,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
           "the printed {2} plus rule 702.29a's discard"
           (ActivatedAbility.cost ability)
           (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 2])) [CostComponent.DiscardThis])
-        Spec.assertEqWith s "instant speed" (ActivatedAbility.timing ability) ActivationTiming.AnyTime
+        Spec.assertEqWith s "instant speed" (ActivatedAbility.restrictions ability) []
       abilities -> Spec.assertFailure s ("expected exactly one ability, got " <> show (length abilities))
 
   -- The whole card: pay {2}, discard it, draw. The Mauler is in the graveyard
@@ -693,7 +694,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
           "both costs end in rule 702.29a's discard"
           (Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost typecycler))), Maybe.listToMaybe (reverse (Cost.Type.components (ActivatedAbility.cost plain))))
           (Just CostComponent.DiscardThis, Just CostComponent.DiscardThis)
-        Spec.assertEqWith s "and both are instant speed" (ActivatedAbility.timing typecycler, ActivatedAbility.timing plain) (ActivationTiming.AnyTime, ActivationTiming.AnyTime)
+        Spec.assertEqWith s "and both are instant speed" (ActivatedAbility.restrictions typecycler, ActivatedAbility.restrictions plain) ([], [])
       _ -> Spec.assertFailure s "expected one cycling ability on each"
 
   -- CR 701.20a from the battlefield, and by a card that prints the word
@@ -791,7 +792,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
                 (Seq.fromList [Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing, Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing])
                 (ModeSelection.ChooseExactly 1)
             )
-            ActivationTiming.AnyTime
+            []
             Nothing
         after = S.runPure chooseNoModes gs (Activate.activateAbility S.alice oid twoModes)
     Spec.assertEqWith s "the activation was rejected: nothing on the stack" (GameState.stack after) []
@@ -828,7 +829,7 @@ isActivationOf oid a = case a of
 -- Activate only during the end of combat step."
 --
 -- The mirror of Pawl.CastSpec's printedCastingRestrictionSpec, and deliberately
--- not the same type -- see Pawl.Types.ActivationTiming for why the two gates
+-- not the same type -- see Pawl.Types.ActivationRestriction for why the two gates
 -- cannot share one, CR 307.5's last two sentences being the load-bearing part.
 --
 -- The fixture is alice attacking with one Goblin Piker (2/1) into a bob who
@@ -861,8 +862,8 @@ pingAnswer p = case p of
     [] -> A.Pass
   _ -> S.aggressiveAnswer p
 
-printedActivationTimingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
-printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTiming" $ do
+printedActivationRestrictionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationRestrictionSpec s registry = Spec.describe s "PrintedActivationRestriction" $ do
   -- The rider, isolated. bob is in the declare attackers step with an
   -- untapped Desert, a legal target (CR 508.1f has just tapped alice's
   -- attacker, and it is attacking) and no cost to pay beyond {T}. The only
@@ -948,6 +949,150 @@ printedActivationTimingSpec s registry = Spec.describe s "PrintedActivationTimin
         after = S.runCombat S.aggressiveAnswer board
     Spec.assertEqWith s "the Piker still connected" (S.lifeOf S.bob after) (Just 18)
     Spec.assertBool s (Set.member attackerId (GameState.battlefield after)) "and is still on the battlefield"
+
+-- CR 602.5's conjunction, printed on a card about itself: Kongming's
+-- Contraptions (Portal Three Kingdoms) prints "{T}: This creature deals 2 damage
+-- to target attacking creature. Activate only during the declare attackers step
+-- and only if you've been attacked this step."
+--
+-- TWO clauses on ONE ability, which is what Desert's group above cannot reach:
+-- Desert prints the step clause alone, so a reader that stopped after the first
+-- clause would satisfy every assertion up there. CR 602.5 -- "A player can't
+-- begin to activate an ability that's prohibited from being activated" -- is what
+-- makes a printed list of clauses a conjunction, the ability-side counterpart of
+-- CR 601.3 for a spell.
+--
+-- THREE SEATS, and that is the whole fixture. The pair of boards below differs in
+-- nothing but WHOM alice attacked. With carol as the defending player (CR 507.1,
+-- which is CR 506.2's choice once there are three seats to choose from)
+-- bob is still in the declare attackers step, still holds priority, and still has
+-- an attacking creature to target -- everything the first clause asks for -- so
+-- only the second clause can withhold the ability. On two seats "an attack
+-- happened" and "bob was attacked" are one fact, and the second clause would go
+-- untested.
+--
+-- bob also gets a Prodigal Sorcerer, the same control Desert's group uses: an
+-- unrestricted {T} of bob's on the same board, so a board that offered him
+-- nothing at all cannot be mistaken for the rider working.
+kongmingBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> PlayerId.PlayerId -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+kongmingBoard piker contraptions sorcerer defender =
+  let (gs0, _, theirs, _) = S.threePlayerCombat [piker] [contraptions, sorcerer] []
+      -- Combat.defender is STATED rather than run: CR 507.1's turn-based action
+      -- is what would fill it in, and a direct-call test never reaches it.
+      ready =
+        gs0
+          { GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            GameState.combat = (GameState.combat gs0) {Combat.Type.defender = Just defender}
+          }
+      -- CR 508.1, then priority to bob -- who is the defending player on one of
+      -- these two boards and a bystander on the other, which is the variable.
+      declared = (S.runPure S.aggressiveAnswer ready (Combat.declareAttackers S.alice)) {GameState.priority = Just S.bob}
+   in case theirs of
+        contraptionsId : sorcererId : _ -> (contraptionsId, sorcererId, declared)
+        -- threePlayerCombat returns one id per printing given, so this is
+        -- unreachable; bogus ids fail the assertions rather than the suite.
+        _ -> (S.noSource, S.noSource, declared)
+
+-- Chooses `who` as the defending player, declines every block, and takes the
+-- first activation the engine offers -- the interpreter the whole-card tests
+-- below drive a real combat phase with.
+--
+-- CR 509.1: no blocks, so the only thing that can remove the attacker from the
+-- battlefield is the ping. Without that clause bob's own 2/4 would eat the Piker
+-- in the combat damage step and the life totals would stop discriminating.
+kongmingAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+kongmingAnswer who p = case p of
+  Prompt.ChooseDefender {} -> who
+  Prompt.DeclareBlockers {} -> Map.empty
+  Prompt.ChooseAction _ _ options -> case filter isActivate options of
+    a : _ -> a
+    [] -> A.Pass
+  _ -> S.aggressiveAnswer p
+
+printedActivationConjunctionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+printedActivationConjunctionSpec s registry = Spec.describe s "PrintedActivationConjunction" $ do
+  -- The second clause, isolated. Everything the FIRST clause asks for holds --
+  -- the game is in the declare attackers step, bob has priority, his Contraptions
+  -- is untapped and settled, and alice's Piker is attacking and so a legal target
+  -- -- and the ability is withheld anyway, because the attack was on carol.
+  --
+  -- Both halves of "everything the first clause asks for" are asserted rather
+  -- than assumed: without the attack there would be no attacking creature to
+  -- target, and the ability would be absent for a reason that has nothing to do
+  -- with either clause.
+  Spec.it s "CR 602.5 the Contraptions' ping is NOT offered when the attack was on somebody else" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    contraptions <- S.printingOf s registry "Kongming's Contraptions"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (contraptionsId, sorcererId, board) = kongmingBoard piker contraptions prodigalSorcerer S.carol
+        offered = Action.legalActions S.bob board
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.carol) (Combat.Type.declaredAttacked (GameState.combat board))) "carol is the player who was attacked"
+    Spec.assertBool s (not (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat board)))) "and bob is not"
+    Spec.assertBool s (not (Set.null (Combat.Type.attacked (GameState.combat board)))) "but there IS an attacking creature to target"
+    Spec.assertEqWith s "no activation of the Contraptions" (activationsOf contraptionsId offered) []
+    Spec.assertBool s (not (null (activationsOf sorcererId offered))) "and bob's unrestricted ability is offered in the same step"
+
+  -- The discriminating twin: the same seats, the same step, the same permanent,
+  -- one fact changed. Without this half the assertion above would pass on an
+  -- engine that never offered this ability at all.
+  Spec.it s "CR 602.5 the Contraptions' ping IS offered when bob is the player attacked" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    contraptions <- S.printingOf s registry "Kongming's Contraptions"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (contraptionsId, _, board) = kongmingBoard piker contraptions prodigalSorcerer S.bob
+        offered = Action.legalActions S.bob board
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat board))) "bob is the player who was attacked"
+    Spec.assertEqWith s "exactly one activation, the ping" (length (activationsOf contraptionsId offered)) 1
+
+  -- The first clause has not gone soft under the second: the same attack ON BOB,
+  -- one step later. CR 511.3 keeps the attacker in combat through the end of
+  -- combat step, and CR 508.1's declaration record is not cleared either, so the
+  -- second clause still holds -- and the ability is gone all the same.
+  Spec.it s "CR 602.5 being attacked is not enough on its own: not offered in the end of combat step" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    contraptions <- S.printingOf s registry "Kongming's Contraptions"
+    prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let (contraptionsId, _, board) = kongmingBoard piker contraptions prodigalSorcerer S.bob
+        later = board {GameState.phase = Phase.Combat CombatStep.EndOfCombat}
+    Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.declaredAttacked (GameState.combat later))) "bob is still on the record as attacked"
+    Spec.assertBool s (not (Set.null (Combat.Type.attacked (GameState.combat later)))) "and the attacker is still attacking"
+    Spec.assertEqWith s "but the step has passed" (activationsOf contraptionsId (Action.legalActions S.bob later)) []
+
+  -- The gameplay-level proof (design.md section 4), driven through Engine.runStep
+  -- and the priority loop rather than by calling Activate.activateAbility: bob
+  -- takes every activation the engine offers him, and the whole combat phase runs.
+  --
+  -- bob's life is the falsifier. CR 508.1 declares the attack, bob's first
+  -- priority is in that same step, and the ping (2 damage, CR 704.5g against a
+  -- 2/1) removes the attacker before CR 510.2 can deal combat damage -- so bob is
+  -- still at 20.
+  Spec.it s "CR 602.5 whole card: the Contraptions ping the attacker dead before it connects" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    contraptions <- S.printingOf s registry "Kongming's Contraptions"
+    let (gs0, ours, theirs, _) = S.threePlayerCombat [piker] [contraptions] []
+        after = S.runCombat (kongmingAnswer S.bob) gs0
+    case (ours, theirs) of
+      (attackerId : _, contraptionsId : _) -> do
+        Spec.assertEqWith s "bob took no combat damage" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertBool s (not (Set.member attackerId (GameState.battlefield after))) "because the Piker died to the ping"
+        Spec.assertEqWith s "which cost the Contraptions its {T}" (fmap Object.tapped (Game.lookupObject contraptionsId after)) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should have given alice an attacker and bob a Contraptions"
+
+  -- The same combat with the SAME interpreter, attacking carol instead. This is
+  -- the second clause at gameplay level: bob is never offered the ping, so the
+  -- Piker lives, carol takes the 2, and the Contraptions is still untapped at the
+  -- end of it.
+  Spec.it s "CR 602.5 whole card: bob may not ping an attack aimed at carol" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    contraptions <- S.printingOf s registry "Kongming's Contraptions"
+    let (gs0, ours, theirs, _) = S.threePlayerCombat [piker] [contraptions] []
+        after = S.runCombat (kongmingAnswer S.carol) gs0
+    case (ours, theirs) of
+      (attackerId : _, contraptionsId : _) -> do
+        Spec.assertEqWith s "carol took the hit" (S.lifeOf S.carol after) (Just 18)
+        Spec.assertBool s (Set.member attackerId (GameState.battlefield after)) "the Piker survived the combat"
+        Spec.assertEqWith s "and the Contraptions never paid its {T}" (fmap Object.tapped (Game.lookupObject contraptionsId after)) (Just TapState.Untapped)
+      _ -> Spec.assertFailure s "fixture should have given alice an attacker and bob a Contraptions"
 
 -- alice controls a Jade Statue and two Mountains, and holds priority. The {2} is
 -- payable exactly once, which is all any of these tests needs.

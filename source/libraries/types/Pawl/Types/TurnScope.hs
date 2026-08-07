@@ -10,7 +10,7 @@ module Pawl.Types.TurnScope where
 -- ability triggered; for an activated one, the CR 602.2 activator.
 --
 -- Shared by Pawl.Types.TriggerCondition's StepBegins (CR 603.2b) and
--- Pawl.Types.ActivationTiming's DuringPhase (CR 307.5).
+-- Pawl.Types.ActivationRestriction's DuringPhase (CR 307.5).
 --
 -- A CR 603.7 delayed ability keyed to "the NEXT end step" is EachTurn: any
 -- player's end step qualifies, and its once-ness comes from the delayed store

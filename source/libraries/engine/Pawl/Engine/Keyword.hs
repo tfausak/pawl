@@ -11,7 +11,6 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.CastingPermission (CastingPermission)
@@ -200,8 +199,8 @@ handAbilitiesFor keyword = case keyword of
 -- says which keyword, the rule says what it means.
 --
 -- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
--- is activated. AnyTime because rule 702.29a states no timing restriction, which
--- leaves CR 117.1b's default.
+-- is activated. No restriction clause, because rule 702.29a states no timing
+-- restriction, which leaves CR 117.1b's default.
 cycling :: Cost Keyword -> Maybe (Filter Keyword) -> ActivatedAbility Card
 cycling cost searchFor =
   ActivatedAbility.MkActivatedAbility
@@ -210,7 +209,7 @@ cycling cost searchFor =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.restrictions = [],
       -- CR 702.29a gives the card this ability outright, with no "as long as".
       ActivatedAbility.condition = Nothing
     }
@@ -338,8 +337,9 @@ battlefieldAbilitiesFor keyword count = case keyword of
 -- 301.7b's "it immediately has its printed power and toughness".
 --
 -- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
--- activated, cycling's posture. AnyTime because rule 702.122a states no timing
--- restriction, which leaves CR 117.1b's default -- and CR 702.122a's "any number
+-- activated, cycling's posture. No restriction clause, because rule 702.122a
+-- states no timing restriction, which leaves CR 117.1b's default -- and CR
+-- 702.122a's "any number
 -- of times" needs no expression, an activated ability having no once-per-turn
 -- limit unless one is printed.
 crew :: Natural -> ActivatedAbility Card
@@ -356,7 +356,7 @@ crew n =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.restrictions = [],
       -- CR 702.122a gives the permanent this ability outright, with no "as long
       -- as", cycling's answer.
       ActivatedAbility.condition = Nothing

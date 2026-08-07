@@ -203,6 +203,40 @@ defendingPlayerOf grants target gs = case target of
   AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
   AttackTarget.OfBattle oid -> Battle.protectorOf oid gs
 
+-- "only if you've been attacked this step", asked of the player a printed clause
+-- says "you" about.
+--
+-- TWO readers, one question: Pawl.Types.CastingRestriction.AttackedThisStep
+-- (Rally the Troops) and Pawl.Types.ActivationRestriction.AttackedThisStep
+-- (Kongming's Contraptions) spell the same clause, and CR 307.5's ban on the two
+-- gates agreeing is about casting PROHIBITIONS, not about a fact of the combat
+-- record. So the record is read once, here, and each gate conjoins it itself.
+--
+-- CR 506.2 (CR 507.1 where the seat count makes it a choice) settles who the
+-- defending player is, so the question left is whether any creature was DECLARED
+-- attacking THIS PLAYER rather than a planeswalker of theirs -- exactly
+-- membership in Combat.declaredAttacked. DECLARED, and not "or put onto the
+-- battlefield attacking": CR 508.4 says such creatures never "attacked", and CR
+-- 508.3b spells out the player side. So this reads Combat.declaredAttacked and
+-- NOT Combat.attacked, CR 508.8's wider set; the two fields exist because the two
+-- rules disagree (see Pawl.Types.Combat). Eightfold Maze's ruling pins the
+-- reading: a creature needs to have attacked YOU, which is why this cannot be
+-- emptiness of the record, and CR 306.6 is what made it observable.
+--
+-- Membership in the HISTORICAL set rather than a search of Combat.attackers,
+-- because CR 506.4 removing the lone attacker from combat does not un-attack
+-- anybody. No separate Combat.defender test either: only a defending player can
+-- be attacked, so an OfPlayer entry naming this player IS that conjunct.
+--
+-- "THIS STEP" is read off the combat record, which CR 511.3 scopes to the whole
+-- combat PHASE. The two spans coincide for every card in the pool because this
+-- set is written ONLY by declareAttackers below, CR 508.1's turn-based action.
+-- That is a fact about the pool rather than a rule (#447): what remains open is a
+-- second declaration inside one phase.
+attackedThisStep :: PlayerId -> GameState -> Bool
+attackedThisStep pid gs =
+  Set.member (AttackTarget.OfPlayer pid) (Combat.declaredAttacked (GameState.combat gs))
+
 -- CR 506.4: is this planeswalker still one that is being attacked -- or has it
 -- been removed from combat since the declaration?
 --

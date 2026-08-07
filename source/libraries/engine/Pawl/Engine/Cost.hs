@@ -456,7 +456,7 @@ requiresSicknessCheck cost =
 --
 -- Derived from the cost rather than stored on the ability, because CR 606.2 is a
 -- rule about what a cost CONTAINS and not a rider a card prints. That is also
--- why Jace Beleren's abilities carry no ActivationTiming.SorcerySpeed: the
+-- why Jace Beleren's abilities carry no ActivationRestriction.SorcerySpeed: the
 -- sorcery-speed half of CR 606.3 is the rules core's to know, and a card file
 -- claiming a rider it does not print would be the open half teaching the closed
 -- half a rule it already has.

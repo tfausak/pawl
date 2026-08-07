@@ -68,9 +68,11 @@
               }
             ]
           },
-          "timing": {
-            "type": "SorcerySpeed"
-          }
+          "restrictions": [
+            {
+              "type": "SorcerySpeed"
+            }
+          ]
         }
       ],
       "manaCost": [
