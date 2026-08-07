@@ -76,7 +76,11 @@
 -- total moved" trigger, with Exquisite Blood -- `lifeLossTriggerSpec`. That
 -- event read for BOTH the halves CR 603.2 makes part of it -- the amount and the
 -- player who lost it -- on a three-seat board where "that player" and "an
--- opponent" come apart, with Mindcrank -- `mindcrankSpec`.
+-- opponent" come apart, with Mindcrank -- `mindcrankSpec`. CR 601.2i's cast
+-- trigger again, this time with a payload that aims at a TARGET PLAYER and the
+-- keyword half of the spell filter (CR 702.90 infect), which is the pool's first
+-- poison counter given to someone chosen rather than derived, with Hand of the
+-- Praetors -- `handOfThePraetorsSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -5041,6 +5045,127 @@ ezuriExperienceSpec s registry =
           Spec.assertEqWith s "alice gets no experience counter" (experienceOf S.alice after) 0
           Spec.assertEqWith s "and neither does bob, who has no Ezuri" (experienceOf S.bob after) 0
 
+-- CR 601.2i's cast trigger with a payload aimed at a TARGET PLAYER: the pool's
+-- first card to hand out poison counters (CR 122.1f, whose tenth loses the game
+-- under CR 704.5c) to a player who was CHOSEN rather than derived from the
+-- ability's controller (#120).
+--
+-- Hand of the Praetors, {3}{B} Creature -- Phyrexian Zombie 3/2: "Infect. Other
+-- creatures you control with infect get +1/+1. Whenever you cast a creature
+-- spell with infect, target player gets a poison counter." Only the third line
+-- is this group's subject. The anthem is Pawl.PowerToughnessSpec's, and what the
+-- printed infect keyword does to damage is Pawl.DamageSpec's ground already (CR
+-- 702.90b).
+--
+-- The printed condition narrows THREE things in one sentence -- who cast it (CR
+-- 109.5's "you", which for a triggered ability is CR 603.3a's controller of the
+-- source at the trigger moment), that it was a creature spell, and that it had
+-- infect (CR 702.90) -- and the Filter carries all three. Each case below moves
+-- exactly one of them, so a Filter that always answered True is distinguishable
+-- from one that reads each half.
+--
+-- THREE SEATS, which the PAYLOAD wants as much as the condition does. On a
+-- two-seat board with alice casting, "target player" answered as bob and "an
+-- opponent" put the counter in the same place. carol is the seat that separates
+-- them: she is a legal target that was not chosen, so an effect that poisoned
+-- every opponent fails here too. She serves the condition's "you cast" case for
+-- Young Pyromancer's reason as well -- "bob cast it" is not "an opponent cast
+-- it" until someone else is sitting there.
+handOfThePraetorsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+handOfThePraetorsSpec s registry =
+  let poisonOf = S.playerCounterOf PlayerCounterKind.Poison
+      -- The trigger's one target slot, answered with `who` rather than left to
+      -- S.identityAnswer, whose lowest-sorting candidate on this board is alice
+      -- -- the caster, and so the wrong answer to prove anything with.
+      aimAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        _ -> S.identityAnswer p
+      -- alice bears the Hand; alice and bob each get two Forests (Glistener
+      -- Elf's {G}) and two Mountains (Goblin Piker's {1}{R}). carol gets no
+      -- land: she never casts, and is only ever a seat the counter must miss.
+      board forest mountain hand =
+        let addLands pid n printing g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+            withLands =
+              addLands S.bob 2 mountain
+                . addLands S.bob 2 forest
+                . addLands S.alice 2 mountain
+                $ addLands S.alice 2 forest S.threePlayerGame
+            (_, withHand) = S.addCreature hand S.alice withLands
+         in withHand
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castAndResolve who caster oid gs = S.runPure (aimAt who) (S.runPure (aimAt who) gs (S.cast caster oid)) Engine.priorityLoop
+   in Spec.describe s "Hand of the Praetors" $ do
+        -- THE case: the counter lands on the player the answerer named, and on
+        -- nobody else. Glistener Elf, {G} Creature -- Phyrexian Elf Warrior 1/1
+        -- with infect, is the spell cast.
+        Spec.it s "CR 601.2i casting an infect creature spell poisons the TARGETED player" $ do
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          hand <- S.printingOf s registry "Hand of the Praetors"
+          elf <- S.printingOf s registry "Glistener Elf"
+          let (elfId, gs) = S.addHandCard elf S.alice (board forest mountain hand)
+              after = castAndResolve S.bob S.alice elfId gs
+          Spec.assertEqWith s "nobody is poisoned before the cast" (poisonOf S.bob gs) 0
+          Spec.assertEqWith s "bob, who was targeted, has one poison counter" (poisonOf S.bob after) 1
+          -- The falsifier for a payload plumbed to the ability's controller:
+          -- alice cast it and alice gets nothing.
+          Spec.assertEqWith s "alice, who cast it, has none" (poisonOf S.alice after) 0
+          -- And the falsifier for one plumbed to every opponent.
+          Spec.assertEqWith s "and carol, who was not targeted, has none" (poisonOf S.carol after) 0
+        -- The same board and the same answerer, aimed the other way: alice may
+        -- target herself, since CR 115.1 puts every player in the pool and
+        -- nothing on this card narrows it. A payload that read the caster would
+        -- pass this case and fail the one above, and a payload that read an
+        -- opponent would do the reverse -- neither passes both.
+        Spec.it s "CR 115.1 the same trigger aimed at its own controller poisons her instead" $ do
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          hand <- S.printingOf s registry "Hand of the Praetors"
+          elf <- S.printingOf s registry "Glistener Elf"
+          let (elfId, gs) = S.addHandCard elf S.alice (board forest mountain hand)
+              after = castAndResolve S.alice S.alice elfId gs
+          Spec.assertEqWith s "alice, who targeted herself, has one" (poisonOf S.alice after) 1
+          Spec.assertEqWith s "bob has none" (poisonOf S.bob after) 0
+          Spec.assertEqWith s "and neither has carol" (poisonOf S.carol after) 0
+        -- The INFECT half of the Filter, moved on its own: alice still casts, and
+        -- what she casts is still a creature spell. Goblin Piker, {1}{R} Creature
+        -- -- Goblin Warrior 2/1, has no keyword at all.
+        Spec.it s "CR 702.90 a creature spell WITHOUT infect fires nothing" $ do
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          hand <- S.printingOf s registry "Hand of the Praetors"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, gs) = S.addHandCard piker S.alice (board forest mountain hand)
+              after = castAndResolve S.bob S.alice pikerId gs
+          -- Positive control: the cast really happened and really resolved, so
+          -- the silence below is the Filter's answer rather than a fixture that
+          -- could not pay for anything.
+          Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+          Spec.assertEqWith s "and nobody is poisoned" (poisonOf S.bob after) 0
+          Spec.assertEqWith s "not even the caster" (poisonOf S.alice after) 0
+        -- The "you cast" half, moved on its own: the same infect creature spell,
+        -- cast from the seat to alice's left. carol makes "bob cast it" a
+        -- different statement from "an opponent cast it".
+        Spec.it s "CR 109.5 'you cast': an OPPONENT's infect creature spell fires nothing" $ do
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          hand <- S.printingOf s registry "Hand of the Praetors"
+          elf <- S.printingOf s registry "Glistener Elf"
+          let base = board forest mountain hand
+              (bobsElf, withBobs) = S.addHandCard elf S.bob base
+              (alicesElf, gs) = S.addHandCard elf S.alice withBobs
+              byBob = castAndResolve S.bob S.bob bobsElf gs
+              byAlice = castAndResolve S.bob S.alice alicesElf gs
+          Spec.assertEqWith s "bob's own cast poisons nobody" (poisonOf S.bob byBob) 0
+          Spec.assertEqWith s "not alice" (poisonOf S.alice byBob) 0
+          Spec.assertEqWith s "and not carol" (poisonOf S.carol byBob) 0
+          -- The same board, one caster apart: alice casting her own copy is what
+          -- proves the seat is the only thing the silence above turns on.
+          Spec.assertEqWith s "the same board poisons bob for alice's own cast" (poisonOf S.bob byAlice) 1
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -5085,3 +5210,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
   presenceOfTheMasterSpec s registry
+  handOfThePraetorsSpec s registry
