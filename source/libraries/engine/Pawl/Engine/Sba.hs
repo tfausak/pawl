@@ -79,11 +79,15 @@ woundedByDeathtouch gs oid =
 -- The isCreature guard states CR 301.7a's distinction rather than relying on it.
 -- An uncrewed Consulate Dreadnought is a permanent with printed numbers and no
 -- toughness CHARACTERISTIC, and 704.5f/g must not touch it -- which
--- Projection.noncreaturePT already guarantees by answering Nothing for it, so
--- the two conjuncts now agree by construction on every permanent in the pool.
--- Kept because they are different questions: rule 208.5 gives a creature with no
--- value for its toughness a toughness of 0, and the day that is implemented
--- (#759) this guard is what keeps a Vehicle out of the graveyard.
+-- Projection.noncreaturePT already guarantees by answering Nothing for it.
+--
+-- CR 208.5 does not change that. Its substitution (Projection.noValuePT) is
+-- itself creature-guarded, so a noncreature still arrives here with Nothing and
+-- this conjunct is still the same by construction -- what 208.5 changed is that
+-- a CREATURE now always arrives with a Just, making the toughness case below
+-- exhaustive in practice rather than the place a no-value creature escaped.
+-- Kept because the two remain different questions, and this one states CR
+-- 704.5f's own premise: "if a CREATURE has toughness 0 or less".
 --
 -- Takes the object's already-projected characteristics (checkStateBasedActions
 -- projects the whole board once, per CR 704.3 simultaneity).
