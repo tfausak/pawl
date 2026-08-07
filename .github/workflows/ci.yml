@@ -8,126 +8,56 @@ on:
       - main
 jobs:
   build:
-    name: Build ${{ matrix.runner }}
-    runs-on: ${{ matrix.runner }}
-    needs: meta
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            bench: true
-            test: true
+    name: Build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - id: haskell
-        uses: haskell-actions/setup@v2
+      - uses: nixbuild/nix-quick-install-action@v35
         with:
-          ghc-version: 9.14.1
-      - id: info
-        run: |
-          echo "os=$(ghc -e 'putStrLn System.Info.os')" >> "$GITHUB_OUTPUT"
-          echo "arch=$(ghc -e 'putStrLn System.Info.arch')" >> "$GITHUB_OUTPUT"
-        shell: bash
-      - run: mkdir artifact
-      - run: ghc-pkg list
-      - run: cabal sdist --output-dir artifact
-      - run: cabal configure ${{ matrix.bench && '--enable-benchmarks' || '' }} ${{ matrix.test && '--enable-tests' || '' }} --flags=pedantic --jobs --semaphore
-      - run: cat cabal.project.local
-      - run: cp cabal.project.local artifact
-      - run: cabal freeze
-      - run: cat cabal.project.freeze
-      - run: cp cabal.project.freeze artifact
-      - run: cabal outdated --v2-freeze-file
-      - uses: actions/cache@v6
+          nix_conf: max-jobs = auto
+      - uses: nix-community/cache-nix-action@v7
         with:
-          key: ${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}-${{ hashFiles('cabal.project.freeze') }}
-          path: ${{ steps.haskell.outputs.cabal-store }}
-          restore-keys: ${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}-
-      - run: cabal build --only-download
-      - run: cabal build --only-dependencies
-      - run: cabal build
-      - run: cp $( cabal list-bin ${{ needs.meta.outputs.name }} ) artifact
-      - if: matrix.test
-        run: cp $( cabal list-bin ${{ needs.meta.outputs.name }}-test-suite ) artifact
-      - if: matrix.bench
-        run: cp $( cabal list-bin ${{ needs.meta.outputs.name }}-benchmark ) artifact
-      - run: tar --create --file artifact.tar --verbose artifact
+          primary-key: nix-${{ hashFiles('flake.lock', 'pawl.cabal') }}
+          restore-prefixes-first-match: nix-
+      - run: nix build
+      - run: nix build --print-build-logs --out-link benchmark .#benchmark
+      - run: cp benchmark/bench.csv .
       - uses: actions/upload-artifact@v7
         with:
-          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}
-          path: artifact.tar
+          name: pawl-${{ github.sha }}-bench
+          path: bench.csv
   cabal:
     name: Cabal
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: cabal check
+      - uses: nixbuild/nix-quick-install-action@v35
+      - run: nix build --print-build-logs .#checks.x86_64-linux.cabal
   gild:
     name: Gild
     runs-on: ubuntu-latest
-    needs: meta
     steps:
       - uses: actions/checkout@v7
-      - uses: tfausak/cabal-gild-setup-action@v2
-      - run: cabal-gild --mode check ${{ needs.meta.outputs.name }}.cabal
+      - uses: nixbuild/nix-quick-install-action@v35
+      - run: nix build --print-build-logs .#checks.x86_64-linux.gild
   hlint:
     name: HLint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: haskell-actions/hlint-setup@v2
-      - uses: haskell-actions/hlint-run@v2
-        with:
-          fail-on: status
-  meta:
-    name: Meta
+      - uses: nixbuild/nix-quick-install-action@v35
+      - run: nix build --print-build-logs .#checks.x86_64-linux.hlint
+  nixfmt:
+    name: Nixfmt
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - id: name
-        run: "echo name=$( awk '/^name:/ {print $2}' *.cabal ) >> $GITHUB_OUTPUT"
-      - id: version
-        run: "echo version=$( awk '/^version:/ {print $2}' *.cabal ) >> $GITHUB_OUTPUT"
-    outputs:
-      name: ${{ steps.name.outputs.name }}
-      version: ${{ steps.version.outputs.version }}
+      - uses: nixbuild/nix-quick-install-action@v35
+      - run: nix build --print-build-logs .#checks.x86_64-linux.nixfmt
   ormolu:
     name: Ormolu
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: haskell-actions/run-ormolu@v20
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    needs:
-      - build
-      - meta
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-linux-x86_64
-      - run: tar --extract --file artifact.tar --verbose
-      - run: tar --extract --file artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}.tar.gz --directory artifact --verbose
-      - run: artifact/${{ needs.meta.outputs.name }}-test-suite
-        env:
-          pawl_datadir: ${{ github.workspace }}/artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}/data
-  bench:
-    name: Bench
-    runs-on: ubuntu-latest
-    needs:
-      - build
-      - meta
-    steps:
-      - uses: actions/download-artifact@v8
-        with:
-          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-linux-x86_64
-      - run: tar --extract --file artifact.tar --verbose
-      - run: tar --extract --file artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}.tar.gz --directory artifact --verbose
-      - run: artifact/${{ needs.meta.outputs.name }}-benchmark --csv bench.csv +RTS -T
-        env:
-          pawl_datadir: ${{ github.workspace }}/artifact/${{ needs.meta.outputs.name }}-${{ needs.meta.outputs.version }}/data
-      - uses: actions/upload-artifact@v7
-        with:
-          name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-bench
-          path: bench.csv
+      - uses: nixbuild/nix-quick-install-action@v35
+      - run: nix build --print-build-logs .#checks.x86_64-linux.ormolu
