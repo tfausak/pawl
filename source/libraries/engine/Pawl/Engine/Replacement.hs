@@ -463,6 +463,10 @@ bucketOfEffect re = case re of
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> ReplacementBucket.Other
+  -- CR 614.1d is none of CR 616.1a-d either: a tap-state rewrite changes the
+  -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
+  -- copies or which face is up. So CR 616.1e.
+  ReplacementEffect.EntryR _ EntryRewrite.Tapped -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -530,6 +534,10 @@ readsApplier re = case re of
   -- offer that permanent's controller the same two outcomes -- so which applies
   -- first is not a board difference.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> False
+  -- CR 614.1d: no chooser at all, and no payload -- the rewrite sets one status on
+  -- the object the event already named (CR 110.5b), so it applies the same way
+  -- whoever's row is applying it. Two such rows are the same write twice.
+  ReplacementEffect.EntryR _ EntryRewrite.Tapped -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are

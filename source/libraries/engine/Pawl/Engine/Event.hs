@@ -814,6 +814,30 @@ apply batch candidate event =
                               }
                        in gs3 {GameState.continuousEffects = eff : GameState.continuousEffects gs3}
             pure (Just event)
+      -- CR 614.1d / 110.5b: "This land enters tapped" (Zof Bloodbog). CR 110.5b
+      -- has a permanent enter untapped "unless a spell or ability says otherwise",
+      -- and this is the permanent's own ability saying otherwise -- which is why
+      -- it is here and not in EntryRiders, the rider a SPELL or ability writes
+      -- when it puts something onto the battlefield tapped. A land played as CR
+      -- 305.1's special action passes through no effect at all, so only this route
+      -- reaches it.
+      --
+      -- ENTERS TAPPED, not "enters, then is tapped", and the difference is the
+      -- whole point of the arm: the status is stamped straight onto the object
+      -- rather than routed through the tap funnel, so the permanent never
+      -- transitions from untapped to tapped and nothing watching for that can
+      -- fire. Stamping the ALREADY-MATERIALIZED incarnation is observationally the same
+      -- as minting it tapped, on UnderSourceControl's footing above: runEntry
+      -- finishes before the Moved event is recorded, so no trigger scan and no
+      -- state-based action can see the interim object.
+      --
+      -- No prompt, and none is owed: rule 614.1d's rewrite has no choice in it.
+      EntryRewrite.Tapped -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        State.modify' $ \gs ->
+          let stamp obj = obj {Object.tapped = TapState.Tapped}
+           in gs {GameState.objects = Map.adjust stamp oid (GameState.objects gs)}
+        pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
     (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of

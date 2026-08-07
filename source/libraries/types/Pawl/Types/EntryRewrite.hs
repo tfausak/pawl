@@ -11,7 +11,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- (CR 208.2b); ChooseColor is Painter's Servant (CR 614.1c);
 -- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChooseCardNames is Null
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
--- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b).
+-- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
+-- Bloodbog (CR 614.1d).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
 -- makes CR 707.2 fall out with no further machinery. CR 707.5's second half is
@@ -22,11 +23,6 @@ import qualified Pawl.Types.Keyword as Keyword
 -- 614.12b's combined-affordability check across permanents entering
 -- simultaneously is still not implemented -- the entry loop has no budget to
 -- measure a batch against (#72).
---
--- A permanent whose OWN text says it enters TAPPED ("This land enters tapped")
--- has no arm here: the tap state an entering incarnation gets is written only by
--- an effect's rider (Pawl.Types.EntryRiders), never by a replacement the card
--- itself prints (#894).
 data EntryRewrite
   = AsCopy
   | ChoiceOf [EntryOption.EntryOption]
@@ -149,4 +145,30 @@ data EntryRewrite
     -- end means -- neither value is copiable (CR 707.2), so neither may be
     -- written into the snapshot AsCopy and ChoiceOf use.
     Riot
+  | -- | CR 614.1d: "This land enters tapped" (Zof Bloodbog). The one arm a
+    -- permanent's OWN printed text writes about the STATUS it enters with, where
+    -- every other writer of an entering incarnation's tap state is an EFFECT's
+    -- rider (Pawl.Types.EntryRiders' `tapped`, "put it onto the battlefield
+    -- tapped"). CR 110.5b divides the two: a permanent enters untapped "unless a
+    -- spell or ability says otherwise", and this is the ability saying otherwise
+    -- rather than the spell putting it there. A land played as CR 305.1's special
+    -- action goes through no effect at all, so a rider could not reach it.
+    --
+    -- NULLARY. CR 614.1d fixes both halves -- which status, and that the permanent
+    -- gets it -- so there is nothing for a card to vary, the position Riot and
+    -- ChooseColor take.
+    --
+    -- Applied as "enters tapped" and NOT as "enters, then is tapped": the arm
+    -- stamps Object.tapped rather than routing through the tap funnel, so no
+    -- becomes-tapped event exists for anything to watch (CR 110.5b's distinction).
+    -- The write lands on the already-materialized incarnation, which is
+    -- observationally the same as minting it tapped -- Pawl.Engine.Event.runEntry
+    -- runs before the Moved event is recorded, so no trigger scan and no
+    -- state-based action can see the interim untapped object, the same footing
+    -- UnderSourceControl's write to Object.enteredUnder stands on.
+    --
+    -- Not implemented: CR 614.1c's optional-cost variant of the same rewrite --
+    -- "As this land enters, you may pay 3 life. If you don't, it enters tapped"
+    -- (#950).
+    Tapped
   deriving (Eq, Ord, Show)

@@ -83,6 +83,15 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       EntryRewrite.Riot
       """ {"type":"Riot"} """
+  -- CR 614.1d: the tap-state rewrite a permanent's own text prints, payload-free
+  -- because rule 614.1d and CR 110.5b fix both halves.
+  Spec.it s "Tapped (Zof Bloodbog)" $
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      EntryRewrite.Tapped
+      """ {"type":"Tapped"} """
   -- CR 616.1b: a control rewrite, payload-free because CR 109.5 derives the
   -- player.
   Spec.it s "UnderSourceControl (Gather Specimens)" $
