@@ -63,13 +63,7 @@
         in
         {
           cabal = pkgs.runCommand "pawl-cabal-check" { nativeBuildInputs = [ pkgs.cabal-install ]; } ''
-            # cabal writes a config on first use, so it needs a writable HOME.
-            # The source is copied because cabal creates dist-newstyle beside
-            # the package, and a store path is read-only.
-            export HOME="$PWD/home"
-            cp --recursive ${source} package
-            chmod --recursive +w package
-            cd package
+            cd ${source}
             cabal check
             touch "$out"
           '';
@@ -77,7 +71,6 @@
           # Run from the source root so ormolu finds pawl.cabal and picks up
           # default-extensions, as it does in the dev shell.
           ormolu = pkgs.runCommand "pawl-ormolu-check" { nativeBuildInputs = [ pkgs.ormolu ]; } ''
-            export HOME="$PWD"
             cd ${source}
             find source -name '*.hs' -print0 | xargs -0 ormolu --mode check
             touch "$out"
