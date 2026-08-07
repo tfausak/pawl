@@ -293,8 +293,16 @@ castableZones :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -
 castableZones pid oid face gs =
   let permitted zone = case zone of
         -- CR 304.1 / 307.1: the rules' own allowance is worded "from their
-        -- hand", so the hand needs no permission of its own.
-        Zone.Hand -> True
+        -- hand", so the hand needs no permission of its own -- unless a rule takes
+        -- it away, which CR 702.127a's second static ability does: "this half of
+        -- this split card can't be cast from any zone other than a graveyard".
+        --
+        -- A PROHIBITION and so read here rather than as a CastingPermission: a
+        -- permission list can only add zones, and this one removes the zone every
+        -- card gets for free. It reads the FACE, which is how the rule's "this
+        -- half" scoping comes out right -- Dusk is castable from a hand and Dawn
+        -- is not, off the same card.
+        Zone.Hand -> not (Keyword.hasAftermath (Face.keywords face))
         Zone.Graveyard -> permitsCastFromGraveyard face
         Zone.Exile -> permitsCastFromExile pid oid face gs
         -- CR 903.8: "a commander's owner may cast it from the command zone". A

@@ -77,6 +77,19 @@ to agents as written. What it doesn't say:
   the next unit either: one unit at a time per checkout, since two branches
   contend for `HEAD`.
 
+- `hooky fix` is not enough to keep CI's `Ormolu` job green: it formats only
+  *staged* files, so a file edited earlier in a long task can keep an unsorted
+  import and never be re-checked. Run the repo-wide check CI runs before
+  pushing --- `ormolu --mode check $(git ls-files '*.hs')`.
+
+- After a PR merges, before picking up the next unit, spend a few minutes on
+  what the cycle taught. Three questions: did anything catch you that your own
+  checks didn't (CI, a review, the owner)? did you violate an instruction? did
+  you learn a project fact the repo doesn't already record? Write the answers
+  down --- a project fact belongs here, in the section it bears on, folded into
+  the next unit's PR rather than a PR of its own. Skip it when there is
+  genuinely nothing; ceremonial notes cost more than they return.
+
 - Most of what's left is card-driven --- it fires when a card demands it, so
   the backlog is a menu rather than a queue. Working one means finding the real
   card and adding it to `data/cards/`; that is expected, not a side quest, and

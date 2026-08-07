@@ -1740,6 +1740,10 @@ waxName, waneName :: CardName.CardName
 waxName = CardName.MkCardName (Text.pack "Wax")
 waneName = CardName.MkCardName (Text.pack "Wane")
 
+onwardName, victoryName :: CardName.CardName
+onwardName = CardName.MkCardName (Text.pack "Onward")
+victoryName = CardName.MkCardName (Text.pack "Victory")
+
 -- The two halves of
 -- data/cards/synthetic-glacial-half-synthetic-volcanic-half.json, a split card
 -- printing Panglacial Wurm's permission on each half. Synthetic because no
@@ -1923,6 +1927,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   blazeSpec s registry
   corrosiveGaleSpec s registry
   waxWaneSpec s registry
+  aftermathSpec s registry
   modalCastSpec s registry
   entwineSpec s registry
   auraTargetSpec s registry
@@ -1965,3 +1970,51 @@ castLastOption p = case p of
     choice : _ -> Just choice
     [] -> Nothing
   _ -> castFirstOption p
+
+-- CR 702.127a, aftermath, all three of the static abilities the one word stands
+-- for -- on Onward // Victory, where the keyword is printed on the RIGHT half
+-- only. That asymmetry is the point: every assertion here would pass vacuously on
+-- a card whose halves agreed.
+-- A board that can pay for EITHER half and has something for either to target:
+-- four Mountains for Onward's {2}{R}, four Plains for Victory's {2}{W}, and a
+-- Goblin Piker.
+--
+-- Both colours on purpose. With Mountains alone every "Victory is not castable"
+-- assertion below would hold because {W} could not be paid, which is the vacuous
+-- pass a cast gate invites -- the negatives have to fail on rule 702.127a and
+-- nothing else.
+aftermathBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+aftermathBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  let withPlains = foldr (\_ g -> snd (S.addCreature plains S.alice g)) (S.landsInPlay mountain 4) [1 :: Int .. 4]
+  pure (snd (S.addCreature piker S.alice withPlains))
+
+aftermathSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aftermathSpec s registry = Spec.describe s "Aftermath" $ do
+  -- Rule 702.127a's SECOND ability: "this half of this split card can't be cast
+  -- from any zone other than a graveyard". A hand is where every other card in
+  -- the pool is castable from, so this is the prohibition doing real work -- and
+  -- "this HALF" is why Onward, off the same card in the same hand, still is.
+  Spec.it s "CR 702.127a an aftermath half can't be cast from a hand, and its sibling can" $ do
+    onwardVictory <- S.printingOf s registry "Onward"
+    board <- aftermathBoard s registry
+    let (gs, oid) = S.handOne onwardVictory board
+    Spec.assertEqWith s "Onward is castable from the hand" (Cast.castable S.alice oid onwardName Facing.FaceUp gs) True
+    Spec.assertEqWith s "Victory is not" (Cast.castable S.alice oid victoryName Facing.FaceUp gs) False
+  -- Rule 702.127a's FIRST ability: "you may cast this half of this split card from
+  -- your graveyard". The mirror of the case above, and the falsifier for a
+  -- prohibition that swallowed the permission too.
+  Spec.it s "CR 702.127a an aftermath half can be cast from a graveyard, and its sibling cannot" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    onwardVictory <- S.printingOf s registry "Onward"
+    board <- aftermathBoard s registry
+    -- A main phase with priority: Victory is a SORCERY (CR 307.1), so without it
+    -- this would fail on timing rather than on rule 702.127a.
+    let (gs0, _) = S.handOne piker board
+        (oid, gs) = S.addGraveyardCard onwardVictory S.alice gs0
+    Spec.assertEqWith s "Victory is castable from the graveyard" (Cast.castable S.alice oid victoryName Facing.FaceUp gs) True
+    -- Onward has no permission of its own, so the graveyard is closed to it --
+    -- CR 702.127a grants the half that PRINTS aftermath, not the card.
+    Spec.assertEqWith s "Onward is not" (Cast.castable S.alice oid onwardName Facing.FaceUp gs) False

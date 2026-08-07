@@ -174,7 +174,16 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- demands that permission alongside an affordable candidate from this
             -- list, so a candidate offered here can never carry a graveyard cast
             -- on its own.
-            Zone.Graveyard -> fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
+            -- CR 702.127a pays the PRINTED cost, which is the whole difference
+            -- between aftermath and flashback: rule 702.34a supplies an
+            -- alternative cost and this supplies none, so the half is cast from a
+            -- graveyard for exactly what it says. `printed` and not
+            -- `withAdditional printed` -- that wrapper exists to bolt the face's
+            -- additional costs onto an ALTERNATIVE, and `printed` already carries
+            -- them.
+            Zone.Graveyard ->
+              fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
+                <> [printed | Keyword.hasAftermath (Face.keywords face)]
             _ -> printed : fmap withAdditional (Face.alternativeCosts face)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []

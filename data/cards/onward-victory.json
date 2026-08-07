@@ -1,0 +1,134 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Onward",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "ModifyPowerToughness",
+                    "value": [
+                      {
+                        "type": "Power"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    },
+    {
+      "keywords": [
+        {
+          "type": "Aftermath"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Victory",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "ModifyTarget",
+                "value": [
+                  {
+                    "type": "UntilEndOfTurn"
+                  },
+                  {
+                    "type": "GainKeyword",
+                    "value": {
+                      "type": "DoubleStrike"
+                    }
+                  },
+                  "target"
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ],
+  "layout": {
+    "type": "Split"
+  }
+}

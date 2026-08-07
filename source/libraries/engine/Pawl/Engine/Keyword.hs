@@ -112,6 +112,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
+  Keyword.Aftermath -> []
   Keyword.Fear -> []
   Keyword.Morph _ -> []
   Keyword.Menace -> []
@@ -167,6 +168,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
+  Keyword.Aftermath -> []
   Keyword.Fear -> []
   Keyword.Morph _ -> []
   Keyword.Menace -> []
@@ -269,6 +271,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
+  Keyword.Aftermath -> []
   Keyword.Fear -> []
   -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
   -- doesn't use the stack (CR 116), so morph gives a permanent no activated
@@ -435,6 +438,15 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
+  -- CR 702.127a's FIRST static ability: "you may cast this half of this split card
+  -- from your graveyard". Ungated, unlike flashback's arm above -- rule 702.127a
+  -- carries no instant-or-sorcery clause, because rule 702.127a's own first
+  -- sentence already confines aftermath to split cards.
+  --
+  -- The rule's SECOND ability, "can't be cast from any zone other than a
+  -- graveyard", is not a permission and is not here: a prohibition is
+  -- Pawl.Engine.Cast's to apply, at its Zone.Hand arm.
+  Keyword.Aftermath -> [CastingPermission.CastFromGraveyard]
   Keyword.Fear -> []
   Keyword.Morph _ -> []
   Keyword.Menace -> []
@@ -495,6 +507,18 @@ permissionsFor cardTypes keyword = case keyword of
 -- A membership test rather than an exhaustive case: this asks about ONE named
 -- constructor rather than classifying every keyword, so a new arm has nothing to
 -- say here.
+
+-- | CR 702.127a's SECOND static ability: "this half of this split card can't be
+-- cast from any zone other than a graveyard". A PROHIBITION, so it is a question
+-- Pawl.Engine.Cast asks of the zone it is about to offer rather than anything
+-- minted here -- the counterweight to the CastFromGraveyard permission
+-- permissionsFor grants for the same keyword.
+--
+-- Membership rather than a count: rule 702.127a takes no parameter and a second
+-- instance would forbid nothing further.
+hasAftermath :: Set Keyword -> Bool
+hasAftermath = Set.member Keyword.Aftermath
+
 hasFlash :: Set Keyword -> Bool
 hasFlash = Set.member Keyword.Flash
 
@@ -579,6 +603,13 @@ entwineCost keywords =
 castFromGraveyardReplacementsOf :: Set Keyword -> [ReplacementEffect]
 castFromGraveyardReplacementsOf keywords =
   [flashbackExile | Maybe.isJust (flashbackCost keywords)]
+    -- CR 702.127a's THIRD static ability: "if this spell was cast from a
+    -- graveyard, exile it instead of putting it anywhere else any time it would
+    -- leave the stack" -- word for word CR 702.34a's second ability, so it is the
+    -- same effect and not a sibling. Both are installed by Pawl.Engine.Cast on the
+    -- stack incarnation, and only when the cast really came from a graveyard,
+    -- which is the "if this spell was cast from a graveyard" condition.
+    <> [flashbackExile | Set.member Keyword.Aftermath keywords]
 
 flashbackExile :: ReplacementEffect
 flashbackExile =
@@ -644,6 +675,7 @@ entryReplacementsFor keyword count = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
+  Keyword.Aftermath -> []
   Keyword.Fear -> []
   Keyword.Morph _ -> []
   Keyword.Menace -> []
