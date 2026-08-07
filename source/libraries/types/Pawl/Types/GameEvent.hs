@@ -296,6 +296,6 @@ data GameEvent
     -- trigger's is.
     --
     -- NOT emitted for a LOCK (CR 709.5g): nothing in the pool locks a door, and no
-    -- rule asks a trigger about one (#N).
+    -- rule asks a trigger about one (#924).
     HalfUnlocked ObjectId.ObjectId CardName.CardName
   deriving (Eq, Ord, Show)

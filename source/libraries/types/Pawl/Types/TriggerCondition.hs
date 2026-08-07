@@ -441,6 +441,6 @@ data TriggerCondition
     -- by CR 709.5d's entry all fire it. CR 709.5i's "fully unlocks" is a second
     -- shape -- the permanent getting the other designation while it has one, or
     -- both at once -- and has no constructor here, since no printing in the pool
-    -- says it (#N).
+    -- says it (#924).
     SelfHalfUnlocked CardName.CardName
   deriving (Eq, Ord, Show)

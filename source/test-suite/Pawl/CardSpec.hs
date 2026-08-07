@@ -2788,6 +2788,26 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let wax = vanillaFace "Wax" instantLine
         offender = Card.Type.MkCard {Card.Type.layout = Layout.Split, Card.Type.faces = wax NonEmpty.:| [wax]}
     Spec.assertBool s (distinctFaceNamesOffends offender) "two faces sharing one name are rejected"
+  -- CR 709.5h names "a PARTICULAR half", and CR 709.5j says which halves there
+  -- are: "Some cards refer to a 'door' of a Room permanent. A door is a half of
+  -- that permanent." So the door a "when you unlock this door" trigger names has
+  -- to be one of its own card's faces -- Pawl.Engine.Event.matchesTrigger
+  -- compares the two names, and a condition naming anything else can never fire.
+  --
+  -- Held over the pool rather than by construction, for the reason the
+  -- pairwise-distinct lint above gives: a card file is data. Non-vacuity is
+  -- asserted the same way, since a pool with no such condition would pass this
+  -- sweep without comparing anything.
+  Spec.it s "an unlock trigger names one of its own card's faces" $ do
+    ps <- S.allPrintings s
+    let doors c = [n | TriggerCondition.SelfHalfUnlocked n <- fmap TriggeredAbility.condition (Face.triggeredAbilities c)]
+        offends card = any (\c -> any (`notElem` fmap Face.name (NonEmpty.toList (Card.Type.faces card))) (doors c)) (Card.Type.faces card)
+        offenders = filter (offends . Printing.card) ps
+    Spec.assertBool
+      s
+      (not (all (all (null . doors) . Card.Type.faces . Printing.card) ps))
+      "the pool has a card with an unlock trigger to lint"
+    Spec.assertEqWith s "every door named is a face of the card naming it" (fmap (S.nameOf . Printing.card) offenders) []
   Spec.it s "no mode declares a slot named enchant" $ do
     ps <- S.allPrintings s
     let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Face.spell c))

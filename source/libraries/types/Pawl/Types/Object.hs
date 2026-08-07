@@ -191,6 +191,12 @@ data Object = MkObject
     -- rules single one out. Nothing everywhere else, and the layout decides --
     -- see Pawl.Engine.Game.faceOf.
     --
+    -- Nothing for a ROOM permanent in particular, though its spell was cast as
+    -- one half like any other split card's: CR 709.5 gives a permanent with a
+    -- shared type line both halves at once, subtracting the locked ones, so no
+    -- single face is up. What the cast half became is unlockedHalves below (CR
+    -- 709.5d), and Pawl.Engine.Game.resolveFaceFor is where the two part.
+    --
     -- A CardName rather than a positional index: CR 709.3 has a player choose
     -- which half they are casting, and CR 709.4a is what gives a card's faces
     -- names to choose from. Resolved against the object's STORED card, never a

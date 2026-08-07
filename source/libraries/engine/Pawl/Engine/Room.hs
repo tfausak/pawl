@@ -55,7 +55,7 @@ import qualified Pawl.Types.Zone as Zone
 -- card, never a projected view: CR 709.5 makes which half a characteristic is in
 -- a copiable value, so the doors of a Room that became a copy of another Room
 -- are the copy's -- which falls out of Game.cardOf answering with the card
--- underneath (#N).
+-- underneath (#925).
 lockedHalves :: ObjectId -> GameState -> [Face.Face Card.Type.Card]
 lockedHalves oid gs = Maybe.fromMaybe [] $ do
   obj <- Game.lookupObject oid gs

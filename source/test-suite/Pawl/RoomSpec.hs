@@ -43,6 +43,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -54,6 +55,7 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -252,7 +254,7 @@ spec s registry = Spec.describe s "Room" $ do
   -- The same board as the case above, one action later. Every assertion that
   -- case makes about Steaming Sauna's text flips.
   Spec.it s "CR 709.5e paying the unlock cost opens the other door" $ do
-    (roomId, _, gs) <- setUp s registry
+    (roomId, wallId, gs) <- setUp s registry
     let after = castDoor furnaceName roomId gs
     case roomPermanent after of
       [permId] -> do
@@ -281,6 +283,9 @@ spec s registry = Spec.describe s "Room" $ do
           (S.handSize S.alice (resolveAll (settle (beginEndStep opened))) - S.handSize S.alice opened)
           1
         Spec.assertEqWith s "nothing is left to unlock" (unlocksOffered opened) []
+        -- CR 709.5h's "a PARTICULAR half": the BLUE door opening is not the red
+        -- door's trigger, so the wall takes no second helping of damage.
+        Spec.assertEqWith s "and the other door's trigger did not fire again" (S.damageOf wallId opened) (Just 3)
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 709.5h, on the door the special action opened rather than the one the
   -- cast did: "These abilities trigger when that permanent is given the
@@ -329,6 +334,28 @@ spec s registry = Spec.describe s "Room" $ do
         drained = List.foldl' (flip S.tapObject) after (Set.toList (GameState.battlefield after))
     Spec.assertBool s (not (null (unlocksOffered after))) "the control: ten untapped lands pay {3}{U}{U}"
     Spec.assertEqWith s "a tapped-out controller is offered nothing" (unlocksOffered drained) []
+  -- CR 400.7: "an object that moves from one zone to another becomes a new object
+  -- with no memory of, or relation to, its previous existence." An unlocked
+  -- designation is per-incarnation state and goes back with the rest, which is
+  -- what makes CR 709.5d the ONLY writer of it on an entry -- a Room that dies
+  -- and is returned comes back with its doors shut unless a half was cast again.
+  --
+  -- Asserted on Object.newIncarnation directly rather than through a bounce,
+  -- because Pawl.Engine.Event.changeZoneAttaching writes the field on every move
+  -- as well (CR 709.5d) and would mask the forgetting on the funnel path. The
+  -- three hand-written movers that call newIncarnation and not the funnel --
+  -- Setup's CR 727.2 restart and CR 729.5 funnel-back, and Departure's CR 800.4a
+  -- exile -- are what this covers.
+  Spec.it s "CR 400.7 a new incarnation of a Room has neither designation" $ do
+    (roomId, _, gs) <- setUp s registry
+    let after = castDoor furnaceName roomId gs
+    case roomPermanent after of
+      [permId] -> case Game.lookupObject permId after of
+        Nothing -> Spec.assertFailure s "expected to find the Room permanent"
+        Just obj -> do
+          Spec.assertEqWith s "the control: this incarnation has the red door open" (Object.unlockedHalves obj) (Set.singleton furnaceName)
+          Spec.assertEqWith s "the next one has neither" (Object.unlockedHalves (Object.newIncarnation obj)) Set.empty
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 709.5d's last sentence: "If it's entering the battlefield and neither half
   -- was cast as a spell, it enters with neither unlocked designation." Put the
   -- card onto the battlefield from the hand and both doors are shut -- so CR
@@ -346,5 +373,11 @@ spec s registry = Spec.describe s "Room" $ do
           (Just Set.empty)
         Spec.assertEqWith s "and so no name" (Projection.nameOf permId put) (CardName.MkCardName Text.empty)
         Spec.assertEqWith s "and no rules text" (length (Projection.triggeredAbilitiesOf permId put)) 0
-        Spec.assertEqWith s "though CR 709.5a leaves the shared type line" (Set.member permId (GameState.battlefield put)) True
+        -- CR 709.5a: "Each half of a split card with a shared type line shares
+        -- the types and subtypes listed on that card's shared type line." CR
+        -- 709.5 subtracts the name, the mana cost and the rules text -- and
+        -- nothing else -- so a Room with both doors shut is still an
+        -- Enchantment Room on the battlefield.
+        Spec.assertEqWith s "though CR 709.5a leaves the card types" (Projection.cardTypesOf permId put) (Set.singleton CardType.Enchantment)
+        Spec.assertEqWith s "and the shared subtype" (Projection.subtypesOf permId put) (Set.singleton Subtype.Room)
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))

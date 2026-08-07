@@ -558,14 +558,21 @@ nextFace mName card =
 -- CR 712.13: "By default, a resolving double-faced spell that becomes a
 -- permanent is put onto the battlefield with the same face up that was face up
 -- on the stack." Takes the face the SPELL showed on the stack (Object.face) and
--- answers the one the permanent enters showing.
+-- answers the half that survives the move onto the battlefield.
 --
--- Nothing for every layout the rule does not name, and that is a claim rather
--- than a shrug: CR 400.7 makes the resolving spell a new object, so the default
--- is that nothing about the stack incarnation survives, and CR 709.4 and CR
--- 715.4 say outright that a split card and an adventurer card have their
--- combined and normal characteristics respectively in every zone but the stack.
--- Dropping the face is what gives them that.
+-- WHAT THE ANSWER IS FOR differs by layout, which is why it is worded as a half
+-- surviving rather than as the face the permanent shows. For a double-faced card
+-- CR 712.13 leaves the permanent showing it, and Object.face is where
+-- Pawl.Engine.Event.changeZoneAttaching writes it. For a Room, CR 709.5d spends
+-- it on an unlocked DESIGNATION instead -- see the Room arm below, and
+-- hasSharedTypeLine, which is what that move reads to tell the two apart.
+--
+-- Nothing for every layout neither rule names, and that is a claim rather than a
+-- shrug: CR 400.7 makes the resolving spell a new object, so the default is that
+-- nothing about the stack incarnation survives, and CR 709.4 and CR 715.4 say
+-- outright that a split card and an adventurer card have their combined and
+-- normal characteristics respectively in every zone but the stack. Dropping the
+-- face is what gives them that.
 --
 enteringFace :: Card.Card -> Maybe CardName.CardName -> Maybe CardName.CardName
 enteringFace card shown = case Card.layout card of

@@ -1001,7 +1001,7 @@ designateProtector oid = do
 -- given.
 --
 -- CR 709.5g's LOCK -- taking a designation back away -- has no counterpart
--- function: no card in the pool locks a door (#N).
+-- function: no card in the pool locks a door (#924).
 unlockHalf :: ObjectId -> CardName.CardName -> Game ()
 unlockHalf oid half = do
   gs <- State.get
