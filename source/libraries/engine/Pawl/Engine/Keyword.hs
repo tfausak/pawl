@@ -267,6 +267,10 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Fear -> []
+  -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
+  -- doesn't use the stack (CR 116), so morph gives a permanent no activated
+  -- ability. Pawl.Engine.Keyword.morphCost serves that action instead.
+  Keyword.Morph _ -> []
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
