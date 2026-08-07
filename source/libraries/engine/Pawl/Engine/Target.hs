@@ -173,8 +173,7 @@ admittedGiven pcs perspective source spec gs =
 --     -- "[quality] spells your opponents control or abilities your opponents
 --     control from [quality] sources" -- which `sourceView` answers and plain
 --     hexproof never asks. Protection (CR 702.16b) asks the same question of the
---     same view, in the same two halves; it is not built (#555 covers only rule
---     702.11d).
+--     same view, in the same two halves; it is not a keyword here at all (#877).
 --
 -- The quality is matched against the source with the CANDIDATE's controller as
 -- the Context's perspective, not the targeting player's: rule 702.11d's ability

@@ -7,7 +7,8 @@
 -- determine) and the P3b/M5.5 gates (Tarmogoyf, Inner Calm Outer Strength,
 -- Twisted Image, Nightmare, Monstrous War-Leech, Omnath Locus of Mana, Serra
 -- Avatar), plus CR 604.2's "as long as" gate on a printed static ability (Kird
--- Ape) and CR 613.4c's layer 7c anthem narrowed by a keyword its affected
+-- Ape for the clause that names a player, Knight of Grace for the one that names
+-- none) and CR 613.4c's layer 7c anthem narrowed by a keyword its affected
 -- objects have (Hand of the Praetors).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
@@ -548,6 +549,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   omnathSpec s registry
   serraAvatarSpec s registry
   kirdApeSpec s registry
+  knightOfGraceSpec s registry
   woodElementalSpec s registry
   handOfThePraetorsSpec s registry
 
@@ -841,6 +843,48 @@ removeFromBattlefield oid gs =
     { GameState.battlefield = Set.delete oid (GameState.battlefield gs),
       GameState.objects = Map.delete oid (GameState.objects gs)
     }
+
+-- Knight of Grace ({1}{W} Creature -- Human Knight, printed 2/2), third line:
+-- "This creature gets +1/+0 as long as any player controls a black permanent."
+-- Oracle text verified against Scryfall. Its other two lines, first strike and CR
+-- 702.11d's "hexproof from black", are Pawl.TargetSpec's half.
+--
+-- The SAME shape as Kird Ape's clause above -- a CR 604.2 "as long as" gate on a
+-- printed static ability, counting a population over the battlefield -- with one
+-- difference that is the whole reason it earns a case of its own: "ANY player
+-- controls" drops the ControlledBy conjunct. Kird Ape's clause is CR 109.5's
+-- "you" and Knight of Grace's names no player at all, so the Count's filter is
+-- bare and its InZone scope (CR 400.1's shared battlefield, with EachPlayer) does
+-- all the sweeping.
+knightOfGraceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+knightOfGraceSpec s registry = Spec.describe s "Knight of Grace" $ do
+  -- Both halves of the clause on one board, with the black permanent ENTERING
+  -- between the two assertions (Kird Ape's first case's rationale): asserting only
+  -- the 3/2 passes for an engine that ignored the condition, and only the 2/2 for
+  -- one that dropped the ability.
+  --
+  -- BOB's Bog Wraith ({3}{B} Creature -- Wraith), not alice's, and the Knight is
+  -- alice's: that is what discriminates "any player controls" from a
+  -- ControlledBy You mis-authoring, which reads 2/2 here.
+  --
+  -- Toughness is asserted too, so a ModifyPowerToughness 1 1 mis-authoring of the
+  -- "+1/+0" fails rather than passing on the power alone.
+  Spec.it s "CR 604.2 a 2/2 with no black permanent, and a 3/2 once ANY player controls one" $ do
+    knight <- S.printingOf s registry "Knight of Grace"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    let (knightId, alone) = S.addCreature knight S.alice (Setup.emptyGame S.bothPlayers)
+        withBlack = snd (S.addCreature bogWraith S.bob alone)
+    Spec.assertEqWith s "no black permanent anywhere" (S.powerToughnessOf knightId alone) (Just (2, 2))
+    Spec.assertEqWith s "bob's black creature entered, and it is any player's" (S.powerToughnessOf knightId withBlack) (Just (3, 2))
+  -- The other side of "any player": the Knight's OWN controller counts too. A
+  -- mis-authoring that narrowed the filter the other way -- to what an opponent
+  -- controls -- passes the case above and fails this one.
+  Spec.it s "CR 604.2 the Knight's own controller is one of the any players" $ do
+    knight <- S.printingOf s registry "Knight of Grace"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    let (knightId, alone) = S.addCreature knight S.alice (Setup.emptyGame S.bothPlayers)
+        withBlack = snd (S.addCreature bogWraith S.alice alone)
+    Spec.assertEqWith s "alice's own black creature turns it on as readily" (S.powerToughnessOf knightId withBlack) (Just (3, 2))
 
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), first line: "Serra
 -- Avatar's power and toughness are each equal to your life total." Oracle text

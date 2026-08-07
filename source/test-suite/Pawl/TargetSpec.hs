@@ -8,13 +8,13 @@
 -- reads WHO is targeting. One case covers the other side of the
 -- restriction/admission split -- Pawl.Engine.Sba's CR 303.4c re-check, which
 -- asks what an enchant spec ADMITS and must not ask a targeting question --
--- three cover rule 702.11's "hexproof from [quality]" variant (CR 702.11d and
--- 702.11e), the only restriction here that reads what the SOURCE is rather than
--- who controls it -- and the last ten cover
--- CR 115.2's two escape hatches from "only permanents are legal targets": its
--- clause (b) as Cancel and Stifle, its clause (a) as Raise Dead, Withered Wretch
--- and Riftsweeper. (Those letters are prose inside rule 115.2, not subrule
--- numbers; there is no CR 115.2a.)
+-- a group of them covers rule 702.11's "hexproof from [quality]" variant (CR
+-- 702.11d and 702.11e), the only restriction here that reads what the SOURCE is
+-- rather than who controls it, ending on Knight of Grace's printing -- and the
+-- last ten cover CR 115.2's two escape hatches from "only permanents are legal
+-- targets": its clause (b) as Cancel and Stifle, its clause (a) as Raise Dead,
+-- Withered Wretch and Riftsweeper. (Those letters are prose inside rule 115.2,
+-- not subrule numbers; there is no CR 115.2a.)
 --
 -- Raise Dead and Withered Wretch are the two halves of CR 400.1's per-player
 -- axis -- "in your graveyard" against "from a graveyard" -- and the case that
@@ -580,12 +580,14 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- and every quality would be vacuously unmatched -- the whole case would pass
   -- for the wrong reason.
   --
-  -- SYNTHETIC GRANT, and the one crutch here: no card in data/cards prints or
-  -- grants the variant (#555), so the ability arrives as a stored layer-6
-  -- continuous effect, exactly as the CR 608.2b case below grants plain hexproof.
-  -- The granted shape is real Magic -- Skrelv, Defector Mite and Sungold Sentinel
-  -- both grant one -- and both of them choose a colour first, which pawl cannot
-  -- prompt for.
+  -- SYNTHETIC GRANT BY CHOICE, not for want of a printing: Knight of Grace is
+  -- committed and gets its own case below. What no printed card can do is what
+  -- this case needs -- MUTATE the quality across six rows off one board, the
+  -- Piker's colour and both spells held fixed while only the ability moves -- so
+  -- the ability arrives as a stored layer-6 continuous effect, exactly as the CR
+  -- 608.2b case below grants plain hexproof. The granted shape is real Magic:
+  -- Skrelv, Defector Mite and Sungold Sentinel both grant one, and both of them
+  -- choose a colour first, which pawl cannot prompt for.
   Spec.it s "CR 702.11d hexproof from black stops an opponent's black spell and admits their white one" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
@@ -622,8 +624,13 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- ONE BOARD, ONE SPELL, TWO PERSPECTIVES, the way the CR 702.11b case above
   -- reads Slippery Bogle: an implementation that dropped the controller test once
   -- the quality matched would make the Piker untargetable by everybody, and one
-  -- that dropped the quality test would be the far-too-strong reading #555 opened
-  -- with. Neither passes both assertions.
+  -- that dropped the quality test would read the variant as CR 702.11b's plain
+  -- hexproof, which is far too strong. Neither passes both assertions.
+  --
+  -- The grant stays synthetic so this reads off the SAME Piker board as the case
+  -- above, with the controller axis as the only thing that moved between them.
+  -- Knight of Grace makes the same "your opponents control" assertion off a real
+  -- printing below.
   Spec.it s "CR 702.11d hexproof from black does not stop its own controller's black spell" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     doomBlade <- S.printingOf s registry "Doom Blade"
@@ -693,6 +700,57 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertBool s (S.castable S.alice dbId (guarded Color.White)) "hexproof from white leaves it the same one it had"
     Spec.assertEqWith s "and bob's Piker dies to it" (S.creaturesInPlay S.bob (resolve (guarded Color.White))) 0
     Spec.assertEqWith s "while the black row leaves it alive" (S.creaturesInPlay S.bob (guarded Color.Black)) 1
+
+  -- THE PRINTED CARD, which is what the cases above stand in for: Knight of Grace
+  -- ({1}{W} Creature -- Human Knight 2/2, "First strike / Hexproof from black /
+  -- This creature gets +1/+0 as long as any player controls a black permanent"),
+  -- oracle text verified against Scryfall. Its variant arrives off the card's own
+  -- `keywords`, through the codec, with no test-side grant anywhere -- so this is
+  -- the case that would notice the wire format and `Keyword.Hexproof`'s payload
+  -- disagreeing, which no synthetic grant can.
+  --
+  -- THREE ANSWERS OFF ONE BOARD, and each is load-bearing:
+  --
+  --   * alice's black Doom Blade does NOT reach it (CR 702.11d).
+  --   * alice's WHITE Angelic Edict does -- without this leg an implementation
+  --     that read the variant as CR 702.11b's plain hexproof passes.
+  --   * BOB's own black Doom Blade does, bob being the Knight's controller. CR
+  --     702.11d stops only what "your opponents control", and reading this off
+  --     alice would let "that player" and "an opponent" collapse into each other.
+  --
+  -- The Knight is itself WHITE (CR 202.2, {1}{W}), which is what makes the first
+  -- leg discriminating: an implementation that matched the quality against the
+  -- CANDIDATE's colours rather than the source's finds no black on it and admits
+  -- the Doom Blade.
+  --
+  -- Every spell is a REAL object on the stack for the reason the CR 702.11d case
+  -- above gives: S.noSource names no object, its view carries no colour, and the
+  -- whole group would pass vacuously.
+  Spec.it s "CR 702.11d Knight of Grace stops an opponent's black spell, admits their white one, and admits its own controller's black one" $ do
+    knight <- S.printingOf s registry "Knight of Grace"
+    doomBlade <- S.printingOf s registry "Doom Blade"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    case (S.spellTargetSpec doomBlade, S.spellTargetSpec angelicEdict) of
+      (Just blackSpec, Just whiteSpec) -> do
+        let (knightId, board) = S.addCreature knight S.bob (Setup.emptyGame S.bothPlayers)
+            -- Doom Blade's pool is Creatures and Angelic Edict's is Permanents,
+            -- so the same Knight is tagged differently in the two sets (CR 115).
+            reaches printing theSpec tag caster =
+              let (spellId, onStack) = S.spellOnStack printing caster board
+               in Set.member (tag knightId) (Target.legalRecipients (Just caster) spellId theSpec onStack)
+        Spec.assertBool
+          s
+          (not (reaches doomBlade blackSpec Recipient.ToCreature S.alice))
+          "alice's black Doom Blade cannot target bob's Knight of Grace (CR 702.11d)"
+        Spec.assertBool
+          s
+          (reaches angelicEdict whiteSpec Recipient.ToObject S.alice)
+          "her white Angelic Edict can -- the half a plain-hexproof reading loses"
+        Spec.assertBool
+          s
+          (reaches doomBlade blackSpec Recipient.ToCreature S.bob)
+          "and bob's own black Doom Blade can, CR 702.11d stopping only what his opponents control"
+      _ -> Spec.assertFailure s "Doom Blade and Angelic Edict should each declare a target slot"
 
   -- CR 608.2b: "If the spell or ability specifies targets, it checks whether the
   -- targets are still legal. ... If all its targets, for every instance of the
