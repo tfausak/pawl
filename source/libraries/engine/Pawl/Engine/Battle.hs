@@ -273,7 +273,7 @@ siegeDefeat =
       Effect.MoveToZone
         Binding.triggerSource
         Zone.Exile
-        EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False}
+        EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False}
         (Just Binding.became)
         Nothing
     -- "then you may cast it transformed without paying its mana cost": CR 608.2g's

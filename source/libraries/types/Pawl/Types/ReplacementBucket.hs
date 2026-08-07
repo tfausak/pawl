@@ -10,9 +10,11 @@ module Pawl.Types.ReplacementBucket where
 -- Gather Specimens. CopyOnEntry (616.1c) is EntryR AsCopy, from Clone, split from
 -- EntryR ChoiceOf, which stays in Other with every other arm. BackFaceOnEntry
 -- (616.1d) is classification with a documented absence: CR 701.27 transform has
--- landed, and what it still needs is the enter-transformed wording -- CR 712.13a
--- for a double-faced spell on the stack, CR 712.14a for a card put onto the
--- battlefield without being cast (#70).
+-- landed, and CR 712.14a's "put onto the battlefield transformed" with it, but
+-- that wording is an instruction the effect carries (Pawl.Types.EntryRiders)
+-- rather than a replacement effect. What this bucket still waits on is CR
+-- 712.13a, the ability that causes a double-faced SPELL on the stack to enter
+-- the battlefield transformed (#906).
 data ReplacementBucket
   = SelfReplacement -- CR 616.1a
   | ControlOnEntry -- CR 616.1b

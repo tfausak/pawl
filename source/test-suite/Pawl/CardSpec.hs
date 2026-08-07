@@ -74,6 +74,7 @@ import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
@@ -2567,6 +2568,27 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     Spec.assertEqWith s "control belongs on a static ability, never in a stored effect" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 712.14a's rider is about a double-faced CARD, and CR 111.1 makes a token
+  -- no card at all -- so an Effect.Create that carried it would be asking for a
+  -- face-turn no rule performs. Pawl.Engine.Resolve's Create arm accordingly does
+  -- not read the field, and this is what holds the corpus to that reading. A lint
+  -- rather than a per-opcode rider type: CR 110.5b's tap state and CR 508.4's
+  -- attacking genuinely are common to Create and MoveToZone, so splitting the
+  -- record to keep one field off one opcode would duplicate the other two.
+  Spec.it s "no Create carries CR 712.14a's transformed entry rider" $ do
+    ps <- S.allPrintings s
+    let creates effect = case effect of
+          Effect.Create _ _ riders _ -> EntryRiders.transformed riders
+          _ -> False
+        moves effect = case effect of
+          Effect.MoveToZone _ _ riders _ _ -> EntryRiders.transformed riders
+          _ -> False
+        offenders = filter (anyFace (any creates . cardResolutionEffects) . Printing.card) ps
+    -- Guards against a vacuous sweep: with no transformed rider in the pool at
+    -- all this would pass whatever Create did. Befriending the Moths is the card
+    -- that prints one.
+    Spec.assertBool s (any (anyFace (any moves . cardResolutionEffects) . Printing.card) ps) "the pool has a card returning itself transformed"
+    Spec.assertEqWith s "a token is not a card, so no token is created transformed" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).

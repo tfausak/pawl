@@ -15,11 +15,20 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       s
       EntryRiders.toJson
       EntryRiders.fromJson
-      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True}
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False}
       """ {"tapped":{"type":"Tapped"},"attacking":true} """
-  -- CR 110.5b's default written out means both keys elided: an untapped,
-  -- non-attacking entry is what an EMPTY object means.
-  Spec.it s "MkEntryRiders, the CR 110.5b default omits both keys" $
+  -- CR 712.14a's rider, which no other rider implies: a card returned
+  -- transformed is not tapped and not attacking by that fact.
+  Spec.it s "MkEntryRiders, transformed alone" $
+    Common.assertJsonCodec
+      s
+      EntryRiders.toJson
+      EntryRiders.fromJson
+      EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = True}
+      """ {"transformed":true} """
+  -- CR 110.5b's default written out means every key elided: an untapped,
+  -- non-attacking, untransformed entry is what an EMPTY object means.
+  Spec.it s "MkEntryRiders, the CR 110.5b default omits every key" $
     Common.assertJsonCodec
       s
       EntryRiders.toJson
@@ -27,12 +36,16 @@ spec s = Spec.describe s "Pawl.Codec.EntryRiders" $ do
       EntryRiders.defaultValue
       """ {} """
   Spec.describe s "defaultValue" $ do
-    Spec.it s "is untapped and not attacking" $
-      Spec.assertEq s EntryRiders.defaultValue EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False}
+    Spec.it s "is untapped, not attacking and not transformed" $
+      Spec.assertEq s EntryRiders.defaultValue EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False}
     Spec.it s "a missing tapped key decodes as Untapped" $
       Common.assertFromJson s EntryRiders.fromJson "{\"attacking\":false}" EntryRiders.defaultValue
     Spec.it s "a missing attacking key decodes as False" $
       Common.assertFromJson s EntryRiders.fromJson "{\"tapped\":{\"type\":\"Untapped\"}}" EntryRiders.defaultValue
+    -- CR 712.14: the front face is the default, so a card file that says nothing
+    -- about transforming is saying the card enters showing its front face.
+    Spec.it s "a missing transformed key decodes as False" $
+      Common.assertFromJson s EntryRiders.fromJson "{\"tapped\":{\"type\":\"Untapped\"},\"attacking\":false}" EntryRiders.defaultValue
     -- An explicit null is tolerated only for a Maybe field, composed with
     -- Common.decodeMaybe. `tapped` isn't one, so a null is a decode error
     -- rather than a second spelling of the default.

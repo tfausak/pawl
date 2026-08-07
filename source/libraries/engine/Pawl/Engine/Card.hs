@@ -221,10 +221,12 @@ castableFaces card = case Card.layout card of
   -- cast "transformed" or "converted" puts a back face on the stack (CR 712.8c /
   -- 712.11a), and such an effect names the face itself rather than reaching this
   -- list -- Effect.OfferCast carries CR 310.11b's "transformed" rider and
-  -- Pawl.Engine.Resolve answers it with `backFace` below. What is still absent is
-  -- the CONVERT wording (#698), and the wordings that reach a back face without
-  -- one on the STACK -- CR 712.13a for a double-faced spell already on the stack,
-  -- CR 712.14a for a card put there without being cast (#70).
+  -- Pawl.Engine.Resolve answers it with `backFace` below. CR 712.14a's wording
+  -- reaches a back face without one on the stack, and likewise does not come
+  -- through here: Pawl.Types.EntryRiders carries it and
+  -- Pawl.Engine.Event.changeZoneEntering applies it. What is still absent is the
+  -- CONVERT wording (#698), and CR 712.13a's ability causing a double-faced
+  -- spell already on the stack to enter transformed (#906).
   Layout.Transforming -> [NonEmpty.head (Card.faces card)]
   -- CR 712.11b: "A player casting a modal double-faced card or a copy of a modal
   -- double-faced card as a spell chooses which face they are casting before
@@ -297,7 +299,8 @@ landFaces card =
 -- False for every other layout, and that is the rule rather than a gap. CR
 -- 712.14b names the modal double-faced card and nothing else; a nonmodal one is
 -- covered by CR 712.14's default (front face up) and by CR 712.14a's
--- "transformed" wording, which pawl has no producer for (#70).
+-- "transformed" wording, whose own refusal -- a card that isn't double-faced
+-- stays put -- is the same door's, read off `backFace` rather than off this.
 staysWhenPutOntoBattlefield :: Card.Card -> Bool
 staysWhenPutOntoBattlefield card = case Card.layout card of
   Layout.Normal -> False
@@ -449,11 +452,12 @@ enteringFace card shown = case Card.layout card of
   Layout.Normal -> Nothing
   Layout.Split -> Nothing
   Layout.Adventure -> Nothing
-  -- Indistinguishable from Nothing for every nonmodal card pawl can build today,
-  -- and written as the rule reads anyway: CR 712.11 casts one with its front
-  -- face up, so `shown` IS the front face, and CR 712.8a resolves Nothing to
-  -- that same face. The two answers part only once a card can be cast
-  -- "transformed" (CR 712.11a), which is #698's wording plus #70's.
+  -- CR 712.11 casts one with its front face up, so for an ordinary cast `shown`
+  -- IS the front face and CR 712.8a would resolve Nothing to that same face. The
+  -- two answers part where CR 712.11a's "transformed" cast does put a back face
+  -- on the stack, which CR 310.11b's defeated Siege reaches (Pawl.BattleSpec's
+  -- "she may then cast it TRANSFORMED and FREE" is the proof). The CONVERT
+  -- spelling of the same permission is still absent (#698).
   Layout.Transforming -> shown
   -- The arm CR 712.13 is written for in this pool: CR 712.11b let the caster
   -- choose either face, so the face that was up on the stack is genuinely a
