@@ -53,9 +53,9 @@ first question.
 `CONTRIBUTING.md` has the loop --- issue, branch, TDD, draft PR --- and applies
 to agents as written. What it doesn't say:
 
-- Agents usually work in a fresh `git worktree`, which is the case
-  `CONTRIBUTING.md` warns about under the configure command: without
-  `cabal.project.local` copied in, a locally green build says nothing about CI.
+- Agents usually work in a fresh `git worktree`, which starts without the
+  gitignored `cabal.project.local`. Copy it in from the primary checkout before
+  the first build, or a locally green build says nothing about CI.
 
 - Self-review the branch before opening the PR, and fix the findings on the
   branch. At minimum: re-check every CR citation against `docs/rules.txt`, and
