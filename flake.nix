@@ -73,6 +73,15 @@
             cabal check
             touch "$out"
           '';
+
+          # Run from the source root so ormolu finds pawl.cabal and picks up
+          # default-extensions, as it does in the dev shell.
+          ormolu = pkgs.runCommand "pawl-ormolu-check" { nativeBuildInputs = [ pkgs.ormolu ]; } ''
+            export HOME="$PWD"
+            cd ${source}
+            find source -name '*.hs' -print0 | xargs -0 ormolu --mode check
+            touch "$out"
+          '';
         }
       );
 
