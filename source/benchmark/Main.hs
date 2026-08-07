@@ -1,322 +1,17 @@
-{-# LANGUAGE GADTs #-}
-
 import qualified Control.Exception as Exception
-import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import Numeric.Natural (Natural)
-import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Script as Script
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
-import qualified Pawl.Types.Action as Action
-import qualified Pawl.Types.CardName as CardName
-import qualified Pawl.Types.Color as Color
-import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Deck as Deck
-import qualified Pawl.Types.EntwineDecision as EntwineDecision
-import qualified Pawl.Types.MulliganDecision as MulliganDecision
-import qualified Pawl.Types.OptionalDecision as OptionalDecision
-import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.Prompt as Prompt
-import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Result (Result)
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Test.Tasty.Bench as Bench
-
-isCreatureRecipient :: Recipient.Recipient -> Bool
-isCreatureRecipient r = case r of
-  Recipient.ToCreature _ -> True
-  Recipient.ToPlaneswalker _ -> False
-  Recipient.ToBattle _ -> False
-  Recipient.ToPlayer _ -> False
-  Recipient.ToObject _ -> False
-
--- Cast if anything is castable, else play a land, else pass. Mirrors the test
--- suite's Pawl.Support.castAnswer. The land fallback is load-bearing: without it
--- no land ever reaches the battlefield, so no mana ever exists, so
--- Action.legalActions never offers a Cast and the filter is always empty -- which
--- is how all three benchmarks came to execute the same goldfish game (#66).
-castElsePlay :: [Action.Action] -> Action.Action
-castElsePlay actions =
-  let isCast a = case a of
-        Action.Cast {} -> True
-        _ -> False
-      isPlay a = case a of
-        Action.Play {} -> True
-        _ -> False
-   in case filter isCast actions of
-        h : _ -> h
-        [] -> case filter isPlay actions of
-          h : _ -> h
-          [] -> Action.Pass
-
--- CR 514.1 cleanup discard, answered from the END of the hand.
---
--- Also load-bearing for #66, and not interchangeable with taking the front. The
--- hand is oldest-first, and a player may play only one land per turn (CR 305.2),
--- so surplus lands pile up as the oldest cards held. Discarding from the front
--- therefore pitches precisely the lands the script needs, and the board never
--- develops even with the cast/play fallback above in place: measured over one
--- match, front-discard yields 4 land plays and no combat, back-discard yields 72
--- land plays and 66 declare-attackers prompts.
-discardNewest :: [a] -> Natural -> [a]
-discardNewest ids n = List.genericTake n (reverse ids)
-
-alwaysPass :: Prompt.Prompt r -> r
-alwaysPass p = case p of
-  Prompt.Shuffle ids -> ids
-  Prompt.RandomFirstPlayer order -> NonEmpty.head order
-  Prompt.ChooseAction {} -> Action.Pass
-  Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
-  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  Prompt.DeclareAttackers {} -> []
-  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
-  Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  Prompt.SearchLibrary {} -> Nothing
-  Prompt.CastWhileSearching {} -> Nothing
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  Prompt.ChooseCopyTarget {} -> Nothing
-  Prompt.ChooseEntryOption {} -> 0
-  Prompt.ChooseRiot {} -> OptionalDecision.Declines
-  Prompt.ChooseColor {} -> Color.White
-  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
-  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
-  -- permanent away. The engine's own replay fallback takes the maximal one.
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  -- CR 702.122a: tap every candidate, the maximal subset, matching
-  -- Replay.defaultAnswer. NOT the empty set the arm above takes: this prompt is
-  -- raised only once a crew ability is already being activated, so declining is
-  -- not on offer, and an answer under the threshold makes the payment Unpaid
-  -- (CR 601.2h forbids a partial payment) and voids the activation instead of
-  -- paying it. The maximal subset clears the threshold whenever the cost is
-  -- payable at all, save on a board where a candidate has negative power. A
-  -- deterministic answer, not a recommendation -- and unreached today, since no
-  -- benchmark deck holds a Vehicle and castElsePlay never activates anything.
-  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
-  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  Prompt.MulliganAction {} -> Nothing
-  Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
-  -- the benchmark's script deterministic.
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
-  -- resolving effect put it -- the least-eventful default, as above. A test that
-  -- wants the cast TAKEN says so with its own interpreter.
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
-  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
-  -- test that wants the cost PAID says so with its own interpreter, which is
-  -- what makes that answer discriminating.
-  Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
-  -- and is the least eventful default, matching Replay.defaultAnswer.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.7e: both halves are legal answers whatever the board, so the head
-  -- is a deterministic default rather than the only payable route.
-  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
-
--- Plays lands and casts when legal, otherwise passes: the benchmark that actually
--- exercises the stack, mana payment, and resolution.
-castAnswer :: Prompt.Prompt r -> r
-castAnswer p = case p of
-  Prompt.Shuffle ids -> ids
-  Prompt.RandomFirstPlayer order -> NonEmpty.head order
-  Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
-  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  Prompt.DeclareAttackers {} -> []
-  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
-  Prompt.DeclareBlockers {} -> Map.empty
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseAction _ _ actions -> castElsePlay actions
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  Prompt.SearchLibrary {} -> Nothing
-  Prompt.CastWhileSearching {} -> Nothing
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  Prompt.ChooseCopyTarget {} -> Nothing
-  Prompt.ChooseEntryOption {} -> 0
-  Prompt.ChooseRiot {} -> OptionalDecision.Declines
-  Prompt.ChooseColor {} -> Color.White
-  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
-  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
-  -- permanent away. The engine's own replay fallback takes the maximal one.
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  -- CR 702.122a: tap every candidate, the maximal subset, matching
-  -- Replay.defaultAnswer. NOT the empty set the arm above takes: this prompt is
-  -- raised only once a crew ability is already being activated, so declining is
-  -- not on offer, and an answer under the threshold makes the payment Unpaid
-  -- (CR 601.2h forbids a partial payment) and voids the activation instead of
-  -- paying it. The maximal subset clears the threshold whenever the cost is
-  -- payable at all, save on a board where a candidate has negative power. A
-  -- deterministic answer, not a recommendation -- and unreached today, since no
-  -- benchmark deck holds a Vehicle and castElsePlay never activates anything.
-  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
-  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  Prompt.MulliganAction {} -> Nothing
-  Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
-  -- the benchmark's script deterministic.
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
-  -- resolving effect put it -- the least-eventful default, as above. A test that
-  -- wants the cast TAKEN says so with its own interpreter.
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
-  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
-  -- test that wants the cost PAID says so with its own interpreter, which is
-  -- what makes that answer discriminating.
-  Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
-  -- and is the least eventful default, matching Replay.defaultAnswer.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.7e: both halves are legal answers whatever the board, so the head
-  -- is a deterministic default rather than the only payable route.
-  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
-
--- Plays lands, casts, attacks, and blocks: the benchmark that exercises combat.
-fightAnswer :: Prompt.Prompt r -> r
-fightAnswer p = case p of
-  Prompt.Shuffle ids -> ids
-  Prompt.RandomFirstPlayer order -> NonEmpty.head order
-  Prompt.Concede _ -> Concession.Continues
-  Prompt.ChooseDiscard _ _ ids n -> discardNewest ids n
-  Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseProliferate {} -> (Set.empty, Set.empty)
-  Prompt.ChooseRingBearer _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseLegend _ _ candidates -> NonEmpty.head candidates
-  Prompt.DeclareAttackers _ _ ids -> ids
-  Prompt.ChooseAttackTarget _ _ _ options -> NonEmpty.head options
-  Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
-    [] -> Map.empty
-    a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
-  Prompt.AssignCombatDamage _ _ _ thresholds n ->
-    case filter isCreatureRecipient (Map.keys thresholds) of
-      r : _ -> Map.singleton r n
-      [] -> Map.empty
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  Prompt.ChooseAction _ _ actions -> castElsePlay actions
-  Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseCreatureTypeSwap {} -> (Subtype.Frog, Subtype.Frog)
-  Prompt.SearchLibrary {} -> Nothing
-  Prompt.CastWhileSearching {} -> Nothing
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
-  Prompt.ChooseCopyTarget {} -> Nothing
-  Prompt.ChooseEntryOption {} -> 0
-  Prompt.ChooseRiot {} -> OptionalDecision.Declines
-  Prompt.ChooseColor {} -> Color.White
-  Prompt.ChooseCardName {} -> CardName.MkCardName mempty
-  Prompt.ChooseOpponent _ _ _ opponents -> NonEmpty.head opponents
-  Prompt.ChooseProtector _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseBasicLandType {} -> Subtype.Mountain
-  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
-  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
-  Prompt.ChooseReplacement {} -> 0
-  Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
-  Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
-  -- Sacrifice nothing: the minimal subset, so a default answerer never throws a
-  -- permanent away. The engine's own replay fallback takes the maximal one.
-  Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
-  -- CR 702.122a: tap every candidate, the maximal subset, matching
-  -- Replay.defaultAnswer. NOT the empty set the arm above takes: this prompt is
-  -- raised only once a crew ability is already being activated, so declining is
-  -- not on offer, and an answer under the threshold makes the payment Unpaid
-  -- (CR 601.2h forbids a partial payment) and voids the activation instead of
-  -- paying it. The maximal subset clears the threshold whenever the cost is
-  -- payable at all, save on a board where a candidate has negative power. A
-  -- deterministic answer, not a recommendation -- and unreached today, since no
-  -- benchmark deck holds a Vehicle and castElsePlay never activates anything.
-  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
-  Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
-  Prompt.DeclareMulligan {} -> MulliganDecision.Keep
-  Prompt.Bottom _ _ hand count -> List.genericTake count hand
-  Prompt.MulliganAction {} -> Nothing
-  Prompt.OpeningHandAction {} -> Nothing
-  -- CR 603.5: declining a printed "may" is the least-eventful answer, and keeps
-  -- the benchmark's script deterministic.
-  Prompt.ChooseOptional {} -> OptionalDecision.Declines
-  -- CR 608.2g: declining an offered cast is legal and leaves the card where the
-  -- resolving effect put it -- the least-eventful default, as above. A test that
-  -- wants the cast TAKEN says so with its own interpreter.
-  Prompt.OfferedCast {} -> OptionalDecision.Declines
-  -- CR 118.12a: the cost rides a "may", so declining is legal, spends nothing
-  -- and is the least-eventful default (mirrors ChooseOptional -> Declines). A
-  -- test that wants the cost PAID says so with its own interpreter, which is
-  -- what makes that answer discriminating.
-  Prompt.ChooseToPay {} -> PaymentDecision.Declines
-  -- CR 118.13a: the head is a legal answer -- every offered route is payable --
-  -- and is the least eventful default, matching Replay.defaultAnswer.
-  Prompt.AnnouncePhyrexianPayment _ _ _ _ offers -> NonEmpty.head offers
-  Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 118.7e: both halves are legal answers whatever the board, so the head
-  -- is a deterministic default rather than the only payable route.
-  Prompt.ChooseReductionHalf _ _ _ _ offers -> NonEmpty.head offers
-  -- CR 702.42a: declining entwine is always legal, costs nothing and changes
-  -- no mode, the least-eventful default (mirrors ChooseOptional -> Declines).
-  Prompt.ChooseEntwine {} -> EntwineDecision.Declines
 
 -- Two players, seeded from the benchmark's argument.
 playersFrom :: Natural -> NonEmpty.NonEmpty PlayerId
@@ -328,20 +23,20 @@ playersFrom n = PlayerId.MkPlayerId n NonEmpty.:| [PlayerId.MkPlayerId (n + 1)]
 goldfish :: Deck.Deck -> Natural -> Result
 goldfish deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure alwaysPass (Setup.mirror deck players))
+   in fst (Engine.runMatchPure Script.passing (Setup.mirror deck players))
 {-# NOINLINE goldfish #-}
 
 -- Parameterized for the same reason as 'goldfish'.
 casting :: Deck.Deck -> Natural -> Result
 casting deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure castAnswer (Setup.mirror deck players))
+   in fst (Engine.runMatchPure Script.casting (Setup.mirror deck players))
 {-# NOINLINE casting #-}
 
 fighting :: Deck.Deck -> Natural -> Result
 fighting deck n =
   let players = playersFrom n
-   in fst (Engine.runMatchPure fightAnswer (Setup.mirror deck players))
+   in fst (Engine.runMatchPure Script.fighting (Setup.mirror deck players))
 {-# NOINLINE fighting #-}
 
 -- The redDeck recipe (name -> count), loaded from the registry -- the proof
@@ -416,7 +111,7 @@ loadControlDeck registry = do
 -- Deck size and creature count are held fixed on purpose, because both drive
 -- the workload. 60 cards means the same number of turns: both decks are observed
 -- (via 'cabal repl bench:pawl-benchmark', reading 'GameState.turnNumber' after
--- 'Engine.runMatchPure fightAnswer') to deck out on turn 108, and to leave a
+-- 'Engine.runMatchPure Script.fighting') to deck out on turn 108, and to leave a
 -- battlefield of comparable size -- 115 permanents here against 120 there. And 4
 -- Darksteel Myr a side is the same attack/block/damage cycle, since a 0/1
 -- indestructible never dies and so never stops attacking.
