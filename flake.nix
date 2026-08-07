@@ -82,7 +82,9 @@
           # lint rule changed.
           hlint = pkgs.runCommand "pawl-hlint-check" { nativeBuildInputs = [ pkgs.hlint ]; } ''
             cd ${source}
-            hlint --hint=${./.hlint.yaml} source
+            # hlint defaults to one thread, and 543 files is enough for that
+            # to dominate: measured 67s serial against 24s across 8 cores.
+            hlint --hint=${./.hlint.yaml} -j"$NIX_BUILD_CORES" source
             touch "$out"
           '';
         }

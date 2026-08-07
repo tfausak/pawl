@@ -74,8 +74,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: nixbuild/nix-quick-install-action@v35
-        with:
-          nix_conf: experimental-features = nix-command flakes
       - run: nix build --print-build-logs .#checks.x86_64-linux.${{ matrix.check }}
   gild:
     name: Gild
@@ -107,9 +105,9 @@ jobs:
       # into it. This is the single-user install cache-nix-action expects.
       - uses: nixbuild/nix-quick-install-action@v35
         with:
-          nix_conf: |
-            experimental-features = nix-command flakes
-            max-jobs = auto
+          # Flakes are on by default for nix > 2.13, so only max-jobs is worth
+          # setting: it is what lets the dependency closure build concurrently.
+          nix_conf: max-jobs = auto
       - uses: nix-community/cache-nix-action@v7
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'pawl.cabal') }}
