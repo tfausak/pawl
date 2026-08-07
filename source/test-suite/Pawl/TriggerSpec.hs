@@ -3592,6 +3592,9 @@ representativeEvents cond =
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
         TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked departed half)
+        -- CR 708.7's own event, and the only one this condition admits, on the
+        -- BEARER -- so the pair really matches.
+        TriggerCondition.SelfTurnedFaceUp -> one (GameEvent.TurnedFaceUp departed)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3620,7 +3623,8 @@ everyTriggerCondition =
     TriggerCondition.SelfCountersReached CounterKind.Lore 1,
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
     TriggerCondition.SpellCast Filter.Type.IsSource,
-    TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna"))
+    TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
+    TriggerCondition.SelfTurnedFaceUp
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something

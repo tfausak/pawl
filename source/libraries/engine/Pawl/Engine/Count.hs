@@ -224,6 +224,7 @@ snapshotView shape event = case event of
   -- Becomes a real view the day an EventShape names countering (#162).
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked _ _ -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing

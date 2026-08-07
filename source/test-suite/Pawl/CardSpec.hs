@@ -404,6 +404,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   -- CR 709.5h names a half, which is a CardName and not a Quantity.
   TriggerCondition.SelfHalfUnlocked _ -> []
+  -- CR 708.7's condition is nullary, so there is nothing in it to be a Quantity.
+  TriggerCondition.SelfTurnedFaceUp -> []
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
@@ -1389,6 +1391,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentEnters f -> [f]
   -- CR 709.5h names a half by name; nothing about the door is a Filter.
   TriggerCondition.SelfHalfUnlocked _ -> []
+  -- CR 708.7's condition is nullary, so there is nothing in it to be a Filter.
+  TriggerCondition.SelfTurnedFaceUp -> []
   TriggerCondition.PermanentDies f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []

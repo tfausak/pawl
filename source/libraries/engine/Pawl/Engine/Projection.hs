@@ -1304,6 +1304,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 709.5h names a HALF by its own name (CR 709.4a), and a name is not a
   -- subtype: CR 612.1 changes subtype words, so nothing here can move a door.
   TriggerCondition.SelfHalfUnlocked _ -> condition
+  -- CR 708.7 names no subtype at all -- the condition is nullary -- so a CR 612.1
+  -- text change has nothing in it to rewrite.
+  TriggerCondition.SelfTurnedFaceUp -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

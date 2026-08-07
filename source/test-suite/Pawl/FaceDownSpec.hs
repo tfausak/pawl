@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.FaceDown, Pawl.Engine.Card.faceDownFace and the face-down
@@ -5,13 +6,21 @@
 -- Pawl.Engine.Cost.costsFor, Pawl.Engine.Event.changeZoneFaceDown and
 -- Pawl.Engine.Stack -- rule 708 as far as morph reaches it.
 --
--- Ainok Tracker is the whole card pool for this file, and is the only card in
--- `data/cards` with morph. {5}{R} Creature -- Dog Scout 3/3, "First strike /
--- Morph {4}{R}". Every axis CR 708.2a substitutes is observable on it and none
--- of them coincides with the face-down value: 3/3 against the rule's 2/2, two
--- subtypes against none, a keyword against none, a name against none, and a
--- mana value of 6 against CR 202.3a's 0. A 2/2 morph creature would leave the
--- headline assertion passing whether the substitution happened or not.
+-- TWO morph cards carry this file, one per half of rule 708.
+--
+-- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
+-- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
+-- on it and none of them coincides with the face-down value: 3/3 against the
+-- rule's 2/2, two subtypes against none, a keyword against none, a name against
+-- none, and a mana value of 6 against CR 202.3a's 0. A 2/2 morph creature would
+-- leave the headline assertion passing whether the substitution happened or not.
+--
+-- Skirk Marauder is the TRIGGER's card, and the only printing rule 708.7 needs.
+-- {1}{R} Creature -- Goblin 2/1, "Morph {2}{R} / When this creature is turned
+-- face up, it deals 2 damage to any target." Three different 2s meet on it --
+-- the damage, CR 708.2a's face-down 2/2 and the printed 2 power -- so the damage
+-- is asserted as a LIFE-TOTAL DELTA on the chosen target and never as a board
+-- fact, which is the one reading none of the others can fake.
 module Pawl.FaceDownSpec where
 
 import qualified Data.Map.Strict as Map
@@ -19,6 +28,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -34,7 +44,10 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -47,10 +60,10 @@ spec s registry = Spec.describe s "FaceDown" $ do
 noName :: CardName.CardName
 noName = CardName.MkCardName Text.empty
 
--- alice holds an Ainok Tracker with `n` untapped Mountains in play, in her own
--- precombat main phase with priority.
+-- alice holds one card of a morph printing with `n` untapped Mountains in play,
+-- in her own precombat main phase with priority.
 morphBoard :: Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId)
-morphBoard mountain ainok n = S.handOne ainok (S.landsInPlay mountain n)
+morphBoard mountain morph n = S.handOne morph (S.landsInPlay mountain n)
 
 -- The permanent a move added to the battlefield between these two states, or
 -- Nothing when it added none or several. Identifies the new incarnation without
@@ -61,15 +74,15 @@ enteredOne before after =
     [oid] -> Just oid
     _ -> Nothing
 
--- Cast the Tracker with the given facing and let it resolve, returning the
+-- Cast the card with the given facing and let it resolve, returning the
 -- permanent it became.
 castAndResolve :: Printing.Printing -> Facing.Facing -> GameState.GameState -> ObjectId.ObjectId -> (GameState.GameState, Maybe ObjectId.ObjectId)
-castAndResolve ainok facing gs oid =
+castAndResolve morph facing gs oid =
   let after =
         S.runPure
           S.identityAnswer
           gs
-          (Cast.castSpell S.alice oid (S.printingName ainok) facing >> Stack.resolveTop)
+          (Cast.castSpell S.alice oid (S.printingName morph) facing >> Stack.resolveTop)
    in (after, enteredOne gs after)
 
 -- CR 702.37d: "You can't normally cast a card face down. A morph ability allows
@@ -278,10 +291,143 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertBool s (S.onBattlefield permanent settled) "CR 708.8 the 3/3 survives the same two damage"
         Spec.assertEqWith s "CR 708.8 and the damage is still marked" (S.damageOf permanent settled) (Just 2)
 
--- A resolved face-down Ainok Tracker on a board of `n` Mountains, three of which
--- the morph cast has tapped. Nothing if the cast did not land.
+  -- THE PROVING TEST for CR 708.7. Skirk Marauder is cast face down for CR
+  -- 702.37a's {3}, turned face up for its {2}{R} morph cost, and the ability it
+  -- regains as it turns over deals its 2 to bob.
+  --
+  -- The damage is read as a LIFE-TOTAL DELTA and never off the board: 2 damage,
+  -- CR 708.2a's face-down 2/2 and the printed 2 power are all the same number, so
+  -- an assertion about the creature could not tell them apart. bob's 20 -> 18 can
+  -- come from nothing else on this board.
+  --
+  -- bob is answered explicitly rather than left to S.identityAnswer, which picks
+  -- the lowest-sorting candidate -- alice, the controller, which would make the
+  -- positive case indistinguishable from the "no target was chosen" control.
+  --
+  -- THE BEFORE assertion is CR 708.3 and CR 708.8's last sentence: the face-down
+  -- cast and the battlefield entry it resolved into fired nothing at all, which
+  -- is what makes 18 the TURNING's doing rather than the entry's.
+  Spec.it s "CR 708.7 turning Skirk Marauder face up deals its 2 to the chosen target" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    marauder <- S.printingOf s registry "Skirk Marauder"
+    case faceDownWith mountain marauder 6 of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (before, permanent) -> do
+        Spec.assertEqWith s "CR 708.3 the face-down entry fired nothing" (S.lifeOf S.bob before) (Just 20)
+        -- The control: the action really is on offer, so a silent engine below
+        -- cannot be a permanent that simply never turned over.
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [permanent]
+        let after = S.runPure (aimAt S.bob) before (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 708.7 bob took the 2" (S.lifeOf S.bob after) (Just 18)
+        -- CR 115.1: the ability TARGETS, so the damage went where it was aimed
+        -- and was not broadcast at the table.
+        Spec.assertEqWith s "and alice took none" (S.lifeOf S.alice after) (Just 20)
+        Spec.assertEqWith s "CR 708.8 the printed 2/1" (S.powerToughnessOf permanent after) (Just (2, 1))
+        Spec.assertEqWith s "CR 708.8 the printed name" (Projection.nameOf permanent after) (S.printingName marauder)
+        Spec.assertEqWith s "CR 110.5 face up" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
+        -- {3} for the cast and {2}{R} for the morph cost: six, which is a
+        -- multiple of neither printed cost alone.
+        Spec.assertEqWith s "CR 702.37a/702.37e six mana in all" (S.tappedCount S.alice after) 6
+        -- CR 702.37e's "a FACE-DOWN permanent you control", and the guard on the
+        -- whole action: the permanent is face up now, so there is nothing left to
+        -- turn over and asking again is a no-op. THE DISCRIMINATOR for the event
+        -- being recorded inside
+        -- FaceDown.turnFaceUp's paid branch rather than on entry -- record it
+        -- unconditionally and this second call fires the ability a second time,
+        -- since by now the permanent has its text back to see it with.
+        let again = S.runPure (aimAt S.bob) after (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 702.37e asking again turns nothing over and fires nothing" (S.lifeOf S.bob again) (Just 18)
+
+  -- CR 708.8's last sentence, said the way Skirk Marauder can say it: a permanent
+  -- that entered the battlefield FACE UP was never TURNED face up, so the same
+  -- ability on the same card stays silent. Cast for the printed {1}{R} this time.
+  --
+  -- The stronger half of the pair with the case above. An engine that fired this
+  -- ability on any arrival -- an entry, a Moved event into the battlefield --
+  -- would pass every assertion up there and fail here.
+  --
+  -- Answered with aimAt as well, so a trigger that DID go on the stack would find
+  -- its target and reach bob. Nothing is being kept quiet by an unanswerable
+  -- prompt.
+  Spec.it s "CR 708.8 a Skirk Marauder cast FACE UP was never turned face up" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    marauder <- S.printingOf s registry "Skirk Marauder"
+    let (gs, oid) = morphBoard mountain marauder 2
+        (cast, entered) = castAndResolve marauder Facing.FaceUp gs oid
+        settled = S.runPure (aimAt S.bob) cast Engine.priorityLoop
+    case entered of
+      Nothing -> Spec.assertFailure s "the ordinary cast did not reach the battlefield"
+      Just permanent -> do
+        -- The control: it really did arrive, face up and printed, so the silence
+        -- below is CR 708.7 and not an empty battlefield.
+        Spec.assertEqWith s "CR 110.5b the printed 2/1 arrived" (S.powerToughnessOf permanent settled) (Just (2, 1))
+        Spec.assertEqWith s "face up" (fmap Object.facing (Game.lookupObject permanent settled)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 702.37a the printed {1}{R} was paid, not {3}" (S.tappedCount S.alice settled) 2
+    Spec.assertEqWith s "CR 708.7 nothing was turned face up, so bob took nothing" (S.lifeOf S.bob settled) (Just 20)
+
+  -- CR 702.37e's "pay that cost", on the failure side: two Mountains left after
+  -- the {3} cast cannot pay {2}{R}, FaceDown.turnFaceUp restores the state it
+  -- began with, and a permanent that never turned over fires nothing.
+  --
+  -- The silence here is NOT evidence about where the event is recorded, and the
+  -- case does not claim to be: CR 708.2a leaves the still-face-down permanent
+  -- with no ability that could see the event, so an engine recording it in the
+  -- unpaid branch too would pass this anyway. What this pins is the reject: the
+  -- permanent is still face down, and mana that could not pay bought nothing. The
+  -- second call in the proving test above is what discriminates the placement.
+  Spec.it s "CR 702.37e an unpayable morph cost turns nothing over and fires nothing" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    marauder <- S.printingOf s registry "Skirk Marauder"
+    case faceDownWith mountain marauder 5 of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (before, permanent) -> do
+        Spec.assertEqWith s "two Mountains cannot pay {2}{R}" (FaceDown.turnableFaceUp S.alice before) []
+        let after = S.runPure (aimAt S.bob) before (FaceDown.turnFaceUp S.alice permanent >> Engine.priorityLoop)
+        Spec.assertEqWith s "CR 702.37e it is still face down" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceDown)
+        Spec.assertEqWith s "and bob took nothing" (S.lifeOf S.bob after) (Just 20)
+
+  -- CR 603.2 through the bearer: the ability fires for the permanent it is ON and
+  -- not for any permanent turning face up.
+  --
+  -- TWO Skirk Marauders, flipped one after the other. By the second flip the
+  -- FIRST one is face up and carrying its ability again (CR 708.2a took it away
+  -- only while it was face down), so a matcher that ignored the bearer would fire
+  -- both abilities on that one event and cost bob 4 instead of 2. The running
+  -- total is asserted after each flip, so the two flips are told apart.
+  --
+  -- Twelve Mountains: {3} + {3} for the casts and {2}{R} + {2}{R} for the morph
+  -- costs.
+  Spec.it s "CR 603.2 a face-up Skirk Marauder does not fire off the OTHER one turning face up" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    marauder <- S.printingOf s registry "Skirk Marauder"
+    let (base, firstCard) = S.handOne marauder (S.landsInPlay mountain 12)
+        (secondCard, both) = S.addHandCard marauder S.alice base
+        (afterFirst, firstEntered) = castAndResolve marauder Facing.FaceDown both firstCard
+        (afterSecond, secondEntered) = castAndResolve marauder Facing.FaceDown afterFirst secondCard
+    case (firstEntered, secondEntered) of
+      (Just one, Just two) -> do
+        let flippedOne = S.runPure (aimAt S.bob) afterSecond (FaceDown.turnFaceUp S.alice one >> Engine.priorityLoop)
+            flippedTwo = S.runPure (aimAt S.bob) flippedOne (FaceDown.turnFaceUp S.alice two >> Engine.priorityLoop)
+        Spec.assertEqWith s "the first flip is worth 2" (S.lifeOf S.bob flippedOne) (Just 18)
+        -- Both are face up now, and only the one that turned over fired.
+        Spec.assertEqWith s "CR 603.2 the second flip is worth 2 more and not 4" (S.lifeOf S.bob flippedTwo) (Just 16)
+        Spec.assertEqWith s "both are face up" (fmap Object.facing (Game.lookupObject two flippedTwo)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 702.37a/702.37e twelve mana in all" (S.tappedCount S.alice flippedTwo) 12
+      _ -> Spec.assertFailure s "both morph casts did not reach the battlefield"
+
+-- The one target slot of Skirk Marauder's ability, answered with `who` rather
+-- than left to S.identityAnswer's lowest-sorting candidate -- which is alice, the
+-- ability's own controller, and so the control rather than the positive case.
+aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+aimAt who p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+  _ -> S.identityAnswer p
+
+-- A resolved face-down permanent of a morph printing on a board of `n`
+-- Mountains, three of which CR 702.37a's {3} has tapped. Nothing if the cast did
+-- not land.
 faceDownWith :: Printing.Printing -> Printing.Printing -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId)
-faceDownWith mountain ainok n =
-  let (gs, oid) = morphBoard mountain ainok n
-      (after, entered) = castAndResolve ainok Facing.FaceDown gs oid
+faceDownWith mountain morph n =
+  let (gs, oid) = morphBoard mountain morph n
+      (after, entered) = castAndResolve morph Facing.FaceDown gs oid
    in fmap (\permanent -> (after, permanent)) entered
