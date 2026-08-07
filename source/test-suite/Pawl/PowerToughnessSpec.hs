@@ -8,8 +8,10 @@
 -- Twisted Image, Nightmare, Monstrous War-Leech, Omnath Locus of Mana, Serra
 -- Avatar), plus CR 604.2's "as long as" gate on a printed static ability (Kird
 -- Ape for the clause that names a player, Knight of Grace for the one that names
--- none) and CR 613.4c's layer 7c anthem narrowed by a keyword its affected
--- objects have (Hand of the Praetors).
+-- none), CR 613.4c's layer 7c anthem narrowed by a keyword its affected
+-- objects have (Hand of the Praetors), and CR 208.5's 0 for a creature left
+-- with no value for its power or toughness (Ashaya, Soul of the Wild under
+-- Blood Moon).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -552,6 +554,93 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   knightOfGraceSpec s registry
   woodElementalSpec s registry
   handOfThePraetorsSpec s registry
+  ashayaBloodMoonSpec s registry
+
+-- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
+-- The same is true for toughness."
+--
+-- Ashaya, Soul of the Wild ({3}{G}{G} Legendary Creature -- Elemental, printed
+-- \*/*), whole text: "Ashaya, Soul of the Wild's power and toughness are each
+-- equal to the number of lands you control. Each nontoken creature you control
+-- is a Forest land in addition to its other types." Blood Moon ({2}{R}
+-- Enchantment), whole text: "Nonbasic lands are Mountains." Oracle text for
+-- both verified against Scryfall.
+--
+-- It takes both cards to reach the rule at all, and the path runs through
+-- Ashaya's SECOND sentence pointed at herself: she is a nontoken creature her
+-- controller controls, so she makes herself a Forest land -- a land with no
+-- Basic supertype, which is what Blood Moon's "nonbasic" means (CR 205.4a).
+-- Blood Moon then sets that land's subtype, and CR 305.7's "it loses all
+-- abilities generated from its rules text" takes her characteristic-defining
+-- ability (CR 604.3 makes a CDA a static ability like any other) -- which was
+-- her only source of a P/T value, the printed box being a star.
+--
+-- She is still a creature afterwards: CR 305.7's "Setting a land's subtype
+-- doesn't add or remove any card types (such as creature)". So the state is
+-- exactly rule 208.5's premise -- a creature with no value for its power --
+-- and 0 rather than blank is what CR 704.5f then acts on.
+--
+-- Goblin Piker rides along as the control. Blood Moon makes it a Mountain too
+-- (Ashaya made it a land as well), but its 2/1 is PRINTED rather than defined
+-- by an ability, so CR 305.7 leaves the numbers alone and rule 208.5 never
+-- reaches it. Its 2 is also the one number on this board that no other
+-- assertion's expected value could be confused with.
+ashayaBloodMoonSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ashayaBloodMoonSpec s registry = Spec.describe s "Ashaya, Soul of the Wild under Blood Moon" $ do
+  -- The fixture's live half: with the CDA intact Ashaya counts five lands --
+  -- three Mountains, herself, and the Piker she animated -- so a 5/5 here is
+  -- what makes the 0/0 below a change rather than a fixture that never worked.
+  Spec.it s "CR 604.3 before Blood Moon, Ashaya's CDA counts the lands she makes: 5/5" $ do
+    (_, ashayaId, pikerId, gs) <- ashayaBoard s registry
+    Spec.assertEqWith s "three Mountains, Ashaya and the Piker" (S.powerToughnessOf ashayaId gs) (Just (5, 5))
+    Spec.assertEqWith s "the Piker keeps its printed box" (S.powerToughnessOf pikerId gs) (Just (2, 1))
+  -- THE PROVING CASE, at gameplay level: alice casts Blood Moon off her three
+  -- Mountains. It resolves, CR 305.7 strips Ashaya's CDA, CR 208.5 makes the
+  -- resulting no-value creature a 0/0, and the settle boundary buries her (CR
+  -- 704.5f, "if a creature has toughness 0 or less, it's put into its owner's
+  -- graveyard"). Without CR 208.5's substitution she has NO toughness at all,
+  -- Pawl.Engine.Sba.zeroToughness reads Nothing and she is still standing --
+  -- the board difference this test exists to falsify.
+  Spec.it s "CR 208.5/704.5f casting Blood Moon leaves Ashaya a 0/0 and buries her" $ do
+    (bloodMoonId, _, pikerId, gs) <- ashayaBoard s registry
+    let settled = S.runPure S.identityAnswer gs (S.cast S.alice bloodMoonId >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "the enchantment resolved" (GameState.stack settled) []
+    Spec.assertEqWith s "Blood Moon is on the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Blood Moon")) S.alice settled) 1
+    Spec.assertEqWith s "no Ashaya on the battlefield" (S.countOnBattlefieldByName ashayaName S.alice settled) 0
+    Spec.assertEqWith s "CR 704.5f put her in her owner's graveyard" (namedInGraveyard ashayaName settled) 1
+    -- The guard the burial must not overshoot: the Piker was under the same
+    -- Blood Moon and is still a 2/1 on the battlefield.
+    Spec.assertEqWith s "the Piker survives, still 2/1" (S.powerToughnessOf pikerId settled) (Just (2, 1))
+
+-- alice, with three untapped Mountains, Ashaya and a Goblin Piker on the
+-- battlefield and Blood Moon in hand. Mountains rather than the Forests
+-- Ashaya's ability names: they pay Blood Moon's {2}{R}, and being BASIC they
+-- are the half of the board Blood Moon does not touch.
+ashayaBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+ashayaBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
+  bloodMoon <- S.printingOf s registry "Blood Moon"
+  let (ashayaId, g1) = S.addCreature ashaya S.alice (S.landsInPlay mountain 3)
+      (pikerId, g2) = S.addCreature piker S.alice g1
+      (gs, bloodMoonId) = S.handOne bloodMoon g2
+  pure (bloodMoonId, ashayaId, pikerId, gs)
+
+ashayaName :: CardName.CardName
+ashayaName = CardName.MkCardName (Text.pack "Ashaya, Soul of the Wild")
+
+-- How many of alice's graveyard objects show this printed name. CR 400.7 mints
+-- a fresh object on the zone change, so the id the fixture held names nothing
+-- there.
+namedInGraveyard :: CardName.CardName -> GameState.GameState -> Int
+namedInGraveyard wanted gs =
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just wanted
+   in length (filter named (Game.zoneMembers Zone.Graveyard S.alice gs))
 
 -- CR 613.4c layer 7c, narrowed by a KEYWORD the affected object has: Hand of the
 -- Praetors, {3}{B} Creature -- Phyrexian Zombie 3/2, "Other creatures you

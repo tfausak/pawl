@@ -1308,18 +1308,24 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- apply because Ashaya's */* would first apply at layer 7a, after the layer
   -- 4 that takes it away.
   --
-  -- Her power is then Nothing rather than the 0 CR 208.5 asks for ("If a
-  -- creature somehow has no value for its power, its power is 0"), which is
-  -- the read-point gap #759 tracks -- not something this fixture is
-  -- claiming is right.
-  Spec.it s "CR 305.7 Blood Moon takes Ashaya's CDA with the rest of her rules text" $ do
+  -- Nothing is then left to define her power, and CR 208.5 fills the hole:
+  -- "If a creature somehow has no value for its power, its power is 0. The
+  -- same is true for toughness." She is still a creature (CR 305.7 adds and
+  -- removes no card types), so the substitution applies and she reads 0/0
+  -- rather than blank. The board consequence -- CR 704.5f burying her -- is
+  -- proved at gameplay level in Pawl.PowerToughnessSpec.
+  Spec.it s "CR 305.7/208.5 Blood Moon takes Ashaya's CDA, and the creature with no value reads 0" $ do
     forest <- S.printingOf s registry "Forest"
     piker <- S.printingOf s registry "Goblin Piker"
     ashaya <- S.printingOf s registry "Ashaya, Soul of the Wild"
     bloodMoon <- S.printingOf s registry "Blood Moon"
-    let (_, _, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
-    Spec.assertEqWith s "no CDA left to define power" (Projection.powerOf ashayaId gs) Nothing
-    Spec.assertEqWith s "nor toughness" (Projection.toughnessOf ashayaId gs) Nothing
+    let (_, pikerId, _, ashayaId, gs) = ashayaBloodMoon forest piker ashaya bloodMoon True
+    Spec.assertEqWith s "no CDA left to define power, so CR 208.5 makes it 0" (Projection.powerOf ashayaId gs) (Just 0)
+    Spec.assertEqWith s "and the same for toughness" (Projection.toughnessOf ashayaId gs) (Just 0)
+    -- 0 and absent both read as "no value" to a careless helper, and the
+    -- Piker pins the other end: its 2/1 is printed rather than defined by an
+    -- ability, so CR 305.7 leaves it alone and CR 208.5 never reaches it.
+    Spec.assertEqWith s "the Piker under the same Blood Moon is untouched" (S.powerToughnessOf pikerId gs) (Just (2, 1))
 
   -- The remaining two ability kinds the strip has to reach, at the projection
   -- rather than through a game: Corpsejack Menace's counter-doubling
@@ -1400,10 +1406,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- March of the Machines is the card that needs it, and the reason nothing
   -- before it did. Its affected set is "each NONCREATURE artifact" and its own
   -- layer-4 part makes every object in that set a creature, so a set
-  -- re-derived at layer 7b would be empty: the animated artifact would have no
-  -- power or toughness at all (not 0/0 -- Nothing), which CR 704.5f would not
-  -- even fire on. Opalescence never noticed because its filter reads card
-  -- types it does not change.
+  -- re-derived at layer 7b would be empty: the animated artifact would never
+  -- get the P/T March's own layer-7b part is there to set, and CR 208.5 would
+  -- hand it 0/0 and CR 704.5f would bury it. Opalescence never noticed because
+  -- its filter reads card types it does not change.
   Spec.it s "CR 613.6: March of the Machines animates an artifact AND still sets its P/T" $ do
     march <- S.printingOf s registry "March of the Machines"
     bonesplitter <- S.printingOf s registry "Bonesplitter"

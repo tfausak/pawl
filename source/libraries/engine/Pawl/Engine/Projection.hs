@@ -1936,9 +1936,6 @@ project oid gs = projectFrom (gather gs) oid gs
 -- 7b, where CR 208.2a does not reach and an unevaluable quantity determines
 -- nothing.
 --
--- Not implemented: CR 208.5, which is about the READ POINTS -- powerOf and
--- toughnessOf return Nothing for a creature with no value rather than 0 (#759).
---
 -- CR 604.3a(3): a CDA does not affect any other object, so the Filter.Context is
 -- the object's OWN controller -- contrast applyModification's, which is the
 -- source's (CR 109.5). The caller always passes Layer.CharacteristicPT, so a CDA's
@@ -2185,11 +2182,46 @@ noncreaturePT oid gs pc
   | not (Set.member oid (GameState.battlefield gs)) = pc
   | otherwise = pc {PC.power = Nothing, PC.toughness = Nothing}
 
+-- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
+-- The same is true for toughness." The hole this fills is opened by a card that
+-- takes a characteristic-defining ability away -- Blood Moon on an Ashaya, Soul
+-- of the Wild who has made herself a nonbasic land, where CR 305.7 strips the
+-- CDA that was her only source of a value and CR 305.7's own "doesn't add or
+-- remove any card types" leaves her a creature.
+--
+-- Guarded on CREATURE, which is the whole of the rule's premise, and the line CR
+-- 208.3 draws from the other side: a noncreature permanent does not HAVE a power
+-- or a toughness at all, which is a different thing from having one with no
+-- value, so an uncrewed Consulate Dreadnought keeps the Nothing noncreaturePT
+-- just gave it (CR 301.7a). Applied after noncreaturePT for that reason -- 208.3
+-- decides whether 208.5's premise is even reached, so it has to run first.
+--
+-- The card types are read off the FINISHED fold, so a permanent that layer 4
+-- made a creature is judged as one (CR 613.1d).
+noValuePT :: ProjectedCharacteristics -> ProjectedCharacteristics
+noValuePT pc
+  | not (Set.member CardType.Creature (PC.cardTypes pc)) = pc
+  | otherwise =
+      pc
+        { PC.power = Just (Maybe.fromMaybe 0 (PC.power pc)),
+          PC.toughness = Just (Maybe.fromMaybe 0 (PC.toughness pc))
+        }
+
 -- Project one object against a PRECOMPUTED candidate list. gather is
 -- oid-independent, so a whole-board sweep gathers once and folds each object
 -- (projectAll) instead of re-gathering per object.
+--
+-- Where CR 208.5 goes, and deliberately NOT inside projectWith beside
+-- noncreaturePT: a layer-bounded view (projectUpTo) is a mid-fold intermediate,
+-- and "has no value" is not a question that can be asked of one -- a */* creature
+-- has no value yet at every bound below layer 7a and a value at every bound above
+-- it. Every projection a reader can observe -- project, projectAll, and so every
+-- powerOf, toughnessOf and state-based-action sweep -- comes through here.
+--
+-- Not implemented: a bounded count that reads a P/T set in its own layer or
+-- later still sees the unsubstituted Nothing (#157).
 projectFrom :: [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
-projectFrom = projectWith (const True)
+projectFrom cands oid gs = noValuePT (projectWith (const True) cands oid gs)
 
 -- CR 613.1: a projection bounded to the layers BEFORE `bound` -- what a Count sees
 -- while layer `bound` is being applied. See projectWith for the termination
