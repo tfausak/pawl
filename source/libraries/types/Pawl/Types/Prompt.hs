@@ -659,9 +659,11 @@ data Prompt r where
   --
   -- The ObjectId is the CARD being offered -- the exiled incarnation CR 400.7
   -- minted, not the ability resolving -- and the CardName is the half CR 712.11a
-  -- puts on the stack, the same pair Action.Cast and CastWhileSearching carry and
-  -- for the same reason: a bare id would leave which face is being offered
-  -- invisible to the answerer.
+  -- puts on the stack -- the same pair CastWhileSearching carries, and the same
+  -- pair Action.Cast carries alongside CR 708.4's facing, for the same reason: a
+  -- bare id would leave which face is being offered invisible to the answerer.
+  -- No facing here, because an OfferCast opcode offers no face-down cast (see
+  -- Pawl.Engine.Resolve.offerCast).
   --
   -- Distinct from CastWhileSearching, which is the same rule's other producer.
   -- That one offers a LIST and loops, because CR 601.3's Panglacial permission

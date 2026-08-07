@@ -51,6 +51,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -164,6 +165,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.source = Source.OfCard mountain,
               Object.zone = Zone.Battlefield,
               Object.tapped = TapState.Untapped,
+              Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Sick,
               Object.bindings = Map.empty,
@@ -1737,6 +1739,7 @@ handBobBolt lightningBolt gs =
             Object.source = Source.OfCard lightningBolt,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled S.bob,
             Object.bindings = Map.empty,
@@ -2104,6 +2107,7 @@ restartOnStack mountain =
             Object.source = Source.OfAbility (ObjectId.MkObjectId 0) ability,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled S.bob,
             Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),

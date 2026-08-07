@@ -78,6 +78,7 @@ import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
@@ -146,8 +147,8 @@ ruleOfLawSpec s registry =
       ruleOfLaw <- S.printingOf s registry "Rule of Law"
       let (a, b, _, board) = ruleOfLawBoard plains ruleOfLaw
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell board)) "not prohibited"
-      Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw)) (Action.legalActions S.alice board)) "a offered"
-      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw)) (Action.legalActions S.alice board)) "b offered"
+      Spec.assertBool s (elem (Action.Type.Cast a (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "a offered"
+      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice board)) "b offered"
 
     -- Ruling: "Rule of Law looks at the entire turn to see if a player has
     -- cast a spell, even if Rule of Law wasn't on the battlefield when that
@@ -191,7 +192,7 @@ ruleOfLawSpec s registry =
               }
       Spec.assertEqWith s "alice is active again" (GameState.activePlayer nextOwnTurn) S.alice
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell nextOwnTurn)) "not prohibited"
-      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw)) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
+      Spec.assertBool s (elem (Action.Type.Cast b (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice nextOwnTurn)) "b offered again"
 
     -- Ruling: "If you cast a spell that was countered, you can't cast
     -- another spell during the same turn." The counted event is the CAST.
@@ -219,7 +220,7 @@ ruleOfLawSpec s registry =
           gone = S.runPure S.identityAnswer castOne (Event.destroy Regenerability.Regenerable [rol])
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice anySpell castOne) "prohibited while it stands"
       Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice anySpell gone)) "not prohibited once it is gone"
-      Spec.assertBool s (elem (Action.Type.Cast z (S.printingName ruleOfLaw)) (Action.legalActions S.alice gone)) "and a cast is offered again"
+      Spec.assertBool s (elem (Action.Type.Cast z (S.printingName ruleOfLaw) Facing.FaceUp) (Action.legalActions S.alice gone)) "and a cast is offered again"
 
     -- CR 601.3's prohibit half applies to EVERY cast, including a
     -- Panglacial Wurm cast from the library: the Panglacial permission
@@ -251,6 +252,7 @@ isCast action = case action of
   Action.Type.Cast {} -> True
   Action.Type.Play {} -> False
   Action.Type.Activate _ _ -> False
+  Action.Type.TurnFaceUp _ -> False
   Action.Type.Pass -> False
 
 -- The CR 601.2f arithmetic, with no board at all. The unit half of the cost
@@ -1854,6 +1856,7 @@ isSilenceActivate action = case action of
   Action.Type.Activate _ _ -> True
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
+  Action.Type.TurnFaceUp _ -> False
   Action.Type.Pass -> False
 
 -- Silence {W} Instant: "Your opponents can't cast spells this turn."
@@ -1867,7 +1870,7 @@ silenceSpec s registry =
       prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
       piker <- S.printingOf s registry "Goblin Piker"
       let (_, _, pikerId, _, before, _) = silenceAfter plains silence mountain prodigalSorcerer piker
-      Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.bob before)) "offered"
+      Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.bob before)) "offered"
 
     -- CR 611.2c, THE FALSIFIER: nothing bob owns is a spell when Silence
     -- resolves -- the stack holds only Silence itself. Freeze the affected
@@ -1948,8 +1951,8 @@ silenceSpec s registry =
       -- The fixture really is three-seat and both opponents really could cast,
       -- given their own main phase.
       Spec.assertEqWith s "three seats" (length (GameState.turnOrder before)) 3
-      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker)) (Action.legalActions S.bob bobsTurn)) "bob could cast before it resolved"
-      Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker)) (Action.legalActions S.carol carolsTurn)) "carol could cast before it resolved"
+      Spec.assertBool s (elem (Action.Type.Cast bobsPiker (S.printingName piker) Facing.FaceUp) (Action.legalActions S.bob bobsTurn)) "bob could cast before it resolved"
+      Spec.assertBool s (elem (Action.Type.Cast carolsPiker (S.printingName piker) Facing.FaceUp) (Action.legalActions S.carol carolsTurn)) "carol could cast before it resolved"
       Spec.assertEqWith s "one stored effect" (length (GameState.playerEffects resolved)) 1
       -- THE DISCRIMINATOR. carol is the far seat: an Opponents scope resolved as
       -- "the next player in turn order" prohibits bob and leaves carol free, and
@@ -2195,8 +2198,8 @@ nullChamberSpec s registry =
           picks pid = if pid == S.alice then S.printingName lightningBolt else S.printingName ashBarrens
           after = castChamber S.bob picks before oid
           casts = Action.legalActions S.bob
-      Spec.assertBool s (elem (Action.Type.Cast bobsBolt (S.printingName lightningBolt)) (casts before)) "bob may cast his Bolt before the Chamber lands"
-      Spec.assertBool s (notElem (Action.Type.Cast bobsBolt (S.printingName lightningBolt)) (casts after)) "and may not once it has"
+      Spec.assertBool s (elem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts before)) "bob may cast his Bolt before the Chamber lands"
+      Spec.assertBool s (notElem (Action.Type.Cast bobsBolt (S.printingName lightningBolt) Facing.FaceUp) (casts after)) "and may not once it has"
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.bob (S.printingName lightningBolt) after) "bob is prohibited by alice's name"
       Spec.assertBool s (elem (bobsBarrens, Nothing) (Action.playableLands S.bob before)) "bob's land is playable before the Chamber lands"
       Spec.assertBool s (notElem (bobsBarrens, Nothing) (Action.playableLands S.bob after)) "and not once it has"
@@ -2218,8 +2221,8 @@ nullChamberSpec s registry =
           (pikerId, withPiker) = S.addHandCard piker S.alice after
           (boltId, gs) = S.addHandCard lightningBolt S.alice withPiker
           offered = Action.legalActions S.alice gs
-      Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker)) offered) "the named Piker is not offered"
-      Spec.assertBool s (elem (Action.Type.Cast boltId (S.printingName lightningBolt)) offered) "the unnamed Bolt still is"
+      Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) offered) "the named Piker is not offered"
+      Spec.assertBool s (elem (Action.Type.Cast boltId (S.printingName lightningBolt) Facing.FaceUp) offered) "the unnamed Bolt still is"
 
     -- The OPPONENT's name binds the Chamber's controller, which is the half a
     -- one-chooser reading of the card would lose: bob names the Piker, and it is
@@ -2237,7 +2240,7 @@ nullChamberSpec s registry =
           after = castChamber S.bob picks board oid
           (pikerId, gs) = S.addHandCard piker S.alice after
       Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "alice is prohibited by bob's name"
-      Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.alice gs)) "and no cast is offered"
+      Spec.assertBool s (notElem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gs)) "and no cast is offered"
 
     -- CR 305.1: playing a land is a SPECIAL ACTION that never uses the stack, so
     -- the land half of the card is a different gate from the cast half --
@@ -2289,7 +2292,7 @@ nullChamberSpec s registry =
           let gone = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [chamber])
           Spec.assertBool s (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gs) "prohibited while it stands"
           Spec.assertBool s (not (PlayerEffect.prohibitsCasting S.alice (S.printingName piker) gone)) "not prohibited once it is gone"
-          Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker)) (Action.legalActions S.alice gone)) "and the cast is offered again"
+          Spec.assertBool s (elem (Action.Type.Cast pikerId (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gone)) "and the cast is offered again"
           Spec.assertBool s (elem (barrensId, Nothing) (Action.playableLands S.alice gone)) "and the land may be played again"
 
     -- REJECT-NOT-REPAIR on the opponent answer, which only a three-seat board
@@ -2466,6 +2469,7 @@ isActivateOf oid action = case action of
   Action.Type.Activate o _ -> o == oid
   Action.Type.Cast {} -> False
   Action.Type.Play {} -> False
+  Action.Type.TurnFaceUp _ -> False
   Action.Type.Pass -> False
 
 isPlay :: Action.Type.Action -> Bool
@@ -2473,6 +2477,7 @@ isPlay action = case action of
   Action.Type.Play {} -> True
   Action.Type.Cast {} -> False
   Action.Type.Activate _ _ -> False
+  Action.Type.TurnFaceUp _ -> False
   Action.Type.Pass -> False
 
 -- Exploration {G} Enchantment: "You may play an additional land on each of your

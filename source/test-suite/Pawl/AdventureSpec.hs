@@ -29,6 +29,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Subtype as Subtype
@@ -67,7 +68,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     shieldbreaker <- S.printingOf s registry "Embereth Shieldbreaker"
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
-    let namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+    let namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
         -- An artifact on the battlefield, or Battle Display has no legal target
         -- and is gated out for a reason that has nothing to do with the layout.
         board = snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 2))
@@ -99,7 +100,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     mountain <- S.printingOf s registry "Mountain"
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    let namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+    let namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
         -- The Bonesplitter is the Adventure's legal target, without which every
         -- absent offer below would be about targeting instead of about cost.
         artifactAnd n = snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain n))
@@ -123,7 +124,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     let board = snd (S.addCreature thalia S.alice (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 2))))
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
     Spec.assertEqWith s "the Adventure is on the stack" (length (GameState.stack cast)) 1
     Spec.assertEqWith s "both Mountains paid {R} plus Thalia's {1}" (S.tappedCount S.alice cast) 2
   -- CR 715.3d: "Instead of putting a spell that was cast as an Adventure into
@@ -134,7 +135,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 1)
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertBool s (S.onBattlefield bonesplitterId gs) "the Bonesplitter starts on the battlefield"
     Spec.assertBool s (not (S.onBattlefield bonesplitterId resolved)) "and Battle Display destroys it"
@@ -168,9 +169,9 @@ spec s registry = Spec.describe s "Adventure" $ do
     let (_, oneArtifact) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
         (_, board) = S.addCreature bonesplitter S.alice oneArtifact
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
-        namesOffered g = [n | A.Cast _ n <- Action.legalActions S.alice g]
+        namesOffered g = [n | A.Cast _ n _ <- Action.legalActions S.alice g]
     Spec.assertEqWith
       s
       "an artifact survives, so the Adventure has a legal target"
@@ -181,11 +182,11 @@ spec s registry = Spec.describe s "Adventure" $ do
     Spec.assertEqWith s "only the creature half" (namesOffered resolved) [shieldbreakerName]
     case Game.zoneMembers Zone.Exile S.alice resolved of
       [exiledId] -> do
-        Spec.assertBool s (Cast.castable S.alice exiledId shieldbreakerName resolved) "the creature is castable from exile"
-        Spec.assertBool s (not (Cast.castable S.alice exiledId battleDisplayName resolved)) "the Adventure is not"
+        Spec.assertBool s (Cast.castable S.alice exiledId shieldbreakerName Facing.FaceUp resolved) "the creature is castable from exile"
+        Spec.assertBool s (not (Cast.castable S.alice exiledId battleDisplayName Facing.FaceUp resolved)) "the Adventure is not"
         -- The permission names its player (CR 715.3d's "that player"), so it is
         -- not an offer to the table.
-        Spec.assertBool s (not (Cast.castable S.bob exiledId shieldbreakerName resolved)) "and bob may not cast it"
+        Spec.assertBool s (not (Cast.castable S.bob exiledId shieldbreakerName Facing.FaceUp resolved)) "and bob may not cast it"
       other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
   -- The whole loop, which is what the mechanic IS: the Adventure resolves, and
   -- the creature it left in exile is cast from there onto the battlefield.
@@ -195,11 +196,11 @@ spec s registry = Spec.describe s "Adventure" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (_, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     case Game.zoneMembers Zone.Exile S.alice resolved of
       [exiledId] -> do
-        let recast = snd (Engine.runGamePure S.identityAnswer resolved (Cast.castSpell S.alice exiledId shieldbreakerName))
+        let recast = snd (Engine.runGamePure S.identityAnswer resolved (Cast.castSpell S.alice exiledId shieldbreakerName Facing.FaceUp))
             entered = snd (Engine.runGamePure S.identityAnswer recast Stack.resolveTop)
             knights =
               [ o
@@ -233,8 +234,8 @@ spec s registry = Spec.describe s "Adventure" $ do
     let (withArtifact, _) = S.handOne mountain (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)))
         (exiledId, gs) = S.addExiledCard shieldbreaker S.alice withArtifact
     Spec.assertEqWith s "no permission on the card" (fmap Object.playableFromExileBy (Game.lookupObject exiledId gs)) (Just Nothing)
-    Spec.assertBool s (not (Cast.castable S.alice exiledId shieldbreakerName gs)) "the creature is not castable"
-    Spec.assertBool s (not (Cast.castable S.alice exiledId battleDisplayName gs)) "nor is the Adventure"
+    Spec.assertBool s (not (Cast.castable S.alice exiledId shieldbreakerName Facing.FaceUp gs)) "the creature is not castable"
+    Spec.assertBool s (not (Cast.castable S.alice exiledId battleDisplayName Facing.FaceUp gs)) "nor is the Adventure"
   -- The same ruling's other half: an Adventure spell that leaves the stack "by
   -- failing to resolve because its targets have all become illegal" is NOT
   -- exiled. CR 608.2b's fizzle is the path, and CR 715.3d's "as it resolves"
@@ -245,7 +246,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     bonesplitter <- S.printingOf s registry "Bonesplitter"
     let (bonesplitterId, board) = S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)
         (gs, oid) = S.handOne shieldbreaker board
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid battleDisplayName Facing.FaceUp))
         -- The only target leaves the battlefield while the spell is on the
         -- stack, so every filled slot is illegal at CR 608.2b.
         gone = snd (Engine.runGamePure S.identityAnswer cast (Event.changeZone bonesplitterId Zone.Graveyard))

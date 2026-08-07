@@ -7,6 +7,7 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
@@ -47,6 +48,36 @@ data Object = MkObject
     source :: Source.Source,
     zone :: Zone.Zone,
     tapped :: TapState.TapState,
+    -- | CR 110.5: the second of rule 110.5's four status categories pawl models
+    -- -- face up or face down. `tapped` above is the first, and the two are
+    -- separate fields because the rule makes the categories independent.
+    --
+    -- WHAT IT DOES, and it is not a characteristic (CR 110.5a): FaceDown
+    -- SUBSTITUTES the object's printed characteristics wholesale, at
+    -- Pawl.Engine.Game.faceOf, for CR 708.2a's 2/2 creature with no name, no
+    -- text, no subtypes and no mana cost (Pawl.Engine.Card.faceDownFace). CR
+    -- 708.2 is why that is a substitution and not a CR 613 layer: the listed
+    -- characteristics ARE the object's copiable values, so they belong where the
+    -- fold starts rather than anywhere inside it.
+    --
+    -- Reaches a SPELL as well as a permanent, though CR 110.5d gives only
+    -- permanents status: CR 708.4 turns an object face down before it is put
+    -- onto the stack, and the face-down spell has to answer for its own
+    -- characteristics while it waits there. Nothing writes FaceDown for an
+    -- object in any other zone.
+    --
+    -- Per-incarnation state, like damage and counters: reset to FaceUp by
+    -- newIncarnation, which is CR 110.5b's default for a battlefield entry and
+    -- CR 708.9's reveal for a departure from one -- a face-down permanent that
+    -- leaves the battlefield is a face-up card again wherever it lands. The one
+    -- move that must NOT forget it is CR 708.4's last sentence ("the permanent
+    -- the spell becomes will be a face-down permanent"), and
+    -- Event.changeZoneFaceDown is the door that carries it.
+    --
+    -- NOT hidden from anything that inspects the game state: Object.source still
+    -- holds the printing, so CR 708.5's "you can't look at face-down permanents
+    -- controlled by another player" is unimplemented (#682).
+    facing :: Facing.Facing,
     -- | CR 120.3e: damage dealt to a creature is MARKED on it. A count, not a list
     -- of tagged units -- unlike mana, every damage rider (wither, infect,
     -- lifelink, toxic) is consumed at deal time and never re-read, and CR 704.5g
@@ -309,13 +340,19 @@ data Object = MkObject
 -- object). The first two ARE, but they are what the caller is DECIDING rather
 -- than forgetting: the move names its destination, and CR 613.7d wants the
 -- moment of entry, which only a caller in the Game monad can mint. A caller
--- overrides the rest the same way -- CR 110.5b's "enters tapped" and CR 701.3's
--- attach-on-entry are choices the move makes about the new object, not memories
--- of the old one, so they are reset here and set again by the funnel.
+-- overrides the rest the same way -- CR 110.5b's "enters tapped", CR 708.4's
+-- face-down status and CR 701.3's attach-on-entry are choices the move makes
+-- about the new object, not memories of the old one, so they are reset here and
+-- set again by the funnel.
 newIncarnation :: Object -> Object
 newIncarnation object =
   object
     { tapped = TapState.Untapped,
+      -- CR 110.5b for a battlefield entry, CR 708.9 for a departure from one:
+      -- a permanent enters face up unless a spell or ability says otherwise,
+      -- and a face-down permanent leaving the battlefield is revealed to all
+      -- players as it goes. Event.changeZoneFaceDown is the "otherwise".
+      facing = Facing.FaceUp,
       damage = 0,
       sickness = Sickness.Sick,
       bindings = Map.empty,

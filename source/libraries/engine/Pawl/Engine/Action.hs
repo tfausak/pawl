@@ -4,6 +4,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
@@ -87,8 +88,17 @@ legalActions pid gs =
           && Map.findWithDefault 0 pid (GameState.landsPlayed gs) < PlayerEffect.landPlaysAllowed pid gs
       lands = if canPlayLand then fmap (uncurry Action.Play) (playableLands pid gs) else []
       -- CR 709.3: one action per castable HALF, so choosing a half is choosing
-      -- an action and the engine never asks which one.
-      spells = fmap (uncurry Action.Cast) (Cast.castableSpells pid gs)
+      -- an action and the engine never asks which one. CR 702.37d adds one more
+      -- per half with morph, for the same reason: casting face down is a second
+      -- cast of the same card, not a rider on the first.
+      spells = fmap (\(oid, name, facing) -> Action.Cast oid name facing) (Cast.castableSpells pid gs)
+      -- CR 116.2b / 702.37e: turning a face-down permanent face up is a special
+      -- action a player may take any time they have priority, so it joins the
+      -- menu beside CR 116.2a's land play rather than going through the stack.
+      -- Ungated by phase or by an empty stack, which is the whole difference
+      -- between the two special actions pawl offers -- CR 116.2a states both
+      -- restrictions and CR 116.2b states neither.
+      turnUps = fmap Action.TurnFaceUp (FaceDown.turnableFaceUp pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -113,4 +123,4 @@ legalActions pid gs =
             forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
-   in Action.Pass : lands <> spells <> activations
+   in Action.Pass : lands <> spells <> turnUps <> activations

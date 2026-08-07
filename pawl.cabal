@@ -343,6 +343,7 @@ library engine
     Pawl.Engine.Engine
     Pawl.Engine.Event
     Pawl.Engine.Expiry
+    Pawl.Engine.FaceDown
     Pawl.Engine.Filter
     Pawl.Engine.Game
     Pawl.Engine.Keyword
@@ -563,6 +564,7 @@ library types
     Pawl.Types.ExtraPhase
     Pawl.Types.ExtraTurn
     Pawl.Types.Face
+    Pawl.Types.Facing
     Pawl.Types.Filter
     Pawl.Types.Game
     Pawl.Types.GameEvent
@@ -719,6 +721,7 @@ test-suite pawl-test-suite
     Pawl.EngineSpec
     Pawl.EventSpec
     Pawl.ExpirySpec
+    Pawl.FaceDownSpec
     Pawl.FilterSpec
     Pawl.GameSpec
     Pawl.ManaSpec

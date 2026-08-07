@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Counterability as Counterability
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter
@@ -28,13 +29,98 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.Power as Power
+import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import Pawl.Types.TargetSpec (TargetSpec)
 import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TypeLine as TypeLine
+
+-- CR 708.2a: what a face-down object's characteristics ARE -- "a 2/2 face-down
+-- creature with no text, no name, no subtypes, and no mana cost". CR 702.37a
+-- words the morph cast's version identically, so one value serves both.
+--
+-- A SUBSTITUTION and not a layer, which is CR 708.2's own reading: "face-down
+-- spells and face-down permanents have no characteristics other than those
+-- listed ... Any listed characteristics are the COPIABLE VALUES of that object's
+-- characteristics." Copiable values are where the CR 613 fold starts, so this
+-- replaces the printed face at Pawl.Engine.Game.faceOf and every layer then runs
+-- on top of it. CR 708.10 says as much from the other side -- a face-down
+-- permanent that becomes a copy of another permanent still has these
+-- characteristics.
+--
+-- A CONSTANT and not a function of the card underneath, which is the whole point
+-- of the rule: nothing about Ainok Tracker survives into what the face-down
+-- permanent is. That is also why nothing here can leak the card's identity.
+--
+-- A constant is also all rule 708.2 needs while morph is the only way in, since
+-- morph lists nothing and CR 708.2a fixes the default. An ability that DOES list
+-- characteristics -- disguise's and cloak's ward {2} -- would make this a
+-- function of what allowed the object to be face down, and is not implemented
+-- (#922). Nor is CR 708.2a's other producer, a spell that turns a FACE-UP
+-- permanent face down (#920).
+--
+-- "No characteristics other than those listed" reaches past the fields rule
+-- 708.2a names: no colour (the empty colour indicator and absent mana cost make
+-- it colourless by CR 105.2c), no supertypes, no abilities of any kind, no
+-- casting permissions and no additional or alternative costs. Every field below
+-- is that reading, written out rather than inherited, so a field added to
+-- Pawl.Types.Face has to be decided here rather than defaulting to the card's.
+--
+-- The one field that is not empty besides the type line and the P/T is `spell`:
+-- a face-down creature spell still has to RESOLVE, and Face.defaultSpell is
+-- exactly "one mode, no effects, no targets" -- what CR 708.2a's "no text"
+-- means for a permanent spell, whose resolution is CR 608.3's move to the
+-- battlefield rather than anything the text says.
+--
+-- The empty name is CR 708.2a's "no name" and is the same value
+-- Pawl.Engine.Projection.baseCharacteristics gives an object with no card behind
+-- it. It matches no printed card, which is what makes CR 708.4's "effects that
+-- care about the characteristics of a spell will see only the face-down spell's
+-- characteristics" true for a prohibition that names a card
+-- (Pawl.Engine.PlayerEffect.prohibitsCasting).
+faceDownFace :: Face.Face Card.Card
+faceDownFace =
+  Face.MkFace
+    { Face.name = CardName.MkCardName Text.empty,
+      Face.manaCost = Nothing,
+      Face.typeLine =
+        TypeLine.MkTypeLine
+          { TypeLine.supertypes = Set.empty,
+            TypeLine.types = Set.singleton CardType.Creature,
+            TypeLine.subtypes = Set.empty
+          },
+      Face.power = Just (Power.MkPower (Quantity.Literal 2)),
+      Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 2)),
+      Face.loyalty = Nothing,
+      Face.defense = Nothing,
+      Face.keywords = Set.empty,
+      Face.colorIndicator = Set.empty,
+      Face.characteristicPT = Nothing,
+      Face.staticAbilities = [],
+      Face.spell = Face.defaultSpell,
+      Face.activatedAbilities = [],
+      Face.replacementEffects = [],
+      Face.triggeredAbilities = [],
+      Face.delayedAbilities = Map.empty,
+      Face.castingPermissions = [],
+      Face.castingRestrictions = [],
+      Face.enchant = [],
+      Face.counterability = Counterability.Counterable,
+      Face.additionalCosts = [],
+      Face.alternativeCosts = [],
+      Face.playerAbilities = [],
+      Face.blockRequirements = [],
+      Face.attackRequirements = [],
+      Face.combatRestrictions = [],
+      Face.attackCosts = [],
+      Face.mulliganActions = [],
+      Face.openingHandActions = []
+    }
 
 -- The face a card shows where nothing has singled out one half for itself. WHICH
 -- face that is, is exactly what the layout decides, and the three rules disagree:

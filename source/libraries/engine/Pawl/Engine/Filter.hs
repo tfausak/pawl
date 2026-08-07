@@ -328,7 +328,7 @@ rewrite pairs predicate = case predicate of
 -- so a new one carrying a Filter must break this build rather than silently keep
 -- the printed word.
 --
--- Not rewritten: the Cost that cycling, flashback and entwine carry. A cost may
+-- Not rewritten: the Cost that cycling, flashback, morph and entwine carry. A cost may
 -- hold a Filter through CostComponent.Sacrifice, which is the ability-cost half
 -- of #635 one carrier over.
 rewriteKeyword :: [(Subtype.Subtype, Subtype.Subtype)] -> Keyword.Keyword -> Keyword.Keyword
@@ -364,6 +364,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Vigilance -> keyword
   Keyword.Flashback _ -> keyword
   Keyword.Fear -> keyword
+  Keyword.Morph _ -> keyword
   Keyword.Entwine _ -> keyword
   Keyword.Poisonous _ -> keyword
   Keyword.Infect -> keyword

@@ -16,6 +16,7 @@ import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.Face (Face)
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -277,9 +278,37 @@ resolveFace mName card = case mName of
 -- The face of the card an object is showing. Nothing when the id is unknown or
 -- the object has no card behind it (an ability on the stack, CR 113.7a).
 --
--- The seam every characteristic read goes through.
+-- The seam every characteristic read goes through -- which is why CR 708.2's
+-- substitution is HERE and nowhere else. "Face-down spells and face-down
+-- permanents have no characteristics other than those listed by the ability or
+-- rules that allowed the spell or permanent to be face down", and CR 708.2a
+-- fixes the list for an ability that names none. Those listed values are the
+-- object's COPIABLE values, so they replace the printed face at the point every
+-- read starts from rather than being folded in as a CR 613 layer -- see
+-- Card.faceDownFace.
+--
+-- The object still HAS its card (Object.source), and faceUpFaceOf below is how
+-- CR 702.37e reads the morph cost off it. Nothing hides the card from a reader
+-- that goes looking, so CR 708.5's "you can't look at face-down permanents
+-- controlled by another player" is unimplemented (#682).
 faceOf :: ObjectId -> GameState -> Maybe (Face Card)
-faceOf oid gs = do
+faceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
+  Just Facing.FaceDown -> Just Card.faceDownFace
+  _ -> faceUpFaceOf oid gs
+
+-- `faceOf` IGNORING CR 708.2's substitution: the face the object's own card
+-- shows, whichever way up the object is.
+--
+-- Two rules want it, and both are about a face-down object without being about
+-- its characteristics. CR 702.37e reads "what the permanent's morph cost WOULD
+-- BE if it were face up" -- a face-down permanent has no keywords for a
+-- projected read to find, so the cost has to come from the card. CR 708.8's
+-- turning face up then reverts the copiable values to these.
+--
+-- Deliberately NOT the door any characteristic read may take: a reader that
+-- wants to know what an object IS wants faceOf.
+faceUpFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
+faceUpFaceOf oid gs = do
   card <- cardOf oid gs
   Just (resolveFace (lookupObject oid gs >>= Object.face) card)
 
@@ -293,10 +322,17 @@ faceOf oid gs = do
 -- for exactly one object -- a transformed permanent -- and every OTHER
 -- characteristic of that permanent is its back face's (CR 712.8e's first
 -- sentence). Collapsing them either way is a silent wrong answer.
+--
+-- CR 708.2a's "no mana cost" wins over CR 712.8e, and the rules leave no room
+-- for it not to: a face-down permanent's characteristics are the listed ones and
+-- nothing else, so there is no front face for that rule to reach back to. The
+-- mana value that falls out is CR 202.3a's 0.
 manaCostFaceOf :: ObjectId -> GameState -> Maybe (Face Card)
-manaCostFaceOf oid gs = do
-  card <- cardOf oid gs
-  Just (Card.manaCostFace card (resolveFace (lookupObject oid gs >>= Object.face) card))
+manaCostFaceOf oid gs = case fmap Object.facing (lookupObject oid gs) of
+  Just Facing.FaceDown -> Just Card.faceDownFace
+  _ -> do
+    card <- cardOf oid gs
+    Just (Card.manaCostFace card (resolveFace (lookupObject oid gs >>= Object.face) card))
 
 -- `faceOf` for an object that may already be gone -- cardOfWithLastKnown's
 -- fallback, for its reasons (CR 608.2h). Shares resolveFace with faceOf: if the
@@ -304,10 +340,18 @@ manaCostFaceOf oid gs = do
 -- does; if it is gone, `lookupObject` answers Nothing and this falls back to
 -- the combined view, because LastKnown carries no face of its own for a later
 -- read to recover (#654).
+--
+-- CR 708.2's substitution applies while the object is still live, for faceOf's
+-- reason. Once it is gone there is nothing to apply it from -- LastKnown carries
+-- no facing any more than it carries a face (#654) -- and CR 708.9 is what makes
+-- that the right answer anyway: a face-down permanent leaving the battlefield is
+-- revealed to all players as it goes.
 faceOfWithLastKnown :: ObjectId -> GameState -> Maybe (Face Card)
-faceOfWithLastKnown oid gs = do
-  card <- cardOfWithLastKnown oid gs
-  Just (resolveFace (lookupObject oid gs >>= Object.face) card)
+faceOfWithLastKnown oid gs = case fmap Object.facing (lookupObject oid gs) of
+  Just Facing.FaceDown -> Just Card.faceDownFace
+  _ -> do
+    card <- cardOfWithLastKnown oid gs
+    Just (resolveFace (lookupObject oid gs >>= Object.face) card)
 
 -- CR 701.27a over ONE object: "turn it over so that its other face is up", or
 -- leave the map exactly as it was. The primitive BOTH transform paths share --

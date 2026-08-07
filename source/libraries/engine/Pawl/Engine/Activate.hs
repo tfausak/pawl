@@ -28,6 +28,7 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -417,6 +418,7 @@ activateAbility pid srcId ability = do
             Object.source = Source.OfAbility srcId ability,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,

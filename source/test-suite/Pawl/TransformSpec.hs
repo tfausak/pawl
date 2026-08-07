@@ -148,7 +148,7 @@ spec s registry = Spec.describe s "Transform" $ do
     gargoyle <- S.printingOf s registry "Thraben Gargoyle"
     island <- S.printingOf s registry "Island"
     let (gs, _) = S.handOne gargoyle (S.landsInPlay island 1)
-        namesOffered = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+        namesOffered = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
     Spec.assertEqWith
       s
       "CR 712.11: the card proposes its front face and no other"

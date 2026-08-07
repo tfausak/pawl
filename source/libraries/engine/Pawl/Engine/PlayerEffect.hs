@@ -275,15 +275,22 @@ castsThisTurn pid gs =
 -- casting when some choice made during the proposal could move the spell out of
 -- the prohibited class, and nothing here searches choice space (#95).
 --
--- Nothing in this pool reaches it, and that rests on a missing capability rather
--- than on a claim about Magic. CR 601.2b names two choices that are made BEFORE
--- the announcement it governs and may restrict it -- "choosing to cast a spell
--- with flashback from a graveyard or choosing to cast a creature with morph face
--- down" -- and both would move a spell across this prohibition, since CR 702.37a
--- gives a face-down spell "no name" at all. CR 709.3's half is settled the same
--- way, before the card is put onto the stack, which is why each half is offered
--- as its own action here. Face-down casting is what pawl lacks: there is no
--- face-down state for anything to be in (#192).
+-- Nothing in this pool reaches the LOOKAHEAD, and that rests on a missing
+-- capability rather than on a claim about Magic. CR 601.2b names two choices
+-- that are made BEFORE the announcement it governs and may restrict it --
+-- "choosing to cast a spell with flashback from a graveyard or choosing to cast
+-- a creature with morph face down" -- and both would move a spell across this
+-- prohibition, since CR 702.37a gives a face-down spell "no name" at all.
+--
+-- Both of those choices are now MADE BEFORE this is asked rather than searched
+-- for: each is its own Action, so the offer is per (half, facing) pair and this
+-- predicate is asked once per pair with that pair's own name. CR 708.2a's empty
+-- name is what a morph cast brings, which is why a Null Chamber naming the card
+-- stops its face-up cast and not its face-down one -- Pawl.FaceDownSpec's
+-- "CR 708.4 a prohibition naming the card stops the face-up cast and not the
+-- morph one". What is still absent is the SEARCH: a player who must be told they
+-- may begin casting because some choice not yet on the menu would escape the
+-- prohibition gets no such offer (#95).
 prohibitsCasting :: PlayerId -> CardName -> GameState -> Bool
 prohibitsCasting pid name gs =
   let cast = castsThisTurn pid gs
