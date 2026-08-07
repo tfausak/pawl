@@ -617,12 +617,12 @@ canPayComponent pid oid component gs = case component of
   -- cost.
   CostComponent.TapThis -> case Game.lookupObject oid gs of
     Nothing -> False
-    Just obj -> Object.zone obj == Zone.Battlefield && Object.tapped obj == TapState.Untapped
+    Just obj -> Set.member oid (GameState.battlefield gs) && Object.tapped obj == TapState.Untapped
   -- CR 107.6: the exact mirror of TapThis above, and the reason a {Q} ability is
   -- one a player uses on a creature they left tapped.
   CostComponent.UntapThis -> case Game.lookupObject oid gs of
     Nothing -> False
-    Just obj -> Object.zone obj == Zone.Battlefield && Object.tapped obj == TapState.Tapped
+    Just obj -> Set.member oid (GameState.battlefield gs) && Object.tapped obj == TapState.Tapped
   -- CR 701.21a: only a permanent, and only one this player controls.
   CostComponent.SacrificeThis ->
     Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid

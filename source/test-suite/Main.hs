@@ -163,6 +163,7 @@ import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
 import qualified Pawl.PerformanceSpec
+import qualified Pawl.PhasingSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
@@ -390,6 +391,7 @@ spec s registry = do
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
   Pawl.PerformanceSpec.spec s registry
+  Pawl.PhasingSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry

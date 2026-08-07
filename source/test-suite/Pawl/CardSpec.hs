@@ -1244,6 +1244,10 @@ keywordFilters keyword = case keyword of
   Keyword.Morph cost -> costFilters cost
   -- CR 702.22: plain banding names no quality, so it filters nothing.
   Keyword.Banding -> []
+  -- CR 702.26a: phasing names no quality -- who phases is "the permanents that
+  -- player controls", written into the CR 502.1 turn-based action rather than
+  -- into the keyword.
+  Keyword.Phasing -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []

@@ -33,7 +33,6 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
-import qualified Pawl.Types.Zone as Zone
 
 -- CR 514.2: during the cleanup step, all damage marked on permanents is removed.
 --
@@ -49,12 +48,16 @@ removeAllDamage gs =
 -- liveness test every combat-damage read shares, because the combat record
 -- outlives the objects it names. Two ways off the battlefield -- destroyed inside
 -- CR 510.4's two-step window, or deleted outright when its owner left the game
--- (CR 800.4a's first clause) -- so the predicate is on the ZONE, not on mere
--- existence: Event.destroy leaves the object in the graveyard.
+-- (CR 800.4a's first clause) -- so the predicate is not mere existence:
+-- Event.destroy leaves the object in the graveyard.
+--
+-- Battlefield MEMBERSHIP and not Object.zone, which differ for exactly one thing:
+-- CR 702.26b's phased-out permanents, which the game treats as not existing while
+-- their zone still reads Zone.Battlefield (CR 702.26d). Rule 702.26b's own last
+-- sentence puts such a permanent in the same position as one that left, so the
+-- set is the reading CR 506.4 wants.
 onBattlefield :: ObjectId -> GameState -> Bool
-onBattlefield oid gs = case Game.lookupObject oid gs of
-  Just obj -> Object.zone obj == Zone.Battlefield
-  Nothing -> False
+onBattlefield oid gs = Set.member oid (GameState.battlefield gs)
 
 -- CR 510.1e / 702.19b, as a pure predicate over the whole assignment. Legal iff
 -- it totals power, uses only legal recipients, and -- the trample implication --

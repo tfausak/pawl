@@ -661,6 +661,12 @@ performStateBasedActions = do
       isVanishingToken oid = case Game.lookupObject oid departed of
         Nothing -> False
         Just obj -> case Object.source obj of
+          -- Object.zone and NOT GameState.battlefield, which is the one place in
+          -- the engine where the two must disagree: CR 702.26d says "tokens
+          -- continue to exist on the battlefield while phased out", and a
+          -- phased-out permanent is absent from that set (CR 702.26b). Reading the
+          -- set here would make a phasing token cease to exist the moment it
+          -- phased out.
           Source.OfToken _ -> Object.zone obj /= Zone.Battlefield
           _ -> False
       vanishing = filter isVanishingToken (Map.keys (GameState.objects departed))

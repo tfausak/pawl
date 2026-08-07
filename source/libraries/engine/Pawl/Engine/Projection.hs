@@ -1718,8 +1718,10 @@ data Aspect
 -- instant control or creature-ness changes, and pawl removes it at the next
 -- settle.
 --
--- The CR 506.4 clause that remains unbuilt -- phasing (#154) -- would arrive by
--- one of those same doors; the attacked-planeswalker and attacked-battle clauses
+-- CR 506.4's phasing clause arrives by one of those same doors:
+-- Pawl.Engine.Phasing.phaseOut calls Game.removeFromCombat directly, so a
+-- permanent that phases out leaves the record without this function's help. The
+-- attacked-planeswalker and attacked-battle clauses
 -- are answered where the attack target is read (Combat.stillAttacked and
 -- Combat.stillAttackedBattle) and never edit the record at all.
 filterReads :: Filter.Type.Filter Keyword.Type.Keyword -> Set Aspect

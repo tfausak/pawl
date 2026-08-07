@@ -71,6 +71,7 @@ emptyGame order =
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
           GameState.battlefield = mempty,
+          GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.stack = [],
@@ -197,6 +198,7 @@ startGameFromCards perform = do
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
+        GameState.phasedOut = mempty,
         GameState.exile = mempty,
         GameState.command = mempty,
         GameState.stack = []
@@ -348,6 +350,7 @@ subgameStateFrom starter parent =
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
           GameState.battlefield = mempty,
+          GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.stack = [],
@@ -396,7 +399,11 @@ subgameStateFrom starter parent =
 
 -- CR 729.5: at the end of a subgame, each player takes all traditional cards
 -- (Source.OfCard) they own anywhere in the subgame into their main-game library
--- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step). All
+-- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step).
+-- "Anywhere" is literal, and covers rule 729.5's second sentence -- "including
+-- phased-out permanents" -- for free: `returned` filters GameState.objects, and
+-- CR 702.26d leaves a phased-out permanent in that map with its zone unchanged,
+-- so nothing here has to know phasing exists. All
 -- other subgame objects and zones simply are not carried over. The parent's
 -- non-library objects are untouched -- the main game continues from where it
 -- was discontinued -- and the old parent library objects are dropped, having

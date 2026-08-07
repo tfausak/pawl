@@ -1304,6 +1304,7 @@ oneMountainState mountain ph =
           GameState.hand = Map.singleton alice (Seq.singleton oid),
           GameState.graveyard = Map.empty,
           GameState.battlefield = mempty,
+          GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.stack = [],

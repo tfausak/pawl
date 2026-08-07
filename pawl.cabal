@@ -354,6 +354,7 @@ library engine
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.Mulligan
+    Pawl.Engine.Phasing
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Projection
     Pawl.Engine.Quantity
@@ -732,6 +733,7 @@ test-suite pawl-test-suite
     Pawl.ModalSpec
     Pawl.MulliganSpec
     Pawl.PerformanceSpec
+    Pawl.PhasingSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec

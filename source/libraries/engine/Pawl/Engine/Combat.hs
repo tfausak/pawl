@@ -39,7 +39,6 @@ import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.Zone as Zone
 
 emptyCombat :: Combat
 emptyCombat =
@@ -301,7 +300,13 @@ canAttackGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs 
   Just obj ->
     Projection.controllerOfGiven grants Set.empty oid gs == Just pid
       && GameState.activePlayer gs == pid
-      && Object.zone obj == Zone.Battlefield
+      -- CR 506.3 wants a permanent, so the test is battlefield MEMBERSHIP and not
+      -- Object.zone: CR 702.26b makes a phased-out permanent one the game treats
+      -- as not existing, and its zone still reads Zone.Battlefield (CR 702.26d).
+      -- legalAttackers below never offers one, since it filters
+      -- Projection.controlsGiven, which walks the same set -- this conjunct is what
+      -- makes the predicate agree when asked about an id off that menu.
+      && Set.member oid (GameState.battlefield gs)
       && Object.tapped obj == TapState.Untapped
       -- CR 302.6, relaxed by CR 702.10b: a creature with haste can attack even if
       -- it hasn't been controlled continuously since its controller's most recent
@@ -553,7 +558,8 @@ canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs o
   Nothing -> False
   Just obj ->
     Projection.controllerOfGiven grants Set.empty oid gs == Just pid
-      && Object.zone obj == Zone.Battlefield
+      -- Battlefield MEMBERSHIP, for canAttackGiven's reason above.
+      && Set.member oid (GameState.battlefield gs)
       && Object.tapped obj == TapState.Untapped
       && isCreatureObjectGiven pcs oid gs
       -- CR 509.1b: every PRINTED per-creature blocking restriction in force

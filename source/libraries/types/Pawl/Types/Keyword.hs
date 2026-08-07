@@ -159,6 +159,26 @@ data Keyword
     -- "[quality] creature with 'bands with other [quality]'" clause both rules
     -- also cover would need one, and is part of the unmodeled half.
     Banding -- 702.22
+  | -- | 702.26a: a static ability that MODIFIES THE RULES OF THE UNTAP STEP.
+    -- During each player's untap step, before that player untaps anything, every
+    -- phased-in permanent with phasing they control phases out, and every
+    -- phased-out permanent that phased out under their control phases in.
+    --
+    -- Nothing here mints an ability, so Pawl.Engine.Keyword answers this
+    -- constructor with [] at every one of its arms. The rule is read directly by
+    -- Pawl.Engine.Phasing, from the CR 502.1 turn-based action -- the same shape
+    -- as CR 702.145's daybound, whose CR 502.2 check Pawl.Engine.Daytime reads
+    -- rather than granting anything.
+    --
+    -- Payload-free: rule 702.26a takes no parameter, and CR 702.26p makes multiple
+    -- instances redundant, so its reader takes membership rather than the
+    -- per-keyword count the projection carries.
+    --
+    -- Phasing is a property of the PERMANENT, not of the phased-out state: a
+    -- permanent phased out by an effect (Teferi's Protection) has no phasing
+    -- ability and so never phases back in on its own. That is why "is it phased
+    -- out" lives on Pawl.Types.GameState and not here.
+    Phasing
   | -- | 702.29a: pay the cost and discard this card to draw a card, functioning
     -- only while the card is in a player's hand. The cost rides the constructor,
     -- as Flashback's does, because rule 702.29a states it as part of the keyword
