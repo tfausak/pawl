@@ -714,6 +714,7 @@ test-suite pawl-test-suite
     Pawl.CoreSpec
     Pawl.CostSpec
     Pawl.CountSpec
+    Pawl.CrewSpec
     Pawl.DamageSpec
     Pawl.DaytimeSpec
     Pawl.DecideSpec

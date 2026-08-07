@@ -19,6 +19,7 @@ toJson encode c = case c of
   CostComponent.SacrificeThis -> Common.nullary "SacrificeThis"
   CostComponent.PayLife n -> Common.tagged "PayLife" . Just $ Common.encodeNatural n
   CostComponent.Sacrifice n c_ -> Common.tagged "Sacrifice" . Just . Common.array $ [Common.encodeNatural n, Filter.toJson encode c_]
+  CostComponent.TapForTotalPower n c_ -> Common.tagged "TapForTotalPower" . Just . Common.array $ [Common.encodeNatural n, Filter.toJson encode c_]
   CostComponent.DiscardCards n -> Common.tagged "DiscardCards" . Just $ Common.encodeNatural n
   CostComponent.DiscardThis -> Common.nullary "DiscardThis"
   CostComponent.PayEnergy n -> Common.tagged "PayEnergy" . Just $ Common.encodeNatural n
@@ -38,6 +39,10 @@ fromJson decode value = do
       count <- Common.decodeNatural n
       filter_ <- Filter.fromJson decode c_
       pure $ CostComponent.Sacrifice count filter_
+    ("TapForTotalPower", Just (Value.Array (Array.MkArray [n, c_]))) -> do
+      threshold <- Common.decodeNatural n
+      filter_ <- Filter.fromJson decode c_
+      pure $ CostComponent.TapForTotalPower threshold filter_
     ("DiscardCards", Just v) -> CostComponent.DiscardCards <$> Common.decodeNatural v
     ("DiscardThis", _) -> Right CostComponent.DiscardThis
     ("PayEnergy", Just v) -> CostComponent.PayEnergy <$> Common.decodeNatural v

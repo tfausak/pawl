@@ -8,6 +8,7 @@ import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -59,6 +60,16 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       fromJson
       (CostComponent.Sacrifice 2 (Filter.HasSubtype Subtype.Mountain))
       """ {"type":"Sacrifice","value":[2,{"type":"HasSubtype","value":{"type":"Mountain"}}]} """
+  -- The THRESHOLD and the Filter ride the payload positionally, Sacrifice's
+  -- shape -- but the Natural means something else here (CR 702.122a's total
+  -- power, not a count of objects), which is why the two are separate arms.
+  Spec.it s "TapForTotalPower" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (CostComponent.TapForTotalPower 6 (Filter.HasCardType CardType.Creature))
+      """ {"type":"TapForTotalPower","value":[6,{"type":"HasCardType","value":{"type":"Creature"}}]} """
   Spec.it s "DiscardCards" $
     Common.assertJsonCodec
       s

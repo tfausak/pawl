@@ -398,6 +398,7 @@ recordingAnswer p = case p of
   Prompt.ChooseAttachment _ _ _ candidates -> pure (NonEmpty.head candidates)
   Prompt.ChooseSacrifices _ _ _ candidates count -> pure (Set.fromList (List.genericTake count candidates))
   Prompt.ChooseAnyNumberToSacrifice {} -> pure Set.empty
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> pure (Set.fromList candidates)
   Prompt.ChooseCost _ _ _ candidates -> pure (Cost.firstOffered candidates)
   Prompt.DeclareMulligan {} -> pure MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> pure (List.genericTake count hand)
@@ -1826,6 +1827,7 @@ slaveAnswer p = case p of
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   Prompt.ChooseAnyNumberToSacrifice {} -> Set.empty
+  Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   Prompt.ChooseCost _ _ _ candidates -> Cost.firstOffered candidates
   Prompt.DeclareMulligan {} -> MulliganDecision.Keep
   Prompt.Bottom _ _ hand count -> List.genericTake count hand

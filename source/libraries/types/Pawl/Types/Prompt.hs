@@ -553,6 +553,34 @@ data Prompt r where
   -- Answers as Response.ChoseSacrifices: the payload is the same set of
   -- permanents, and a transcript that replays one replays the other.
   ChooseAnyNumberToSacrifice :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 702.122a: which permanents to TAP to pay a cost whose payment is
+  -- measured by their TOTAL POWER. The ObjectId is the permanent whose ability
+  -- is being activated (the Vehicle); the [ObjectId] is the payer's untapped
+  -- permanents matching the component's criterion, engine-pre-filtered in
+  -- ascending order; the Natural is the threshold the chosen set's summed power
+  -- must reach.
+  --
+  -- Neither of the two sacrifice prompts above, and not expressible as either.
+  -- ChooseSacrifices names how many objects; this one does not, because CR
+  -- 702.122a's cost never does -- crew 6 is paid by one 7-power creature or by
+  -- four 2-power ones. ChooseAnyNumberToSacrifice names no count either, but
+  -- admits every subset including the empty one, and here the empty set pays
+  -- nothing unless the threshold is 0. So the count field carries a THRESHOLD
+  -- rather than a size, and Pawl.Engine.Cost validates against a sum.
+  --
+  -- ASKED WHENEVER THE COST IS PAID, with no elision, which is the one place
+  -- this differs from every sibling: whether the answer is forced is a question
+  -- about SUBSETS -- crew 6 with a 6-power and a 7-power creature has two legal
+  -- answers, crew 6 with a 4 and a 3 has one -- and deciding it means
+  -- enumerating them. Asking a forced question costs a redundant prompt; not
+  -- asking an unforced one decides for the player, which the engine may never
+  -- do.
+  --
+  -- A Set, for ChooseSacrifices' reason: one permanent cannot be tapped twice
+  -- for one payment. Answers as Response.ChoseTaps, which is its own
+  -- constructor rather than a reuse of ChoseSacrifices -- a transcript that
+  -- taps creatures and one that sacrifices them are not the same transcript.
+  ChooseTapsForTotalPower :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 701.3a: where an effect that moves an already-attached permanent puts it.
   -- The first ObjectId is the permanent being moved (Crown of the Ages' targeted
   -- Aura); the NonEmpty is the destinations its card text admits.

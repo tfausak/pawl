@@ -27,6 +27,7 @@ import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -93,6 +94,7 @@ abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
+  Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -146,6 +148,7 @@ handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
 handAbilitiesFor keyword = case keyword of
   Keyword.Cycling cost searchFor -> [cycling cost searchFor]
+  Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -223,6 +226,145 @@ cycling cost searchFor =
       Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
       Just filter_ -> Effect.Search filter_ SearchDestination.RevealThenHand
 
+-- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
+-- sibling one zone over. Named for the zone for that function's reason, and read
+-- by Pawl.Engine.Projection.abilitiesGiven, which appends them to the projection's
+-- own list and never learns that rule 702 produced any of them.
+--
+-- POST-LAYER keywords, unlike handAbilitiesOf's printed ones, and the contrast is
+-- CR 113.6 again: this ability functions on the battlefield, which the projection
+-- does reach. So Humility takes crew away at CR 613.1f layer 6 for free, and an
+-- effect that grants crew adds it.
+--
+-- One ability PER INSTANCE, rule 702.70b's reading rather than rule 702.164b's:
+-- CR 702.122a states a whole self-contained ability, so a permanent with crew
+-- twice has two of them to activate and two thresholds, and nothing is summed.
+--
+-- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable, for
+-- triggeredAbilitiesOf's reason.
+battlefieldAbilitiesOf :: Map Keyword Natural -> [ActivatedAbility Card]
+battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map.toAscList counts)
+
+-- Exhaustive, exactly as handAbilitiesFor is, and for the same reason.
+battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card]
+battlefieldAbilitiesFor keyword count = case keyword of
+  Keyword.Crew n -> List.genericReplicate count (crew n)
+  Keyword.Cycling _ _ -> []
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flash -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Hexproof _ -> []
+  Keyword.Indestructible -> []
+  Keyword.Landwalk _ -> []
+  Keyword.Lifelink -> []
+  Keyword.Reach -> []
+  Keyword.Shroud -> []
+  Keyword.Trample -> []
+  Keyword.Vigilance -> []
+  Keyword.Banding -> []
+  Keyword.Fear -> []
+  Keyword.Menace -> []
+  Keyword.Flashback _ -> []
+  Keyword.Entwine _ -> []
+  Keyword.Poisonous _ -> []
+  Keyword.BattleCry -> []
+  Keyword.Infect -> []
+  Keyword.Devoid -> []
+  Keyword.Riot -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
+  Keyword.Toxic _ -> []
+  Keyword.StartYourEngines -> []
+
+-- CR 702.122a: "Crew N" means "Tap any number of other untapped creatures you
+-- control with total power N or greater: This permanent becomes an artifact
+-- creature until end of turn." The whole ability, minted from the one number the
+-- keyword carries -- the card says which keyword, the rule says what it means.
+--
+-- THE COST. Every word of rule 702.122a's criterion is written in the existing
+-- Filter vocabulary rather than baked into the component: "other" is
+-- `Not IsSource` (#163's one-relation-one-spelling), "untapped" is
+-- `Not IsTapped`, "creatures" is `HasCardType Creature` and "you control" is
+-- `ControlledBy You`. Only the AGGREGATE is the component's own, total power
+-- being a property of the chosen set rather than of any candidate -- see
+-- Pawl.Types.CostComponent.TapForTotalPower.
+--
+-- `Not IsSource` is load-bearing and not decoration: a Vehicle that has already
+-- become a creature -- by an earlier crew, or by Opalescence -- would otherwise
+-- be an untapped creature its controller controls, and could crew itself.
+--
+-- CR 302.6 does NOT reach this cost, in either direction. The Vehicle needs no
+-- haste, because the tap symbol is not in the cost (Cost.requiresSicknessCheck
+-- tests for CostComponent.TapThis and this is not one); and a creature that
+-- arrived this turn may still be tapped to crew, because rule 302.6 gates only a
+-- creature's OWN activated ability with the tap symbol in it. The Vehicle it
+-- crews is still subject to rule 302.6's second sentence when it attacks.
+--
+-- THE EFFECT. "Becomes an artifact creature" ADDS two card types and sets
+-- nothing, which is CR 205.1b naming this exact phrase: "some effects state that
+-- an object becomes an 'artifact creature'; these effects also allow the object
+-- to retain all of its prior card types and subtypes". So the Vehicle stays a
+-- Vehicle, and Modification.AddCardType -- which adds and has no setting sibling
+-- -- is the right opcode rather than a near miss. TWO of them, artifact and
+-- creature being separate card types (CR 300.1), in one mode rather than one
+-- opcode over a set: AddCardType carries a single type by design, and CR 613.7b
+-- stamps both at the moment this one resolution creates them, so nothing in CR
+-- 613.7's ordering can come between them.
+--
+-- Layer 4 either way (CR 613.1d).
+--
+-- ObjectRef.InSlot Binding.triggerSource -- the engine-reserved "self" slot -- so
+-- the Vehicle is named and never TARGETED (CR 115.10a): rule 702.122a says "this
+-- permanent", and a targeted crew would fizzle to shroud and fire "becomes the
+-- target" triggers that the printed ability does not.
+--
+-- CR 208.3 is what makes this observable at all, and it needs no clause here: the
+-- Vehicle's printed power and toughness are gated on its being a creature at
+-- Pawl.Engine.Projection's read points, so adding the type is the whole of CR
+-- 301.7b's "it immediately has its printed power and toughness".
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- activated, cycling's posture. AnyTime because rule 702.122a states no timing
+-- restriction, which leaves CR 117.1b's default -- and CR 702.122a's "any number
+-- of times" needs no expression, an activated ability having no once-per-turn
+-- limit unless one is printed.
+crew :: Natural -> ActivatedAbility Card
+crew n =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost =
+        Cost.MkCost
+          { -- CR 118.5: rule 702.122a's cost has no mana part, which is
+            -- `Just` an empty one and not the Nothing that means unpayable.
+            Cost.mana = Just (ManaCost.MkManaCost []),
+            Cost.components = [CostComponent.TapForTotalPower n criterion]
+          },
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.fromList [becomes CardType.Artifact, becomes CardType.Creature]) Map.empty Optionality.Mandatory Nothing))
+          (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      -- CR 702.122a gives the permanent this ability outright, with no "as long
+      -- as", cycling's answer.
+      ActivatedAbility.condition = Nothing
+    }
+  where
+    criterion =
+      Filter.And
+        [ Filter.HasCardType CardType.Creature,
+          Filter.Not Filter.IsTapped,
+          Filter.ControlledBy PlayerRelation.You,
+          Filter.Not Filter.IsSource
+        ]
+    becomes cardType =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.AddCardType cardType)
+        (ObjectRef.InSlot Binding.triggerSource)
+
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions (Face.castingPermissions) are a separate,
 -- additive list; Pawl.Engine.Cast reads both.
@@ -260,6 +402,9 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.29a is an ACTIVATED ability, not a casting permission: cycling
   -- discards the card, it never casts it. See handAbilitiesOf above.
   Keyword.Cycling _ _ -> []
+  -- CR 702.122a is an activated ability too, and one that functions on the
+  -- battlefield -- see battlefieldAbilitiesOf above.
+  Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -473,6 +618,7 @@ entryReplacementsOf counts = concatMap (uncurry entryReplacementsFor) (Map.toAsc
 entryReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
 entryReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Riot)
+  Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []

@@ -129,6 +129,7 @@ import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
 import qualified Pawl.CostSpec
 import qualified Pawl.CountSpec
+import qualified Pawl.CrewSpec
 import qualified Pawl.DamageSpec
 import qualified Pawl.DaytimeSpec
 import qualified Pawl.DecideSpec
@@ -355,6 +356,7 @@ spec s registry = do
   Pawl.CoreSpec.spec s registry
   Pawl.CostSpec.spec s registry
   Pawl.CountSpec.spec s registry
+  Pawl.CrewSpec.spec s registry
   Pawl.DamageSpec.spec s registry
   Pawl.DaytimeSpec.spec s registry
   Pawl.DecideSpec.spec s
