@@ -761,7 +761,7 @@ benchmark pawl-benchmark
     pawl:engine,
     pawl:registry,
     pawl:types,
-    tasty-bench ^>=0.5.1,
+    tasty-bench ^>=0.4.1 || ^>=0.5.1,
 
   hs-source-dirs: source/benchmark
   main-is: Main.hs
