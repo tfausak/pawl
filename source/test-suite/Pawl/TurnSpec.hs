@@ -482,7 +482,7 @@ assaultAbility assault = case Face.activatedAbilities (S.combinedFace assault) o
 -- Activate it and let it resolve, through the real activation path (the
 -- Bonesplitter shape in Pawl.AuraSpec) -- not Resolve.applyEffect, so the
 -- {3}{R}{R} is genuinely paid off the board. The CR 307.5 rider is NOT checked
--- here: Activate.timingOk gates Action.legalActions, and a direct
+-- here: Activate.restrictionsOk gates Action.legalActions, and a direct
 -- activateAbility call goes around it, so the test that cares asks
 -- Activate.activatable itself.
 activateAssault :: ActivatedAbility.ActivatedAbility Card.Type.Card -> ObjectId -> GameState.GameState -> GameState.GameState

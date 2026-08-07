@@ -809,7 +809,7 @@ animateStep gs = S.runPure animateAnswer gs Engine.runStep
 -- Jade Statue ({4} Artifact, Arabian Nights): "{2}: This artifact becomes a 3/6
 -- Golem artifact creature until end of combat. Activate only during combat."
 -- The card is the producer for BOTH halves -- Duration.UntilEndOfCombat and
--- ActivationTiming.DuringPhase's whole-phase window -- which is why the two
+-- ActivationRestriction.DuringPhase's whole-phase window -- which is why the two
 -- landed together.
 untilEndOfCombatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do

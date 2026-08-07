@@ -6,7 +6,7 @@
           "cost": {
             "components": [
               {
-                "type": "SacrificeThis"
+                "type": "TapThis"
               }
             ],
             "mana": []
@@ -16,40 +16,13 @@
               {
                 "effects": [
                   {
-                    "type": "ModifyTarget",
+                    "type": "DealDamage",
                     "value": [
+                      "target",
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "ModifyPowerToughness",
-                        "value": [
-                          {
-                            "type": "Literal",
-                            "value": 3
-                          },
-                          {
-                            "type": "Literal",
-                            "value": 3
-                          }
-                        ]
-                      },
-                      "target"
-                    ]
-                  },
-                  {
-                    "type": "ModifyTarget",
-                    "value": [
-                      {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "GainKeyword",
-                        "value": {
-                          "type": "Trample"
-                        }
-                      },
-                      "target"
+                        "type": "Literal",
+                        "value": 2
+                      }
                     ]
                   }
                 ],
@@ -57,6 +30,9 @@
                   {
                     "slot": "target",
                     "spec": {
+                      "filter": {
+                        "type": "IsAttacking"
+                      },
                       "pool": {
                         "type": "Creatures"
                       }
@@ -73,47 +49,54 @@
                 {
                   "type": "Step",
                   "value": {
-                    "type": "Beginning",
+                    "type": "Combat",
                     "value": {
-                      "type": "Upkeep"
+                      "type": "DeclareAttackers"
                     }
                   }
                 },
                 {
-                  "type": "ControllersTurn"
+                  "type": "EachTurn"
                 }
               ]
+            },
+            {
+              "type": "AttackedThisStep"
             }
           ]
         }
       ],
       "manaCost": [
         {
+          "type": "Generic",
+          "value": 3
+        },
+        {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Green"
+              "type": "White"
             }
           }
         }
       ],
-      "name": "Llanowar Augur",
+      "name": "Kongming's Contraptions",
       "power": {
         "type": "Literal",
-        "value": 0
+        "value": 2
       },
       "toughness": {
         "type": "Literal",
-        "value": 3
+        "value": 4
       },
       "typeLine": {
         "subtypes": [
           {
-            "type": "Elf"
+            "type": "Human"
           },
           {
-            "type": "Shaman"
+            "type": "Soldier"
           }
         ],
         "types": [

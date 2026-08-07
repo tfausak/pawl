@@ -49,7 +49,6 @@ import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackCost as AttackCost
@@ -994,7 +993,7 @@ oneEffectActivated mana effect =
         Modal.MkModal
           (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.restrictions = [],
       ActivatedAbility.condition = Nothing
     }
 
@@ -1018,7 +1017,7 @@ modalActivated modes =
   ActivatedAbility.MkActivatedAbility
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
       ActivatedAbility.modal = Modal.MkModal (Seq.fromList modes) (ModeSelection.ChooseExactly 1),
-      ActivatedAbility.timing = ActivationTiming.AnyTime,
+      ActivatedAbility.restrictions = [],
       ActivatedAbility.condition = Nothing
     }
 

@@ -71,17 +71,19 @@
               }
             ]
           },
-          "timing": {
-            "type": "DuringPhase",
-            "value": [
-              {
-                "type": "CombatPhase"
-              },
-              {
-                "type": "EachTurn"
-              }
-            ]
-          }
+          "restrictions": [
+            {
+              "type": "DuringPhase",
+              "value": [
+                {
+                  "type": "CombatPhase"
+                },
+                {
+                  "type": "EachTurn"
+                }
+              ]
+            }
+          ]
         }
       ],
       "manaCost": [

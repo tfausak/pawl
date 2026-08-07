@@ -69,23 +69,25 @@
               }
             ]
           },
-          "timing": {
-            "type": "DuringPhase",
-            "value": [
-              {
-                "type": "Step",
-                "value": {
-                  "type": "Combat",
+          "restrictions": [
+            {
+              "type": "DuringPhase",
+              "value": [
+                {
+                  "type": "Step",
                   "value": {
-                    "type": "EndOfCombat"
+                    "type": "Combat",
+                    "value": {
+                      "type": "EndOfCombat"
+                    }
                   }
+                },
+                {
+                  "type": "EachTurn"
                 }
-              },
-              {
-                "type": "EachTurn"
-              }
-            ]
-          }
+              ]
+            }
+          ]
         }
       ],
       "name": "Desert",

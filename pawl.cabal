@@ -70,8 +70,8 @@ library codec
     Pawl.Codec.AbilityNameSpec
     Pawl.Codec.ActivatedAbility
     Pawl.Codec.ActivatedAbilitySpec
-    Pawl.Codec.ActivationTiming
-    Pawl.Codec.ActivationTimingSpec
+    Pawl.Codec.ActivationRestriction
+    Pawl.Codec.ActivationRestrictionSpec
     Pawl.Codec.Affected
     Pawl.Codec.AffectedSpec
     Pawl.Codec.Aggregation
@@ -506,7 +506,7 @@ library types
     Pawl.Types.AbilityName
     Pawl.Types.Action
     Pawl.Types.ActivatedAbility
-    Pawl.Types.ActivationTiming
+    Pawl.Types.ActivationRestriction
     Pawl.Types.ActivePlayerEffect
     Pawl.Types.ActiveReplacement
     Pawl.Types.Affected

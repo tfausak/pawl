@@ -1,6 +1,6 @@
 module Pawl.Types.ActivatedAbility where
 
-import qualified Pawl.Types.ActivationTiming as ActivationTiming
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
@@ -16,9 +16,10 @@ import qualified Pawl.Types.Modal as Modal
 data ActivatedAbility card = MkActivatedAbility
   { cost :: Cost.Cost Keyword.Keyword,
     modal :: Modal.Modal card,
-    -- | CR 307.5: any timing rider the ability carries. AnyTime for every ability
-    -- without one, which is all of them but equip.
-    timing :: ActivationTiming.ActivationTiming,
+    -- | CR 602.5: every clause of the "activate only ..." rider the ability
+    -- prints, ALL of which must hold. Empty for an ability without one, which is
+    -- all of them but equip and a handful of printed windows.
+    restrictions :: [ActivationRestriction.ActivationRestriction],
     -- | The "as long as" clause of a static ability that GRANTS this one, or
     -- Nothing for an ability the object simply has, which is nearly all of them.
     --
