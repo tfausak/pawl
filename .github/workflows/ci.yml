@@ -96,8 +96,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: cachix/install-nix-action@v31
-      - uses: nix-community/cache-nix-action@v6
+      # Not cachix/install-nix-action: that installs the multi-user daemon,
+      # which leaves /nix root-owned, and the cache restore then cannot untar
+      # into it. This is the single-user install cache-nix-action expects.
+      - uses: nixbuild/nix-quick-install-action@v35
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+            max-jobs = auto
+      - uses: nix-community/cache-nix-action@v7
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'pawl.cabal') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
