@@ -52,9 +52,10 @@ data CounterKind
     -- Contributes nothing to the CR 613 layer system, so
     -- Pawl.Engine.Projection.counterGathered grants nothing for this kind.
     --
-    -- Nothing reads the count yet. CR 704.5v's state-based action is what will,
-    -- and it is not implemented: the way a battle's count reaches 0 is damage, and
-    -- CR 310.6 needs an attackable battle first (#302). A battle printing defense
-    -- 0 would reach it on entry, and none exists.
+    -- Three readers, and unlike Loyalty's they are the whole of the count's story:
+    -- CR 310.6 / 120.3h takes counters off in Pawl.Engine.Damage, CR 310.11b's
+    -- intrinsic Siege ability fires when the last one goes, and CR 704.5v buries a
+    -- battle sitting at 0 that owes no ability. All three count Object.counters
+    -- directly, as loyalty's and lore's readers do.
     Defense
   deriving (Eq, Ord, Show)

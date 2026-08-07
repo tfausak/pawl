@@ -233,6 +233,27 @@ stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   Nothing -> False
   Just defender -> List.elem oid (attackablePlaneswalkers defender gs)
 
+-- CR 506.4 for a battle: is this one still being attacked, or has it left the
+-- battlefield since the declaration? stillAttacked's twin, asked at the same one
+-- place -- Damage.combatRecipient's CR 510.1b assignment -- and built the same way,
+-- out of the candidate list CR 508.1b drew the declaration from.
+--
+-- Reusing attackableBattles rather than testing the zone directly is what keeps
+-- the two readings in step: a battle that stopped being a battle (CR 613.1d) is off
+-- the list for the same reason a planeswalker that stopped being one is, and CR
+-- 506.4's "leaves the battlefield" falls out of the list being battlefield-scoped.
+--
+-- It is one clause WIDER than CR 506.4, because the list also asks who protects
+-- the battle: a protector moved to a third player mid-combat (CR 310.8f) would read
+-- here as removed from combat, where rule 506.4 lists no such clause. No effect in
+-- the pool can move a designation (#853), and CR 310.8d is why the extra clause is
+-- the conservative direction anyway -- the defending player would have moved with
+-- it.
+stillAttackedBattle :: ObjectId -> GameState -> Bool
+stillAttackedBattle oid gs = case Combat.defender (GameState.combat gs) of
+  Nothing -> False
+  Just defender -> List.elem oid (attackableBattles defender gs)
+
 isCreatureObject :: ObjectId -> GameState -> Bool
 isCreatureObject = isCreatureObjectGiven Map.empty
 
@@ -910,10 +931,11 @@ combatants c = Set.union (Map.keysSet (Combat.attackers c)) (Set.unions (Map.ele
 -- takes its blocked-ness with it while a removed BLOCKER leaves the attacker
 -- blocked with nothing blocking it -- CR 509.1h's last sentence, argued there.
 --
--- Creatures only, which is what `combatants` gathers: an ATTACKED planeswalker is
--- not in that set, and CR 506.4's clauses about one are answered at stillAttacked
--- instead. CR 506.4d/e, the becomes-a-battle clause and the phases-out clause are
--- all unreachable in this pool (#503, #302, #154).
+-- Creatures only, which is what `combatants` gathers: an ATTACKED planeswalker or
+-- battle is not in that set, and CR 506.4's clauses about either are answered at
+-- stillAttacked and stillAttackedBattle instead. CR 506.4d/e, the
+-- becomes-a-battle clause and the phases-out clause are all unreachable in this
+-- pool (#503, #154).
 --
 -- A combatant with no entry in Combat.joinedUnder is left alone by the CONTROL
 -- clause, because there is nothing to compare it against and this only ever

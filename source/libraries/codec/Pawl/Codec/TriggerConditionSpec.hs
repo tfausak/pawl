@@ -227,3 +227,11 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfCountersReached CounterKind.Lore 3)
       """ {"type":"SelfCountersReached","value":[{"type":"Lore"},3]} """
+  -- CR 310.11b. The payload is the counter kind alone: "the last" needs no number.
+  Spec.it s "SelfLastCounterRemoved round-trips its kind" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfLastCounterRemoved CounterKind.Defense)
+      """ {"type":"SelfLastCounterRemoved","value":{"type":"Defense"}} """

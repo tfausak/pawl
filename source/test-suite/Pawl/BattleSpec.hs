@@ -33,11 +33,20 @@
 -- plainest bodies: a vanilla 2/1 and a 3/3 whose entire text is swampwalk. Neither
 -- is a battle, so every case below reads rule 310 rather than the attacker.
 --
--- NOT COVERED, because none of it is built (#897): CR 310.6's damage removing
--- defense counters, CR 310.7 / 704.5v's defense-0 state-based action, and CR
--- 310.11b's "when the last defense counter is removed, exile it, then you may cast
--- it transformed". A creature attacking a battle here therefore deals it no
--- damage, which is why no case below runs the combat damage step.
+-- And how a battle is defeated: CR 310.6 / 120.3h's damage removing defense
+-- counters, CR 115.4's "any target" admitting one, CR 310.11b's intrinsic Siege
+-- ability, and CR 310.7 / 704.5v's state-based action. Those are damageSpec and
+-- defeatSpec below.
+--
+-- Lightning Bolt ({R} Instant, "deals 3 damage to any target") and Firebolt ({R}
+-- Sorcery, "deals 2 damage to any target") are the pool's two plainest CR 115.4
+-- spells, and 3 + 2 is exactly the Siege's printed defense of 5. Distinct amounts
+-- on purpose: a defense-5 battle taking 5 at once could not tell "removed all the
+-- counters" from "removed the right number".
+--
+-- NOT COVERED, because it is not built (#901): the SECOND half of CR 310.11b's
+-- sentence, "then you may cast it transformed without paying its mana cost". A
+-- defeated Siege reaches exile below and stops there.
 module Pawl.BattleSpec where
 
 import qualified Control.Monad as Monad
@@ -48,6 +57,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -55,15 +65,18 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -72,8 +85,11 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -83,6 +99,8 @@ spec s registry = Spec.describe s "Battle" $ do
   candidateSpec s registry
   repairSpec s registry
   attackSpec s registry
+  damageSpec s registry
+  defeatSpec s registry
 
 -- CR 310.4b and CR 310.8a both fire as the battle enters, and both are visible
 -- from a cast -- which is what makes this the gameplay-level test rather than a
@@ -414,6 +432,188 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
         checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
     Spec.assertBool s (not (Battle.isBeingAttacked battle gone)) "nothing is attacking it"
     Spec.assertEqWith s "bob protects it now" (protectorOf battle checked) (Just S.bob)
+
+-- CR 310.6 / CR 120.3h: damage dealt to a battle removes that many defense
+-- counters, and CR 115.4 is what lets a damage spell name one.
+damageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+damageSpec s registry = Spec.describe s "Damage" $ do
+  Spec.it s "CR 115.4 an any-target spell offers the battle, and only what rule 115.4 names" $ do
+    (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt"]
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    case (spells, S.spellTargetSpec bolt) of
+      ([boltId], Just theSpec) ->
+        -- EXACT rather than a membership test, and that is what makes this read CR
+        -- 115.4 rather than "battles are permanents": alice's Plains and Mountain
+        -- are on the same battlefield, and rule 115.4's last sentence keeps them
+        -- off the list. Three seats, so all three players are on it.
+        Spec.assertEqWith
+          s
+          "the Siege and the three players"
+          (Target.legalRecipients (Just S.alice) boltId theSpec gs)
+          ( Set.fromList
+              [ Recipient.ToBattle battle,
+                Recipient.ToPlayer S.alice,
+                Recipient.ToPlayer S.bob,
+                Recipient.ToPlayer S.carol
+              ]
+          )
+      _ -> Spec.assertFailure s "fixture should have a Bolt with a target spec"
+  Spec.it s "CR 310.6 Lightning Bolt takes three defense counters off it" $ do
+    (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt"]
+    case spells of
+      [boltId] -> do
+        let after = castAt battle S.alice boltId gs
+        -- Five printed, three dealt, two left -- so this reads the AMOUNT and not
+        -- merely "some counters came off".
+        Spec.assertEqWith s "two defense counters left" (S.counterOf CounterKind.Defense battle after) 2
+        Spec.assertBool s (S.onBattlefield battle after) "and the Siege is still on the battlefield"
+      _ -> Spec.assertFailure s "fixture should have a Bolt"
+  Spec.it s "CR 310.6 / 510.1b combat damage to a battle removes them too" $ do
+    -- The other producer, and the one attacking a battle exists for. Goblin Piker
+    -- is a vanilla 2/1, so this reads CR 510.1b's assignment and no card text.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
+    case mine of
+      [attacker] -> do
+        let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+            dealt = S.runPure S.identityAnswer attacked (Monad.void Damage.dealCombatDamage)
+        Spec.assertEqWith
+          s
+          "the Piker really is attacking the battle"
+          (Map.lookup attacker (Combat.Type.attackers (GameState.combat attacked)))
+          (Just (AttackTarget.OfBattle battle))
+        Spec.assertEqWith s "three defense counters left" (S.counterOf CounterKind.Defense battle dealt) 3
+      _ -> Spec.assertFailure s "fixture should have exactly one attacker"
+  Spec.it s "CR 506.4 a battle that has left the battlefield is assigned no combat damage" $ do
+    -- THE FALSIFIER for combatRecipient answering with the battle unconditionally.
+    -- The same declaration with the Siege destroyed inside CR 510.4's window, so CR
+    -- 510.1b gives the attacker nothing to assign to and no damage event is built.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
+    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        killed = S.runPure S.identityAnswer attacked (Event.destroy Regenerability.Regenerable [battle])
+        dealt = S.runPure S.identityAnswer killed (Monad.void Damage.dealCombatDamage)
+    Spec.assertEqWith s "no damage was dealt at all" (S.damageEventsOf dealt) []
+
+-- CR 310.11b and CR 310.7 / 704.5v: what happens when the last defense counter
+-- comes off. The two rules are only jointly observable -- 704.5v alone would send
+-- the Siege to a graveyard where 310.11b exiles it -- so every case here asserts
+-- the DESTINATION zone rather than merely that the battle left.
+defeatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+defeatSpec s registry = Spec.describe s "Defeat" $ do
+  Spec.it s "CR 310.11b a Siege has the intrinsic defeat ability" $ do
+    siege <- siegePC s registry
+    Spec.assertEqWith
+      s
+      "one ability, conditioned on the last defense counter"
+      (fmap TriggeredAbility.condition (Battle.triggeredAbilitiesOf siege))
+      [TriggerCondition.SelfLastCounterRemoved CounterKind.Defense]
+  Spec.it s "CR 310.11b a battle with no battle types does not" $ do
+    -- Rule 310.11b says "Sieges", not "battles", and this is the falsifier for
+    -- gating the mint on the card type instead: the same real projection with its
+    -- subtypes stripped, which candidateSpec above uses for CR 310.8a's other
+    -- branch.
+    siege <- siegePC s registry
+    Spec.assertEqWith s "no intrinsic ability" (Battle.triggeredAbilitiesOf siege {PC.subtypes = Set.empty}) []
+  Spec.it s "CR 310.11b / 704.5v three plus two defeats it, and it is EXILED" $ do
+    -- THE PROVING CASE. Bolt for 3 then Firebolt for 2 against a printed defense of
+    -- 5, so the last counter comes off on the second spell and not the first.
+    invasion <- S.printingOf s registry "Invasion of Dominaria"
+    (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt", "Firebolt"]
+    case spells of
+      [boltId, fireboltId] -> do
+        let afterBolt = castAt battle S.alice boltId gs
+            afterBoth = castAt battle S.alice fireboltId afterBolt
+            copiesIn zone = invasionsIn (S.printingName invasion) zone afterBoth
+        Spec.assertEqWith s "no defense counters left" (S.counterOf CounterKind.Defense battle afterBoth) 0
+        -- EXILE, with the graveyard checked separately: CR 704.5v alone would put
+        -- it into its owner's graveyard, and "it left the battlefield" cannot tell
+        -- the two rules apart. CR 400.7 mints a fresh id on the move, so the card
+        -- is counted by name rather than found at `battle`.
+        Spec.assertEqWith s "the Siege is in exile" (copiesIn Zone.Exile) 1
+        Spec.assertEqWith s "and in nobody's graveyard" (copiesIn Zone.Graveyard) 0
+        Spec.assertBool s (not (S.onBattlefield battle afterBoth)) "and not on the battlefield"
+      _ -> Spec.assertFailure s "fixture should have a Bolt and a Firebolt"
+  Spec.it s "CR 310.6 the FIRST of those two spells defeats nothing" $ do
+    -- THE FALSIFIER for the case above: the identical board after the Bolt alone.
+    -- Without it, an engine that exiled a battle on any damage at all would pass.
+    invasion <- S.printingOf s registry "Invasion of Dominaria"
+    (gs, battle, spells) <- siegeUnderFire s registry ["Lightning Bolt", "Firebolt"]
+    case spells of
+      boltId : _ -> do
+        let afterBolt = castAt battle S.alice boltId gs
+        Spec.assertBool s (S.onBattlefield battle afterBolt) "the Siege is still on the battlefield"
+        Spec.assertEqWith s "and nowhere else" (invasionsIn (S.printingName invasion) Zone.Exile afterBolt) 0
+      _ -> Spec.assertFailure s "fixture should have a Bolt"
+  Spec.it s "CR 704.5v a battle at defense 0 with nothing pending is named by the state-based action" $ do
+    -- The clause's own reading, at the level Pawl.Engine.Battle states it.
+    -- Unreachable for a SIEGE in a real game, and that is rule 704.5v's design: the
+    -- counters hitting 0 fires CR 310.11b, whose exemption holds the battle there
+    -- until the ability exiles it. What this pins is that the clause exists, so
+    -- that the case below shows the RIDER and not the clause doing the holding.
+    (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
+    let drained = drain battle entered
+    Spec.assertEqWith s "it is named" (Battle.defeated (Projection.projectAll drained) [] drained) [battle]
+  Spec.it s "CR 704.5v and is NOT while its defeat ability is still owed a resolution" $ do
+    -- THE FALSIFIER for the rider, on the identical board with CR 310.11b's own
+    -- event still unscanned. Pawl.Engine.Engine.performSettle runs the state-based
+    -- action pass BEFORE placePendingTriggers, so this window is real rather than
+    -- hypothetical, and it is the whole reason the Siege above reaches exile.
+    (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
+    let drained = drain battle entered
+        removal = [GameEvent.CountersRemoved battle CounterKind.Defense 2 0]
+    Spec.assertBool s (Battle.awaitingAbility removal drained battle) "the ability has triggered"
+    Spec.assertEqWith s "so nothing is buried" (Battle.defeated (Projection.projectAll drained) removal drained) []
+
+-- Cast the spell in `caster`'s hand at `battle`, then settle: the spell resolves,
+-- CR 310.6 takes its counters off, and CR 310.11b's ability -- if the last one came
+-- off -- is placed and resolved inside the same loop. Every case above reads the
+-- board that loop leaves.
+castAt :: ObjectId.ObjectId -> PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+castAt battle caster spell gs =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToBattle battle)) sets
+        _ -> S.identityAnswer p
+      cast = S.runPure answer gs (S.cast caster spell)
+   in S.runPure answer cast Engine.priorityLoop
+
+-- Set a battle's defense counters to none without any damage having been dealt, so
+-- the two CR 704.5v cases differ in the unscanned event log ALONE.
+drain :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+drain oid gs =
+  let empty obj = obj {Object.counters = Map.insert CounterKind.Defense 0 (Object.counters obj)}
+   in gs {GameState.objects = Map.adjust empty oid (GameState.objects gs)}
+
+-- How many copies of a card sit in `zone`, across every player's share of it.
+-- Counted by NAME because CR 400.7 mints a fresh id on every zone change, so the id
+-- the battle had on the battlefield names nothing once it has left.
+invasionsIn :: CardName.CardName -> Zone.Zone -> GameState.GameState -> Int
+invasionsIn wanted zone gs =
+  let isCopy oid = fmap S.nameOf (Game.cardOf oid gs) == Just wanted
+      members pid = Game.zoneMembers zone pid gs
+   in length (concatMap (filter isCopy . members) (Map.keys (GameState.players gs)))
+
+-- alice's three-seat board with the Siege on it (carol protects), plus one Mountain
+-- and one hand card per named spell -- so each is castable for its {R} without any
+-- case above having to say so.
+siegeUnderFire ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [String] ->
+  m (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId])
+siegeUnderFire s registry spells = do
+  (entered, battle) <- castInvasionThreeSeated s registry (protectTo S.carol)
+  mountain <- S.printingOf s registry "Mountain"
+  printings <- Monad.mapM (S.printingOf s registry) spells
+  let withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) entered printings
+      (ids, ready) =
+        List.foldl'
+          (\(acc, g) p -> let (oid, g2) = S.addHandCard p S.alice g in (acc <> [oid], g2))
+          ([], withLands)
+          printings
+  pure (ready, battle, ids)
 
 -- Answer CR 508.1b's announcement with the given battle whenever it is offered,
 -- and everything else aggressively -- so the DeclareAttackers prompt takes every

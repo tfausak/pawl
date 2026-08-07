@@ -506,3 +506,4 @@ castOf event = case event of
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
+  GameEvent.CountersRemoved {} -> Nothing
