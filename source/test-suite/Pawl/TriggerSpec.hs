@@ -61,8 +61,11 @@
 -- Unsummon -- `leavesBattlefieldSpec`. That rule's SECOND written form read by a
 -- BYSTANDER -- "whenever another creature you control dies", where the bearer
 -- watches a permanent other than itself leave the battlefield -- with Meren of
--- Clan Nel Toth, which is also the pool's producer for CR 122's experience
--- counters -- `permanentDiesSpec`. CR 119.9's life-gain trigger, from both
+-- Clan Nel Toth, which is also the pool's producer for CR 122.1's experience
+-- counters -- `permanentDiesSpec`, and the pool's first READER of that same
+-- counter kind, whose two triggers are CR 603.6a's entry form narrowed by a
+-- power floor and a CR 603.2b step trigger whose Quantity counts a player's
+-- counters, with Ezuri, Claw of Progress -- `ezuriExperienceSpec`. CR 119.9's life-gain trigger, from both
 -- producers (CR 119.3's instructed gain and CR 120.3f's lifelink) with the
 -- controls that keep it from being a "life total moved" trigger, with Ajani's
 -- Pridemate -- `lifeGainTriggerSpec`. That event read for its NUMBER, which CR
@@ -4699,6 +4702,164 @@ anafenzaAttackSpec s registry =
             Spec.assertEqWith s "and neither is a creature bob controls" (countersOn theirs settled) (Just 0)
           _ -> Spec.assertFailure s "fixture should give alice Anafenza, a Piker and a Wall, and bob a Piker"
 
+-- CR 122.1's experience counters READ, with Ezuri, Claw of Progress {2}{G}{U}
+-- Legendary Creature -- Phyrexian Elf Warrior 3/3: "Whenever a creature you
+-- control with power 2 or less enters, you get an experience counter. At the
+-- beginning of combat on your turn, put X +1/+1 counters on another target
+-- creature you control, where X is the number of experience counters you have."
+--
+-- permanentDiesSpec above is where the counters are HANDED OUT, with Meren of
+-- Clan Nel Toth. Nothing counted them until this card: an experience counter is
+-- CR 122.1's bare first sentence and no rule reads one, so the only possible
+-- reader is a card's own text, and the pool had none.
+--
+-- Both of Ezuri's abilities are triggered, which is why the whole card sits in
+-- this spec rather than being split. The first is CR 603.6a's second written
+-- form ("whenever a [type] enters") narrowed by a POWER CEILING, and the second is
+-- a CR 603.2b step trigger whose Quantity is Quantity.PlayerCounters -- the arm
+-- CR 728.1's rad mill already used for a rule, aimed for the first time at a
+-- counter kind only card text can see.
+--
+-- Every number on these boards is arranged not to coincide, because arithmetic
+-- is all this card does. The target's printed 2/1 is not the experience count
+-- (3, then 5), the count is not the number of creatures its controller controls
+-- (5, then 2), and the two counts differ from each other -- so a payload that
+-- added a constant, counted the board, or read the wrong counter kind lands on a
+-- power and toughness no assertion here accepts.
+ezuriExperienceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+ezuriExperienceSpec s registry =
+  let experienceOf = S.playerCounterOf PlayerCounterKind.Experience
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+      -- The board sitting in pid's beginning of combat step -- CR 506.1's first
+      -- combat step, rule 507 -- which is the moment Ezuri's second ability
+      -- names. Staged directly, as Pawl.RadSpec stages its precombat main phase,
+      -- because Engine.runStep is what writes the CR 603.2b StepBegan record this
+      -- trigger matches.
+      atBeginningOfCombat pid gs =
+        gs
+          { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+            GameState.activePlayer = pid,
+            GameState.priority = Just pid
+          }
+      -- Every target slot aimed at one object, where S.identityAnswer would take
+      -- the least Recipient -- which on the first board below is one of the three
+      -- Pikers rather than the permanent every assertion is about.
+      aimAt oid p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+        _ -> S.identityAnswer p
+      -- alice casts the spell in her hand and lets the stack empty, so the spell
+      -- resolves and so does whatever Ezuri's entry trigger put on top of it.
+      castAndResolve sid gs =
+        let onStack = S.runPure S.identityAnswer gs (S.cast S.alice sid)
+         in S.runPure S.identityAnswer onStack Engine.priorityLoop
+      -- alice's Ezuri beside one Bonded Construct, and nothing else. The
+      -- Construct is ARRANGED rather than cast, so it contributes no enters
+      -- event and no experience counter of its own -- every counter on these
+      -- boards is one the test put there deliberately.
+      ezuriAndTarget = do
+        ezuri <- S.printingOf s registry "Ezuri, Claw of Progress"
+        construct <- S.printingOf s registry "Bonded Construct"
+        let (ezuriId, withEzuri) = S.addCreature ezuri S.alice (Setup.emptyGame S.bothPlayers)
+            (targetId, gs) = S.addCreature construct S.alice withEzuri
+        pure (ezuriId, targetId, gs)
+   in Spec.describe s "Ezuri, Claw of Progress" $ do
+        -- The whole arc #858 asks for, at gameplay level: alice CASTS three
+        -- small creature spells, the counters accumulate on her, and a
+        -- permanent's size changes by exactly that many. The Construct she
+        -- already had is the target, so its printed 2/1 is untouched by the
+        -- casting and 5/4 can only be 2/1 plus three.
+        Spec.it s "CR 122.1 three cast creature spells become three experience counters, and the combat trigger spends them" $ do
+          ezuri <- S.printingOf s registry "Ezuri, Claw of Progress"
+          construct <- S.printingOf s registry "Bonded Construct"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
+          let (_, withEzuri) = S.addCreature ezuri S.alice (S.landsInPlay mountain 6)
+              (targetId, board) = S.addCreature construct S.alice withEzuri
+              (gs0, firstPiker) = S.handOne piker board
+              (secondPiker, gs1) = S.addHandCard piker S.alice gs0
+              (thirdPiker, gs2) = S.addHandCard piker S.alice gs1
+              cast = castAndResolve thirdPiker (castAndResolve secondPiker (castAndResolve firstPiker gs2))
+              combat = S.runPure (aimAt targetId) (atBeginningOfCombat S.alice cast) (Engine.runStep >> Engine.priorityLoop)
+          Spec.assertEqWith s "alice started with no experience" (experienceOf S.alice gs2) 0
+          Spec.assertEqWith s "three 2/1 spells resolved, so three experience counters" (experienceOf S.alice cast) 3
+          Spec.assertEqWith s "bob, who cast nothing, has none" (experienceOf S.bob cast) 0
+          Spec.assertEqWith s "the Construct took one +1/+1 counter per experience counter" (countersOn targetId combat) (Just 3)
+          Spec.assertEqWith s "so its printed 2/1 reads 5/4" (S.powerToughnessOf targetId combat) (Just (5, 4))
+          -- READING a player's counters is not removing them, and CR 728.1's rad
+          -- mill -- the pool's other user of this Quantity, which removes one
+          -- counter per nonland card it milled -- is why that is worth an
+          -- assertion. Ezuri's printed text says only "the number of experience
+          -- counters you have", so alice keeps all three.
+          Spec.assertEqWith s "and alice still has all three experience counters" (experienceOf S.alice combat) 3
+        -- The control at a DIFFERENT count, which is what stops a payload that
+        -- hardcodes three from passing the case above. Same two permanents, five
+        -- counters instead of three, and 2/1 reads 7/6.
+        --
+        -- The offered target set is asserted too, because the outcome alone does
+        -- not discriminate: with only two creatures on the board, an answerer
+        -- taking the first offer reaches the same place whether or not "another"
+        -- rejected Ezuri.
+        Spec.it s "CR 122.1 five experience counters put five, and \"another\" keeps Ezuri off her own trigger" $ do
+          (ezuriId, targetId, board) <- ezuriAndTarget
+          let gs = S.addPlayerCounter PlayerCounterKind.Experience 5 S.alice board
+              recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)] r
+              recordTargets p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> do
+                  State.modify' (<> [sets])
+                  pure (aimAt targetId p)
+                _ -> pure (aimAt targetId p)
+              ((_, combat), offered) =
+                State.runState (Engine.runGame recordTargets (atBeginningOfCombat S.alice gs) (Engine.runStep >> Engine.priorityLoop)) []
+          Spec.assertEqWith
+            s
+            "the Construct is the only legal target"
+            (fmap Map.elems offered)
+            [[Set.singleton (Recipient.ToCreature targetId)]]
+          Spec.assertEqWith s "five counters, not three" (countersOn targetId combat) (Just 5)
+          Spec.assertEqWith s "so its printed 2/1 reads 7/6" (S.powerToughnessOf targetId combat) (Just (7, 6))
+          Spec.assertEqWith s "and Ezuri, whom \"another\" excludes, took none" (countersOn ezuriId combat) (Just 0)
+          Spec.assertEqWith s "leaving her printed 3/3" (S.powerToughnessOf ezuriId combat) (Just (3, 3))
+        -- ZERO, the case a "for each" that quietly means "one" would pass. The
+        -- ability still triggers and still resolves -- CR 603.2b says nothing
+        -- about the count -- so the Construct staying 2/1 has to come from the
+        -- Quantity reading 0 rather than from nothing happening, and the stack
+        -- assertion is what tells those apart.
+        Spec.it s "CR 122.1 no experience counters put no +1/+1 counters, though the ability still resolves" $ do
+          (_, targetId, board) <- ezuriAndTarget
+          let staged = S.withEvents [GameEvent.StepBegan (Phase.Combat CombatStep.BeginningOfCombat) S.alice] (atBeginningOfCombat S.alice board)
+              settled = S.runPure (aimAt targetId) staged Engine.settleForPriority
+              combat = S.runPure (aimAt targetId) (atBeginningOfCombat S.alice board) (Engine.runStep >> Engine.priorityLoop)
+          Spec.assertEqWith s "alice has no experience counters" (experienceOf S.alice board) 0
+          Spec.assertEqWith s "the ability went on the stack anyway" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "no +1/+1 counter was put" (countersOn targetId combat) (Just 0)
+          Spec.assertEqWith s "so the Construct keeps its printed 2/1" (S.powerToughnessOf targetId combat) (Just (2, 1))
+        -- "WITH POWER 2 OR LESS", the Filter.PowerAtMost arm. Hill Giant is 3/3
+        -- and Goblin Piker is 2/1, so the same Ezuri pays one experience counter
+        -- for the second and nothing for the first. BOTH halves are here, because
+        -- a filter that always rejected and one that always admitted are told
+        -- apart only by running both.
+        Spec.it s "CR 208.1 power 2 or less: a 3/3 entering pays nothing, a 2/1 pays one" $ do
+          ezuri <- S.printingOf s registry "Ezuri, Claw of Progress"
+          hillGiant <- S.printingOf s registry "Hill Giant"
+          piker <- S.printingOf s registry "Goblin Piker"
+          mountain <- S.printingOf s registry "Mountain"
+          let boardWith n = snd (S.addCreature ezuri S.alice (S.landsInPlay mountain n))
+              (giantGs, giantSpell) = S.handOne hillGiant (boardWith 4)
+              (pikerGs, pikerSpell) = S.handOne piker (boardWith 2)
+          Spec.assertEqWith s "the 3/3 gives alice nothing" (experienceOf S.alice (castAndResolve giantSpell giantGs)) 0
+          Spec.assertEqWith s "the 2/1 gives her one" (experienceOf S.alice (castAndResolve pikerSpell pikerGs)) 1
+        -- "YOU CONTROL", read through CR 109.5 against the ability's controller
+        -- (CR 603.3a). bob's 2/1 entering in front of alice's Ezuri is a creature
+        -- with power 2 or less entering, and it pays nobody.
+        Spec.it s "CR 109.5 you control: an opponent's 2/1 entering gives alice nothing" $ do
+          ezuri <- S.printingOf s registry "Ezuri, Claw of Progress"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, withEzuri) = S.addCreature ezuri S.alice (Setup.emptyGame S.bothPlayers)
+              (_, entered) = S.entersWithTrigger piker S.bob withEzuri
+              after = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Engine.priorityLoop)
+          Spec.assertEqWith s "alice gets no experience counter" (experienceOf S.alice after) 0
+          Spec.assertEqWith s "and neither does bob, who has no Ezuri" (experienceOf S.bob after) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -4740,3 +4901,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lifeLossTriggerSpec s registry
   mindcrankSpec s registry
   anafenzaAttackSpec s registry
+  ezuriExperienceSpec s registry

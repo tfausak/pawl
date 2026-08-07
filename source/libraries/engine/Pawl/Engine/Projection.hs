@@ -1713,6 +1713,7 @@ filterReads f = case f of
   -- under the fold as HasCardType's moves under layer 4.
   Filter.Type.HasKeyword _ -> Set.singleton Keywords
   Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
+  Filter.Type.PowerAtMost _ -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty

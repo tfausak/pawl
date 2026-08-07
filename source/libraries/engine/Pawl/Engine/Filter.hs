@@ -186,6 +186,12 @@ matches context view predicate = case predicate of
   Filter.PowerAtLeast n -> case power view of
     Nothing -> False
     Just p -> p >= n
+  -- CR 208.1 again, and False for the same absent power PowerAtLeast declines:
+  -- an object with no power is not "a creature with power 2 or less", it is not
+  -- a creature at all.
+  Filter.PowerAtMost n -> case power view of
+    Nothing -> False
+    Just p -> p <= n
   -- CR 202.3, and answerable in every zone -- see the View field's own note.
   -- Vacuously False for a player, which has no mana value to compare.
   Filter.ManaValueAtMost n -> case manaValue view of
@@ -283,6 +289,7 @@ rewrite pairs predicate = case predicate of
   -- a keyword rather than a filter over one.
   Filter.HasKeyword k -> Filter.HasKeyword (rewriteKeyword pairs k)
   Filter.PowerAtLeast _ -> predicate
+  Filter.PowerAtMost _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
   Filter.IsSource -> predicate

@@ -113,7 +113,22 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     let noPower = blackCreature {Filter.power = Nothing}
     Spec.assertBool s (not (Filter.matches self noPower (Filter.Type.PowerAtLeast 1))) "no power"
 
-  -- CR 202.3, the other direction from PowerAtLeast above: Ojutai's Command's
+  -- CR 208.1 read as a ceiling: Ezuri, Claw of Progress' "power 2 or less".
+  -- The bound is INCLUSIVE, which is the printed "or less", so the 2 that
+  -- PowerAtLeast 4 declines is admitted here and the 5 is not.
+  Spec.it s "PowerAtMost compares projected power" $ do
+    Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.PowerAtMost 2)) "power 2 <= 2"
+    Spec.assertBool s (not (Filter.matches self devoidBigCreature (Filter.Type.PowerAtMost 2))) "power 5 > 2"
+
+  -- NOT the negation of PowerAtLeast, which is the whole reason it is a separate
+  -- atom: an object with no power answers False to both, where `Not (PowerAtLeast
+  -- 3)` would admit it.
+  Spec.it s "PowerAtMost is False when power is Nothing" $ do
+    let noPower = blackCreature {Filter.power = Nothing}
+    Spec.assertBool s (not (Filter.matches self noPower (Filter.Type.PowerAtMost 99))) "no power"
+    Spec.assertBool s (Filter.matches self noPower (Filter.Type.Not (Filter.Type.PowerAtLeast 99))) "where the negation of PowerAtLeast admits it"
+
+  -- CR 202.3, a ceiling on a different characteristic: Ojutai's Command's
   -- "mana value 2 or less".
   Spec.it s "ManaValueAtMost compares the mana value" $ do
     Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.ManaValueAtMost 3)) "mana value 3 <= 3"
