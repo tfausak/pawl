@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.ManaCount as ManaCount
+import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Array as Array
@@ -25,6 +26,7 @@ toJson q = case q of
   Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ ManaCount.toJson c
   Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ PlayerRef.toJson p
   Quantity.Speed p -> Common.tagged "Speed" . Just $ PlayerRef.toJson p
+  Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Common.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -40,6 +42,7 @@ fromJson value = do
     ("ManaCount", Just v) -> Quantity.ManaCount <$> ManaCount.fromJson v
     ("LifeTotal", Just v) -> Quantity.LifeTotal <$> PlayerRef.fromJson v
     ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
+    ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)

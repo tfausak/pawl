@@ -82,6 +82,7 @@ import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
+import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -336,6 +337,8 @@ quantityCounts quantity = case quantity of
   -- nor a Pawl.Types.Filter, so these lints have nothing to sweep here either.
   Quantity.Type.LifeTotal _ -> []
   Quantity.Type.Speed _ -> []
+  -- CR 122.1's per-player counter tally, another such scalar.
+  Quantity.Type.PlayerCounters _ _ -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this
@@ -449,7 +452,7 @@ effectCounts effect = case effect of
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
   Effect.Draw _ quantity -> quantityCounts quantity
-  Effect.Mill _ quantity -> quantityCounts quantity
+  Effect.Mill _ quantity _ -> quantityCounts quantity
   Effect.Discard _ quantity -> quantityCounts quantity
   Effect.LoseLife _ quantity -> quantityCounts quantity
   Effect.GainLife _ quantity -> quantityCounts quantity
@@ -466,6 +469,7 @@ effectCounts effect = case effect of
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
+  Effect.RemovePlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Transform _ -> []
@@ -662,7 +666,7 @@ effectReplacements effect = case effect of
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
   Effect.Draw _ _ -> []
-  Effect.Mill _ _ -> []
+  Effect.Mill {} -> []
   Effect.Discard _ _ -> []
   Effect.LoseLife _ _ -> []
   Effect.GainLife _ _ -> []
@@ -674,6 +678,7 @@ effectReplacements effect = case effect of
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
   Effect.GainPlayerCounters {} -> []
+  Effect.RemovePlayerCounters {} -> []
   Effect.Tap _ -> []
   Effect.Untap _ -> []
   Effect.Transform _ -> []
@@ -1621,7 +1626,9 @@ effectFilters effect = case effect of
   Effect.Sacrifice _ -> []
   Effect.MoveToZone {} -> []
   Effect.Draw _ quantity -> unframed (quantityFilters quantity)
-  Effect.Mill _ quantity -> unframed (quantityFilters quantity)
+  -- The tally's Filter is a position a card author writes, so the lint reaches
+  -- it: rule 728.1's "nonland card" is one of these.
+  Effect.Mill _ quantity mTally -> unframed (quantityFilters quantity <> fmap MillTally.filter (Maybe.maybeToList mTally))
   Effect.Discard _ quantity -> unframed (quantityFilters quantity)
   Effect.LoseLife _ quantity -> unframed (quantityFilters quantity)
   Effect.GainLife _ quantity -> unframed (quantityFilters quantity)
@@ -1637,6 +1644,7 @@ effectFilters effect = case effect of
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
+  Effect.RemovePlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.Tap ref -> unframed (objectRefFilters ref)
   Effect.Untap ref -> unframed (objectRefFilters ref)
   Effect.Transform ref -> unframed (objectRefFilters ref)

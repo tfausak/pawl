@@ -186,6 +186,8 @@ library codec
     Pawl.Codec.ManaSymbolSpec
     Pawl.Codec.ManaType
     Pawl.Codec.ManaTypeSpec
+    Pawl.Codec.MillTally
+    Pawl.Codec.MillTallySpec
     Pawl.Codec.Modal
     Pawl.Codec.ModalSpec
     Pawl.Codec.Mode
@@ -354,6 +356,7 @@ library engine
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Projection
     Pawl.Engine.Quantity
+    Pawl.Engine.Rad
     Pawl.Engine.Replacement
     Pawl.Engine.Replay
     Pawl.Engine.Resolve
@@ -580,6 +583,7 @@ library types
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType
     Pawl.Types.ManaUnit
+    Pawl.Types.MillTally
     Pawl.Types.Modal
     Pawl.Types.Mode
     Pawl.Types.ModeIndex
@@ -726,6 +730,7 @@ test-suite pawl-test-suite
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec
     Pawl.ProjectionSpec
+    Pawl.RadSpec
     Pawl.RegistrySpec
     Pawl.ReplacementSpec
     Pawl.ReplaySpec

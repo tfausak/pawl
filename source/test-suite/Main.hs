@@ -67,6 +67,7 @@ import qualified Pawl.Codec.ManaFilterSpec
 import qualified Pawl.Codec.ManaProductionSpec
 import qualified Pawl.Codec.ManaSymbolSpec
 import qualified Pawl.Codec.ManaTypeSpec
+import qualified Pawl.Codec.MillTallySpec
 import qualified Pawl.Codec.ModalSpec
 import qualified Pawl.Codec.ModeIndexSpec
 import qualified Pawl.Codec.ModeSelectionSpec
@@ -164,6 +165,7 @@ import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
 import qualified Pawl.ProjectionSpec
+import qualified Pawl.RadSpec
 import qualified Pawl.Registry as Registry
 import qualified Pawl.RegistrySpec
 import qualified Pawl.ReplacementSpec
@@ -290,6 +292,7 @@ spec s registry = do
   Pawl.Codec.ManaProductionSpec.spec s
   Pawl.Codec.ManaSymbolSpec.spec s
   Pawl.Codec.ManaTypeSpec.spec s
+  Pawl.Codec.MillTallySpec.spec s
   Pawl.Codec.ModalSpec.spec s
   Pawl.Codec.ModeIndexSpec.spec s
   Pawl.Codec.ModeSelectionSpec.spec s
@@ -386,6 +389,7 @@ spec s registry = do
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry
   Pawl.ProjectionSpec.spec s registry
+  Pawl.RadSpec.spec s registry
   Pawl.RegistrySpec.spec s
   Pawl.ReplaySpec.spec s registry
   Pawl.ResolveSpec.spec s registry

@@ -158,6 +158,17 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Speed ref -> case Count.playersFor context gs ref of
     Just [pid] -> fmap (maybe 0 toInteger . Player.speed) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
+  -- CR 122.1: how many counters of a kind that player has. The third arm on
+  -- LifeTotal's and Speed's terms -- live, one player only, through the same
+  -- Count.playersFor.
+  --
+  -- A kind the player's map does not hold answers 0 rather than Nothing, which
+  -- is Player.counters' own convention and not this arm's invention: an absent
+  -- key means the player has none of that counter, and "none" is a number. The
+  -- outer Nothing is reserved for the reference, exactly as above.
+  Quantity.PlayerCounters ref kind -> case Count.playersFor context gs ref of
+    Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
+    _ -> Nothing
 
 -- CR 208.2a, last sentence: an undeterminable number is 0, including inside a
 -- calculation. TOTAL where evaluate is partial -- an Integer, never a Maybe.
@@ -195,6 +206,7 @@ substituteStar star quantity = case quantity of
   Quantity.ManaCount _ -> quantity
   Quantity.LifeTotal _ -> quantity
   Quantity.Speed _ -> quantity
+  Quantity.PlayerCounters _ _ -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -226,6 +238,8 @@ slots quantity = case quantity of
   Quantity.LifeTotal _ -> Set.empty
   -- And a fourth: LifeTotal's sibling carries a PlayerRef in the same position.
   Quantity.Speed _ -> Set.empty
+  -- And a fifth. The PlayerCounterKind beside it names no slot either.
+  Quantity.PlayerCounters _ _ -> Set.empty
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A

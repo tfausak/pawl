@@ -57,6 +57,7 @@ manaProduced effect = case effect of
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
+  Effect.RemovePlayerCounters {} -> Nothing
   Effect.Tap _ -> Nothing
   Effect.Untap _ -> Nothing
   Effect.Transform _ -> Nothing

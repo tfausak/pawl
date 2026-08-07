@@ -14,6 +14,7 @@ import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaProduction as ManaProduction
+import qualified Pawl.Codec.MillTally as MillTally
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Codec.MonarchTarget as MonarchTarget
 import qualified Pawl.Codec.ObjectRef as ObjectRef
@@ -83,7 +84,11 @@ toJson codec e = case e of
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
         <> fmap Zone.toJson (Maybe.maybeToList mo)
   Effect.Draw r q -> Common.tagged "Draw" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.Mill s q -> Common.tagged "Mill" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
+  -- The tally is ELIDED when absent, as Destroy's bound-count slot is, so a mill
+  -- nothing looks back at keeps its two-element payload.
+  Effect.Mill r q mt ->
+    Common.tagged "Mill" . Just . Common.array $
+      [PlayerRef.toJson r, Quantity.toJson q] <> fmap MillTally.toJson (Maybe.maybeToList mt)
   Effect.Discard s q -> Common.tagged "Discard" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
   Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.GainLife r q -> Common.tagged "GainLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
@@ -105,6 +110,7 @@ toJson codec e = case e of
   Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
+  Effect.RemovePlayerCounters r k q -> Common.tagged "RemovePlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
   Effect.Untap r -> Common.tagged "Untap" (Just (ObjectRef.toJson r))
   Effect.Transform r -> Common.tagged "Transform" (Just (ObjectRef.toJson r))
@@ -223,8 +229,9 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Draw expects [playerRef, quantity]"
     "Mill" -> case mv of
-      Just (Value.Array (Array.MkArray [s, q])) -> Effect.Mill <$> SlotName.fromJson s <*> Quantity.fromJson q
-      _ -> Left . Text.pack $ "Mill expects [slot, quantity]"
+      Just (Value.Array (Array.MkArray [r, q])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> pure Nothing
+      Just (Value.Array (Array.MkArray [r, q, tv])) -> Effect.Mill <$> PlayerRef.fromJson r <*> Quantity.fromJson q <*> (Just <$> MillTally.fromJson tv)
+      _ -> Left . Text.pack $ "Mill expects [playerRef, quantity], optionally with a tally"
     "Discard" -> case mv of
       Just (Value.Array (Array.MkArray [s, q])) -> Effect.Discard <$> SlotName.fromJson s <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Discard expects [slot, quantity]"
@@ -277,6 +284,9 @@ fromJson decode value = do
     "GainPlayerCounters" -> case mv of
       Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> PlayerRef.fromJson r <*> PlayerCounterKind.fromJson k <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]"
+    "RemovePlayerCounters" -> case mv of
+      Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.RemovePlayerCounters <$> PlayerRef.fromJson r <*> PlayerCounterKind.fromJson k <*> Quantity.fromJson q
+      _ -> Left . Text.pack $ "RemovePlayerCounters expects [playerRef, playerCounterKind, quantity]"
     "Tap" -> Common.withValue mv (fmap Effect.Tap . ObjectRef.fromJson)
     "Untap" -> Common.withValue mv (fmap Effect.Untap . ObjectRef.fromJson)
     "Transform" -> Common.withValue mv (fmap Effect.Transform . ObjectRef.fromJson)

@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -126,6 +127,21 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.LifeTotal (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"LifeTotal","value":{"type":"InSlot","value":"target"}} """
+  -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
+  -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
+  Spec.it s "PlayerCounters, relative and from a slot" $ do
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
+      """ {"type":"PlayerCounters","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Rad"}]} """
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.PlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PlayerCounterKind.Experience)
+      """ {"type":"PlayerCounters","value":[{"type":"InSlot","value":"target"},{"type":"Experience"}]} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s

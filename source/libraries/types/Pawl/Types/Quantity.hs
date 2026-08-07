@@ -2,6 +2,7 @@ module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.ManaCount as ManaCount
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.SlotName as SlotName
 
@@ -130,4 +131,23 @@ data Quantity
     --
     -- A LEAF, like LifeTotal and ManaCount: it holds no Quantity.
     Speed PlayerRef.PlayerRef
+  | -- | CR 122.1: how many counters of a kind a PLAYER has -- CR 728.1's "a
+    -- number of cards equal to the number of rad counters they have", and the
+    -- shape "the number of experience counters you have" asks for.
+    --
+    -- LifeTotal's and Speed's sibling: one number attached to a player rather
+    -- than a population in a zone, so it is not a Count -- CR 400.1 scopes a
+    -- Count over a zone and its Aggregation folds over the objects there, and a
+    -- player's counter store is neither. The PlayerRef says whose, the
+    -- PlayerCounterKind which.
+    --
+    -- A counter kind ABSENT from Player.counters reads as 0 rather than as
+    -- unanswered, which is that field's own stated convention: a player who has
+    -- never been given a rad counter has no rad counters, which is a number.
+    --
+    -- The OBJECT-counter reading (CR 122.1a-e) has no arm here and needs a
+    -- different one: it must say which object, where this says which player.
+    --
+    -- A LEAF, like LifeTotal, Speed and ManaCount: it holds no Quantity.
+    PlayerCounters PlayerRef.PlayerRef PlayerCounterKind.PlayerCounterKind
   deriving (Eq, Ord, Show)
