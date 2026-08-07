@@ -7,6 +7,25 @@ on:
     branches:
       - main
 jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: nixbuild/nix-quick-install-action@v35
+        with:
+          nix_conf: max-jobs = auto
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ hashFiles('flake.lock', 'pawl.cabal') }}
+          restore-prefixes-first-match: nix-
+      - run: nix build
+      - run: nix build --print-build-logs --out-link benchmark .#benchmark
+      - run: cp benchmark/bench.csv .
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pawl-${{ github.sha }}-bench
+          path: bench.csv
   cabal:
     name: Cabal
     runs-on: ubuntu-latest
@@ -28,27 +47,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: nixbuild/nix-quick-install-action@v35
       - run: nix build --print-build-logs .#checks.x86_64-linux.hlint
-  nix:
-    name: Nix
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      # The single-user install: the daemon one leaves /nix root-owned, and the
-      # cache restore cannot untar into it. max-jobs otherwise defaults to 1.
-      - uses: nixbuild/nix-quick-install-action@v35
-        with:
-          nix_conf: max-jobs = auto
-      - uses: nix-community/cache-nix-action@v7
-        with:
-          primary-key: nix-${{ hashFiles('flake.lock', 'pawl.cabal') }}
-          restore-prefixes-first-match: nix-
-      - run: nix build
-      - run: nix build --print-build-logs --out-link benchmark .#benchmark
-      - run: cp benchmark/bench.csv .
-      - uses: actions/upload-artifact@v7
-        with:
-          name: pawl-${{ github.sha }}-bench
-          path: bench.csv
   nixfmt:
     name: Nixfmt
     runs-on: ubuntu-latest
