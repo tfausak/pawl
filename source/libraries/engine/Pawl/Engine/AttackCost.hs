@@ -67,7 +67,7 @@ costsOn attacker target gs =
             -- The same two ability losses CombatRestriction.restricted asks
             -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
             -- CR 613.1f layer-6 removal.
-            if (null setEffs || Projection.liveGiven setEffs Set.empty source gs)
+            if (null setEffs || Projection.liveGiven setEffs source gs)
               && not (removed source)
               then concatMap (fromCost source) costs
               else []
