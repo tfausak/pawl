@@ -332,6 +332,7 @@ library engine
     Pawl.Engine.Cast
     Pawl.Engine.Combat
     Pawl.Engine.CombatRestriction
+    Pawl.Engine.Commander
     Pawl.Engine.Condition
     Pawl.Engine.Cost
     Pawl.Engine.Count
@@ -528,6 +529,7 @@ library types
     Pawl.Types.Combat
     Pawl.Types.CombatRestriction
     Pawl.Types.CombatStep
+    Pawl.Types.CommandZoneDecision
     Pawl.Types.Comparison
     Pawl.Types.Concession
     Pawl.Types.Condition
@@ -712,6 +714,7 @@ test-suite pawl-test-suite
     Pawl.CodecIntegrationSpec
     Pawl.ColorSpec
     Pawl.CombatSpec
+    Pawl.CommanderSpec
     Pawl.ConditionSpec
     Pawl.CopySpec
     Pawl.CoreSpec

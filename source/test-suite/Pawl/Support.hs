@@ -196,7 +196,7 @@ greenBlack fetch = do
 landsOnly :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 landsOnly fetch = do
   mountain <- fetch "Mountain"
-  pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) bothPlayers)
+  pure (Setup.mirror (Deck.fromCards (Map.singleton mountain 60)) bothPlayers)
 
 -- CR 800.1: the three-seat twin of landsOnly. 60 basic lands each, so the only
 -- reachable loss condition is CR 704.5b deck-out and the only reachable end is
@@ -205,7 +205,7 @@ landsOnly fetch = do
 threePlayerLandsOnly :: (Monad m) => Cards.Fetch m -> m (NonEmpty.NonEmpty (PlayerId.PlayerId, Deck.Deck))
 threePlayerLandsOnly fetch = do
   mountain <- fetch "Mountain"
-  pure (Setup.mirror (Deck.MkDeck (Map.singleton mountain 60)) threePlayers)
+  pure (Setup.mirror (Deck.fromCards (Map.singleton mountain 60)) threePlayers)
 
 -- CR 800.1: the three-seat twin of redRed -- one red deck each for alice, bob and
 -- carol. Setup.mirror is already NonEmpty-shaped, so the seat count is the only

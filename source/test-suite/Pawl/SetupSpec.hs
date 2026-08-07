@@ -64,7 +64,7 @@ deckSpec s registry = Spec.describe s "Deck" $ do
     dragonFodder <- S.printingOf s registry "Dragon Fodder"
     chaosCharm <- S.printingOf s registry "Chaos Charm"
     deck <- Cards.redDeck (S.printingOf s registry)
-    let Deck.MkDeck m = deck
+    let m = Deck.cards deck
     Spec.assertEqWith s "mountains" (Map.lookup mountain m) (Just 36)
     Spec.assertEqWith s "pikers" (Map.lookup piker m) (Just 4)
     Spec.assertEqWith s "maidens" (Map.lookup birdMaiden m) (Just 4)
@@ -81,7 +81,7 @@ deckSpec s registry = Spec.describe s "Deck" $ do
     serpentsGift <- S.printingOf s registry "Serpent's Gift"
     battlegrowth <- S.printingOf s registry "Battlegrowth"
     deck <- Cards.greenDeck (S.printingOf s registry)
-    let Deck.MkDeck m = deck
+    let m = Deck.cards deck
     Spec.assertEqWith s "forests" (Map.lookup forest m) (Just 36)
     Spec.assertEqWith s "mammoths" (Map.lookup warMammoth m) (Just 8)
     Spec.assertEqWith s "fogs" (Map.lookup fog m) (Just 4)
@@ -97,7 +97,7 @@ deckSpec s registry = Spec.describe s "Deck" $ do
     mindRot <- S.printingOf s registry "Mind Rot"
     instillInfection <- S.printingOf s registry "Instill Infection"
     deck <- Cards.blackDeck (S.printingOf s registry)
-    let Deck.MkDeck m = deck
+    let m = Deck.cards deck
     Spec.assertEqWith s "swamps" (Map.lookup swamp m) (Just 36)
     Spec.assertEqWith s "rats" (Map.lookup typhoidRats m) (Just 8)
     Spec.assertEqWith s "drudge skeletons" (Map.lookup drudgeSkeletons m) (Just 4)

@@ -23,7 +23,7 @@ redDeck fetch = do
   blaze <- fetch "Blaze"
   dragonFodder <- fetch "Dragon Fodder"
   chaosCharm <- fetch "Chaos Charm"
-  pure . Deck.MkDeck $
+  pure . Deck.fromCards $
     Map.fromList
       [ (mountain, 36),
         (piker, 4),
@@ -50,7 +50,7 @@ greenDeck fetch = do
   giantGrowth <- fetch "Giant Growth"
   serpentsGift <- fetch "Serpent's Gift"
   battlegrowth <- fetch "Battlegrowth"
-  pure . Deck.MkDeck $
+  pure . Deck.fromCards $
     Map.fromList
       [ (forest, 36),
         (warMammoth, 8),
@@ -74,7 +74,7 @@ blackDeck fetch = do
   murder <- fetch "Murder"
   mindRot <- fetch "Mind Rot"
   instillInfection <- fetch "Instill Infection"
-  pure . Deck.MkDeck $
+  pure . Deck.fromCards $
     Map.fromList
       [ (swamp, 36),
         (typhoidRats, 8),
