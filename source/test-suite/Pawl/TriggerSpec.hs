@@ -3584,6 +3584,10 @@ representativeEvents cond =
         -- spell is bound whichever id it names, the caster is not, so the two
         -- sides agree on `thatSpell` alone.
         TriggerCondition.SpellCast _ -> one (GameEvent.SpellCast S.alice arrived)
+        -- CR 709.5h's own event, on the BEARER and naming the same door the
+        -- condition does, so the pair really matches -- the door below is the one
+        -- everyTriggerCondition names.
+        TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked departed half)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3611,7 +3615,8 @@ everyTriggerCondition =
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached CounterKind.Lore 1,
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
-    TriggerCondition.SpellCast Filter.Type.IsSource
+    TriggerCondition.SpellCast Filter.Type.IsSource,
+    TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna"))
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something

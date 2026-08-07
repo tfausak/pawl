@@ -1,0 +1,191 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Roaring Furnace",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfHalfUnlocked",
+            "value": "Roaring Furnace"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Hand"
+                              },
+                              {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "ControlledBy",
+                        "value": {
+                          "type": "Opponent"
+                        }
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Room"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    },
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Steaming Sauna",
+      "playerAbilities": [
+        {
+          "effect": {
+            "type": "NoMaximumHandSize"
+          },
+          "scope": {
+            "type": "You"
+          }
+        }
+      ],
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Ending",
+                "value": {
+                  "type": "EndStep"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Room"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ],
+  "layout": {
+    "type": "Room"
+  }
+}

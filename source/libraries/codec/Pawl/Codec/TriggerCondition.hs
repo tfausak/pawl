@@ -1,6 +1,7 @@
 module Pawl.Codec.TriggerCondition where
 
 import qualified Data.Text as Text
+import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
@@ -38,6 +39,7 @@ toJson c = case c of
   TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Common.array $ [CounterKind.toJson kind, Common.encodeNatural n]
   TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ CounterKind.toJson kind
   TriggerCondition.SpellCast f -> Common.tagged "SpellCast" . Just $ Filter.toJson Keyword.toJson f
+  TriggerCondition.SelfHalfUnlocked n -> Common.tagged "SelfHalfUnlocked" . Just $ CardName.toJson n
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
 fromJson value = do
@@ -65,4 +67,5 @@ fromJson value = do
     ("SelfCountersReached", Just (Value.Array (Array.MkArray [kind, n]))) -> TriggerCondition.SelfCountersReached <$> CounterKind.fromJson kind <*> Common.decodeNatural n
     ("SelfLastCounterRemoved", Just v) -> TriggerCondition.SelfLastCounterRemoved <$> CounterKind.fromJson v
     ("SpellCast", Just v) -> TriggerCondition.SpellCast <$> Filter.fromJson Keyword.fromJson v
+    ("SelfHalfUnlocked", Just v) -> TriggerCondition.SelfHalfUnlocked <$> CardName.fromJson v
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t

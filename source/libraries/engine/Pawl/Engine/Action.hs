@@ -8,6 +8,7 @@ import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Turn as Turn
 import Pawl.Types.Action (Action)
 import qualified Pawl.Types.Action as Action
@@ -95,10 +96,20 @@ legalActions pid gs =
       -- CR 116.2b / 702.37e: turning a face-down permanent face up is a special
       -- action a player may take any time they have priority, so it joins the
       -- menu beside CR 116.2a's land play rather than going through the stack.
-      -- Ungated by phase or by an empty stack, which is the whole difference
-      -- between the two special actions pawl offers -- CR 116.2a states both
-      -- restrictions and CR 116.2b states neither.
+      -- Ungated by phase or by an empty stack, and the ONLY one of the three
+      -- special actions pawl offers that is: CR 116.2a and CR 116.2m both state
+      -- those restrictions and CR 116.2b states neither.
       turnUps = fmap Action.TurnFaceUp (FaceDown.turnableFaceUp pid gs)
+      -- CR 116.2m / 709.5e: the third special action, and the one whose window is
+      -- CR 116.2a's rather than CR 116.2b's -- "any time they have priority and
+      -- the stack is empty during a main phase of their turn". That gate is
+      -- Turn.sorcerySpeedWindow, asked inside Room.canUnlock beside the cost, so
+      -- the two clauses of one rule stay together.
+      --
+      -- ONE ACTION PER DOOR, for the reason CR 709.3's cast offers one per half:
+      -- which door to open is the player's choice, and offering each as its own
+      -- legal action is how the engine avoids making it.
+      unlocks = fmap (uncurry Action.Unlock) (Room.unlockable pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -123,4 +134,4 @@ legalActions pid gs =
             forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
-   in Action.Pass : lands <> spells <> turnUps <> activations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> activations
