@@ -539,7 +539,7 @@ performStateBasedActions = do
         pc <- Map.lookup oid pcs
         Monad.guard (Battle.isBattle pc)
         controller <- Projection.controllerOf oid gs
-        Monad.guard (Battle.needsProtector pc controller (Game.stillPlaying gs) (Object.protector =<< Game.lookupObject oid gs))
+        Monad.guard (Battle.needsProtector pc controller (Game.stillPlaying gs) (Battle.isBeingAttacked oid gs) (Object.protector =<< Game.lookupObject oid gs))
         pure (oid, pc, controller)
       undefended = Maybe.mapMaybe undefendedOne onBattlefield
   -- CR 704.5j: the legend rule is one of the two state-based actions that ASK --

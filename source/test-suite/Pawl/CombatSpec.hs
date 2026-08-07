@@ -4,6 +4,7 @@
 -- Covers Pawl.Engine.Combat: attack/block legality, combat damage, and the combat
 -- keywords (flying, reach, defender, vigilance, haste, first/double strike).
 -- Also Pawl.Engine.BlockRequirement, whose only consumer is Pawl.Engine.Combat's CR 509.1c
+-- check, Pawl.Engine.AttackRequirement, whose only consumer is its CR 508.1d
 -- check, Pawl.Engine.CombatRestriction, whose only consumer is that module's CR
 -- 508.1c and CR 509.1b checks, and Pawl.Engine.AttackCost, whose only consumer is
 -- its CR 508.1d cost clause and CR 508.1h total.
@@ -2094,6 +2095,181 @@ textChangedCombatRestrictionSpec s registry = Spec.describe s "TextChangedCombat
     Spec.assertEqWith s "unhacked, it is never declared" (S.attackerDeclarationsOf control) []
     Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob control) (Just 20)
 
+-- castHackAt's twin for a board where alice controls more than one land, and the
+-- one thing it does differently is NAME THE LAND THAT PAYS. The Swamp the Bell has
+-- animated is itself a mana source, so the shared caster's interpreter -- which
+-- takes the head of Pawl.Engine.Mana.chooseSource's candidates -- taps the very
+-- creature the cases below are about, and CR 508.1a's "must be untapped" then
+-- refuses the attack for a reason that has nothing to do with a text change. That
+-- is not hypothetical: it is how this group's first red run lied about which
+-- assertions were failing.
+castHackPaying :: ObjectId.ObjectId -> ObjectId.ObjectId -> ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> GameState.GameState -> GameState.GameState
+castHackPaying island hackId target from to gs =
+  let answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject target)) sets
+        Prompt.ChooseLandTypeSwap {} -> (from, to)
+        Prompt.ChooseManaSource {} -> island
+        _ -> S.identityAnswer p
+   in S.runPure answer (gs {GameState.priority = Just S.alice}) (do S.cast S.alice hackId; Stack.resolveTop)
+
+-- CR 612.1 reaching the AFFECTED SET of a combat requirement or restriction --
+-- the other half of the sentence textChangedCombatRestrictionSpec above proves
+-- for the gate. Three readers share the shape and none of them is the layer fold:
+-- Pawl.Engine.CombatRestriction.restricted, Pawl.Engine.AttackRequirement.instances
+-- and Pawl.Engine.BlockRequirement.instances all take an Affected printed on a
+-- permanent and ask Projection.affects about it, so a text change on the source
+-- must reach the subtype word inside it (CR 613.11 puts all three after the
+-- layers, which is why the layer fold's own rewrite does not cover them).
+--
+-- SYNTHETIC CARDS, and why. A sweep of the full Oracle bulk corpus (2026-08-06,
+-- 38623 oracle entries) for a line carrying combat-requirement or
+-- combat-restriction vocabulary alongside a land-type word returns 218 cards, and
+-- every one of them puts the land type somewhere OTHER than the affected set:
+-- landwalk reminder text, which is a keyword's own word and is covered by
+-- textChangedLandwalkSpec above (#523); "can't attack unless defending player
+-- controls an Island", which is the gate (#620); Leviathan's "unless you
+-- sacrifice two Islands", which is a cost; and Kraken of the Straits, where the
+-- type sits inside a count in a pairwise clause Pawl.Types.CombatRestriction's
+-- header argues is not representable. No printing in Magic names a basic land
+-- type as the SUBJECT of one of these effects, so the two cards below are
+-- written. Nothing in the CR forbids them: CR 508.1c and CR 509.1c describe the
+-- effects in terms of the creatures they name, and CR 305.7's basic land types
+-- are ordinary subtypes an Affected may match on -- Kormus Bell prints exactly
+-- that affected set for a static ability.
+--
+--   Synthetic Wetland Embargo {2}{W} Enchantment
+--     "Swamps can't attack. Islands can't block."
+--   Synthetic Wetland Frenzy {2}{R} Enchantment
+--     "Swamps attack each combat if able.
+--      All creatures able to block Islands do so."
+--
+-- Each card names TWO DIFFERENT land types on purpose, so one printing gives both
+-- directions of the discriminator. The Swamp half is read against animated Swamps
+-- and is FREED by a hack; the Island half is read against the same animated
+-- Swamps and is BOUND by one. A reader that dropped the restriction or the
+-- requirement whenever any text change was present would pass the freeing half
+-- and fail the binding half.
+--
+-- Kormus Bell ("All Swamps are 1/1 black creatures that are still lands") is what
+-- makes a land a combat participant at all, and Magical Hack is the text changer.
+-- Both are real printings already in the pool.
+textChangedCombatAffectedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAffected" $ do
+  -- alice controls a Kormus Bell, the Swamp it animates into a 1/1, the card under
+  -- test, and the Island that pays for the Magical Hack in her hand; `theirs` is
+  -- bob's side. With `hacked`, the Hack is cast at the card under test before
+  -- anything is declared.
+  --
+  -- Her OWN Island, and it is never animated: the Bell names Swamps, so the land
+  -- that pays for the swap is not also a creature that could attack or block and
+  -- confuse a count.
+  let board name theirs hacked from to = do
+        bell <- S.printingOf s registry "Kormus Bell"
+        swamp <- S.printingOf s registry "Swamp"
+        island <- S.printingOf s registry "Island"
+        magicalHack <- S.printingOf s registry "Magical Hack"
+        printing <- S.printingOf s registry name
+        let (gs0, ours, yours) = S.combatBoardOf [bell, swamp] theirs
+            (islandId, gs1) = S.addCreature island S.alice gs0
+            (sourceId, gs2) = S.addCreature printing S.alice gs1
+            (hackId, gs3) = S.addHandCard magicalHack S.alice gs2
+        case ours of
+          [_, swampId] -> pure (if hacked then castHackPaying islandId hackId sourceId from to gs3 else gs3, swampId, sourceId, yours)
+          _ -> Spec.assertFailure s "fixture should have the Bell and the Swamp"
+      embargo = board "Synthetic Wetland Embargo"
+      frenzy = board "Synthetic Wetland Frenzy"
+  Spec.it s "CR 508.1c the printed Embargo stops the Bell's animated Swamp attacking" $ do
+    -- The premise, and the anti-vacuity check for every negative below: the
+    -- animated Swamp really is an attack candidate, so "it did not attack" is the
+    -- restriction talking rather than a land that was never a creature. Both
+    -- worlds on one board -- with the Embargo and without it.
+    (gs, swampId, _, _) <- embargo [] False Subtype.Swamp Subtype.Forest
+    bell <- S.printingOf s registry "Kormus Bell"
+    swamp <- S.printingOf s registry "Swamp"
+    let (bare, ours, _) = S.combatBoardOf [bell, swamp] []
+    Spec.assertBool s (not (Combat.canAttack S.alice swampId gs)) "under the Embargo the animated Swamp cannot attack"
+    Spec.assertEqWith s "and nothing is offered" (Combat.legalAttackers S.alice gs) []
+    Spec.assertEqWith s "without it the same Swamp is offered" (Combat.legalAttackers S.alice bare) (drop 1 ours)
+  Spec.it s "CR 612.1 a hacked Embargo reads FORESTS and the animated Swamp may attack" $ do
+    -- THE FREEING DIRECTION, over the affected set rather than the gate. The board
+    -- never moves: the Swamp is still a Swamp and still animated, and only the
+    -- Embargo's own printed word changed. Fails against a reader that hands
+    -- Projection.affects the printed Affected.
+    (gs, swampId, sourceId, _) <- embargo [] True Subtype.Swamp Subtype.Forest
+    Spec.assertEqWith s "the Hack resolved onto the Embargo" (Projection.textChangesAffecting sourceId gs) [(Subtype.Swamp, Subtype.Forest)]
+    Spec.assertBool s (Combat.canAttack S.alice swampId gs) "the animated Swamp may attack"
+    Spec.assertEqWith s "and is offered" (Combat.legalAttackers S.alice gs) [swampId]
+  Spec.it s "CR 509.1b a hacked Embargo's block half BINDS a Swamp the printed one left alone" $ do
+    -- THE BINDING DIRECTION. The Embargo prints "Islands can't block", and the
+    -- only creature on bob's side is a Swamp the Bell animated, so the printed
+    -- clause leaves it free; Island -> Swamp rewrites the clause onto it. This is
+    -- the half a reader that simply dropped every restriction in the presence of a
+    -- text change would fail.
+    swamp <- S.printingOf s registry "Swamp"
+    (printed, _, _, theirs) <- embargo [swamp] False Subtype.Island Subtype.Swamp
+    (hacked, _, sourceId, theirs') <- embargo [swamp] True Subtype.Island Subtype.Swamp
+    case (theirs, theirs') of
+      ([blocker], [blocker']) -> do
+        Spec.assertEqWith s "the Hack resolved onto the Embargo" (Projection.textChangesAffecting sourceId hacked) [(Subtype.Island, Subtype.Swamp)]
+        Spec.assertBool s (Combat.canBlock S.bob blocker printed) "under the printed Embargo bob's animated Swamp can block"
+        Spec.assertBool s (not (Combat.canBlock S.bob blocker' hacked)) "under the hacked one it cannot"
+      _ -> Spec.assertFailure s "fixture should have one blocker"
+  Spec.it s "CR 508.1d the printed Frenzy requires the animated Swamp to attack" $ do
+    -- The requirement twin of the premise above, and the same anti-vacuity shape:
+    -- declining is illegal WITH the Frenzy and legal without it, so the
+    -- maximization really is counting an instance minted off the affected set.
+    (gs, _, _, _) <- frenzy [] False Subtype.Swamp Subtype.Forest
+    bell <- S.printingOf s registry "Kormus Bell"
+    swamp <- S.printingOf s registry "Swamp"
+    let (bare, _, _) = S.combatBoardOf [bell, swamp] []
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "under the Frenzy declining is illegal"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] bare) "without it declining is legal"
+  Spec.it s "CR 612.1 a hacked Frenzy reads FORESTS and the animated Swamp is required no more" $ do
+    -- THE FREEING DIRECTION for Pawl.Engine.AttackRequirement.instances. The
+    -- positive control rides along: the Swamp may still attack, so the requirement
+    -- lifted rather than the creature dropping off CR 508.1a's candidate list.
+    (gs, swampId, sourceId, _) <- frenzy [] True Subtype.Swamp Subtype.Forest
+    Spec.assertEqWith s "the Hack resolved onto the Frenzy" (Projection.textChangesAffecting sourceId gs) [(Subtype.Swamp, Subtype.Forest)]
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "declining is legal"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [swampId] gs) "and attacking is still legal"
+  Spec.it s "CR 509.1c a hacked Frenzy's block half BINDS bob's Piker to the animated Swamp" $ do
+    -- THE BINDING DIRECTION for Pawl.Engine.BlockRequirement.instances. The Frenzy
+    -- prints "All creatures able to block Islands do so" and the lone attacker is
+    -- an animated Swamp, so the printed clause mints no instance; Island -> Swamp
+    -- makes it mint one, and declining to block stops being a legal answer.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (printed0, _, _, _) <- frenzy [piker] False Subtype.Island Subtype.Swamp
+    (hacked0, swampId, sourceId, theirs) <- frenzy [piker] True Subtype.Island Subtype.Swamp
+    let declare g = snd (Engine.runGamePure S.aggressiveAnswer g (Combat.declareAttackers S.alice))
+        printed = declare printed0
+        hacked = declare hacked0
+    case theirs of
+      [blocker] -> do
+        Spec.assertEqWith s "the Hack resolved onto the Frenzy" (Projection.textChangesAffecting sourceId hacked) [(Subtype.Island, Subtype.Swamp)]
+        Spec.assertEqWith s "the animated Swamp is the attacker in both worlds" (S.attackerDeclarationsOf hacked) [swampId]
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty printed) "under the printed Frenzy declining to block is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty hacked)) "under the hacked one it is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker swampId) hacked) "and blocking is the legal answer"
+      _ -> Spec.assertFailure s "fixture should have one blocker"
+  Spec.it s "CR 612.1 whole cards: the rewritten affected sets decide a real combat phase" $ do
+    -- The gameplay-level case, run through CR 703.4i's turn-based action and the
+    -- priority loop rather than a direct call, with an interpreter that would
+    -- rather not act. Under the printed Frenzy the animated 1/1 Swamp is
+    -- forced to attack an undefended bob for one; under the hacked one nothing is
+    -- required and nothing is declared.
+    (printed, _, _, _) <- frenzy [] False Subtype.Swamp Subtype.Forest
+    (hacked, _, _, _) <- frenzy [] True Subtype.Swamp Subtype.Forest
+    let declining :: Prompt.Prompt r -> r
+        declining p = case p of
+          Prompt.DeclareAttackers {} -> []
+          _ -> S.aggressiveAnswer p
+        after = S.runCombat declining printed
+        control = S.runCombat declining hacked
+    Spec.assertEqWith s "printed, the forced Swamp connects for one" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "hacked, nothing is declared" (S.attackerDeclarationsOf control) []
+    Spec.assertEqWith s "and bob takes nothing" (S.lifeOf S.bob control) (Just 20)
+
 -- CR 508.1c read through CR 506.5, proved by Bonded Construct ("{1} Artifact
 -- Creature -- Construct 2/1, This creature can't attack alone") -- the attacking
 -- side's SET-SHAPED restriction, and menaceSpec's twin across the combat phase.
@@ -3181,6 +3357,7 @@ isPlaneswalkerTarget :: AttackTarget.AttackTarget -> Bool
 isPlaneswalkerTarget target = case target of
   AttackTarget.OfPlaneswalker _ -> True
   AttackTarget.OfPlayer _ -> False
+  AttackTarget.OfBattle _ -> False
 
 -- Announce every attack at the first planeswalker offered, and answer everything
 -- else aggressively. The counterpart of S.aggressiveAnswer, which takes the head
@@ -3766,6 +3943,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   combatRestrictionSpec s registry
   conditionalCombatRestrictionSpec s registry
   textChangedCombatRestrictionSpec s registry
+  textChangedCombatAffectedSpec s registry
   attacksAloneSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry

@@ -7,9 +7,16 @@
 -- choice to an opponent, and CR 310.10's state-based action -- listed as CR 704.5w
 -- and CR 704.5x -- repairing the designation once it is illegal.
 --
+-- And what a protector is FOR, which lives in Pawl.Engine.Combat rather than in
+-- Pawl.Engine.Battle but is rule 310 all the same: CR 310.5's attackable battle
+-- (Combat.attackableBattles), CR 310.8b including its "notably, a Siege battle can
+-- be attacked by its own controller", CR 310.8c's blocking, and CR 310.8d with CR
+-- 508.5 (Combat.defendingPlayerOf). Those are attackSpec below; Pawl.CombatSpec
+-- keeps rule 508's own cases.
+--
 -- Also the pieces rule 310 needed underneath it, exercised here because this is
 -- where a card reaches them: Pawl.Types.Defense, CounterKind.Defense,
--- EntryRewrite.ChooseProtector and Object.protector.
+-- EntryRewrite.ChooseProtector, Object.protector and AttackTarget.OfBattle.
 --
 -- Invasion of Dominaria // Serra Faithkeeper is the whole card pool for this file,
 -- and is the only battle in `data/cards`. {2}{W} Battle -- Siege, defense 5, "When
@@ -22,18 +29,25 @@
 -- honestly. Serra Faithkeeper is two printed keywords, so every line of this card
 -- is representable and these cases exercise rule 310 rather than the card.
 --
--- NOT COVERED, because none of it is built (#302): CR 310.5's attackable battle
--- and everything a protector is FOR that depends on it -- CR 310.8b, CR 310.8c and
--- CR 310.8d with CR 508.5 -- plus CR 310.6's damage removing defense counters, CR
--- 310.7 / 704.5v's defense-0 state-based action, and CR 310.11b's "when the last
--- defense counter is removed, exile it, then you may cast it transformed".
+-- Goblin Piker and Bog Wraith join it for the combat cases, and are the pool's
+-- plainest bodies: a vanilla 2/1 and a 3/3 whose entire text is swampwalk. Neither
+-- is a battle, so every case below reads rule 310 rather than the attacker.
+--
+-- NOT COVERED, because none of it is built (#897): CR 310.6's damage removing
+-- defense counters, CR 310.7 / 704.5v's defense-0 state-based action, and CR
+-- 310.11b's "when the last defense counter is removed, exile it, then you may cast
+-- it transformed". A creature attacking a battle here therefore deals it no
+-- damage, which is why no case below runs the combat damage step.
 module Pawl.BattleSpec where
 
+import qualified Control.Monad as Monad
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Battle as Battle
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -44,6 +58,9 @@ import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.Combat as Combat.Type
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Defense as Defense
 import qualified Pawl.Types.Departure as Departure.Type
@@ -52,9 +69,11 @@ import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -63,6 +82,7 @@ spec s registry = Spec.describe s "Battle" $ do
   protectorSpec s registry
   candidateSpec s registry
   repairSpec s registry
+  attackSpec s registry
 
 -- CR 310.4b and CR 310.8a both fire as the battle enters, and both are visible
 -- from a cast -- which is what makes this the gameplay-level test rather than a
@@ -162,13 +182,13 @@ candidateSpec s registry = Spec.describe s "Candidates" $ do
     siege <- siegePC s registry
     Spec.assertBool
       s
-      (Battle.needsProtector siege S.alice [S.alice, S.bob] (Just S.alice))
+      (Battle.needsProtector siege S.alice [S.alice, S.bob] False (Just S.alice))
       "the controller is not a legal protector of their own Siege"
   Spec.it s "CR 310.10 a legal designation needs no repair" $ do
     siege <- siegePC s registry
     Spec.assertBool
       s
-      (not (Battle.needsProtector siege S.alice [S.alice, S.bob] (Just S.bob)))
+      (not (Battle.needsProtector siege S.alice [S.alice, S.bob] False (Just S.bob)))
       "bob is legal and is left alone"
 
 -- CR 704.5w: the designation is repaired by a state-based action once the
@@ -217,6 +237,258 @@ repairSpec s registry = Spec.describe s "Repair" $ do
     let killed = S.runPure S.identityAnswer entered (Event.destroy Regenerability.Regenerable [oid])
         designations = Maybe.mapMaybe Object.protector (Map.elems (GameState.objects killed))
     Spec.assertEqWith s "nobody protects anything now" designations []
+
+-- CR 310.5: battles can be attacked, and everything that follows from WHOM they
+-- are attacked through -- CR 310.8b's protector rule, CR 310.8c's blocking, CR
+-- 310.8d with CR 508.5's defending player, and CR 704.5w's rider once one of them
+-- is under attack.
+attackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+attackSpec s registry = Spec.describe s "Attacking" $ do
+  Spec.it s "CR 310.5 / 310.8b a Siege is offered as an attack target through its PROTECTOR" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
+    -- The three seats really are three here, which is what makes the pair of
+    -- assertions below distinguishable at all: alice controls the Siege, carol
+    -- protects it, bob is neither.
+    Spec.assertEqWith s "alice controls the Siege" (Projection.controllerOf battle gs) (Just S.alice)
+    Spec.assertEqWith s "carol protects it" (protectorOf battle gs) (Just S.carol)
+    -- CR 310.8b's "notably, a Siege battle can be attacked by its own controller":
+    -- alice is the attacking player AND the battle's controller, and the battle is
+    -- on her list anyway, because CR 310.11a put the protector among her
+    -- opponents. Exact rather than a membership test, so a list that grew a
+    -- spurious entry fails too.
+    Spec.assertEqWith
+      s
+      "carol herself and the Siege she protects"
+      (NonEmpty.toList (Combat.attackTargets S.carol gs))
+      [AttackTarget.OfPlayer S.carol, AttackTarget.OfBattle battle]
+  Spec.it s "CR 310.8b and NOT through an opponent who merely does not protect it" $ do
+    -- THE FALSIFIER for the case above, and the reason it cannot pass vacuously:
+    -- the same board read through the other opponent. bob is a legal defending
+    -- player (CR 506.2a) with a legal attack available, so this is not "nothing
+    -- can be attacked" -- it is the battle alone dropping off the list, which is
+    -- CR 310.8b's "any attacking player for whom its protector is a defending
+    -- player" and no wider a rule.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, _, _, _) <- battleCombat s registry S.carol S.bob [piker] [] []
+    Spec.assertEqWith s "carol still protects it" (protectorOf battle gs) (Just S.carol)
+    Spec.assertEqWith
+      s
+      "bob alone"
+      (NonEmpty.toList (Combat.attackTargets S.bob gs))
+      [AttackTarget.OfPlayer S.bob]
+  Spec.it s "CR 310.5 / 508.1b a creature is declared as attacking the battle" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
+    case mine of
+      [attacker] -> do
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        Spec.assertEqWith
+          s
+          "the record names the battle"
+          (Map.lookup attacker (Combat.Type.attackers (GameState.combat after)))
+          (Just (AttackTarget.OfBattle battle))
+        -- CR 508.1f: the creature really went through the declaration rather than
+        -- the record being written past it.
+        Spec.assertEqWith s "and it is tapped" (fmap Object.tapped (Game.lookupObject attacker after)) (Just TapState.Tapped)
+      _ -> Spec.assertFailure s "fixture should have exactly one attacker"
+  Spec.it s "CR 310.8b the identical announcement is refused when the protector is not the defending player" $ do
+    -- THE FALSIFIER for the declaration: same board, same answerer, bob defending
+    -- instead of carol. announceAttackTarget filters an answer outside CR 508.1b's
+    -- list down to the defending player, so a recorded OfPlayer bob is the list
+    -- refusing the battle -- not the answerer declining to name it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.bob [piker] [] []
+    case mine of
+      [attacker] -> do
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        Spec.assertEqWith
+          s
+          "the defending player instead"
+          (Map.lookup attacker (Combat.Type.attackers (GameState.combat after)))
+          (Just (AttackTarget.OfPlayer S.bob))
+      _ -> Spec.assertFailure s "fixture should have exactly one attacker"
+
+  Spec.it s "CR 310.8d / 508.5 the defending player of a creature attacking a battle is the battle's protector" $ do
+    -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so this
+    -- reads CR 508.5's defending player and no other text: CR 702.14c's swampwalk
+    -- is exactly an ability of an attacking creature that refers to one. carol
+    -- protects the Siege and controls the Swamp, so she may not block her own
+    -- battle's attacker.
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Swamp"]
+    case (mine, hers) of
+      ([wraith], blocker : _) -> do
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        Spec.assertEqWith
+          s
+          "and it really is attacking the battle"
+          (Map.lookup wraith (Combat.Type.attackers (GameState.combat after)))
+          (Just (AttackTarget.OfBattle battle))
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker wraith) after)) "illegal"
+      _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
+  Spec.it s "CR 702.14c the same attack is blocked normally when the protector's land is an Island" $ do
+    -- THE FALSIFIER for the case above: the same board with the wrong land, so a
+    -- "cannot block" that had nothing to do with landwalk would fail here too.
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith"] [] ["Goblin Piker", "Island"]
+    case (mine, hers) of
+      ([wraith], blocker : _) -> do
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker wraith) after) "legal"
+      _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
+  Spec.it s "CR 310.8d the battle's CONTROLLER's lands are not the ones read" $ do
+    -- THE FALSIFIER for reading CR 508.5's defending player off the battle's
+    -- controller instead of its protector, which is the one substitution CR 310.8d
+    -- exists to make. The Swamp has moved to alice, who controls the Siege and is
+    -- attacking it; carol, who protects it, holds an Island. Nothing about the
+    -- board changed except which of two distinct players owns the Swamp, and a
+    -- controller-reading engine would call this block illegal.
+    (gs, battle, mine, _, hers) <- battleCombatOf s registry S.carol S.carol ["Bog Wraith", "Swamp"] [] ["Goblin Piker", "Island"]
+    case (mine, hers) of
+      (wraith : _, blocker : _) -> do
+        let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker wraith) after) "legal"
+      _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
+
+  Spec.it s "CR 310.8c a creature the protector does not control can't block the battle's attacker" $ do
+    -- CR 310.8c: "creatures controlled by other players can't block those
+    -- attackers". bob holds the board's only untapped creature besides the
+    -- attacker, and bob protects nothing. Nothing forbids it explicitly -- CR
+    -- 509.1a already restricts blocking to the defending player, and CR 310.8b
+    -- makes the battle attackable only through its protector, so the two rules
+    -- meet and bob is never asked.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, mine, _, _) <- battleCombat s registry S.carol S.carol [piker] [piker] []
+    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        blocked = S.runPure S.aggressiveAnswer attacked Combat.declareBlockers
+    -- Asserted, not assumed: without it this case would read the same on a board
+    -- where the creature attacked carol herself and no battle was involved at all.
+    Spec.assertEqWith
+      s
+      "the Piker is attacking the battle"
+      (Map.elems (Combat.Type.attackers (GameState.combat attacked)))
+      (fmap (const (AttackTarget.OfBattle battle)) mine)
+    Spec.assertEqWith s "nothing blocks" (Combat.Type.blockers (GameState.combat blocked)) Map.empty
+  Spec.it s "CR 310.8c and one the protector does control blocks it" $ do
+    -- THE FALSIFIER for the case above: the same Piker moved from bob's side to
+    -- carol's, under the same answerer, which blocks with everything it is
+    -- offered. Without this the empty map above would pass on a board where
+    -- nothing could ever block.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, mine, _, hers) <- battleCombat s registry S.carol S.carol [piker] [] [piker]
+    case (mine, hers) of
+      ([attacker], [blocker]) -> do
+        let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+            blocked = S.runPure S.aggressiveAnswer attacked Combat.declareBlockers
+        Spec.assertEqWith
+          s
+          "the Piker is attacking the battle"
+          (Map.lookup attacker (Combat.Type.attackers (GameState.combat attacked)))
+          (Just (AttackTarget.OfBattle battle))
+        Spec.assertEqWith s "carol blocks" (Combat.blockersOf attacker blocked) (Set.singleton blocker)
+      _ -> Spec.assertFailure s "fixture should have one creature a side"
+
+  Spec.it s "CR 704.5w a battle that IS being attacked keeps a protector who has left" $ do
+    -- The rider CR 704.5w carries and CR 704.5x does not: "no attacking creatures
+    -- are currently attacking that battle". carol concedes with alice's creature
+    -- still attacking her Siege, so the designation is illegal -- no player in the
+    -- game holds it -- and the state-based action must nonetheless leave it be.
+    -- Gatherer states the consequence: the battle "continues to be attacked and
+    -- can be dealt combat damage as normal", and a new protector is chosen once
+    -- nothing is attacking it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
+    let attacked = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
+        gone = Departure.depart Departure.Type.Conceded S.carol attacked
+        checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
+    Spec.assertBool s (Battle.isBeingAttacked battle gone) "the Siege is under attack"
+    Spec.assertBool s (notElem S.carol (Game.stillPlaying gone)) "and carol is gone"
+    Spec.assertEqWith s "the illegal designation stands" (protectorOf battle checked) (Just S.carol)
+  Spec.it s "CR 704.5w the same concession on the same board DOES repair it when nothing attacks" $ do
+    -- THE FALSIFIER for the rider: the identical fixture with the declaration
+    -- skipped. bob is the only opponent left, so the re-choice is forced and the
+    -- new designation is the state-based action firing rather than an answerer's
+    -- preference.
+    piker <- S.printingOf s registry "Goblin Piker"
+    (gs, battle, _, _, _) <- battleCombat s registry S.carol S.carol [piker] [] []
+    let gone = Departure.depart Departure.Type.Conceded S.carol gs
+        checked = S.runPure S.identityAnswer gone Sba.checkStateBasedActions
+    Spec.assertBool s (not (Battle.isBeingAttacked battle gone)) "nothing is attacking it"
+    Spec.assertEqWith s "bob protects it now" (protectorOf battle checked) (Just S.bob)
+
+-- Answer CR 508.1b's announcement with the given battle whenever it is offered,
+-- and everything else aggressively -- so the DeclareAttackers prompt takes every
+-- candidate. Naming a target that is not offered is the point on the falsifier
+-- boards: announceAttackTarget filters it back to the defending player, which is
+-- what makes those cases read the candidate list rather than the answerer.
+attackTheBattle :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+attackTheBattle battle p = case p of
+  Prompt.ChooseAttackTarget _ _ _ options ->
+    Maybe.fromMaybe
+      (NonEmpty.head options)
+      (List.find (== AttackTarget.OfBattle battle) (NonEmpty.toList options))
+  _ -> S.aggressiveAnswer p
+
+-- battleCombat by card NAME, for the cases whose printings differ per seat.
+battleCombatOf ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  PlayerId.PlayerId ->
+  [String] ->
+  [String] ->
+  [String] ->
+  m (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], [ObjectId.ObjectId])
+battleCombatOf s registry protector defender mine theirs hers = do
+  let printings = Monad.mapM (S.printingOf s registry)
+  mine' <- printings mine
+  theirs' <- printings theirs
+  hers' <- printings hers
+  battleCombat s registry protector defender mine' theirs' hers'
+
+-- alice is active and controls a Siege that `protector` protects (CR 310.8a),
+-- plus one Settled permanent per printing in `mine`; bob and carol get one each
+-- per printing in `theirs` and `hers`. The board sits in the declare attackers
+-- step with `defender` already designated -- stated rather than derived for
+-- S.combatBoardOf's reason, since a direct-call test never runs CR 703.4h's
+-- turn-based action.
+--
+-- THREE seats throughout, and that is the whole point of the group: at two seats
+-- the Siege's protector, the defending player and "an opponent of the battle's
+-- controller" are one person, and every case above is about telling them apart.
+-- carol protects, bob is the other opponent, alice controls the battle and
+-- attacks it.
+battleCombat ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  PlayerId.PlayerId ->
+  PlayerId.PlayerId ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  [Printing.Printing] ->
+  m (GameState.GameState, ObjectId.ObjectId, [ObjectId.ObjectId], [ObjectId.ObjectId], [ObjectId.ObjectId])
+battleCombat s registry protector defender mine theirs hers = do
+  (entered, battle) <- castInvasionThreeSeated s registry (protectTo protector)
+  let addAll pid ps g =
+        List.foldl'
+          (\(ids, g1) p -> let (oid, g2) = S.addCreature p pid g1 in (ids <> [oid], g2))
+          ([], g)
+          ps
+      (ours, gs1) = addAll S.alice mine entered
+      (yours, gs2) = addAll S.bob theirs gs1
+      (theirsToo, gs3) = addAll S.carol hers gs2
+  pure
+    ( gs3
+        { GameState.activePlayer = S.alice,
+          GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+          GameState.combat = (GameState.combat gs3) {Combat.Type.defender = Just defender}
+        },
+      battle,
+      ours,
+      yours,
+      theirsToo
+    )
 
 -- Cast Invasion of Dominaria on the two-seat board and settle the stack, giving
 -- back the state and the battle's id. A Plains sits in the library so the printed
