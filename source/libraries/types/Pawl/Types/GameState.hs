@@ -124,8 +124,15 @@ data GameState = MkGameState
     -- stays on the battlefield, so an absent id is answered live and gets the
     -- same answer.
     controlWhenTriggered :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
-    -- | CR 704.5h ("since the last state-based action check"): how far the
-    -- state-based-action damage read has consumed.
+    -- | How far the STATE-BASED ACTION check has consumed the event log --
+    -- "since the last state-based action check", the boundary CR 704.5h names.
+    --
+    -- Not damage-only despite the name it was given for its first reader: CR
+    -- 903.9a asks the same question of the same boundary ("that object was put
+    -- into that zone since the last time state-based actions were checked"), and
+    -- Pawl.Engine.Commander.returnable reads it through
+    -- Pawl.Engine.Event.unscannedSbaEvents. One watermark, because there is one
+    -- check -- a second field would be a duplicate that could only ever drift.
     damageScannedThrough :: Natural.Natural,
     -- | CR 603.7: delayed triggered abilities awaiting their event, in creation
     -- order. An entry is removed as it fires (CR 603.7b) unless it states a

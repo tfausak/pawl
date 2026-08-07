@@ -207,10 +207,17 @@ unscannedEvents :: GameState -> [GameEvent]
 unscannedEvents gs =
   Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.scannedThrough gs)) (GameState.events gs))
 
+-- The events the STATE-BASED ACTION check has not yet consumed -- CR 704.5h's
+-- "since the last state-based action check", and the same boundary CR 903.9a
+-- names. Pawl.Engine.Commander.returnable is the other reader.
+unscannedSbaEvents :: GameState -> [GameEvent]
+unscannedSbaEvents gs =
+  Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs))
+
 -- CR 704.5h: the damage the state-based-action check has not yet consumed.
 unscannedDamage :: GameState -> [DamageEvent]
 unscannedDamage gs =
-  Maybe.mapMaybe damageOf (Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs)))
+  Maybe.mapMaybe damageOf (unscannedSbaEvents gs)
 
 -- Insert a freshly-built object into `dest` under a new id and timestamp, and
 -- return that id. The common tail of changeZone (a moved incarnation) and

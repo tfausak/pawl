@@ -27,6 +27,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
@@ -195,7 +196,25 @@ costsFor name oid gs = case Game.lookupObject oid gs of
 -- CR 118.6a's first sentence needs no special case: fmap over the Maybe leaves
 -- Nothing as Nothing.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
-total pid oid cost gs = totalWith (PlayerEffect.costAdjustments pid oid gs) cost
+total pid oid cost gs = totalWith (allAdjustments pid oid gs) cost
+
+-- CR 601.2f's increases and reductions: the ones CARDS generate
+-- (Pawl.Engine.PlayerEffect) plus the one the RULES do, CR 903.8's commander tax.
+--
+-- The tax joins the increases rather than being added to the printed mana cost,
+-- because rule 903.8 words it "plus {2} for each previous time" -- an increase
+-- applied during rule 601.2f, so a cost reduction still applies to the total
+-- afterwards in the order rule 601.2f fixes. Folding it into the cost would put
+-- it before the reductions instead.
+--
+-- Zero for every spell that is not a commander being cast from the command zone,
+-- and Pawl.Engine.Commander.tax short-circuits on that, so an ordinary game pays
+-- nothing to ask.
+allAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [ManaCost.ManaCost])
+allAdjustments pid oid gs =
+  let (increases, reductions) = PlayerEffect.costAdjustments pid oid gs
+      commanderTax = Commander.tax pid oid gs
+   in (if commanderTax == 0 then increases else commanderTax : increases, reductions)
 
 -- The same totalling over adjustments the CALLER already has, which is what CR
 -- 118.7e's prompt needs: `announceReductions` asks the payer which half of each
@@ -212,7 +231,7 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 -- once 601.2f has run?" of candidate costs that do not exist yet and never become
 -- a Cost of their own.
 totalMana :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
-totalMana pid oid gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs)
+totalMana pid oid gs = applyAdjustments (allAdjustments pid oid gs)
 
 -- CR 601.2f's ADDITIONAL-COSTS clause alone, bolted onto one candidate -- the
 -- shape CR 702.42a's entwine needs. Pawl.Engine.Cast applies it to whichever

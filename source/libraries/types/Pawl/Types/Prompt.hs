@@ -10,6 +10,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -311,6 +312,15 @@ data Prompt r where
   -- Asked only when entwining is available -- the spell has the keyword, every mode
   -- is legal (CR 700.2a), and some candidate cost plus this one is payable.
   ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt EntwineDecision.EntwineDecision
+  -- CR 903.9a: this player's commander is in a graveyard or in exile, having
+  -- arrived since the last state-based action check. Rule 903.9a is a "may", so
+  -- the owner is asked; the object stays where it is if they decline, and is not
+  -- asked again until it moves there afresh.
+  --
+  -- The OWNER is the player asked, never the controller: rule 903.9a says "its
+  -- owner may put it into the command zone", and a commander that died under a
+  -- thief's control is still its owner's to reclaim.
+  ReturnCommander :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt CommandZoneDecision.CommandZoneDecision
   -- | CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.

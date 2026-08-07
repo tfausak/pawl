@@ -11,6 +11,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
@@ -21,6 +22,7 @@ import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Departure as Departure.Type
@@ -577,6 +579,20 @@ performStateBasedActions = do
   -- and not an event: CR 310.8a's designation is a mark on the object, and neither
   -- rule 704.5w nor 704.5x makes it trigger anything.
   State.modify' (\g -> g {GameState.objects = List.foldl' (\m (oid, picked) -> Map.adjust (\o -> o {Object.protector = picked}) oid m) (GameState.objects g) redesignated})
+  -- CR 903.9a: the THIRD state-based action that asks, in the same window and for
+  -- the same reason as the two above -- a commander that reached a graveyard or
+  -- exile since the last check, offered to its owner for the command zone.
+  --
+  -- Asked before anything below moves, so the offer is made against the board this
+  -- pass began in. A commander that is ALSO about to be moved by the batch below
+  -- cannot arise: rule 903.9a only reaches objects already in a graveyard or in
+  -- exile, and every batch below moves things OFF the battlefield.
+  returningCommanders <-
+    fmap Maybe.catMaybes . Monad.forM (Commander.returnable gs) $ \(owner, oid) -> do
+      decision <- Game.choose (Prompt.ReturnCommander (Decide.deciderFor owner gs) owner oid)
+      pure $ case decision of
+        CommandZoneDecision.Returns -> Just oid
+        CommandZoneDecision.Leaves -> Nothing
   -- CR 310.10's second sentence: "if no player can be chosen this way, the battle
   -- is put into its owner's graveyard". NOT EXERCISED by any test, and not for want
   -- of trying -- a Siege's candidates are its controller's opponents still in the
@@ -605,6 +621,12 @@ performStateBasedActions = do
   -- itself burying still exiles the cards the rest of the batch would put into
   -- graveyards. See Pawl.Engine.Replacement's applyReplacementsIn.
   Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Graveyard) (List.nub (toGraveyard <> legendVictims <> worldLosers <> unattachedAuras <> undefendable <> routed))
+  -- CR 903.9a's ACTION half: "its owner may put it into the command zone". A real
+  -- zone change (CR 400.7 mints a fresh incarnation), so it goes through the same
+  -- batch funnel as the buries above rather than editing the zone sets -- a
+  -- commander leaving a graveyard is a zone change like any other, and anything
+  -- watching for one must see it.
+  Monad.mapM_ (\oid -> Event.changeZoneInBatch gs oid Zone.Command) returningCommanders
   -- CR 704.5n / 704.5p: the Equipment does NOT follow its creature -- it detaches
   -- and stays. Not a zone change, so unlike the Aura above it does not funnel
   -- through Pawl.Engine.Event: no Moved event, no replacement, no trigger.
@@ -692,7 +714,7 @@ performStateBasedActions = do
       -- named something. A regenerated creature still counts as destroyed, which
       -- the CR 704.3 settle loop re-checks and -- because the regen healed the
       -- damage -- terminates.
-      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended)
+      acted = not (null legendVictims) || not (null worldLosers) || not (null toGraveyard) || not (null toDestroy) || not (null leaving) || not (null vanishing) || not (null annihilations) || not (null unattachedAuras) || not (null detaching) || not (null revving) || not (null told) || not (null undefended) || not (null returningCommanders)
   -- CR 104.1: a game ends the moment a result is reached, so a later pass may
   -- not replace one. The existing result therefore wins; this pass only settles
   -- an outcome when the game did not already have one. Same ordering as

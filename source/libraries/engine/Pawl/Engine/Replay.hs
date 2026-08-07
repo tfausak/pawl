@@ -16,6 +16,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
 import Pawl.Types.Desync (Desync)
 import qualified Pawl.Types.Desync as Desync
@@ -59,6 +60,7 @@ encode p answer = case p of
   Prompt.CastWhileSearching {} -> Response.CastWhileSearched answer
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
+  Prompt.ReturnCommander {} -> Response.ReturnedCommander answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
@@ -248,6 +250,9 @@ decode p response = case p of
   Prompt.ChooseEntwine {} -> case response of
     Response.AnnouncedEntwine decision -> Just decision
     _ -> Nothing
+  Prompt.ReturnCommander {} -> case response of
+    Response.ReturnedCommander decision -> Just decision
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -423,6 +428,9 @@ defaultAnswer p = case p of
   -- no mana, which keeps a short transcript from diverging into an unpayable
   -- cast.
   Prompt.ChooseEntwine {} -> EntwineDecision.Declines
+  -- CR 903.9a is a "may", so leaving the commander where it is is always legal
+  -- and is the answer that changes nothing.
+  Prompt.ReturnCommander {} -> CommandZoneDecision.Leaves
 
 -- Run a game under a base interpreter, keeping every answer in order.
 --
