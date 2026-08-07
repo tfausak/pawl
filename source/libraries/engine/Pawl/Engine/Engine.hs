@@ -36,6 +36,7 @@ import qualified Pawl.Engine.Rad as Rad
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Ring as Ring
+import qualified Pawl.Engine.Room as Room
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
@@ -569,7 +570,8 @@ placeBorne srcId pending = do
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if Natural.length legal < count
@@ -967,6 +969,17 @@ priorityLoop = do
                               -- this was an action.
                               Action.Type.TurnFaceUp oid -> do
                                 FaceDown.turnFaceUp p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 116.2m / 709.5e: a special action too, so the
+                              -- TurnFaceUp arm's shape above applies unchanged --
+                              -- nothing goes on the stack and no player gets a
+                              -- window to respond to the payment. What CR 709.5h's
+                              -- trigger sees is the DESIGNATION, which
+                              -- settleForPriority then gathers like any other.
+                              Action.Type.Unlock oid half -> do
+                                Room.unlock p oid half
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

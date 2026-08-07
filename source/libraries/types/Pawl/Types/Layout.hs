@@ -7,11 +7,37 @@ module Pawl.Types.Layout where
 
 data Layout
   = -- | A card with exactly one face: every card printed without a second set
-    -- of characteristics, which is the whole pool today.
+    -- of characteristics, which is all but a handful of the pool.
     Normal
   | -- | CR 709.1: "Split cards have two card faces on a single card. The back
     -- of a split card is the normal Magic card back."
     Split
+  | -- | CR 709.5: "Some split cards are permanent cards with a single shared type
+    -- line." A Room -- the opposite shape to Split above, and not a narrowing of
+    -- it. CR 709.3b makes an ordinary split card's other half stop existing once
+    -- one half is on the stack; CR 709.5b says the reverse of this one ("The
+    -- existence of each half of an object with a shared type line is part of that
+    -- object's copiable values, even if that object is a spell on the stack. This
+    -- is an exception to rule 709.3b."), and both halves go on being halves of the
+    -- one permanent that results.
+    --
+    -- What separates the two everywhere else is that a Room's halves are
+    -- SUBTRACTED rather than combined. CR 709.5's shared type line "represents two
+    -- static abilities that function on the battlefield" -- "As long as this
+    -- permanent doesn't have the 'left half unlocked' designation, it doesn't have
+    -- the name, mana cost, or rules text of this object's left half", and the
+    -- mirror of it for the right -- so CR 709.4's combined view is where a Room
+    -- STARTS and the locked halves are then taken back out
+    -- (Pawl.Engine.Card.roomFace). Off the battlefield no half is locked, because
+    -- CR 709.5c's designations are ones "a permanent on the battlefield can have",
+    -- and there the combined view is all there is.
+    --
+    -- LEFT and RIGHT are Pawl.Types.Card.faces' printed order, the same positional
+    -- reading Adventure and the two double-faced arms below take. CR 709.5d
+    -- ("given the 'left half unlocked' designation as it enters the battlefield if
+    -- its left half was cast as a spell") is what makes the order load-bearing
+    -- here rather than decorative.
+    Room
   | -- | CR 715.1: a card with "a two-part card frame, with a smaller frame
     -- inset within their text box". CR 715.2 makes the inset frame's text a set
     -- of ALTERNATIVE characteristics the object may have while it is a spell,

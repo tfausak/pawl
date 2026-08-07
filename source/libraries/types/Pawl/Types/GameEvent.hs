@@ -1,6 +1,7 @@
 module Pawl.Types.GameEvent where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -270,4 +271,31 @@ data GameEvent
     -- planeswalker, CR 704.5q's annihilation -- stay direct writes and emit
     -- nothing, so a card triggering off one of those would not see it (#900).
     CountersRemoved ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
+  | -- | CR 709.5c: a permanent was given an UNLOCKED DESIGNATION -- the permanent,
+    -- and the half the designation names. Emitted by Pawl.Engine.Event.unlockHalf,
+    -- the one place a designation is given, and only when the permanent did not
+    -- already have it.
+    --
+    -- The event CR 709.5h asks about: "Some abilities trigger when a player
+    -- unlocks a particular half of a permanent. These abilities trigger when that
+    -- permanent is given the appropriate unlocked designation, regardless of
+    -- whether it was given that designation while entering the battlefield or
+    -- after entering the battlefield." That last clause is why this is an event
+    -- and not something read off the board: the two moments leave the same board
+    -- and only a record can tell them apart from a door that was already open.
+    --
+    -- The HALF by name, for the reason Object.unlockedHalves stores it by name:
+    -- CR 709.4a makes a split card's halves the things a name picks out, and a
+    -- Room with two "when you unlock this door" abilities needs each to know
+    -- which door the event was about.
+    --
+    -- No player, though CR 709.5e's special action has one: the rule words the
+    -- trigger as "when that permanent IS GIVEN the appropriate unlocked
+    -- designation", and CR 709.5f's unlock reaches it with no payer at all. The
+    -- ability's own controller is CR 603.3a's, read off the source as every other
+    -- trigger's is.
+    --
+    -- NOT emitted for a LOCK (CR 709.5g): nothing in the pool locks a door, and no
+    -- rule asks a trigger about one (#924).
+    HalfUnlocked ObjectId.ObjectId CardName.CardName
   deriving (Eq, Ord, Show)

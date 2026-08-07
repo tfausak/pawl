@@ -130,6 +130,7 @@ landPlays actions =
         A.Pass -> Nothing
         A.Cast {} -> Nothing
         A.TurnFaceUp _ -> Nothing
+        A.Unlock _ _ -> Nothing
         A.Activate _ _ -> Nothing
    in Maybe.mapMaybe playOf actions
 

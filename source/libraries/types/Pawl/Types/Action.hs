@@ -7,8 +7,9 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | What a player with priority may do. CR 116.2 lists twelve SPECIAL actions
--- and two of them are here -- CR 116.2a's land play and CR 116.2b's turning a
--- face-down permanent face up; the tracker for the other ten is #875. Grows.
+-- and three of them are here -- CR 116.2a's land play, CR 116.2b's turning a
+-- face-down permanent face up and CR 116.2m's unlock cost; the tracker for the
+-- other nine is #875. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
@@ -65,4 +66,22 @@ data Action
     -- it. Nor is the RESULT one -- turning face up reveals what the card is, and
     -- the card is already decided.
     TurnFaceUp ObjectId.ObjectId
+  | -- | CR 116.2m / 709.5e: pay a locked half's mana cost to give this permanent
+    -- the matching unlocked designation. "A player can take this action any time
+    -- they have priority and the stack is empty during a main phase of their
+    -- turn", and it does not use the stack -- so it is an Action rather than
+    -- anything that goes through Pawl.Engine.Stack, exactly as CR 116.2a's land
+    -- play is.
+    --
+    -- Carries the DOOR as well as the permanent, unlike TurnFaceUp above, because
+    -- here there is a choice to make: CR 709.5e says "a locked half", and a Room
+    -- with both doors shut offers two different actions at two different prices.
+    -- Naming it rather than indexing into Card.faces is Cast's argument
+    -- unchanged -- CR 709.4a gives the halves names, and a name either resolves
+    -- or fails loudly where an index silently replays as the wrong door.
+    --
+    -- What it COSTS is not a choice: CR 709.5e fixes it as the named half's mana
+    -- cost, so Pawl.Engine.Room reads it off the card rather than the player
+    -- naming it.
+    Unlock ObjectId.ObjectId CardName.CardName
   deriving (Eq, Ord, Show)

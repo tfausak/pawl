@@ -1244,6 +1244,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- leaves a chapter symbol reading the same chapter.
   TriggerCondition.SelfCountersReached _ _ -> condition
   TriggerCondition.SelfLastCounterRemoved _ -> condition
+  -- CR 709.5h names a HALF by its own name (CR 709.4a), and a name is not a
+  -- subtype: CR 612.1 changes subtype words, so nothing here can move a door.
+  TriggerCondition.SelfHalfUnlocked _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

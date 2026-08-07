@@ -155,6 +155,7 @@ movedOf event = case event of
   -- The Moved event `counter` records alongside this one is rule 701.6a's zone
   -- change; this one only says the move WAS a countering. The Discarded case.
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.HalfUnlocked _ _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -174,6 +175,7 @@ damageOf event = case event of
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.HalfUnlocked _ _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -193,6 +195,7 @@ revealOf event = case event of
   GameEvent.Discarded {} -> Nothing
   GameEvent.AttackerDeclared _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
+  GameEvent.HalfUnlocked _ _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -261,7 +264,8 @@ createEmblem pid card =
             Object.turnedOverAt = Nothing,
             Object.playableFromExileBy = Nothing,
             Object.ringBearerFor = Nothing,
-            Object.protector = Nothing
+            Object.protector = Nothing,
+            Object.unlockedHalves = Set.empty
           }
    in placeObject pid mkObj Zone.Command
 
@@ -980,6 +984,36 @@ designateProtector oid = do
         let stamp o = o {Object.protector = picked}
          in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
 
+-- CR 709.5f / 709.5c: give this permanent the unlocked designation for one of
+-- its halves -- the single door every unlock goes through, and the only writer of
+-- Object.unlockedHalves after the entry designation the move itself writes (CR
+-- 709.5d, changeZoneAttaching's mkObj).
+--
+-- IDEMPOTENT, and that is CR 709.5h rather than defensiveness: the trigger fires
+-- "when that permanent IS GIVEN the appropriate unlocked designation", so a
+-- permanent that already has it is given nothing and nothing fires. CR 709.5e's
+-- special action and CR 709.5f's keyword action both choose a LOCKED half, so
+-- neither reaches this with a door already open; an effect that unlocks without
+-- choosing would.
+--
+-- The EVENT is recorded here rather than by the caller, so the two cannot drift:
+-- CR 709.5h is a fact about the designation being given, and this is where it is
+-- given.
+--
+-- CR 709.5g's LOCK -- taking a designation back away -- has no counterpart
+-- function: no card in the pool locks a door (#924).
+unlockHalf :: ObjectId -> CardName.CardName -> Game ()
+unlockHalf oid half = do
+  gs <- State.get
+  case Game.lookupObject oid gs of
+    Nothing -> pure ()
+    Just obj ->
+      Monad.unless (Set.member half (Object.unlockedHalves obj)) $ do
+        State.modify' $ \g ->
+          let open o = o {Object.unlockedHalves = Set.insert half (Object.unlockedHalves o)}
+           in g {GameState.objects = Map.adjust open oid (GameState.objects g)}
+        State.modify' (recordEvent (GameEvent.HalfUnlocked oid half))
+
 -- CR 615: settle one proposed damage event. Nothing means it does not happen;
 -- the second answer is CR 615.13's, one entry per prevention effect that applied
 -- to THIS event and prevented some of it.
@@ -1189,15 +1223,20 @@ changeZoneEntering oid requestedDest riders under = do
     then pure Nothing
     else changeZoneAttaching Nothing oid requestedDest Nothing (EntryRiders.tapped riders) under shown Facing.FaceUp
 
--- changeZoneReturning for a move that puts the object into its destination
--- SHOWING one named face: CR 709.3's choice of which half of a split card is
--- being cast, which the rule makes "before putting it onto the stack", so the
--- move is what carries it. CR 712.11b words the modal double-faced card's
--- version of the same choice identically, and CR 712.11c its version of CR
--- 709.3a, so both layouts come through this door.
+-- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
+-- its destination: CR 709.3's choice of which half of a split card is being
+-- cast, which the rule makes "before putting it onto the stack", so the move is
+-- what carries it. CR 712.11b words the modal double-faced card's version of the
+-- same choice identically, and CR 712.11c its version of CR 709.3a, so both
+-- layouts come through this door.
 --
--- The face is a MAYBE, because the third rule asking for this door does not
--- always have one to name: CR 712.13 carries a resolving double-faced spell's
+-- A HALF and not always a face that is up, which is CR 709.5d's use of the same
+-- parameter: a Room permanent shows both halves at once, so changeZoneAttaching
+-- spends the name on an unlocked designation and leaves Object.face empty. Every
+-- other caller's half IS the face the object arrives showing.
+--
+-- The name is a MAYBE, because the third rule asking for this door does not
+-- always have one to give: CR 712.13 carries a resolving double-faced spell's
 -- face onto the battlefield, and Pawl.Engine.Stack asks that of every permanent
 -- spell it resolves, most of which show nothing (Pawl.Engine.Card.enteringFace).
 -- Nothing here is exactly changeZoneReturning.
@@ -1401,6 +1440,40 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown facing = do
               -- "casting the back face puts the artifact onto the battlefield"
               -- proves it for a modal card, and Pawl.BattleSpec's "she may then
               -- cast it TRANSFORMED and FREE" for a transforming one.
+              -- CR 709.5d: "A permanent with a shared type line is given the
+              -- 'left half unlocked' designation as it enters the battlefield if
+              -- its left half was cast as a spell. It is given the 'right half
+              -- unlocked' designation as it enters the battlefield if its right
+              -- half was a cast as a spell." `shown` is that half --
+              -- Pawl.Engine.Card.enteringFace carried it off the stack, exactly
+              -- as CR 712.13's face is carried -- so a Room spends it on a
+              -- DESIGNATION where a double-faced card spends it on `face`, and
+              -- the two are mutually exclusive below.
+              --
+              -- Written INSIDE the move rather than stamped onto what it hands
+              -- back, which is CR 709.5d's own "as it enters the battlefield":
+              -- the CR 400.7 incarnation must never exist without the
+              -- designation, so nothing in the CR 616.1 entry loop and nothing
+              -- in the CR 709.5h trigger scan can see a Room whose doors are all
+              -- shut when one of them was cast. CR 614.12 is what makes the
+              -- first of those observable rather than merely tidy -- an entry
+              -- replacement reads the object's characteristics "as it would
+              -- exist on the battlefield", and a Room with every door shut has
+              -- no text for such a replacement to be printed in. `face` above
+              -- takes the same position for CR 709.3a's chosen half.
+              --
+              -- Gated on the BATTLEFIELD rather than on the move arriving where
+              -- it was headed, which the two clauses of the rule name in as many
+              -- words. A Room spell countered onto its owner's graveyard, or a
+              -- CR 616.1 redirect that lands it anywhere but the battlefield, is
+              -- not a permanent and has no designations (CR 709.5c).
+              --
+              -- Nothing to unlock when neither half was cast, which is CR
+              -- 709.5d's own last sentence: "If it's entering the battlefield and
+              -- neither half was cast as a spell, it enters with neither unlocked
+              -- designation." A Room put onto the battlefield by an effect
+              -- reaches this with `shown` Nothing and enters with both doors shut.
+              unlocking = dest == Zone.Battlefield && maybe False Card.hasSharedTypeLine (Game.cardOf oid gs)
               mkObj ts =
                 (Object.newIncarnation obj)
                   { Object.zone = dest,
@@ -1408,7 +1481,16 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown facing = do
                     Object.tapped = tapped,
                     Object.attachedTo = seed,
                     Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing,
-                    Object.face = if dest == requestedDest then shown else Nothing,
+                    -- `unlocking` is what excludes a Room here: CR 709.5c gives
+                    -- a permanent with a shared type line designations rather
+                    -- than a face that is up, and both halves go on being halves
+                    -- of the one permanent (CR 709.5b), so there is no half for
+                    -- this field to single out. Leaving `shown` here as well
+                    -- would give Game.resolveFaceFor two answers to choose
+                    -- between, one of which stops being right the moment the
+                    -- second door opens.
+                    Object.face = if dest == requestedDest && not unlocking then shown else Nothing,
+                    Object.unlockedHalves = if unlocking then foldMap Set.singleton shown else Set.empty,
                     -- CR 708.4 / 708.3: the object is turned face down BEFORE it
                     -- is put onto the stack or enters the battlefield, so this is
                     -- part of the move rather than a stamp on what the move
@@ -1440,6 +1522,23 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown facing = do
           -- same-batch siblings (CR 614.12a; see applyReplacementsIn
           -- for why 614.12a and not 614.13a).
           Monad.when (dest == Zone.Battlefield) (runEntry Set.empty newId)
+          -- CR 709.5h: an ability that triggers on a door opening fires "regardless
+          -- of whether it was given that designation while entering the
+          -- battlefield or after entering the battlefield", so the entry
+          -- designation `unlocking` wrote into mkObj above needs its event too.
+          -- Recorded rather than routed through unlockHalf, which would find the
+          -- door already open and record nothing: writing the designation inside
+          -- the move is what CR 709.5d's "as it enters" asks for, and the event is
+          -- what CR 709.5h asks for -- two rules, and the entry is the one place
+          -- they are not the same write.
+          --
+          -- BEFORE the Moved event, so a Room's own "when you unlock this door"
+          -- and its "when this enters" are gathered in one scan with the door's
+          -- event first. The two are simultaneous and CR 603.3b lets their
+          -- controller order them on the stack, so nothing observable rides on
+          -- which is logged first.
+          Monad.forM_ (if unlocking then Maybe.maybeToList shown else []) $ \half ->
+            State.modify' (recordEvent (GameEvent.HalfUnlocked newId half))
           -- CR 603.2g: record the RESOLVED event, carrying the NEW object's id --
           -- what an enters trigger scans -- alongside the id it had in `fromZone`,
           -- which is the key `lastKnown` is filed under and so the only route back
@@ -1741,7 +1840,8 @@ createTokens controller card n tapped = do
                     Object.turnedOverAt = Nothing,
                     Object.playableFromExileBy = Nothing,
                     Object.ringBearerFor = Nothing,
-                    Object.protector = Nothing
+                    Object.protector = Nothing,
+                    Object.unlockedHalves = Set.empty
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield)
           Monad.mapM_ (runEntry (Set.fromList ids)) ids
@@ -1837,6 +1937,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -1880,6 +1981,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -1900,6 +2002,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -1924,6 +2027,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -1955,6 +2059,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -1990,6 +2095,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2019,6 +2125,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2045,6 +2152,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2074,6 +2182,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2103,6 +2212,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2145,6 +2255,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2177,6 +2288,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2208,6 +2320,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Discarded {} -> False
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2250,6 +2363,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2288,6 +2402,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2332,6 +2447,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2365,6 +2481,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2389,6 +2506,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked _ _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2419,6 +2537,32 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCast caster spell -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
+    GameEvent.HalfUnlocked _ _ -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 709.5h: the bearer is the permanent that was given the designation, and
+  -- the door named is the one it was given for. A bare comparison of an id and a
+  -- name, in SelfEnters' shape and for its reason -- nothing about the entrant's
+  -- characteristics is read, so there is no CR 608.2h fallback to reach for.
+  --
+  -- The half is checked as well as the bearer, which is the arm's whole content:
+  -- CR 709.5h fires "when a player unlocks a PARTICULAR half", so a Room whose
+  -- other door was the one that opened must not fire this ability.
+  TriggerCondition.SelfHalfUnlocked half -> case event of
+    GameEvent.HalfUnlocked oid name -> oid == bearer && name == half
+    GameEvent.SpellCast _ _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
@@ -2709,6 +2853,10 @@ eventBindingSlots cond = case cond of
   -- print says "that many", and eventBindings has no arm for this condition.
   TriggerCondition.SelfCountersReached _ _ -> Set.empty
   TriggerCondition.SelfLastCounterRemoved _ -> Set.empty
+  -- CR 709.5h names the permanent and the half, and CR 113.7a's source slot
+  -- already names the permanent. The HALF is not bound: no printing says "that
+  -- door", so there is nothing for a payload to read it as.
+  TriggerCondition.SelfHalfUnlocked _ -> Set.empty
   -- CR 601.2i's spell, the object the event names and nobody the bearer already
   -- does. Guaranteed given a match for the reason CR 615.13's amount is:
   -- GameEvent.SpellCast carries an ObjectId unconditionally, so no shape of the
@@ -2903,6 +3051,7 @@ eventTriggers events gs =
         GameEvent.Revealed _ _ -> Map.empty
         GameEvent.AttackerDeclared _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.HalfUnlocked _ _ -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -2972,6 +3121,7 @@ eventTriggers events gs =
         GameEvent.Revealed _ _ -> Map.empty
         GameEvent.AttackerDeclared _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
+        GameEvent.HalfUnlocked _ _ -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -3091,6 +3241,9 @@ functionsInGraveyard cond = case cond of
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
   TriggerCondition.StepBegins _ _ -> False
+  -- CR 709.5c makes an unlocked designation something a permanent ON THE
+  -- BATTLEFIELD has, so this condition cannot trigger from a graveyard at all.
+  TriggerCondition.SelfHalfUnlocked _ -> False
   -- CR 603.8's state triggers are not event triggers, so this scan is not their
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> False
@@ -3183,6 +3336,11 @@ controllerTurnScoped cond = case cond of
   -- anybody's turn.
   TriggerCondition.SelfEnters -> False
   TriggerCondition.PermanentEnters _ -> False
+  -- CR 709.5e restricts the special action to the taker's own turn, but CR
+  -- 709.5f's keyword action and CR 709.5d's entry have no such restriction, and
+  -- this classification is about the CONDITION rather than about how the
+  -- designation came to be given.
+  TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
@@ -3298,6 +3456,11 @@ stateTriggers gs
               TriggerCondition.DamageToPlayerPrevented _ -> False
               TriggerCondition.PlayerGainsLife _ -> False
               TriggerCondition.PlayerLosesLife _ -> False
+              -- CR 709.5h is an EVENT trigger: it fires on the permanent BEING
+              -- GIVEN the designation, which CR 709.5c leaves it holding
+              -- thereafter, so a state read would fire it again every time the
+              -- board settles.
+              TriggerCondition.SelfHalfUnlocked _ -> False
               -- CR 714.2b is an EVENT trigger too: it fires on the moment counters
               -- are PUT ON, not on the count standing at or above N -- which is
               -- exactly the difference CR 603.8 draws, and the reason a Saga does
