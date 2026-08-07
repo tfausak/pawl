@@ -66,6 +66,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
@@ -1123,8 +1124,8 @@ changeZone :: ObjectId -> Zone -> Game ()
 changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest)
 
 -- changeZoneReturning for a move whose effect says how the object ENTERS -- CR
--- 110.5b's tap state, and CR 110.2a's controller -- rather than taking the
--- rules' defaults.
+-- 110.5b's tap state, CR 712.14a's transformed face, and CR 110.2a's controller
+-- -- rather than taking the rules' defaults.
 --
 -- A separate door rather than a fifth parameter on changeZone, as changeZoneInBatch
 -- is: the ~30 callers moving under the default have no tap state to name. Handed
@@ -1132,6 +1133,21 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- tapped is never untapped for an instant, and so a permanent an effect says
 -- enters under someone's control never belongs to its owner for an instant --
 -- CR 614.1c's entry replacements run inside this call and read both.
+--
+-- CR 712.14a is the other rule this door is the only one for: "If a spell or
+-- ability puts a double-faced card onto the battlefield 'transformed' or
+-- 'converted', it enters the battlefield with its back face up." Which face that
+-- is comes from the card's layout (Card.backFace), so the rider stays a Bool and
+-- the engine never learns which card is entering. The rule's SECOND sentence is
+-- the same refusal CR 712.14b gets below -- "if a player is instructed to put a
+-- card that isn't a double-faced card onto the battlefield transformed or
+-- converted, that card stays in its current zone" -- which is exactly a card
+-- whose layout gives Card.backFace nothing to answer with.
+--
+-- CR 712.14a and NOT CR 712.13a, which is a different rule with a different
+-- mechanism: an ability causing a double-faced SPELL already on the stack to
+-- enter transformed is a replacement effect, CR 616.1d's own bucket, and no
+-- rider on a move can express it (#906).
 --
 -- The one door CR 712.14b applies to, and that is what the rule's own wording
 -- picks out: "If a player is INSTRUCTED to put a modal double-faced card onto
@@ -1148,13 +1164,28 @@ changeZone oid requestedDest = Monad.void (changeZoneReturning oid requestedDest
 -- 712.14b is not a replacement effect -- there is no event for CR 616.1 to
 -- choose among, and running the entry loop first would fire CR 614.1c's
 -- as-enters abilities for a card that never enters.
-changeZoneEntering :: ObjectId -> Zone -> TapState.TapState -> Maybe PlayerId -> Game (Maybe ObjectId)
-changeZoneEntering oid requestedDest tapped under = do
+changeZoneEntering :: ObjectId -> Zone -> EntryRiders.EntryRiders -> Maybe PlayerId -> Game (Maybe ObjectId)
+changeZoneEntering oid requestedDest riders under = do
   gs <- State.get
-  let refused = requestedDest == Zone.Battlefield && maybe False Card.staysWhenPutOntoBattlefield (Game.cardOf oid gs)
+  let mCard = Game.cardOf oid gs
+      onto = requestedDest == Zone.Battlefield
+      -- CR 712.14a's back face, asked only of a move the effect says is
+      -- transformed. Nothing means one of two different things, which is why the
+      -- rider is read alongside it below: no back face to turn to, or no
+      -- instruction to turn at all.
+      mBack = if EntryRiders.transformed riders then mCard >>= Card.backFace else Nothing
+      refused =
+        onto
+          && ( maybe False Card.staysWhenPutOntoBattlefield mCard -- CR 712.14b
+                 || (EntryRiders.transformed riders && Maybe.isNothing mBack) -- CR 712.14a
+             )
+      -- CR 712.14: "A double-faced card put onto the battlefield from a zone
+      -- other than the stack enters the battlefield with its front face up by
+      -- default", which Object.face records as Nothing (CR 712.8a).
+      shown = if onto then fmap Face.name mBack else Nothing
   if refused
     then pure Nothing
-    else changeZoneAttaching Nothing oid requestedDest Nothing tapped under Nothing
+    else changeZoneAttaching Nothing oid requestedDest Nothing (EntryRiders.tapped riders) under shown
 
 -- changeZoneReturning for a move that puts the object into its destination
 -- SHOWING one named face: CR 709.3's choice of which half of a split card is

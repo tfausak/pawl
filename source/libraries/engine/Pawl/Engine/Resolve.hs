@@ -1575,69 +1575,94 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
         _ -> gs
-  Effect.MoveToZone slot zone entry mSlot _ ->
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
-        -- (CR 400.3 for a library, graveyard or hand destination).
-        -- CR 110.5b: the funnel is handed the riders' tap state, so a permanent
-        -- an effect says enters tapped is never untapped for an instant.
-        --
-        -- CR 110.2a: "If an effect instructs a player to put an object onto the
-        -- battlefield, that object enters the battlefield under THAT PLAYER's
-        -- control unless the effect states otherwise." This effect is exactly
-        -- such an instruction, so its controller (CR 109.5) is who the permanent
-        -- enters under -- Meandering Towershell's "return it to the battlefield
-        -- under your control" is that rule restated on the card rather than an
-        -- exception to it. Handed to the FUNNEL, not applied after it returns,
-        -- for the reason the tap state is: control is settled on the entering
-        -- incarnation before CR 614.1c's entry loop and the Moved snapshot can
-        -- read it, so a CR 616.1b entry replacement that filters on control
-        -- (Gather Specimens' "under an opponent's control") sees the controller
-        -- the permanent actually enters under. No card in the pool observes that
-        -- ordering -- Gather Specimens' row is Uses.Unlimited, so applying it to
-        -- a creature already entering under its own controller changes nothing
-        -- and consumes nothing -- so it buys the ordering rather than a passing
-        -- test. The funnel ignores the player entirely for a non-battlefield
-        -- destination, which is CR 110.2's own scope.
-        --
-        -- No CR 800.4b guard, unlike Effect.GainControl's arm: `controller` here
-        -- is whoever controls the resolving spell or ability, and a departed
-        -- player controls neither -- CR 800.4d keeps their triggered ability off
-        -- the stack and Departure.nonCardStackObjectsCease removes one already
-        -- on it, while clause 1 of CR 800.4a took their spells out of the game.
-        Just target -> do
-          mNew <- Event.changeZoneEntering target zone (EntryRiders.tapped entry) (Just controller)
-          case mNew of
-            -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
-            -- already gone (CR 603.7c's "no longer in the zone it's expected to
-            -- be in ... the ability won't affect it"). Nothing entered, so there
-            -- is nothing to join to combat and nothing to bind.
-            Nothing -> pure ()
-            Just newId -> do
-              -- CR 508.4: "if a creature is put onto the battlefield attacking,
-              -- its controller chooses which defending player ... it's
-              -- attacking". The rules for that live in Pawl.Engine.Combat, which
-              -- is also what keeps this from looking like a declaration -- CR
-              -- 508.3a's attack triggers see nothing, INCLUDING the returning
-              -- creature's own (Meandering Towershell's ruling says so in as
-              -- many words). The Create arm calls the same function for the same
-              -- rule.
-              --
-              -- It reads the new permanent's controller, and CR 506.3b refuses
-              -- one who is not the active player -- which the funnel above has
-              -- already settled. A Towershell its attacker does not own would
-              -- otherwise return to its owner and then fail to be attacking at
-              -- all (Pawl.CombatSpec pins both halves).
-              Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
-              -- CR 603.7c: bind the arriving incarnation into the resolving
-              -- object's live bindings, so a delayed ability THIS SAME
-              -- resolution arms can name it -- the exiled card in "exile it.
-              -- Return IT to the battlefield". Nothing to ask: CR 400.7 minted
-              -- exactly one object and it is the whole candidate set.
-              Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
-      _ -> pure ()
+  Effect.MoveToZone slot zone entry mSlot _ -> do
+    -- The slot names EITHER a target this ability declared or an incarnation an
+    -- earlier effect of this same resolution bound (the mSlot below, CR 400.7).
+    -- A declared target is read out of `chosen` behind CR 608.2b's re-validation,
+    -- which is what a target is owed; a slot `chosen` does not mention was never
+    -- targeted and owes it nothing, so it is read LIVE off the resolving object
+    -- (slotOne, whose own note explains why `chosen` cannot see it). Testing
+    -- membership rather than preferring one answer is what keeps the two apart:
+    -- a slot cannot be both, and a target never loses its re-validation to a
+    -- binding that happens to share its name. No card observes the difference --
+    -- the CardSpec lint "no delayed ability declares a target spec under a slot
+    -- its card defines" is what rules the collision out -- so the membership test
+    -- buys the ordering rather than a passing test.
+    --
+    -- Befriending the Moths' chapter III is the producer: "Exile this Saga, then
+    -- return IT to the battlefield transformed", two moves in one resolution
+    -- where the second names what the first minted.
+    bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
+    let mTarget = case bound of
+          Just oid -> Just oid
+          Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+            (Just recipient, True) -> Recipient.objectOf recipient
+            -- Illegal slot (CR 608.2b), a non-object recipient, or a slot
+            -- nothing ever bound.
+            _ -> Nothing
+    case mTarget of
+      Nothing -> pure ()
+      -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
+      -- (CR 400.3 for a library, graveyard or hand destination).
+      -- CR 110.5b: the funnel is handed the riders, so a permanent an effect
+      -- says enters tapped is never untapped for an instant -- and, by CR
+      -- 712.14a, a double-faced card an effect returns "transformed" never
+      -- shows its front face for one either. WHICH face that is stays the
+      -- funnel's question, since only Pawl.Engine.Card can read a layout.
+      --
+      -- CR 110.2a: "If an effect instructs a player to put an object onto the
+      -- battlefield, that object enters the battlefield under THAT PLAYER's
+      -- control unless the effect states otherwise." This effect is exactly
+      -- such an instruction, so its controller (CR 109.5) is who the permanent
+      -- enters under -- Meandering Towershell's "return it to the battlefield
+      -- under your control" is that rule restated on the card rather than an
+      -- exception to it. Handed to the FUNNEL, not applied after it returns,
+      -- for the reason the tap state is: control is settled on the entering
+      -- incarnation before CR 614.1c's entry loop and the Moved snapshot can
+      -- read it, so a CR 616.1b entry replacement that filters on control
+      -- (Gather Specimens' "under an opponent's control") sees the controller
+      -- the permanent actually enters under. No card in the pool observes that
+      -- ordering -- Gather Specimens' row is Uses.Unlimited, so applying it to
+      -- a creature already entering under its own controller changes nothing
+      -- and consumes nothing -- so it buys the ordering rather than a passing
+      -- test. The funnel ignores the player entirely for a non-battlefield
+      -- destination, which is CR 110.2's own scope.
+      --
+      -- No CR 800.4b guard, unlike Effect.GainControl's arm: `controller` here
+      -- is whoever controls the resolving spell or ability, and a departed
+      -- player controls neither -- CR 800.4d keeps their triggered ability off
+      -- the stack and Departure.nonCardStackObjectsCease removes one already
+      -- on it, while clause 1 of CR 800.4a took their spells out of the game.
+      Just target -> do
+        mNew <- Event.changeZoneEntering target zone entry (Just controller)
+        case mNew of
+          -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
+          -- already gone (CR 603.7c's "no longer in the zone it's expected to
+          -- be in ... the ability won't affect it"). Nothing entered, so there
+          -- is nothing to join to combat and nothing to bind.
+          Nothing -> pure ()
+          Just newId -> do
+            -- CR 508.4: "if a creature is put onto the battlefield attacking,
+            -- its controller chooses which defending player ... it's
+            -- attacking". The rules for that live in Pawl.Engine.Combat, which
+            -- is also what keeps this from looking like a declaration -- CR
+            -- 508.3a's attack triggers see nothing, INCLUDING the returning
+            -- creature's own (Meandering Towershell's ruling says so in as
+            -- many words). The Create arm calls the same function for the same
+            -- rule.
+            --
+            -- It reads the new permanent's controller, and CR 506.3b refuses
+            -- one who is not the active player -- which the funnel above has
+            -- already settled. A Towershell its attacker does not own would
+            -- otherwise return to its owner and then fail to be attacking at
+            -- all (Pawl.CombatSpec pins both halves).
+            Monad.when (EntryRiders.attacking entry) (Combat.putOntoBattlefieldAttacking newId)
+            -- CR 603.7c: bind the arriving incarnation into the resolving
+            -- object's live bindings, so a LATER EFFECT of this same resolution
+            -- or a delayed ability it arms can name it -- the exiled card in
+            -- "exile it. Return IT to the battlefield". Nothing to ask: CR 400.7
+            -- minted exactly one object and it is the whole candidate set.
+            Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
   -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
   -- this order and with the owner read before either:
   --

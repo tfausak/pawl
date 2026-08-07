@@ -30,6 +30,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -57,7 +58,6 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Printing as Printing
-import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- The two names the card prints, plus the basic land every case pays with. CR
@@ -348,7 +348,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
     birgi <- S.printingOf s registry "Birgi, God of Storytelling"
     let moveTo zone printing =
           let (oid, board) = handBoardOne printing
-           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid zone TapState.Untapped (Just S.alice))))
+           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid zone EntryRiders.defaultValue (Just S.alice))))
         (zofId, zofAfter) = moveTo Zone.Battlefield zof
         (_, birgiAfter) = moveTo Zone.Battlefield birgi
         (buriedId, buried) = moveTo Zone.Graveyard zof
