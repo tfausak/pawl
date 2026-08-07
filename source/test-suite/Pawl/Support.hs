@@ -65,6 +65,7 @@ import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -533,6 +534,7 @@ playLandAnswer p = case p of
           A.Play {} -> True
           A.Pass -> False
           A.Cast {} -> False
+          A.TurnFaceUp _ -> False
           A.Activate _ _ -> False
      in case filter isPlay actions of
           h : _ -> h
@@ -601,6 +603,7 @@ addCreature printing pid gs =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
@@ -807,6 +810,7 @@ addToken card pid gs =
             Object.source = Source.OfToken card,
             Object.zone = Zone.Battlefield,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
@@ -841,6 +845,7 @@ addLibraryCard printing pid gs =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
@@ -875,6 +880,7 @@ addGraveyardCard printing pid gs =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Graveyard,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
@@ -916,6 +922,7 @@ addExiledCard printing pid gs =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Exile,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
@@ -964,6 +971,7 @@ addHandCard printing pid gs =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
@@ -1015,6 +1023,7 @@ landsInPlay land n =
                   Object.source = Source.OfCard land,
                   Object.zone = Zone.Battlefield,
                   Object.tapped = TapState.Untapped,
+                  Object.facing = Facing.FaceUp,
                   Object.damage = 0,
                   Object.sickness = Sickness.Settled alice,
                   Object.bindings = Map.empty,
@@ -1048,6 +1057,7 @@ handOne printing base =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled alice,
             Object.bindings = Map.empty,
@@ -1087,6 +1097,7 @@ pikerInHand land piker n ph =
             Object.source = Source.OfCard piker,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled alice,
             Object.bindings = Map.empty,
@@ -1556,6 +1567,7 @@ oneMountainState mountain ph =
             Object.source = Source.OfCard mountain,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,
@@ -1638,15 +1650,18 @@ soleFaceName oid gs = case fmap Card.castableFaces (Game.cardOf oid gs) of
           <> " does not offer exactly one castable half -- name the half and call Pawl.Engine.Cast directly"
       )
 
--- Pawl.Engine.Cast.castSpell of that one half.
+-- Pawl.Engine.Cast.castSpell of that one half, FACE UP -- CR 702.37c's
+-- face-down cast is a second cast of the same card, so a test that wants it
+-- names it (Pawl.FaceDownSpec) rather than getting it from a helper that cannot
+-- know which was meant.
 cast :: PlayerId.PlayerId -> ObjectId.ObjectId -> Game.Type.Game ()
 cast pid oid = do
   gs <- State.get
-  Cast.castSpell pid oid (soleFaceName oid gs)
+  Cast.castSpell pid oid (soleFaceName oid gs) Facing.FaceUp
 
 -- `cast`'s predicate half: Pawl.Engine.Cast.castable asked of that same half.
 castable :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
-castable pid oid gs = Cast.castable pid oid (soleFaceName oid gs) gs
+castable pid oid gs = Cast.castable pid oid (soleFaceName oid gs) Facing.FaceUp gs
 
 -- The name a single-face printing carries -- what a test naming the half of an
 -- A.Cast action holds in scope.
@@ -1659,10 +1674,11 @@ printingName = nameOf . Printing.card
 -- for.
 isCastOf :: ObjectId.ObjectId -> A.Action -> Bool
 isCastOf oid action = case action of
-  A.Cast o _ -> o == oid
+  A.Cast o _ _ -> o == oid
   A.Pass -> False
   A.Play {} -> False
   A.Activate _ _ -> False
+  A.TurnFaceUp _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
 -- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only
@@ -1693,6 +1709,7 @@ spellOnStack printing pid gs =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,

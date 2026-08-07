@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
@@ -71,6 +72,19 @@ resolveTopWith runSubgame = do
               -- `face`, because what the rule carries is the object's own record
               -- of which face is up and not the face a fallback resolved to.
               entering = Card.enteringFace (Printing.card printing) (Object.face obj)
+              -- CR 708.4's last sentence: "the permanent the spell becomes will
+              -- be a face-down permanent". A STATUS carried across a zone change,
+              -- which CR 400.7 otherwise forgets -- so it is read off the
+              -- resolving spell and handed to the move, exactly as `entering` is.
+              -- A closed-half read: rule 110.5's status, never the card's
+              -- identity.
+              --
+              -- The Aura branch below does not carry it, and cannot need to: CR
+              -- 708.2a gives a face-down permanent no subtypes, so `face` here is
+              -- Card.faceDownFace and Card.isAura is False.
+              ontoBattlefield = case Object.facing obj of
+                Facing.FaceDown -> Event.changeZoneFaceDown
+                Facing.FaceUp -> Event.changeZoneShowing
            in if not (Card.isPermanent face)
                 then Resolve.resolveSpellWith runSubgame oid
                 else
@@ -79,7 +93,7 @@ resolveTopWith runSubgame = do
                   -- permanent it becomes, and an Aura back face would carry its
                   -- face for the same reason a creature one does.
                   if not (Card.isAura face)
-                    then carryOver oid =<< Event.changeZoneShowing oid Zone.Battlefield entering
+                    then carryOver oid =<< ontoBattlefield oid Zone.Battlefield entering
                     else -- CR 303.4a made this spell target, so CR 608.2b applies
                     -- to it. THE INVARIANT: is-it-an-Aura is a SUBTYPE read off
                     -- the type line (CR 205.3h), the same closed-half
@@ -97,7 +111,7 @@ resolveTopWith runSubgame = do
                           -- that is Object.owner for every spell in the pool --
                           -- nothing here lets a player cast a card they do not
                           -- own, so the two readings coincide (#83).
-                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped Nothing entering
+                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield (enchantedBy oid gs) TapState.Untapped Nothing entering Facing.FaceUp
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}

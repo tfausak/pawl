@@ -68,6 +68,7 @@ import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameEvent (GameEvent)
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -246,6 +247,7 @@ createEmblem pid card =
             Object.source = Source.OfEmblem card,
             Object.zone = Zone.Command,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled pid,
             Object.bindings = Map.empty,
@@ -1185,7 +1187,7 @@ changeZoneEntering oid requestedDest riders under = do
       shown = if onto then fmap Face.name mBack else Nothing
   if refused
     then pure Nothing
-    else changeZoneAttaching Nothing oid requestedDest Nothing (EntryRiders.tapped riders) under shown
+    else changeZoneAttaching Nothing oid requestedDest Nothing (EntryRiders.tapped riders) under shown Facing.FaceUp
 
 -- changeZoneReturning for a move that puts the object into its destination
 -- SHOWING one named face: CR 709.3's choice of which half of a split card is
@@ -1213,7 +1215,32 @@ changeZoneEntering oid requestedDest riders under = do
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
 changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneShowing oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing
+changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing shown Facing.FaceUp
+
+-- changeZoneShowing for a move that puts the object into its destination FACE
+-- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
+--
+-- The two rules that need it are the two ends of one cast. CR 708.4: "Objects
+-- that are cast face down are turned face down BEFORE they are put onto the
+-- stack, so effects that care about the characteristics of a spell will see only
+-- the face-down spell's characteristics" -- so the facing is part of the move
+-- and not a stamp applied to what it hands back, exactly as CR 709.3a's chosen
+-- half is. And that rule's last sentence, "the permanent the spell becomes will
+-- be a face-down permanent", which is the stack-to-battlefield move
+-- Pawl.Engine.Stack makes. CR 708.3 is the same door for a permanent PUT onto
+-- the battlefield face down, which nothing in the pool does yet (#921).
+--
+-- A separate door rather than an eighth parameter on changeZoneShowing, as
+-- changeZoneEntering is: the ordinary move leaves CR 110.5b's default standing
+-- and has no facing to name.
+--
+-- The face name goes along, and is not in tension with CR 708.2a's "no name":
+-- Object.face records WHICH HALF of the card is underneath, not what the object
+-- is called, and the substitution that empties the name reads it (faceOf) rather
+-- than being stored. Turning the permanent face up is what makes it observable
+-- again (CR 708.8).
+changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing shown Facing.FaceDown
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -1223,14 +1250,14 @@ changeZoneShowing oid requestedDest = changeZoneAttaching Nothing oid requestedD
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped Nothing Nothing)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest Nothing TapState.Untapped Nothing Nothing Facing.FaceUp)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing Nothing
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest Nothing TapState.Untapped Nothing Nothing Facing.FaceUp
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -1248,9 +1275,10 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- and Nothing there too for a move whose effect names no player, which by CR
 -- 110.2 and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
 -- half or CR 712.13's carried face, Nothing for every door but
--- changeZoneShowing.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
+-- changeZoneShowing. `facing` is CR 110.5's face-up/face-down status, FaceUp for
+-- every door but changeZoneFaceDown (CR 110.5b).
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest seed tapped under shown facing = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -1380,7 +1408,18 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown = do
                     Object.tapped = tapped,
                     Object.attachedTo = seed,
                     Object.enteredUnder = if dest == Zone.Battlefield then under else Nothing,
-                    Object.face = if dest == requestedDest then shown else Nothing
+                    Object.face = if dest == requestedDest then shown else Nothing,
+                    -- CR 708.4 / 708.3: the object is turned face down BEFORE it
+                    -- is put onto the stack or enters the battlefield, so this is
+                    -- part of the move rather than a stamp on what the move
+                    -- returned -- CR 709.3a's `face` above, one status over.
+                    --
+                    -- Gated on the move ARRIVING where it was headed, for
+                    -- `face`'s reason and one of its own: CR 708.9 reveals a
+                    -- face-down permanent to all players as it leaves the
+                    -- battlefield, so a CR 616.1 redirect that lands the object
+                    -- anywhere else must leave it face up.
+                    Object.facing = if dest == requestedDest then facing else Facing.FaceUp
                   }
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
@@ -1686,6 +1725,9 @@ createTokens controller card n tapped = do
                     -- is why the caller supplies this rather than the default
                     -- being taken and the token tapped after.
                     Object.tapped = tapped,
+                    -- CR 110.5b: face up, for the same rule's reason. No effect
+                    -- in the pool creates a token face down.
+                    Object.facing = Facing.FaceUp,
                     Object.damage = 0,
                     Object.sickness = Sickness.Sick,
                     Object.bindings = Map.empty,

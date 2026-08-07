@@ -15,6 +15,7 @@ import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -123,6 +124,7 @@ createCard pid printing = do
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Library,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Sick,
             Object.bindings = Map.empty,

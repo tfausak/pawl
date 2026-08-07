@@ -24,6 +24,7 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
@@ -57,6 +58,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -553,6 +555,7 @@ placeBorne srcId pending = do
             Object.source = Source.OfTrigger srcId ability,
             Object.zone = Zone.Stack,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,
             Object.bindings = Map.empty,
@@ -949,8 +952,21 @@ priorityLoop = do
                                 State.modify' (\g -> g {GameState.landsPlayed = Map.insertWith (+) p 1 (GameState.landsPlayed g), GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
-                              Action.Type.Cast oid name -> do
-                                Cast.castSpell p oid name
+                              Action.Type.Cast oid name facing -> do
+                                Cast.castSpell p oid name facing
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 116.2b / 702.37e: a special action, so
+                              -- nothing goes on the stack and no player gets a
+                              -- window to respond to it -- the same shape as
+                              -- CR 116.2a's land play above. Priority is
+                              -- retained and the pass count restarts, because
+                              -- CR 117.4's "passing in succession" means
+                              -- passing without taking actions in between and
+                              -- this was an action.
+                              Action.Type.TurnFaceUp oid -> do
+                                FaceDown.turnFaceUp p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

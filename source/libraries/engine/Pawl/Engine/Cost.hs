@@ -40,6 +40,7 @@ import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
@@ -99,6 +100,25 @@ firstOffered candidates = case candidates of
   c : _ -> c
   [] -> unpayable
 
+-- CR 702.37a: what a morph cast pays -- "by paying {3} rather than paying its
+-- mana cost". An alternative cost (CR 118.9) written into rule 702.37a itself
+-- rather than onto any card, which is why it is minted here and not read off
+-- Keyword.Morph: that constructor carries the cost of CR 702.37e's special
+-- action, and the two are different amounts on every printing.
+--
+-- No additional costs ride along, where `costsFor`'s `withAdditional` adds the
+-- card's to every other alternative. CR 702.37c is explicit that the face-down
+-- cast is measured against the face-down characteristics -- "any effects or
+-- prohibitions that would apply to casting a card with THESE characteristics
+-- (and not the face-up card's characteristics)" -- and CR 708.2a leaves those
+-- characteristics with no text for an additional cost to be printed in.
+faceDownCost :: Cost Keyword.Type.Keyword
+faceDownCost =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost [ManaSymbol.Generic 3]),
+      Cost.components = []
+    }
+
 -- The candidate costs for CASTING this object (CR 601.2b) -- from hand, the
 -- printed one first and then each alternative. Empty for anything that is not a
 -- card: a token is created onto the battlefield and never cast, and an ability
@@ -120,9 +140,19 @@ firstOffered candidates = case candidates of
 -- as an argument rather than being read off the object. CR 709.4b's combined
 -- mana cost is what a split card HAS outside the stack, and is emphatically not
 -- what casting one half pays.
+--
+-- And on the object's FACING. A cast Pawl.Engine.Cast has proposed face down
+-- (Cast.asProposed stamps it) pays rule 702.37a's {3} and nothing else: the
+-- printed mana cost is what the alternative replaces, and the card's own
+-- alternatives are text the face-down object does not have (CR 708.2a). Asked
+-- ahead of the zone case, because CR 702.37a's morph ability "functions in any
+-- zone from which you could play the card it's on" -- the zone question is
+-- Cast.castableZones', and that gate reads the face-down face, which permits
+-- only the hand.
 costsFor :: CardName.CardName -> ObjectId -> GameState -> [Cost Keyword.Type.Keyword]
 costsFor name oid gs = case Game.lookupObject oid gs of
   Nothing -> []
+  Just obj | Object.facing obj == Facing.FaceDown -> [faceDownCost]
   Just obj -> case Object.source obj of
     Source.OfCard printing ->
       let face = Game.resolveFace (Just name) (Printing.card printing)

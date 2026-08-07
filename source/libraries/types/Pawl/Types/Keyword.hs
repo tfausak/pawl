@@ -190,6 +190,26 @@ data Keyword
     -- exile replacement.
     Flashback (Cost.Cost Keyword)
   | Fear -- 702.36
+  | -- | 702.37a: "You may cast this card as a 2/2 face-down creature with no
+    -- text, no name, no subtypes, and no mana cost by paying {3} rather than
+    -- paying its mana cost", plus CR 702.37e's special action -- any time you
+    -- have priority you may turn a face-down permanent you control with a morph
+    -- ability face up by paying this cost.
+    --
+    -- The cost rides the constructor, as Flashback's and Entwine's do, because
+    -- rule 702.37a states it as part of the keyword. It is the cost of the
+    -- SPECIAL ACTION and never of the cast: the {3} a morph cast pays is written
+    -- into rule 702.37a itself and so is minted by
+    -- Pawl.Engine.Cost.faceDownCost rather than read from here. That is the
+    -- whole reason this is not a Face.alternativeCosts entry -- an alternative
+    -- cost there would be payable to cast the card FACE UP, which is the one
+    -- thing a morph ability does not offer.
+    --
+    -- Megamorph (CR 702.37b) is deliberately NOT this constructor with a flag
+    -- and not a sibling either: it adds an "as this permanent is turned face up"
+    -- ability (CR 708.11) that pawl cannot yet apply, so it is unimplemented
+    -- rather than modelled (#918).
+    Morph (Cost.Cost Keyword)
   | -- | 702.42a: you may choose all modes of this modal spell (rule 700.2) instead
     -- of the number specified, paying an additional cost if you do.
     --

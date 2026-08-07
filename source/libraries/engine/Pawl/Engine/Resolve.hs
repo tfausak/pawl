@@ -57,6 +57,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -1126,8 +1127,13 @@ offerCast resolving controller slot offer = do
             -- CR 118.9a: at most ONE alternative cost, so the applied one
             -- replaces the candidates rather than joining them.
             applied = if CastOffer.withoutPayingManaCost offer then Just (Cost.withoutPayingManaCost face) else Nothing
-            candidates = maybe (Cost.costsFor name oid (Cast.asProposed oid name gs)) pure applied
-        Monad.guard (Cast.castableWhenOffered controller oid name candidates (Cast.asProposed oid name gs))
+            -- Face up: CR 708.4's face-down cast is a permission a MORPH
+            -- ability gives (CR 702.37d), and an OfferCast opcode carries no
+            -- such rider -- CR 310.11b's offer names a face and a cost and
+            -- nothing about turning the card over.
+            proposed = Cast.asProposed oid name Facing.FaceUp gs
+            candidates = maybe (Cost.costsFor name oid proposed) pure applied
+        Monad.guard (Cast.castableWhenOffered controller oid name candidates proposed)
         pure (oid, name, applied)
   case offered of
     Nothing -> pure ()
@@ -1136,7 +1142,7 @@ offerCast resolving controller slot offer = do
       decision <- Game.choose (Prompt.OfferedCast decider controller oid name)
       case decision of
         OptionalDecision.Declines -> pure ()
-        OptionalDecision.Exercises -> Cast.castSpellWith applied controller oid name
+        OptionalDecision.Exercises -> Cast.castSpellWith applied controller oid name Facing.FaceUp
 
 -- CR 615.3: install one floating prevention shield over `recipient`, for a
 -- duration. The shared body of Effect.PreventNextDamage's and

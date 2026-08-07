@@ -3,6 +3,7 @@ module Pawl.Engine.Cast where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
@@ -30,6 +31,7 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
@@ -98,8 +100,19 @@ timingOk pid oid name gs = case proposedFace oid name gs of
 -- Resolved through the same Game.resolveFace seam Object.face reads through, so
 -- what a gate measures before the move and what the stack incarnation shows
 -- after it cannot drift.
+--
+-- CR 708.4 is the one thing that overrules the name, and it arrives through the
+-- STATE rather than as an argument: a cast proposed face down is one `asProposed`
+-- has stamped Facing.FaceDown onto, and the rule says the object is turned face
+-- down BEFORE it is put onto the stack, so every gate below must already be
+-- measuring CR 708.2a's characteristics. Read off `Object.facing` for the same
+-- reason `asProposed` exists at all -- one stamped state, so a gate and the
+-- announcement it authorises cannot disagree.
 proposedFace :: ObjectId -> CardName.CardName -> GameState -> Maybe (Face.Face Card.Type.Card)
-proposedFace oid name gs = fmap (Game.resolveFace (Just name)) (Game.cardOf oid gs)
+proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
+  Nothing -> Nothing
+  Just Facing.FaceDown -> Just Card.faceDownFace
+  Just Facing.FaceUp -> fmap (Game.resolveFace (Just name)) (Game.cardOf oid gs)
 
 -- CR 304.1 / 702.8a: is this card one the rules let its controller cast whenever
 -- they have priority, rather than only in the sorcery-speed window? Two ways in,
@@ -431,9 +444,16 @@ attackedThisStep pid gs =
 -- carries no zone axis, and Projection.viewOfObject applies no zone gate --
 -- projectGiven falls through to the full layer fold off the battlefield (see
 -- Pawl.Types.Affected's MatchingAnywhere).
-asProposed :: ObjectId -> CardName.CardName -> GameState -> GameState
-asProposed oid name gs =
-  gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name}) oid (GameState.objects gs)}
+--
+-- CR 708.4 rides the same stamp: a cast proposed face down is measured against
+-- the face-down characteristics, and the rule puts that turning-over BEFORE the
+-- object is put onto the stack -- so `facing` is written here alongside the
+-- half, and every gate below reads it through `proposedFace` and `Game.faceOf`
+-- without knowing morph exists. FaceUp is CR 110.5b's default and what every
+-- ordinary proposal passes.
+asProposed :: ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> GameState
+asProposed oid name facing gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.face = Just name, Object.facing = facing}) oid (GameState.objects gs)}
 
 -- Affordable and correctly timed, actually in a zone this player may cast it
 -- from, fillable, and prohibited by nothing. CR 601.2b: affordable means at least
@@ -456,34 +476,69 @@ asProposed oid name gs =
 -- filter measuring the spell's own characteristics. Thalia's "noncreature spells
 -- cost {1} more to cast" is the observable: it taxes the Sorcery half of an
 -- adventurer card and not the Creature half, off one card in one hand.
-castable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
-castable pid oid name gs =
-  let proposed = asProposed oid name gs
+--
+-- And of one FACING, for the reason CR 708.4 gives: a morph cast and an ordinary
+-- cast of the same card are two different proposals, gated separately, because
+-- "any effects or prohibitions that would apply to casting an object with these
+-- characteristics (and not the face-up object's characteristics) are applied to
+-- casting this object". Every conjunct below reads the face-down face once the
+-- stamp is on, so none of them names morph.
+castable :: PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> GameState -> Bool
+castable pid oid name facing gs =
+  let proposed = asProposed oid name facing gs
+      -- CR 708.2a's "no name", where the name is used AS A NAME. Taken off the
+      -- proposed face rather than from the argument, so a face-down proposal
+      -- carries the empty name CR 708.4 gives it and a face-up one carries the
+      -- half's own -- the two coincide for every face-up cast, since
+      -- `proposedFace` resolved that half by this very name.
+      proposedName = maybe name Face.name (proposedFace oid name proposed)
    in timingOk pid oid name proposed
         && inCastableZone pid oid name proposed
         -- CR 601.3: gated HERE, upstream of Action.legalActions, because the
         -- engine never offers an illegal action and then rejects it. The half's
         -- own name goes with it, since CR 601.3a's prohibitions name a quality of
         -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half.
-        && not (PlayerEffect.prohibitsCasting pid name proposed)
+        && not (PlayerEffect.prohibitsCasting pid proposedName proposed)
         && printedRestrictionsOk pid oid name proposed
         && legendaryRestrictionOk pid oid name proposed
         && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
         && targetable pid oid name proposed
 
 -- Every cast this player may propose right now, in castZones' order, as the
--- (object, half) pairs Action.Cast is built from. `castable` re-checks the
--- permission per card, so a graveyard with no flashback card in it contributes
--- nothing.
+-- (object, half, facing) triples Action.Cast is built from. `castable` re-checks
+-- the permission per card, so a graveyard with no flashback card in it
+-- contributes nothing.
 --
 -- ONE ENTRY PER CASTABLE FACE, which is CR 709.3's choice being offered rather
 -- than made: a split card in hand with both halves affordable appears twice,
 -- and the player picks by picking an action. A card whose halves are separately
 -- gated appears only as often as CR 709.3a lets it.
-castableSpells :: PlayerId -> GameState -> [(ObjectId, CardName.CardName)]
+--
+-- AND ONE MORE PER FACE WITH MORPH, which is CR 702.37d's permission being
+-- offered the same way: "you can't normally cast a card face down; a morph
+-- ability allows you to do so". Casting face up and casting face down are two
+-- different casts of one card at two different costs for two different objects,
+-- so they are two actions and the player picks -- the engine never decides which
+-- (docs/design.md's second invariant). Both are then gated independently, since
+-- CR 708.4 measures each against its own characteristics: a card whose face-up
+-- cast is prohibited or unaffordable may still be castable face down, and the
+-- other way round.
+--
+-- Read off the card's PRINTED keywords, which is rule 702.37a's own scope ("a
+-- static ability that functions in any zone from which you could play the
+-- card"), and off the face being proposed, so a multi-face card offers the
+-- morph cast only for the half that prints one. No printing has one.
+castableSpells :: PlayerId -> GameState -> [(ObjectId, CardName.CardName, Facing.Facing)]
 castableSpells pid gs =
-  let proposals oid = fmap (\face -> (oid, Face.name face)) (foldMap Card.castableFaces (Game.cardOf oid gs))
-      offered oid = filter (\(_, name) -> castable pid oid name gs) (proposals oid)
+  let facings face =
+        Facing.FaceUp
+          : [Facing.FaceDown | Maybe.isJust (Keyword.morphCost (Face.keywords face))]
+      proposals oid =
+        [ (oid, Face.name face, facing)
+        | face <- foldMap Card.castableFaces (Game.cardOf oid gs),
+          facing <- facings face
+        ]
+      offered oid = filter (\(_, name, facing) -> castable pid oid name facing gs) (proposals oid)
       inZone zone = concatMap offered (Game.zoneMembers zone pid gs)
    in concatMap inZone castZones
 
@@ -552,8 +607,12 @@ castableWhileSearching pid gs =
         let name = Face.name face
             -- The same stamped state `castable` gates on, for the same rule:
             -- CR 601.3's exception is about TIMING, so the half a library cast
-            -- is evaluated against is still CR 709.3a's chosen one.
-            proposed = asProposed oid name gs
+            -- is evaluated against is still CR 709.3a's chosen one, face up:
+            -- CR 702.37a's morph ability functions from a library, but CR 601.3
+            -- is what would have to permit the cast from there and the
+            -- Panglacial permission is printed text the face-down object does
+            -- not have (CR 708.2a). Unreachable either way -- no card holds both.
+            proposed = asProposed oid name Facing.FaceUp gs
          in permitsCastWhileSearching face
               && castableWhenOffered pid oid name (Cost.costsFor name oid proposed) proposed
       proposals oid = fmap (\face -> (oid, Face.name face)) (filter (allowed oid) (foldMap Card.castableFaces (Game.cardOf oid gs)))
@@ -619,7 +678,9 @@ castWhileSearching pid = do
           -- half the offer did not include is rejected even when the card's
           -- other half was offered (CR 709.3a).
           Monad.when (elem (oid, name) options) $ do
-            castSpell pid oid name
+            -- Face up: castableWhileSearching offers no face-down cast, for the
+            -- reason its `proposed` note gives.
+            castSpell pid oid name Facing.FaceUp
             castWhileSearching pid
 
 -- CR 601.2's own order, walked in it: 601.2a moves the card to the stack FIRST,
@@ -662,7 +723,12 @@ castWhileSearching pid = do
 -- card is put onto the stack, so it arrives with the proposal rather than being
 -- prompted for here. CR 601.2b's last sentence is what that buys -- a
 -- previously made choice may restrict the ones announced below.
-castSpell :: PlayerId -> ObjectId -> CardName.CardName -> Game ()
+--
+-- `facing` is CR 702.37c's other already-made choice, and it rides the action
+-- for CR 709.3's reason one rule over: CR 708.4 puts the turning-over BEFORE the
+-- object is put onto the stack, so it cannot be a prompt inside the
+-- announcement.
+castSpell :: PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
 castSpell = castSpellWith Nothing
 
 -- castSpell with CR 118.9's other source of an alternative cost: one "applied to
@@ -679,14 +745,21 @@ castSpell = castSpellWith Nothing
 -- Nothing about the offer is re-checked here: `castSpellWith` casts, and whether
 -- the cast may be offered at all is `castableWhenOffered`'s question, asked by
 -- the caller that made the offer.
-castSpellWith :: Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Game ()
-castSpellWith applied pid oid name = do
+castSpellWith :: Maybe (Cost Keyword) -> PlayerId -> ObjectId -> CardName.CardName -> Facing.Facing -> Game ()
+castSpellWith applied pid oid name facing = do
   before <- State.get
-  case proposedFace oid name before of
+  -- The state the GATE measured, which is `before` with CR 709.3's half and CR
+  -- 708.4's facing stamped on. Read from rather than written to the game: the
+  -- card has not moved, and the move below is what makes the stamp real.
+  let proposed = asProposed oid name facing before
+  case proposedFace oid name proposed of
     Nothing -> pure ()
     Just face -> do
       let castFrom = fmap Object.zone (Game.lookupObject oid before)
-          candidates = maybe (Cost.costsFor name oid before) pure applied
+          -- Read off the PROPOSED state, so a face-down cast is priced at CR
+          -- 702.37a's {3} rather than at the card's own mana cost -- the same
+          -- candidate list `castable` gated the offer on.
+          candidates = maybe (Cost.costsFor name oid proposed) pure applied
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -701,7 +774,13 @@ castSpellWith applied pid oid name = do
       -- Nothing means the id was unknown or the CR 616.1 replacement loop
       -- cancelled the move, and a proposal whose first step did not happen is
       -- one the game returns from (CR 601.2).
-      moved <- Event.changeZoneShowing oid Zone.Stack (Just name)
+      --
+      -- CR 708.4 is the same claim about the other status: the object is turned
+      -- face down BEFORE it is put onto the stack, so the move carries the
+      -- facing too and no reader inside it sees a face-up incarnation.
+      moved <- case facing of
+        Facing.FaceUp -> Event.changeZoneShowing oid Zone.Stack (Just name)
+        Facing.FaceDown -> Event.changeZoneFaceDown oid Zone.Stack (Just name)
       case moved of
         Nothing -> State.put before
         Just sid -> castProposed pid sid face castFrom candidates before

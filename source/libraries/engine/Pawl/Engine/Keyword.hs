@@ -110,6 +110,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Fear -> []
+  Keyword.Morph _ -> []
   Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
@@ -162,6 +163,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Fear -> []
+  Keyword.Morph _ -> []
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
@@ -281,6 +283,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Fear -> []
+  Keyword.Morph _ -> []
   Keyword.Menace -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
   -- cost to a cast that some other rule already allowed; it never allows one.
@@ -357,6 +360,32 @@ flashbackCost :: Set Keyword -> Maybe (Cost Keyword)
 flashbackCost keywords =
   let costOf keyword = case keyword of
         Keyword.Flashback cost -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.37a / 702.37e: the MORPH cost -- what a face-down permanent's
+-- controller pays to turn it face up as CR 116.2b's special action -- or Nothing
+-- when the card has no morph ability. Read by Pawl.Engine.FaceDown.
+--
+-- NOT the cost of the morph CAST: rule 702.37a writes that one into the rule
+-- itself ("by paying {3}"), so it comes from Pawl.Engine.Cost.faceDownCost and
+-- never from a card.
+--
+-- Asked of the card's PRINTED keywords, which for morph is the rule's own scope:
+-- CR 702.37a says the ability "functions in any zone from which you could play
+-- the card it's on", and CR 702.37e reads it off "the permanent's morph cost
+-- WOULD BE IF IT WERE FACE UP" -- a face-down permanent projects no keywords at
+-- all (CR 708.2a), so a projected read would find nothing to pay.
+--
+-- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
+--
+-- Nothing beyond the FIRST morph cost is reachable: a card printing two morph
+-- abilities is expressible and unrepresented, as for flashback and entwine, and
+-- no printing does it.
+morphCost :: Set Keyword -> Maybe (Cost Keyword)
+morphCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Morph cost -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
@@ -461,6 +490,7 @@ entryReplacementsFor keyword count = case keyword of
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Fear -> []
+  Keyword.Morph _ -> []
   Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []

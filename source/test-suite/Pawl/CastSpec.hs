@@ -49,6 +49,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
@@ -116,7 +117,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
     let (gs, oid) = S.pikerInHand mountain piker 2 Phase.PrecombatMain
-    Spec.assertBool s (elem (A.Cast oid (S.printingName piker)) (Action.legalActions S.alice gs)) "offered"
+    Spec.assertBool s (elem (A.Cast oid (S.printingName piker) Facing.FaceUp) (Action.legalActions S.alice gs)) "offered"
   Spec.it s "an unaffordable Piker is not offered" $ do
     mountain <- S.printingOf s registry "Mountain"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -132,7 +133,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     forest <- S.printingOf s registry "Forest"
     plains <- S.printingOf s registry "Plains"
     let waxWane = Printing.MkPrinting CardSpec.splitCard
-        namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+        namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
         (green, _) = S.handOne waxWane (S.landsInPlay forest 1)
         (both, _) = S.handOne waxWane (snd (S.addCreature plains S.alice (S.landsInPlay forest 1)))
     -- CR 709.3: "A player chooses which half of a split card they are casting
@@ -152,7 +153,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     forest <- S.printingOf s registry "Forest"
     let wax = CardName.MkCardName (Text.pack "Wax")
         (gs, oid) = S.handOne (Printing.MkPrinting CardSpec.splitCard) (S.landsInPlay forest 1)
-        after = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid wax)
+        after = S.runPure S.identityAnswer gs (Cast.castSpell S.alice oid wax Facing.FaceUp)
     case GameState.stack after of
       [] -> Spec.assertFailure s "expected the spell on the stack"
       top : _ -> do
@@ -699,6 +700,7 @@ handInPlay printing board =
             Object.source = Source.OfCard printing,
             Object.zone = Zone.Hand,
             Object.tapped = TapState.Untapped,
+            Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled S.alice,
             Object.bindings = Map.empty,
@@ -1236,7 +1238,7 @@ fireboltSpec s registry = Spec.describe s "Firebolt" $ do
     case Game.zoneMembers Zone.Graveyard S.alice resolved1 of
       [inGraveyard] -> do
         Spec.assertBool s (S.castable S.alice inGraveyard resolved1) "castable from the graveyard"
-        Spec.assertBool s (elem (A.Cast inGraveyard (S.printingName firebolt)) (Action.legalActions S.alice resolved1)) "and offered as a legal action"
+        Spec.assertBool s (elem (A.Cast inGraveyard (S.printingName firebolt) Facing.FaceUp) (Action.legalActions S.alice resolved1)) "and offered as a legal action"
         let cast2 = S.runPure S.identityAnswer resolved1 (S.cast S.alice inGraveyard)
             resolved2 = S.runPure S.identityAnswer cast2 Stack.resolveTop
         Spec.assertEqWith s "the flashback cast dealt 2 more" (S.lifeOf S.alice resolved2) (Just 16)
@@ -1408,7 +1410,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     let (oid, gs) = inHandWith mountain sorcery 1
         board = snd (S.addCreature thalia S.alice gs)
     Spec.assertBool s (S.castable S.alice oid board) "castable"
-    Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery)) (Action.legalActions S.alice board)) "and offered as a legal action"
+    Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery) Facing.FaceUp) (Action.legalActions S.alice board)) "and offered as a legal action"
   -- Rule 205.4e's SECOND disjunct, "or a legendary planeswalker". Jace
   -- Beleren is the pool's only one, and it is not a creature -- so this case
   -- fails for any reading that collapsed the rule onto the creature limb.
@@ -1420,7 +1422,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
         board = snd (S.addCreature jace S.alice gs)
     Spec.assertBool s (not (Card.isCreature (S.combinedFace jace))) "not a creature"
     Spec.assertBool s (S.castable S.alice oid board) "castable"
-    Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery)) (Action.legalActions S.alice board)) "and offered as a legal action"
+    Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery) Facing.FaceUp) (Action.legalActions S.alice board)) "and offered as a legal action"
   Spec.it s "CR 205.4e not castable with no legendary permanent at all" $ do
     mountain <- S.printingOf s registry "Mountain"
     sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
@@ -1457,7 +1459,7 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
     let (oid, gs) = inHandWith plains thalia 2
     Spec.assertBool s (S.castable S.alice oid gs) "castable"
-    Spec.assertBool s (elem (A.Cast oid (S.printingName thalia)) (Action.legalActions S.alice gs)) "and offered as a legal action"
+    Spec.assertBool s (elem (A.Cast oid (S.printingName thalia) Facing.FaceUp) (Action.legalActions S.alice gs)) "and offered as a legal action"
   -- Gameplay level, through the stack: the permitted cast resolves and its
   -- effect lands, so the gate is a gate and not a silent no-op.
   Spec.it s "CR 205.4e the permitted cast resolves" $ do
@@ -1522,7 +1524,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     let (bobsRally, _, _, board) = rallyBoard piker plains rally
         attacked = S.runPure S.aggressiveAnswer board (Combat.declareAttackers S.alice)
     Spec.assertBool s (S.castable S.bob bobsRally attacked) "castable"
-    Spec.assertBool s (elem (A.Cast bobsRally (S.printingName rally)) (Action.legalActions S.bob attacked)) "and offered as a legal action"
+    Spec.assertBool s (elem (A.Cast bobsRally (S.printingName rally) Facing.FaceUp) (Action.legalActions S.bob attacked)) "and offered as a legal action"
   -- CR 306.6 / CR 508.1b: the same board, with the attack aimed at bob's
   -- planeswalker instead of at bob. Eightfold Maze's ruling is the reading being
   -- pinned -- "If all the attacking creatures attack your planeswalkers, you
@@ -1594,7 +1596,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     Spec.assertBool s (Set.member (AttackTarget.OfPlayer S.bob) (Combat.Type.attacked (GameState.combat later))) "still attacked"
     Spec.assertBool s (not (S.castable S.bob bobsRally later)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf bobsRally) (Action.legalActions S.bob later))) "and not offered"
-    Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt)) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
+    Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt) Facing.FaceUp) (Action.legalActions S.bob later)) "bob's unrestricted instant still is"
   -- CR 508.4's last-but-one sentence: "Such creatures are 'attacking' but, for
   -- the purposes of trigger events and effects, they never 'attacked.'" The
   -- words that reach a printed casting restriction are "AND EFFECTS" -- a
@@ -1648,7 +1650,7 @@ printedCastingRestrictionSpec s registry = Spec.describe s "PrintedCastingRestri
     let (_, _, _, board) = rallyBoard piker plains rally
         (boltId, withBolt) = S.addHandCard bolt S.alice (snd (S.addCreature mountain S.alice board))
     Spec.assertBool s (S.castable S.alice boltId withBolt) "castable"
-    Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt)) (Action.legalActions S.alice withBolt)) "and offered as a legal action"
+    Spec.assertBool s (elem (A.Cast boltId (S.printingName bolt) Facing.FaceUp) (Action.legalActions S.alice withBolt)) "and offered as a legal action"
   -- Gameplay level, through the stack: the permitted cast resolves and its
   -- effect lands, so the gate is a gate and not a silent no-op.
   Spec.it s "CR 601.3 the permitted cast resolves and untaps bob's creatures" $ do
@@ -1717,7 +1719,7 @@ flashSpec s registry = Spec.describe s "Flash" $ do
     let (gs, cheetahId, mammothId) = cheetahAndMammothInHand forest pouncingCheetah warMammoth
         bobsTurn = gs {GameState.activePlayer = S.bob}
     Spec.assertBool s (S.castable S.alice cheetahId bobsTurn) "the Cheetah is castable"
-    Spec.assertBool s (elem (A.Cast cheetahId (S.printingName pouncingCheetah)) (Action.legalActions S.alice bobsTurn)) "and offered as a legal action"
+    Spec.assertBool s (elem (A.Cast cheetahId (S.printingName pouncingCheetah) Facing.FaceUp) (Action.legalActions S.alice bobsTurn)) "and offered as a legal action"
     Spec.assertBool s (not (S.castable S.alice mammothId bobsTurn)) "the Mammoth is not"
     Spec.assertBool s (not (any (S.isCastOf mammothId) (Action.legalActions S.alice bobsTurn))) "and is not offered"
   -- CR 302.1's "when the stack is empty", same pair.
@@ -1844,7 +1846,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     waxWane <- S.printingOf s registry "Wax"
     let (pikerId, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "the 2/1 Piker is a 4/3" (S.powerToughnessOf pikerId resolved) (Just (4, 3))
   -- The half that carries the weight. One Plains, an enchantment, and no
@@ -1864,7 +1866,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     waxWane <- S.printingOf s registry "Wane"
     let (prisonId, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
         (gs, oid) = S.handOne waxWane withPrison
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName Facing.FaceUp))
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertBool s (S.onBattlefield prisonId gs) "the Prison starts on the battlefield"
     Spec.assertBool s (not (S.onBattlefield prisonId resolved)) "and Wane destroys it"
@@ -1893,7 +1895,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     waxWane <- S.printingOf s registry "Wax"
     let (_, withPiker) = S.addCreature piker S.alice (S.landsInPlay forest 1)
         (gs, oid) = S.handOne waxWane withPiker
-        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName))
+        cast = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waxName Facing.FaceUp))
     -- CR 709.4a gives the card two names and no joined one, so the string a
     -- single CardName can carry here is a stand-in (#650) rather than a name
     -- the card has -- and it is emphatically not "Wax".
@@ -1911,7 +1913,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     -- offered list is empty for a reason that has nothing to do with mana. Wax
     -- wants a creature; Wane wants an enchantment.
     let targets g = snd (S.addCreature ghostlyPrison S.alice (snd (S.addCreature piker S.alice g)))
-        namesOffered gs = [n | A.Cast _ n <- Action.legalActions S.alice gs]
+        namesOffered gs = [n | A.Cast _ n _ <- Action.legalActions S.alice gs]
         (green, _) = S.handOne waxWane (targets (S.landsInPlay forest 1))
         (both, _) = S.handOne waxWane (targets (snd (S.addCreature plains S.alice (S.landsInPlay forest 1))))
     -- CR 709.3a: "Only the chosen half is evaluated to see if it can be cast."
@@ -1963,7 +1965,7 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
     let (_, withPrison) = S.addCreature ghostlyPrison S.alice (S.landsInPlay plains 1)
         (_, withInterdiction) = S.addCreature interdiction S.alice withPrison
         (gs, oid) = S.handOne waxWane withInterdiction
-        after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName))
+        after = snd (Engine.runGamePure S.identityAnswer gs (Cast.castSpell S.alice oid waneName Facing.FaceUp))
     -- Not asserted: what CR 601.2b-i do afterwards. castSpell announces, prices
     -- and pays for a spell the redirect has already moved off the stack, and
     -- which of the two defensible readings is right is not implemented (#816).
