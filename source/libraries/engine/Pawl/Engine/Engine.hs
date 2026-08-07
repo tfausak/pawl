@@ -30,6 +30,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.Phasing as Phasing
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Rad as Rad
@@ -312,13 +313,24 @@ runTurnBasedActions phase = do
   hasActive <- State.gets (\gs -> List.elem active (Game.stillPlaying gs))
   case phase of
     Phase.Beginning BeginningStep.Untap -> do
+      -- CR 502.1 / 703.4a: phasing, immediately after the step begins and so
+      -- first of all. Inside the CR 800.4j guard, because rule 502.1 ranges over
+      -- what THE ACTIVE PLAYER controls and controlled -- vacuous under the guard
+      -- rather than merely skipped for the permanents CR 800.4a's first clause
+      -- reaches: it has already taken everything a departed player OWNED, and CR
+      -- 702.26k took their phased-out ones with it. It is NOT vacuous where owner
+      -- and controller come apart -- a permanent somebody else owns that phased
+      -- out under a player who has since left keeps a GameState.phasedOut row
+      -- keyed to a player with no further untap step, which CR 800.4c and CR
+      -- 702.26n between them say what to do about (#931).
+      Monad.when hasActive (State.modify' (Phasing.phasingEvent active))
       -- CR 502.2 / 703.4b: the day/night check, second in the step and BEFORE the
       -- untap itself (CR 502.3 / 703.4c). Outside the CR 800.4j guard the actions
       -- below take, because rule 703.4b makes it the GAME's action rather than the
       -- active player's -- CR 703.4p's sweep is the other one of those.
       --
-      -- CR 502.1's phasing, which the rule puts first of all, is not implemented
-      -- (#154), so nothing separates the two here.
+      -- Rule 703.4b's "immediately after the phasing action has been completed"
+      -- is the line above, so the two are in the rule's order.
       _ <- Daytime.untapCheck
       Monad.when hasActive $ do
         untapAll active
@@ -1493,8 +1505,12 @@ playGame =
 -- roughly |library| / 7 (the CR 729.6 gate rests on this bound).
 --
 -- Cards brought into a subgame from the main game, and the main-game triggers
--- their removal queues, are not implemented (#152). Nontraditional/Vanguard/
--- Commander subgame movement is not implemented (#131).
+-- their removal queues, are not implemented (#152). Neither is CR 729.5's other
+-- half, the command-zone residents moving into and back out of a subgame: none of
+-- them exists to move, with one exception: COMMANDERS now do, and neither
+-- direction carries them (#943). The five other kinds of command-zone card are
+-- still unbuilt -- #933 (dungeons), #934 (planes and phenomena), #935 (schemes),
+-- #936 (vanguards) and #937 (conspiracies).
 playSubgame :: Game Result
 playSubgame = do
   parent <- State.get

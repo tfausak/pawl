@@ -30,7 +30,47 @@ data GameState = MkGameState
     library :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     hand :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
     graveyard :: Map.Map PlayerId.PlayerId (Seq.Seq ObjectId.ObjectId),
+    -- | CR 400.1's battlefield, MINUS its phased-out permanents, which
+    -- `phasedOut` below holds instead.
     battlefield :: Set.Set ObjectId.ObjectId,
+    -- | CR 702.26b: the permanents whose status is "phased out", each mapped to
+    -- the player who controlled it WHEN IT PHASED OUT. They are still
+    -- ON the battlefield -- CR 702.26d says the phasing event changes no zone, and
+    -- their `Object.zone` stays `Zone.Battlefield` to say so -- but rule 702.26b
+    -- says that "except for rules and effects that specifically mention
+    -- phased-out permanents, a phased-out permanent is treated as though it does
+    -- not exist".
+    --
+    -- Keeping them in a SEPARATE set, rather than flagging them inside
+    -- `battlefield`, is what makes that sentence true by construction: every
+    -- reader that walks the battlefield -- the projection, targeting, the
+    -- state-based actions, combat, cost payment -- is asking about existing
+    -- permanents, and none of them has to remember phasing to get the right
+    -- answer. Three rules sit on the other side of rule 702.26b's "except", and
+    -- each is answered somewhere different:
+    --
+    --   * CR 502.1's phasing event, which reads and writes this field
+    --     (Pawl.Engine.Phasing).
+    --   * CR 702.26k, a phased-out permanent leaving the game with its owner,
+    --     which deletes from it (Pawl.Engine.Game.removeFromZones).
+    --   * CR 514.2's damage sweep, which does NOT name this field and does not
+    --     have to: Pawl.Engine.Damage.removeAllDamage clears every object rather
+    --     than every permanent, so a phased-out one is already covered.
+    --
+    -- The PLAYER is stored rather than recomputed because rule 702.26a asks who
+    -- controlled the permanent "when it phased out", and CR 702.26e takes the
+    -- live answer away: a phased-out permanent is not in the set of objects a
+    -- continuous effect affects, so a control-changing effect that would name it
+    -- must not be read while it is gone -- nor may one that expires meanwhile
+    -- (CR 702.26f) hand it back to somebody else. A stored player is that
+    -- sentence; Pawl.Engine.Projection.controllerOf is not.
+    --
+    -- What DOESN'T live here is why a permanent phased out. Phasing back in on
+    -- one's own is CR 702.26a's business and is read off the permanent's keywords;
+    -- an unattached permanent phased out by an effect has no phasing ability and
+    -- so is not among those that phase in. Nor is the indirect half of CR 702.26g
+    -- represented -- no Aura or Equipment can phase out today (#928).
+    phasedOut :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
     exile :: Set.Set ObjectId.ObjectId,
     -- | CR 400.1: the command zone -- a shared collection (not per-player), keyed
     -- into `objects` like `battlefield`/`exile`. Emblems live here.
@@ -84,8 +124,15 @@ data GameState = MkGameState
     -- stays on the battlefield, so an absent id is answered live and gets the
     -- same answer.
     controlWhenTriggered :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
-    -- | CR 704.5h ("since the last state-based action check"): how far the
-    -- state-based-action damage read has consumed.
+    -- | How far the STATE-BASED ACTION check has consumed the event log --
+    -- "since the last state-based action check", the boundary CR 704.5h names.
+    --
+    -- Not damage-only despite the name it was given for its first reader: CR
+    -- 903.9a asks the same question of the same boundary ("that object was put
+    -- into that zone since the last time state-based actions were checked"), and
+    -- Pawl.Engine.Commander.returnable reads it through
+    -- Pawl.Engine.Event.unscannedSbaEvents. One watermark, because there is one
+    -- check -- a second field would be a duplicate that could only ever drift.
     damageScannedThrough :: Natural.Natural,
     -- | CR 603.7: delayed triggered abilities awaiting their event, in creation
     -- order. An entry is removed as it fires (CR 603.7b) unless it states a

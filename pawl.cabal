@@ -332,6 +332,7 @@ library engine
     Pawl.Engine.Cast
     Pawl.Engine.Combat
     Pawl.Engine.CombatRestriction
+    Pawl.Engine.Commander
     Pawl.Engine.Condition
     Pawl.Engine.Cost
     Pawl.Engine.Count
@@ -354,6 +355,7 @@ library engine
     Pawl.Engine.Modal
     Pawl.Engine.Monarch
     Pawl.Engine.Mulligan
+    Pawl.Engine.Phasing
     Pawl.Engine.PlayerEffect
     Pawl.Engine.Projection
     Pawl.Engine.Quantity
@@ -527,6 +529,7 @@ library types
     Pawl.Types.Combat
     Pawl.Types.CombatRestriction
     Pawl.Types.CombatStep
+    Pawl.Types.CommandZoneDecision
     Pawl.Types.Comparison
     Pawl.Types.Concession
     Pawl.Types.Condition
@@ -711,6 +714,7 @@ test-suite pawl-test-suite
     Pawl.CodecIntegrationSpec
     Pawl.ColorSpec
     Pawl.CombatSpec
+    Pawl.CommanderSpec
     Pawl.ConditionSpec
     Pawl.CopySpec
     Pawl.CoreSpec
@@ -732,6 +736,7 @@ test-suite pawl-test-suite
     Pawl.ModalSpec
     Pawl.MulliganSpec
     Pawl.PerformanceSpec
+    Pawl.PhasingSpec
     Pawl.PlaneswalkerSpec
     Pawl.PlayerEffectSpec
     Pawl.PowerToughnessSpec

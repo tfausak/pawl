@@ -57,7 +57,7 @@ loadRedDeck registry = do
   piker <- fetchOrThrow registry "Goblin Piker"
   maiden <- fetchOrThrow registry "Bird Maiden"
   bolt <- fetchOrThrow registry "Lightning Bolt"
-  pure (Deck.MkDeck (Map.fromList [(mountain, 36), (piker, 12), (maiden, 8), (bolt, 4)]))
+  pure (Deck.fromCards (Map.fromList [(mountain, 36), (piker, 12), (maiden, 8), (bolt, 4)]))
 
 -- A deck that reliably attaches several Auras to a populated battlefield, so
 -- Sba.fallsOff (per-Aura board re-derivation) and Projection.controllerOf
@@ -95,7 +95,7 @@ loadControlDeck registry = do
   island <- fetchOrThrow registry "Island"
   myr <- fetchOrThrow registry "Darksteel Myr"
   control <- fetchOrThrow registry "Control Magic"
-  pure (Deck.MkDeck (Map.fromList [(island, 53), (myr, 4), (control, 3)]))
+  pure (Deck.fromCards (Map.fromList [(island, 53), (myr, 4), (control, 3)]))
 
 -- loadControlDeck's PAIRED CONTROL: the same 60 cards and the same 4 Darksteel
 -- Myr, with the 3 Control Magic replaced by 3 more Islands -- so the only
@@ -124,7 +124,7 @@ loadNoAuraDeck :: Registry.Registry IO -> IO Deck.Deck
 loadNoAuraDeck registry = do
   island <- fetchOrThrow registry "Island"
   myr <- fetchOrThrow registry "Darksteel Myr"
-  pure (Deck.MkDeck (Map.fromList [(island, 56), (myr, 4)]))
+  pure (Deck.fromCards (Map.fromList [(island, 56), (myr, 4)]))
 
 main :: IO ()
 main = do

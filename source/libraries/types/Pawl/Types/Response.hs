@@ -7,6 +7,7 @@ import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -170,4 +171,6 @@ data Response
   | -- | CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
     -- ability.
     AnnouncedEntwine EntwineDecision.EntwineDecision
+  | -- | CR 903.9a's answer: whether the commander goes to the command zone.
+    ReturnedCommander CommandZoneDecision.CommandZoneDecision
   deriving (Eq, Show)

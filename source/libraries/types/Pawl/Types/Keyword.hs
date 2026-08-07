@@ -159,6 +159,26 @@ data Keyword
     -- "[quality] creature with 'bands with other [quality]'" clause both rules
     -- also cover would need one, and is part of the unmodeled half.
     Banding -- 702.22
+  | -- | 702.26a: a static ability that MODIFIES THE RULES OF THE UNTAP STEP.
+    -- During each player's untap step, before that player untaps anything, every
+    -- phased-in permanent with phasing they control phases out, and every
+    -- phased-out permanent that phased out under their control phases in.
+    --
+    -- Nothing here mints an ability, so Pawl.Engine.Keyword answers this
+    -- constructor with [] at every one of its arms. The rule is read directly by
+    -- Pawl.Engine.Phasing, from the CR 502.1 turn-based action -- the same shape
+    -- as CR 702.145's daybound, whose CR 502.2 check Pawl.Engine.Daytime reads
+    -- rather than granting anything.
+    --
+    -- Payload-free: rule 702.26a takes no parameter, and CR 702.26p makes multiple
+    -- instances redundant, so its reader takes membership rather than the
+    -- per-keyword count the projection carries.
+    --
+    -- Phasing is a property of the PERMANENT, not of the phased-out state: a
+    -- permanent phased out by an effect (Teferi's Protection) has no phasing
+    -- ability and so never phases back in on its own. That is why "is it phased
+    -- out" lives on Pawl.Types.GameState and not here.
+    Phasing
   | -- | 702.29a: pay the cost and discard this card to draw a card, functioning
     -- only while the card is in a player's hand. The cost rides the constructor,
     -- as Flashback's does, because rule 702.29a states it as part of the keyword
@@ -270,6 +290,27 @@ data Keyword
     -- cost is not a Cost the card names, it is a SHAPE the rule states, and the
     -- only thing the card supplies is the threshold.
     Crew Natural.Natural
+  | -- | 702.127a: an ability found on some split cards, and THREE static abilities
+    -- in one word -- "you may cast this half of this split card from your
+    -- graveyard", "this half of this split card can't be cast from any zone other
+    -- than a graveyard", and "if this spell was cast from a graveyard, exile it
+    -- instead of putting it anywhere else any time it would leave the stack".
+    --
+    -- Flashback's near-twin (702.34a), and deliberately NOT that constructor with
+    -- an absent cost: flashback carries an alternative cost and this pays the
+    -- printed one, and flashback adds no prohibition where rule 702.127a's second
+    -- clause forbids the hand outright. Pawl.Engine.Keyword mints the first and
+    -- third from this constructor exactly as it does flashback's, and
+    -- Pawl.Engine.Cast reads the second at its Zone.Hand arm.
+    --
+    -- Payload-free: rule 702.127a takes no parameter -- what it costs is the half's
+    -- own mana cost.
+    --
+    -- "This HALF" is the rule's own scoping and needs nothing here: pawl's
+    -- keywords live on a Face, and Pawl.Engine.Cast already reasons about one
+    -- proposed half at a time, so an aftermath half restricts itself and leaves its
+    -- sibling alone.
+    Aftermath
   | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
     -- enter with an additional +1/+1 counter on it. If you don't, it gains
     -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,

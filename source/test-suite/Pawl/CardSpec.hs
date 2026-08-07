@@ -1244,6 +1244,13 @@ keywordFilters keyword = case keyword of
   Keyword.Morph cost -> costFilters cost
   -- CR 702.22: plain banding names no quality, so it filters nothing.
   Keyword.Banding -> []
+  -- CR 702.26a: phasing names no quality -- who phases is "the permanents that
+  -- player controls", written into the CR 502.1 turn-based action rather than
+  -- into the keyword.
+  Keyword.Phasing -> []
+  -- CR 702.127a names no quality: which zone an aftermath half may be cast from is
+  -- written into the rule, not into the keyword.
+  Keyword.Aftermath -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -3071,6 +3078,37 @@ basicLandSpec s = Spec.describe s "BasicLand" $ do
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Card" $ do
   cardSpec s
+  realSplitCardSpec s registry
   lintSpec s registry
+
+-- CR 709.4 again, on a PRINTED split card rather than the invented `splitCard`
+-- fixture above.
+--
+-- Onward // Victory is the pool's second real split card and the first whose
+-- halves are asymmetric in ways the merge has to carry: {2}{R} Instant against
+-- {2}{W} Sorcery, so the mana cost, the colours and the card types all come from
+-- both halves -- and **aftermath on Victory alone**, so the keyword set, the
+-- casting permission and the casting prohibition come from one half only. Wax //
+-- Wane, the other real one, is two plain halves and reaches none of that.
+--
+-- This is what #660 asked for: it makes merges load-bearing that a synthetic
+-- fixture could only pretend to exercise, because the behaviour below is read off
+-- the same combined view Pawl.Engine.Cast consults.
+realSplitCardSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
+realSplitCardSpec s registry = Spec.describe s "RealSplitCard" $ do
+  Spec.it s "CR 709.4b/709.4c Onward // Victory combines both halves' costs, colours and types" $ do
+    printing <- S.printingOf s registry "Onward"
+    let c = Card.combined (Printing.card printing)
+    -- CR 709.4b: the combined mana cost is {2}{R} plus {2}{W}, so both colours and
+    -- a mana value of 6. A merge that kept one half gives 3 and one colour.
+    Spec.assertEqWith s "both colours" (Projection.printedColorsOf c) (Set.fromList [Color.Red, Color.White])
+    Spec.assertEqWith s "mana value 3 + 3" (Quantity.manaValueOf c) 6
+    -- CR 709.4c: "each card type specified on either of its halves" -- and these
+    -- halves genuinely differ, unlike a card whose halves are both sorceries.
+    Spec.assertEqWith s "instant and sorcery" (TypeLine.types (Face.typeLine c)) (Set.fromList [CardType.Instant, CardType.Sorcery])
+    -- One-sided: aftermath is printed on Victory only, so a merge that took the
+    -- LEFT half's keyword set -- which a record update over `l` does by default --
+    -- leaves this empty.
+    Spec.assertEqWith s "aftermath, from the right half alone" (Face.keywords c) (Set.singleton Keyword.Aftermath)
   m2bCardSpec s registry
   basicLandSpec s

@@ -24,6 +24,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
@@ -173,7 +174,16 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- demands that permission alongside an affordable candidate from this
             -- list, so a candidate offered here can never carry a graveyard cast
             -- on its own.
-            Zone.Graveyard -> fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
+            -- CR 702.127a pays the PRINTED cost, which is the whole difference
+            -- between aftermath and flashback: rule 702.34a supplies an
+            -- alternative cost and this supplies none, so the half is cast from a
+            -- graveyard for exactly what it says. `printed` and not
+            -- `withAdditional printed` -- that wrapper exists to bolt the face's
+            -- additional costs onto an ALTERNATIVE, and `printed` already carries
+            -- them.
+            Zone.Graveyard ->
+              fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
+                <> [printed | Keyword.hasAftermath (Face.keywords face)]
             _ -> printed : fmap withAdditional (Face.alternativeCosts face)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []
@@ -195,7 +205,25 @@ costsFor name oid gs = case Game.lookupObject oid gs of
 -- CR 118.6a's first sentence needs no special case: fmap over the Maybe leaves
 -- Nothing as Nothing.
 total :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Cost Keyword.Type.Keyword
-total pid oid cost gs = totalWith (PlayerEffect.costAdjustments pid oid gs) cost
+total pid oid cost gs = totalWith (allAdjustments pid oid gs) cost
+
+-- CR 601.2f's increases and reductions: the ones CARDS generate
+-- (Pawl.Engine.PlayerEffect) plus the one the RULES do, CR 903.8's commander tax.
+--
+-- The tax joins the increases rather than being added to the printed mana cost,
+-- because rule 903.8 words it "plus {2} for each previous time" -- an increase
+-- applied during rule 601.2f, so a cost reduction still applies to the total
+-- afterwards in the order rule 601.2f fixes. Folding it into the cost would put
+-- it before the reductions instead.
+--
+-- Zero for every spell that is not a commander being cast from the command zone,
+-- and Pawl.Engine.Commander.tax short-circuits on that, so an ordinary game pays
+-- nothing to ask.
+allAdjustments :: PlayerId -> ObjectId -> GameState -> ([Natural], [ManaCost.ManaCost])
+allAdjustments pid oid gs =
+  let (increases, reductions) = PlayerEffect.costAdjustments pid oid gs
+      commanderTax = Commander.tax pid oid gs
+   in (if commanderTax == 0 then increases else commanderTax : increases, reductions)
 
 -- The same totalling over adjustments the CALLER already has, which is what CR
 -- 118.7e's prompt needs: `announceReductions` asks the payer which half of each
@@ -212,7 +240,7 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 -- once 601.2f has run?" of candidate costs that do not exist yet and never become
 -- a Cost of their own.
 totalMana :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
-totalMana pid oid gs = applyAdjustments (PlayerEffect.costAdjustments pid oid gs)
+totalMana pid oid gs = applyAdjustments (allAdjustments pid oid gs)
 
 -- CR 601.2f's ADDITIONAL-COSTS clause alone, bolted onto one candidate -- the
 -- shape CR 702.42a's entwine needs. Pawl.Engine.Cast applies it to whichever
@@ -617,12 +645,12 @@ canPayComponent pid oid component gs = case component of
   -- cost.
   CostComponent.TapThis -> case Game.lookupObject oid gs of
     Nothing -> False
-    Just obj -> Object.zone obj == Zone.Battlefield && Object.tapped obj == TapState.Untapped
+    Just obj -> Set.member oid (GameState.battlefield gs) && Object.tapped obj == TapState.Untapped
   -- CR 107.6: the exact mirror of TapThis above, and the reason a {Q} ability is
   -- one a player uses on a creature they left tapped.
   CostComponent.UntapThis -> case Game.lookupObject oid gs of
     Nothing -> False
-    Just obj -> Object.zone obj == Zone.Battlefield && Object.tapped obj == TapState.Tapped
+    Just obj -> Set.member oid (GameState.battlefield gs) && Object.tapped obj == TapState.Tapped
   -- CR 701.21a: only a permanent, and only one this player controls.
   CostComponent.SacrificeThis ->
     Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid

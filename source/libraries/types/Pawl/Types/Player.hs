@@ -3,6 +3,7 @@ module Pawl.Types.Player where
 import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Status as Status
 
 data Player = MkPlayer
@@ -54,6 +55,27 @@ data Player = MkPlayer
     -- Bounded above at 4 by the only rule that raises it: CR 702.179d increases
     -- speed only "if your speed is less than 4", and CR 702.179e reads 4 as max
     -- speed. Nothing in rule 702.179 lowers it.
-    speed :: Maybe Natural.Natural
+    speed :: Maybe Natural.Natural,
+    -- | CR 903.3: the card this player designated as their commander, or Nothing
+    -- outside a Commander game. The designation is made before the game begins
+    -- and never changes.
+    --
+    -- A PRINTING and not an ObjectId, because CR 400.7 mints a fresh id on every
+    -- zone change and a commander crosses zones constantly -- command zone to
+    -- stack to battlefield to command zone again. An id would name a dead object
+    -- after the first cast. A printing survives, and CR 903.5's singleton deck
+    -- construction is what makes it unambiguous: a Commander deck holds at most
+    -- one card with a given name, so "the object whose printing is this one" picks
+    -- out exactly the commander. Pawl does not ENFORCE rule 903.5 (#940), so a
+    -- malformed deck with two copies would make both answer to it.
+    commander :: Maybe Printing.Printing,
+    -- | CR 903.8: how many times this player has cast their commander from the
+    -- command zone this game. The commander tax is {2} for each of them.
+    --
+    -- Counted here rather than on the object for `commander`'s reason -- no object
+    -- survives the round trip. Counts CASTS and not returns, which is the detail
+    -- rule 903.8 turns on: a commander that dies and goes back to the command zone
+    -- without being recast has not made its own next cast any dearer.
+    commanderCasts :: Natural.Natural
   }
   deriving (Eq, Show)

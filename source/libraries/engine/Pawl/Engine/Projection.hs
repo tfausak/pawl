@@ -907,29 +907,86 @@ setLandSubtypeEffects gs =
 -- from the bearer's projection afterwards. Every other rules-text ability is
 -- stripped inside the fold by setLandSubtypeTo.
 --
--- "Live" recurses on the stripper's own source; "applies to" reads BASE
--- characteristics, so nothing recurses into the projection and the result is
--- order-independent. A cycle trips the visited set, both treated as live -- an
--- analog of CR 613.8b's loop escape, not an implementation of it (#37).
+-- "Applies to" reads BASE characteristics, so nothing recurses into the
+-- projection and the question each effect asks of each other is a fixed one. The
+-- ORDER the effects apply in is CR 613.8's, computed by `appliedSetEffects` below
+-- -- dependency order, falling back to timestamp order inside a dependency loop
+-- (CR 613.8b).
 --
 -- The base read is a restriction rather than a shortcut, so the two halves of CR
 -- 305.7 disagree about their affected set: a permanent that becomes a land only
 -- through a layer-4 type change is invisible here while the fold's arm reaches it
 -- (#391).
 staticAbilitiesLive :: ObjectId -> GameState -> Bool
-staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) Set.empty oid gs
+staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) oid gs
 
--- The liveness fixpoint, given the game's subtype-setting effects precomputed.
--- The list is hoisted so gather computes it once per projection rather than once
--- per permanent, which made project O(permanents^3) per SBA sweep.
-liveGiven :: [(ObjectId, Affected.Affected)] -> Set ObjectId -> ObjectId -> GameState -> Bool
-liveGiven setEffs visited oid gs =
-  Set.member oid visited
-    || let visited' = Set.insert oid visited
-           strips (src, aff) =
-             liveGiven setEffs visited' src gs
-               && affectsBase src oid aff gs
-        in not (any strips setEffs)
+-- The liveness answer, given the game's subtype-setting effects precomputed. The
+-- list is hoisted so gather computes it once per projection rather than once per
+-- permanent, which made project O(permanents^3) per SBA sweep.
+--
+-- `oid`'s rules-text abilities survive iff no effect that ACTUALLY APPLIES reaches
+-- it. Which ones apply is rule 613.8's question, answered once by
+-- appliedSetEffects; this function only asks the applied ones whether they name
+-- `oid`.
+liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
+liveGiven setEffs oid gs =
+  not (any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs))
+
+-- CR 613.8: which of the CR 305.7 subtype-setting effects actually apply, in the
+-- order the rule applies them.
+--
+-- The rule pawl used to skip. An effect that sets a land's subtype strips that
+-- land's rules-text abilities, so it can switch OFF another such effect -- which
+-- by CR 613.8a is a dependency, since "applying the other would change the text or
+-- the EXISTENCE of the first effect". Two of them can depend on each other, and
+-- rule 613.8b says what to do then: "if several dependent effects form a
+-- dependency loop, then this rule is ignored and the effects in the dependency
+-- loop are applied in timestamp order."
+--
+-- The walk, which is rules 613.8a-c in order:
+--
+--   * 613.8a -- e1 depends on e2 when e2's affected set names e1's SOURCE, so
+--     applying e2 would take e1's ability away.
+--   * 613.8b's first sentence -- an effect with an unapplied dependency waits, so
+--     each step picks only from the effects that have none.
+--   * 613.8b's last sentence -- if EVERY remaining effect is waiting, they are all
+--     in loops, so the rule is ignored and the earliest timestamp goes next.
+--   * 613.8c -- the order is recomputed after each application, which is what
+--     makes this a loop rather than a sort: `remaining` shrinks and the
+--     dependency test is asked afresh each time.
+--
+-- An effect whose source has already been stripped by an applied effect is
+-- dropped rather than applied: its ability no longer exists, so it generates
+-- nothing. An effect that strips its OWN source still applies -- it is applied
+-- before it can remove anything, and rule 613.8 never un-applies an effect.
+--
+-- Timestamps are the SOURCE PERMANENT's (CR 613.7d). A source that has left the
+-- battlefield has none; it sorts last and is otherwise harmless, since a missing
+-- object's affected set names nothing.
+--
+-- Indices carry the identity, not the (ObjectId, Affected) pairs themselves: two
+-- permanents can generate equal pairs, and a walk that deleted by value would drop
+-- both at once.
+appliedSetEffects :: [(ObjectId, Affected.Affected)] -> GameState -> [(ObjectId, Affected.Affected)]
+appliedSetEffects setEffs gs =
+  let indexed = zip [0 :: Int ..] setEffs
+      stampOf (_, (src, _)) = fmap Object.timestamp (Game.lookupObject src gs)
+      -- CR 613.8a, for these effects: does `other` strip `e`'s source?
+      dependsOn (_, (src, _)) (_, (osrc, oaff)) = affectsBase osrc src oaff gs
+      earliest :: [(Int, (ObjectId, Affected.Affected))] -> (Int, (ObjectId, Affected.Affected))
+      earliest = List.minimumBy (Ord.comparing (\e -> (stampOf e, fst e)))
+      go remaining applied = case remaining of
+        [] -> reverse applied
+        _ ->
+          let waiting e = any (dependsOn e) (filter (\o -> fst o /= fst e) remaining)
+              ready = filter (not . waiting) remaining
+              -- CR 613.8b's last sentence: nothing ready means every remaining
+              -- effect is in a loop, so dependency order is ignored here.
+              next = earliest (if null ready then remaining else ready)
+              (nsrc, _) = snd next
+              stripped = any (\(src, aff) -> affectsBase src nsrc aff gs) applied
+           in go (filter (\o -> fst o /= fst next) remaining) (if stripped then applied else snd next : applied)
+   in go indexed []
 
 -- Every subtype-word pair a ChangeSubtypeWord continuous effect imposes on `oid`
 -- (CR 612). CR 612.2's family gate is applied where a pair meets a word, not
@@ -1402,7 +1459,7 @@ gatherGiven stripped functioning gs =
         Just permObj -> case Game.faceOf permId gs of
           Nothing -> []
           Just face ->
-            if null setEffs || liveGiven setEffs Set.empty permId gs
+            if null setEffs || liveGiven setEffs permId gs
               then
                 -- CR 612: rewrite each static ability's subtype words by the text
                 -- changes affecting THIS source, before its effect is folded onto
@@ -1513,7 +1570,9 @@ removesAbilities m = case m of
 --
 -- Not asked of the remover's own source: whether a stripper was itself stripped is
 -- a question about order WITHIN layer 6, which the fold settles by CR 613.7
--- timestamp (#37).
+-- timestamp. CR 305.7's gate asks a related question one level up and settles it
+-- by CR 613.8 instead -- see appliedSetEffects -- because there the strip decides
+-- whether the effect EXISTS rather than merely when it lands.
 abilitiesRemoved :: [Gathered] -> GameState -> ObjectId -> Bool
 abilitiesRemoved cands gs oid =
   let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c)]
@@ -1718,8 +1777,10 @@ data Aspect
 -- instant control or creature-ness changes, and pawl removes it at the next
 -- settle.
 --
--- The CR 506.4 clause that remains unbuilt -- phasing (#154) -- would arrive by
--- one of those same doors; the attacked-planeswalker and attacked-battle clauses
+-- CR 506.4's phasing clause arrives by one of those same doors:
+-- Pawl.Engine.Phasing.phaseOut calls Game.removeFromCombat directly, so a
+-- permanent that phases out leaves the record without this function's help. The
+-- attacked-planeswalker and attacked-battle clauses
 -- are answered where the attack target is read (Combat.stillAttacked and
 -- Combat.stillAttackedBattle) and never edit the record at all.
 filterReads :: Filter.Type.Filter Keyword.Type.Keyword -> Set Aspect
@@ -2526,7 +2587,7 @@ controlGrants gs =
           Just face ->
             -- CR 305.7: a land whose subtype was SET has lost its rules text, so
             -- it grants nothing. Same gate gather applies to every static ability.
-            if not (null setEffs) && not (liveGiven setEffs Set.empty permId gs)
+            if not (null setEffs) && not (liveGiven setEffs permId gs)
               then []
               else
                 let isControl sa = any isControlOp (StaticAbility.modifications sa)
@@ -2554,8 +2615,9 @@ controllerOf oid gs = controllerOfGiven (controlGrants gs) Set.empty oid gs
 
 -- controllerOf with the grant list PRECOMPUTED and a visited set.
 --
--- The visited set is liveGiven's CR 613.8b loop-escape analog (#37), not an
--- implementation of it: deriving a grant's player asks for its SOURCE's
+-- The visited set is a CR 613.8b loop-escape analog, not an implementation of it
+-- (#946) -- the shape liveGiven had before appliedSetEffects replaced it with rule
+-- 613.8's real ordering: deriving a grant's player asks for its SOURCE's
 -- controller, which can re-enter this function. Re-entering an object already
 -- under question returns its owner, so a cycle grants nothing. Unreachable today
 -- and unobservable if it existed -- a direct query on any object in the cycle

@@ -8,6 +8,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -280,7 +281,7 @@ entwineOffer pid oid candidates gs = case Game.faceOf oid gs of
 -- a search in progress (castableWhileSearching) rather than to the whole game,
 -- so it is not a zone a player may simply cast from.
 castZones :: [Zone.Zone]
-castZones = [Zone.Hand, Zone.Graveyard, Zone.Exile]
+castZones = [Zone.Hand, Zone.Graveyard, Zone.Exile, Zone.Command]
 
 -- Which of those zones THIS player may cast THIS half of THIS object from --
 -- where a permission turns into a zone.
@@ -292,10 +293,24 @@ castableZones :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -
 castableZones pid oid face gs =
   let permitted zone = case zone of
         -- CR 304.1 / 307.1: the rules' own allowance is worded "from their
-        -- hand", so the hand needs no permission of its own.
-        Zone.Hand -> True
+        -- hand", so the hand needs no permission of its own -- unless a rule takes
+        -- it away, which CR 702.127a's second static ability does: "this half of
+        -- this split card can't be cast from any zone other than a graveyard".
+        --
+        -- A PROHIBITION and so read here rather than as a CastingPermission: a
+        -- permission list can only add zones, and this one removes the zone every
+        -- card gets for free. It reads the FACE, which is how the rule's "this
+        -- half" scoping comes out right -- Dusk is castable from a hand and Dawn
+        -- is not, off the same card.
+        Zone.Hand -> not (Keyword.hasAftermath (Face.keywords face))
         Zone.Graveyard -> permitsCastFromGraveyard face
         Zone.Exile -> permitsCastFromExile pid oid face gs
+        -- CR 903.8: "a commander's owner may cast it from the command zone". A
+        -- FORMAT's permission, not a card's, which is why it is asked of
+        -- Pawl.Engine.Commander rather than read off the face -- see that module.
+        -- The owner test is inside isCommander's caller: rule 903.8 lets only the
+        -- commander's owner cast it from there.
+        Zone.Command -> Commander.canCastFromCommandZone pid oid gs
         -- No other zone is in castZones.
         _ -> False
    in filter permitted castZones
@@ -759,7 +774,25 @@ castSpellWith applied pid oid name facing = do
           -- Read off the PROPOSED state, so a face-down cast is priced at CR
           -- 702.37a's {3} rather than at the card's own mana cost -- the same
           -- candidate list `castable` gated the offer on.
-          candidates = maybe (Cost.costsFor name oid proposed) pure applied
+          -- CR 903.8's commander tax is added HERE, before CR 601.2a's move,
+          -- and not left to Cost.total further down. The move mints a fresh CR
+          -- 400.7 incarnation on the stack, and the tax is a question about the
+          -- command zone -- so by the time castProposed prices `sid`, the object
+          -- the rule is about is gone. `oid` is still in the command zone at this
+          -- line, which is the only point where the question has an answer.
+          --
+          -- The castability GATE (castable, below) prices the same spell through
+          -- Cost.total on this same pre-move id, so it sees the tax too, and the
+          -- two agree. Nothing is double-counted: Cost.total adds the tax only
+          -- for an object currently in the command zone, and `sid` never is.
+          --
+          -- Added to the candidate rather than kept as a separate increase
+          -- because CR 601.2f applies every increase before any reduction, so
+          -- {2} folded in here and {2} added as an increase reach the same total
+          -- -- and a cost reduction still applies to it, which is what rule
+          -- 601.2f's order says and what Commander decks expect.
+          taxed = Commander.taxCandidates pid oid before
+          candidates = fmap taxed (maybe (Cost.costsFor name oid proposed) pure applied)
       -- CR 601.2a, carrying CR 709.3a's "only that half is considered to be put
       -- onto the stack": the chosen half is part of the move rather than a
       -- stamp applied once it has landed, so the CR 400.7 incarnation never
@@ -979,6 +1012,18 @@ castProposed pid sid face castFrom candidates before = do
                                   }
                             )
                           Monad.when (castFrom == Just Zone.Graveyard) (armCastFromGraveyard pid face sid)
+                          -- CR 903.8: the cast is now announced, so this is a
+                          -- "previous time they cast it from the command zone"
+                          -- for every later one. Here rather than at CR 601.2a's
+                          -- move, because everything above this line can still
+                          -- reject the cast and rewind to `before` -- a proposal
+                          -- the game returned from was never a cast (CR 601.2),
+                          -- and must not make the next one dearer.
+                          --
+                          -- Counted for the CASTER, who by
+                          -- Commander.canCastFromCommandZone is also the owner:
+                          -- rule 903.8 lets nobody else cast it from there.
+                          Monad.when (castFrom == Just Zone.Command) (State.modify' (Commander.recordCast pid))
 
 -- CR 702.34a's SECOND static ability -- exile this card instead of putting it
 -- anywhere else any time it would leave the stack -- installed onto the spell's

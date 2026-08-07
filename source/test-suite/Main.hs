@@ -124,6 +124,7 @@ import qualified Pawl.Codec.ZoneSpec
 import qualified Pawl.CodecIntegrationSpec
 import qualified Pawl.ColorSpec
 import qualified Pawl.CombatSpec
+import qualified Pawl.CommanderSpec
 import qualified Pawl.ConditionSpec
 import qualified Pawl.CopySpec
 import qualified Pawl.CoreSpec
@@ -163,6 +164,7 @@ import qualified Pawl.ModalDoubleFacedSpec
 import qualified Pawl.ModalSpec
 import qualified Pawl.MulliganSpec
 import qualified Pawl.PerformanceSpec
+import qualified Pawl.PhasingSpec
 import qualified Pawl.PlaneswalkerSpec
 import qualified Pawl.PlayerEffectSpec
 import qualified Pawl.PowerToughnessSpec
@@ -352,6 +354,7 @@ spec s registry = do
   Pawl.CodecIntegrationSpec.spec s registry
   Pawl.ColorSpec.spec s registry
   Pawl.CombatSpec.spec s registry
+  Pawl.CommanderSpec.spec s registry
   Pawl.ConditionSpec.spec s registry
   Pawl.CopySpec.spec s registry
   Pawl.CoreSpec.spec s registry
@@ -390,6 +393,7 @@ spec s registry = do
   Pawl.ModalSpec.spec s registry
   Pawl.MulliganSpec.spec s registry
   Pawl.PerformanceSpec.spec s registry
+  Pawl.PhasingSpec.spec s registry
   Pawl.PlaneswalkerSpec.spec s registry
   Pawl.PlayerEffectSpec.spec s registry
   Pawl.PowerToughnessSpec.spec s registry

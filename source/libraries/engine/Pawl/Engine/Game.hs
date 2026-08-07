@@ -184,6 +184,14 @@ removeFromZones pid oid gs =
       GameState.hand = Map.adjust (Seq.filter (/= oid)) pid (GameState.hand gs),
       GameState.graveyard = Map.adjust (Seq.filter (/= oid)) pid (GameState.graveyard gs),
       GameState.battlefield = Set.delete oid (GameState.battlefield gs),
+      -- CR 702.26k: "phased-out permanents owned by a player who leaves the game
+      -- also leave the game", one of the three rules on the far side of CR 702.26b's
+      -- "except for rules and effects that specifically mention phased-out
+      -- permanents" -- so the battlefield line above does not reach them and this
+      -- one has to. Rule 702.26k's second sentence ("this doesn't cause zone-change
+      -- abilities to trigger") is free: nothing here funnels through
+      -- Pawl.Engine.Event.
+      GameState.phasedOut = Map.delete oid (GameState.phasedOut gs),
       GameState.exile = Set.delete oid (GameState.exile gs),
       GameState.command = Set.delete oid (GameState.command gs),
       GameState.stack = filter (/= oid) (GameState.stack gs)

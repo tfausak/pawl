@@ -10,6 +10,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Turn as Turn
@@ -37,8 +38,12 @@ import qualified Pawl.Types.Zone as Zone
 startingLife :: Integer
 startingLife = 20
 
+-- How many cards this deck holds, CR 903.5's commander included: rule 903.5
+-- counts the deck at exactly 100 cards "including its commander", so the card
+-- that starts in the command zone is still one of the deck's cards. Every
+-- non-Commander deck has no commander and so is unaffected.
 deckSize :: Deck.Deck -> Natural
-deckSize (Deck.MkDeck m) = sum (Map.elems m)
+deckSize deck = sum (Map.elems (Deck.cards deck)) + maybe 0 (const 1) (Deck.commander deck)
 
 -- Pair every player with one deck, for a symmetric (mirror) matchup.
 mirror :: Deck.Deck -> NonEmpty.NonEmpty PlayerId -> NonEmpty.NonEmpty (PlayerId, Deck.Deck)
@@ -62,7 +67,9 @@ emptyGame order =
               -- 704.5z gives one to a player who controls a permanent with start
               -- your engines!, which is a state-based action and so cannot have
               -- happened before the game began.
-              Player.speed = Nothing
+              Player.speed = Nothing,
+              Player.commander = Nothing,
+              Player.commanderCasts = 0
             }
         )
    in GameState.MkGameState
@@ -71,6 +78,7 @@ emptyGame order =
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
           GameState.battlefield = mempty,
+          GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.stack = [],
@@ -150,10 +158,35 @@ createCard pid printing = do
   pure oid
 
 -- Build each player's library from their deck's multiset, shuffle, draw.
+-- CR 103.1: build this player's library from their deck -- and, for a Commander
+-- deck, CR 903.6's "the commander begins the game in the command zone".
+--
+-- The commander is created exactly like any other card and then placed in a
+-- different zone, so it is an ordinary Source.OfCard object throughout: CR 903.3
+-- designates a CARD, not a special kind of object, and everything that reads a
+-- card -- the projection, casting, the CR 400.7 conservation count -- must find it
+-- unchanged. The designation itself lives on the player (Player.commander),
+-- because CR 400.7 mints a fresh id on every zone change and a commander crosses
+-- zones constantly; an id or an object field could not survive that.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
-createDeck pid (Deck.MkDeck m) =
-  Monad.forM_ (Map.toList m) $ \(printing, n) ->
+createDeck pid deck = do
+  Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printing)
+  Monad.forM_ (Deck.commander deck) $ \printing -> do
+    oid <- createCard pid printing
+    State.modify' $ \gs ->
+      let moved =
+            Game.insertIntoZone Zone.Command pid oid (Game.removeFromZones pid oid gs)
+          -- Object.zone tracks the zone sets, so it moves with them. A hand-written
+          -- move outside Event.changeZone for createCard's own reason: this is the
+          -- game being built, so there is no CR 400.7 event to emit and nothing to
+          -- trigger.
+          rezoned =
+            moved
+              { GameState.objects =
+                  Map.adjust (\o -> o {Object.zone = Zone.Command}) oid (GameState.objects moved)
+              }
+       in Commander.designate pid printing rezoned
 
 newGame :: HandActionPerformer -> NonEmpty.NonEmpty (PlayerId, Deck.Deck) -> Game ()
 newGame perform matchup = do
@@ -197,6 +230,7 @@ startGameFromCards perform = do
         GameState.hand = Map.empty,
         GameState.graveyard = Map.empty,
         GameState.battlefield = mempty,
+        GameState.phasedOut = mempty,
         GameState.exile = mempty,
         GameState.command = mempty,
         GameState.stack = []
@@ -233,7 +267,13 @@ resetPlayers players =
               Player.ringTemptations = 0,
               -- CR 727.1 again: a new game starts with nobody having speed (CR
               -- 702.179b), whatever the restarted one reached.
-              Player.speed = Nothing
+              Player.speed = Nothing,
+              -- CR 903.8 counts casts "this game", and CR 727.1 makes the
+              -- restarted one a new game, so the tax starts over. Player.commander
+              -- is deliberately NOT reset beside it: rule 903.3's designation is
+              -- made from the deck before the game begins and the restart reuses
+              -- the same decks, so the same card is still the commander.
+              Player.commanderCasts = 0
             }
         Status.Departed _ -> player
    in fmap reset players
@@ -348,6 +388,7 @@ subgameStateFrom starter parent =
           GameState.hand = Map.empty,
           GameState.graveyard = Map.empty,
           GameState.battlefield = mempty,
+          GameState.phasedOut = mempty,
           GameState.exile = mempty,
           GameState.command = mempty,
           GameState.stack = [],
@@ -396,7 +437,11 @@ subgameStateFrom starter parent =
 
 -- CR 729.5: at the end of a subgame, each player takes all traditional cards
 -- (Source.OfCard) they own anywhere in the subgame into their main-game library
--- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step). All
+-- and reshuffles (the reshuffle is playSubgame's Prompt.Shuffle step).
+-- "Anywhere" is literal, and covers rule 729.5's second sentence -- "including
+-- phased-out permanents" -- for free: `returned` filters GameState.objects, and
+-- CR 702.26d leaves a phased-out permanent in that map with its zone unchanged,
+-- so nothing here has to know phasing exists. All
 -- other subgame objects and zones simply are not carried over. The parent's
 -- non-library objects are untouched -- the main game continues from where it
 -- was discontinued -- and the old parent library objects are dropped, having

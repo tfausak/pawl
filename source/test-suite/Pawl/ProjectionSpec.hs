@@ -160,6 +160,27 @@ humilityTimestamp humility gs =
         t : _ -> t
         [] -> Timestamp.MkTimestamp 0
 
+-- Two synthetic nonbasic lands, each printing "OTHER nonbasic lands are [type]", so each
+-- sits inside the other's affected set and the two form a CR 613.8a dependency
+-- loop. "Other" (a Not IsSource conjunct) keeps each out of its OWN affected set,
+-- which isolates rule 613.8b: a land that stripped itself would raise the separate
+-- and unsettled question of whether an effect that removes the ability generating
+-- it keeps applying (#945), and this pair asks only about the loop. `lunarFirst` controls which is older -- fresh timestamps ascend with
+-- placement -- and rule 613.8b makes the older one the winner, so unlike
+-- bloodMoonUrborg below the answer is deliberately order-DEPENDENT.
+wasteLoop :: Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+wasteLoop lunar tidal lunarFirst =
+  let base = Setup.emptyGame S.bothPlayers
+   in if lunarFirst
+        then
+          let (l, g1) = S.addCreature lunar S.alice base
+              (t, g2) = S.addCreature tidal S.alice g1
+           in (l, t, g2)
+        else
+          let (t, g1) = S.addCreature tidal S.alice base
+              (l, g2) = S.addCreature lunar S.alice g1
+           in (l, t, g2)
+
 -- Blood Moon, Urborg, and a Forest on the battlefield. `urborgFirst` controls
 -- the timestamp order (fresh timestamps ascend with placement), to prove the
 -- outcome is order-INDEPENDENT (CR 613.8 dependency overrides CR 613.7).
@@ -972,6 +993,41 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     bloodMoon <- S.printingOf s registry "Blood Moon"
     let (_, urborgId, gs) = bloodMoonUrborg forest urborg bloodMoon True
     Spec.assertEqWith s "Urborg subtypes, order-independent" (Projection.subtypesOf urborgId gs) (Set.singleton Subtype.Type.Mountain)
+
+  -- CR 613.8b's last sentence: "if several
+  -- dependent effects form a dependency loop, then this rule is ignored and the
+  -- effects in the dependency loop are applied in timestamp order."
+  --
+  -- Two nonbasic lands that each set every nonbasic land's subtype form the loop:
+  -- each is inside the other's affected set, so each would strip the other's rules
+  -- text, and by CR 613.8a each therefore depends on the other. Dependency order
+  -- cannot break the tie, so rule 613.8b hands it to the timestamps -- the EARLIER
+  -- effect applies and the later one, its ability now gone, never does.
+  --
+  -- Both cards are synthetic, and they have to be: every printed effect that SETS
+  -- a land subtype lives on a non-land (Blood Moon is an enchantment, Magus of the
+  -- Moon and Harbinger of the Seas are creatures), and every printed one whose
+  -- source IS a land only ADDS a type (Urborg, Yavimaya), which strips nothing. So
+  -- no printed pair can sit inside each other's affected sets, in either direction.
+  -- Nothing in the CR forbids the card -- it is Blood Moon's text on a land.
+  Spec.it s "CR 613.8b a dependency loop applies in timestamp order: the older land wins" $ do
+    lunar <- S.printingOf s registry "Synthetic Lunar Waste"
+    tidal <- S.printingOf s registry "Synthetic Tidal Waste"
+    let (lunarId, tidalId, gs) = wasteLoop lunar tidal True
+    Spec.assertEqWith s "the older Lunar Waste applies: Tidal is a Mountain" (Projection.subtypesOf tidalId gs) (Set.singleton Subtype.Type.Mountain)
+    -- And the loser's effect never applied, so Lunar keeps the subtype it was
+    -- printed with -- none. The falsifier for both effects applying.
+    Spec.assertEqWith s "and Lunar is untouched" (Projection.subtypesOf lunarId gs) Set.empty
+
+  -- The same board with the timestamps swapped, which is the whole point: under
+  -- the old visited-set escape BOTH effects were treated as live and the answer
+  -- did not move. Rule 613.8b says it must.
+  Spec.it s "CR 613.8b the same loop with the timestamps swapped gives the other answer" $ do
+    lunar <- S.printingOf s registry "Synthetic Lunar Waste"
+    tidal <- S.printingOf s registry "Synthetic Tidal Waste"
+    let (lunarId, tidalId, gs) = wasteLoop lunar tidal False
+    Spec.assertEqWith s "the older Tidal Waste applies: Lunar is an Island" (Projection.subtypesOf lunarId gs) (Set.singleton Subtype.Type.Island)
+    Spec.assertEqWith s "and Tidal is untouched" (Projection.subtypesOf tidalId gs) Set.empty
 
   -- CR 305.7's GATE half, which applyModification structurally cannot do:
   -- Urborg's ability lands on OTHER objects, so a stripped Urborg has to be kept

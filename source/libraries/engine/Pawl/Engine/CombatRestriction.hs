@@ -113,7 +113,7 @@ restricted select candidates gs =
             -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
             -- restriction that has started to apply is argued in
             -- BlockRequirement.instances.
-            if (null setEffs || Projection.liveGiven setEffs Set.empty source gs)
+            if (null setEffs || Projection.liveGiven setEffs source gs)
               && not (removed source)
               then
                 -- CR 612.1's word swap over the source's own text, computed HERE
