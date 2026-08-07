@@ -56,12 +56,27 @@ jobs:
         with:
           name: ${{ needs.meta.outputs.name }}-${{ github.sha }}-${{ steps.info.outputs.os }}-${{ steps.info.outputs.arch }}
           path: artifact.tar
-  cabal:
-    name: Cabal
+  # The lint jobs, as flake checks. No store cache: each one pulls a prebuilt
+  # tool from cache.nixos.org and runs it, so there is nothing worth carrying
+  # between runs. Names match the jobs these replaced.
+  check:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: Cabal
+            check: cabal
+          - name: HLint
+            check: hlint
+          - name: Ormolu
+            check: ormolu
     steps:
       - uses: actions/checkout@v7
-      - run: cabal check
+      - uses: nixbuild/nix-quick-install-action@v35
+        with:
+          nix_conf: experimental-features = nix-command flakes
+      - run: nix build --print-build-logs .#checks.x86_64-linux.${{ matrix.check }}
   gild:
     name: Gild
     runs-on: ubuntu-latest
@@ -70,15 +85,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: tfausak/cabal-gild-setup-action@v2
       - run: cabal-gild --mode check ${{ needs.meta.outputs.name }}.cabal
-  hlint:
-    name: HLint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: haskell-actions/hlint-setup@v2
-      - uses: haskell-actions/hlint-run@v2
-        with:
-          fail-on: status
   meta:
     name: Meta
     runs-on: ubuntu-latest
@@ -113,16 +119,7 @@ jobs:
           purge-prefixes: nix-${{ runner.os }}-
           purge-created: 0
           purge-primary-key: never
-      # Before the build: these take seconds, so a lint failure costs seconds
-      # rather than a full compile.
-      - run: nix flake check --print-build-logs
       - run: nix build
-  ormolu:
-    name: Ormolu
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - uses: haskell-actions/run-ormolu@v20
   test:
     name: Test
     runs-on: ubuntu-latest
