@@ -358,4 +358,25 @@ data TriggerCondition
     -- final chapter number, CR 714.3c's turn-based action, CR 704.5s's state-based
     -- action) read the subtype.
     SelfCountersReached CounterKind.CounterKind Natural.Natural
+  | -- | CR 310.11b, generalized over the kind of counter: "when the LAST [kind]
+    -- counter is removed from this permanent". SelfCountersReached's mirror,
+    -- matched against a GameEvent.CountersRemoved whose before/after pair went from
+    -- one or more to none.
+    --
+    -- Bearer-scoped, like SelfCountersReached: the event names an object and the
+    -- match is a comparison of ids.
+    --
+    -- "The last counter is removed" is a fact about the EVENT and not about the
+    -- board, which is why the whole sentence lives here rather than half of it in
+    -- TriggeredAbility.intervening -- SelfCountersReached's Haddock argues the same
+    -- point at length. A permanent whose counters were removed and then replaced
+    -- before the ability resolved still had its last counter removed.
+    --
+    -- Takes no threshold, because rule 310.11b states none: "the last" is
+    -- after == 0, and a rule wanting "the last N" would be a different clause.
+    --
+    -- Not restricted to battles and not restricted to defense counters, for
+    -- SelfCountersReached's reason: the shape is the counter kind's, and
+    -- Pawl.Engine.Battle is where rule 310's battle-only reading lives.
+    SelfLastCounterRemoved CounterKind.CounterKind
   deriving (Eq, Ord, Show)

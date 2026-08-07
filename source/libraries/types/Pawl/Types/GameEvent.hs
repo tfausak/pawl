@@ -234,10 +234,24 @@ data GameEvent
     -- CR 714.2b's "one or more" and keeps a would-be trigger from firing on a
     -- replacement that reduced the placement to nothing.
     --
-    -- Removal is deliberately NOT recorded. CR 122.6 is about putting counters on,
-    -- every rule reading this constructor is phrased that way, and the engine's
-    -- removals are direct writes that bypass the funnel by design (a loyalty cost,
-    -- CR 306.8's damage, CR 704.5q's annihilation). A "counters were removed"
-    -- event is a separate record for the first card that asks for one.
+    -- Removal is a record of its OWN -- CountersRemoved below -- rather than a
+    -- before > after pair here. CR 122.6 is about putting counters on and every
+    -- rule reading this constructor is phrased that way, so widening the pair
+    -- would make every such reader ask which direction it went.
     CountersPut ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
+  | -- | Counters were REMOVED from an object -- the object, the kind, and the
+    -- counts of that kind on it BEFORE and AFTER. CountersPut's mirror, and shaped
+    -- the same way for the same reason: CR 310.11b's Siege ability asks whether the
+    -- LAST counter came off, which is a fact about the pair (before > 0, after ==
+    -- 0) and not about the amount alone.
+    --
+    -- BEFORE is strictly greater than AFTER: a removal that took nothing is not
+    -- recorded, which is CountersPut's "one or more" read the other way.
+    --
+    -- Recorded ONLY for CR 120.3h's damage to a battle (Pawl.Engine.Damage), which
+    -- is the one removal a rule asks a trigger about. NOT IMPLEMENTED: the engine's
+    -- other counter removals -- a loyalty cost, CR 306.8's damage to a
+    -- planeswalker, CR 704.5q's annihilation -- stay direct writes and emit
+    -- nothing, so a card triggering off one of those would not see it (#900).
+    CountersRemoved ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
   deriving (Eq, Ord, Show)

@@ -139,3 +139,11 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.CountersPut (ObjectId.MkObjectId 3) CounterKind.Lore 1 2)
       """ {"type":"CountersPut","value":[3,{"type":"Lore"},1,2]} """
+  -- CR 310.11b's record, and the pair runs the other way: before > after.
+  Spec.it s "CountersRemoved" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.CountersRemoved (ObjectId.MkObjectId 3) CounterKind.Defense 2 0)
+      """ {"type":"CountersRemoved","value":[3,{"type":"Defense"},2,0]} """

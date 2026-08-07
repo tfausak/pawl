@@ -1,6 +1,8 @@
--- | CR 310, battles: the defense a battle enters with (CR 310.4b), and the
--- protector designated as it enters (CR 310.8a / 310.11a) together with the
--- state-based actions that repair that designation (CR 704.5w / 704.5x).
+-- | CR 310, battles: the defense a battle enters with (CR 310.4b), the protector
+-- designated as it enters (CR 310.8a / 310.11a) together with the state-based
+-- actions that repair that designation (CR 704.5w / 704.5x), the intrinsic ability
+-- rule 310.11b gives a Siege, and the state-based action rule 310.7 / 704.5v
+-- performs on a battle at defense 0.
 --
 -- Pawl.Engine.Saga's sibling, and kept apart from Pawl.Engine.Sba for the reason
 -- that module gives: Sba owns WHEN a state-based action is checked, not what any
@@ -25,33 +27,53 @@
 -- (Combat.defendingPlayerOf). This module owns the designation; that one owns what
 -- reads it.
 --
--- NOT here and not anywhere, and #897: CR 310.6's damage removing defense
--- counters, CR 310.7 / 704.5v's defense-0 state-based action, and CR 310.11b's
--- "when the last defense counter is removed, exile it, then you may cast it
--- transformed". Those three are only jointly observable -- a battle driven to
--- defense 0 belongs in EXILE via CR 310.11b, not in the graveyard CR 704.5v alone
--- would send it to -- so none of them is built.
+-- CR 310.6's damage removing defense counters is NOT here: rule 120.3h is one arm
+-- of CR 120.3 among several, and it lives beside the others in Pawl.Engine.Damage.
+-- What this module owns is what the rest of rule 310 makes of the result.
+--
+-- NOT IMPLEMENTED, and the second half of CR 310.11b's sentence: "then you may
+-- cast it transformed without paying its mana cost". The Siege reaches exile and
+-- stops there (#901).
 module Pawl.Engine.Battle where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat
+import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Modal as Modal
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
+import Pawl.Types.TriggeredAbility (TriggeredAbility)
+import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.Zone as Zone
 
 -- CR 310: is this object a battle? Read off the PROJECTED card types, so a
 -- permanent that became one is judged as one and a paper-only one is not -- the
@@ -201,3 +223,139 @@ designateProtector pc controller oid = do
             if List.elem answer (NonEmpty.toList candidates)
               then answer
               else NonEmpty.head candidates
+
+-- CR 310.11b: "Sieges have the intrinsic ability 'When the last defense counter is
+-- removed from this permanent, exile it, then you may cast it transformed without
+-- paying its mana cost.'"
+--
+-- MINTED here and handed to the ordinary CR 603 machinery, exactly as
+-- Pawl.Engine.Keyword mints rule 702.70a's poisonous and rule 702.91a's battle cry:
+-- the rules give this ability, no card prints it, and every reader downstream gets
+-- an ordinary TriggeredAbility that never learns rule 310 produced it. That is what
+-- keeps CR 704.5v's "isn't the source of an ability that has triggered but not yet
+-- left the stack" honest -- the exemption is about a real ability on a real stack,
+-- not about a special case in the state-based action.
+--
+-- Gated on the battle TYPE and not on the card type: rule 310.11b says "Sieges",
+-- and a battle with no battle types (CR 310.8a's other branch) has no such ability.
+-- `battleTypes` above is where that gate is stated once.
+--
+-- Single mode, no targets, ChooseExactly 1, and Mandatory: rule 310.11b's exile is
+-- not optional -- the "you may" governs the casting that follows it, which is the
+-- half not built.
+--
+-- NOT IMPLEMENTED: "then you may cast it transformed without paying its mana cost"
+-- (#901). Pawl has no way to offer a cast from exile, as the back face, for free,
+-- so the ability stops at the exile. A defeated Siege therefore reaches exile and
+-- stays there.
+siegeDefeat :: TriggeredAbility Card
+siegeDefeat =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    -- "Exile it": the permanent the ability triggered from, which CR 113.7 binds
+    -- under Binding.triggerSource. No entry riders, no bound incarnation and no
+    -- stated origin zone -- the ability functions on the battlefield, where the
+    -- permanent already is.
+    effect =
+      Effect.MoveToZone
+        Binding.triggerSource
+        Zone.Exile
+        EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False}
+        Nothing
+        Nothing
+
+-- The intrinsic triggered abilities rule 310 gives a permanent, read off the
+-- finished projection. Pawl.Engine.Keyword.triggeredAbilitiesOf's sibling, and
+-- consumed at the same one place: Pawl.Engine.Event's event scan.
+--
+-- Off the PROJECTION rather than off the printed type line, so a permanent that
+-- became a Siege has the ability and a Siege that stopped being one does not (CR
+-- 613.1d, CR 613.1f). That differs from CR 310.4b's intrinsic replacement, which
+-- Projection mints after the layer fold and so puts out of LoseAllAbilities' reach:
+-- rule 310.4b hangs off the CARD TYPE, where 310.11b hangs off an ability the rules
+-- grant, and layer 6 removes abilities.
+triggeredAbilitiesOf :: PC.ProjectedCharacteristics -> [TriggeredAbility Card]
+triggeredAbilitiesOf pc = [siegeDefeat | Set.member Subtype.Siege (battleTypes pc)]
+
+-- CR 122.1g / 310.4c: the defense counters on a permanent. Zero for an object the
+-- game does not hold, the answer Saga.loreOn gives for rule 714.3.
+defenseOn :: ObjectId.ObjectId -> GameState -> Natural
+defenseOn oid gs = case Game.lookupObject oid gs of
+  Nothing -> 0
+  Just obj -> Map.findWithDefault 0 CounterKind.Defense (Object.counters obj)
+
+-- CR 704.5v's exemption: is this battle "the source of an ability that has
+-- triggered but not yet left the stack"?
+--
+-- Saga.awaitingChapter's twin, and TWO halves for its reason: the rule says
+-- "triggered" and not "is on the stack", and the engine has a window where exactly
+-- that is true -- Engine.performSettle runs the CR 704.5 pass BEFORE
+-- placePendingTriggers, so a battle taken to defense 0 by combat damage meets this
+-- check with CR 310.11b's ability still in the unscanned event log. Without the
+-- second half the battle would be buried first and its own defeat ability would
+-- resolve without it, sending it to the GRAVEYARD where rule 310.11b exiles it.
+-- That is the observable wrong answer this rider exists to prevent.
+--
+-- The stack half compares OBJECT IDS, for awaitingChapter's reason: CR 400.7 mints
+-- a fresh id on every zone change, so a battle that flickered is not the source of
+-- the old one's ability.
+--
+-- The stack half is rule 704.5v's own width -- ANY ability, where rule 704.5s says
+-- "a chapter ability". The PENDING half is narrower than that: it recognizes only
+-- CR 310.11b's own trigger, because reading a general "would any of this
+-- permanent's abilities fire on any unscanned event" means the CR 603 matcher,
+-- which lives above this module. NOT IMPLEMENTED: a battle at defense 0 owing some
+-- OTHER triggered ability that has fired and not yet been placed (#902).
+--
+-- The unscanned events arrive as an ARGUMENT for awaitingChapter's reason:
+-- Pawl.Engine.Event owns the watermark and this module sits below it.
+awaitingAbility :: [GameEvent.GameEvent] -> GameState -> ObjectId.ObjectId -> Bool
+awaitingAbility events gs oid =
+  let onStack sid = case fmap Object.source (Game.lookupObject sid gs) of
+        Just (Source.OfTrigger srcId _) -> srcId == oid
+        _ -> False
+      -- CR 310.11b's condition, matched exactly as Event.matchesTrigger matches it:
+      -- an unscanned removal on this permanent that took its last defense counter.
+      pending event = case event of
+        GameEvent.CountersRemoved target CounterKind.Defense _ after -> target == oid && after == 0
+        _ -> False
+   in any onStack (GameState.stack gs) || any pending events
+
+-- CR 310.7 / CR 704.5v: the battles put into their owners' graveyards -- defense 0,
+-- and not the source of an ability still owed a resolution. The state-based
+-- action's CLASSIFIER half, taking the pre-pass projection so Pawl.Engine.Sba can
+-- judge it against the same board as every other CR 704.5 clause (CR 704.3).
+--
+-- The card-type guard is load-bearing in Sba.zeroLoyalty's direction rather than in
+-- zeroToughness's: Object.counters is keyed by kind for EVERY permanent, so absent
+-- it every creature on the battlefield would read as defense 0. CR 122.1g confines
+-- the reading to battles.
+--
+-- A battle that never received counters reads 0 here and is buried, which is the
+-- rule and not an accident: CR 310.4b gives a battle its counters as it enters.
+--
+-- For a SIEGE this is normally unreachable, and that is CR 704.5v's whole design:
+-- the counters hitting 0 fires CR 310.11b, the exemption holds the battle on the
+-- battlefield while that ability resolves, and the ability exiles it. What reaches
+-- this clause is a battle with no defeat ability to fire -- one with no battle types
+-- (CR 310.8a's other branch), or a Siege whose ability layer 6 removed.
+--
+-- Ascending, for Saga.sacrificing's reason.
+defeated :: Map.Map ObjectId.ObjectId PC.ProjectedCharacteristics -> [GameEvent.GameEvent] -> GameState -> [ObjectId.ObjectId]
+defeated pcs events gs =
+  let gone oid = case Map.lookup oid pcs of
+        Nothing -> Nothing
+        Just pc
+          | isBattle pc,
+            defenseOn oid gs == 0,
+            not (awaitingAbility events gs oid) ->
+              Just oid
+          | otherwise -> Nothing
+   in Maybe.mapMaybe gone (Set.toAscList (GameState.battlefield gs))

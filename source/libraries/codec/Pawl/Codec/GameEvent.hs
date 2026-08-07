@@ -34,6 +34,8 @@ toJson e = case e of
   GameEvent.LoyaltyAbilityActivated oid -> Common.tagged "LoyaltyAbilityActivated" . Just $ ObjectId.toJson oid
   GameEvent.CountersPut oid kind before after ->
     Common.tagged "CountersPut" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
+  GameEvent.CountersRemoved oid kind before after ->
+    Common.tagged "CountersRemoved" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
 
 fromJson :: Value.Value -> Either Text.Text GameEvent.GameEvent
 fromJson value = do
@@ -55,4 +57,6 @@ fromJson value = do
     ("LoyaltyAbilityActivated", Just v) -> GameEvent.LoyaltyAbilityActivated <$> ObjectId.fromJson v
     ("CountersPut", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
       GameEvent.CountersPut <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
+    ("CountersRemoved", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
+      GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     _ -> Left . Text.pack $ "unknown GameEvent: " <> t

@@ -3403,6 +3403,9 @@ representativeEvents cond =
         -- bearer here is `departed`, the id Event.matchesTrigger is asked about
         -- below, and the counts straddle N so the event really matches.
         TriggerCondition.SelfCountersReached kind n -> one (GameEvent.CountersPut departed kind 0 n)
+        -- CR 310.11b: a removal on the BEARER that took the last counter, so the
+        -- event really matches the condition Event.matchesTrigger is asked about.
+        TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved departed kind 1 0)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3428,7 +3431,8 @@ everyTriggerCondition =
     TriggerCondition.DamageToPlayerPrevented PlayerRelation.You,
     TriggerCondition.PlayerGainsLife PlayerRelation.You,
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
-    TriggerCondition.SelfCountersReached CounterKind.Lore 1
+    TriggerCondition.SelfCountersReached CounterKind.Lore 1,
+    TriggerCondition.SelfLastCounterRemoved CounterKind.Defense
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something

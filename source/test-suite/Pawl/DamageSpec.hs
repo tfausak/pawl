@@ -1769,12 +1769,12 @@ m2cPropertySpec s registry =
 -- says nothing about the entrant's card types -- gets classified before an
 -- effect can build a damage event out of it.
 --
--- All three clauses of that rule are now live: the creature one has been since
--- M3a, and CR 306.8's loyalty removal made the planeswalker one so (#494). Only
--- "battle" is still aspirational, for want of a Recipient.ToBattle tag (#302).
+-- All three clauses of that rule are live: the creature one has been since M3a, CR
+-- 306.8's loyalty removal made the planeswalker one so (#494), and CR 120.3h's
+-- defense-counter removal made the battle one so.
 --
--- So the function has three answers for a generically named permanent --
--- ToCreature, ToPlaneswalker, or Nothing -- plus the pass-through for a
+-- So the function has four answers for a generically named permanent --
+-- ToCreature, ToPlaneswalker, ToBattle, or Nothing -- plus the pass-through for a
 -- recipient that arrives already classified.
 --
 -- Two of them happen in real games. Aether Flash reaches both (TriggerSpec's
@@ -1808,7 +1808,7 @@ damageRecipientSpec s registry =
     -- permanent" is NOT the condition for taking nothing -- a planeswalker is
     -- one and takes damage (the case below) -- so what CR 120.1a rejects is a
     -- permanent that is none of its three card types. A land is the case the
-    -- pool can build today; a battle would be the other side of it (#302).
+    -- pool can build today; the battle case below is the other side of it.
     Spec.it s "a generically named permanent that is neither a creature nor a planeswalker can be dealt no damage" $ do
       plains <- S.printingOf s registry "Plains"
       let (oid, gs) = S.addCreature plains S.alice (Setup.emptyGame S.bothPlayers)
@@ -1836,6 +1836,26 @@ damageRecipientSpec s registry =
         (Damage.damageRecipient gs (Recipient.ToObject oid))
         (Just (Recipient.ToPlaneswalker oid))
 
+    -- CR 120.1a's battle clause, and the retag CR 120.3h needs, on exactly the
+    -- planeswalker case's footing above: the ToBattle tag is what tells
+    -- Damage.applyDamage to remove DEFENSE counters, so classifying a generically
+    -- named battle as anything else would give it the wrong one of CR 120.3's
+    -- results.
+    --
+    -- No card drives this either, and for the same reason: nothing in the pool
+    -- names a battle generically. Pawl.BattleSpec's Damage group is what proves the
+    -- counter removal in a real game, through AnyTarget's own ToBattle tag rather
+    -- than through this arm.
+    Spec.it s "a generically named battle becomes CR 120.3h's battle recipient" $ do
+      invasion <- S.printingOf s registry "Invasion of Dominaria"
+      let (oid, gs) = S.addCreature invasion S.alice (Setup.emptyGame S.bothPlayers)
+      Spec.assertBool s (Set.member oid (GameState.battlefield gs)) "the battle is really there"
+      Spec.assertEqWith
+        s
+        "retagged, not rejected"
+        (Damage.damageRecipient gs (Recipient.ToObject oid))
+        (Just (Recipient.ToBattle oid))
+
     Spec.it s "an object that no longer exists takes nothing either (CR 608.2h)" $
       Spec.assertEqWith
         s
@@ -1846,13 +1866,16 @@ damageRecipientSpec s registry =
     -- The pass-through half. A combat recipient (CR 510.1b-d) and a chosen
     -- target out of a typed Pool were classified when they were built, so this
     -- function is not a second, later reading of the same question.
-    Spec.it s "a creature, planeswalker or player recipient is unchanged" $ do
+    Spec.it s "a creature, planeswalker, battle or player recipient is unchanged" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       jace <- S.printingOf s registry "Jace Beleren"
+      invasion <- S.printingOf s registry "Invasion of Dominaria"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-          (jaceId, gs) = S.addCreature jace S.alice gs0
+          (jaceId, gs1) = S.addCreature jace S.alice gs0
+          (battleId, gs) = S.addCreature invasion S.alice gs1
       Spec.assertEqWith s "creature" (Damage.damageRecipient gs (Recipient.ToCreature oid)) (Just (Recipient.ToCreature oid))
       Spec.assertEqWith s "planeswalker" (Damage.damageRecipient gs (Recipient.ToPlaneswalker jaceId)) (Just (Recipient.ToPlaneswalker jaceId))
+      Spec.assertEqWith s "battle" (Damage.damageRecipient gs (Recipient.ToBattle battleId)) (Just (Recipient.ToBattle battleId))
       Spec.assertEqWith s "player" (Damage.damageRecipient gs (Recipient.ToPlayer S.bob)) (Just (Recipient.ToPlayer S.bob))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

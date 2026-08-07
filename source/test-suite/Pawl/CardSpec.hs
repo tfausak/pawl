@@ -425,6 +425,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached _ _ -> []
+  -- CR 310.11b carries a counter kind alone.
+  TriggerCondition.SelfLastCounterRemoved _ -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -1376,6 +1378,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerLosesLife _ -> []
   -- CR 714.2b carries a counter kind and a Natural, neither of which is a Count.
   TriggerCondition.SelfCountersReached _ _ -> []
+  -- CR 310.11b carries a counter kind alone.
+  TriggerCondition.SelfLastCounterRemoved _ -> []
 
 -- CR 613.11: which spells a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
