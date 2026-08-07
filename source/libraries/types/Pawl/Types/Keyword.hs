@@ -290,6 +290,27 @@ data Keyword
     -- cost is not a Cost the card names, it is a SHAPE the rule states, and the
     -- only thing the card supplies is the threshold.
     Crew Natural.Natural
+  | -- | 702.127a: an ability found on some split cards, and THREE static abilities
+    -- in one word -- "you may cast this half of this split card from your
+    -- graveyard", "this half of this split card can't be cast from any zone other
+    -- than a graveyard", and "if this spell was cast from a graveyard, exile it
+    -- instead of putting it anywhere else any time it would leave the stack".
+    --
+    -- Flashback's near-twin (702.34a), and deliberately NOT that constructor with
+    -- an absent cost: flashback carries an alternative cost and this pays the
+    -- printed one, and flashback adds no prohibition where rule 702.127a's second
+    -- clause forbids the hand outright. Pawl.Engine.Keyword mints the first and
+    -- third from this constructor exactly as it does flashback's, and
+    -- Pawl.Engine.Cast reads the second at its Zone.Hand arm.
+    --
+    -- Payload-free: rule 702.127a takes no parameter -- what it costs is the half's
+    -- own mana cost.
+    --
+    -- "This HALF" is the rule's own scoping and needs nothing here: pawl's
+    -- keywords live on a Face, and Pawl.Engine.Cast already reasons about one
+    -- proposed half at a time, so an aftermath half restricts itself and leaves its
+    -- sibling alone.
+    Aftermath
   | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
     -- enter with an additional +1/+1 counter on it. If you don't, it gains
     -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,

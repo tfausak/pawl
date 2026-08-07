@@ -210,6 +210,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Phasing
       """ {"type":"Phasing"} """
+  -- CR 702.127a: nullary, because what an aftermath half costs is its own printed
+  -- mana cost -- unlike flashback, whose alternative cost rides the constructor.
+  Spec.it s "Aftermath" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Aftermath
+      """ {"type":"Aftermath"} """
   -- CR 702.29e: the typecycling filter rides the same keyword arm and
   -- is absent for plain cycling, so both spellings have to survive the trip.
   Spec.it s "Cycling round-trips with and without a typecycling filter" $ do
