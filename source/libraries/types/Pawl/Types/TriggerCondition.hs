@@ -443,4 +443,19 @@ data TriggerCondition
     -- both at once -- and has no constructor here, since no printing in the pool
     -- says it (#924).
     SelfHalfUnlocked CardName.CardName
+  | -- | CR 708.7 through CR 603.2: "when this creature is turned face up". Fires
+    -- when the permanent BEARING the ability is the one that turned over, which
+    -- is SelfEnters' shape and for its reason -- a bare comparison of ids, with
+    -- nothing about the permanent's characteristics read, so there is no CR
+    -- 608.2h fallback to reach for.
+    --
+    -- SELF-scoped. CR 603.6a's second written form has a counterpart here --
+    -- "whenever a permanent is turned face up", borne by some other permanent
+    -- entirely -- and it has NO constructor (#959). Skirk Marauder is the
+    -- printing this one answers.
+    --
+    -- No PAYLOAD. CR 702.37e's morph cost, the player who took the special
+    -- action and the characteristics the permanent regained are all things a
+    -- printed ability could in principle say "that much" about, and none does.
+    SelfTurnedFaceUp
   deriving (Eq, Ord, Show)

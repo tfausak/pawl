@@ -40,6 +40,7 @@ toJson c = case c of
   TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ CounterKind.toJson kind
   TriggerCondition.SpellCast f -> Common.tagged "SpellCast" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.SelfHalfUnlocked n -> Common.tagged "SelfHalfUnlocked" . Just $ CardName.toJson n
+  TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
 fromJson value = do
@@ -68,4 +69,5 @@ fromJson value = do
     ("SelfLastCounterRemoved", Just v) -> TriggerCondition.SelfLastCounterRemoved <$> CounterKind.fromJson v
     ("SpellCast", Just v) -> TriggerCondition.SpellCast <$> Filter.fromJson Keyword.fromJson v
     ("SelfHalfUnlocked", Just v) -> TriggerCondition.SelfHalfUnlocked <$> CardName.fromJson v
+    ("SelfTurnedFaceUp", _) -> Right TriggerCondition.SelfTurnedFaceUp
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t

@@ -2,10 +2,12 @@
 
 module Pawl.Codec.GameEventSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -147,3 +149,22 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.CountersRemoved (ObjectId.MkObjectId 3) CounterKind.Defense 2 0)
       """ {"type":"CountersRemoved","value":[3,{"type":"Defense"},2,0]} """
+  -- CR 709.5c's designation, recorded by the permanent and the DOOR: CR 709.5h
+  -- tells two unlock triggers on one Room apart by the half's name, so the pair
+  -- has to survive the round trip together.
+  Spec.it s "HalfUnlocked" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.HalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Steaming Sauna")))
+      """ {"type":"HalfUnlocked","value":[4,"Steaming Sauna"]} """
+  -- CR 708.7. One id and no more: CR 708.8 makes turning face up a change to one
+  -- permanent, and the payload says only which.
+  Spec.it s "TurnedFaceUp" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.TurnedFaceUp (ObjectId.MkObjectId 5))
+      """ {"type":"TurnedFaceUp","value":5} """
