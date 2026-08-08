@@ -606,4 +606,28 @@ data TriggerCondition
     -- neither, so Pawl.Engine.Event.eventBindingSlots answers empty; a card
     -- printing "that Saga" is what would earn a slot.
     SagaFinalChapterTriggers PlayerRelation.PlayerRelation
+  | -- | CR 725.1: "whenever [a player] becomes the monarch" -- Custodi Lich's.
+    -- Matched against GameEvent.BecameMonarch, whose PlayerId is the newly
+    -- crowned player; the PlayerRelation reads that player against CR 109.5's
+    -- "you", the ability's controller (CR 603.3a). PlayerDiscards' shape, not a
+    -- Self- condition's: the bearer is a creature watching a DESIGNATION change
+    -- and contributes only the perspective the relation is read from.
+    --
+    -- ONE constructor with a relation rather than two, for PlayerDiscards' and
+    -- PlayerGainsLife's reason: "you become the monarch" and "an opponent
+    -- becomes the monarch" are the same trigger EVENT read from two seats, not
+    -- two events. CR 725.1 states the event once.
+    --
+    -- No Filter, and that is CR 725.3 rather than an omission: "Only one player
+    -- can be the monarch at a time", so a crowning names exactly one player and
+    -- there is nothing to select among. A relation is the whole of what a card
+    -- can say about who that player is.
+    --
+    -- Matched against the EVENT, never against how the crown was won. CR 725.1
+    -- gives one way to become the monarch, an effect instructing a player to,
+    -- so an entry trigger's crown (Palace Jailer), a targeted crown
+    -- (Denethor, Stone Seer) and CR 725.2's stolen crown all record the one
+    -- event and all fire this. TriggerSpec's "CR 725.2 a stolen crown is a
+    -- crowning" is the test that proves the last of those.
+    PlayerBecomesMonarch PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

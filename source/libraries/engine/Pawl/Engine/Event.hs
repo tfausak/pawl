@@ -2633,6 +2633,38 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+  -- CR 725.1: a player BECAME the monarch. Matched against the event the
+  -- crowning records, so every route to the crown fires it alike -- CR 725.1's
+  -- own "an effect instructs a player to become the monarch" is the only way in,
+  -- and Effect.BecomeMonarch records this event whichever MonarchTarget named the
+  -- player.
+  --
+  -- The event carries exactly one player, which is CR 725.3 ("Only one player can
+  -- be the monarch at a time") rather than a simplification -- so the relation is
+  -- the whole comparison and there is no filter to apply. The bearer is NOT part
+  -- of the match: Custodi Lich watches a designation, not itself.
+  TriggerCondition.PlayerBecomesMonarch relation -> case event of
+    GameEvent.BecameMonarch crowned -> case relation of
+      PlayerRelation.You -> crowned == you
+      PlayerRelation.Opponent -> crowned /= you
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
   -- declaration event rather than Combat.attackers, which keeps that rule's last
   -- sentence true -- a creature put onto the battlefield attacking is in the
@@ -3417,6 +3449,10 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
   TriggerCondition.PlayerDiscards _ -> False
+  -- CR 725.1's crowning is something that happens TO a player, which is CR
+  -- 603.3b's first class in as many words -- a designation changing hands is not
+  -- an ability triggering, whatever put the crown there.
+  TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
@@ -3636,6 +3672,10 @@ eventBindings cond event = case (cond, event) of
   -- AnyOf and is pinned by Pawl.TriggerSpec against every event either branch
   -- admits. An AnyOf two of whose branches bind the SAME slot is not handled
   -- (#963).
+  --
+  -- CR 725.1's crowning reaches it too, and deliberately: see
+  -- eventBindingSlots' PlayerBecomesMonarch arm for why the crowned player gets
+  -- no slot (#1051).
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -3844,6 +3884,13 @@ eventBindingSlots cond = case cond of
   -- Angel" reads neither. A card printing "that Saga" or "that player" is what
   -- would earn a slot (#1029).
   TriggerCondition.SagaFinalChapterTriggers _ -> Set.empty
+  -- CR 725.1's newly crowned player gets NO slot: under the one relation a card
+  -- in the pool uses, that player is CR 109.5's "you", whom Binding.setYou
+  -- already names, so a slot would be a second name for one player. Exactly
+  -- PlayerGainsLife's posture above, and empty by decision rather than by
+  -- default -- eventBindings has no arm for this condition either. A card
+  -- watching an OPPONENT be crowned is what would want the slot (#1051).
+  TriggerCondition.PlayerBecomesMonarch _ -> Set.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -3934,6 +3981,9 @@ looksBack condition = case condition of
   -- bearer is a permanent standing on the battlefield watching a Saga, and CR
   -- 603.10's first sentence is what reads it.
   TriggerCondition.SagaFinalChapterTriggers _ -> False
+  -- CR 725.1's crowning names no zone change either -- it moves a DESIGNATION,
+  -- not an object -- so none of CR 603.10a's four families reaches it.
+  TriggerCondition.PlayerBecomesMonarch _ -> False
 
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
@@ -4434,6 +4484,9 @@ functionsInGraveyard cond = case cond of
   -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
   -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
   TriggerCondition.SagaFinalChapterTriggers _ -> False
+  -- CR 113.6's default once more: Custodi Lich is a creature and watches the
+  -- crown from the battlefield, so a copy of it in a graveyard sees nothing.
+  TriggerCondition.PlayerBecomesMonarch _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -4540,6 +4593,11 @@ controllerTurnScoped cond = case cond of
   -- a Saga's last lore counter on during anybody's turn, and the watcher is not
   -- even the Saga's controller under the Opponent relation.
   TriggerCondition.SagaFinalChapterTriggers _ -> False
+  -- The condition carries no TurnScope, and CR 725 gives a crowning no turn of
+  -- its own: an effect can instruct a player to become the monarch on anybody's
+  -- turn, and CR 725.2's crown steal falls on the ATTACKER's turn, which is not
+  -- the watcher's under any relation.
+  TriggerCondition.PlayerBecomesMonarch _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -4622,6 +4680,10 @@ stateTriggers gs
               -- another ability triggering: nothing about it is a state a settle
               -- could re-read.
               TriggerCondition.SagaFinalChapterTriggers _ -> False
+              -- CR 603.2 event trigger, not a CR 603.8 state: this fires on a
+              -- player BECOMING the monarch, and a settle re-reading "is the
+              -- monarch" would fire it again every time until the crown moved.
+              TriggerCondition.PlayerBecomesMonarch _ -> False
               -- CR 709.5h is an EVENT trigger: it fires on the permanent BEING
               -- GIVEN the designation, which CR 709.5c leaves it holding
               -- thereafter, so a state read would fire it again every time the
