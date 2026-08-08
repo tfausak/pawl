@@ -184,7 +184,10 @@ data GameEvent
     -- RULES and not about the engine's plumbing: CR 119.3 for a loss an effect
     -- instructs (Pawl.Engine.Resolve's LoseLife arm), CR 119.2 for damage dealt to
     -- a player, which CAUSES life loss rather than being it (Pawl.Engine.Damage),
-    -- and CR 119.4 for life paid as a cost (Pawl.Engine.Event.payLife). A reader
+    -- and CR 119.4 for life a cost OR AN EFFECT has a player pay -- the cost side
+    -- being a Phyrexian symbol or a PayLife component, the effect side an "as
+    -- this permanent enters, you may pay N life" (both Pawl.Engine.Event.payLife,
+    -- which is why rule 119.4 names them together). A reader
     -- asking "did this player lose life" must find all three; anything narrower is
     -- a different question. CR 119.5's life-total set has no producer in the pool
     -- and so no site here.

@@ -292,8 +292,8 @@ data TriggerCondition
     --   * CR 119.2 / 120.3a, damage dealt to a player by a source without
     --     infect, which CAUSES that player to lose that much life
     --     (Pawl.Engine.Damage).
-    --   * CR 119.4, life paid as a cost -- "in other words, the player loses
-    --     that much life" (Pawl.Engine.Event.payLife).
+    --   * CR 119.4, life a cost or an effect has a player pay -- "in other
+    --     words, the player loses that much life" (Pawl.Engine.Event.payLife).
     --
     -- Three life-total facts that are NOT this event, each for a rule's reason:
     -- CR 120.3b's infect damage gives poison counters INSTEAD of the life loss;
