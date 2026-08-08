@@ -55,17 +55,17 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.70 and 702.91 do not: they spell poisonous and battle cry out as
--- TRIGGERED abilities, so those have to be MINTED and handed to the ordinary CR
--- 603 machinery rather than merely consulted.
+-- Rules 702.70, 702.86 and 702.91 do not: they spell poisonous, annihilator and
+-- battle cry out as TRIGGERED abilities, so those have to be MINTED and handed
+-- to the ordinary CR 603 machinery rather than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
 -- this module must never do is grow an arm for a CARD.
 --
 -- triggeredAbilitiesOf derives its abilities from a projection's POST-LAYER
--- keyword counts, so Humility takes rule 702.70a's and rule 702.91a's abilities
--- away for free and an Aura's layer-6 grant adds them. Its one caller is
+-- keyword counts, so Humility takes all three of those abilities away for free
+-- and an Aura's layer-6 grant adds them. Its one caller is
 -- Pawl.Engine.Event's EVENT scan; rule 702 has no state-triggered (CR 603.8) or
 -- delayed (CR 603.7) keyword ability, so the first keyword that needs one must
 -- widen those two scans.
@@ -83,8 +83,8 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and
 -- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
--- 702.91b says the same of battle cry, so the two minting arms below are the
--- same shape.
+-- 702.86b says the same of annihilator and CR 702.91b of battle cry, so the
+-- three minting arms below are the same shape.
 --
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
 -- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
@@ -96,6 +96,7 @@ triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList co
 abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
+  Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
@@ -178,6 +179,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
+  Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
@@ -284,6 +286,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
+  Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
@@ -458,6 +461,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
+  Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
@@ -727,6 +731,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Poisonous _ -> []
+  Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
@@ -775,6 +780,7 @@ familyOf keyword = case keyword of
   Keyword.Morph _ _ -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
+  Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Deathtouch -> Nothing
@@ -833,11 +839,57 @@ poisonous n =
         PlayerCounterKind.Poison
         (Quantity.Literal (toInteger n))
 
+-- CR 702.86a: whenever this creature attacks, defending player sacrifices N
+-- permanents. The SECOND keyword in this pool stated as a triggered ability, and
+-- minted exactly as rule 702.70a's poisonous above and rule 702.91a's battle cry
+-- below are -- handed to the ordinary CR 603 machinery, which never learns a
+-- keyword produced it.
+--
+-- CR 508.3a is what "attacks" means -- being declared as an attacker -- so the
+-- condition is battle cry's: the self-scoped SelfAttacks, EveryTime, rule
+-- 702.86a stating no "for the first time each turn" narrowing.
+--
+-- "DEFENDING PLAYER" is CR 508.5's, resolved off what this creature is attacking
+-- at the moment of declaration and stamped onto GameEvent.AttackerDeclared
+-- there; Pawl.Engine.Event.eventBindings reads it back into the reserved
+-- Binding.triggerPlayer slot as the trigger is gathered. So this is an ordinary
+-- slot read and needs no opcode of its own, precisely as poisonous' "that
+-- player" is. NOT the ability's controller: CR 603.3a makes that the attacking
+-- creature's controller, and the sacrifice falls on whom they attacked.
+--
+-- The sacrifice is CR 701.21a's edict, Effect.PlayerSacrifices -- so the
+-- SACRIFICING PLAYER chooses which permanents go, which that opcode prompts for
+-- (CR 609.3 short-circuits the choice when they have no more than N).
+--
+-- The Filter is the empty conjunction, which admits every permanent the victim
+-- controls: rule 702.86a says "N permanents" with no qualification, so a filter
+-- naming a card type would be narrower than the rule.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
+-- is placed -- rule 702.86a leaves nothing to choose, and has no "if" clause, so
+-- intervening = Nothing.
+annihilator :: Natural -> TriggeredAbility Card
+annihilator n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.PlayerSacrifices
+        Binding.triggerPlayer
+        (Filter.And [])
+        (Quantity.Literal (toInteger n))
+
 -- CR 702.91a: whenever this creature attacks, each other attacking creature gets
--- +1/+0 until end of turn. Rule 702.70a's poisonous above is the only other
--- keyword in this pool stated as a triggered ability, and this is built the same
--- way: minted here and handed to the ordinary CR 603 machinery, which never
--- learns a keyword produced it.
+-- +1/+0 until end of turn. Rule 702.70a's poisonous above and rule 702.86a's
+-- annihilator are the other two keywords in this pool stated as triggered
+-- abilities, and this is built the same way: minted here and handed to the
+-- ordinary CR 603 machinery, which never learns a keyword produced it.
 --
 -- CR 508.3a is what "attacks" means -- being declared as an attacker -- so the
 -- condition is the self-scoped SelfAttacks, EveryTime: rule 702.91a states no

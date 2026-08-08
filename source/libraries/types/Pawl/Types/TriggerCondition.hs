@@ -84,8 +84,13 @@ data TriggerCondition
     -- "attacking": CR 508.3a exempts a creature put onto the battlefield
     -- attacking, and CR 508.4 says such a creature never attacked. So this matches
     -- GameEvent.AttackerDeclared, which only the declaration appends, and never
-    -- the combat record. No attack TARGET is carried; CR 508.3a's second sentence
-    -- is a different condition no card in the pool has.
+    -- the combat record. No attack TARGET is compared against; CR 508.3a's second
+    -- sentence is a different condition no card in the pool has (#538). What the
+    -- event does carry alongside the attacker is CR 508.5's defending player, whom
+    -- Pawl.Engine.Event.eventBindings binds under
+    -- Pawl.Engine.Binding.triggerPlayer for CR 702.86a's annihilator to read --
+    -- a BINDING rather than part of the match, since this condition fires on
+    -- every declaration whoever is defending.
     --
     -- The TriggerFrequency is Aurelia, the Warleader's "for the first time each
     -- turn" -- a payload rather than a sibling condition, because it narrows this

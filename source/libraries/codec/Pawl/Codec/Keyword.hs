@@ -50,6 +50,7 @@ toJson k = case k of
   Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Common.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
   Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
+  Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
   Keyword.Infect -> Common.nullary "Infect"
   Keyword.BattleCry -> Common.nullary "BattleCry"
   Keyword.Menace -> Common.nullary "Menace"
@@ -90,6 +91,7 @@ fromJson value = do
     ("Morph", Just (Value.Array (Array.MkArray [c, v]))) -> Keyword.Morph <$> Cost.fromJson fromJson c <*> MorphVariant.fromJson v
     ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
+    ("Annihilator", Just v) -> Keyword.Annihilator <$> Common.decodeNatural v
     ("Infect", _) -> Right Keyword.Infect
     ("BattleCry", _) -> Right Keyword.BattleCry
     ("Menace", _) -> Right Keyword.Menace

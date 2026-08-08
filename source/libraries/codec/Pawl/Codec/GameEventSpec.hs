@@ -106,8 +106,8 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3))
-      """ {"type":"AttackerDeclared","value":3} """
+      (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1))
+      """ {"type":"AttackerDeclared","value":[3,1]} """
   Spec.it s "SpellCountered" $
     Common.assertJsonCodec
       s

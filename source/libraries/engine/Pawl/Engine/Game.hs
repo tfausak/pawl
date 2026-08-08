@@ -584,7 +584,7 @@ castOf event = case event of
   GameEvent.BecameMonarch _ -> Nothing
   GameEvent.Discarded {} -> Nothing
   GameEvent.Revealed _ _ -> Nothing
-  GameEvent.AttackerDeclared _ -> Nothing
+  GameEvent.AttackerDeclared _ _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
