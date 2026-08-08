@@ -375,6 +375,24 @@ data Prompt r where
   -- one. Pawl.Engine.Event's arm has an unreachable no-controller fallback beside
   -- it, the same shape ChooseEntryOption's carries; see there.
   ChooseRiot :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 614.1c with CR 119.4: as a permanent whose text reads "As [this
+  -- permanent] enters, you may pay N life. If you don't, it enters tapped"
+  -- enters, its controller decides whether to pay (Razorgrass Field). The
+  -- ObjectId is the entering object and the Natural is the amount of life, which
+  -- is card text rather than a rule's.
+  --
+  -- An OptionalDecision for ChooseRiot's reason: the card states a "may" with a
+  -- stated consequence for declining, not a menu. Exercises pays and enters
+  -- untapped; Declines enters tapped.
+  --
+  -- ELIDED IN EXACTLY ONE CASE, and it is a forced selection rather than an
+  -- elision of distinguishable options: CR 119.4 lets a player pay N life only
+  -- if their life total is at least N, so below that the only legal answer is to
+  -- decline and Pawl.Engine.Event never asks. CR 119.4b's always-payable 0 makes
+  -- a zero amount payable at any total, so that case is still asked -- and a card
+  -- printing "you may pay 0 life" would be offering a real choice, since paying
+  -- is what keeps the permanent untapped.
+  ChoosePayLifeOnEntry :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Natural.Natural -> Prompt OptionalDecision.OptionalDecision
   -- | CR 614.1c: as an object enters, its controller chooses a colour
   -- ("As this creature enters, choose a color" -- Painter's Servant). The
   -- ObjectId is the entering object.

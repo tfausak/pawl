@@ -491,6 +491,10 @@ bucketOfEffect re = case re of
   -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
   -- copies or which face is up. So CR 616.1e.
   ReplacementEffect.EntryR _ EntryRewrite.Tapped -> ReplacementBucket.Other
+  -- CR 614.1c's paid variant of the same rewrite is none of CR 616.1a-d either,
+  -- and paying life does not make it one: what the rewrite changes is still the
+  -- STATUS the permanent enters with (CR 110.5b). So CR 616.1e.
+  ReplacementEffect.EntryR _ (EntryRewrite.PayLifeOrTapped _) -> ReplacementBucket.Other
   -- CR 616.1b: a control-on-entry rewrite is one step ABOVE the copy bucket, and
   -- Gather Specimens racing an entering Clone is the board where the two orders
   -- disagree: taking the control rewrite first hands Clone's own CR 109.5 copy
@@ -565,6 +569,13 @@ readsApplier re = case re of
   -- the object the event already named (CR 110.5b), so it applies the same way
   -- whoever's row is applying it. Two such rows are the same write twice.
   ReplacementEffect.EntryR _ EntryRewrite.Tapped -> False
+  -- CR 614.1c: NO despite spending a resource, for SacrificeAnyNumber's reason.
+  -- The payer is the ENTERING object's controller -- "you" in an "as this
+  -- permanent enters" ability the permanent prints about itself -- read live off
+  -- the board at CR 614.12a's moment rather than off the candidate, and the
+  -- amount rides the effect. Two such rows are always on the same object and
+  -- would offer that object's controller the same price.
+  ReplacementEffect.EntryR _ (EntryRewrite.PayLifeOrTapped _) -> False
   -- THE ONE ARM THAT ANSWERS YES. CR 616.1b / 110.2 / 109.5: the rewrite hands
   -- the permanent to the candidate's own `controller`, baked when the row was
   -- installed. Two Gather Specimens are one card, so their `effect` values are

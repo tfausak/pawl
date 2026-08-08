@@ -746,7 +746,7 @@ canPayComponent pid oid component gs = case component of
   -- same floor is read of the whole cost's life at once. Kept because a component
   -- is asked about on its own terms here, and it can only ever be the weaker of
   -- the two.
-  CostComponent.PayLife n -> Mana.canPayLife pid n gs
+  CostComponent.PayLife n -> Event.canPayLife pid n gs
   -- CR 701.21a: this player must control at least `n` matching permanents.
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
   -- effect" is not enforced across two components of ONE cost (#104).
@@ -899,7 +899,7 @@ payComponent pid oid component = case component of
   -- CR 119.4: the payment is subtracted from the life total. Shared with CR
   -- 107.4f's Phyrexian mana symbol, exactly as the payability check above is.
   CostComponent.PayLife n -> do
-    State.modify' (Mana.payLife pid n)
+    State.modify' (Event.payLife pid n)
     pure Payment.Paid
   -- CR 701.21a: the player chooses which of their permanents dies, so this is a
   -- prompt. Elided only when forced -- exactly as many candidates as the count.

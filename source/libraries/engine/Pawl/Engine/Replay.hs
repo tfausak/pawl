@@ -68,6 +68,7 @@ encode p answer = case p of
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseRiot {} -> Response.ChoseRiot answer
+  Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
   Prompt.ChooseOpponent {} -> Response.ChoseOpponent answer
@@ -178,6 +179,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseRiot {} -> case response of
     Response.ChoseRiot d -> Just d
+    _ -> Nothing
+  Prompt.ChoosePayLifeOnEntry {} -> case response of
+    Response.ChosePayLifeOnEntry d -> Just d
     _ -> Nothing
   Prompt.ChooseColor {} -> case response of
     Response.ChoseColor c -> Just c
@@ -363,6 +367,11 @@ defaultAnswer p = case p of
   -- the board, which keeps a short transcript from conjuring a bigger creature
   -- than the game had.
   Prompt.ChooseRiot {} -> OptionalDecision.Declines
+  -- CR 614.1c: declining, for ChooseRiot's reason above and one more. Declining
+  -- is the branch the card itself states as the default -- "if you don't, it
+  -- enters tapped" -- and it is the half that spends nothing, so a transcript
+  -- that ran out cannot drain a life total a real game never spent.
+  Prompt.ChoosePayLifeOnEntry {} -> OptionalDecision.Declines
   -- CR 105.1: any of the five colours is a legal answer.
   Prompt.ChooseColor {} -> Color.White
   -- THE ONE ILLEGAL ANSWER, deliberately. CR 201.4 offers every card in the
