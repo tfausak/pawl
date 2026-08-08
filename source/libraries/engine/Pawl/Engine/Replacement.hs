@@ -125,6 +125,11 @@ collect sources floating =
             -- board this segment was gathered from -- a stolen Furnace of Rath
             -- belongs to whoever holds it now.
             ReplacementCandidate.controller = Projection.controllerOf src sources,
+            -- CR 614.3's lifetime, which a static ability does not have: this
+            -- segment is re-derived from the battlefield on every iteration, and
+            -- `consume` is a no-op for it. So there is no duration to expire and
+            -- no use to spend, which is what Nothing says -- not an unknown one.
+            ReplacementCandidate.lifetime = Nothing,
             -- CR 614.15: a permanent's replacement ability is a STATIC ability,
             -- which puts it outside the self-replacement class -- so this
             -- segment is never CR 616.1a's, whatever it replaces.
@@ -140,6 +145,11 @@ collect sources floating =
             -- graveyard as a new object with a new id, so `source` names nothing
             -- the board can answer about. See Pawl.Types.ActiveReplacement.
             ReplacementCandidate.controller = Just (ActiveReplacement.controller active),
+            -- CR 614.3, read straight off the row: this is the segment that has a
+            -- lifetime, and `consume` spends only the row that applied. Two rows
+            -- alike in `effect` and unlike here are therefore NOT interchangeable
+            -- to `choose` below.
+            ReplacementCandidate.lifetime = Just (ActiveReplacement.expiry active, ActiveReplacement.uses active),
             -- CR 614.15: a floating row IS an effect of a resolving spell or
             -- ability, so this is the one segment that can carry a
             -- self-replacement, and the row itself says whether it does.
@@ -574,13 +584,25 @@ readsApplier re = case re of
 --     opportunity, so every order produces the same board. Only the PROMPT is
 --     elided, never an application.
 --
--- Indistinguishable is `distinguishing` below: equal in `effect`, plus -- for
--- the effects whose application READS the applying candidate -- equal in CR
--- 109.5's "you". Candidates equal in `effect` can still differ in `source` and
--- in `controller`, so "equal in `effect`" implies "every order yields the same
--- board" only for effects that apply the same way whoever is applying them.
--- readsApplier is the classification that separates those two, and
--- EntryRewrite.UnderSourceControl is the one arm it answers True for.
+-- Indistinguishable is `distinguishing` below: equal in `effect` and in CR
+-- 614.3's `lifetime`, plus -- for the effects whose application READS the
+-- applying candidate -- equal in CR 109.5's "you". Candidates equal in `effect`
+-- can still differ in `source` and in `controller`, so "equal in `effect`"
+-- implies "every order yields the same board" only for effects that apply the
+-- same way whoever is applying them. readsApplier is the classification that
+-- separates those two, and EntryRewrite.UnderSourceControl is the one arm it
+-- answers True for.
+--
+-- `lifetime` is folded in UNCONDITIONALLY, and for a reason that has nothing to
+-- do with how an effect applies: `consume` spends the row that applied and
+-- leaves the rest standing, so two rows differing in when they die or how often
+-- they may fire leave DIFFERENT boards behind whichever way round they are
+-- taken. CR 614.10a says so outright for the case that reaches it -- "one effect
+-- will be satisfied in skipping the first occurrence, while the other will remain
+-- until another occurrence can be skipped" -- and Brine Elemental's Expiry.Never
+-- skip beside Savor the Moment's Expiry.AtCleanup one is that case, two PhaseR
+-- rows equal in every other field. Two rows alike in `lifetime` are still elided:
+-- spending either leaves a store of the same shape.
 --
 -- Folding `controller` in UNCONDITIONALLY would be sound as well, and wrong the
 -- other way: two Rest in Peace under different controllers exile the same card
@@ -588,10 +610,6 @@ readsApplier re = case re of
 -- question the rules leave nothing to decide. `source` is folded in nowhere for
 -- the same reason -- every use of it above is a test run BEFORE Event.apply, not a
 -- branch inside it.
---
--- Not implemented: two floating rows alike in `effect` and `controller` but
--- differing in `expiry` or `uses` are treated as indistinguishable even though
--- `consume` spends only the one that applied (#490).
 --
 -- `origin` is NOT such a hole: highestBucket has already partitioned by bucket,
 -- and CR 616.1a's bucket is exactly an origin of SelfReplacement, so every
@@ -618,6 +636,7 @@ choose gs event candidates = case candidates of
     -- What two candidates must agree on to be interchangeable here.
     distinguishing c =
       ( ReplacementCandidate.effect c,
+        ReplacementCandidate.lifetime c,
         if readsApplier (ReplacementCandidate.effect c)
           then ReplacementCandidate.controller c
           else Nothing

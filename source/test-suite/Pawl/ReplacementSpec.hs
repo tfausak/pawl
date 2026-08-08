@@ -20,10 +20,12 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
+import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 -- Aliased Filter.Type, not Filter, per the project-wide convention (FilterSpec):
@@ -62,6 +64,7 @@ import qualified Pawl.Types.EntryOption as EntryOption
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
@@ -1980,6 +1983,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
   riotSpec s registry
+  brineElementalSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -2749,3 +2753,264 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
                 Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
                 Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste spider after)) "no haste"
       _ -> Spec.assertFailure s "fixture did not deal a card"
+
+-- The tap state of a permanent, which is what CR 502.3's untap step writes -- and
+-- so what a skipped untap step leaves alone.
+tapStateOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe TapState.TapState
+tapStateOf oid = fmap Object.tapped . Game.lookupObject oid
+
+-- The one permanent a move added to the battlefield, or Nothing when it added
+-- none or several. `newestNamed` above cannot answer this one: a face-down
+-- permanent has no name at all (CR 708.2a).
+arrivedOne :: GameState.GameState -> GameState.GameState -> Maybe ObjectId.ObjectId
+arrivedOne before after =
+  case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield before)) of
+    [oid] -> Just oid
+    _ -> Nothing
+
+-- The board at the START of each of the next `n` turns, oldest first -- so the
+-- board a turn LEFT is the next element, and a turn's own first step is still
+-- ahead of the element that names it. Top-level rather than a `where` binding
+-- because the answer is rank-2 and GHC will not infer it, the same reason
+-- castEach above is.
+turnStarts :: (forall r. Prompt.Prompt r -> r) -> Int -> GameState.GameState -> [GameState.GameState]
+turnStarts answer n gs =
+  if n <= 0
+    then []
+    else let next = nextTurn answer gs in next : turnStarts answer (n - 1) next
+
+-- Answer CR 616.1's choice between two untap-step skips by the row's SOURCE:
+-- True takes Brine Elemental's row, False the other one, which on that board is
+-- Savor the Moment's. By source and not by index, because Replacement.collect
+-- emits the floating store newest-first while installTurnSkips prepends -- so a
+-- change in either order must not silently swap what an answer means.
+--
+-- Savor's row is named by exclusion rather than by its own id: CR 400.7 minted a
+-- new object as the card moved to the stack, and the id the fixture holds is the
+-- hand card's.
+skipAnswer :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+skipAnswer wantBrine brine p = case p of
+  Prompt.ChooseReplacement _ _ sources ->
+    let wanted = if wantBrine then (== brine) else (/= brine)
+     in maybe 0 Int.toNaturalSaturating (List.findIndex wanted sources)
+  _ -> S.identityAnswer p
+
+-- Three seats (CR 800.1), alice active in her precombat main phase:
+--
+--   * alice holds Savor the Moment and has three untapped Islands for its
+--     {1}{U}{U}, plus one TAPPED Goblin Piker as her observable;
+--   * bob holds Brine Elemental and has ten untapped Islands -- CR 702.37a's {3}
+--     for the face-down cast, plus CR 702.37e's {5}{U}{U} to turn it back up;
+--   * carol has a TAPPED Goblin Piker of her own and nothing else.
+--
+-- Three seats and not two: at two, "each opponent" and "each player" name the
+-- same set, and carol is what shows the trigger reached bob's opponents rather
+-- than everybody.
+--
+-- The Pikers are the observable, for the reason Pawl.TurnSpec's savorBoard has
+-- one: CR 502.3 untaps the ACTIVE player's permanents, so a turn whose untap step
+-- happened leaves its player's Piker untapped and a turn whose untap step was
+-- skipped leaves it tapped -- and nothing else in these cases taps or untaps
+-- either. Lands go in through S.addCreature too, which puts any printing on the
+-- battlefield untapped; only the mana matters here, never the card type.
+--
+-- Libraries are stocked because these cases run seven whole turns, and CR 104.3c
+-- decks a player who draws from an empty one.
+brineBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+brineBoard island savor brine piker =
+  let addLands pid n g = List.foldl' (\acc _ -> snd (S.addCreature island pid acc)) g [1 .. (n :: Int)]
+      withLands = addLands S.bob 10 (addLands S.alice 3 S.threePlayerGame)
+      (alicePiker, g1) = S.addCreature piker S.alice withLands
+      (carolPiker, g2) = S.addCreature piker S.carol g1
+      (savorId, g3) = S.addHandCard savor S.alice g2
+      (brineId, g4) = S.addHandCard brine S.bob g3
+      stock g pid = List.foldl' (\g' _ -> snd (S.addLibraryCard piker pid g')) g [1 .. (15 :: Int)]
+      stocked = List.foldl' stock g4 [S.alice, S.bob, S.carol]
+   in ( (S.tapObject carolPiker (S.tapObject alicePiker stocked))
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice,
+            GameState.turnNumber = 1
+          },
+        savorId,
+        brineId,
+        alicePiker,
+        carolPiker
+      )
+
+-- Arm both effects on brineBoard: alice casts Savor the Moment, then bob casts
+-- Brine Elemental face down for CR 702.37a's {3} and turns it face up for CR
+-- 702.37e's {5}{U}{U}. Nothing when the face-down cast did not land. Hands back
+-- the board and the Brine Elemental permanent, whose id `skipAnswer` names its
+-- row by.
+--
+-- The turn-face-up special action is taken through Pawl.Engine.FaceDown directly,
+-- as Pawl.FaceDownSpec's cases do: CR 702.37e's "any time you have priority" is
+-- satisfied by the engine offering the action to the priority holder alone, and
+-- what this fixture needs is bob taking it during ALICE's turn. The card's
+-- "when this creature is turned face up" ability triggers on the special action
+-- and resolves in the priority loop like any other (CR 603.2).
+brineArmed ::
+  Printing.Printing ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  Maybe (GameState.GameState, ObjectId.ObjectId)
+brineArmed brine gs savorId brineId =
+  let withSavor = S.runPure S.identityAnswer gs (S.cast S.alice savorId >> Stack.resolveTop)
+      down =
+        S.runPure
+          S.identityAnswer
+          withSavor
+          (Cast.castSpell S.bob brineId (S.printingName brine) Facing.FaceDown >> Stack.resolveTop)
+   in do
+        permanent <- arrivedOne withSavor down
+        pure (S.runPure S.identityAnswer down (FaceDown.turnFaceUp S.bob permanent >> Engine.priorityLoop), permanent)
+
+-- The seven-turn timeline the two answering cases below share, plus carol's
+-- negative control alongside it: alice's own turn (1), Savor's extra turn (2),
+-- bob's (3), carol's (4), alice's again (5), bob's (6), carol's again (7).
+--
+-- `aliceAfter` is what the answer decided -- alice's Piker once her turn 5 has run
+-- -- and `left` is how many floating rows the extra turn's cleanup left behind.
+--
+-- Top-level rather than a `where` binding because the answer is rank-2 and GHC
+-- will not infer it, the same reason castEach above is.
+assertBrineRun ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  (forall r. Prompt.Prompt r -> r) ->
+  GameState.GameState ->
+  ObjectId.ObjectId ->
+  ObjectId.ObjectId ->
+  Maybe TapState.TapState ->
+  Int ->
+  m ()
+assertBrineRun s answer gs alicePiker carolPiker aliceAfter left =
+  case turnStarts answer 7 gs of
+    [startExtra, startBob, startCarol, startAlice, startBobAgain, startCarolAgain, startLast] -> do
+      -- The schedule the rest is read against, pinned first so a mis-ordered turn
+      -- cannot be mistaken for a mis-applied skip.
+      Spec.assertEqWith
+        s
+        "the turns run alice (extra), bob, carol, alice, bob, carol, alice"
+        (fmap GameState.activePlayer [startExtra, startBob, startCarol, startAlice, startBobAgain, startCarolAgain, startLast])
+        [S.alice, S.bob, S.carol, S.alice, S.bob, S.carol, S.alice]
+      -- CR 500.11: the extra turn's untap step is skipped either way -- one of the
+      -- two rows takes it, and WHICH one is exactly what is not observable yet.
+      Spec.assertEqWith s "the extra turn untapped nothing of alice's" (tapStateOf alicePiker startBob) (Just TapState.Tapped)
+      -- carol's negative control: ONE row applies to her untap step, so CR 616.1
+      -- has nothing to choose and the prompt is correctly elided -- and that one
+      -- row takes exactly one untap step of hers.
+      Spec.assertBool
+        s
+        (not (wasAskedToReplace (answersFor answer startCarol Engine.runStep)))
+        "carol's lone skip is not a choice, so she is asked nothing"
+      Spec.assertEqWith s "carol's own untap step was skipped" (tapStateOf carolPiker startAlice) (Just TapState.Tapped)
+      Spec.assertEqWith s "and her NEXT one happened" (tapStateOf carolPiker startLast) (Just TapState.Untapped)
+      -- THE OBSERVABLE, and read off the BOARD rather than off a row index:
+      -- `collect` and installTurnSkips disagree about which end of the store they
+      -- work from, so an ordering change must be unable to flip this. alice's turn
+      -- 5 has run by startBobAgain.
+      Spec.assertEqWith s "alice's following untap step, as the answer decided it" (tapStateOf alicePiker startBobAgain) aliceAfter
+      -- The store behind it, asserted last so the board is what fails first: the
+      -- extra turn's cleanup swept Savor's Expiry.AtCleanup row if it was still
+      -- there, and kept every Expiry.Never one.
+      Spec.assertEqWith s "and the extra turn's cleanup left this many rows" (length (GameState.replacements startBob)) left
+    _ -> Spec.assertFailure s "the seven turns did not run"
+
+-- Brine Elemental {4}{U}{U} Creature -- Elemental 5/4: "Morph {5}{U}{U} / When
+-- this creature is turned face up, each opponent skips their next untap step",
+-- alongside Savor the Moment ({1}{U}{U} Sorcery: "Take an extra turn after this
+-- one. Skip the untap step of that turn.").
+--
+-- CR 614.10a states the outcome outright: "if two effects each cause a player to
+-- skip their next occurrence, that player must skip the next two; one effect will
+-- be satisfied in skipping the first occurrence, while the other will remain until
+-- another occurrence can be skipped."
+--
+-- What makes this pair the discriminating one is that the two rows are equal in
+-- their `effect` -- each a PhaseR naming alice's untap step -- and unequal in
+-- LIFETIME. Brine's is Expiry.Never, so it waits however many turns it must;
+-- Savor's is Expiry.AtCleanup, because "the untap step of THAT turn" dies with the
+-- turn it named. Which of the two CR 616.1 spends is therefore observable a turn
+-- of alice's later, and the choice is hers to make -- CR 616.1's "affected
+-- player", which for a step beginning is whose step it is.
+brineElementalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brineElementalSpec s registry = Spec.describe s "BrineElemental" $ do
+  let boardOf = do
+        island <- S.printingOf s registry "Island"
+        savor <- S.printingOf s registry "Savor the Moment"
+        brine <- S.printingOf s registry "Brine Elemental"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (gs, savorId, brineId, alicePiker, carolPiker) = brineBoard island savor brine piker
+        pure (brineArmed brine gs savorId brineId, alicePiker, carolPiker)
+  -- The setup control: the two spells armed three rows, and not four. bob is the
+  -- ability's controller, so CR 806.1's free-for-all opponents are alice and carol
+  -- while bob himself gets nothing; Savor's own row is added as its extra turn
+  -- BEGINS (CR 500.11), which is why it is missing until the first handoff ran.
+  Spec.it s "CR 614.1b Brine Elemental arms one skip per opponent, and Savor's turn one more" $ do
+    (armed, _, _) <- boardOf
+    case armed of
+      Nothing -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
+      Just (gs, _) -> do
+        Spec.assertEqWith s "the trigger armed one row per opponent, so two" (length (GameState.replacements gs)) 2
+        case turnStarts S.identityAnswer 1 gs of
+          [atExtra] -> do
+            Spec.assertEqWith
+              s
+              "and the extra turn is alice's second"
+              (GameState.turnNumber atExtra, GameState.activePlayer atExtra)
+              (2, S.alice)
+            Spec.assertEqWith s "whose beginning added Savor's own, for three" (length (GameState.replacements atExtra)) 3
+          _ -> Spec.assertFailure s "the extra turn did not begin"
+  -- THE ELISION GOING AWAY. Two rows apply to one untap step and they are not
+  -- interchangeable, so CR 616.1's choice is a real one and the affected player
+  -- has to be asked for it.
+  --
+  -- Fails against a `distinguishing` that compares `effect` alone: the two rows
+  -- are equal in `effect`, so the prompt is elided and the engine spends whichever
+  -- row it happened to collect first.
+  Spec.it s "CR 616.1 two skips alike in effect but not in lifetime raise a choice" $ do
+    (armed, _, _) <- boardOf
+    case armed of
+      Nothing -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
+      Just (gs, brine) ->
+        case turnStarts (skipAnswer True brine) 1 gs of
+          [atExtra] ->
+            Spec.assertBool
+              s
+              (wasAskedToReplace (answersFor (skipAnswer True brine) atExtra Engine.runStep))
+              "a ChooseReplacement was raised for the extra turn's untap step"
+          _ -> Spec.assertFailure s "the extra turn did not begin"
+  -- Answering SAVOR's row: it is the one consumed, and Brine's Expiry.Never row
+  -- remains to take alice's NEXT untap step -- CR 614.10a's "the other will remain
+  -- until another occurrence can be skipped". So her Piker is still tapped after
+  -- the following turn of hers. Two rows survive the extra turn's cleanup, both of
+  -- them Brine's.
+  Spec.it s "CR 614.10a spending Savor's row leaves Brine's to take the following untap step" $ do
+    (armed, alicePiker, carolPiker) <- boardOf
+    case armed of
+      Nothing -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
+      Just (gs, brine) ->
+        assertBrineRun s (skipAnswer False brine) gs alicePiker carolPiker (Just TapState.Tapped) 2
+  -- Answering BRINE's row: it is consumed, and Savor's row survives the untap step
+  -- only to be swept at that same turn's cleanup, since "the untap step of THAT
+  -- turn" is scoped to the turn it named (Expiry.AtCleanup; CR 514.2). Nothing is
+  -- left to take alice's following untap step, so it happens and her Piker untaps.
+  -- One row survives the cleanup, carol's.
+  --
+  -- This is the half that reads LIFETIME rather than merely which row was picked:
+  -- were Savor's row armed Expiry.Never like Brine's, it would survive the cleanup,
+  -- take the following untap step too, and leave this case reading Tapped.
+  Spec.it s "CR 614.10a spending Brine's row lets Savor's expire with its own turn" $ do
+    (armed, alicePiker, carolPiker) <- boardOf
+    case armed of
+      Nothing -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
+      Just (gs, brine) ->
+        assertBrineRun s (skipAnswer True brine) gs alicePiker carolPiker (Just TapState.Untapped) 1
