@@ -79,7 +79,12 @@ data Quantity
     --     all, so there is nothing for the seed to substitute and the Star
     --     reaches evaluate directly, where CR 208.2a's substitution does not
     --     apply (there is no CDA). Real: Primal Plasma, whose star gets its value
-    --     from an as-enters REPLACEMENT (CR 208.2b) rather than a CDA (#76).
+    --     from an as-enters REPLACEMENT (CR 208.2b). On the battlefield that
+    --     replacement has always run before anything reads the power, so the
+    --     evaluator sees a number; OFF it, CR 208.2b's last sentence makes the
+    --     answer 0, and Projection.printedPower is where that 0 is written --
+    --     deliberately not here, since this arm answers for the projection seed,
+    --     where a surviving star is a hole rather than a zero.
     Star
   | -- | CR 208.2: composition, so a printed 1+* needs no constructor of its own.
     Plus Quantity Quantity
