@@ -1089,8 +1089,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
   -- look the same -- so the reversal is what turns "was it shuffled?" into a
   -- question the test can ask. bob's run is then read out a SECOND time under
   -- the identity interpreter as the control: that pins the arrival at the BOTTOM
-  -- (Game.insertIntoZone appends a library arrival), so the reversed run's
-  -- leading position cannot be merely where the move put the card.
+  -- (Effect.ShuffleIntoLibrary states no library position, so the move takes
+  -- LibraryPosition.defaultValue and Game.insertIntoZone appends), so the
+  -- reversed run's leading position cannot be merely where the move put the
+  -- card.
   --
   -- alice controls the Riftsweeper in both runs. When the exiled card is bob's,
   -- it is BOB's library that grows and BOB's that is shuffled: Game.insertIntoZone

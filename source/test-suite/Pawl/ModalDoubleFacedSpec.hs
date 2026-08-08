@@ -55,6 +55,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -352,7 +353,7 @@ spec s registry = Spec.describe s "ModalDoubleFaced" $ do
     birgi <- S.printingOf s registry "Birgi, God of Storytelling"
     let moveTo zone printing =
           let (oid, board) = handBoardOne printing
-           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid zone EntryRiders.defaultValue (Just S.alice))))
+           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid zone LibraryPosition.defaultValue EntryRiders.defaultValue (Just S.alice))))
         (zofId, zofAfter) = moveTo Zone.Battlefield zof
         (_, birgiAfter) = moveTo Zone.Battlefield birgi
         (buriedId, buried) = moveTo Zone.Graveyard zof

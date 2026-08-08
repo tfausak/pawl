@@ -50,6 +50,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -398,7 +399,7 @@ enterTransformedSpec s registry = Spec.describe s "Entering the battlefield tran
     let transformed = EntryRiders.defaultValue {EntryRiders.transformed = True}
         put riders printing =
           let (board, oid) = S.handOne printing emptyBoard
-           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid Zone.Battlefield riders (Just S.alice))))
+           in (oid, S.runPure S.identityAnswer board (Monad.void (Event.changeZoneEntering oid Zone.Battlefield LibraryPosition.defaultValue riders (Just S.alice))))
         (refusedId, refused) = put transformed piker
         (_, entered) = put EntryRiders.defaultValue piker
         (_, turned) = put transformed gargoyle

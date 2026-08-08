@@ -61,6 +61,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -277,6 +278,7 @@ siegeDefeat =
         EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False}
         (Just Binding.became)
         Nothing
+        LibraryPosition.defaultValue
     -- "then you may cast it transformed without paying its mana cost": CR 608.2g's
     -- cast during a resolution, with CR 712.11a's face rider and CR 118.9's
     -- alternative cost. Both riders come from the OFFER, so nothing downstream

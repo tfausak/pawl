@@ -158,7 +158,7 @@ slotsOf effect = case effect of
   Effect.Sacrifice slot -> Set.singleton slot
   Effect.TurnFaceDown slot -> Set.singleton slot
   Effect.RemoveFromCombat slot -> Set.singleton slot
-  Effect.MoveToZone ref _ _ _ _ -> objectRefSlots ref
+  Effect.MoveToZone ref _ _ _ _ _ -> objectRefSlots ref
   Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   -- The tally's slot is a DEFINITION (how many of them counted), not a read, so
   -- it belongs to boundSlots below -- Destroy's third field takes the same
@@ -416,7 +416,7 @@ boundSlots :: Effect Card.Type.Card -> Set SlotName
 boundSlots effect = case effect of
   -- CR 400.7: the incarnation minted at the destination, named so a later
   -- effect can reach the object the move created rather than the one it ended.
-  Effect.MoveToZone _ _ _ mSlot _ -> foldMap Set.singleton mSlot
+  Effect.MoveToZone _ _ _ mSlot _ _ -> foldMap Set.singleton mSlot
   -- The token or tokens this Create minted, named so a later effect can refer
   -- back to them -- CR 603.7c's delayed trigger "that refers to a particular
   -- object" is the case that needs the name to survive the resolution.
@@ -1648,7 +1648,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
         _ -> gs
-  Effect.MoveToZone ref zone entry mSlot _ ->
+  Effect.MoveToZone ref zone entry mSlot _ position ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below so that
     -- what a move DOES is written once and only WHICH objects move differs.
     let -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
@@ -1658,6 +1658,12 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- 712.14a, a double-faced card an effect returns "transformed" never
         -- shows its front face for one either. WHICH face that is stays the
         -- funnel's question, since only Pawl.Engine.Card can read a layout.
+        --
+        -- CR 401.2: the library position goes to the funnel for the tap state's
+        -- reason -- Griptide's "on top of its owner's library" is where the card
+        -- ARRIVES, so it has to be settled by the move rather than by a second
+        -- write afterward, which would leave the incarnation on the bottom while
+        -- the Moved event and any CR 616.1 watcher looked at it.
         --
         -- CR 110.2a: "If an effect instructs a player to put an object onto the
         -- battlefield, that object enters the battlefield under THAT PLAYER's
@@ -1683,7 +1689,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- the stack and Departure.nonCardStackObjectsCease removes one already
         -- on it, while clause 1 of CR 800.4a took their spells out of the game.
         moveOne target = do
-          mNew <- Event.changeZoneEntering target zone entry (Just controller)
+          mNew <- Event.changeZoneEntering target zone position entry (Just controller)
           case mNew of
             -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
             -- already gone (CR 603.7c's "no longer in the zone it's expected to

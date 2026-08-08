@@ -80,6 +80,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Layer as Layer
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -1821,7 +1822,7 @@ effectFilters effect = case effect of
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy ref _ _ -> unframed (objectRefFilters ref)
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone ref _ _ _ _ -> unframed (objectRefFilters ref)
+  Effect.MoveToZone ref _ _ _ _ _ -> unframed (objectRefFilters ref)
   Effect.Draw _ quantity -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
@@ -2659,7 +2660,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a reserved event slot the condition never binds" $ do
     roaches <- S.printingOf s registry "Endless Cockroaches"
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
-        returnIt = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing
+        returnIt = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPosition.defaultValue
         -- Rule 702.70a's shape, as a targetless read of "that player".
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
     Spec.assertBool
@@ -2724,7 +2725,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         youDiscards = Effect.Discard Binding.you (Quantity.Type.Literal 1)
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
-        returnIt = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing
+        returnIt = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPosition.defaultValue
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
         -- CR 113.7's source slot, which every activation DOES bind.
         tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
@@ -2801,7 +2802,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         ownDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
         -- Mode 0 MINTS `exiled` at a MoveToZone's destination; mode 1 reads it.
         -- The two never resolve together, so mode 1's read is dangling.
-        exileIt = Effect.MoveToZone (ObjectRef.InSlot creature) Zone.Exile EntryRiders.defaultValue (Just exiled) Nothing
+        exileIt = Effect.MoveToZone (ObjectRef.InSlot creature) Zone.Exile EntryRiders.defaultValue (Just exiled) Nothing LibraryPosition.defaultValue
         crossMinted = modalActivated [lintMode [exileIt] [creature], lintMode [tap exiled] []]
         ownMinted = modalActivated [lintMode [exileIt, tap exiled] [creature], lintMode [tap victim] [victim]]
     Spec.assertBool s (activatedAbilityOffends crossDeclared) "a mode reading a slot only another mode declares is rejected"
@@ -2812,7 +2813,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- CR 400.7e's `became` is bound by the condition for the whole ability, so a
     -- SECOND mode reading it is accepted, and a mode reading it under a
     -- condition that never binds it is rejected however late the mode sits.
-    let returnBecame = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing
+    let returnBecame = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPosition.defaultValue
         secondModeReads condition = modalTrigger condition [lintMode [] [], lintMode [returnBecame] []]
     Spec.assertBool
       s
@@ -2973,7 +2974,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.Create _ _ riders _ -> EntryRiders.transformed riders
           _ -> False
         moves effect = case effect of
-          Effect.MoveToZone _ _ riders _ _ -> EntryRiders.transformed riders
+          Effect.MoveToZone _ _ riders _ _ _ -> EntryRiders.transformed riders
           _ -> False
         offenders = filter (anyFace (any creates . cardResolutionEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: with no transformed rider in the pool at
@@ -2990,13 +2991,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "no MoveToZone binds an incarnation under a swept set (#972)" $ do
     ps <- S.allPrintings s
     let offends effect = case effect of
-          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ mSlot _ -> Maybe.isJust mSlot
+          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ mSlot _ _ -> Maybe.isJust mSlot
           _ -> False
         binds effect = case effect of
-          Effect.MoveToZone (ObjectRef.InSlot _) _ _ mSlot _ -> Maybe.isJust mSlot
+          Effect.MoveToZone (ObjectRef.InSlot _) _ _ mSlot _ _ -> Maybe.isJust mSlot
           _ -> False
         sweeps effect = case effect of
-          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ _ _ -> True
+          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ _ _ _ -> True
           _ -> False
         offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
     -- Both halves of the rejected shape are in the pool separately, so the sweep
