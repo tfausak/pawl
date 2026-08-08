@@ -412,6 +412,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionCounts conditions
   -- CR 708.7's condition is nullary, so there is nothing in it to be a Quantity.
   TriggerCondition.SelfTurnedFaceUp -> []
+  -- CR 701.21a's is nullary too, so it holds no Quantity either.
+  TriggerCondition.PermanentSacrificed -> []
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
@@ -1405,6 +1407,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionFilters conditions
   -- CR 708.7's condition is nullary, so there is nothing in it to be a Filter.
   TriggerCondition.SelfTurnedFaceUp -> []
+  -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
+  -- PermanentDies below there is no Filter to sweep.
+  TriggerCondition.PermanentSacrificed -> []
   TriggerCondition.PermanentDies f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []

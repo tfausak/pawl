@@ -158,6 +158,7 @@ movedOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -179,6 +180,7 @@ damageOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -200,6 +202,7 @@ revealOf event = case event of
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -1831,6 +1834,19 @@ protectedFromCountering oid gs =
 -- trusted from each caller: a cost payment, a triggered ability's own source and
 -- `apply`'s CR 614.1c as-enters sacrifice are controlled by the paying player by
 -- construction, but an edict's victim is a permanent a PLAYER named.
+--
+-- Records GameEvent.PermanentSacrificed, which is what makes CR 603.10a's
+-- "abilities that trigger when a player sacrifices a permanent" expressible: CR
+-- 700.4 makes a sacrifice a death, so the Moved event changeZone writes below is
+-- the one a destruction writes too and cannot say what the move WAS. Written HERE
+-- rather than at each caller for the reason the controller check is: this is the
+-- one funnel.
+--
+-- BEFORE the zone change, and naming the PRE-MOVE id, which is CR 603.10a's
+-- look-back. CR 701.21a's sacrifice is the game action, so a replacement that
+-- redirects the move -- Rest in Peace exiling it instead -- does not un-sacrifice
+-- the permanent, and an event recorded afterwards would either name an
+-- incarnation the redirection never produced or not be recorded at all.
 sacrifice :: PlayerId -> ObjectId -> Game ()
 sacrifice pid oid = do
   gs <- State.get
@@ -1846,7 +1862,9 @@ sacrifice pid oid = do
       -- be wrong.
       Zone.Battlefield
         | Projection.controllerOf oid gs /= Just pid -> pure ()
-        | otherwise -> changeZone oid Zone.Graveyard
+        | otherwise -> do
+            State.modify' (recordEvent (GameEvent.PermanentSacrificed pid oid))
+            changeZone oid Zone.Graveyard
       Zone.Library -> pure ()
       Zone.Hand -> pure ()
       Zone.Graveyard -> pure ()
@@ -2021,6 +2039,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2066,6 +2085,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2088,6 +2108,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2114,6 +2135,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2147,6 +2169,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2184,6 +2207,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2215,6 +2239,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2243,6 +2268,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2274,6 +2300,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2305,6 +2332,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2349,6 +2377,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2383,6 +2412,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2416,6 +2446,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2460,6 +2491,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2500,6 +2532,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2546,6 +2579,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2581,6 +2615,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2607,6 +2642,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2639,6 +2675,7 @@ matchesTrigger gs bearer you cond event = case cond of
       Just _ -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
@@ -2664,6 +2701,7 @@ matchesTrigger gs bearer you cond event = case cond of
   TriggerCondition.SelfHalfUnlocked half -> case event of
     GameEvent.HalfUnlocked oid name _ -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.SpellCast _ _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
@@ -2694,6 +2732,7 @@ matchesTrigger gs bearer you cond event = case cond of
   -- CR 708.8's last sentence fall out rather than needing a clause.
   TriggerCondition.SelfTurnedFaceUp -> case event of
     GameEvent.TurnedFaceUp oid -> oid == bearer
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast _ _ -> False
     GameEvent.CountersRemoved {} -> False
@@ -2736,9 +2775,40 @@ matchesTrigger gs bearer you cond event = case cond of
           PlayerRelation.You -> controller == you
           PlayerRelation.Opponent -> controller /= you
     GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
     GameEvent.SpellCast _ _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 603.10a's sacrifice family: the log entry Event.sacrifice writes is the
+  -- whole of the answer, which is exactly what makes the condition worth having.
+  -- CR 700.4 makes every sacrifice a death, so the Moved event the same sacrifice
+  -- records is indistinguishable from a destruction's or a mill's -- an arm that
+  -- read the zone change instead would fire on both.
+  --
+  -- Nothing is compared. CR 701.21a's "a player" is every player, its own
+  -- controller included, and "a permanent" names no quality, so neither the
+  -- bearer nor `you` is consulted and the event's payload goes unread.
+  TriggerCondition.PermanentSacrificed -> case event of
+    GameEvent.PermanentSacrificed {} -> True
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.SpellCast _ _ -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.CountersPut {} -> False
+    -- CR 700.4 again, from this side: a sacrifice DOES record a Moved event, and
+    -- matching it here would answer twice for one sacrifice.
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
@@ -3097,6 +3167,18 @@ eventBindingSlots cond = case cond of
   -- condition that had been forgotten, which is exactly why it is spelled out
   -- here: Pawl.TriggerSpec pins the two against each other.
   TriggerCondition.SelfTurnedFaceUp -> Set.empty
+  -- CR 701.21a's event names a player and a permanent, and this claims NEITHER --
+  -- a deliberate empty, decided rather than defaulted, since eventBindings' own
+  -- fallthrough would answer the same for a condition nobody wrote an arm for.
+  --
+  -- The permanent is not bound because CR 603.10a's look-back keeps the pre-move
+  -- id out of the graveyard: `became` names the incarnation a zone change
+  -- produced (CR 400.7e), and this event is recorded BEFORE the move, so the id it
+  -- carries is the one that no longer exists. The player is not bound because
+  -- Mayhem Devil's "deals 1 damage to any target" names nobody the event did.
+  -- A card saying "that player" or "return it to its owner's hand" is what earns
+  -- a slot here (#977).
+  TriggerCondition.PermanentSacrificed -> Set.empty
   -- CR 601.2i's spell, the object the event names and nobody the bearer already
   -- does. Guaranteed given a match for the reason CR 615.13's amount is:
   -- GameEvent.SpellCast carries an ObjectId unconditionally, so no shape of the
@@ -3296,6 +3378,7 @@ eventTriggers events gs =
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
+        GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -3367,6 +3450,7 @@ eventTriggers events gs =
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
+        GameEvent.PermanentSacrificed {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -3501,6 +3585,11 @@ functionsInGraveyard cond = case cond of
   -- CR 708.7 is about a PERMANENT being turned face up, and CR 110.1 puts
   -- permanents on the battlefield alone, so CR 113.6k never reaches this.
   TriggerCondition.SelfTurnedFaceUp -> False
+  -- CR 113.6's default: an ability of a permanent functions only while that
+  -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
+  -- condition that CANNOT trigger from the battlefield, and this one plainly can
+  -- -- Mayhem Devil watches every sacrifice from the board it stands on.
+  TriggerCondition.PermanentSacrificed -> False
   -- CR 603.8's state triggers are not event triggers, so this scan is not their
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> False
@@ -3608,6 +3697,9 @@ controllerTurnScoped cond = case cond of
   -- CR 702.37e offers the special action "any time you have priority", which is
   -- every turn and not only the controller's own.
   TriggerCondition.SelfTurnedFaceUp -> False
+  -- CR 701.21a says nothing about whose turn it is, and neither does the printed
+  -- "whenever a player sacrifices a permanent".
+  TriggerCondition.PermanentSacrificed -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
@@ -3734,6 +3826,10 @@ stateTriggers gs
               -- thereafter -- so a state read would fire it again every settle,
               -- for as long as the permanent stayed on the battlefield.
               TriggerCondition.SelfTurnedFaceUp -> False
+              -- CR 701.21a is a game ACTION, so this is an event trigger too: it
+              -- fires on the moment the permanent is sacrificed, and the board
+              -- afterwards holds no state a read could recover.
+              TriggerCondition.PermanentSacrificed -> False
               -- CR 714.2b is an EVENT trigger too: it fires on the moment counters
               -- are PUT ON, not on the count standing at or above N -- which is
               -- exactly the difference CR 603.8 draws, and the reason a Saga does
