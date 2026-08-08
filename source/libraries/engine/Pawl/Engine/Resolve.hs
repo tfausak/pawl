@@ -672,6 +672,18 @@ resolveSpell = resolveSpellWith noSubgame
 --
 -- Takes the modes rather than a flat effect list plus a spec map: the specs ARE
 -- the union of those modes' own (CR 700.2c).
+--
+-- The resolving object's bindings are re-read before EACH effect, exactly as
+-- resolveSpellWith does it, so a slot an earlier effect of this same list DEFINED
+-- is visible to a later one -- Harried Dronesmith's "create ... token. It gains
+-- haste until end of turn", which is CR 608.2c's "instructions in the order
+-- written" applied to a sentence that names what the sentence before it made.
+--
+-- CR 608.2b's question is asked ONCE, off the pre-fold snapshot: `fizzles` below
+-- is decided before any effect runs, and the per-effect re-read only ever adds
+-- RESERVED slots, which are vacuously legal. Re-deriving the fizzle mid-fold
+-- would let a token a Create just minted rescue an ability whose every target is
+-- gone.
 resolveModes :: ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card)] -> Game ()
 resolveModes stackId srcId modes = do
   gs <- State.get
@@ -713,13 +725,27 @@ resolveModes stackId srcId modes = do
                 -- CR 700.2d: this instance's own slots under the names its mode
                 -- prints, with every other instance's removed -- the spell path's
                 -- projection, applied to both maps so they cannot disagree.
-                viewLegality = Modal.instanceView specs mi (Mode.targetSpecs mode) legality
-                viewChosen = Modal.instanceView specs mi (Mode.targetSpecs mode) chosen
+                instanceView = Modal.instanceView specs mi (Mode.targetSpecs mode)
             taken <- exercises stackId effectController idx mode
-            -- CR 118.12a: then the "unless [a player] pays", against the same
-            -- slots -- see the spell path for why it follows the "may".
-            gatePaid <- if taken then paid stackId srcId idx viewLegality viewChosen mode else pure False
-            Monad.when (taken && not gatePaid) (Monad.mapM_ (applyEffect stackId srcId effectController viewLegality viewChosen) (Mode.effects mode))
+            -- CR 118.12a: then the "unless [a player] pays", against the
+            -- START-of-resolution slots -- the spell path's own note says why it
+            -- follows the "may", and why the gate is asked before this mode's
+            -- effects have defined anything.
+            gatePaid <- if taken then paid stackId srcId idx (instanceView legality) (instanceView chosen) mode else pure False
+            let applyOne eff = do
+                  -- Re-read the LIVE bindings for THIS effect (CR 608.2c), the
+                  -- same shape resolveSpellWith's applyOne has: a Create's single
+                  -- token (CR 111.1) reaches the sentence after the one that
+                  -- minted it. Both maps are recomputed from the SAME bindings,
+                  -- because every slot read consults both -- a slot present in
+                  -- `chosen` but missing from the legality map reads as illegal,
+                  -- so a re-read of one without the other would drop exactly the
+                  -- bindings it just gained.
+                  bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
+                  let chosenNow = Binding.targetsOf bindingsNow
+                      legalityNow = Map.mapWithKey legalSlot chosenNow
+                  applyEffect stackId srcId effectController (instanceView legalityNow) (instanceView chosenNow) eff
+            Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
@@ -1112,11 +1138,13 @@ slotGroup slot resolving gs = Binding.objectsOf slot (maybe Map.empty Object.bin
 -- slotGroup's singular: the ONE object bound at a slot, read live off the
 -- resolving object rather than out of `chosen`.
 --
--- LIVE is the whole point, and it is what `chosen` cannot be: resolveModes fixes
--- a resolving ability's target map before its effect fold begins, so an
--- incarnation an earlier effect of the same list bound (Effect.MoveToZone's CR
--- 400.7 slot) is not in it. Every reader of such a binding goes through a live
--- read for that reason -- see bindObjectsSlot's note, and CR 603.7c for why the
+-- LIVE rather than through `chosen`, and not because `chosen` is stale -- both
+-- resolution paths re-read it per effect (CR 608.2c) -- but because it is a
+-- PROJECTION: `chosen` carries CR 601.2c's targets under the printed names CR
+-- 700.2d renames them to, and gates every read on CR 608.2b legality. A binding
+-- an earlier effect of the same list DEFINED (Effect.MoveToZone's CR 400.7 slot)
+-- is neither a target nor renameable, so reading it off the object is the
+-- shorter true answer. See bindObjectsSlot's note, and CR 603.7c for why the
 -- binding exists at all.
 --
 -- Nothing when the slot is unbound, holds a group, or names a player: a cast
@@ -1571,8 +1599,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- reached a graveyard any other way "hasn't been 'destroyed'". Bound onto
     -- this effect's SOURCE so a later effect of the same resolution reads it as
     -- Quantity.InSlot, which is Bane of Progress' rider; the read goes through
-    -- live GameState rather than the `chosen` snapshot, so it works on the
-    -- ability path as well as the spell one.
+    -- live GameState rather than through `chosen`, which carries recipients
+    -- rather than amounts.
     --
     -- Bound even when nothing was destroyed. Zero is an answer -- "for each
     -- permanent destroyed this way" of nothing is no counters -- where leaving
@@ -2881,20 +2909,16 @@ performHandAction source player =
 -- same object ArmDelayedTrigger captures from, so the two always agree. See
 -- applyEffectWith for why the stack object and not the effect's `source`.
 --
--- Whether this makes the slot visible to a later effect of the same fold depends
--- on the path: on the SPELL path, resolveSpellWith re-reads Object.bindings
--- before EACH effect, so a later Sacrifice/Destroy/etc. reading the same slot
--- DOES see the mid-fold value (this is exactly what lets PlaySubgame's derived
--- loser reach a follow-on DealDamage). On the ABILITY path, resolveModes still
--- folds applyEffect over a `chosen` snapshot taken once before the fold starts,
--- so a later Sacrifice/Destroy/etc. there still sees the pre-bind value
--- (Nothing). ArmDelayedTrigger and slotGroup see it on either path, because both
--- re-read Object.bindings from LIVE GameState rather than from `chosen`.
---
--- So the gap is narrower than it was but real: a slot bound HERE and read by an
--- ObjectRef on the ABILITY path still comes back empty, where the same card
--- text as a spell works (#762). The D4 lint does not catch it -- it asks that a
--- read slot be DEFINED, which this one is.
+-- The slot IS visible to a later effect of the same fold, on both paths and by
+-- the same mechanism: resolveSpellWith and resolveModes each re-read
+-- Object.bindings before EACH effect (CR 608.2c), so a later
+-- Sacrifice/Destroy/ModifyTarget reading this slot sees the mid-fold value. That
+-- is what lets PlaySubgame's derived loser reach a follow-on DealDamage on the
+-- spell path, and Harried Dronesmith's "It gains haste until end of turn" reach
+-- the token its own trigger just minted on the ability path (proved by
+-- Pawl.TriggerSpec's "CR 702.10b \"it gains haste\" reaches the one token").
+-- ArmDelayedTrigger and slotOne see it without either re-read, since both go to
+-- LIVE GameState rather than to `chosen`.
 bindSlot :: ObjectId -> SlotName -> ObjectId -> GameState -> GameState
 bindSlot holder slot target gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObject target) (Object.bindings obj)}
@@ -2905,11 +2929,12 @@ bindSlot holder slot target gs =
 -- 603.7c) -- ArmDelayedTrigger captures this object's whole environment, which is
 -- how "those tokens" outlives the resolution that minted them.
 --
--- Readable mid-fold on BOTH paths, because every reader goes through slotGroup,
--- which reads live GameState rather than `chosen` -- `chosen` carries CR 601.2c's
--- targets and this is never one, and on the ability path resolveModes fixes it
--- before the fold begins. bindSlot's SINGLE object is readable the same way and
--- for the same reason, through slotOne; what neither is, is visible in `chosen`.
+-- Readable mid-fold without either resolution path's per-effect re-read, because
+-- every reader goes through slotGroup, which reads live GameState. It has to:
+-- this rides the binding's `objects` field, and `chosen` is Binding.targetsOf,
+-- which reads only the `target` field -- so a group is invisible there however
+-- often the map is rebuilt. bindSlot's SINGLE object is the one that lands in
+-- `target`, and so the one both a live read (slotOne) and `chosen` can see.
 bindObjectsSlot :: ObjectId -> SlotName -> Seq.Seq ObjectId -> GameState -> GameState
 bindObjectsSlot holder slot targets gs =
   let put obj = obj {Object.bindings = Map.insert slot (Binding.toObjects targets) (Object.bindings obj)}

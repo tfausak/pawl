@@ -17,7 +17,9 @@
 -- holds every token it minted, so a card can say "those tokens", with Thatcher
 -- Revolt -- `tokenSetSpec`, and that group read back through ObjectRef.InSlot by
 -- a second opcode of the same resolution, with Salt Road Skirmish --
--- `tokenGroupReadSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
+-- `tokenGroupReadSpec`, and that group's SINGULAR -- one token bound into the
+-- target field and read back by a later effect of the same TRIGGERED ability,
+-- with Harried Dronesmith -- `singleTokenSlotReadSpec`. The CR 603.3b ordering prompt -- `orderingSpec`, and its
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingSpec`. The CR 603.4 / 608.2a intervening "if" --
 -- `interveningSpec`. Also Pawl.Engine.Keyword: CR
@@ -109,6 +111,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
+import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
@@ -1414,6 +1417,131 @@ tokenGroupReadSpec s registry =
           -- Otherwise "no Warriors" would also be true of a spell still sitting
           -- on the stack, which is a different bug wearing the same result.
           Spec.assertEqWith s "the spell left the stack rather than stalling on it" (GameState.stack after) []
+
+-- Harried Dronesmith {3}{R} Creature -- Human Artificer 2/3: "At the beginning of
+-- combat on your turn, create a 1/1 colorless Thopter artifact creature token with
+-- flying. It gains haste until end of turn. Sacrifice it at the beginning of your
+-- next end step."
+--
+-- tokenGroupReadSpec's SINGULAR, and the whole reason it is a separate group: a
+-- Create binds one token into the binding's target field and several into its
+-- objects group (Pawl.Engine.Resolve.bindSlot and bindObjectsSlot), and the two
+-- are read back by different routes. Salt Road Skirmish's "they" reads the group,
+-- which has always been live; this card's "it" reads the single target, which the
+-- ability path once fixed before its effect fold began -- so CR 608.2c's "in the
+-- order written" was violated for the second sentence only, and only when the
+-- sentence before it made exactly one token.
+--
+-- ATTACKING is the discriminating observable, not the keyword. CR 302.6 keeps a
+-- creature that has not been controlled continuously since the turn began from
+-- attacking, and CR 702.10b is the only thing that lifts it; the token entered
+-- during this very combat phase, so it is on the attackers menu if and only if
+-- the haste grant landed on it. Asserting Projection.hasKeyword alone would be a
+-- claim about a stored effect rather than about the game.
+--
+-- The token is authored with FLYING only. Printing haste on its face would make
+-- every assertion below pass with the grant deleted entirely.
+singleTokenSlotReadSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+singleTokenSlotReadSpec s registry =
+  let thopters gs = filter (\oid -> Set.member Subtype.Thopter (Projection.subtypesOf oid gs)) (Set.toList (GameState.battlefield gs))
+      -- alice, active, sitting in her own beginning of combat step with the
+      -- Dronesmith and a Goblin Piker both SETTLED (S.addCreature stamps
+      -- Sickness.Settled), so neither of the two creatures she already had is
+      -- summoning-sick and a bug that kept EVERY creature off the menu could not
+      -- hide inside assertion 2. The rest of the turn is scheduled so Engine.runStep
+      -- can walk it.
+      board dronesmith piker =
+        let (dronesmithId, gs1) = S.addCreature dronesmith S.alice (Setup.emptyGame S.bothPlayers)
+            (pikerId, gs2) = S.addCreature piker S.alice gs1
+         in ( dronesmithId,
+              pikerId,
+              gs2
+                { GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice,
+                  GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+                  GameState.remaining =
+                    Seq.fromList
+                      [ Phase.Combat CombatStep.DeclareAttackers,
+                        Phase.Combat CombatStep.DeclareBlockers,
+                        Phase.Combat CombatStep.CombatDamage,
+                        Phase.Combat CombatStep.EndOfCombat,
+                        Phase.PostcombatMain,
+                        Phase.Ending EndingStep.EndStep,
+                        Phase.Ending EndingStep.Cleanup
+                      ]
+                }
+            )
+      -- The real turn loop, one whole step at a time: Engine.runStep is what
+      -- writes the CR 603.2b StepBegan record this trigger matches, runs the
+      -- priority round that resolves it, and advances the schedule.
+      step gs = snd (Engine.runGamePure S.identityAnswer gs Engine.runStep)
+      -- Run steps until the cleanup step is scheduled, which is one step PAST the
+      -- end step -- so the delayed ability has fired and resolved. Bounded, so a
+      -- schedule bug cannot loop forever.
+      throughEndStep =
+        let go n gs =
+              if n <= (0 :: Int) || GameState.phase gs == Phase.Ending EndingStep.Cleanup
+                then gs
+                else go (n - 1) (step gs)
+         in go 10
+      dronesmithBoard = do
+        dronesmith <- S.printingOf s registry "Harried Dronesmith"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (board dronesmith piker)
+   in Spec.describe s "Single-token slot read through InSlot" $ do
+        -- CR 603.2b then CR 111.1: the step began, the ability triggered, and one
+        -- token stands. The characteristics are all here because the token is
+        -- authored in this card's own text and nothing else asserts them.
+        Spec.it s "CR 111.1 the combat trigger mints one 1/1 colorless flying Thopter artifact creature" $ do
+          (_, _, gs) <- dronesmithBoard
+          let after = step gs
+          case thopters after of
+            [token] -> do
+              Spec.assertEqWith s "1/1" (S.powerToughnessOf token after) (Just (1, 1))
+              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Flying token after) "flying"
+              Spec.assertEqWith s "colorless" (Projection.colorsOf token after) Set.empty
+              Spec.assertEqWith
+                s
+                "an artifact creature"
+                (Projection.cardTypesOf token after)
+                (Set.fromList [CardType.Artifact, CardType.Creature])
+              Spec.assertEqWith s "under alice's control" (Projection.controllerOf token after) (Just S.alice)
+              Spec.assertEqWith s "and untapped" (fmap Object.tapped (Game.lookupObject token after)) (Just TapState.Untapped)
+              Spec.assertEqWith s "the same resolution armed the delayed ability" (Seq.length (GameState.delayedTriggers after)) 1
+            other -> Spec.assertFailure s ("expected exactly one Thopter token, got " <> show (length other))
+        -- THE PROVING CASE. "It gains haste until end of turn" is the
+        -- sentence after the one that made the token, on a TRIGGERED ability, and
+        -- the token's slot is read through ObjectRef.InSlot. With the ability
+        -- path's pre-fold snapshot, that read comes back empty, ModifyTarget
+        -- stores nothing, and CR 302.6 keeps the token home.
+        --
+        -- The Piker is asserted onto the same menu deliberately: it makes an
+        -- answer of "every creature alice controls" and an answer of "none" both
+        -- fail, so the Thopter's membership is the only thing that can carry
+        -- this.
+        Spec.it s "CR 702.10b \"it gains haste\" reaches the one token, so it can attack the turn it entered" $ do
+          (_, pikerId, gs) <- dronesmithBoard
+          let after = step gs
+              menu = Combat.legalAttackers S.alice after
+          Spec.assertEqWith s "the beginning of combat step is over" (GameState.phase after) (Phase.Combat CombatStep.DeclareAttackers)
+          case thopters after of
+            [token] -> do
+              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Haste token after) "the grant landed on the token"
+              Spec.assertBool s (List.elem token menu) "so CR 302.6 does not keep it out of the attackers menu"
+              Spec.assertBool s (List.elem pikerId menu) "and the Piker that was already there is on the same menu"
+            other -> Spec.assertFailure s ("expected exactly one Thopter token, got " <> show (length other))
+        -- The regression guard on the group reader's LIVE read, which the fix must
+        -- not disturb: the third sentence's delayed ability reads the same slot at
+        -- alice's own end step (CR 603.7 / 603.7b), and the onset is immediate, so
+        -- "your next end step" is this turn's.
+        Spec.it s "CR 603.7b the delayed ability sacrifices the token at alice's end step" $ do
+          (_, _, gs) <- dronesmithBoard
+          let armed = step gs
+              after = throughEndStep armed
+          Spec.assertEqWith s "one Thopter before the end step" (length (thopters armed)) 1
+          Spec.assertEqWith s "none after it" (thopters after) []
+          Spec.assertEqWith s "and the store is empty" (Seq.length (GameState.delayedTriggers after)) 0
+          Spec.assertEqWith s "with nothing stuck on the stack" (GameState.stack after) []
 
 -- CR 603.3b: "puts each triggered ability they control ... on the stack in any
 -- order they choose". The centerpiece: two triggers, one controller, and an
@@ -5789,6 +5917,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   delayedSpec s registry
   tokenSetSpec s registry
   tokenGroupReadSpec s registry
+  singleTokenSlotReadSpec s registry
   towershellOnsetSpec s registry
   towershellSkipSpec s registry
   orderingSpec s registry
