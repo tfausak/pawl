@@ -332,12 +332,12 @@ affects source oid a partial gs = case a of
         -- answer wrong (#197).
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
-          && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
+          && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct. The `perspective` laziness
   -- caveat in the Matching arm above applies here unchanged (#197).
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
-     in Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) gs) f
+     in Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. A source that is unattached, or attached to an object, names no player
   -- and affects nobody. The controller comparison is CR 613.1b's layer 2, already
@@ -357,7 +357,7 @@ affects source oid a partial gs = case a of
       let controller = controllerOf oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
-            && Filter.matches (Filter.MkContext (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller gs) f
+            && Filter.matches (Filter.MkContext (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
 -- CR 205.4a: supertypes are read from the printed type line -- no Modification
@@ -378,7 +378,7 @@ viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
 -- projectGiven for what the board is and when it is valid.
 viewOfObjectGiven :: Map ObjectId ProjectedCharacteristics -> [ControlGrant] -> ObjectId -> GameState -> Filter.View
 viewOfObjectGiven pcs grants oid gs =
-  viewOfCharacteristics oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) gs
+  viewOfCharacteristics oid (projectGiven pcs oid gs) (controllerOfGiven grants Set.empty oid gs) (countersOf oid gs) gs
 
 -- CR 112.2 / 601.2a: the view of a SPELL on the stack, whose controller is "by
 -- default, the player who put it on the stack" -- the player casting it, which
@@ -393,7 +393,7 @@ viewOfObjectGiven pcs grants oid gs =
 -- effects that modify the spell as it is cast are applied BEFORE it becomes cast,
 -- so by the time a trigger reads this they are already on the stack object.
 viewOfSpell :: PlayerId.PlayerId -> ObjectId -> GameState -> Filter.View
-viewOfSpell caster oid gs = viewOfCharacteristics oid (project oid gs) (Just caster) gs
+viewOfSpell caster oid gs = viewOfCharacteristics oid (project oid gs) (Just caster) (countersOf oid gs) gs
 
 -- The ViewOf for callers OUTSIDE the CR 613 layer fold: every object projected
 -- with all layers applied. `viewUpTo` below is the bounded counterpart for
@@ -414,13 +414,15 @@ fullView gs oid = Just (viewOfObject oid gs)
 -- Nothing when the source is gone and nothing was recorded for it, which lands
 -- on the no-op every caller already gives an unevaluable quantity. The
 -- controller comes from the same record rather than Nothing, so a ControlledBy
--- filter read against a gone source still names whoever last controlled it.
+-- filter read against a gone source still names whoever last controlled it, and
+-- so do the COUNTERS -- CR 122.2 made them cease to exist with the object, and
+-- the record is the only place Quantity.ObjectCounters can still find them.
 viewWithLastKnown :: ObjectId -> GameState -> Count.ViewOf
 viewWithLastKnown src gs oid =
   if oid == src && not (Map.member oid (GameState.objects gs))
     then
       fmap
-        (\lk -> viewOfCharacteristics oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) gs)
+        (\lk -> viewOfCharacteristics oid (LastKnown.characteristics lk) (Just (LastKnown.controller lk)) (LastKnown.counters lk) gs)
         (Map.lookup oid (GameState.lastKnown gs))
     else fullView gs oid
 
@@ -464,7 +466,7 @@ controllerWithLastKnown oid gs = case lastKnownOf oid gs of
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Set.member oid (GameState.battlefield gs)
-    then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) gs)
+    then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
     else fmap viewOfCard (Game.faceOf oid gs)
 
 -- The characteristics view of a printed card off the battlefield, e.g. one being
@@ -513,11 +515,14 @@ viewOfCard face =
           -- and CR 704.5d already made a token in any such zone cease to exist --
           -- so no token can reach here, and False is not a lost distinction.
           Filter.token = False,
-          Filter.tapped = False
+          Filter.tapped = False,
+          -- CR 122.1a-b: a counter can sit on a CARD in a zone other than the
+          -- battlefield, but this builder describes a printed FACE rather than
+          -- an object, so there is nothing here for one to be on. The vacuous
+          -- posture power and controller already take.
+          Filter.counters = Map.empty
         }
 
--- Shared assembly: fill a View from a projection's characteristics plus the
--- printed supertypes (not projected) and a supplied controller.
 -- CR 508.3a: does this event record THIS object being declared as an attacker?
 -- Only Combat.declareAttackers appends one, which is what keeps CR 508.4's
 -- creature put onto the battlefield attacking -- one that "never attacked" --
@@ -527,8 +532,18 @@ declaredIt oid event = case event of
   GameEvent.AttackerDeclared declared -> declared == oid
   _ -> False
 
-viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> GameState -> Filter.View
-viewOfCharacteristics oid pc controller gs =
+-- Shared assembly: fill a View from a projection's characteristics plus the
+-- printed supertypes (not projected), a supplied controller and supplied
+-- counters.
+--
+-- The COUNTERS come in as an argument for the reason the controller does: CR
+-- 109.3's characteristic list has no counters in it, so a ProjectedCharacteristics
+-- carries none -- CR 613.4c folded them into the power and toughness and then the
+-- counters themselves are gone from that record. The caller has to say what was
+-- on the object, and only the caller knows whether it is reading a live one or CR
+-- 608.2h's record of one that is not.
+viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map CounterKind.CounterKind Natural -> GameState -> Filter.View
+viewOfCharacteristics oid pc controller counters gs =
   Filter.MkView
     { Filter.cardTypes = PC.cardTypes pc,
       Filter.supertypes = printedSupertypes oid gs,
@@ -583,8 +598,15 @@ viewOfCharacteristics oid pc controller gs =
       -- CR 111.6: fixed for the life of the object (CR 400.7 mints a new one on
       -- every zone change), so it is a constant input to the projection.
       Filter.token = Game.isToken oid gs,
-      Filter.tapped = Game.isTapped oid gs
+      Filter.tapped = Game.isTapped oid gs,
+      Filter.counters = counters
     }
+
+-- CR 122.1: the counters on an object right now, and none for an id that names
+-- nothing. The LIVE half of the pair whose other half is LastKnown.counters --
+-- every viewOfCharacteristics caller but viewWithLastKnown passes this.
+countersOf :: ObjectId -> GameState -> Map CounterKind.CounterKind Natural
+countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result, the value the layer fold
 -- starts from -- the entry-stamped snapshot (CR 707.5) when it has one, the
@@ -1362,6 +1384,9 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.PlayerCounters _ _ -> quantity
+  -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
+  -- name no subtype word, not even the CR 122.1b keyword one.
+  Quantity.Type.ObjectCounters _ -> quantity
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.

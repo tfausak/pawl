@@ -8,7 +8,9 @@ import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -142,6 +144,24 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.PlayerCounters (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) PlayerCounterKind.Experience)
       """ {"type":"PlayerCounters","value":[{"type":"InSlot","value":"target"},{"type":"Experience"}]} """
+  -- CR 122.1's OBJECT reading, with only a CounterKind on the wire: the object
+  -- is whichever one the quantity is evaluated against, so there is no reference
+  -- beside the kind. The payload-bearing CounterKind arm (CR 122.1b's keyword
+  -- counter) is round-tripped too, since that is the one a recursive decoder
+  -- could lose.
+  Spec.it s "ObjectCounters, a plain kind and a payload-bearing one" $ do
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)
+      """ {"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}} """
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.ObjectCounters (CounterKind.Keyword Keyword.Flying))
+      """ {"type":"ObjectCounters","value":{"type":"Keyword","value":{"type":"Flying"}}} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s

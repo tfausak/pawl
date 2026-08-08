@@ -761,7 +761,10 @@ lastKnownRiderSpec s registry =
                 LastKnown.MkLastKnown
                   { LastKnown.characteristics = Projection.project srcId equipped,
                     LastKnown.controller = S.alice,
-                    LastKnown.source = Source.OfCard prodigalSorcerer
+                    LastKnown.source = Source.OfCard prodigalSorcerer,
+                    -- CR 122.1: nothing put a counter on the Sorcerer, and this
+                    -- case is about a keyword grant rather than a counter.
+                    LastKnown.counters = Map.empty
                   }
               humbled = S.withHumility humility equipped
               planted =
