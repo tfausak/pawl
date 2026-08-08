@@ -2797,6 +2797,27 @@ eventBindings cond event = case (cond, event) of
   -- becomes a real test.
   (TriggerCondition.SelfDies, GameEvent.Moved zc _) ->
     Binding.setBecame (ZoneChange.object zc) Map.empty
+  -- The same rule and the same field, watched by a BYSTANDER: Promise of
+  -- Tomorrow's "whenever a creature you control dies, exile IT". What differs
+  -- from the arm above is only which object CR 113.7a's source is -- there the
+  -- bearer and the deceased are two incarnations of one card, here the bearer is
+  -- a third object entirely (an enchantment) and the source slot cannot reach
+  -- the dead creature at all.
+  --
+  -- ZoneChange.object, NOT `departed`, and here the two really are two different
+  -- cards' worth of trap: matchesTrigger's PermanentDies arm matches on
+  -- `departed`, because CR 603.10a's look-back is what makes "you control"
+  -- answerable off CR 608.2h last known information -- but CR 400.7 deleted that
+  -- id, so a payload handed it would move nothing. `object` is the graveyard
+  -- card the payload has to act on.
+  --
+  -- CR 400.7e's public-zone proviso holds BY CONSTRUCTION, needing no guard of
+  -- the kind SelfLeavesTheBattlefield below carries: matchesTrigger's
+  -- PermanentDies arm has already required the battlefield-to-graveyard pair, and
+  -- CR 400.2 lists the graveyard among the public zones. That is what makes
+  -- eventBindingSlots' unconditional promise for this condition honest.
+  (TriggerCondition.PermanentDies _, GameEvent.Moved zc _) ->
+    Binding.setBecame (ZoneChange.object zc) Map.empty
   -- The same rule, with its proviso doing real work for the first time: CR 603.6c's
   -- wider condition accepts ANY destination, and CR 400.2 makes two of them hidden.
   --
@@ -2998,12 +3019,12 @@ eventBindingSlots cond = case cond of
   -- CR 400.7e: the incarnation the card became, which CR 603.10a's look-back
   -- keeps out of the source slot.
   TriggerCondition.SelfDies -> Set.singleton Binding.became
-  -- Empty, and NOT PermanentEnters' `became`, though the two are the same
-  -- bystander shape pointed at opposite zone changes. CR 400.7e would supply the
-  -- name, a graveyard being public, but no card in the pool says anything about
-  -- the permanent that died. Binding a slot nothing reads is speculative
-  -- construction, so the card that needs it is the one that adds it (#616).
-  TriggerCondition.PermanentDies _ -> Set.empty
+  -- PermanentEnters' `became` pointed at the opposite zone change, the two being
+  -- the same bystander shape: CR 400.7e supplies the name and CR 400.2 makes the
+  -- graveyard public. Guaranteed rather than conditional, unlike
+  -- SelfLeavesTheBattlefield below, because matchesTrigger has already pinned the
+  -- destination to the graveyard. Promise of Tomorrow's "exile it" is the reader.
+  TriggerCondition.PermanentDies _ -> Set.singleton Binding.became
   -- The same slot and rule as SelfDies, but bound only for a PUBLIC destination
   -- (CR 400.7e's proviso over CR 400.2's hidden zones), so the guaranteed floor is
   -- empty. A card whose leaves-the-battlefield payload names `became` is therefore
