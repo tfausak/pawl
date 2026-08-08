@@ -524,6 +524,11 @@ namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
 --
 -- Modes rather than a flat effect list because CR 603.5's "may" is a property of
 -- the mode. A text change rewrites EFFECTS only, so optionality passes through.
+--
+-- Not implemented: a SPELL's mode target specs are left unrewritten, so CR
+-- 608.2b's re-validation in targetsAllIllegal below measures the printed clause
+-- (#635). An ACTIVATED ability has no such gap -- Projection.rewriteModal rewrites
+-- its specs and CR 602.2a's stack object carries them.
 modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card)]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
