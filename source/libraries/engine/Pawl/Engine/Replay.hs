@@ -83,6 +83,7 @@ encode p answer = case p of
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
   Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
+  Prompt.ChooseTurnUpAttachment {} -> Response.ChoseTurnUpAttachment answer
   Prompt.ChooseCost {} -> Response.ChoseCost answer
   Prompt.DeclareMulligan {} -> Response.DeclaredMulligan answer
   Prompt.Bottom {} -> Response.PutOnBottom answer
@@ -225,6 +226,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseAttachment {} -> case response of
     Response.ChoseAttachment oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseTurnUpAttachment {} -> case response of
+    Response.ChoseTurnUpAttachment d -> Just d
     _ -> Nothing
   Prompt.ChooseCost {} -> case response of
     Response.ChoseCost cost -> Just cost
@@ -421,6 +425,11 @@ defaultAnswer p = case p of
   Prompt.ChooseTapsForTotalPower _ _ _ candidates _ -> Set.fromList candidates
   -- CR 701.3a: every candidate is a destination the card's own text offered.
   Prompt.ChooseAttachment _ _ _ candidates -> NonEmpty.head candidates
+  -- CR 303.4k: declining, the ChooseRiot posture -- the "may" is a real fork, so
+  -- there is no answer that changes nothing, and this is the half that moves no
+  -- permanent. It is also the half a transcript that ran out cannot get wrong in
+  -- the player's favour: CR 704.5m buries the Aura it leaves unattached.
+  Prompt.ChooseTurnUpAttachment {} -> OptionalDecision.Declines
   -- The first offered candidate is the PRINTED cost for a cast from hand
   -- (Cost.costsFor puts it first), so it sacrifices nothing. A cast from the
   -- graveyard offers only CR 702.34a's flashback cost, so the head is the sole

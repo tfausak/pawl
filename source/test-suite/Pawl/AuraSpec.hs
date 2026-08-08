@@ -5,8 +5,10 @@
 -- resolving Aura spell either fizzles (CR 608.2b) or enters the battlefield
 -- already attached to its target (CR 303.4) -- together with the rest of the
 -- attachment substrate that shares Object.attachedTo: Pawl.Engine.Resolve's Attach
--- opcode (CR 701.3) and Pawl.Engine.Sba's three attachment state-based actions
--- (CR 704.5m, 704.5n, 704.5p).
+-- opcode over Pawl.Engine.Attach (CR 701.3) and Pawl.Engine.Sba's three attachment
+-- state-based actions (CR 704.5m, 704.5n, 704.5p). Rule 701.3's OTHER caller,
+-- CR 303.4k's attachment as an Aura is turned face up, is Pawl.FaceDownSpec's:
+-- CR 708.11 puts it inside the turning-over rather than in a resolution.
 --
 -- Also Pawl.Engine.Replacement's CR 614.1c as-enters basic-land-type choice,
 -- since the pool's one producer of it is an Aura (Convincing Mirage) and
@@ -876,7 +878,7 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
   -- 303.4j is about and which no pair of cards could produce before.
   --
   -- CR 109.5 fixes whose "you" that is: the AURA's controller, not the moving
-  -- effect's. Pawl.Engine.Resolve.attachmentFor asks Target.legalRecipients with
+  -- effect's. Pawl.Engine.Attach.attachmentFor asks Target.legalRecipients with
   -- Projection.controllerOf on the Aura for exactly that reason. Alice controls
   -- both cards here, so this board cannot tell the two readings apart -- nothing
   -- in the pool takes control of a noncreature artifact -- but attachmentFor is

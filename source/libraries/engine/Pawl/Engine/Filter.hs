@@ -105,16 +105,18 @@ data View = MkView
     -- The one field whose answer depends on something OTHER than the candidate,
     -- which is why it lives here rather than in Context: Context carries no game
     -- state, and this needs both the subject's enchant ability (CR 702.5a) and the
-    -- candidate's projected characteristics. Pawl.Engine.Resolve's AttachTarget arm is
-    -- the only site that fills it, from Resolve.attachmentFor -- the same function
-    -- that performs the move, so the offer and the move cannot disagree.
+    -- candidate's projected characteristics. Pawl.Engine.Attach.hostsFor is the only
+    -- site that fills it, from Attach.attachmentFor -- the same function that
+    -- performs the move, so the offer and the move cannot disagree.
     --
     -- False everywhere else, and that is not a lost distinction: outside an attach
     -- there is no subject for the question to be about. A Filter that named the
     -- atom from any other position would read that vacuous False, so no card is
-    -- allowed to -- Pawl.CardSpec rejects it in every Filter position a card has
-    -- but this one's. Widening the subject to somewhere every evaluation can see
-    -- it is #572.
+    -- allowed to -- Pawl.CardSpec rejects it in every Filter position a card has.
+    -- No card position is exempt: Effect.AttachTarget's destination is the one
+    -- that MAY hold it, and CR 303.4k's is not, because there the enchant-ability
+    -- conjunct is the rule's rather than the card's (Attach.turnUpHosts).
+    -- Widening the subject to somewhere every evaluation can see it is #572.
     canHostSubject :: Bool,
     -- CR 111.1 / 111.6: is this candidate a token rather than a card? Read from
     -- Object.source (Pawl.Engine.Game.isToken), never from a projection -- CR 111.3 makes

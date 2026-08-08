@@ -5,11 +5,13 @@
 -- Effect.TurnFaceDown arm of Pawl.Engine.Resolve, and the face-down arms
 -- threaded through Pawl.Engine.Game.faceOf, Pawl.Engine.Cast,
 -- Pawl.Engine.Cost.costsFor, Pawl.Engine.Event.changeZoneFaceDown and
--- Pawl.Engine.Stack -- rule 708 as far as morph reaches it.
+-- Pawl.Engine.Stack -- rule 708 as far as morph reaches it. Also
+-- Pawl.Engine.Attach.turnUpHosts, since CR 303.4k's attachment choice is made
+-- WHILE a permanent is being turned face up (CR 708.11) and nowhere else.
 --
--- THREE morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
--- part of them this file reaches, a fourth card carries the TURN-FACE-DOWN
--- half, and a fifth -- Aven Farseer, which has no morph ability at all -- is the
+-- FOUR morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
+-- part of them this file reaches, a fifth card carries the TURN-FACE-DOWN
+-- half, and a sixth -- Aven Farseer, which has no morph ability at all -- is the
 -- WATCHER of rule 708.7's other written form.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
@@ -26,6 +28,17 @@
 -- counter that landed from one that did not. Misthoof Kirin ends a 3/2, which is
 -- neither the face-down 2/2 nor the printed 2/1 -- and differs from the printed
 -- pair on BOTH axes, so no single stale read produces it.
+--
+-- Gift of Doom is CR 303.4k's card, and the rule's ONLY printing: {4}{B}
+-- Enchantment - Aura, "Enchant creature / Enchanted creature has deathtouch and
+-- indestructible. / Morph-Sacrifice another creature. / As this Aura is turned
+-- face up, you may attach it to a creature." It is the only card in Magic that
+-- is both an Aura and a morph, which is what makes it the only card that can
+-- reach a rule about what an Aura being turned face up attaches to. Its morph
+-- cost is a SACRIFICE rather than mana, which the group below leans on twice:
+-- it removes a creature from the board between the offer and the choice, and CR
+-- 708.2a's face-down 2/2 makes the Aura itself a candidate for its own "another
+-- creature" unless the cost's Filter is framed.
 --
 -- Skirk Marauder is the SELF-SCOPED trigger's card -- rule 708.7's first written
 -- form, the one whose bearer is the permanent that turns over.
@@ -54,16 +67,19 @@
 -- Backslide off it.
 module Pawl.FaceDownSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
+import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
@@ -71,25 +87,178 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "FaceDown" $ do
   offerSpec s registry
   castSpec s registry
   turnFaceUpSpec s registry
+  turnUpAttachSpec s registry
   turnFaceDownSpec s registry
+
+-- CR 303.4k: an Aura turned face up, choosing what it becomes attached to.
+--
+-- Gift of Doom is the whole group's card and the rule's only printing --
+-- {4}{B} Enchantment - Aura, "Enchant creature / Enchanted creature has
+-- deathtouch and indestructible. / Morph-Sacrifice another creature. / As this
+-- Aura is turned face up, you may attach it to a creature." That last line is
+-- the "effect [that] allows an Aura that's being turned face up to become
+-- attached" CR 303.4k is conditional on, and no other card prints one.
+--
+-- THE BOARD, and every piece of it is a vacuity trap closed:
+--
+--   * TWO legal hosts, one under EACH player -- alice's War Mammoth and bob's
+--     Goblin Piker. One host would let CR 303.4k's choice be elided as a
+--     single-candidate one and never asked, so every assertion about the
+--     destination would pass without a prompt ever being issued.
+--   * A THIRD creature under alice, the Piker her morph cost sacrifices. It is
+--     gone by the time the destinations are built, which is why the two hosts
+--     above are the whole list.
+--   * The face-down 2/2 is asserted BEFORE the turn-up. A cast that never
+--     happened would leave every later assertion vacuous.
+--   * The Aura is read again after a state-based pass. CR 303.4d buries an Aura
+--     that is also a creature and CR 704.5m buries an unattached one; a
+--     destination that was chosen and then not stored would go green here and
+--     land in the graveyard on the next pass.
+turnUpAttachSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnUpAttachSpec s registry = Spec.describe s "Turning an Aura face up" $ do
+  Spec.it s "CR 303.4k Gift of Doom turned face up attaches to a creature its face-up enchant ability admits" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    gift <- S.printingOf s registry "Gift of Doom"
+    case giftBoard swamp piker mammoth gift of
+      Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
+      Just (before, fodder, mine, theirs, aura) -> do
+        -- CR 708.2a: a 2/2 CREATURE with no text, which is the state CR 303.4k's
+        -- "as it would exist if it were face up" is measured against.
+        Spec.assertEqWith s "CR 708.2a a 2/2 before" (S.powerToughnessOf aura before) (Just (2, 2))
+        Spec.assertBool s (Projection.isCreatureOf aura before) "CR 708.2a a creature before"
+        Spec.assertBool s (not (Set.member Subtype.Aura (Projection.subtypesOf aura before))) "CR 708.2a no Aura subtype before"
+        Spec.assertEqWith s "and attached to nothing" (fmap Object.attachedTo (Game.lookupObject aura before)) (Just Nothing)
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [aura]
+        -- The destination answered is BOB's creature, which is neither the
+        -- lowest-sorting candidate nor alice's own: an implementation that
+        -- offered one candidate, or that fell back to the head of the list,
+        -- lands the Aura on the Mammoth instead and fails here.
+        let after = S.runPure (giftAnswer fodder theirs) before (FaceDown.turnFaceUp S.alice aura)
+            settled = S.settleSba (S.settleSba after)
+        Spec.assertEqWith s "CR 303.4k attached to the creature alice chose" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature theirs)))
+        -- CR 613.1f: the Aura's own static ability, which is what says the
+        -- attachment is real rather than a field nothing reads.
+        Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch theirs after) "the enchanted creature has deathtouch"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Indestructible theirs after) "and indestructible"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch mine after)) "and the creature nobody chose has neither"
+        -- CR 303.4d and CR 704.5m, the two state-based actions that would bury
+        -- this Aura: it is no longer a creature, and it is attached.
+        Spec.assertBool s (Set.member aura (GameState.battlefield settled)) "CR 704.5m the Aura is still on the battlefield"
+        Spec.assertEqWith s "and still attached" (fmap Object.attachedTo (Game.lookupObject aura settled)) (Just (Just (Recipient.ToCreature theirs)))
+        -- THE OTHER LEG of the same choice. Answering with alice's Mammoth puts
+        -- the Aura there instead, so both candidates really were offered and the
+        -- answer above was not the only outcome this board can produce.
+        let mineInstead = S.settleSba (S.runPure (giftAnswer fodder mine) before (FaceDown.turnFaceUp S.alice aura))
+        Spec.assertEqWith s "CR 303.4k the other candidate is equally available" (fmap Object.attachedTo (Game.lookupObject aura mineInstead)) (Just (Just (Recipient.ToCreature mine)))
+        Spec.assertBool s (Projection.hasKeyword Keyword.Deathtouch mine mineInstead) "and it is that creature that gains deathtouch"
+  -- CR 303.4k's "AS IT WOULD EXIST IF IT WERE FACE UP", read directly off the
+  -- destination builder. THE DISCRIMINATOR for the rule's actual content: the
+  -- same board, the same Filter and the same function, asked once of the
+  -- face-down permanent and once of the face-up one.
+  --
+  -- Face down it is CR 708.2a's 2/2 creature with no text -- no Aura subtype and
+  -- no enchant ability -- so the list is EMPTY and, had the rewrite been applied
+  -- before the status write, CR 704.5m would have buried the Aura. Face up the
+  -- list is exactly the creatures its enchant ability admits.
+  Spec.it s "CR 303.4k the destinations are read off the face-UP Aura, not the face-down 2/2" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    gift <- S.printingOf s registry "Gift of Doom"
+    case giftBoard swamp piker mammoth gift of
+      Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
+      Just (before, fodder, mine, theirs, aura) -> case giftDestinationFilter gift of
+        Nothing -> Spec.assertFailure s "Gift of Doom should print one CR 614.1e attach rewrite"
+        Just filter_ -> do
+          Spec.assertEqWith s "CR 708.2a face down, no enchant ability, so nothing is admitted" (Attach.turnUpHosts S.alice aura filter_ before) []
+          -- The turn-up, which sacrifices the fodder; the list is then read on
+          -- the face-up permanent, before the attachment it goes on to make.
+          let up = S.runPure (giftAnswer fodder theirs) before (FaceDown.turnFaceUp S.alice aura)
+              unattached = up {GameState.objects = Map.adjust (\o -> o {Object.attachedTo = Nothing}) aura (GameState.objects up)}
+          Spec.assertEqWith
+            s
+            "CR 303.4k face up, exactly the creatures the enchant ability admits"
+            (Attach.turnUpHosts S.alice aura filter_ unattached)
+            (List.sort [mine, theirs])
+          -- The Swamps are on the same battlefield and are not creatures; the
+          -- fodder was sacrificed. Neither shows up, so the list above is a
+          -- narrowing rather than "every permanent".
+          Spec.assertBool s (notElem fodder (Attach.turnUpHosts S.alice aura filter_ unattached)) "the sacrificed creature is not a candidate"
+          Spec.assertEqWith s "and the whole battlefield is bigger than that" (length (Set.toList (GameState.battlefield unattached)) > 2) True
+  -- CR 303.4k's "you MAY attach it": declining leaves the Aura attached to
+  -- nothing, and CR 704.5m puts an unattached Aura into its owner's graveyard.
+  -- The pair with the case above is what says the prompt is a real fork rather
+  -- than a formality -- and S.identityAnswer's Script.declining is what answers
+  -- it here, so this is also the control for "the may is asked at all".
+  Spec.it s "CR 704.5m declining Gift of Doom's may leaves it unattached, and it is buried" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    gift <- S.printingOf s registry "Gift of Doom"
+    case giftBoard swamp piker mammoth gift of
+      Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
+      Just (before, fodder, mine, _, aura) -> do
+        let after = S.runPure (declining fodder) before (FaceDown.turnFaceUp S.alice aura)
+            settled = S.settleSba (S.settleSba after)
+        Spec.assertEqWith s "CR 110.5 it did turn face up" (fmap Object.facing (Game.lookupObject aura after)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 303.4k and attached to nothing" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just Nothing)
+        Spec.assertBool s (not (Set.member aura (GameState.battlefield settled))) "CR 704.5m so the Aura is buried"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Deathtouch mine settled)) "and no creature gained deathtouch"
+  -- CR 701.21a with CR 702.37e: Gift of Doom's morph cost is "sacrifice ANOTHER
+  -- creature", and while it is face down the permanent paying that cost is
+  -- itself a creature (CR 708.2a). "Another" is `Not IsSource`, so the candidate
+  -- list is only right if the cost's Filter is matched against a context that
+  -- knows what the source is -- the same fact Pawl.Engine.Cost.tapCandidates
+  -- records for crew, where a Vehicle could otherwise crew itself.
+  --
+  -- ASSERTED EXACTLY. The Mammoth is on the same battlefield under the same
+  -- player and is admitted; only the Aura is taken off, so a list that dropped
+  -- everything would fail here too.
+  Spec.it s "CR 701.21a a face-down Aura is not 'another creature' for its own morph cost" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    piker <- S.printingOf s registry "Goblin Piker"
+    mammoth <- S.printingOf s registry "War Mammoth"
+    gift <- S.printingOf s registry "Gift of Doom"
+    case giftBoard swamp piker mammoth gift of
+      Nothing -> Spec.assertFailure s "the morph cast of Gift of Doom did not reach the battlefield"
+      Just (before, fodder, mine, _, aura) ->
+        case FaceDown.morphCostOf aura before of
+          Nothing -> Spec.assertFailure s "Gift of Doom should have a morph cost"
+          Just cost -> case Cost.components cost of
+            [CostComponent.Sacrifice _ criterion] ->
+              Spec.assertEqWith
+                s
+                "CR 701.21a every creature alice controls except the Aura itself"
+                (Replacement.sacrificeCandidates S.alice (Just aura) criterion before)
+                (List.sort [fodder, mine])
+            _ -> Spec.assertFailure s "Gift of Doom's morph cost should be one sacrifice component"
 
 -- CR 708.2a in the OTHER direction: a face-up permanent turned face down, which
 -- is Backslide's Effect.TurnFaceDown.
@@ -724,6 +893,61 @@ aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimAt who p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
   _ -> S.identityAnswer p
+
+-- CR 303.4k's board. alice holds the Aura and has three Swamps for CR 702.37a's
+-- {3}, a Goblin Piker her morph cost will sacrifice and a War Mammoth to
+-- enchant; bob has a Goblin Piker of his own. Answers with the face-down
+-- permanent, the fodder, and the two hosts. Nothing if the morph cast did not
+-- land.
+--
+-- The hosts are a 3/3 and a 2/1 under DIFFERENT players, so neither "the only
+-- candidate" nor "the only one alice controls" can produce the right answer by
+-- accident.
+giftBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+giftBoard land piker mammoth gift =
+  let (gs0, card) = morphBoard land gift 3
+      (fodder, gs1) = S.addCreature piker S.alice gs0
+      (mine, gs2) = S.addCreature mammoth S.alice gs1
+      (theirs, gs3) = S.addCreature piker S.bob gs2
+      (after, entered) = castAndResolve gift Facing.FaceDown gs3 card
+   in fmap (\aura -> (after, fodder, mine, theirs, aura)) entered
+
+-- Both of Gift of Doom's turn-up questions: the morph cost's CR 701.21a
+-- sacrifice, answered with the fodder rather than the Mammoth, and CR 303.4k's
+-- destination, answered with the named host.
+--
+-- Neither is left to S.identityAnswer, and for opposite reasons: its
+-- Script.declining would refuse CR 303.4k's printed "may" outright, and the
+-- sacrifice it picked would decide which creature is left to enchant.
+giftAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+giftAnswer fodder host p = case p of
+  Prompt.ChooseSacrifices {} -> Set.singleton fodder
+  Prompt.ChooseAttachment {} -> host
+  Prompt.ChooseTurnUpAttachment {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
+
+-- The morph cost paid and CR 303.4k's "may" refused. Everything else is
+-- S.identityAnswer's, which is where the refusal comes from -- Script.declining
+-- answers every optional that way -- so this differs from giftAnswer above in
+-- exactly the one arm the case under it is about.
+declining :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+declining fodder p = case p of
+  Prompt.ChooseSacrifices {} -> Set.singleton fodder
+  _ -> S.identityAnswer p
+
+-- Gift of Doom's CR 614.1e destination text, read off the committed card rather
+-- than restated here: a test asserting what the rewrite admits is then asserting
+-- what the card really says.
+giftDestinationFilter :: Printing.Printing -> Maybe (Filter.Type.Filter Keyword.Keyword)
+giftDestinationFilter printing =
+  case Face.replacementEffects (S.combinedFace printing) of
+    [ReplacementEffect.TurnUpR _ (TurnUpRewrite.MayAttachTo f)] -> Just f
+    _ -> Nothing
 
 -- A resolved face-down permanent of a morph printing on a board of `n` lands,
 -- three of which CR 702.37a's {3} has tapped. Nothing if the cast did not land.
