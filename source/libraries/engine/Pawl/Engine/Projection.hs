@@ -1121,7 +1121,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
   Effect.Sacrifice _ -> effect
   Effect.RemoveFromCombat _ -> effect
-  Effect.MoveToZone {} -> effect
+  Effect.MoveToZone ref zone riders mSlot mOrigin -> Effect.MoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin
   Effect.Draw {} -> effect
   -- The tally's Filter is text like the Search arm's above (CR 612.1), so a
   -- swap reaches it; the slot it binds to is a name no card prints.
