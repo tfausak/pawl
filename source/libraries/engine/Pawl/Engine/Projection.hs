@@ -2055,6 +2055,14 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
             PC.toughness = Just (Quantity.determine viewOf context gs oid t)
           }
 
+-- projectDeciding with the decision memo dropped, which is what all but one
+-- caller wants. `admits` is bound before `oid` so the candidate-only work inside
+-- the fold is still shared across a whole-board sweep.
+projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
+projectWith admits cands =
+  let forObject = projectDeciding admits cands
+   in \oid gs -> fst (forObject oid gs)
+
 -- Project one object against a PRECOMBINED candidate list, applying only the
 -- layers the predicate admits. CR 613.1 applies layers in order and Layer's
 -- derived Ord IS that order, so `(< bound)` is exactly the layers before this one.
@@ -2065,18 +2073,12 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 -- finite, so the nesting terminates. It is a terminating approximation -- exact
 -- whenever a count reads strictly earlier layers, under-reading one over its own
 -- layer or later (#157).
-projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
-projectWith admits cands =
-  -- Bound before `oid` so the candidate-only work inside projectDeciding is
-  -- shared across the board, exactly as calling it directly would.
-  let forObject = projectDeciding admits cands
-   in \oid gs -> fst (forObject oid gs)
-
--- The fold itself, returning CR 613.6's decision memo beside the characteristics
--- it produced. abilitiesRemoved is the one caller that wants the memo: the
--- question "did this remover's set include `oid`?" is settled inside the fold and
--- cannot be re-derived from a layer-bounded view without contradicting either CR
--- 613.6 or CR 613.7/613.8 -- see the comment there.
+--
+-- Returns CR 613.6's decision memo beside the characteristics, since the question
+-- "did this effect's affected set include `oid`?" is settled in here and cannot
+-- be re-derived from a layer-bounded view without contradicting either CR 613.6
+-- or CR 613.7/613.8. abilitiesRemoved is the one caller that wants it, through
+-- decisionsUpTo; everything else goes through projectWith just above.
 projectDeciding :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
 -- Candidates-in, then a worker taking the object: everything derived from the
 -- candidate list alone is bound before `oid`, so projectAll shares it across the
