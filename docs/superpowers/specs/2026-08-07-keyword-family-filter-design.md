@@ -86,6 +86,24 @@ Exhaustive, NO wildcard. A sibling of the classifiers already there
 Computed, not stored: `ProjectedCharacteristics` gains no field. Correctness over
 performance, and a stored set would be one more derived-state sampling hazard.
 
+### The exhaustive cases the new atom lands in
+
+Three wildcard-free cases over `Filter` had to answer for it, and each answer is a
+rules claim rather than a formality:
+
+- `Engine.Filter.rewrite` (CR 612) -- NOT rewritten, where `HasKeyword` is. Rule
+  612.1's swap acts on a word in the text; Magical Hack turning "Swamp" into "Island"
+  turns a swampwalk into an islandwalk, but "creature with landwalk" still reads
+  landwalk, and CR 702.14a's generic term is not a land type to swap.
+- `Engine.Projection.filterReads` (CR 613.8a) -- reads `Keywords`, the same aspect
+  `HasKeyword` reads, so a creature granted toxic at layer 6 starts satisfying it.
+- `CardSpec.canHostSubjects` (CR 701.3a) -- contributes zero, because a family is
+  payload-free and hides no `Filter` position.
+
+`Engine.Filter` also picks up `Pawl.Engine.Keyword` for `familyOf`, so its
+`Pawl.Types.Keyword` import takes the `Keyword.Type` alias that `Engine.Projection`
+already uses for the same collision.
+
 ### Codec
 
 New `Pawl.Codec.KeywordFamily` and its spec; a `HasKeywordFamily` arm in
@@ -95,14 +113,15 @@ New `Pawl.Codec.KeywordFamily` and its spec; a `HasKeywordFamily` arm in
 ### The card
 
 `data/cards/flensing-raptor.json`: `{2}{W}`, 2/2 Phyrexian Bird, `Flying`, `Toxic 1`,
-and a `SelfEnters` trigger with one target slot narrowed by
+and a `SelfEnters` trigger with one target slot over the `Creatures` pool, narrowed by
 
-    And [HasCardType Creature, ControlledBy You, Not IsSource, HasKeywordFamily Toxic]
+    And [Not IsSource, ControlledBy You, HasKeywordFamily Toxic]
 
 and two effects on that same slot, `ObjectRef.InSlot` making "one target, two
 modifications" expressible: `ModifyTarget UntilEndOfTurn (ModifyPowerToughness 1 1)`
 and `ModifyTarget UntilEndOfTurn (GainKeyword Flying)`. `Not IsSource` is CR 601.2c's
-"another".
+"another". No `HasCardType Creature` conjunct: `Pool.Creatures` already answers that,
+and restating it in the filter would be the pool's question asked twice.
 
 ## Rejected
 
@@ -126,9 +145,11 @@ and `ModifyTarget UntilEndOfTurn (GainKeyword Flying)`. `Not IsSource` is CR 601
 
 ## The maintenance cost, stated plainly
 
-`docs/rules.txt` has 194 CR 702 keyword subrules; 64 describe a parameter in their
-first subrule alone. `Pawl.Types.Keyword` models 34 of the 194, 9 of them
-payload-carrying. So `KeywordFamily` will track roughly a third of `Keyword`'s growth
+Rule 702 runs to 702.194, so past its own general 702.1 it states 193 keywords;
+around a third describe a parameter -- a `[cost]`, an `N`, or a bracketed
+placeholder -- in their first subrule alone, which is a lower bound since some state
+it later. `Pawl.Types.Keyword` models 34 of them, 9 of those payload-carrying. So
+`KeywordFamily` will track roughly a third of `Keyword`'s growth
 -- ward N, annihilator N, bushido N, casualty N, and the alternative-cost crowd all
 land in it eventually. Nine is a snapshot of pawl's coverage, not a fact about Magic.
 
@@ -149,15 +170,33 @@ can write `Nothing` and move on.
 
 ## Verification
 
-- Gameplay test: Flensing Raptor enters; creatures with toxic 1, toxic 2 and toxic 3
-  are all legal targets; a vanilla creature and the Raptor itself are not.
-- `FilterSpec` unit pair pinning family against exact: `HasKeyword (Toxic 2)` rejects
-  toxic 3 while `HasKeywordFamily Toxic` accepts it. This is what keeps Quagmire's
-  question askable, and it sits alongside the existing `PowerAtLeast`/`PowerAtMost`
-  pinning.
-- Mutation: change `familyOf`'s `Toxic` arm to `Nothing` and confirm both the gameplay
-  test and the family half of the unit pair fail; change `matches` to ignore the family
-  and confirm the exact half fails.
+- Gameplay test, in `Pawl.TargetSpec`: a second Flensing Raptor enters beside a first
+  one (toxic 1) and a Branchblight Stalker (toxic 2), and both are legal targets of
+  its trigger, while a Goblin Piker, the entering Raptor itself and bob's Stalker are
+  not. TWO Ns is the point -- one toxic creature would not discriminate, since a
+  HasKeyword-shaped implementation matching the Raptor's own toxic 1 would still fail
+  the Stalker.
+
+  Toxic 3 is deliberately not here: no printing is a plain creature with toxic 3, and
+  the three-way sweep the issue asks for belongs in the unit case below, where the
+  keyword set is built directly.
+
+- `Pawl.FilterSpec` group pinning family against exact: `HasKeyword (Toxic 2)` rejects
+  toxic 1 and toxic 3 while `HasKeywordFamily Toxic` accepts all three; poisonous 2 is
+  not toxic; and CR 702.14a's swampwalk/islandwalk pair splits the two atoms the way
+  Quagmire needs. It sits alongside the existing `PowerAtLeast`/`PowerAtMost` pinning.
+
+- Mutation, all three confirmed to fail the right cases:
+  1. `familyOf`'s `Toxic` arm to `Nothing` -- the family unit case and the gameplay
+     case fail.
+  2. `HasKeyword` widened to compare families (the rejected design) -- the exact unit
+     case and the swampwalk case fail, and nothing else does.
+  3. the family arm answering "has any parameterized keyword" -- the poisonous
+     assertion fails, which is what earns that assertion its place.
+
+  A fourth, the family arm answering `True` outright, never reaches the tests:
+  `-Werror`'s unused-import check rejects it first.
+
 - Repo-wide `ormolu --mode check $(git ls-files '*.hs')` before pushing.
 
 ## Out of scope, staying open

@@ -169,6 +169,8 @@ library codec
     Pawl.Codec.GameEvent
     Pawl.Codec.GameEventSpec
     Pawl.Codec.Keyword
+    Pawl.Codec.KeywordFamily
+    Pawl.Codec.KeywordFamilySpec
     Pawl.Codec.KeywordSpec
     Pawl.Codec.Layout
     Pawl.Codec.LayoutSpec
@@ -578,6 +580,7 @@ library types
     Pawl.Types.HandActionPerformer
     Pawl.Types.HybridPayment
     Pawl.Types.Keyword
+    Pawl.Types.KeywordFamily
     Pawl.Types.LastKnown
     Pawl.Types.Layer
     Pawl.Types.Layout

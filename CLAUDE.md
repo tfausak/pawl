@@ -171,6 +171,13 @@ project-specific rules it doesn't cover:
 - Short names, disambiguated by module --- `Pawl.Types.Mana`, imported as
   `Mana`, rather than long prefixes.
 
+- A new `Pawl.Types.Keyword` constructor that CARRIES A PAYLOAD owes a matching
+  `Pawl.Types.KeywordFamily` constructor in the same change --- that type is how
+  a card says "a creature with toxic" rather than "with toxic 2", and it is
+  owed at the keyword, not at the first card that asks. `-Werror` catches the
+  missing `Pawl.Engine.Keyword.familyOf` arm but not a missing family, since
+  answering `Nothing` compiles.
+
 ## Adding a module
 
 Pick the sublibrary by what the module *is*, not by who calls it. Each is

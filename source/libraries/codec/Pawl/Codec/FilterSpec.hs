@@ -12,6 +12,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -62,6 +63,19 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       (Filter.HasKeyword Keyword.Flying)
       """ {"type":"HasKeyword","value":{"type":"Flying"}} """
+  Spec.it s "HasKeywordFamily" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Filter.HasKeywordFamily KeywordFamily.Toxic)
+      """ {"type":"HasKeywordFamily","value":{"type":"Toxic"}} """
+    -- The two atoms must not share a wire shape: a card asking for the family
+    -- and one asking for toxic 2 have to round-trip back to different filters.
+    Spec.assertBool
+      s
+      (toJson (Filter.HasKeywordFamily KeywordFamily.Toxic) /= toJson (Filter.HasKeyword (Keyword.Toxic 2)))
+      "the toxic family filter is not the toxic 2 filter"
   Spec.it s "PowerAtLeast" $
     Common.assertJsonCodec
       s

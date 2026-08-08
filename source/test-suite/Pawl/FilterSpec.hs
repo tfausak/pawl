@@ -12,6 +12,7 @@ import qualified Pawl.Types.Cost as Cost
 -- component, per the M4.5 P9 plan's global constraints).
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -66,6 +67,12 @@ devoidBigCreature =
       Filter.tapped = False
     }
 
+-- A creature whose only ability is the given keyword -- the toxic N and landwalk
+-- views the family/instance cases below are asked about. Off blackCreature, so
+-- every other axis is a fixed background and only the keyword set varies.
+withKeyword :: Keyword.Keyword -> Filter.View
+withKeyword keyword = blackCreature {Filter.keywords = Set.singleton keyword}
+
 self :: Filter.Context
 self = Filter.MkContext (Just (PlayerId.MkPlayerId 0)) Nothing
 
@@ -104,6 +111,46 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
   Spec.it s "Or matches when either arm matches" $ do
     Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.HasCardType CardType.Enchantment])) "creature or enchantment"
+
+  -- CR 702.1 gives an ability a NAME and rule 702.164a says toxic "is written
+  -- 'toxic N'". The two atoms ask about those two things, and this group is what
+  -- keeps them apart: widening HasKeyword to cover both would make the first
+  -- three assertions below fail, and dropping HasKeywordFamily would make the
+  -- rest unwritable. Both readings have a producer -- Quagmire names swampwalk,
+  -- Flensing Raptor names toxic -- so neither may absorb the other (#522).
+  Spec.describe s "the keyword family and the written instance" $ do
+    -- CR 702.164a. `HasKeyword (Toxic 2)` is toxic 2 and no other N: the
+    -- projection is keyed by the whole keyword, so toxic 1 and toxic 3 are
+    -- different keys and neither is this one.
+    Spec.it s "HasKeyword asks about one written instance" $ do
+      Spec.assertBool s (Filter.matches self (withKeyword (Keyword.Toxic 2)) (Filter.Type.HasKeyword (Keyword.Toxic 2))) "toxic 2 is toxic 2"
+      Spec.assertBool s (not (Filter.matches self (withKeyword (Keyword.Toxic 1)) (Filter.Type.HasKeyword (Keyword.Toxic 2)))) "toxic 1 is not toxic 2"
+      Spec.assertBool s (not (Filter.matches self (withKeyword (Keyword.Toxic 3)) (Filter.Type.HasKeyword (Keyword.Toxic 2)))) "toxic 3 is not toxic 2"
+
+    -- The same three creatures, the other question. This is the issue's own
+    -- success criterion: ONE filter reaching toxic 1, toxic 2 and toxic 3 alike.
+    Spec.it s "HasKeywordFamily asks about the ability, whatever its N" $ do
+      Spec.assertBool s (Filter.matches self (withKeyword (Keyword.Toxic 1)) (Filter.Type.HasKeywordFamily KeywordFamily.Toxic)) "toxic 1 has toxic"
+      Spec.assertBool s (Filter.matches self (withKeyword (Keyword.Toxic 2)) (Filter.Type.HasKeywordFamily KeywordFamily.Toxic)) "toxic 2 has toxic"
+      Spec.assertBool s (Filter.matches self (withKeyword (Keyword.Toxic 3)) (Filter.Type.HasKeywordFamily KeywordFamily.Toxic)) "toxic 3 has toxic"
+
+    -- Not a predicate that says yes to everything: a nullary keyword has no
+    -- family constructor at all, so flying can only ever answer this False.
+    Spec.it s "a family matches nothing outside it" $ do
+      Spec.assertBool s (not (Filter.matches self (withKeyword Keyword.Flying) (Filter.Type.HasKeywordFamily KeywordFamily.Toxic))) "flying is not toxic"
+      Spec.assertBool s (not (Filter.matches self (withKeyword (Keyword.Poisonous 2)) (Filter.Type.HasKeywordFamily KeywordFamily.Toxic))) "CR 702.70a poisonous 2 is not toxic 2"
+
+    -- CR 702.14a's generic term, and the reason the exact atom had to survive:
+    -- Quagmire is "creatures with SWAMPWALK", not creatures with landwalk, and
+    -- CR 702.14d says landwalk abilities don't cancel one another -- so an
+    -- islandwalker is a different ability, not a different value of the same one.
+    Spec.it s "CR 702.14a swampwalk is not islandwalk, but both are landwalk" $ do
+      let swampwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Swamp)
+          islandwalk = Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Island)
+      Spec.assertBool s (Filter.matches self (withKeyword swampwalk) (Filter.Type.HasKeyword swampwalk)) "Quagmire reaches swampwalk"
+      Spec.assertBool s (not (Filter.matches self (withKeyword islandwalk) (Filter.Type.HasKeyword swampwalk))) "and not islandwalk"
+      Spec.assertBool s (Filter.matches self (withKeyword swampwalk) (Filter.Type.HasKeywordFamily KeywordFamily.Landwalk)) "Staff of the Ages reaches swampwalk"
+      Spec.assertBool s (Filter.matches self (withKeyword islandwalk) (Filter.Type.HasKeywordFamily KeywordFamily.Landwalk)) "and islandwalk too"
 
   Spec.it s "PowerAtLeast compares projected power" $ do
     Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.PowerAtLeast 4))) "power 2 < 4"

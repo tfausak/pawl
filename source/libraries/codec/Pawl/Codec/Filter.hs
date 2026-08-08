@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
@@ -23,6 +24,9 @@ optional decode = Common.decodeMaybe (fromJson decode)
 -- The keyword codec is a PARAMETER: Pawl.Codec.Keyword imports this module for
 -- CR 702.29e's typecycling filter, so a direct call to Keyword.toJson here
 -- would close a module cycle. Every caller passes Pawl.Codec.Keyword.toJson.
+-- Pawl.Codec.KeywordFamily is called DIRECTLY below and needs no parameter,
+-- mirroring the types it encodes: a family carries no filter, so that module
+-- imports neither this one nor Pawl.Codec.Keyword.
 toJson :: (keyword -> Value.Value) -> Filter.Filter keyword -> Value.Value
 toJson encode filter_ = case filter_ of
   Filter.HasCardType t -> Common.tagged "HasCardType" . Just $ CardType.toJson t
@@ -30,6 +34,7 @@ toJson encode filter_ = case filter_ of
   Filter.HasColor c -> Common.tagged "HasColor" . Just $ Color.toJson c
   Filter.HasSubtype sub -> Common.tagged "HasSubtype" . Just $ Subtype.toJson sub
   Filter.HasKeyword k -> Common.tagged "HasKeyword" . Just $ encode k
+  Filter.HasKeywordFamily f -> Common.tagged "HasKeywordFamily" . Just $ KeywordFamily.toJson f
   Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Common.integer n
   Filter.PowerAtMost n -> Common.tagged "PowerAtMost" . Just $ Common.integer n
   Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Common.integer n
@@ -57,6 +62,7 @@ fromJson decode value = do
     ("HasColor", Just v) -> Filter.HasColor <$> Color.fromJson v
     ("HasSubtype", Just v) -> Filter.HasSubtype <$> Subtype.fromJson v
     ("HasKeyword", Just v) -> Filter.HasKeyword <$> decode v
+    ("HasKeywordFamily", Just v) -> Filter.HasKeywordFamily <$> KeywordFamily.fromJson v
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Common.asInteger v
     ("PowerAtMost", Just v) -> Filter.PowerAtMost <$> Common.asInteger v
     ("ManaValueAtMost", Just v) -> Filter.ManaValueAtMost <$> Common.asInteger v
