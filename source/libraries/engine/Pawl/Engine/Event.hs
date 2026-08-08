@@ -106,6 +106,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -1848,10 +1849,80 @@ changeZoneAttaching asOf oid requestedDest position seed tapped under shown faci
                     -- anywhere else must leave it face up.
                     Object.facing = if dest == requestedDest then facing else Facing.FaceUp
                   }
+              -- CR 604.2 ends a static ability's continuous effect the moment
+              -- its permanent leaves the battlefield. A card whose own text
+              -- overrides that -- Titania's Song's "If this enchantment leaves
+              -- the battlefield, this effect continues until end of turn" --
+              -- needs the effect to outlive the ability generating it, and the
+              -- only way an effect outlives its source is to become a STORED
+              -- one (CR 611.2). So the abilities this permanent prints with a
+              -- StaticAbility.lingers duration are handed over here, as it
+              -- goes.
+              --
+              -- Everything is read from `gs`, the board the permanent is still
+              -- on and still projecting from, so what is handed over is the
+              -- effect that was actually applying. CR 611.2c then fixes its set
+              -- for good: the noncreature artifacts Titania's Song names at
+              -- THIS instant, never the live filter -- an artifact that enters
+              -- after the Song is gone is not animated. Pawl.ExpirySpec's
+              -- whole-card case proves both halves, and its Humility case is
+              -- the control for the gate: an ability with no such clause hands
+              -- over nothing and ends at once.
+              --
+              -- The timestamp is the departing permanent's own, the one CR
+              -- 613.7a already gave this effect, rather than a fresh one: the
+              -- card says "this effect CONTINUES", so it is the same effect and
+              -- nothing reorders it against its neighbours within its layers.
+              -- CR 613.7b's fresh timestamp belongs to an effect the resolution
+              -- of a spell or ability creates, and nothing resolved here.
+              --
+              -- ONE stored effect per PART, since a stored effect carries a
+              -- single modification. CR 613.6's "one set for the whole effect"
+              -- survives that split by construction: frozenStaticParts freezes
+              -- every part of an ability to the same objects, so asking each of
+              -- them separately can only get the same answer back.
+              --
+              -- `lastController` is CR 109.5's "you" for the arming, read from
+              -- the same pre-move board.
+              --
+              -- Not implemented: CR 800.4a's removal of a departing player's
+              -- objects takes a permanent off the battlefield without a zone
+              -- change, so it never reaches here and hands nothing over (#1037).
+              lingering :: [(Natural, Duration.Duration)]
+              lingering =
+                [ (n, duration)
+                | fromZone == Zone.Battlefield,
+                  face <- Maybe.maybeToList (Game.faceOf oid gs),
+                  (n, sa) <- zip [0 ..] (Face.staticAbilities face),
+                  duration <- Maybe.maybeToList (StaticAbility.lingers sa)
+                ]
+              -- Short-circuited on the cheap printed read above, so an ordinary
+              -- zone change -- every one in the pool but this card's -- never
+              -- pays for the projection frozenStaticParts spends.
+              handover =
+                if null lingering
+                  then []
+                  else
+                    [ ContinuousEffect.MkContinuousEffect
+                        { ContinuousEffect.source = oid,
+                          ContinuousEffect.timestamp = ts,
+                          ContinuousEffect.expiry = expiry,
+                          ContinuousEffect.modification = modification,
+                          ContinuousEffect.affected = Affected.TheseObjects frozen
+                        }
+                    | (n, ts, modification, frozen) <- Projection.frozenStaticParts oid gs,
+                      duration <- fmap snd (filter ((== n) . fst) lingering),
+                      expiry <- Maybe.maybeToList (Expiry.arm lastController oid duration gs)
+                    ]
           State.modify' $ \g ->
             let g1 = Game.removeFromZones pid oid g
              in g1
                   { GameState.objects = Map.delete oid (GameState.objects g1),
+                    -- Stored as the permanent goes, in the same write that
+                    -- removes it: nothing can observe a board where the
+                    -- permanent has left and its effect has not yet been handed
+                    -- over.
+                    GameState.continuousEffects = handover <> GameState.continuousEffects g1,
                     -- CR 608.2h: the object ceases here, so this is the last
                     -- moment its information is known. Filed under the id it had
                     -- while it existed -- the id an ability on the stack still

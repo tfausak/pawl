@@ -6,11 +6,19 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Timestamp as Timestamp
 
--- | A stored, resolution-generated continuous effect (CR 611.2), held in
--- GameState.continuousEffects. `timestamp` orders it within its layer (CR 613.7);
--- `expiry` decides when a sweep drops it (Pawl.Engine.Expiry; CR 514.2, 611.2a, 611.2b);
--- `affected` is its fixed set (CR 611.2c). Static-ability effects are NOT stored
--- here -- they are re-derived from Face.staticAbilities each projection.
+-- | A stored continuous effect (CR 611.2), held in GameState.continuousEffects.
+-- `timestamp` orders it within its layer (CR 613.7); `expiry` decides when a
+-- sweep drops it (Pawl.Engine.Expiry; CR 514.2, 611.2a, 611.2b); `affected` is
+-- its fixed set (CR 611.2c). Static-ability effects are NOT stored here -- they
+-- are re-derived from Face.staticAbilities each projection.
+--
+-- Made by a spell or ability RESOLVING, all but one of them. The exception is
+-- the one clause that turns a static ability's effect into a stored one:
+-- StaticAbility.lingers, Titania's Song's "if this enchantment leaves the
+-- battlefield, this effect continues until end of turn", which
+-- Pawl.Engine.Event hands over as the permanent goes. Such an effect keeps the
+-- timestamp CR 613.7a gave it rather than taking a fresh one, since the card
+-- says it is the same effect continuing.
 data ContinuousEffect = MkContinuousEffect
   { source :: ObjectId.ObjectId,
     timestamp :: Timestamp.Timestamp,

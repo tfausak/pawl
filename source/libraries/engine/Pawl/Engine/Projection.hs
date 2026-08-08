@@ -865,6 +865,14 @@ affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) 
 -- to a spell or ability's resolution, while a static ability's effect (CR 604.2)
 -- is regenerated per projection and must keep moving.
 --
+-- Nor to the effect frozenStaticParts hands over as a permanent leaves, which
+-- is the same reason one step on: CR 611.2d fixes a variable "only once, on
+-- resolution", and nothing resolved there. So Titania's Song's "power and
+-- toughness each equal to its mana value" keeps reading mana value live after
+-- the Song is gone, exactly as it did before -- which is what "this effect
+-- continues" asks for. CR 611.2c's affected set is the one thing that DOES get
+-- fixed there, and it is fixed because the rule names it.
+--
 -- Nothing when any quantity cannot be evaluated at store time -- a value
 -- undeterminable at that one moment cannot be determined later either, so
 -- re-reading it live would be wrong rather than deferred, and Resolve stores
@@ -1566,7 +1574,9 @@ gatherGiven stripped functioning gs =
   let setEffs = setLandSubtypeEffects gs
       -- A stored effect carries exactly one modification, so CR 613.6 has nothing
       -- to hold together -- and every stored effect's set is CR 611.2c's
-      -- TheseObjects, locked at resolution.
+      -- TheseObjects, locked when the effect began: at resolution for the ones a
+      -- spell or ability made, and at the departure for the ones
+      -- frozenStaticParts froze.
       fromStored eff =
         MkGathered
           { gEffect = Nothing,
@@ -1578,23 +1588,7 @@ gatherGiven stripped functioning gs =
             gModification = ContinuousEffect.modification eff
           }
       stored = fmap fromStored (GameState.continuousEffects gs)
-      fromPermanent permId = case Game.lookupObject permId gs of
-        Nothing -> []
-        Just permObj -> case Game.faceOf permId gs of
-          Nothing -> []
-          Just face ->
-            if null setEffs || liveGiven setEffs permId gs
-              then
-                -- CR 612: rewrite each static ability's subtype words by the text
-                -- changes affecting THIS source, before its effect is folded onto
-                -- any other object.
-                let changes = textChangesAffecting permId gs
-                 in -- One thunk per permanent, shared by all its abilities and
-                    -- forced by none unless an ability is entirely above layer 6,
-                    -- so the projection costs at most one per permanent.
-                    concat (zipWith (gatherStatic (functioning permId) permId (Object.timestamp permObj) changes (stripped permId)) [0 ..] (Face.staticAbilities face))
-              else []
-      static = concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+      static = concatMap (fmap snd . permanentParts stripped functioning setEffs gs) (Set.toList (GameState.battlefield gs))
       fromEmblem emblemId = case Game.lookupObject emblemId gs of
         Nothing -> []
         Just emblemObj -> case Game.faceOf emblemId gs of
@@ -1609,6 +1603,102 @@ gatherGiven stripped functioning gs =
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       counters = counterGathered gs
    in stored <> static <> emblems <> counters
+
+-- ONE battlefield permanent's static-ability parts, each tagged with the index
+-- of the ability it came from -- gatherStatic's `n`, and so the key half CR
+-- 613.6's decision memo is filed under.
+--
+-- Hoisted out of gatherGiven's battlefield walk so that frozenStaticParts below
+-- gathers a permanent's parts by exactly the walk the fold uses, gates and CR
+-- 612 rewrite included. A second copy of this body is the one thing the
+-- departure handover must not have: it would freeze a set the fold never
+-- applied.
+--
+-- The index is dropped by gatherGiven, which has no use for it -- gatherStatic
+-- has already spent it on `gEffect`.
+permanentParts :: (ObjectId -> Bool) -> (ObjectId -> Layer -> Condition.Type.Condition -> Bool) -> [(ObjectId, Affected.Affected)] -> GameState -> ObjectId -> [(Natural, Gathered)]
+permanentParts stripped functioning setEffs gs permId = case Game.lookupObject permId gs of
+  Nothing -> []
+  Just permObj -> case Game.faceOf permId gs of
+    Nothing -> []
+    Just face ->
+      if null setEffs || liveGiven setEffs permId gs
+        then
+          -- CR 612: rewrite each static ability's subtype words by the text
+          -- changes affecting THIS source, before its effect is folded onto
+          -- any other object.
+          let changes = textChangesAffecting permId gs
+              -- One thunk per permanent, shared by all its abilities and
+              -- forced by none unless an ability is entirely above layer 6,
+              -- so the projection costs at most one per permanent. Bound
+              -- here, OUTSIDE the zipWith, which is what shares it.
+              partsOf = gatherStatic (functioning permId) permId (Object.timestamp permObj) changes (stripped permId)
+              tagged n sa = fmap ((,) n) (partsOf n sa)
+           in concat (zipWith tagged [0 ..] (Face.staticAbilities face))
+        else []
+
+-- CR 611.2c, applied to a static ability's effect: the parts `src`'s own static
+-- abilities are generating RIGHT NOW, each with the index of the ability it
+-- belongs to, the timestamp CR 613.7a gave it, and its affected set resolved
+-- from a live predicate to the concrete objects it names at this instant.
+--
+-- The one reader is Pawl.Engine.Event's departure handover, for a card whose
+-- text says its effect outlives its own permanent (StaticAbility.lingers). Such
+-- an effect stops being a static ability's and becomes a STORED one, and CR
+-- 611.2c fixes a stored effect's set when it begins -- which is here, on the
+-- board the permanent is still on. Never called for an ordinary ability, whose
+-- set goes on being re-derived every projection (CR 613.5).
+--
+-- The set is asked ONCE PER ABILITY and copied onto each of its parts, which is
+-- CR 613.6: the affected set belongs to the effect, not to its parts. Every
+-- part of one ability therefore freezes to the same objects, which is what lets
+-- the caller store them as separate single-modification effects without the
+-- split being observable.
+--
+-- Each part's answer is taken at CR 613.6's decision point -- gLowest -- and by
+-- the same two routes abilitiesRemoved takes: projectWith's own memo for a
+-- multi-part effect, so the two cannot drift, and a bounded projection for a
+-- single-part one.
+frozenStaticParts :: ObjectId -> GameState -> [(Natural, Timestamp, Modification, Set ObjectId)]
+frozenStaticParts src gs =
+  let cands = gather gs
+      -- gather's own seed list, and the same one it feeds its two gates.
+      ungated = gatherGiven (const False) alwaysFunctioning gs
+      parts = permanentParts (abilitiesRemoved ungated gs) (conditionHolds ungated gs) (setLandSubtypeEffects gs) gs src
+      applies c oid =
+        let lyr = gLowest c
+            partial = projectUpTo lyr cands oid gs
+            decided = decisionsUpTo lyr cands oid gs
+         in case gEffect c >>= (`Map.lookup` decided) of
+              Just answer -> answer
+              Nothing -> affects (gSource c) oid (gAffected c) partial gs
+      -- One entry per ability rather than per part, so the set is computed once
+      -- and shared -- the parts of an ability agree on both inputs, gAffected
+      -- and gLowest, so whichever part Map.fromList keeps asks the same
+      -- question. Lazy, so only the retained thunk is ever forced.
+      byAbility = Map.fromList [(n, Set.filter (applies c) (candidatesFor (gAffected c) gs)) | (n, c) <- parts]
+   in -- `parts` order, which is the card's PRINTED order (gatherStatic's), and
+      -- load-bearing once these become separate stored effects: the fold applies
+      -- same-layer parts sharing one timestamp in list order, so reordering them
+      -- here would reorder the ability against itself.
+      [(n, gTimestamp c, gModification c, Map.findWithDefault Set.empty n byAbility) | (n, c) <- parts]
+
+-- The objects an affected set could possibly name, so freezing one need not
+-- project every object in the game. Battlefield-scoped for every arm the
+-- battlefield bounds -- `affects` gates Matching and AttachedPlayerControls on
+-- membership itself, and CR 303.4's attachment only ever names a permanent --
+-- and the whole pool for MatchingAnywhere, which is the arm that exists because
+-- its set is not scoped to the battlefield.
+candidatesFor :: Affected.Affected -> GameState -> Set ObjectId
+candidatesFor a gs = case a of
+  Affected.Matching _ -> GameState.battlefield gs
+  Affected.Attached -> GameState.battlefield gs
+  Affected.AttachedPlayerControls _ -> GameState.battlefield gs
+  Affected.MatchingAnywhere _ -> Map.keysSet (GameState.objects gs)
+  -- Already fixed (CR 611.2c), so `affects` answers True for exactly these and
+  -- freezing it is the identity. Returned rather than special-cased away, so
+  -- the caller has one shape to filter.
+  Affected.TheseObjects s -> s
 
 -- CR 613.1f, hoisted over the whole game: "were THIS object's abilities removed
 -- by the time layer 6 finished?", as one predicate. For a caller OUTSIDE the

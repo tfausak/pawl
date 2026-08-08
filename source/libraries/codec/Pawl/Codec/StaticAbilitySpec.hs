@@ -11,6 +11,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
@@ -29,7 +30,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       s
       StaticAbility.toJson
       StaticAbility.fromJson
-      (StaticAbility.MkStaticAbility Affected.Attached Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
+      (StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying)))
       """ {"affected":{"type":"Attached"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- Humility's shape: several parts under one affected set (CR 613.6).
   Spec.it s "several parts" $
@@ -39,6 +40,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       StaticAbility.fromJson
       ( StaticAbility.MkStaticAbility
           Affected.Attached
+          Nothing
           Nothing
           (Modification.LoseAllAbilities NonEmpty.:| [Modification.SetBasePowerToughness (Quantity.Literal 1) (Quantity.Literal 1)])
       )
@@ -61,9 +63,25 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
                   (Quantity.Literal 1)
               )
           )
+          Nothing
           (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
       )
       """ {"affected":{"type":"Attached"},"condition":{"comparison":{"type":"AtLeast"},"measured":{"type":"Count","value":{"aggregation":{"type":"Objects"},"filter":{"type":"HasSubtype","value":{"type":"Forest"}},"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]}}},"threshold":{"type":"Literal","value":1}},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
+  -- Titania's Song's second sentence: CR 604.2's other override, and optional
+  -- for the condition's reason -- absent means the effect ends with its
+  -- permanent, which is every other ability in the pool.
+  Spec.it s "a leaves-the-battlefield duration" $
+    Common.assertJsonCodec
+      s
+      StaticAbility.toJson
+      StaticAbility.fromJson
+      ( StaticAbility.MkStaticAbility
+          Affected.Attached
+          Nothing
+          (Just Duration.UntilEndOfTurn)
+          (NonEmpty.singleton (Modification.GainKeyword Keyword.Flying))
+      )
+      """ {"affected":{"type":"Attached"},"lingers":{"type":"UntilEndOfTurn"},"modifications":[{"type":"GainKeyword","value":{"type":"Flying"}}]} """
   -- CR 613.6 is why a static ability is one affected set and one or more parts, so
   -- the wire format is an array -- and an array can be empty. An ability with
   -- no parts does nothing, which no card means, so it is a decode FAILURE

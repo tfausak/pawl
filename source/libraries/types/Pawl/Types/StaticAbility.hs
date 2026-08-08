@@ -3,6 +3,7 @@ module Pawl.Types.StaticAbility where
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
+import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Modification as Modification
 
 -- | A card's printed static continuous ability (CR 604.1/604.2: a static ability
@@ -43,6 +44,22 @@ data StaticAbility = MkStaticAbility
     -- re-asked on every projection (CR 613.5) and so turns the same effect off and
     -- on again as the board moves, with no resolution and no trigger in between.
     condition :: Maybe Condition.Condition,
+    -- | Titania's Song's second sentence: "If this enchantment leaves the
+    -- battlefield, this effect continues until end of turn." Nothing -- almost
+    -- every ability -- is CR 604.2 as written, the effect ending with the
+    -- permanent; Just d is the card overriding that with a duration of its own.
+    --
+    -- The handover is Pawl.Engine.Event's, at the moment the permanent leaves,
+    -- and what it hands over is a STORED effect (CR 611.2). So the clause moves
+    -- the ability's effect from one side of CR 611.2c to the other: the live
+    -- `affected` set below is resolved to the concrete objects it names right
+    -- then, and never re-derived again.
+    --
+    -- A Duration and not a Bool, because the clause states one in words the
+    -- printed vocabulary already has -- "until end of turn" is
+    -- Duration.UntilEndOfTurn, the same value a spell would print. A card
+    -- naming a different one needs no new field.
+    lingers :: Maybe Duration.Duration,
     modifications :: NonEmpty.NonEmpty Modification.Modification
   }
   deriving (Eq, Ord, Show)

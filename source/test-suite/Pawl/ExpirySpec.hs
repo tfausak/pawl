@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
+import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -1010,6 +1011,110 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     Spec.assertBool s (not (Projection.isCreatureOf statueId after)) "never a creature"
     Spec.assertEqWith s "so it never attacked" (S.lifeOf S.bob after) (Just 20)
 
+-- Aims every target slot at one object, so a spell with two legal targets on
+-- the board is pointed at the one the test means. S.identityAnswer would take
+-- the engine's first offer, and below that offer is a choice between Titania's
+-- Song and the Bonesplitter the Song has itself turned into a creature.
+aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtObject oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  _ -> S.identityAnswer p
+
+-- The duration that begins when a permanent LEAVES the battlefield rather than
+-- when a spell resolves.
+--
+-- Titania's Song ({3}{G} Enchantment, Antiquities / Masters Edition IV): "Each
+-- noncreature artifact loses all abilities and becomes an artifact creature
+-- with power and toughness each equal to its mana value. If this enchantment
+-- leaves the battlefield, this effect continues until end of turn."
+--
+-- CR 604.2 gives a static ability's continuous effect exactly the life of its
+-- permanent on the battlefield, so the second sentence is the card overriding
+-- that: the effect has to survive the ability that made it, which means being
+-- handed over to GameState.continuousEffects as the Song goes.
+lingeringSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+lingeringSpec s registry = Spec.describe s "TitaniasSong" $ do
+  -- The gameplay-level proof (design.md section 4), all five moments in one
+  -- test because they are one board: only a run that ANIMATED the Bonesplitter,
+  -- then really removed the Song, can say anything about what happens after.
+  --
+  -- Bonesplitter ({1} Artifact -- Equipment) is the animated permanent because
+  -- it makes all three of the Song's parts observable at once: it is a
+  -- noncreature artifact (so the layer-4 animation reaches it), its mana value
+  -- is 1 (so CR 613.4b's base P/T is a 1/1 rather than a 0/0 CR 704.5f would
+  -- bury), and it prints a real Equip ability (so the layer-6 strip is
+  -- observable at all -- without one, steps 1 and 4 would pass vacuously).
+  --
+  -- Angelic Edict ({4}{W} Sorcery, "Exile target creature or enchantment") is
+  -- how the Song leaves: exiling is leaving the battlefield, and no card in the
+  -- pool destroys an enchantment. Five Plains pay for it.
+  Spec.it s "CR 611.2a whole card: the animation outlives Titania's Song and ends at cleanup" $ do
+    plains <- S.printingOf s registry "Plains"
+    titaniasSong <- S.printingOf s registry "Titania's Song"
+    bonesplitter <- S.printingOf s registry "Bonesplitter"
+    jadeStatue <- S.printingOf s registry "Jade Statue"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    let base = S.landsInPlay plains 5
+        (songId, g1) = S.addCreature titaniasSong S.alice base
+        (axeId, g2) = S.addCreature bonesplitter S.alice g1
+        (staged, spellId) = S.handOne angelicEdict g2
+        cast = S.runPure (aimAtObject songId) staged (S.cast S.alice spellId)
+        exiled = S.settleSba (S.runPure (aimAtObject songId) cast Stack.resolveTop)
+        -- CR 611.2c's anti-over-reach probe: a noncreature artifact that
+        -- arrives AFTER the handover. Jade Statue is a {4} artifact with an
+        -- activated ability, so an implementation that carried the Song's live
+        -- "each noncreature artifact" filter forward would show up here twice
+        -- over -- as a 4/4 creature, and as one with no abilities.
+        (statueId, withStatue) = S.addCreature jadeStatue S.alice exiled
+        toCleanup =
+          withStatue
+            { GameState.remaining = Seq.fromList [Phase.Ending EndingStep.EndStep, Phase.Ending EndingStep.Cleanup]
+            }
+        afterMain = S.runPure S.identityAnswer toCleanup Engine.runStep
+        afterEnd = S.runPure S.identityAnswer afterMain Engine.runStep
+        afterCleanup = S.runPure S.identityAnswer afterEnd Engine.runStep
+    -- 1. Before: the Song is doing all three of its jobs.
+    Spec.assertBool s (Projection.isCreatureOf axeId staged) "CR 613.1d the Song animates the Bonesplitter"
+    Spec.assertEqWith s "CR 613.4b a 1/1, its mana value" (S.powerToughnessOf axeId staged) (Just (1, 1))
+    Spec.assertEqWith s "CR 613.1f and its Equip ability is stripped" (Projection.abilitiesOf axeId staged) []
+    -- 2. The Song really left. Without this the rest passes trivially.
+    Spec.assertEqWith s "Angelic Edict exiled Titania's Song" (Game.lookupObject songId exiled) Nothing
+    Spec.assertBool s (not (S.onBattlefield songId exiled)) "so it is off the battlefield"
+    -- 3. CR 611.2c: the set was fixed when the effect began.
+    Spec.assertBool s (not (Projection.isCreatureOf statueId withStatue)) "CR 611.2c an artifact entering afterwards is NOT animated"
+    Spec.assertEqWith s "and keeps its own ability" (length (Projection.abilitiesOf statueId withStatue)) 1
+    -- 4. Same turn, Song gone: the effect continues.
+    Spec.assertBool s (Projection.isCreatureOf axeId exiled) "CR 611.2a the animation continues without the Song"
+    Spec.assertEqWith s "still a 1/1" (S.powerToughnessOf axeId exiled) (Just (1, 1))
+    Spec.assertEqWith s "still no abilities" (Projection.abilitiesOf axeId exiled) []
+    -- 5. CR 514.2: and the whole thing ends in the cleanup step.
+    Spec.assertEqWith s "the cleanup step ran" (GameState.phase afterEnd) (Phase.Ending EndingStep.Cleanup)
+    Spec.assertBool s (not (Projection.isCreatureOf axeId afterCleanup)) "CR 514.2 no longer a creature after cleanup"
+    Spec.assertEqWith s "and its Equip ability is back" (length (Projection.abilitiesOf axeId afterCleanup)) 1
+  -- The control, and CR 604.2 read straight: a static ability whose card says
+  -- nothing about leaving the battlefield ends with its permanent, THIS
+  -- INSTANT. Humility is the same shape as Titania's Song one card over -- a
+  -- layer-6 strip beside a layer-7b P/T set -- so an implementation that handed
+  -- every departing permanent's static abilities over would keep Bird Maiden a
+  -- 1/1 with no flying here, and the test above could not tell it apart.
+  Spec.it s "CR 604.2 an ordinary static ability does NOT linger past its permanent" $ do
+    plains <- S.printingOf s registry "Plains"
+    humility <- S.printingOf s registry "Humility"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    angelicEdict <- S.printingOf s registry "Angelic Edict"
+    let base = S.landsInPlay plains 5
+        (humilityId, g1) = S.addCreature humility S.alice base
+        (birdId, g2) = S.addCreature birdMaiden S.alice g1
+        (staged, spellId) = S.handOne angelicEdict g2
+        cast = S.runPure (aimAtObject humilityId) staged (S.cast S.alice spellId)
+        exiled = S.settleSba (S.runPure (aimAtObject humilityId) cast Stack.resolveTop)
+    Spec.assertEqWith s "CR 613 Humility makes it a 1/1" (S.powerToughnessOf birdId staged) (Just (1, 1))
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying birdId staged)) "with no flying"
+    Spec.assertEqWith s "Angelic Edict exiled Humility" (Game.lookupObject humilityId exiled) Nothing
+    Spec.assertEqWith s "CR 604.2 and the Maiden is a 1/2 again at once" (S.powerToughnessOf birdId exiled) (Just (1, 2))
+    Spec.assertBool s (Projection.hasKeyword Keyword.Flying birdId exiled) "with its flying back"
+    Spec.assertEqWith s "nothing was handed over" (GameState.continuousEffects exiled) []
+
 poolSize :: PlayerId.PlayerId -> GameState.GameState -> Int
 poolSize pid gs = case Game.poolOf pid gs of
   Mana.Type.MkMana units -> length units
@@ -1024,3 +1129,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Expiry" $ do
   masterThiefSpec s registry
   monarchSpec s registry
   hagSpec s registry
+  lingeringSpec s registry

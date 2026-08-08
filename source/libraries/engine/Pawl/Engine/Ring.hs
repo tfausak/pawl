@@ -146,6 +146,10 @@ theRingIsLegendary =
               ]
           ),
       StaticAbility.condition = Nothing,
+      -- CR 604.2 as written: the emblem's ability is not a card's text saying
+      -- its effect outlives the emblem, and CR 114.4 keeps the emblem in the
+      -- command zone anyway.
+      StaticAbility.lingers = Nothing,
       StaticAbility.modifications = NonEmpty.singleton (Modification.AddSupertype Supertype.Legendary)
     }
 

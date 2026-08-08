@@ -188,7 +188,7 @@ populatedFace :: Face.Face Card.Card
 populatedFace =
   baseFace
     { Face.keywords = Set.singleton Keyword.Deathtouch,
-      Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
+      Face.staticAbilities = [StaticAbility.MkStaticAbility Affected.Attached Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)],
       Face.activatedAbilities = [ActivatedAbility.MkActivatedAbility (Cost.MkCost (Just (ManaCost.MkManaCost [])) []) minimalModal [] Nothing],
       Face.replacementEffects = [ReplacementEffect.EntryR Filter.IsSource EntryRewrite.AsCopy],
       Face.triggeredAbilities = [minimalTriggeredAbility],

@@ -194,6 +194,7 @@ grantsItself keyword =
   StaticAbility.MkStaticAbility
     (Affected.Matching Filter.Type.IsSource)
     Nothing
+    Nothing
     (NonEmpty.singleton (Modification.GainKeyword keyword))
 
 -- CR 709.4's fixture: two halves that DIFFER on every axis Pawl.Engine.Card.merge2
@@ -404,10 +405,12 @@ modificationCounts modification = case modification of
 
 -- Every Count reachable from a StaticAbility: its modifications' P/T quantities,
 -- plus CR 604.2's "as long as" gate, which is a Condition and so a pair of
--- Quantities.
+-- Quantities -- and the leaves-the-battlefield duration beside it, which is a
+-- Duration and so another Condition when it is a CR 611.2b "for as long as".
 staticAbilityCounts :: StaticAbility.StaticAbility -> [Count.Type.Count Quantity.Type.Quantity]
 staticAbilityCounts ability =
   concatMap conditionCounts (Maybe.maybeToList (StaticAbility.condition ability))
+    <> concatMap durationCounts (Maybe.maybeToList (StaticAbility.lingers ability))
     <> concatMap modificationCounts (StaticAbility.modifications ability)
 
 -- Every Count reachable from a TriggerCondition: only StateIs (CR 603.8, a
@@ -1508,13 +1511,15 @@ modificationFilters modification = case modification of
   Modification.AddChosenColor -> []
   Modification.SwitchPowerToughness -> []
 
--- Three Filter positions, not two: the affected set, each modification's own
--- keywords and Counts, and -- since CR 604.2's "as long as" gate landed -- the
--- Counts inside that condition.
+-- Four Filter positions, not two: the affected set, each modification's own
+-- keywords and Counts, -- since CR 604.2's "as long as" gate landed -- the
+-- Counts inside that condition, and the leaves-the-battlefield duration's own,
+-- which a CR 611.2b "for as long as" would carry.
 staticAbilityFilters :: StaticAbility.StaticAbility -> [Filter.Type.Filter Keyword.Keyword]
 staticAbilityFilters ability =
   affectedFilters (StaticAbility.affected ability)
     <> concatMap conditionFilters (Maybe.maybeToList (StaticAbility.condition ability))
+    <> concatMap durationFilters (Maybe.maybeToList (StaticAbility.lingers ability))
     <> concatMap modificationFilters (StaticAbility.modifications ability)
 
 -- CR 603.6a's "whenever [a permanent] enters" carries one directly; CR 603.8's
@@ -3329,6 +3334,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           StaticAbility.MkStaticAbility
             (Affected.Matching Filter.Type.IsSource)
             Nothing
+            Nothing
             (NonEmpty.singleton (Modification.ModifyPowerToughness quantity (Quantity.Type.Literal 0)))
         planted =
           [ ( "a target spec",
@@ -3342,6 +3348,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 { Face.staticAbilities =
                     [ StaticAbility.MkStaticAbility
                         (Affected.Matching buried)
+                        Nothing
                         Nothing
                         (NonEmpty.singleton (Modification.ModifyPowerToughness (Quantity.Type.Literal 1) (Quantity.Type.Literal 1)))
                     ]
@@ -3407,7 +3414,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                     spellOf
                       [ Effect.Create
                           (Quantity.Type.Literal 1)
-                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}))
+                          (oneFaced (base {Face.staticAbilities = [StaticAbility.MkStaticAbility (Affected.Matching buried) Nothing Nothing (NonEmpty.singleton Modification.LoseAllAbilities)]}))
                           EntryRiders.defaultValue
                           Nothing
                       ]
