@@ -8,6 +8,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.Subtype as Subtype
+import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Modification as Modification
@@ -24,6 +25,8 @@ toJson m = case m of
   Modification.SetCreatureSubtype s -> Common.tagged "SetCreatureSubtype" . Just $ Subtype.toJson s
   Modification.AddCreatureSubtype s -> Common.tagged "AddCreatureSubtype" . Just $ Subtype.toJson s
   Modification.AddCardType c -> Common.tagged "AddCardType" . Just $ CardType.toJson c
+  Modification.AddSupertype t -> Common.tagged "AddSupertype" . Just $ Supertype.toJson t
+  Modification.RemoveSupertype t -> Common.tagged "RemoveSupertype" . Just $ Supertype.toJson t
   Modification.ChangeSubtypeWord a b -> Common.tagged "ChangeSubtypeWord" . Just . Common.array $ [Subtype.toJson a, Subtype.toJson b]
   Modification.SetController p -> Common.tagged "SetController" . Just $ PlayerId.toJson p
   Modification.SetControllerToSource -> Common.nullary "SetControllerToSource"
@@ -49,6 +52,8 @@ fromJson value = do
     "SetCreatureSubtype" -> Common.withValue mv (fmap Modification.SetCreatureSubtype . Subtype.fromJson)
     "AddCreatureSubtype" -> Common.withValue mv (fmap Modification.AddCreatureSubtype . Subtype.fromJson)
     "AddCardType" -> Common.withValue mv (fmap Modification.AddCardType . CardType.fromJson)
+    "AddSupertype" -> Common.withValue mv (fmap Modification.AddSupertype . Supertype.fromJson)
+    "RemoveSupertype" -> Common.withValue mv (fmap Modification.RemoveSupertype . Supertype.fromJson)
     "ChangeSubtypeWord" -> pair mv >>= \(x, y) -> Modification.ChangeSubtypeWord <$> Subtype.fromJson x <*> Subtype.fromJson y
     "SetController" -> Common.withValue mv (fmap Modification.SetController . PlayerId.fromJson)
     "SetControllerToSource" -> Right Modification.SetControllerToSource

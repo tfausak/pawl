@@ -7,6 +7,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 
 -- | The open-half continuous-effect vocabulary: continuous-effect
 -- specifications, classified by layer, distinct from Effect. Within the RULES
@@ -15,9 +16,8 @@ import qualified Pawl.Types.Subtype as Subtype
 -- Pawl.CardSpec's lints also case on it, legitimately: a test-suite lint that
 -- walks the card pool is not rules core. GainKeyword carries a Keyword, a
 -- closed-half CITATION, so casing on it is not an invariant violation. P/T
--- constructors carry signed Quantity. No arm adds or removes a SUPERTYPE
--- (#311), the case CR 205.4b is written for; the layer-4 arms below reach card
--- types and subtypes only.
+-- constructors carry signed Quantity. The layer-4 arms below reach card types,
+-- subtypes and supertypes, which CR 205.4b keeps independent of one another.
 data Modification
   = GainKeyword Keyword.Keyword -- layer 6 (Serpent's Gift)
   | LoseAllAbilities -- layer 6 (Humility)
@@ -59,6 +59,21 @@ data Modification
     -- setLandSubtypeTo.
     AddCreatureSubtype Subtype.Subtype
   | AddCardType CardType.CardType -- layer 4 (Opalescence -> Creature)
+  | -- | layer 4, CR 613.1d / 205.4b: this object gains a supertype (Leyline of
+    -- Singularity's "All nonland permanents are legendary"). An ADD and never a
+    -- set, because CR 205.4b says so outright -- "when an object gains or loses a
+    -- supertype, it retains any other supertypes it had" -- so no supertype arm
+    -- has the SetLandSubtype/AddLandSubtype pairing the subtypes need.
+    --
+    -- Carries one Supertype rather than a set, the narrowing SetLandSubtype and
+    -- SetCreatureSubtype already take: no printing grants two at once, and a card
+    -- that did would author two modifications.
+    AddSupertype Supertype.Supertype
+  | -- | layer 4, CR 613.1d / 205.4b: this object loses a supertype (Thermal Flux's
+    -- "Target snow permanent isn't snow until end of turn"). The removal beside
+    -- the grant above, and the same rule governs it: the object's OTHER supertypes
+    -- survive, and neither its card types nor its subtypes move.
+    RemoveSupertype Supertype.Supertype
   | ChangeSubtypeWord Subtype.Subtype Subtype.Subtype -- layer 3, CR 612 (Magical Hack, Artificial Evolution: from -> to)
   | -- | layer 2, CR 613.1b: set this object's controller. The PlayerId is BAKED at
     -- effect creation (CR 611.2c) by Resolve.applyEffect (GainControl) -- it is

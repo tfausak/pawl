@@ -13,6 +13,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.Supertype as Supertype
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.Modification" $ do
@@ -97,6 +98,22 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.AddCardType CardType.Creature)
       """ {"type":"AddCardType","value":{"type":"Creature"}} """
+  -- layer 4, CR 205.4b grant (Leyline of Singularity -> legendary).
+  Spec.it s "AddSupertype" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.AddSupertype Supertype.Legendary)
+      """ {"type":"AddSupertype","value":{"type":"Legendary"}} """
+  -- layer 4, CR 205.4b removal (Thermal Flux -> isn't snow).
+  Spec.it s "RemoveSupertype" $
+    Common.assertJsonCodec
+      s
+      Modification.toJson
+      Modification.fromJson
+      (Modification.RemoveSupertype Supertype.Snow)
+      """ {"type":"RemoveSupertype","value":{"type":"Snow"}} """
   -- layer 3, CR 612 (Magical Hack: from -> to).
   Spec.it s "ChangeSubtypeWord" $
     Common.assertJsonCodec

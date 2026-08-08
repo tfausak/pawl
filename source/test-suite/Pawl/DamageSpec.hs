@@ -917,6 +917,47 @@ legendRuleSpec s registry =
       Spec.assertBool s (inPlay healthy keptHealthy) "keeping the healthy one saves it"
       Spec.assertEqWith s "and only the 0/0 was buried" (length (Game.zoneMembers Zone.Graveyard S.alice keptHealthy)) 1
 
+    -- CR 613.1d layer 4 / CR 205.4b / CR 704.5j, at gameplay level and end to
+    -- end: Leyline of Singularity's "All nonland permanents are legendary" is
+    -- the pool's only printed GRANT of a supertype, and the legend rule is what
+    -- makes the grant observable. Two Goblin Pikers are a legal board until the
+    -- Leyline resolves; afterwards they are two same-named legends under one
+    -- controller and CR 704.5j buries one.
+    --
+    -- The Leyline is CAST and resolved rather than placed, so the grant is read
+    -- through the same layer fold a real game would run it through.
+    Spec.it s "CR 613.1d/704.5j Leyline of Singularity makes two Goblin Pikers legendary, and the legend rule buries one" $ do
+      piker <- S.printingOf s registry "Goblin Piker"
+      leyline <- S.printingOf s registry "Leyline of Singularity"
+      let (a, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+          (b, g1) = S.addCreature piker S.alice g0
+          -- The CONTROL, and the guard against a vacuous pass below: with no
+          -- Leyline on the board these two live through a settled sweep, so the
+          -- fixture really does hold two duplicates for the rule to find.
+          before = S.runPure S.identityAnswer g1 Sba.performStateBasedActions
+          (_, staged) = S.spellOnStack leyline S.alice g1
+          after = S.runPure (keepsLegend a) staged (Stack.resolveTop >> Engine.settleForPriority)
+      Spec.assertBool s (a /= b) "the two Pikers are separate objects, not one counted twice"
+      Spec.assertBool s (inPlay a before && inPlay b before) "without the Leyline both survive"
+      Spec.assertBool s (inPlay a after) "the Piker alice chose stays"
+      Spec.assertBool s (not (inPlay b after)) "the other Piker is gone"
+      Spec.assertEqWith s "and it is in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+
+    -- The other half of Leyline of Singularity's affected set: "All NONLAND
+    -- permanents". Two Forests share a name and would be a legend rule pair if
+    -- the grant reached them, so this is what proves the Not (HasCardType Land)
+    -- filter discriminates rather than being decoration.
+    Spec.it s "CR 613.1d Leyline of Singularity leaves two Forests alone, because they are lands" $ do
+      forest <- S.printingOf s registry "Forest"
+      leyline <- S.printingOf s registry "Leyline of Singularity"
+      let (a, g0) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+          (b, g1) = S.addCreature forest S.alice g0
+          (_, staged) = S.spellOnStack leyline S.alice g1
+          after = S.runPure (keepsLegend a) staged (Stack.resolveTop >> Engine.settleForPriority)
+      Spec.assertBool s (a /= b) "the two Forests are separate objects"
+      Spec.assertBool s (inPlay a after && inPlay b after) "both Forests stay"
+      Spec.assertEqWith s "nothing was buried" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
 -- The two world enchantments in the pool, fetched together: most tests below
 -- want two DIFFERENTLY NAMED world permanents, since a rule that ignores names
 -- is half of the contrast with the legend rule above.
