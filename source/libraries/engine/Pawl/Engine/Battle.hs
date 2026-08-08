@@ -66,6 +66,7 @@ import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -271,7 +272,7 @@ siegeDefeat =
     -- and Binding.became for the exiled incarnation the next effect names.
     exile =
       Effect.MoveToZone
-        Binding.triggerSource
+        (ObjectRef.InSlot Binding.triggerSource)
         Zone.Exile
         EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False}
         (Just Binding.became)

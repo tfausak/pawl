@@ -124,10 +124,11 @@ data Effect card
     -- ObjectRef is what lets ONE opcode be both Murder's "destroy target creature"
     -- and Day of Judgment's "destroy all creatures"; a sibling DestroyAll would
     -- have needed its own copy of the CR 702.12b gate, the CR 616.1 funnel and the
-    -- CR 701.19c rider. Tap, Untap, ModifyTarget, GainControl and DealDamage have
-    -- since taken the parameter for that reason, the two storing opcodes
-    -- additionally owing CR 611.2c a frozen set; the rest still take a bare
-    -- SlotName, none of them having a card that names a set (#378).
+    -- CR 701.19c rider. Tap, Untap, Transform, ModifyTarget, GainControl,
+    -- DealDamage, PreventNextDamage, PreventAllDamage and MoveToZone have since
+    -- taken the parameter for that reason, the two storing opcodes additionally
+    -- owing CR 611.2c a frozen set; the rest still take a bare SlotName, none of
+    -- them having a card that names a set.
     --
     -- The Maybe SlotName BINDS how many permanents this destruction ACTUALLY
     -- destroyed into the effect source's live bindings, for a later effect of the
@@ -178,11 +179,17 @@ data Effect card
     -- it (Crown of the Ages can, Aura Graft cannot), which is why the rule and the
     -- atom are not the same thing.
     AttachTarget SlotName.SlotName (Filter.Filter Keyword.Keyword)
-  | -- | CR 400.7: move the slot's target object to a zone through the changeZone
-    -- funnel. Bounce is Hand (owner-relative -- changeZone carries Object.owner),
-    -- targeted exile is Exile; the destination is data, so this is one opcode for
-    -- every targeted single-object move. Distinct from Destroy, which checks
+  | -- | CR 400.7: move the objects the ObjectRef names to a zone through the
+    -- changeZone funnel. Bounce is Hand (owner-relative -- changeZone carries
+    -- Object.owner), targeted exile is Exile; the destination is data, so this is
+    -- one opcode for every zone move. Distinct from Destroy, which checks
     -- indestructible.
+    --
+    -- ObjectRef for Destroy's reason: Unsummon's "return target creature to its
+    -- owner's hand" and Evacuation's "return all creatures to their owners'
+    -- hands" are one opcode, and only InSlot is a target (CR 115.10a). A one-shot
+    -- under CR 608.2c/608.2f, so unlike ModifyTarget and GainControl it stores
+    -- nothing and owes CR 611.2c no frozen set.
     --
     -- The EntryRiders are what the effect says about the object AS IT ENTERS the
     -- battlefield, beyond its own text -- Meandering Towershell's "tapped and
@@ -195,7 +202,10 @@ data Effect card
     -- this resolution arms (CR 603.7c's "it") must name the object, and after a
     -- zone change the old id is gone. Meandering Towershell is the producer, its
     -- two "it"s two incarnations of one card. A DEFINITION, not a read: never a
-    -- target, never in targetSpecs.
+    -- target, never in targetSpecs. Meaningful only under InSlot, which moves at
+    -- most one object: binding ONE arriving incarnation is meaningless for a set,
+    -- and no card in the pool asks for the group form. A CardSpec lint rejects
+    -- the combination rather than inventing a group binding (#972).
     --
     -- The trailing Maybe Zone is the zone the effect's own words say the object
     -- is moved OUT of -- Reassembling Skeleton's "return this card FROM YOUR
@@ -212,7 +222,10 @@ data Effect card
     -- zone the data states. The resolver ignores it -- for the self-slot shape
     -- the rule is what guarantees the object is in that zone when the ability is
     -- activated, so a funnel that moves it from wherever it is cannot disagree.
-    MoveToZone SlotName.SlotName Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName) (Maybe Zone.Zone)
+    -- That reading asks about "the object it's on", which only an InSlot naming
+    -- the reserved source slot can be; a swept set is never one object, so
+    -- EffectZone answers Nothing for EachMatching whatever origin is stated.
+    MoveToZone ObjectRef.ObjectRef Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName) (Maybe Zone.Zone)
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one at
     -- a time (CR 121.2). Divination is `Relative You`; Ancestral Recall is
     -- `InSlot`, reading a slot TARGETING filled (CR 601.2c). Empty-library draw is

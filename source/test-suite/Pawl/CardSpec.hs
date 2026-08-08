@@ -835,7 +835,8 @@ cardSlotNamesCollide card =
 -- triggered ability's effects READS must be a slot something binds for that
 -- ability. Without it, an effect naming CR 400.7e's `became` under a condition
 -- that never binds it loads, places its trigger, misses the lookup and silently
--- no-ops (Resolve's MoveToZone arm falls through to `pure ()`).
+-- no-ops (Resolve's MoveToZone arm moves nothing for a slot that names no
+-- object).
 --
 -- A SUBSET check, never the spell lint's equality, and that is forced rather
 -- than chosen: Pawl.Engine.Binding.triggerSource's comment spells out that an
@@ -1667,7 +1668,7 @@ effectFilters effect = case effect of
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy ref _ _ -> unframed (objectRefFilters ref)
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone {} -> []
+  Effect.MoveToZone ref _ _ _ _ -> unframed (objectRefFilters ref)
   Effect.Draw _ quantity -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
@@ -2377,7 +2378,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "the lint itself catches a reserved event slot the condition never binds" $ do
     roaches <- S.printingOf s registry "Endless Cockroaches"
     let -- Endless Cockroaches' own payload: "return it to its owner's hand".
-        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing Nothing
+        returnIt = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing
         -- Rule 702.70a's shape, as a targetless read of "that player".
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
     Spec.assertBool
@@ -2438,11 +2439,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let free = Just (ManaCost.MkManaCost [])
         variable = Just (ManaCost.MkManaCost [ManaSymbol.Variable])
         -- CR 109.5's "you", in the shape Baral, Chief of Compliance's TRIGGERED
-        -- ability uses it: a bare-SlotName opcode (#378) naming the controller.
+        -- ability uses it: a bare-SlotName opcode naming the controller.
         youDiscards = Effect.Discard Binding.you (Quantity.Type.Literal 1)
         -- Endless Cockroaches' payload (CR 400.7e) and rule 702.70a's, the two
         -- event slots, neither of which an activation has an event to bind.
-        returnIt = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing Nothing
+        returnIt = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing
         thatPlayerDraws = Effect.Draw (PlayerRef.InSlot Binding.triggerPlayer) (Quantity.Type.Literal 1)
         -- CR 113.7's source slot, which every activation DOES bind.
         tapSelf = Effect.Tap (ObjectRef.InSlot Binding.triggerSource)
@@ -2519,7 +2520,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         ownDeclared = modalActivated [lintMode [tap creature] [creature], lintMode [tap victim] [victim]]
         -- Mode 0 MINTS `exiled` at a MoveToZone's destination; mode 1 reads it.
         -- The two never resolve together, so mode 1's read is dangling.
-        exileIt = Effect.MoveToZone creature Zone.Exile EntryRiders.defaultValue (Just exiled) Nothing
+        exileIt = Effect.MoveToZone (ObjectRef.InSlot creature) Zone.Exile EntryRiders.defaultValue (Just exiled) Nothing
         crossMinted = modalActivated [lintMode [exileIt] [creature], lintMode [tap exiled] []]
         ownMinted = modalActivated [lintMode [exileIt, tap exiled] [creature], lintMode [tap victim] [victim]]
     Spec.assertBool s (activatedAbilityOffends crossDeclared) "a mode reading a slot only another mode declares is rejected"
@@ -2530,7 +2531,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- CR 400.7e's `became` is bound by the condition for the whole ability, so a
     -- SECOND mode reading it is accepted, and a mode reading it under a
     -- condition that never binds it is rejected however late the mode sits.
-    let returnBecame = Effect.MoveToZone Binding.became Zone.Hand EntryRiders.defaultValue Nothing Nothing
+    let returnBecame = Effect.MoveToZone (ObjectRef.InSlot Binding.became) Zone.Hand EntryRiders.defaultValue Nothing Nothing
         secondModeReads condition = modalTrigger condition [lintMode [] [], lintMode [returnBecame] []]
     Spec.assertBool
       s
@@ -2656,6 +2657,30 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- that prints one.
     Spec.assertBool s (any (anyFace (any moves . cardResolutionEffects) . Printing.card) ps) "the pool has a card returning itself transformed"
     Spec.assertEqWith s "a token is not a card, so no token is created transformed" (fmap (S.nameOf . Printing.card) offenders) []
+  -- MoveToZone's Maybe SlotName binds the ONE incarnation CR 400.7 mints at the
+  -- destination, which a swept set does not have -- so the combination is
+  -- rejected in card data rather than repaired by inventing a group binding
+  -- (#972). A lint rather than a type split for the reason the Create lint above
+  -- gives: every other field is common to both arms of the ObjectRef, so
+  -- splitting the opcode to keep one field off one arm would duplicate them.
+  Spec.it s "no MoveToZone binds an incarnation under a swept set (#972)" $ do
+    ps <- S.allPrintings s
+    let offends effect = case effect of
+          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ mSlot _ -> Maybe.isJust mSlot
+          _ -> False
+        binds effect = case effect of
+          Effect.MoveToZone (ObjectRef.InSlot _) _ _ mSlot _ -> Maybe.isJust mSlot
+          _ -> False
+        sweeps effect = case effect of
+          Effect.MoveToZone (ObjectRef.EachMatching _) _ _ _ _ -> True
+          _ -> False
+        offenders = filter (anyFace (any offends . cardResolutionEffects) . Printing.card) ps
+    -- Both halves of the rejected shape are in the pool separately, so the sweep
+    -- is not vacuous: Befriending the Moths binds an incarnation under a slot,
+    -- and Evacuation sweeps a set without binding one.
+    Spec.assertBool s (any (anyFace (any binds . cardResolutionEffects) . Printing.card) ps) "the pool has a card binding what its move minted"
+    Spec.assertBool s (any (anyFace (any sweeps . cardResolutionEffects) . Printing.card) ps) "and a card moving a swept set"
+    Spec.assertEqWith s "a set has no single incarnation to bind" (fmap (S.nameOf . Printing.card) offenders) []
   -- The sibling of the lint above, for the OTHER PlayerId the engine bakes and
   -- the codec accepts. See phasePatternOffends for why a card cannot name a
   -- player, and for why this is a lint rather than a type split (#437).

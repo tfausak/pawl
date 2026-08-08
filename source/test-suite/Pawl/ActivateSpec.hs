@@ -1504,7 +1504,7 @@ brothersBoard brothers mountain hillGiant owner =
 -- Brothers of Fire -- "{1}{R}{R}: This creature deals 1 damage to any target and
 -- 1 damage to you" (checked against Scryfall) -- is the pool's first card whose
 -- ACTIVATED ability names its controller through a reserved SLOT rather than
--- through an opcode carrying a PlayerRef (#378): DealDamage takes an ObjectRef,
+-- through an opcode carrying a PlayerRef: DealDamage takes an ObjectRef,
 -- which reaches a player only through a bound recipient. CR 120.3a is what turns
 -- that damage into the life loss these assertions read: "Damage dealt to a player
 -- by a source without infect causes that player to lose that much life."
