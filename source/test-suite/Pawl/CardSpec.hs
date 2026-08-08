@@ -1108,9 +1108,84 @@ powerToughnessSlots card =
       maybe Set.empty Quantity.slots (Face.characteristicPT card)
     ]
 
--- Every slot a card DECLARES as a target: its spell modes plus CR 303.4a's
+-- Every face a card MINTS, transitively: the faces of every token (CR 111.1)
+-- and emblem (CR 114.1) its own effects create, plus everything those mint in
+-- turn. The same recursion effectReplacements takes, and for the same reason --
+-- CR 111.3 makes a token's defined characteristics "functionally equivalent to
+-- the characteristic values that are printed on a card", and CR 114.4 makes an
+-- emblem's abilities function in the command zone, so an ability arriving as an
+-- effect's payload is as real as a printed one.
+--
+-- Deliberately NOT folded into cardResolutionEffects, which several other lints
+-- read: those ask what THIS card executes, and widening that view would change
+-- all of them at once.
+--
+-- Not applied to the ability READ lints built on modalReadOffends, which still
+-- stop at the printed face (#1010).
+mintedFaces :: Face.Face Card.Type.Card -> [Face.Face Card.Type.Card]
+mintedFaces card =
+  let minted = concatMap effectMintedFaces (cardResolutionEffects card)
+   in minted <> concatMap mintedFaces minted
+
+-- The faces one effect mints. Exhaustive and hand-maintained, with
+-- effectReplacements' caveat: a NEW effect embedding a Card must be added here
+-- too, and the build breaks until it is.
+effectMintedFaces :: Effect.Effect Card.Type.Card -> [Face.Face Card.Type.Card]
+effectMintedFaces effect = case effect of
+  Effect.Create _ token _ _ -> NonEmpty.toList (Card.Type.faces token)
+  Effect.CreateEmblem emblem -> NonEmpty.toList (Card.Type.faces emblem)
+  Effect.Replace {} -> []
+  Effect.DealDamage _ _ -> []
+  Effect.ModifyTarget {} -> []
+  Effect.AddMana _ -> []
+  Effect.Search _ _ -> []
+  Effect.ExileAllGraveyards -> []
+  Effect.Proliferate -> []
+  Effect.TemptWithTheRing -> []
+  Effect.ExileHandThenDraw -> []
+  Effect.PlayerSacrifices {} -> []
+  Effect.RestartGame -> []
+  Effect.ControlPlayerNextTurn _ -> []
+  Effect.Destroy {} -> []
+  Effect.Sacrifice _ -> []
+  Effect.MoveToZone {} -> []
+  Effect.Draw _ _ -> []
+  Effect.Mill {} -> []
+  Effect.Discard _ _ -> []
+  Effect.LoseLife _ _ -> []
+  Effect.GainLife _ _ -> []
+  Effect.IncreaseSpeed _ _ -> []
+  Effect.SkipNextPhase _ _ -> []
+  Effect.PreventNextDamage {} -> []
+  Effect.PreventAllDamage {} -> []
+  Effect.TurnFaceDown _ -> []
+  Effect.RemoveFromCombat _ -> []
+  Effect.Counter _ -> []
+  Effect.PutCounters {} -> []
+  Effect.GainPlayerCounters {} -> []
+  Effect.RemovePlayerCounters {} -> []
+  Effect.Tap _ -> []
+  Effect.Untap _ -> []
+  Effect.Transform _ -> []
+  Effect.AddPhases _ -> []
+  Effect.GainControl _ _ -> []
+  Effect.ArmDelayedTrigger {} -> []
+  Effect.AffectPlayers {} -> []
+  Effect.BecomeMonarch _ -> []
+  Effect.ItBecomes _ -> []
+  Effect.ExileUntilMonarch _ -> []
+  Effect.Attach _ -> []
+  Effect.AttachTarget {} -> []
+  Effect.PlaySubgame _ -> []
+  Effect.TakeExtraTurn {} -> []
+  Effect.ShuffleIntoLibrary _ -> []
+  Effect.OfferCast {} -> []
+  Effect.ChangeText {} -> []
+
+-- Every slot ONE FACE declares as a target: its spell modes plus CR 303.4a's
 -- enchant slot (Card.allTargetSpecs), and its activated, triggered and delayed
--- abilities' modes.
+-- abilities' modes. The base case of declaredTargetSlots below, named so the
+-- self-test can hold it against the widened view.
 --
 -- All four carriers, because all four ask the same question at different
 -- moments. CR 601.2c is the question ("the player announces their choice of an
@@ -1120,8 +1195,8 @@ powerToughnessSlots card =
 -- spell listed in rules 601.2c-d"; and CR 603.7's delayed abilities are
 -- triggered abilities, placed by that same rule. A lint about what DECLARING a
 -- slot means therefore has to range over all four, not over the spell alone.
-declaredTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
-declaredTargetSlots card =
+ownDeclaredTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+ownDeclaredTargetSlots card =
   Set.unions
     ( Map.keysSet (Card.allTargetSpecs card)
         : fmap
@@ -1131,6 +1206,14 @@ declaredTargetSlots card =
               <> fmap TriggeredAbility.modal (Map.elems (Face.delayedAbilities card))
           )
     )
+
+-- Every slot a card DECLARES as a target: the four carriers above, on the card's
+-- own face AND on every face it mints. A token's triggered ability
+-- declares its targets through CR 603.3d exactly as the minting card's does, so
+-- the question the lint asks is a property of the ABILITY rather than of how the
+-- card carrying it reached the game.
+declaredTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+declaredTargetSlots card = Set.unions (fmap ownDeclaredTargetSlots (card : mintedFaces card))
 
 -- The reserved names a card declares as target slots -- empty for every card
 -- authored correctly, which is the whole of the sweep's assertion.
@@ -1146,21 +1229,25 @@ declaredTargetSlots card =
 reservedDeclarations :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
 reservedDeclarations = Set.intersection reservedSlots . declaredTargetSlots
 
--- Every slot a card BINDS: the names its own effects author for a later effect
--- to read back -- Resolve.boundSlots over every carrier a card can execute an
--- effect from (cardResolutionEffects), which is the spell modes plus the
+-- Every slot ONE FACE binds: the names its own effects author for a later effect
+-- to read back -- Resolve.definedSlots over every carrier that face can execute
+-- an effect from (cardResolutionEffects), which is the spell modes plus the
 -- activated, triggered and delayed abilities.
 --
--- declaredTargetSlots' sibling and the other half of the same question. A target
--- spec is not the only way a card names a slot: MoveToZone and Create name the
--- incarnation CR 400.7 mints, PlaySubgame names CR 729.1b's loser, and Destroy
--- names how many it destroyed.
+-- ownDeclaredTargetSlots' sibling and the other half of the same question. A
+-- target spec is not the only way a card names a slot: MoveToZone and Create
+-- name the incarnation CR 400.7 mints, PlaySubgame names CR 729.1b's loser, and
+-- Destroy names how many it destroyed.
 --
--- Not covered, as declaredTargetSlots does not cover it either: the abilities
--- printed on a token or emblem a Create or CreateEmblem MINTS, which arrive as
--- an effect's payload rather than as a printing (#849).
+-- The base case of boundSlots below, named so the self-test can hold it against
+-- the widened view.
+ownBoundSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+ownBoundSlots = Resolve.definedSlots . cardResolutionEffects
+
+-- The same, over the card's own face AND every face it mints --
+-- declaredTargetSlots' recursion, for the same reason.
 boundSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
-boundSlots = Resolve.definedSlots . cardResolutionEffects
+boundSlots card = Set.unions (fmap ownBoundSlots (card : mintedFaces card))
 
 -- The reserved names a card BINDS -- reservedDeclarations' sibling, and empty
 -- for every card authored correctly for the same reason.
@@ -2125,6 +2212,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- names, leaving `copySource` and `thatPlayer` with no declaration case
   -- at all. See reservedDeclarations for why declaring one is a discarded
   -- prompt rather than a naming quibble.
+  --
+  -- SCOPE: every face the card PRINTS, and every face it MINTS -- the tokens and
+  -- emblems its effects carry as a payload, which S.allPrintings never offers
+  -- the sweep directly. See mintedFaces; the self-test below is what proves that
+  -- half, since no card in the pool offends in either position.
   Spec.it s "no reserved binding slot is ever a declared target slot" $ do
     ps <- S.allPrintings s
     let offends = not . Set.null . reservedDeclarations
@@ -2152,6 +2244,9 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- BIND, and a card is free to write a reserved name into any of them, which
   -- the declaration sweep cannot see because none of the four is a target spec.
   -- See reservedBindings for why that is the worse of the two failures.
+  --
+  -- SCOPE: the declaration sweep's, exactly -- every face the card prints, and
+  -- every face it mints.
   Spec.it s "no reserved binding slot is ever bound by a card" $ do
     ps <- S.allPrintings s
     let offends = not . Set.null . reservedBindings
@@ -2210,6 +2305,96 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       "and the real card binds no reserved slot"
       (reservedBindings (S.combinedFace baneOfProgress))
       Set.empty
+  -- Both sweeps above range over a face's MINTED cards as well as the face
+  -- itself, and this is what proves that half. CR 111.3 makes the abilities a
+  -- token's creator defines "functionally equivalent to the characteristic
+  -- values that are printed on a card", and CR 114.4 makes an emblem's function
+  -- in the command zone -- so a reserved name on either is the same defect as
+  -- one on the minting card, reached through an effect's payload rather than
+  -- through a Printing.
+  --
+  -- Hand-built, in the two self-tests' posture above, because no card in the
+  -- pool names a reserved slot anywhere and none prints a CreateEmblem at all;
+  -- the corpus sweeps are a regression guard for this, never its proof. Each
+  -- case is asserted TWICE: the sweep sees the grafted offender, and the
+  -- minting face's OWN slots stay empty. The second half is what makes this a
+  -- test of the RECURSION rather than of a widened base case.
+  Spec.it s "the lint itself catches a reserved slot on a minted token's or emblem's face" $ do
+    doomedTraveler <- S.printingOf s registry "Doomed Traveler"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let -- One triggered ability that offends in BOTH positions at once: it
+        -- declares CR 109.5's `you` as a target slot and binds CR 615.13's
+        -- `thatMuch` from the count of what it destroyed.
+        offending =
+          TriggeredAbility.MkTriggeredAbility
+            { TriggeredAbility.condition = TriggerCondition.SelfDies,
+              TriggeredAbility.modal =
+                Modal.MkModal
+                  ( Seq.singleton
+                      ( Mode.MkMode
+                          (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))
+                          (Map.singleton Binding.you (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
+                          Optionality.Mandatory
+                          Nothing
+                      )
+                  )
+                  (ModeSelection.ChooseExactly 1),
+              TriggeredAbility.intervening = Nothing
+            }
+        arm face = face {Face.triggeredAbilities = offending : Face.triggeredAbilities face}
+        overModal f modal =
+          modal {Modal.modes = fmap (\m -> m {Mode.effects = fmap f (Mode.effects m)}) (Modal.modes modal)}
+        -- Doomed Traveler mints its Spirit from a TRIGGERED ability, so this
+        -- rewrites the minting effect where the card actually prints it.
+        overMint f card =
+          card
+            { Face.triggeredAbilities =
+                fmap (\t -> t {TriggeredAbility.modal = overModal f (TriggeredAbility.modal t)}) (Face.triggeredAbilities card)
+            }
+        -- Both halves of each case at once: what the sweeps report, and what
+        -- the minting face's own carriers report.
+        caught face = ((reservedDeclarations face, reservedBindings face), (Set.intersection reservedSlots (ownDeclaredTargetSlots face), Set.intersection reservedSlots (ownBoundSlots face)))
+        offended = ((Set.singleton Binding.you, Set.singleton Binding.eventAmount), (Set.empty, Set.empty))
+        traveler = S.combinedFace doomedTraveler
+        onEveryFace f card = card {Card.Type.faces = fmap f (Card.Type.faces card)}
+        -- The graft on the minted TOKEN, on every face of it.
+        armToken effect = case effect of
+          Effect.Create quantity token riders slot -> Effect.Create quantity (onEveryFace arm token) riders slot
+          other -> other
+        -- The same, on the BACK face of a two-faced token whose front is clean.
+        armBackFace effect = case effect of
+          Effect.Create quantity token riders slot ->
+            let front = NonEmpty.head (Card.Type.faces token)
+             in Effect.Create quantity (token {Card.Type.faces = front NonEmpty.:| [arm front]}) riders slot
+          other -> other
+        -- The same, on a minted EMBLEM in place of the token.
+        armEmblem effect = case effect of
+          Effect.Create {} -> Effect.CreateEmblem (onEveryFace arm (S.anthemEmblemCard piker))
+          other -> other
+    Spec.assertEqWith
+      s
+      "the real card offends in neither position"
+      (caught traveler)
+      ((Set.empty, Set.empty), (Set.empty, Set.empty))
+    Spec.assertEqWith
+      s
+      "a reserved slot on the minted TOKEN's face is caught, and the minting face's own slots stay empty"
+      (caught (overMint armToken traveler))
+      offended
+    -- CR 707.8a's double-faced token is why the recursion takes every face of
+    -- the minted card rather than its first: here the offender is the SECOND.
+    Spec.assertEqWith
+      s
+      "a reserved slot on a two-faced token's back face is caught"
+      (caught (overMint armBackFace traveler))
+      offended
+    -- The emblem arm, which no card in the pool exercises: the minting effect
+    -- is swapped for a CreateEmblem carrying the same graft.
+    Spec.assertEqWith
+      s
+      "a reserved slot on a minted EMBLEM's face is caught"
+      (caught (overMint armEmblem traveler))
+      offended
   -- The read half of the same dataflow question, for the one carrier that has no
   -- resolution to bind anything: CR 604.3's characteristic-defining P/T. A CDA is
   -- a static ability, so there is no earlier effect of a resolution to mint its
