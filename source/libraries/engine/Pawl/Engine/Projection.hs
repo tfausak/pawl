@@ -481,7 +481,8 @@ viewUpTo bound cands gs oid =
 
 -- The characteristics view of a printed card off the battlefield, e.g. one being
 -- matched by a search. No projection exists there, so every axis is read from the
--- printed face and power/controller are Nothing.
+-- printed face; the axes that only an OBJECT can have -- a controller, counters,
+-- an attacking flag -- are Nothing or empty, and each says so at its field.
 viewOfCard :: Face.Face Card.Type.Card -> Filter.View
 viewOfCard face =
   let typeLine = Face.typeLine face
@@ -498,10 +499,11 @@ viewOfCard face =
           Filter.subtypes = TypeLine.subtypes typeLine,
           -- CR 702: read off the printed face, like the type line above.
           Filter.keywords = Face.keywords face,
-          Filter.power = Nothing,
-          -- CR 202.3: unlike power, a mana value IS answerable here -- the mana
-          -- cost is printed on the card and rule 202.3 names no zone. This is
-          -- the arm Ojutai's Command's "mana value 2 or less" reads, its
+          -- CR 208.1 read off the PRINTED power box -- see printedPower below.
+          Filter.power = printedPower face,
+          -- CR 202.3: answerable here for the same reason power above is -- the
+          -- mana cost is printed on the card and rule 202.3 names no zone. This
+          -- is the arm Ojutai's Command's "mana value 2 or less" reads, its
           -- candidates being cards in a graveyard.
           Filter.manaValue = Just (Quantity.manaValueOf face),
           Filter.controller = Nothing,
@@ -529,7 +531,7 @@ viewOfCard face =
           -- CR 122.1a-b: a counter can sit on a CARD in a zone other than the
           -- battlefield, but this builder describes a printed FACE rather than
           -- an object, so there is nothing here for one to be on. The vacuous
-          -- posture power and controller already take.
+          -- posture the controller above already takes.
           Filter.counters = Map.empty,
           -- CR 701.54b: the designation rides an OBJECT (Object.ringBearerFor),
           -- and this builder describes a printed face. Nothing is not a lost
@@ -537,6 +539,36 @@ viewOfCard face =
           -- controls, so only a battlefield permanent ever carries one.
           Filter.ringBearerFor = Nothing
         }
+
+-- CR 208.1's power for a card OFF the battlefield, where there is no projection
+-- to read one from -- what Imperial Recruiter's "creature card with power 2 or
+-- less" is asking each card in a library. Nothing for a face with no power box:
+-- CR 208.1 gives power only to creature cards, so a land or an instant has none
+-- to report, and Filter.PowerAtMost/PowerAtLeast answer False for it either way.
+--
+-- CR 208.2b's zero is the STAR's answer here, and only here: "While the card
+-- isn't on the battlefield, its power and toughness are each considered to be
+-- 0." Primal Plasma is the card that sentence is about -- its star is set by an
+-- as-enters replacement effect, so off the battlefield nothing has set it. That
+-- is deliberately NOT Quantity.evaluate's Star arm, which stays Nothing: that
+-- arm answers for the projection seed, where a star that survived
+-- baseCharacteristics is a hole rather than a zero.
+--
+-- Not implemented: the value of a CHARACTERISTIC-DEFINING power off the
+-- battlefield (CR 208.2a) -- a face with a characteristicPT reports Nothing,
+-- where Tarmogoyf in a graveyard has a real power (#1023).
+printedPower :: Face.Face Card.Type.Card -> Maybe Integer
+printedPower face = case Face.characteristicPT face of
+  Just _ -> Nothing
+  Nothing -> case fmap Power.unwrap (Face.power face) of
+    Just (Quantity.Type.Literal n) -> Just n
+    Just Quantity.Type.Star -> Just 0
+    -- Every other shape: no power box at all, or a printed box holding something
+    -- neither a number nor CR 208.2's bare star. The latter is unreachable --
+    -- CR 208.2 makes a star stand for a characteristic-defining ability, so a
+    -- composite box like 1+* comes with a characteristicPT and left through the
+    -- arm above -- and Nothing is the honest answer rather than a guessed number.
+    _ -> Nothing
 
 -- CR 508.3a: does this event record THIS object being declared as an attacker?
 -- Only Combat.declareAttackers appends one, which is what keeps CR 508.4's

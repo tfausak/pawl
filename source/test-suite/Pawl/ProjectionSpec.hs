@@ -10,6 +10,7 @@
 -- AddCreatureSubtype arms fold with.
 module Pawl.ProjectionSpec where
 
+import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -125,6 +126,26 @@ aimAtObject :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtObject oid p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   _ -> S.identityAnswer p
+
+-- Records every library-search candidate list and every shuffled library, and
+-- finds `wanted`. The recording is the point: what a search FINDS cannot tell a
+-- candidate set that was computed correctly from one that admitted everything,
+-- so the set itself has to be observed.
+searchRecordingAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> State.State ([[ObjectId.ObjectId]], [[ObjectId.ObjectId]]) r
+searchRecordingAnswer wanted p = case p of
+  Prompt.SearchLibrary _ _ matches -> do
+    State.modify' (\(searches, shuffles) -> (searches <> [matches], shuffles))
+    pure (Just wanted)
+  Prompt.Shuffle library -> do
+    State.modify' (\(searches, shuffles) -> (searches, shuffles <> [library]))
+    -- An identity permutation: what was shuffled is the assertion, not the order.
+    pure library
+  _ -> pure (S.identityAnswer p)
+
+-- The card names behind a set of object ids, as a Set so an assertion reads as
+-- "exactly these cards" without depending on library order.
+namesOf :: GameState.GameState -> [ObjectId.ObjectId] -> Set.Set Text.Text
+namesOf gs = Set.fromList . fmap CardName.unwrap . Maybe.mapMaybe (fmap Face.name . flip Game.faceOf gs)
 
 -- aimAtObject for a Pool.Creatures slot, whose recipients are ToCreature.
 aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
@@ -2005,8 +2026,57 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         view = Projection.viewOfCard face
     Spec.assertBool s (Set.member CardType.Land (Filter.cardTypes view)) "is a land"
     Spec.assertBool s (Set.member Supertype.Basic (Filter.supertypes view)) "is basic"
-    Spec.assertEqWith s "no power off battlefield" (Filter.power view) Nothing
+    Spec.assertEqWith s "no power off battlefield -- a land has no printed power box" (Filter.power view) Nothing
     Spec.assertEqWith s "no controller off battlefield" (Filter.controller view) Nothing
+
+  -- The gameplay-level proof of Projection.printedPower. Imperial Recruiter's
+  -- entry trigger searches alice's library for "a creature card with power 2 or
+  -- less", and the candidates come from Projection.viewOfCard -- the only view a
+  -- library card has.
+  --
+  -- THE CANDIDATE SET IS THE ASSERTION, not what was found: with Filter.power
+  -- Nothing for every card off the battlefield, CR 208.1's PowerAtMost answered
+  -- False for all three creature cards and the set was EMPTY, which "the search
+  -- found a card" cannot tell from a set that admitted everything. So the set has
+  -- one card in for CR 208.2b's 0 (Primal Plasma, a printed */* with no CDA), one
+  -- in for its printed 2 (Goblin Piker), and the Hill Giant out at 3. The Mountain
+  -- is out on the creature clause rather than on power, and is in the library so
+  -- the search has a non-candidate to shuffle back.
+  Spec.it s "CR 208.1/208.2b Imperial Recruiter's search offers the */* card and the 2-power creature, not the 3-power one" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    recruiter <- S.printingOf s registry "Imperial Recruiter"
+    plasma <- S.printingOf s registry "Primal Plasma"
+    piker <- S.printingOf s registry "Goblin Piker"
+    giant <- S.printingOf s registry "Hill Giant"
+    let base0 = S.landsInPlay mountain 3
+        (_, base1) = S.addLibraryCard mountain S.alice base0
+        (_, base2) = S.addLibraryCard giant S.alice base1
+        (_, base3) = S.addLibraryCard piker S.alice base2
+        (plasmaId, base4) = S.addLibraryCard plasma S.alice base3
+        (gs, spellId) = S.handOne recruiter base4
+        ((_, settled), (searches, shuffles)) =
+          State.runState
+            (Engine.runGame (searchRecordingAnswer plasmaId) gs (do S.cast S.alice spellId; Engine.priorityLoop))
+            ([], [])
+    Spec.assertEqWith s "the Recruiter resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Imperial Recruiter") S.alice settled) 1
+    Spec.assertEqWith
+      s
+      "exactly the */* card and the 2-power creature are candidates"
+      -- Named against `gs`, the state the library was built in: the found card
+      -- gets a FRESH object id when it moves (CR 400.7), so its library
+      -- incarnation names nothing in `settled`.
+      (fmap (namesOf gs) searches)
+      [Set.fromList (fmap Text.pack ["Primal Plasma", "Goblin Piker"])]
+    Spec.assertEqWith
+      s
+      "the Primal Plasma named is the one that reached alice's hand"
+      (namesOf settled (Game.zoneMembers Zone.Hand S.alice settled))
+      (Set.singleton (Text.pack "Primal Plasma"))
+    Spec.assertEqWith
+      s
+      "the library was shuffled once, after the found card left it"
+      (fmap (namesOf gs) shuffles)
+      [Set.fromList (fmap Text.pack ["Mountain", "Hill Giant", "Goblin Piker"])]
 
   Spec.it s "CR 114.4 an emblem's anthem buffs the controller's creatures from the command zone" $ do
     piker <- S.printingOf s registry "Goblin Piker"
