@@ -354,3 +354,20 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SagaFinalChapterTriggers PlayerRelation.Opponent)
       """ {"type":"SagaFinalChapterTriggers","value":{"type":"Opponent"}} """
+  -- CR 725.1's crowning. Both relations, for the same reason PlayerDiscards has
+  -- both: the PlayerRelation is the whole difference between "whenever you
+  -- become the monarch" and "whenever an opponent becomes the monarch", so a
+  -- codec that dropped it would silently turn one printing into the other.
+  Spec.it s "PlayerBecomesMonarch round-trips both relations" $ do
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerBecomesMonarch PlayerRelation.You)
+      """ {"type":"PlayerBecomesMonarch","value":{"type":"You"}} """
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent)
+      """ {"type":"PlayerBecomesMonarch","value":{"type":"Opponent"}} """
