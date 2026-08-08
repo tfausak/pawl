@@ -1,5 +1,6 @@
 module Pawl.Types.CombatRestriction where
 
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Condition as Condition
 
@@ -22,14 +23,15 @@ import qualified Pawl.Types.Condition as Condition
 -- object, and the two requirement carriers collapse opposite ones -- a blocking
 -- requirement carries the attacker to be blocked and no subject, an attacking
 -- requirement carries the subject and no object. A restriction
--- carries only the SUBJECT on every arm: Pacifism's two halves are the same
--- Affected twice, so the only thing distinguishing THOSE TWO is which
--- declaration they forbid. Splitting them would copy the requirements' shape
--- without the reason for it. What tells the third arm from the first is not the
--- declaration -- both forbid an attack -- but the shape, which is the next
+-- carries only the SUBJECT, never an object, on every arm that names one at all:
+-- Pacifism's two halves are the same Affected twice, so the only thing
+-- distinguishing THOSE TWO is which declaration they forbid. Splitting them
+-- would copy the requirements' shape without the reason for it. What tells the
+-- later arms from the first is not the declaration -- CantAttackAlone and
+-- CantAttackMoreThan both forbid an attack -- but the shape, which is the next
 -- paragraph.
 --
--- The arms differ in SHAPE rather than in axis, and there are two shapes. The
+-- The arms differ in SHAPE rather than in axis, and there are three shapes. The
 -- first two are answered about ONE CREATURE, so the reader may apply them to CR
 -- 508.1a's and CR 509.1a's candidate list and never look at a declaration.
 -- CantAttackAlone cannot be: it is a fact about the whole set of creatures
@@ -38,12 +40,18 @@ import qualified Pawl.Types.Condition as Condition
 -- own Example is a "can't attack alone" board -- so they share the type rather
 -- than splitting into a second carrier.
 --
--- A THIRD shape is not representable: a restriction bounding the SIZE of a
--- declaration from above, which is Silent Arbiter's "no more than one creature
--- can attack each combat". CantAttackAlone is not it turned around: it NAMES
--- creatures and asks whether the declaration holds one of them and nothing else,
--- where a bound names no creature at all -- and no Affected can be read as a
--- number (#713).
+-- The THIRD shape bounds the SIZE of a declaration from above, which is Silent
+-- Arbiter's "no more than one creature can attack each combat". CantAttackAlone
+-- is not it turned around: it NAMES creatures and asks whether the declaration
+-- holds one of them and nothing else, where a bound names no creature at all --
+-- so those two arms carry a NUMBER where every other arm carries an Affected,
+-- and no Affected could have stood in for it. CR 508.1d's own Example writes the
+-- sentence with no subject to name -- "An effect states 'No more than one
+-- creature can attack each turn.'" -- and a vacuous Affected would be read by
+-- Pawl.Engine.CombatRestriction and reported by Pawl.CardSpec as card data the
+-- card does not print. Like CantAttackAlone and unlike CantAttack, a bound
+-- subtracts nothing from CR 508.1a's or CR 509.1a's candidate list: every
+-- creature stays a legal candidate and it is the DECLARATION that is refused.
 --
 -- A restriction a player may PAY THROUGH is one of CR 508.1c's all the same
 -- (Ghostly Prison), but it rides Pawl.Types.AttackCost, the SIXTH carrier. The
@@ -81,8 +89,13 @@ import qualified Pawl.Types.Condition as Condition
 --
 -- The SECOND field of each arm is that gate: the condition the creature can't
 -- attack (or block) UNLESS -- Blind-Spot Giant's "unless you control another
--- Giant". Nothing is the unconditional restriction (Pacifism), which is not the
--- same as a condition that never holds: the two would answer alike today, but
+-- Giant". On the two bound arms it gates the whole sentence rather than a
+-- creature, which is the same clause CR 508.1c describes and the same posture
+-- CantAttackAlone's gate is in: nothing in the pool prints a gated one, and the
+-- field is there because whether a restriction is gated is independent of its
+-- shape rather than because a card asks. Nothing is the unconditional
+-- restriction (Pacifism), which is not the same as a condition that never
+-- holds: the two would answer alike today, but
 -- only one of them is what the card says. A Condition states the gate because
 -- CR 508.1c's condition is a predicate over game STATE, which is the type
 -- Pawl.Types.Condition already is.
@@ -118,4 +131,31 @@ data CombatRestriction
     -- The gate beside it is the same "unless" every arm carries, and is about
     -- game state as usual: nothing in the pool prints a gated one.
     CantAttackAlone Affected.Affected (Maybe Condition.Condition)
+  | -- | CR 508.1c: no more than this many creatures may be declared as
+    -- attackers, unless the gate holds. Silent Arbiter's first sentence, and
+    -- the board CR 508.1d's Example is written about.
+    --
+    -- The card says "each combat" where this is asked of a DECLARATION, and the
+    -- two name the same event by RULE rather than by coincidence: CR 506.1
+    -- gives a combat phase exactly one declare attackers step, and CR 703.4i
+    -- makes Pawl.Engine.Combat.declareAttackers that step's turn-based action.
+    -- So nothing needs storing and nothing needs resetting -- the bound is
+    -- re-read live off the battlefield like every sibling above, and a second
+    -- combat phase in the same turn (Relentless Assault, Aggravated Assault)
+    -- gets a fresh reading rather than a running tally, which is what "each
+    -- combat" asks for and what CR 508.1d's last sentence says of the
+    -- requirements on the other side of the same check.
+    --
+    -- CR 508.4c closes the remaining gap: a creature put onto the battlefield
+    -- attacking is not affected by restrictions that apply to the declaration,
+    -- so a creature joining combat outside the declaration is exempt by rule
+    -- rather than by pawl's omission, and a per-phase tally would have had to
+    -- exclude it anyway.
+    CantAttackMoreThan Natural.Natural (Maybe Condition.Condition)
+  | -- | CR 509.1b, the same bound on the other declaration. Silent Arbiter's
+    -- second sentence, and the arm above's reasoning holds unchanged: CR 506.1
+    -- gives a combat phase one declare blockers step, CR 703.4j makes
+    -- Pawl.Engine.Combat.declareBlockers its turn-based action, and CR 509.1a
+    -- names a single defending player to make it.
+    CantBlockMoreThan Natural.Natural (Maybe Condition.Condition)
   deriving (Eq, Ord, Show)
