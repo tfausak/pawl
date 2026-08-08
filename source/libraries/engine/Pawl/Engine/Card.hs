@@ -635,10 +635,10 @@ enteringFace card shown = case Card.layout card of
 -- given, and the reader (Pawl.Engine.Game.manaCostFaceOf) is the only place that
 -- has to know the difference.
 --
--- CR 202.3b's second sentence -- a permanent COPYING the back face of a nonmodal
--- double-faced object has mana value 0 -- is not implemented: this answers the
--- front face's cost for every Transforming card, and a copy carries that answer
--- away in its copiable snapshot (#970).
+-- Only CR 202.3b's FIRST sentence, which is about the object itself. Its second
+-- -- a copy of that back face has mana value 0 -- is a question about copying
+-- that this function has no way to ask, so `showsBackFace` below answers the
+-- classification and Pawl.Engine.Event's AsCopy arm spends it on the snapshot.
 manaCostFace :: Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
 manaCostFace card live = case Card.layout card of
   Layout.Normal -> live
@@ -658,6 +658,41 @@ manaCostFace card live = case Card.layout card of
   -- has only the characteristics of the face that's up." Mana value is a
   -- characteristic (CR 109.3), so the face that's up is where it is read from.
   Layout.ModalDoubleFaced -> live
+
+-- CR 202.3b, second sentence: is this card, showing this face, "the back face of
+-- a nonmodal double-faced object"? "If a permanent or spell is a copy of the
+-- back face of a nonmodal double-faced object (even if the card representing
+-- that copy is itself a double-faced card), the mana value of the copy is 0."
+--
+-- The classification only. WHOSE mana value that makes 0 is a question about
+-- copying, which is Pawl.Engine.Event's AsCopy arm -- the one place a copiable
+-- snapshot is stamped -- and this answers about one card and the face it shows,
+-- the way every other function in this module does.
+--
+-- NONMODAL is CR 712.2's kind, which in this pool is Layout.Transforming alone.
+-- The modal layout is excluded by the rule's own word and not by an oversight:
+-- CR 712.8f gives a modal double-faced permanent only "the characteristics of
+-- the face that's up", its back face prints a mana cost of its own, and CR
+-- 202.3b's first sentence never reached it either.
+--
+-- CR 202.3c states the identical rule for a copy of a MELDED permanent. Melding
+-- is unmodelled (#369), so no object can be one for this to answer about.
+--
+-- The face is matched by NAME against the card's printed order, the way nextFace
+-- above does it, so a name that resolves to no face falls back to the front
+-- face -- Pawl.Engine.Game.resolveFace's own fallback, which is what keeps the
+-- two from disagreeing about which face is up.
+showsBackFace :: Card.Card -> Maybe CardName.CardName -> Bool
+showsBackFace card mName = case Card.layout card of
+  Layout.Normal -> False
+  Layout.Split -> False
+  Layout.Room -> False
+  Layout.Adventure -> False
+  Layout.Transforming ->
+    case mName >>= \name -> List.findIndex ((== name) . Face.name) (NonEmpty.toList (Card.faces card)) of
+      Nothing -> False
+      Just index -> index /= 0
+  Layout.ModalDoubleFaced -> False
 
 -- CR 709.5: does this card have a SHARED TYPE LINE -- is it a Room? "Some split
 -- cards are permanent cards with a single shared type line", and everything the
