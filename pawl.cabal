@@ -98,6 +98,10 @@ library codec
     Pawl.Codec.CastingRestrictionSpec
     Pawl.Codec.CastOffer
     Pawl.Codec.CastOfferSpec
+    Pawl.Codec.Clause
+    Pawl.Codec.ClauseIndex
+    Pawl.Codec.ClauseIndexSpec
+    Pawl.Codec.ClauseSpec
     Pawl.Codec.Color
     Pawl.Codec.ColorSpec
     Pawl.Codec.CombatRestriction
@@ -534,6 +538,8 @@ library types
     Pawl.Types.CastingPermission
     Pawl.Types.CastingRestriction
     Pawl.Types.CastOffer
+    Pawl.Types.Clause
+    Pawl.Types.ClauseIndex
     Pawl.Types.Color
     Pawl.Types.Combat
     Pawl.Types.CombatRestriction
