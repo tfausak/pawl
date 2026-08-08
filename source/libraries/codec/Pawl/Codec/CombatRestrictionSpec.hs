@@ -48,6 +48,27 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
       CombatRestriction.fromJson
       (CombatRestriction.CantAttackAlone Affected.Attached Nothing)
       """ {"type":"CantAttackAlone","value":{"affected":{"type":"Attached"}}} """
+  -- The SIZE-BOUNDING arms, whose payload spells "limit" where the three above
+  -- spell "affected". They are here as much for the DECODER as for the shape:
+  -- Pawl.Codec.CombatRestriction.fromJson dispatches on a string, so an arm
+  -- missing there compiles and fails only when a card file is loaded, and these
+  -- two cases are what turn that into a test failure.
+  Spec.it s "CantAttackMoreThan carries its limit" $
+    Common.assertJsonCodec
+      s
+      CombatRestriction.toJson
+      CombatRestriction.fromJson
+      (CombatRestriction.CantAttackMoreThan 1 Nothing)
+      """ {"type":"CantAttackMoreThan","value":{"limit":1}} """
+  -- CR 509.1b, the blocking counterpart. A DIFFERENT limit from the one above,
+  -- so a codec that crossed the two arms' payloads cannot pass both.
+  Spec.it s "CantBlockMoreThan carries its limit" $
+    Common.assertJsonCodec
+      s
+      CombatRestriction.toJson
+      CombatRestriction.fromJson
+      (CombatRestriction.CantBlockMoreThan 2 Nothing)
+      """ {"type":"CantBlockMoreThan","value":{"limit":2}} """
   -- CR 508.1c's second clause: the gated form.
   Spec.it s "CantAttack carries its condition" $
     Common.assertJsonCodec
