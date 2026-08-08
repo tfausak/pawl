@@ -624,6 +624,67 @@ combatReplaySpec s =
             "the coloured route round trips"
             (Replay.decode p (Replay.encode p HybridPayment.PaysTyped))
             (Just HybridPayment.PaysTyped)
+        -- CR 118.13a once more, for CR 107.4e's colour/colour hybrid: which half
+        -- a {G/U} was announced as decides WHICH mana the spell spent, and so
+        -- what floats afterwards, which has to survive a transcript.
+        Spec.it s "AnnounceHybridHalf round-trips through the transcript" $ do
+          let p =
+                Prompt.AnnounceHybridHalf
+                  decider
+                  S.alice
+                  oid
+                  (ManaSymbol.Hybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue))
+                  (ManaType.Colored Color.Green NonEmpty.:| [ManaType.Colored Color.Blue])
+          Spec.assertEqWith
+            s
+            "the green half round trips"
+            (Replay.decode p (Replay.encode p (ManaType.Colored Color.Green)))
+            (Just (ManaType.Colored Color.Green))
+          -- Discriminating for the same reason the pairs above are: a decode
+          -- that ignored the response and returned the head would pass one leg
+          -- by accident.
+          Spec.assertEqWith
+            s
+            "the blue half round trips"
+            (Replay.decode p (Replay.encode p (ManaType.Colored Color.Blue)))
+            (Just (ManaType.Colored Color.Blue))
+          -- Discriminating: fails if the colour/colour announcement rides the
+          -- monocolored one's response rather than getting its own constructor,
+          -- which is the nearest miss -- both are CR 601.2b announcements about
+          -- a hybrid symbol, asked of the same player about the same object.
+          Spec.assertEqWith
+            s
+            "and a monocolored announcement is not one of these"
+            ( Replay.decode
+                p
+                ( Replay.encode
+                    ( Prompt.AnnounceHybridPayment
+                        decider
+                        S.alice
+                        oid
+                        (ManaType.Colored Color.Red)
+                        (HybridPayment.PaysTyped NonEmpty.:| [HybridPayment.PaysGeneric])
+                    )
+                    HybridPayment.PaysTyped
+                )
+            )
+            Nothing
+        Spec.it s "a short transcript announces the first offered hybrid half" $
+          -- Every offered half is payable (the prompt is raised only with two
+          -- payable halves), so the head is a legal answer.
+          Spec.assertEqWith
+            s
+            "the head"
+            ( Replay.defaultAnswer
+                ( Prompt.AnnounceHybridHalf
+                    decider
+                    S.alice
+                    oid
+                    (ManaSymbol.Hybrid (ManaType.Colored Color.Green) (ManaType.Colored Color.Blue))
+                    (ManaType.Colored Color.Blue NonEmpty.:| [ManaType.Colored Color.Green])
+                )
+            )
+            (ManaType.Colored Color.Blue)
         -- CR 118.7e: which half of a hybrid REDUCTION its payer took decides how
         -- much came off the cost, so it has to survive a transcript too.
         Spec.it s "ChooseReductionHalf round-trips through the transcript" $ do

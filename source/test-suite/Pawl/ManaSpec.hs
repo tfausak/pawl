@@ -1342,6 +1342,41 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     Spec.assertEqWith s "one of each" (castOff 1 1) 1
     Spec.assertEqWith s "one land is not enough" (castOff 1 0) 0
 
+  -- CR 601.2b's announcement for CR 107.4e's COLOUR/COLOUR half, and the board
+  -- that makes the answer observable. Gyre Engineer ("{T}: Add {G}{U}") is the
+  -- oversupply: one activation puts BOTH of {G/U}'s halves in the pool, so
+  -- Slippery Bogle ({G/U}) spends one and floats the other. Which one floats is
+  -- the announcement, and Llanowar Elves ({G}) in hand is what reads it -- with
+  -- the Engineer tapped there is no other source, so the Elves are castable
+  -- exactly when the Bogle took the BLUE half.
+  --
+  -- Asserting the BOARD and not merely the prompt: a prompt whose answer
+  -- changed nothing would satisfy the transcript legs alone.
+  Spec.it s "CR 601.2b whichever half of {G/U} is announced, the OTHER floats" $ do
+    gyreEngineer <- S.printingOf s registry "Gyre Engineer"
+    slipperyBogle <- S.printingOf s registry "Slippery Bogle"
+    llanowarElves <- S.printingOf s registry "Llanowar Elves"
+    let (_, board) = S.addCreature gyreEngineer S.alice (Setup.emptyGame S.bothPlayers)
+        (withBogle, bogleId) = S.handOne slipperyBogle board
+        (elvesId, gs) = S.addHandCard llanowarElves S.alice withBogle
+        -- Resolved, not merely cast: the Elves are a creature spell, and CR
+        -- 302.1 lets one be cast only "during a main phase of their turn when
+        -- the stack is empty", so the Bogle has to leave the stack before the
+        -- mana that floated is any use to them.
+        castWith half =
+          let ((_, cast), asked) = Replay.record (announcesHalf half) gs (S.cast S.alice bogleId)
+           in (asked, cast, snd (S.runPureWith (announcesHalf half) cast Stack.resolveTop))
+        (askedGreen, castGreen, afterGreen) = castWith greenMana
+        (askedBlue, castBlue, afterBlue) = castWith blueMana
+    Spec.assertEqWith s "the green half was announced" (halfAnnouncements askedGreen) [greenMana]
+    Spec.assertEqWith s "the blue half was announced" (halfAnnouncements askedBlue) [blueMana]
+    Spec.assertEqWith s "both casts reached the stack" (length (GameState.stack castGreen), length (GameState.stack castBlue)) (1, 1)
+    Spec.assertEqWith s "and both Bogles resolved" (length (GameState.stack afterGreen), length (GameState.stack afterBlue)) (0, 0)
+    Spec.assertEqWith s "green paid, so BLUE floats" (poolTypes S.alice afterGreen) [blueMana]
+    Spec.assertEqWith s "blue paid, so GREEN floats" (poolTypes S.alice afterBlue) [greenMana]
+    Spec.assertBool s (S.castable S.alice elvesId afterBlue) "the floating {G} casts Llanowar Elves"
+    Spec.assertBool s (not (S.castable S.alice elvesId afterGreen)) "the floating {U} does not"
+
   Spec.it s "CR 107.4e a hybrid symbol is ALL of its component colours" $ do
     burningTreeEmissary <- S.printingOf s registry "Burning-Tree Emissary"
     let (oid, gs) = S.addCreature burningTreeEmissary S.alice (Setup.emptyGame S.bothPlayers)
@@ -1350,6 +1385,34 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
       "red AND green, not one or the other"
       (Projection.colorsOf oid gs)
       (Set.fromList [Color.Red, Color.Green])
+
+greenMana, blueMana :: ManaType.ManaType
+greenMana = ManaType.Colored Color.Green
+blueMana = ManaType.Colored Color.Blue
+
+-- The `announces` shape for CR 107.4e's COLOUR/COLOUR hybrid: answers
+-- Prompt.AnnounceHybridHalf with `half` whenever it is on offer, and defers
+-- everything else to S.identityAnswer.
+announcesHalf :: ManaType.ManaType -> Prompt.Prompt r -> r
+announcesHalf half p = case p of
+  Prompt.AnnounceHybridHalf _ _ _ _ offers ->
+    if elem half (NonEmpty.toList offers) then half else NonEmpty.head offers
+  _ -> S.identityAnswer p
+
+-- Every colour/colour hybrid announcement the engine asked for, in the order it
+-- asked -- CR 601.2b's "for each of those symbols" again.
+halfAnnouncements :: [Response.Response] -> [ManaType.ManaType]
+halfAnnouncements responses =
+  let announcement r = case r of
+        Response.AnnouncedHybridHalf half -> Just half
+        _ -> Nothing
+   in Maybe.mapMaybe announcement responses
+
+-- What is floating, as types in pool order -- poolSize's discriminating twin,
+-- for a case where the SIZE is the same under either answer.
+poolTypes :: PlayerId.PlayerId -> GameState.GameState -> [ManaType.ManaType]
+poolTypes pid gs = case Game.poolOf pid gs of
+  Mana.Type.MkMana units -> fmap ManaUnit.manaType units
 
 twoOrRed :: ManaSymbol.ManaSymbol
 twoOrRed = ManaSymbol.MonocoloredHybrid (ManaType.Colored Color.Red)
