@@ -3749,7 +3749,7 @@ representativeEvents cond =
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
         -- on the pair.
-        TriggerCondition.SpellCast _ -> one (GameEvent.SpellCast S.alice arrived)
+        TriggerCondition.SpellCast _ -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.

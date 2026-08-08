@@ -76,12 +76,23 @@ data GameEvent
     -- the stack when the trigger is checked, so CR 608.2h's last known
     -- information is not involved.
     --
+    -- The ProjectedCharacteristics is that stack object as it was when the spell
+    -- became cast (CR 608.2h), and it is what a LOOK-BACK reader needs rather
+    -- than what a trigger needs: CR 608.2i's "for each spell you've cast this
+    -- turn" is answered when the counting ability resolves, by which time the
+    -- spell it names has resolved or been countered and its stack incarnation is
+    -- gone. Recorded at CR 601.2i, after the effects that modify the spell as
+    -- it's cast have been applied, so a cost-reduced or type-changed spell is
+    -- counted as it was cast.
+    --
+    -- Strict (!) for Moved's reason above.
+    --
     -- Not derivable from the Moved event that CR 601.2a's move to the stack
     -- records. Arriving on the stack is not being cast: CR 707.10 puts a COPY of
     -- a spell there and says in as many words that it "isn't cast", and CR 601.2
     -- can reverse a proposed cast after the move has already happened -- which is
     -- why Pawl.Engine.Cast emits this only past the last step that can fail.
-    SpellCast PlayerId.PlayerId ObjectId.ObjectId
+    SpellCast PlayerId.PlayerId ObjectId.ObjectId !ProjectedCharacteristics.ProjectedCharacteristics
   | -- | CR 725.1: a player became the monarch. What Palace Jailer's exile duration
     -- keys off, and the substrate for any future "whenever a player becomes the
     -- monarch" trigger.
