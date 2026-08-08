@@ -63,10 +63,16 @@ evaluate viewOf context gs oid = evaluateFor viewOf context gs oid oid
 evaluateFor :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> ObjectId -> Quantity -> Maybe Integer
 evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Literal n -> Just n
-  -- Game.manaCostFaceOf and not Game.faceOf: CR 712.8e reads a transformed
-  -- permanent's mana value off its FRONT face's cost while every other
-  -- characteristic comes off its back.
-  Quantity.ManaValue -> fmap manaValueOf (Game.manaCostFaceOf oid gs)
+  -- CR 202.3 read through the injected view, exactly as the Power arm below is
+  -- and for the extra reason that CR 707.2 makes mana cost copiable: layer 1
+  -- replaces it, so a Clone entering as a copy of Darksteel Myr has mana value 3
+  -- and not the 4 its own printed {3}{U} would give. Which face the printed cost
+  -- came off (CR 712.8e, CR 708.2a) is settled at the projection's seed.
+  --
+  -- Nothing when the view cannot say: no object at all, or an object with no
+  -- card behind it. Off the battlefield the view is the printed card's
+  -- (Projection.viewOfCard), which answers CR 202.3 in every zone.
+  Quantity.ManaValue -> viewOf oid >>= Filter.manaValue
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller
   -- decides that by which ViewOf it supplies (Projection.fullView vs.

@@ -27,6 +27,7 @@ toJson pc =
       Common.optionalPair "supertypes" Set.empty (Common.encodeSet Supertype.toJson) (PC.supertypes pc),
       Common.optionalPair "keywords" Map.empty (Common.encodeMultiset Keyword.toJson) (PC.keywords pc),
       Common.optionalPair "colors" Set.empty (Common.encodeSet Color.toJson) (PC.colors pc),
+      Common.optionalPair "manaValue" Nothing (Common.encodeMaybe Common.integer) (PC.manaValue pc),
       Common.optionalPair "power" Nothing (Common.encodeMaybe Common.integer) (PC.power pc),
       Common.optionalPair "toughness" Nothing (Common.encodeMaybe Common.integer) (PC.toughness pc),
       Common.optionalPair "loyalty" Nothing (Common.encodeMaybe Loyalty.toJson) (PC.loyalty pc),
@@ -46,6 +47,7 @@ fromJson value = do
   sups <- Common.defaultedField "supertypes" Set.empty (Common.decodeSet Supertype.fromJson) ps
   kws <- Common.defaultedField "keywords" Map.empty (Common.decodeMultiset Keyword.fromJson) ps
   cols <- Common.defaultedField "colors" Set.empty (Common.decodeSet Color.fromJson) ps
+  mv <- Common.defaultedField "manaValue" Nothing (Common.decodeMaybe Common.asInteger) ps
   pow <- Common.defaultedField "power" Nothing (Common.decodeMaybe Common.asInteger) ps
   tou <- Common.defaultedField "toughness" Nothing (Common.decodeMaybe Common.asInteger) ps
   loy <- Common.defaultedField "loyalty" Nothing (Common.decodeMaybe Loyalty.fromJson) ps
@@ -62,6 +64,7 @@ fromJson value = do
         PC.supertypes = sups,
         PC.keywords = kws,
         PC.colors = cols,
+        PC.manaValue = mv,
         PC.power = pow,
         PC.toughness = tou,
         PC.loyalty = loy,

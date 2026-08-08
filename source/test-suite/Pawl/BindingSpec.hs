@@ -25,6 +25,7 @@ sampleSnapshot =
       PC.supertypes = Set.empty,
       PC.keywords = Map.empty,
       PC.colors = Set.empty,
+      PC.manaValue = Just 0,
       PC.power = Just 2,
       PC.toughness = Just 1,
       PC.loyalty = Nothing,

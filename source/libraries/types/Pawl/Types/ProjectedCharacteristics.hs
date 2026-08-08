@@ -57,6 +57,21 @@ data ProjectedCharacteristics = MkProjectedCharacteristics
     -- A Set, not a sum with a Colorless arm: CR 105.2c says a colourless object
     -- has NO colour, and CR 105.4 denies that colourless is a colour at all.
     colors :: Set.Set Color.Color,
+    -- | CR 202.3 / 613.2a: the object's mana value, DERIVED from the mana cost at
+    -- the seed rather than stored as the cost itself -- colors above take the
+    -- same posture, and for the same reason: every reader wants the derived
+    -- number, and nothing in the layer system rewrites a mana cost.
+    --
+    -- Copiable (CR 707.2 names mana cost in its list), which is what earns it a
+    -- place here rather than a read of the printed card: a Clone entering as a
+    -- copy of Darksteel Myr has mana value 3, not the 4 its own {3}{U} would
+    -- give.
+    --
+    -- Carried, not folded: no Modification writes a mana cost, so no layer
+    -- touches this after the seed. Nothing means "no object to ask" -- an ability
+    -- on the stack has no card and so no mana value at all, which is a different
+    -- claim from CR 202.3a's 0 (#674).
+    manaValue :: Maybe Integer,
     power :: Maybe Integer,
     toughness :: Maybe Integer,
     -- | CR 306.5 / 109.3: the object's PRINTED loyalty, copiable (CR 707.2) -- so

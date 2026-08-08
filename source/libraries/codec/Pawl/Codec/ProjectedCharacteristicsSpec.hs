@@ -37,6 +37,7 @@ testCharacteristics =
       PC.supertypes = Set.singleton Supertype.Legendary,
       PC.keywords = Map.singleton Keyword.Flying 1,
       PC.colors = Set.singleton Color.Blue,
+      PC.manaValue = Just 3,
       PC.power = Just 1,
       PC.toughness = Just 2,
       PC.loyalty = Nothing,
@@ -52,7 +53,7 @@ testCharacteristics =
 testCharacteristicsJson :: String
 testCharacteristicsJson =
   "{\"name\":\"Test Creature\",\"supertypes\":[{\"type\":\"Legendary\"}],\"keywords\":[{\"type\":\"Flying\"}],"
-    <> "\"colors\":[{\"type\":\"Blue\"}],\"power\":1,\"toughness\":2,"
+    <> "\"colors\":[{\"type\":\"Blue\"}],\"manaValue\":3,\"power\":1,\"toughness\":2,"
     <> "\"cardTypes\":[{\"type\":\"Creature\"}],\"subtypes\":[{\"type\":\"Human\"}],"
     <> "\"triggeredAbilities\":[{\"condition\":{\"type\":\"SelfEnters\"},"
     <> "\"modal\":{\"modes\":[{}]}}]}"
@@ -65,6 +66,7 @@ minimalCharacteristics =
       PC.supertypes = Set.empty,
       PC.keywords = Map.empty,
       PC.colors = Set.empty,
+      PC.manaValue = Nothing,
       PC.power = Nothing,
       PC.toughness = Nothing,
       PC.loyalty = Nothing,

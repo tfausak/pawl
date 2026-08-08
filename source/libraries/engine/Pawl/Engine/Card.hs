@@ -635,7 +635,8 @@ enteringFace card shown = case Card.layout card of
 --
 -- CR 202.3b's second sentence -- a permanent COPYING the back face of a nonmodal
 -- double-faced object has mana value 0 -- is not implemented: this answers the
--- front face's cost for every Transforming card, copy or not (#699).
+-- front face's cost for every Transforming card, and a copy carries that answer
+-- away in its copiable snapshot (#970).
 manaCostFace :: Card.Card -> Face.Face Card.Card -> Face.Face Card.Card
 manaCostFace card live = case Card.layout card of
   Layout.Normal -> live
