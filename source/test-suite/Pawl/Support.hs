@@ -1493,7 +1493,8 @@ stubView table oid =
                 Filter.canHostSubject = False,
                 Filter.token = False,
                 Filter.tapped = False,
-                Filter.counters = Map.empty
+                Filter.counters = Map.empty,
+                Filter.ringBearerFor = Nothing
               }
         [] -> Nothing
 

@@ -42,7 +42,8 @@ blackCreature =
       Filter.canHostSubject = False,
       Filter.token = False,
       Filter.tapped = False,
-      Filter.counters = Map.empty
+      Filter.counters = Map.empty,
+      Filter.ringBearerFor = Nothing
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -67,7 +68,8 @@ devoidBigCreature =
       Filter.canHostSubject = False,
       Filter.token = False,
       Filter.tapped = False,
-      Filter.counters = Map.empty
+      Filter.counters = Map.empty,
+      Filter.ringBearerFor = Nothing
     }
 
 -- A creature whose only ability is the given keyword -- the toxic N and landwalk
@@ -75,6 +77,11 @@ devoidBigCreature =
 -- every other axis is a fixed background and only the keyword set varies.
 withKeyword :: Keyword.Keyword -> Filter.View
 withKeyword keyword = blackCreature {Filter.keywords = Set.singleton keyword}
+
+-- blackCreature carrying player 0's Ring-bearer designation (CR 701.54a). Off
+-- blackCreature, so the designation is the only axis that varies.
+ringBearer :: Filter.View
+ringBearer = blackCreature {Filter.ringBearerFor = Just (PlayerId.MkPlayerId 0)}
 
 self :: Filter.Context
 self = Filter.MkContext (Just (PlayerId.MkPlayerId 0)) Nothing
@@ -495,3 +502,29 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- is not one.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsToken)) "player"
+
+  -- CR 701.54e's designation conjunct. Context-relative, so the same VIEW answers
+  -- differently under `self` and `other`, which is the pair that pins "YOUR
+  -- Ring-bearer" apart from "a Ring-bearer".
+  Spec.describe s "IsRingBearer" $ do
+    Spec.it s "matches a permanent designated for the perspective player" $ do
+      Spec.assertBool s (Filter.matches self ringBearer Filter.Type.IsRingBearer) "designated for player 0"
+
+    -- CR 701.54a's "YOUR Ring-bearer": the designation names a player, and an
+    -- opponent's Ring-bearer is not yours. The discriminating case -- an atom that
+    -- ignored the perspective and only asked "is anything designated" passes the
+    -- case above and fails this one.
+    Spec.it s "does not match another player's Ring-bearer" $ do
+      Spec.assertBool s (not (Filter.matches other ringBearer Filter.Type.IsRingBearer)) "designated for someone else"
+
+    Spec.it s "does not match an undesignated permanent" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsRingBearer)) "no designation"
+
+    -- The posture ControlledBy and IsPlayer take: "your Ring-bearer" is
+    -- unanswerable where there is no "you" (an off-battlefield search).
+    Spec.it s "is vacuously false with no perspective" $ do
+      Spec.assertBool s (not (Filter.matches noPerspective ringBearer Filter.Type.IsRingBearer)) "no perspective"
+
+    -- CR 701.54b: Ring-bearer is a designation A PERMANENT can have.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsRingBearer)) "player"
