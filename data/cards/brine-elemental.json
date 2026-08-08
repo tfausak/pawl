@@ -78,24 +78,28 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "SkipNextPhase",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "Opponent"
-                        }
-                      },
-                      {
-                        "type": "Step",
-                        "value": {
-                          "type": "Beginning",
-                          "value": {
-                            "type": "Untap"
+                        "type": "SkipNextPhase",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "Opponent"
+                            }
+                          },
+                          {
+                            "type": "Step",
+                            "value": {
+                              "type": "Beginning",
+                              "value": {
+                                "type": "Untap"
+                              }
+                            }
                           }
-                        }
+                        ]
                       }
                     ]
                   }

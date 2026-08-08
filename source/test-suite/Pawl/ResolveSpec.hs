@@ -49,6 +49,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -722,7 +723,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -738,7 +739,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
@@ -761,7 +762,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -785,7 +786,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -808,7 +809,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           TriggeredAbility.MkTriggeredAbility
             TriggerCondition.SelfEnters
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.ExileAllGraveyards]))) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
             Nothing
         (abilId, g4) = Game.freshObjectId g3
         (ts, g5) = Game.freshTimestamp g4
@@ -867,7 +868,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
@@ -942,7 +943,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.singleton Effect.RestartGame))) Map.empty Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
@@ -1004,7 +1005,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]))) Map.empty Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1081,7 +1082,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]))) Map.empty Optionality.Mandatory Nothing))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1303,7 +1304,7 @@ installControlBy mindslaver controller target gs0 =
                 },
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.restrictions = [],
             ActivatedAbility.condition = Nothing
@@ -2324,7 +2325,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         -- illegal (it's no longer a legal CreatureTarget), while the
         -- reserved slot -- never targeted -- stays vacuously legal.
         gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-        mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory Nothing
+        mode = Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]))) specs Optionality.Mandatory Nothing
         run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore

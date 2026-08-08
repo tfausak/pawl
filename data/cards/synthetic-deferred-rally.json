@@ -66,19 +66,23 @@
             "modal": {
               "modes": [
                 {
-                  "effects": [
+                  "clauses": [
                     {
-                      "type": "GainLife",
-                      "value": [
+                      "effects": [
                         {
-                          "type": "Relative",
-                          "value": {
-                            "type": "You"
-                          }
-                        },
-                        {
-                          "type": "Literal",
-                          "value": 2
+                          "type": "GainLife",
+                          "value": [
+                            {
+                              "type": "Relative",
+                              "value": {
+                                "type": "You"
+                              }
+                            },
+                            {
+                              "type": "Literal",
+                              "value": 2
+                            }
+                          ]
                         }
                       ]
                     }
@@ -105,10 +109,14 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ArmDelayedTrigger",
-                "value": "gain 2 life"
+                "effects": [
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": "gain 2 life"
+                  }
+                ]
               }
             ]
           }

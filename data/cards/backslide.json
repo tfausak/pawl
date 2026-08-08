@@ -41,10 +41,14 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "TurnFaceDown",
-                "value": "target"
+                "effects": [
+                  {
+                    "type": "TurnFaceDown",
+                    "value": "target"
+                  }
+                ]
               }
             ],
             "targetSpecs": [

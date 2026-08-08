@@ -33,14 +33,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Discard",
-                    "value": [
-                      "target",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Discard",
+                        "value": [
+                          "target",
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

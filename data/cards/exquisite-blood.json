@@ -28,19 +28,23 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "InSlot",
-                        "value": "thatMuch"
+                        "type": "GainLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "thatMuch"
+                          }
+                        ]
                       }
                     ]
                   }

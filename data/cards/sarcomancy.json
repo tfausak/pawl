@@ -21,43 +21,47 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "colorIndicator": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "Black"
+                                "colorIndicator": [
+                                  {
+                                    "type": "Black"
+                                  }
+                                ],
+                                "name": "Zombie Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Zombie"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
                               }
-                            ],
-                            "name": "Zombie Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Zombie"
-                                }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                            ]
                           }
                         ]
                       }
@@ -120,14 +124,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "you",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "DealDamage",
+                        "value": [
+                          "you",
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

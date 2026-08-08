@@ -15,18 +15,22 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "PutCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "PlusOnePlusOne"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      "self"
+                        "type": "PutCounters",
+                        "value": [
+                          {
+                            "type": "PlusOnePlusOne"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "self"
+                        ]
+                      }
                     ]
                   }
                 ]
@@ -67,22 +71,26 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainPlayerCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Energy"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "GainPlayerCounters",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Energy"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       }
                     ]
                   }

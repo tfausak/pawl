@@ -53,6 +53,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -262,7 +263,7 @@ siegeDefeat =
     { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.fromList [exile, offer]) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList [exile, offer]))) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }

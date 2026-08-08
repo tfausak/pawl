@@ -14,18 +14,22 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                    "effects": [
+                      {
+                        "type": "AddMana",
                         "value": {
-                          "type": "Blue"
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "Blue"
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 ]
               }

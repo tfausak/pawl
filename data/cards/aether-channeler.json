@@ -33,43 +33,47 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "keywords": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "Flying"
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  }
+                                ],
+                                "name": "Bird Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Bird"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
                               }
-                            ],
-                            "name": "Bird Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Bird"
-                                }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                            ]
                           }
                         ]
                       }
@@ -78,13 +82,17 @@
                 ]
               },
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "permanent",
+                    "effects": [
                       {
-                        "type": "Hand"
+                        "type": "MoveToZone",
+                        "value": [
+                          "permanent",
+                          {
+                            "type": "Hand"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -121,19 +129,23 @@
                 ]
               },
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Draw",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Draw",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

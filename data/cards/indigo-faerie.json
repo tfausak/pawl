@@ -19,22 +19,26 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "AddColor",
+                        "type": "ModifyTarget",
                         "value": [
                           {
-                            "type": "Blue"
-                          }
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "AddColor",
+                            "value": [
+                              {
+                                "type": "Blue"
+                              }
+                            ]
+                          },
+                          "target"
                         ]
-                      },
-                      "target"
+                      }
                     ]
                   }
                 ],

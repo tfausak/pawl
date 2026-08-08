@@ -20,35 +20,39 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "MoveToZone",
-                "value": [
+                "effects": [
                   {
-                    "type": "And",
+                    "type": "MoveToZone",
                     "value": [
                       {
-                        "type": "Not",
-                        "value": {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Land"
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Land"
+                              }
+                            }
+                          },
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "HasSupertype",
+                              "value": {
+                                "type": "Legendary"
+                              }
+                            }
                           }
-                        }
+                        ]
                       },
                       {
-                        "type": "Not",
-                        "value": {
-                          "type": "HasSupertype",
-                          "value": {
-                            "type": "Legendary"
-                          }
-                        }
+                        "type": "Exile"
                       }
                     ]
-                  },
-                  {
-                    "type": "Exile"
                   }
                 ]
               }

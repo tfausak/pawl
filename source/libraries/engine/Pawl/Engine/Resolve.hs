@@ -42,6 +42,7 @@ import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -239,7 +240,7 @@ durationSlots duration = case duration of
 modeSlots :: Mode.Mode Card.Type.Card -> Set SlotName
 modeSlots mode =
   Set.union
-    (foldMap slotsOf (Mode.effects mode))
+    (foldMap slotsOf (Mode.allEffects mode))
     (maybe Set.empty (Set.singleton . UnlessPaid.payer) (Mode.unlessPaid mode))
 
 -- Both sides of a Condition are a Quantity, and either may read a slot.
@@ -520,7 +521,8 @@ modesOf oid gs = case Game.lookupObject oid gs of
     Just face ->
       let chosen = Binding.modesOf (Object.bindings obj)
           rewrite = Projection.rewriteEffect (Projection.textChangesAffecting oid gs)
-          rewriteMode m = m {Mode.effects = fmap rewrite (Mode.effects m)}
+          rewriteClause c = c {Clause.effects = fmap rewrite (Clause.effects c)}
+          rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
        in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
 
 -- CR 405.4: who controls a SPELL on the stack, fixed at cast time -- for both CR
@@ -640,7 +642,7 @@ resolveSpellWith runSubgame oid = do
                           (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) legalityNow)
                           (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenNow)
                           eff
-                  Monad.when (taken && not gatePaid) (Monad.forM_ (Mode.effects mode) applyOne)
+                  Monad.when (taken && not gatePaid) (Monad.forM_ (Mode.allEffects mode) applyOne)
                 finishSpell oid face effectController
 
 -- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution.
@@ -757,7 +759,7 @@ resolveModes stackId srcId modes = do
                   let chosenNow = Binding.targetsOf bindingsNow
                       legalityNow = Map.mapWithKey legalSlot chosenNow
                   applyEffect stackId srcId effectController (instanceView legalityNow) (instanceView chosenNow) eff
-            Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Mode.effects mode))
+            Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Mode.allEffects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)

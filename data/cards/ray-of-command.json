@@ -20,33 +20,37 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Untap",
-                "value": "target"
-              },
-              {
-                "type": "GainControl",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfTurn"
+                    "type": "Untap",
+                    "value": "target"
                   },
                   {
-                    "type": "GainKeyword",
-                    "value": {
-                      "type": "Haste"
-                    }
+                    "type": "GainControl",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "target"
+                    ]
                   },
-                  "target"
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Haste"
+                        }
+                      },
+                      "target"
+                    ]
+                  }
                 ]
               }
             ],

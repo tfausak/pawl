@@ -16,19 +16,23 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ChangeText",
-                "value": [
+                "effects": [
                   {
-                    "type": "CreatureType"
-                  },
-                  [
-                    {
-                      "type": "Wall"
-                    }
-                  ],
-                  "target"
+                    "type": "ChangeText",
+                    "value": [
+                      {
+                        "type": "CreatureType"
+                      },
+                      [
+                        {
+                          "type": "Wall"
+                        }
+                      ],
+                      "target"
+                    ]
+                  }
                 ]
               }
             ],

@@ -35,6 +35,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.Effect as Effect
@@ -86,7 +87,7 @@ resolvedCreature land creature nLands =
 -- single-mode ActivatedAbility now takes.
 singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
 singleModeAbility effects specs =
-  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList effects))) specs Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)
 
 -- Answers Prompt.ChooseManaSource with `wanted` whenever it is on offer, and
 -- defers everything else to S.identityAnswer. Its sibling avoids that source

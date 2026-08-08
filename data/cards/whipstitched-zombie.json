@@ -44,10 +44,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Sacrifice",
-                    "value": "self"
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": "self"
+                      }
+                    ]
                   }
                 ],
                 "unlessPaid": {

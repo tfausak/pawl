@@ -16,18 +16,22 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "AffectPlayers",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "Opponents"
-                  },
-                  {
-                    "type": "CantCastSpells"
+                    "type": "AffectPlayers",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "Opponents"
+                      },
+                      {
+                        "type": "CantCastSpells"
+                      }
+                    ]
                   }
                 ]
               }

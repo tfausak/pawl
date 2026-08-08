@@ -31,7 +31,7 @@ import Pawl.Types.TargetSpec (TargetSpec)
 -- two alternatives into one. selectionEffects just below is what CR 700.2's
 -- selection makes of it, and is what Pawl.Engine.Mana reads.
 modeEffects :: Modal.Modal card -> [[Effect card]]
-modeEffects m = fmap (Foldable.toList . Mode.effects) (Foldable.toList (Modal.modes m))
+modeEffects m = fmap (Foldable.toList . Mode.allEffects) (Foldable.toList (Modal.modes m))
 
 -- Every effect across all modes, printed (mode, then written) order (CR
 -- 608.2c).
@@ -149,7 +149,7 @@ modeAtIndex (ModeIndex.MkModeIndex n) m = Seq.lookup (Natural.toIntSaturating n)
 -- optionality is not part of the question; resolution goes through chosenModes
 -- instead.
 modesEffects :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
-modesEffects chosen m = concatMap (Foldable.toList . Mode.effects . snd) (chosenModes chosen m)
+modesEffects chosen m = concatMap (Foldable.toList . Mode.allEffects . snd) (chosenModes chosen m)
 
 -- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union), each instance's
 -- slots under instanceSlot's name. Two modes may be chosen at once (CR 702.42a's

@@ -16,15 +16,19 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ChangeText",
-                "value": [
+                "effects": [
                   {
-                    "type": "BasicLandType"
-                  },
-                  [],
-                  "target"
+                    "type": "ChangeText",
+                    "value": [
+                      {
+                        "type": "BasicLandType"
+                      },
+                      [],
+                      "target"
+                    ]
+                  }
                 ]
               }
             ],

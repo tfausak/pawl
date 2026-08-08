@@ -44,27 +44,31 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilYourNextTurn"
-                      },
-                      {
-                        "type": "ModifyPowerToughness",
+                        "type": "ModifyTarget",
                         "value": [
                           {
-                            "type": "Literal",
-                            "value": -2
+                            "type": "UntilYourNextTurn"
                           },
                           {
-                            "type": "Literal",
-                            "value": -1
-                          }
+                            "type": "ModifyPowerToughness",
+                            "value": [
+                              {
+                                "type": "Literal",
+                                "value": -2
+                              },
+                              {
+                                "type": "Literal",
+                                "value": -1
+                              }
+                            ]
+                          },
+                          "target"
                         ]
-                      },
-                      "target"
+                      }
                     ]
                   }
                 ],

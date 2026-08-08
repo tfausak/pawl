@@ -450,5 +450,5 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Common.assertFromJson
       s
       decodeFace
-      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"effects":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
+      """ {"name":"Mountain","typeLine":{"supertypes":[{"type":"Basic"}],"types":[{"type":"Land"}],"subtypes":[{"type":"Mountain"}]},"manaCost":null,"power":null,"toughness":null,"keywords":[],"staticAbilities":[],"activatedAbilities":[],"replacementEffects":[],"triggeredAbilities":[],"castingPermissions":[],"spell":{"modes":[{"clauses":[],"targetSpecs":[]}],"selection":{"type":"ChooseExactly","value":1}}} """
       mountainFace

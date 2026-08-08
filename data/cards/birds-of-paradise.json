@@ -14,12 +14,16 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "AnyColor"
-                    }
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "type": "AnyColor"
+                        }
+                      }
+                    ]
                   }
                 ]
               }

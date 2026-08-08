@@ -36,66 +36,70 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "LoseLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    ]
-                  },
-                  {
-                    "type": "Create",
-                    "value": [
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "LoseLife",
+                        "value": [
                           {
-                            "colorIndicator": [
-                              {
-                                "type": "Black"
-                              }
-                            ],
-                            "keywords": [
-                              {
-                                "type": "Flying"
-                              }
-                            ],
-                            "name": "Faerie Rogue Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Faerie"
-                                },
-                                {
-                                  "type": "Rogue"
-                                }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
                             }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
+                      },
+                      {
+                        "type": "Create",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "Black"
+                                  }
+                                ],
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  }
+                                ],
+                                "name": "Faerie Rogue Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Faerie"
+                                    },
+                                    {
+                                      "type": "Rogue"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
                           }
                         ]
                       }

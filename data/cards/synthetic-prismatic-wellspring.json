@@ -14,50 +14,62 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                    "effects": [
+                      {
+                        "type": "AddMana",
                         "value": {
-                          "type": "Red"
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "Red"
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 ]
               },
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                    "effects": [
+                      {
+                        "type": "AddMana",
                         "value": {
-                          "type": "Green"
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "Green"
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 ]
               },
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                    "effects": [
+                      {
+                        "type": "AddMana",
                         "value": {
-                          "type": "White"
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "White"
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 ]
               }

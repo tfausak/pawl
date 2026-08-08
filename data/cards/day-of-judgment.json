@@ -29,18 +29,22 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Destroy",
-                "value": [
+                "effects": [
                   {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
-                  },
-                  {
-                    "type": "Regenerable"
+                    "type": "Destroy",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "Regenerable"
+                      }
+                    ]
                   }
                 ]
               }

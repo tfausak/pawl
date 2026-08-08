@@ -16,17 +16,21 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Draw",
-                "value": [
+                "effects": [
                   {
-                    "type": "InSlot",
-                    "value": "target"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 3
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
                   }
                 ]
               }

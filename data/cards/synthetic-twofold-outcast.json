@@ -78,25 +78,29 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "LoseLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "LoseLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       },
                       {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Sacrifice",
+                        "value": "self"
                       }
                     ]
-                  },
-                  {
-                    "type": "Sacrifice",
-                    "value": "self"
                   }
                 ]
               }
@@ -155,25 +159,29 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "LoseLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "LoseLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       },
                       {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Sacrifice",
+                        "value": "self"
                       }
                     ]
-                  },
-                  {
-                    "type": "Sacrifice",
-                    "value": "self"
                   }
                 ]
               }

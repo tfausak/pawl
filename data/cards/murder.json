@@ -29,13 +29,17 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Destroy",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Regenerable"
+                    "type": "Destroy",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Regenerable"
+                      }
+                    ]
                   }
                 ]
               }

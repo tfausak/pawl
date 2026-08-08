@@ -55,14 +55,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Discard",
-                    "value": [
-                      "thatPlayer",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "Discard",
+                        "value": [
+                          "thatPlayer",
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       }
                     ]
                   }
@@ -89,10 +93,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Sacrifice",
-                    "value": "self"
+                    "effects": [
+                      {
+                        "type": "Sacrifice",
+                        "value": "self"
+                      }
+                    ]
                   }
                 ]
               }

@@ -37,6 +37,7 @@ import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
@@ -1965,7 +1966,7 @@ restartOnStack mountain =
               Cost.Type.MkCost {Cost.Type.mana = Just (ManaCost.MkManaCost []), Cost.Type.components = []},
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory Nothing))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.singleton Effect.RestartGame))) Map.empty Optionality.Mandatory Nothing))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.restrictions = [],
             ActivatedAbility.condition = Nothing

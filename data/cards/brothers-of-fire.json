@@ -32,24 +32,28 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "target",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    ]
-                  },
-                  {
-                    "type": "DealDamage",
-                    "value": [
-                      "you",
+                        "type": "DealDamage",
+                        "value": [
+                          "target",
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
+                      },
                       {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "DealDamage",
+                        "value": [
+                          "you",
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

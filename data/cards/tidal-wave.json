@@ -21,10 +21,14 @@
             "modal": {
               "modes": [
                 {
-                  "effects": [
+                  "clauses": [
                     {
-                      "type": "Sacrifice",
-                      "value": "token"
+                      "effects": [
+                        {
+                          "type": "Sacrifice",
+                          "value": "token"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -53,57 +57,61 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  {
-                    "faces": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "colorIndicator": [
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "faces": [
                           {
-                            "type": "Blue"
-                          }
-                        ],
-                        "keywords": [
-                          {
-                            "type": "Defender"
-                          }
-                        ],
-                        "name": "Wall Token",
-                        "power": {
-                          "type": "Literal",
-                          "value": 5
-                        },
-                        "toughness": {
-                          "type": "Literal",
-                          "value": 5
-                        },
-                        "typeLine": {
-                          "subtypes": [
-                            {
-                              "type": "Wall"
+                            "colorIndicator": [
+                              {
+                                "type": "Blue"
+                              }
+                            ],
+                            "keywords": [
+                              {
+                                "type": "Defender"
+                              }
+                            ],
+                            "name": "Wall Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 5
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 5
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Wall"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
                             }
-                          ],
-                          "types": [
-                            {
-                              "type": "Creature"
-                            }
-                          ]
-                        }
-                      }
+                          }
+                        ]
+                      },
+                      "token"
                     ]
                   },
-                  "token"
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": "sacrifice it"
+                  }
                 ]
-              },
-              {
-                "type": "ArmDelayedTrigger",
-                "value": "sacrifice it"
               }
             ]
           }

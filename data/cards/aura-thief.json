@@ -38,18 +38,22 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainControl",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Indefinite"
-                      },
-                      {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Enchantment"
-                        }
+                        "type": "GainControl",
+                        "value": [
+                          {
+                            "type": "Indefinite"
+                          },
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Enchantment"
+                            }
+                          }
+                        ]
                       }
                     ]
                   }

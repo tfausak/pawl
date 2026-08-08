@@ -38,14 +38,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "PreventAllDamage",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      "you"
+                        "type": "PreventAllDamage",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "you"
+                        ]
+                      }
                     ]
                   }
                 ]
@@ -63,18 +67,22 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "PutCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "PlusOnePlusOne"
-                      },
-                      {
-                        "type": "InSlot",
-                        "value": "thatMuch"
-                      },
-                      "self"
+                        "type": "PutCounters",
+                        "value": [
+                          {
+                            "type": "PlusOnePlusOne"
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "thatMuch"
+                          },
+                          "self"
+                        ]
+                      }
                     ]
                   }
                 ]

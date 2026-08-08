@@ -28,26 +28,30 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "GainLife",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Plus",
+                    "type": "GainLife",
                     "value": [
                       {
-                        "type": "InSlot",
-                        "value": "X"
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
                       },
                       {
-                        "type": "Literal",
-                        "value": 3
+                        "type": "Plus",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "X"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 3
+                          }
+                        ]
                       }
                     ]
                   }

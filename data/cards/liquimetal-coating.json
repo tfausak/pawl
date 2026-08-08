@@ -14,20 +14,24 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "AddCardType",
-                        "value": {
-                          "type": "Artifact"
-                        }
-                      },
-                      "target"
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "AddCardType",
+                            "value": {
+                              "type": "Artifact"
+                            }
+                          },
+                          "target"
+                        ]
+                      }
                     ]
                   }
                 ],

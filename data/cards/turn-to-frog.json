@@ -20,71 +20,75 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "LoseAllAbilities"
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "SetColor",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Blue"
-                      }
-                    ]
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "SetCreatureSubtype",
-                    "value": {
-                      "type": "Frog"
-                    }
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
-                  {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "SetBasePowerToughness",
-                    "value": [
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "Literal",
-                        "value": 1
-                      }
+                        "type": "LoseAllAbilities"
+                      },
+                      "target"
                     ]
                   },
-                  "target"
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "SetColor",
+                        "value": [
+                          {
+                            "type": "Blue"
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "SetCreatureSubtype",
+                        "value": {
+                          "type": "Frog"
+                        }
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "SetBasePowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
+                  }
                 ]
               }
             ],

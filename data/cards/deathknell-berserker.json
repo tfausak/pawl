@@ -45,46 +45,50 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "colorIndicator": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "Black"
-                              }
-                            ],
-                            "name": "Zombie Berserker Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Berserker"
+                                "colorIndicator": [
+                                  {
+                                    "type": "Black"
+                                  }
+                                ],
+                                "name": "Zombie Berserker Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 2
                                 },
-                                {
-                                  "type": "Zombie"
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Berserker"
+                                    },
+                                    {
+                                      "type": "Zombie"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
                                 }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                              }
+                            ]
                           }
                         ]
                       }

@@ -38,42 +38,46 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Replace",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "Unlimited"
-                  },
-                  {
-                    "type": "Other"
-                  },
-                  null,
-                  {
-                    "type": "EntryR",
+                    "type": "Replace",
                     "value": [
                       {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
-                          },
-                          {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "Opponent"
-                            }
-                          }
-                        ]
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "UnderSourceControl"
+                        "type": "Unlimited"
+                      },
+                      {
+                        "type": "Other"
+                      },
+                      null,
+                      {
+                        "type": "EntryR",
+                        "value": [
+                          {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "Opponent"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "type": "UnderSourceControl"
+                          }
+                        ]
                       }
                     ]
                   }

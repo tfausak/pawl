@@ -40,48 +40,52 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "colorIndicator": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "White"
-                              }
-                            ],
-                            "keywords": [
-                              {
-                                "type": "Vigilance"
-                              }
-                            ],
-                            "name": "Knight Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Knight"
+                                "colorIndicator": [
+                                  {
+                                    "type": "White"
+                                  }
+                                ],
+                                "keywords": [
+                                  {
+                                    "type": "Vigilance"
+                                  }
+                                ],
+                                "name": "Knight Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Knight"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
                                 }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                              }
+                            ]
                           }
                         ]
                       }
@@ -105,48 +109,52 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "colorIndicator": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "White"
-                              }
-                            ],
-                            "keywords": [
-                              {
-                                "type": "Vigilance"
-                              }
-                            ],
-                            "name": "Knight Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 2
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Knight"
+                                "colorIndicator": [
+                                  {
+                                    "type": "White"
+                                  }
+                                ],
+                                "keywords": [
+                                  {
+                                    "type": "Vigilance"
+                                  }
+                                ],
+                                "name": "Knight Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 2
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Knight"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
                                 }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                              }
+                            ]
                           }
                         ]
                       }
@@ -170,40 +178,44 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "ModifyPowerToughness",
+                        "type": "ModifyTarget",
                         "value": [
                           {
-                            "type": "Literal",
-                            "value": 2
+                            "type": "UntilEndOfTurn"
                           },
                           {
-                            "type": "Literal",
-                            "value": 1
-                          }
-                        ]
-                      },
-                      {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasSubtype",
-                            "value": {
-                              "type": "Knight"
-                            }
+                            "type": "ModifyPowerToughness",
+                            "value": [
+                              {
+                                "type": "Literal",
+                                "value": 2
+                              },
+                              {
+                                "type": "Literal",
+                                "value": 1
+                              }
+                            ]
                           },
                           {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "You"
-                            }
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasSubtype",
+                                "value": {
+                                  "type": "Knight"
+                                }
+                              },
+                              {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            ]
                           }
                         ]
                       }

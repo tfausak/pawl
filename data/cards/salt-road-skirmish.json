@@ -21,10 +21,14 @@
             "modal": {
               "modes": [
                 {
-                  "effects": [
+                  "clauses": [
                     {
-                      "type": "Sacrifice",
-                      "value": "tokens"
+                      "effects": [
+                        {
+                          "type": "Sacrifice",
+                          "value": "tokens"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -53,76 +57,80 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Destroy",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Regenerable"
-                  }
-                ]
-              },
-              {
-                "type": "Create",
-                "value": [
-                  {
-                    "type": "Literal",
-                    "value": 2
-                  },
-                  {
-                    "faces": [
+                    "type": "Destroy",
+                    "value": [
+                      "target",
                       {
-                        "colorIndicator": [
-                          {
-                            "type": "Red"
-                          }
-                        ],
-                        "name": "Warrior Token",
-                        "power": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "toughness": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "typeLine": {
-                          "subtypes": [
-                            {
-                              "type": "Warrior"
-                            }
-                          ],
-                          "types": [
-                            {
-                              "type": "Creature"
-                            }
-                          ]
-                        }
+                        "type": "Regenerable"
                       }
                     ]
                   },
-                  "tokens"
-                ]
-              },
-              {
-                "type": "ModifyTarget",
-                "value": [
                   {
-                    "type": "UntilEndOfTurn"
+                    "type": "Create",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      {
+                        "faces": [
+                          {
+                            "colorIndicator": [
+                              {
+                                "type": "Red"
+                              }
+                            ],
+                            "name": "Warrior Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Warrior"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "tokens"
+                    ]
                   },
                   {
-                    "type": "GainKeyword",
-                    "value": {
-                      "type": "Haste"
-                    }
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Haste"
+                        }
+                      },
+                      "tokens"
+                    ]
                   },
-                  "tokens"
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": "sacrifice them"
+                  }
                 ]
-              },
-              {
-                "type": "ArmDelayedTrigger",
-                "value": "sacrifice them"
               }
             ],
             "targetSpecs": [

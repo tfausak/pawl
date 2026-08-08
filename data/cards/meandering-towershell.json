@@ -21,19 +21,23 @@
             "modal": {
               "modes": [
                 {
-                  "effects": [
+                  "clauses": [
                     {
-                      "type": "MoveToZone",
-                      "value": [
-                        "exiled",
+                      "effects": [
                         {
-                          "type": "Battlefield"
-                        },
-                        {
-                          "attacking": true,
-                          "tapped": {
-                            "type": "Tapped"
-                          }
+                          "type": "MoveToZone",
+                          "value": [
+                            "exiled",
+                            {
+                              "type": "Battlefield"
+                            },
+                            {
+                              "attacking": true,
+                              "tapped": {
+                                "type": "Tapped"
+                              }
+                            }
+                          ]
                         }
                       ]
                     }
@@ -100,25 +104,29 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "self",
+                    "effects": [
                       {
-                        "type": "Exile"
+                        "type": "MoveToZone",
+                        "value": [
+                          "self",
+                          {
+                            "type": "Exile"
+                          },
+                          "exiled"
+                        ]
                       },
-                      "exiled"
-                    ]
-                  },
-                  {
-                    "type": "ArmDelayedTrigger",
-                    "value": [
-                      "return it",
                       {
-                        "type": "FromYourNextTurn"
-                      },
-                      null
+                        "type": "ArmDelayedTrigger",
+                        "value": [
+                          "return it",
+                          {
+                            "type": "FromYourNextTurn"
+                          },
+                          null
+                        ]
+                      }
                     ]
                   }
                 ]

@@ -71,29 +71,33 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Draw",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
+                        "type": "Draw",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       },
                       {
-                        "type": "Literal",
-                        "value": 1
-                      }
-                    ]
-                  },
-                  {
-                    "type": "Discard",
-                    "value": [
-                      "you",
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Discard",
+                        "value": [
+                          "you",
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

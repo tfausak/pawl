@@ -20,71 +20,75 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "And",
-                            "value": []
-                          },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Hand"
-                              },
-                              {
-                                "type": "Relative",
-                                "value": {
-                                  "type": "You"
-                                }
-                              }
-                            ]
-                          }
-                        }
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "And",
-                            "value": []
-                          },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Hand"
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
                               },
-                              {
-                                "type": "Relative",
-                                "value": {
-                                  "type": "You"
-                                }
+                              "filter": {
+                                "type": "And",
+                                "value": []
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Hand"
+                                  },
+                                  {
+                                    "type": "Relative",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
                               }
-                            ]
+                            }
+                          },
+                          {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
+                              },
+                              "filter": {
+                                "type": "And",
+                                "value": []
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Hand"
+                                  },
+                                  {
+                                    "type": "Relative",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
+                              }
+                            }
                           }
-                        }
-                      }
+                        ]
+                      },
+                      "target"
                     ]
-                  },
-                  "target"
+                  }
                 ]
               }
             ],

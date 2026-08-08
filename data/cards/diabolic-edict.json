@@ -20,20 +20,24 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "PlayerSacrifices",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "HasCardType",
-                    "value": {
-                      "type": "Creature"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "PlayerSacrifices",
+                    "value": [
+                      "target",
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Creature"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }

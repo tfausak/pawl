@@ -15,14 +15,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "target",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 50
+                        "type": "DealDamage",
+                        "value": [
+                          "target",
+                          {
+                            "type": "Literal",
+                            "value": 50
+                          }
+                        ]
                       }
                     ]
                   }
@@ -68,35 +72,39 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "ControlledBy",
+                        "type": "GainLife",
+                        "value": [
+                          {
+                            "type": "Relative",
                             "value": {
                               "type": "You"
                             }
                           },
-                          "scope": {
-                            "type": "InHistory",
+                          {
+                            "type": "Count",
                             "value": {
-                              "type": "SpellCast"
+                              "aggregation": {
+                                "type": "Objects"
+                              },
+                              "filter": {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "You"
+                                }
+                              },
+                              "scope": {
+                                "type": "InHistory",
+                                "value": {
+                                  "type": "SpellCast"
+                                }
+                              }
                             }
                           }
-                        }
+                        ]
                       }
                     ]
                   }

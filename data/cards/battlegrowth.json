@@ -16,18 +16,22 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "PutCounters",
-                "value": [
+                "effects": [
                   {
-                    "type": "PlusOnePlusOne"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  "target"
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "target"
+                    ]
+                  }
                 ]
               }
             ],

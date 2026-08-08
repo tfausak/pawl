@@ -29,15 +29,19 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "TakeExtraTurn",
-                "value": [
+                "effects": [
                   {
-                    "type": "InSlot",
-                    "value": "target"
-                  },
-                  []
+                    "type": "TakeExtraTurn",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      []
+                    ]
+                  }
                 ]
               }
             ],

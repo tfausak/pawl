@@ -38,33 +38,37 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainControl",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      "target"
-                    ]
-                  },
-                  {
-                    "type": "Untap",
-                    "value": "target"
-                  },
-                  {
-                    "type": "ModifyTarget",
-                    "value": [
-                      {
-                        "type": "UntilEndOfTurn"
+                        "type": "GainControl",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          "target"
+                        ]
                       },
                       {
-                        "type": "GainKeyword",
-                        "value": {
-                          "type": "Haste"
-                        }
+                        "type": "Untap",
+                        "value": "target"
                       },
-                      "target"
+                      {
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "GainKeyword",
+                            "value": {
+                              "type": "Haste"
+                            }
+                          },
+                          "target"
+                        ]
+                      }
                     ]
                   }
                 ],

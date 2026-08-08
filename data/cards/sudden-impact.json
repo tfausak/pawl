@@ -20,34 +20,38 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Count",
-                    "value": {
-                      "aggregation": {
-                        "type": "Objects"
-                      },
-                      "filter": {
-                        "type": "And",
-                        "value": []
-                      },
-                      "scope": {
-                        "type": "InZone",
-                        "value": [
-                          {
-                            "type": "Hand"
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
                           },
-                          {
-                            "type": "InSlot",
-                            "value": "target"
+                          "filter": {
+                            "type": "And",
+                            "value": []
+                          },
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Hand"
+                              },
+                              {
+                                "type": "InSlot",
+                                "value": "target"
+                              }
+                            ]
                           }
-                        ]
+                        }
                       }
-                    }
+                    ]
                   }
                 ]
               }

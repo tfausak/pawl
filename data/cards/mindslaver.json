@@ -22,10 +22,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ControlPlayerNextTurn",
-                    "value": "target"
+                    "effects": [
+                      {
+                        "type": "ControlPlayerNextTurn",
+                        "value": "target"
+                      }
+                    ]
                   }
                 ],
                 "targetSpecs": [

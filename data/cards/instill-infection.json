@@ -20,32 +20,36 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "PutCounters",
-                "value": [
+                "effects": [
                   {
-                    "type": "MinusOneMinusOne"
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "MinusOneMinusOne"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "target"
+                    ]
                   },
                   {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "Draw",
-                "value": [
-                  {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }

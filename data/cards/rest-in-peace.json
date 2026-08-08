@@ -40,9 +40,13 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ExileAllGraveyards"
+                    "effects": [
+                      {
+                        "type": "ExileAllGraveyards"
+                      }
+                    ]
                   }
                 ]
               }

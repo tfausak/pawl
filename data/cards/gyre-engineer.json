@@ -14,30 +14,34 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                    "effects": [
+                      {
+                        "type": "AddMana",
                         "value": {
-                          "type": "Green"
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "Green"
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "Blue"
+                            }
+                          }
                         }
                       }
-                    }
-                  },
-                  {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
-                        "value": {
-                          "type": "Blue"
-                        }
-                      }
-                    }
+                    ]
                   }
                 ]
               }

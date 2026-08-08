@@ -31,21 +31,25 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "BecomeMonarch",
-                    "value": {
-                      "type": "InSlot",
-                      "value": "player"
-                    }
-                  },
-                  {
-                    "type": "DealDamage",
-                    "value": [
-                      "damage",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 3
+                        "type": "BecomeMonarch",
+                        "value": {
+                          "type": "InSlot",
+                          "value": "player"
+                        }
+                      },
+                      {
+                        "type": "DealDamage",
+                        "value": [
+                          "damage",
+                          {
+                            "type": "Literal",
+                            "value": 3
+                          }
+                        ]
                       }
                     ]
                   }

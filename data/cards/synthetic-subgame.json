@@ -6,18 +6,22 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "PlaySubgame",
-                "value": "loser"
-              },
-              {
-                "type": "DealDamage",
-                "value": [
-                  "loser",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 3
+                    "type": "PlaySubgame",
+                    "value": "loser"
+                  },
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "loser",
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
                   }
                 ]
               }

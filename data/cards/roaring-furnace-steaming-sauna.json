@@ -26,36 +26,40 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "target",
+                    "effects": [
                       {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
-                          },
-                          "filter": {
-                            "type": "And",
-                            "value": []
-                          },
-                          "scope": {
-                            "type": "InZone",
-                            "value": [
-                              {
-                                "type": "Hand"
+                        "type": "DealDamage",
+                        "value": [
+                          "target",
+                          {
+                            "type": "Count",
+                            "value": {
+                              "aggregation": {
+                                "type": "Objects"
                               },
-                              {
-                                "type": "Relative",
-                                "value": {
-                                  "type": "You"
-                                }
+                              "filter": {
+                                "type": "And",
+                                "value": []
+                              },
+                              "scope": {
+                                "type": "InZone",
+                                "value": [
+                                  {
+                                    "type": "Hand"
+                                  },
+                                  {
+                                    "type": "Relative",
+                                    "value": {
+                                      "type": "You"
+                                    }
+                                  }
+                                ]
                               }
-                            ]
+                            }
                           }
-                        }
+                        ]
                       }
                     ]
                   }
@@ -149,19 +153,23 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Draw",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Draw",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

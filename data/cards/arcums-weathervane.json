@@ -19,20 +19,24 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Indefinite"
-                      },
-                      {
-                        "type": "RemoveSupertype",
-                        "value": {
-                          "type": "Snow"
-                        }
-                      },
-                      "target"
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "Indefinite"
+                          },
+                          {
+                            "type": "RemoveSupertype",
+                            "value": {
+                              "type": "Snow"
+                            }
+                          },
+                          "target"
+                        ]
+                      }
                     ]
                   }
                 ],
@@ -84,20 +88,24 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Indefinite"
-                      },
-                      {
-                        "type": "AddSupertype",
-                        "value": {
-                          "type": "Snow"
-                        }
-                      },
-                      "target"
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "Indefinite"
+                          },
+                          {
+                            "type": "AddSupertype",
+                            "value": {
+                              "type": "Snow"
+                            }
+                          },
+                          "target"
+                        ]
+                      }
                     ]
                   }
                 ],

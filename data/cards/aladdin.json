@@ -37,56 +37,60 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainControl",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "ForAsLongAs",
-                        "value": {
-                          "comparison": {
-                            "type": "Exactly"
-                          },
-                          "measured": {
-                            "type": "Count",
+                        "type": "GainControl",
+                        "value": [
+                          {
+                            "type": "ForAsLongAs",
                             "value": {
-                              "aggregation": {
-                                "type": "Objects"
+                              "comparison": {
+                                "type": "Exactly"
                               },
-                              "filter": {
-                                "type": "And",
-                                "value": [
-                                  {
-                                    "type": "IsSource"
+                              "measured": {
+                                "type": "Count",
+                                "value": {
+                                  "aggregation": {
+                                    "type": "Objects"
                                   },
-                                  {
-                                    "type": "ControlledBy",
-                                    "value": {
-                                      "type": "You"
-                                    }
+                                  "filter": {
+                                    "type": "And",
+                                    "value": [
+                                      {
+                                        "type": "IsSource"
+                                      },
+                                      {
+                                        "type": "ControlledBy",
+                                        "value": {
+                                          "type": "You"
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  "scope": {
+                                    "type": "InZone",
+                                    "value": [
+                                      {
+                                        "type": "Battlefield"
+                                      },
+                                      {
+                                        "type": "EachPlayer"
+                                      }
+                                    ]
                                   }
-                                ]
+                                }
                               },
-                              "scope": {
-                                "type": "InZone",
-                                "value": [
-                                  {
-                                    "type": "Battlefield"
-                                  },
-                                  {
-                                    "type": "EachPlayer"
-                                  }
-                                ]
+                              "threshold": {
+                                "type": "Literal",
+                                "value": 1
                               }
                             }
                           },
-                          "threshold": {
-                            "type": "Literal",
-                            "value": 1
-                          }
-                        }
-                      },
-                      "target"
+                          "target"
+                        ]
+                      }
                     ]
                   }
                 ],

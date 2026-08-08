@@ -20,29 +20,33 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Search",
-                "value": [
+                "effects": [
                   {
-                    "type": "And",
+                    "type": "Search",
                     "value": [
                       {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Land"
-                        }
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Basic"
+                            }
+                          }
+                        ]
                       },
                       {
-                        "type": "HasSupertype",
-                        "value": {
-                          "type": "Basic"
-                        }
+                        "type": "BattlefieldTapped"
                       }
                     ]
-                  },
-                  {
-                    "type": "BattlefieldTapped"
                   }
                 ]
               }

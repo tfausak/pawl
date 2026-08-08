@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Mode as Mode
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter
@@ -48,12 +49,12 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       toJson
       fromJson
       ( Mode.MkMode
-          (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))
+          (Seq.singleton (Clause.MkClause (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
           (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
           Optionality.Mandatory
           Nothing
       )
-      """ {"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]} """
+      """ {"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]} """
   -- CR 603.5: an Optional mode is what a printed "may" encodes to, and the key
   -- is emitted only for that value.
   Spec.it s "an Optional mode's optionality key is present" $
@@ -71,7 +72,7 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
       toJson
       fromJson
       ( Mode.MkMode
-          (Seq.singleton (Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))))
+          (Seq.singleton (Clause.MkClause (Seq.singleton (Effect.Counter (SlotName.MkSlotName (Text.pack "spell"))))))
           (Map.singleton (SlotName.MkSlotName (Text.pack "spell")) (TargetSpec.MkTargetSpec Pool.Spells Nothing))
           Optionality.Mandatory
           ( Just
@@ -81,7 +82,7 @@ spec s = Spec.describe s "Pawl.Codec.Mode" $ do
                 }
           )
       )
-      """ {"effects":[{"type":"Counter","value":"spell"}],"targetSpecs":[{"slot":"spell","spec":{"pool":{"type":"Spells"}}}],"unlessPaid":{"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]}}} """
+      """ {"clauses":[{"effects":[{"type":"Counter","value":"spell"}]}],"targetSpecs":[{"slot":"spell","spec":{"pool":{"type":"Spells"}}}],"unlessPaid":{"payer":"spell","cost":{"mana":[{"type":"Generic","value":3}]}}} """
   -- A Mandatory mode with no effects or targetSpecs is what a card that says
   -- nothing extra means, and it round-trips through the empty object.
   Spec.it s "omits every default field" $

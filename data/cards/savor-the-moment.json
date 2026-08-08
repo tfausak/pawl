@@ -29,27 +29,31 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "TakeExtraTurn",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  [
-                    {
-                      "type": "Step",
-                      "value": {
-                        "type": "Beginning",
+                    "type": "TakeExtraTurn",
+                    "value": [
+                      {
+                        "type": "Relative",
                         "value": {
-                          "type": "Untap"
+                          "type": "You"
                         }
-                      }
-                    }
-                  ]
+                      },
+                      [
+                        {
+                          "type": "Step",
+                          "value": {
+                            "type": "Beginning",
+                            "value": {
+                              "type": "Untap"
+                            }
+                          }
+                        }
+                      ]
+                    ]
+                  }
                 ]
               }
             ]

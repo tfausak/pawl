@@ -21,12 +21,16 @@
             "modal": {
               "modes": [
                 {
-                  "effects": [
+                  "clauses": [
                     {
-                      "type": "Untap",
-                      "value": {
-                        "type": "AttackedThisTurn"
-                      }
+                      "effects": [
+                        {
+                          "type": "Untap",
+                          "value": {
+                            "type": "AttackedThisTurn"
+                          }
+                        }
+                      ]
                     }
                   ]
                 }
@@ -64,24 +68,28 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "AddPhases",
-                "value": [
+                "effects": [
                   {
-                    "type": "ExtraCombat"
+                    "type": "AddPhases",
+                    "value": [
+                      {
+                        "type": "ExtraCombat"
+                      },
+                      {
+                        "type": "ExtraCombat"
+                      }
+                    ]
                   },
                   {
-                    "type": "ExtraCombat"
-                  }
-                ]
-              },
-              {
-                "type": "ArmDelayedTrigger",
-                "value": [
-                  "each combat",
-                  {
-                    "type": "UntilEndOfTurn"
+                    "type": "ArmDelayedTrigger",
+                    "value": [
+                      "each combat",
+                      {
+                        "type": "UntilEndOfTurn"
+                      }
+                    ]
                   }
                 ]
               }

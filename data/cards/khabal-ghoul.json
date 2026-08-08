@@ -44,42 +44,46 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "PutCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "PlusOnePlusOne"
-                      },
-                      {
-                        "type": "Count",
-                        "value": {
-                          "aggregation": {
-                            "type": "Objects"
+                        "type": "PutCounters",
+                        "value": [
+                          {
+                            "type": "PlusOnePlusOne"
                           },
-                          "filter": {
-                            "type": "HasCardType",
+                          {
+                            "type": "Count",
                             "value": {
-                              "type": "Creature"
-                            }
-                          },
-                          "scope": {
-                            "type": "InHistory",
-                            "value": {
-                              "type": "MovedBetween",
-                              "value": [
-                                {
-                                  "type": "Battlefield"
-                                },
-                                {
-                                  "type": "Graveyard"
+                              "aggregation": {
+                                "type": "Objects"
+                              },
+                              "filter": {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
                                 }
-                              ]
+                              },
+                              "scope": {
+                                "type": "InHistory",
+                                "value": {
+                                  "type": "MovedBetween",
+                                  "value": [
+                                    {
+                                      "type": "Battlefield"
+                                    },
+                                    {
+                                      "type": "Graveyard"
+                                    }
+                                  ]
+                                }
+                              }
                             }
-                          }
-                        }
-                      },
-                      "self"
+                          },
+                          "self"
+                        ]
+                      }
                     ]
                   }
                 ]

@@ -20,43 +20,47 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "Keyword",
+                        "value": {
+                          "type": "Flying"
+                        }
                       },
                       {
                         "type": "Literal",
-                        "value": 2
-                      }
+                        "value": 1
+                      },
+                      "target"
                     ]
-                  },
-                  "target"
-                ]
-              },
-              {
-                "type": "PutCounters",
-                "value": [
-                  {
-                    "type": "Keyword",
-                    "value": {
-                      "type": "Flying"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  },
-                  "target"
+                  }
                 ]
               }
             ],

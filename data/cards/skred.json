@@ -16,46 +16,50 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Count",
-                    "value": {
-                      "aggregation": {
-                        "type": "Objects"
-                      },
-                      "filter": {
-                        "type": "And",
-                        "value": [
-                          {
-                            "type": "HasSupertype",
-                            "value": {
-                              "type": "Snow"
-                            }
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
                           },
-                          {
-                            "type": "ControlledBy",
-                            "value": {
-                              "type": "You"
-                            }
-                          }
-                        ]
-                      },
-                      "scope": {
-                        "type": "InZone",
-                        "value": [
-                          {
-                            "type": "Battlefield"
+                          "filter": {
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasSupertype",
+                                "value": {
+                                  "type": "Snow"
+                                }
+                              },
+                              {
+                                "type": "ControlledBy",
+                                "value": {
+                                  "type": "You"
+                                }
+                              }
+                            ]
                           },
-                          {
-                            "type": "EachPlayer"
+                          "scope": {
+                            "type": "InZone",
+                            "value": [
+                              {
+                                "type": "Battlefield"
+                              },
+                              {
+                                "type": "EachPlayer"
+                              }
+                            ]
                           }
-                        ]
+                        }
                       }
-                    }
+                    ]
                   }
                 ]
               }

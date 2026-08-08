@@ -21,10 +21,14 @@
             "modal": {
               "modes": [
                 {
-                  "effects": [
+                  "clauses": [
                     {
-                      "type": "Sacrifice",
-                      "value": "token"
+                      "effects": [
+                        {
+                          "type": "Sacrifice",
+                          "value": "token"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -77,70 +81,74 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "keywords": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "Flying"
-                              }
-                            ],
-                            "name": "Thopter Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Thopter"
-                                }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Artifact"
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  }
+                                ],
+                                "name": "Thopter Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 1
                                 },
-                                {
-                                  "type": "Creature"
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Thopter"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Artifact"
+                                    },
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
                                 }
-                              ]
-                            }
-                          }
+                              }
+                            ]
+                          },
+                          "token"
                         ]
                       },
-                      "token"
-                    ]
-                  },
-                  {
-                    "type": "ModifyTarget",
-                    "value": [
                       {
-                        "type": "UntilEndOfTurn"
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "GainKeyword",
+                            "value": {
+                              "type": "Haste"
+                            }
+                          },
+                          "token"
+                        ]
                       },
                       {
-                        "type": "GainKeyword",
-                        "value": {
-                          "type": "Haste"
-                        }
-                      },
-                      "token"
+                        "type": "ArmDelayedTrigger",
+                        "value": "sacrifice it"
+                      }
                     ]
-                  },
-                  {
-                    "type": "ArmDelayedTrigger",
-                    "value": "sacrifice it"
                   }
                 ]
               }

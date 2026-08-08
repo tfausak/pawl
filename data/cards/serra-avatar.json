@@ -58,10 +58,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ShuffleIntoLibrary",
-                    "value": "self"
+                    "effects": [
+                      {
+                        "type": "ShuffleIntoLibrary",
+                        "value": "self"
+                      }
+                    ]
                   }
                 ]
               }

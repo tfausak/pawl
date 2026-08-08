@@ -10,6 +10,7 @@ import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.ModeSelection as ModeSelection
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Modal as Modal
@@ -49,7 +50,7 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
       ( Modal.MkModal
           ( Seq.singleton
               ( Mode.MkMode
-                  (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))
+                  (Seq.singleton (Clause.MkClause (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
                   (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
                   Optionality.Mandatory
                   Nothing
@@ -57,7 +58,7 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
           )
           (ModeSelection.ChooseExactly 1)
       )
-      """ {"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]} """
+      """ {"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]} """
   Spec.it s "omits a ChooseExactly 1 selection" $
     Common.assertJsonCodec
       s

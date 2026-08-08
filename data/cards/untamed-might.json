@@ -19,27 +19,31 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "InSlot",
-                        "value": "X"
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "InSlot",
-                        "value": "X"
-                      }
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "X"
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "X"
+                          }
+                        ]
+                      },
+                      "target"
                     ]
-                  },
-                  "target"
+                  }
                 ]
               }
             ],

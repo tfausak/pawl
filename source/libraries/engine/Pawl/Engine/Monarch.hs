@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Effect as Effect
@@ -64,7 +65,7 @@ oneEffect cond eff =
     { TriggeredAbility.condition = cond,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton eff) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.singleton eff))) Map.empty Optionality.Mandatory Nothing))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }

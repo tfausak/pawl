@@ -15,16 +15,20 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Draw",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "EachPlayer"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Draw",
+                        "value": [
+                          {
+                            "type": "EachPlayer"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }
@@ -46,17 +50,21 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Draw",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "Draw",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }
@@ -88,17 +96,21 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Mill",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 20.0
+                        "type": "Mill",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 20.0
+                          }
+                        ]
                       }
                     ]
                   }

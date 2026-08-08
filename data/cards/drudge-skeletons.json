@@ -19,25 +19,29 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Replace",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "Once"
-                      },
-                      {
-                        "type": "Other"
-                      },
-                      null,
-                      {
-                        "type": "DestructionR",
-                        "value": {
-                          "type": "Regenerate"
-                        }
+                        "type": "Replace",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "Once"
+                          },
+                          {
+                            "type": "Other"
+                          },
+                          null,
+                          {
+                            "type": "DestructionR",
+                            "value": {
+                              "type": "Regenerate"
+                            }
+                          }
+                        ]
                       }
                     ]
                   }

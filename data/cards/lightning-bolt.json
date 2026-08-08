@@ -16,14 +16,18 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 3
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
                   }
                 ]
               }

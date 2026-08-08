@@ -33,10 +33,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ShuffleIntoLibrary",
-                    "value": "target"
+                    "effects": [
+                      {
+                        "type": "ShuffleIntoLibrary",
+                        "value": "target"
+                      }
+                    ]
                   }
                 ],
                 "targetSpecs": [
