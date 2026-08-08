@@ -1338,7 +1338,11 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.StateIs c -> TriggerCondition.StateIs (rewriteCondition pairs c)
   TriggerCondition.PermanentEnters f -> TriggerCondition.PermanentEnters (Filter.rewrite pairs f)
   TriggerCondition.PermanentDies f -> TriggerCondition.PermanentDies (Filter.rewrite pairs f)
-  TriggerCondition.SpellCast f -> TriggerCondition.SpellCast (Filter.rewrite pairs f)
+  -- The TurnScope is carried through UNTOUCHED and not dropped: CR 612.1 changes
+  -- a subtype word, and "during an opponent's turn" holds no subtype -- so a
+  -- rebuild that forgot the field would silently reset a text-changed Brineborn
+  -- Cutthroat to firing on every turn.
+  TriggerCondition.SpellCast f scope -> TriggerCondition.SpellCast (Filter.rewrite pairs f) scope
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins _ _ -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition

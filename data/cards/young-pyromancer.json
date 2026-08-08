@@ -29,34 +29,39 @@
         {
           "condition": {
             "type": "SpellCast",
-            "value": {
-              "type": "And",
-              "value": [
-                {
-                  "type": "ControlledBy",
-                  "value": {
-                    "type": "You"
-                  }
-                },
-                {
-                  "type": "Or",
-                  "value": [
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Instant"
-                      }
-                    },
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Sorcery"
-                      }
+            "value": [
+              {
+                "type": "And",
+                "value": [
+                  {
+                    "type": "ControlledBy",
+                    "value": {
+                      "type": "You"
                     }
-                  ]
-                }
-              ]
-            }
+                  },
+                  {
+                    "type": "Or",
+                    "value": [
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Instant"
+                        }
+                      },
+                      {
+                        "type": "HasCardType",
+                        "value": {
+                          "type": "Sorcery"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "EachTurn"
+              }
+            ]
           },
           "modal": {
             "modes": [

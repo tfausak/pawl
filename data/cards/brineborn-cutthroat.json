@@ -1,0 +1,89 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flash"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Brineborn Cutthroat",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 1
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SpellCast",
+            "value": [
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "OpponentsTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "PutCounters",
+                    "value": [
+                      {
+                        "type": "PlusOnePlusOne"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      "self"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Merfolk"
+          },
+          {
+            "type": "Pirate"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

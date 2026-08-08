@@ -45,7 +45,6 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
-import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
@@ -280,9 +279,7 @@ restrictionMet pid gs restriction = case restriction of
   -- activatorOf -- so a stolen permanent's rider follows the thief.
   ActivationRestriction.DuringPhase window scope ->
     Turn.inWindow window (GameState.phase gs)
-      && case scope of
-        TurnScope.EachTurn -> True
-        TurnScope.ControllersTurn -> GameState.activePlayer gs == pid
+      && Event.turnScopeAdmits scope (GameState.activePlayer gs) pid
   -- CR 508.3b's question, asked of the ACTIVATING player, and the same reader the
   -- casting side's clause of this name uses -- see Combat.attackedThisStep for
   -- why it is the declaration record and not Combat.attacked.

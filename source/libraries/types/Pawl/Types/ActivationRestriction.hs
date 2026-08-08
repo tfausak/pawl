@@ -62,9 +62,9 @@ data ActivationRestriction
     -- ability's controller, which for an activated ability is the player CR 602.2
     -- already restricts activation to.
     --
-    -- Neither "an opponent's turn" (Trade Caravan, Nettling Imp) nor a turn named
-    -- with no phase at all (Lavinia, Foil to Conspiracy) is sayable: TurnScope has
-    -- two arms, and this one requires a window (#520).
+    -- "An opponent's turn" (Trade Caravan, Nettling Imp) is now sayable --
+    -- TurnScope.OpponentsTurn -- but a turn named with no phase at all (Lavinia,
+    -- Foil to Conspiracy) still is not: this arm requires a window (#520).
     DuringPhase PhaseSelector.PhaseSelector TurnScope.TurnScope
   | -- | "Activate only if you've been attacked this step", asked of the player
     -- activating the ability. Kongming's Contraptions prints it alongside

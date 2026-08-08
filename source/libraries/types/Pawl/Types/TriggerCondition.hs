@@ -417,7 +417,21 @@ data TriggerCondition
     -- controller of the spell, which Kambal, Consul of Allocation's "that player
     -- loses 2 life" names without going through the spell (CR 608.2h can have
     -- taken the spell away by resolution).
-    SpellCast (Filter.Filter Keyword.Keyword)
+    --
+    -- The TurnScope is a SECOND axis beside the Filter, and Brineborn
+    -- Cutthroat's "whenever you cast a spell DURING AN OPPONENT'S TURN" is what
+    -- earns it. Whose turn it is is not a characteristic of the spell, so it
+    -- cannot be smuggled into the Filter -- Pawl.Types.Filter's atoms are all
+    -- characteristics of a candidate -- and it is not carried by
+    -- GameEvent.SpellCast either, so Event.matchesTrigger reads it off the
+    -- GameState's active player. Young Pyromancer and the rest print no turn at
+    -- all and take TurnScope.EachTurn, which is CR 601.2i's own silence: that
+    -- rule says nothing about whose turn it is, and CR 117.1a lets an instant be
+    -- cast on anybody's.
+    --
+    -- The same type StepBegins carries above, read against the same player: CR
+    -- 109.5's "you", the ability's controller when it triggered (CR 603.3a).
+    SpellCast (Filter.Filter Keyword.Keyword) TurnScope.TurnScope
   | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
     -- the ability is given the unlocked designation for the NAMED half. "Some
     -- abilities trigger when a player unlocks a particular half of a permanent.
