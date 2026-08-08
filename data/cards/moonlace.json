@@ -16,18 +16,22 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "Indefinite"
-                  },
-                  {
-                    "type": "SetColor",
-                    "value": []
-                  },
-                  "target"
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "Indefinite"
+                      },
+                      {
+                        "type": "SetColor",
+                        "value": []
+                      },
+                      "target"
+                    ]
+                  }
                 ]
               }
             ],

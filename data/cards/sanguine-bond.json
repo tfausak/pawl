@@ -37,17 +37,21 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "LoseLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
-                        "type": "InSlot",
-                        "value": "thatMuch"
+                        "type": "LoseLife",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "thatMuch"
+                          }
+                        ]
                       }
                     ]
                   }

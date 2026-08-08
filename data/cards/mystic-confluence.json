@@ -29,10 +29,25 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Counter",
-                "value": "spell"
+                "effects": [
+                  {
+                    "type": "Counter",
+                    "value": "spell"
+                  }
+                ],
+                "unlessPaid": {
+                  "cost": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  "payer": "spell"
+                }
               }
             ],
             "targetSpecs": [
@@ -44,27 +59,20 @@
                   }
                 }
               }
-            ],
-            "unlessPaid": {
-              "cost": {
-                "mana": [
-                  {
-                    "type": "Generic",
-                    "value": 3
-                  }
-                ]
-              },
-              "payer": "spell"
-            }
+            ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "MoveToZone",
-                "value": [
-                  "creature",
+                "effects": [
                   {
-                    "type": "Hand"
+                    "type": "MoveToZone",
+                    "value": [
+                      "creature",
+                      {
+                        "type": "Hand"
+                      }
+                    ]
                   }
                 ]
               }
@@ -81,19 +89,23 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Draw",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }

@@ -20,37 +20,41 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "GainPlayerCounters",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "Opponent"
-                    }
+                    "type": "GainPlayerCounters",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "Opponent"
+                        }
+                      },
+                      {
+                        "type": "Poison"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   },
                   {
-                    "type": "Poison"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
-                  }
-                ]
-              },
-              {
-                "type": "Draw",
-                "value": [
-                  {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }

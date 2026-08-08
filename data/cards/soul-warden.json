@@ -46,19 +46,23 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "GainLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

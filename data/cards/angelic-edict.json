@@ -20,13 +20,17 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "MoveToZone",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Exile"
+                    "type": "MoveToZone",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Exile"
+                      }
+                    ]
                   }
                 ]
               }

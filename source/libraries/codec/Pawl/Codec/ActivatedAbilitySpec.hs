@@ -11,6 +11,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -61,10 +62,8 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           ( Modal.MkModal
               ( Seq.singleton
                   ( Mode.MkMode
-                      (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))
+                      (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
                       (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
-                      Optionality.Mandatory
-                      Nothing
                   )
               )
               (ModeSelection.ChooseExactly 1)
@@ -72,7 +71,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           [ActivationRestriction.SorcerySpeed]
           Nothing
       )
-      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"effects":[{"type":"Attach","value":"target"}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"restrictions":[{"type":"SorcerySpeed"}]} """
+      """ {"cost":{"mana":[{"type":"Generic","value":1}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Attach","value":"target"}]}],"targetSpecs":[{"slot":"target","spec":{"pool":{"type":"Creatures"},"filter":{"type":"ControlledBy","value":{"type":"You"}}}}]}]},"restrictions":[{"type":"SorcerySpeed"}]} """
   -- CR 602.5's conjunction, in the JSON: two clauses in printed order, which is
   -- the shape a single tagged object could not hold.
   Spec.it s "MkActivatedAbility, Kongming's Contraptions' two clauses" $
@@ -82,7 +81,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       fromJson
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [CostComponent.TapThis])
-          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           [ ActivationRestriction.DuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers)) TurnScope.EachTurn,
             ActivationRestriction.AttackedThisStep
           ]
@@ -98,7 +97,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       fromJson
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [])
-          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           []
           Nothing
       )

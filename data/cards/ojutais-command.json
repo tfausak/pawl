@@ -29,13 +29,17 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "MoveToZone",
-                "value": [
-                  "creature",
+                "effects": [
                   {
-                    "type": "Battlefield"
+                    "type": "MoveToZone",
+                    "value": [
+                      "creature",
+                      {
+                        "type": "Battlefield"
+                      }
+                    ]
                   }
                 ]
               }
@@ -70,29 +74,37 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "GainLife",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 4
+                    "type": "GainLife",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 4
+                      }
+                    ]
                   }
                 ]
               }
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Counter",
-                "value": "spell"
+                "effects": [
+                  {
+                    "type": "Counter",
+                    "value": "spell"
+                  }
+                ]
               }
             ],
             "targetSpecs": [
@@ -113,19 +125,23 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Draw",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }

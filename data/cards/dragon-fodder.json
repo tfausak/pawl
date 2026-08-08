@@ -20,43 +20,47 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 2
-                  },
-                  {
-                    "faces": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "colorIndicator": [
+                        "type": "Literal",
+                        "value": 2
+                      },
+                      {
+                        "faces": [
                           {
-                            "type": "Red"
+                            "colorIndicator": [
+                              {
+                                "type": "Red"
+                              }
+                            ],
+                            "name": "Goblin Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Goblin"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
                           }
-                        ],
-                        "name": "Goblin Token",
-                        "power": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "toughness": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "typeLine": {
-                          "subtypes": [
-                            {
-                              "type": "Goblin"
-                            }
-                          ],
-                          "types": [
-                            {
-                              "type": "Creature"
-                            }
-                          ]
-                        }
+                        ]
                       }
                     ]
                   }

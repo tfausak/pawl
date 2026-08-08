@@ -20,13 +20,17 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Destroy",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "CantBeRegenerated"
+                    "type": "Destroy",
+                    "value": [
+                      "target",
+                      {
+                        "type": "CantBeRegenerated"
+                      }
+                    ]
                   }
                 ]
               }

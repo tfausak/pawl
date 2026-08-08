@@ -4,28 +4,31 @@ import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.SlotName as SlotName
 
--- | CR 118.12a: the "unless" a mode's instructions hang on -- Mana Leak's
+-- | CR 118.12a: the "unless" a clause's instructions hang on -- Mana Leak's
 -- "Counter target spell UNLESS ITS CONTROLLER PAYS {3}". That rule is the whole
 -- semantics, and it is a rewriting rather than a concept of its own: "'[Do
 -- something] unless [a player does something else]' ... means the same thing as
 -- '[A player may do something else]. If [that player doesn't], [do something].'"
--- So the mode's effect list is the "if they don't" branch, and this is the offer
--- that precedes it.
+-- So the clause's effect list is the "if they don't" branch, and this is the
+-- offer that precedes it.
 --
 -- CR 118.12 puts the payment at RESOLUTION -- "the action [do something] is a
 -- cost, paid when the spell or ability resolves" -- which is the whole reason
 -- this cannot ride Pawl.Types.Face.additionalCosts or .alternativeCosts. Those
 -- are announced and paid at CR 601.2f-h, as the spell is cast, by its caster.
 --
--- A field on the MODE rather than an arm of Pawl.Types.Effect, for
--- Pawl.Types.Optionality's reason carried over: it gates a whole instruction
--- list on an answer given as the effect is applied, and an Effect arm holding
--- other effects would put a BRANCH inside the ISA, which design.md section 1
--- keeps out. A "unless" covering only SOME of a mode's instructions is the case
--- this cannot express -- Condescend's "counter target spell unless its
--- controller pays {X}. Scry 2", where the scry happens either way (#703). The
--- same shape for a "may" rather than an "unless" is #335, and neither issue's
--- carrier would answer the other.
+-- A field on Pawl.Types.Clause rather than an arm of Pawl.Types.Effect, for
+-- Pawl.Types.Optionality's reason carried over: it gates an instruction list on
+-- an answer given as the effect is applied, and an Effect arm holding other
+-- effects would put a BRANCH inside the ISA, which design.md section 1 keeps
+-- out.
+--
+-- The clause is CR 608.2e's span, so an "unless" governing only some of an
+-- ability's instructions is now representable -- Condescend's "counter target
+-- spell unless its controller pays {X}. Scry 2", where the scry happens either
+-- way. No card in the pool prints that shape yet, and Condescend itself also
+-- wants {X} in a resolution cost (CR 107.3, CR 118.4), so #703 stays open on
+-- the card rather than on the carrier.
 --
 -- NEGATIVE only: the effects run when the cost was NOT paid. CR 118.12's other
 -- half -- "[Do something]. If [a player] does, [effect]", where the effects run

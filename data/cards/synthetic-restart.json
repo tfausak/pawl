@@ -17,9 +17,13 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "RestartGame"
+                    "effects": [
+                      {
+                        "type": "RestartGame"
+                      }
+                    ]
                   }
                 ]
               }

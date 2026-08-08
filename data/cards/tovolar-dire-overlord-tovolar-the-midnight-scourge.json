@@ -114,12 +114,16 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ItBecomes",
-                    "value": {
-                      "type": "Night"
-                    }
+                    "effects": [
+                      {
+                        "type": "ItBecomes",
+                        "value": {
+                          "type": "Night"
+                        }
+                      }
+                    ]
                   }
                 ]
               }
@@ -179,42 +183,46 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "ModifyPowerToughness",
+                        "type": "ModifyTarget",
                         "value": [
                           {
-                            "type": "InSlot",
-                            "value": "X"
+                            "type": "UntilEndOfTurn"
                           },
                           {
-                            "type": "Literal",
-                            "value": 0
-                          }
+                            "type": "ModifyPowerToughness",
+                            "value": [
+                              {
+                                "type": "InSlot",
+                                "value": "X"
+                              },
+                              {
+                                "type": "Literal",
+                                "value": 0
+                              }
+                            ]
+                          },
+                          "target"
                         ]
                       },
-                      "target"
-                    ]
-                  },
-                  {
-                    "type": "ModifyTarget",
-                    "value": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "GainKeyword",
-                        "value": {
-                          "type": "Trample"
-                        }
-                      },
-                      "target"
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "GainKeyword",
+                            "value": {
+                              "type": "Trample"
+                            }
+                          },
+                          "target"
+                        ]
+                      }
                     ]
                   }
                 ],

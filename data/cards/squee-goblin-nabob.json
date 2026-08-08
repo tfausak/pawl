@@ -44,23 +44,27 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "self",
+                    "effects": [
                       {
-                        "type": "Hand"
-                      },
-                      {
-                        "type": "Graveyard"
+                        "type": "MoveToZone",
+                        "value": [
+                          "self",
+                          {
+                            "type": "Hand"
+                          },
+                          {
+                            "type": "Graveyard"
+                          }
+                        ]
                       }
-                    ]
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
                   }
-                ],
-                "optionality": {
-                  "type": "Optional"
-                }
+                ]
               }
             ]
           }

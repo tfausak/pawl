@@ -42,12 +42,16 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "BecomeMonarch",
-                    "value": {
-                      "type": "TheController"
-                    }
+                    "effects": [
+                      {
+                        "type": "BecomeMonarch",
+                        "value": {
+                          "type": "TheController"
+                        }
+                      }
+                    ]
                   }
                 ]
               }
@@ -61,10 +65,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ExileUntilMonarch",
-                    "value": "target"
+                    "effects": [
+                      {
+                        "type": "ExileUntilMonarch",
+                        "value": "target"
+                      }
+                    ]
                   }
                 ],
                 "targetSpecs": [

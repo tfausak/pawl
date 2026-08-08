@@ -28,14 +28,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "thatPlayer",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "DealDamage",
+                        "value": [
+                          "thatPlayer",
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       }
                     ]
                   }

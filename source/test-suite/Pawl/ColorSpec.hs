@@ -56,7 +56,6 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
@@ -98,7 +97,7 @@ modeSpec printing idx = case fmap Map.elems (Card.modeTargetSpecs idx (S.combine
 theAbility :: Printing.Printing -> ActivatedAbility.ActivatedAbility Card.Type.Card
 theAbility p = case Face.activatedAbilities (S.combinedFace p) of
   ab : _ -> ab
-  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
+  [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
 
 -- Ersatz Gnomes' two activated abilities, in the order the card prints them
 -- (data/cards/ersatz-gnomes.json). Two separate abilities, NOT two modes -- no

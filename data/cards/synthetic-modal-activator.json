@@ -14,14 +14,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "damaged",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "DealDamage",
+                        "value": [
+                          "damaged",
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }
@@ -38,18 +42,22 @@
                 ]
               },
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "PutCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "PlusOnePlusOne"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      "strengthened"
+                        "type": "PutCounters",
+                        "value": [
+                          {
+                            "type": "PlusOnePlusOne"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          "strengthened"
+                        ]
+                      }
                     ]
                   }
                 ],

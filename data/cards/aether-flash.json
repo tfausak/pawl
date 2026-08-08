@@ -40,14 +40,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "became",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "DealDamage",
+                        "value": [
+                          "became",
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       }
                     ]
                   }

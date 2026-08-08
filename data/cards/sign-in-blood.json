@@ -25,30 +25,34 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Draw",
-                "value": [
+                "effects": [
                   {
-                    "type": "InSlot",
-                    "value": "target"
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
                   },
                   {
-                    "type": "Literal",
-                    "value": 2
-                  }
-                ]
-              },
-              {
-                "type": "LoseLife",
-                "value": [
-                  {
-                    "type": "InSlot",
-                    "value": "target"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "LoseLife",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
                   }
                 ]
               }

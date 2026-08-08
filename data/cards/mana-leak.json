@@ -20,10 +20,25 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Counter",
-                "value": "spell"
+                "effects": [
+                  {
+                    "type": "Counter",
+                    "value": "spell"
+                  }
+                ],
+                "unlessPaid": {
+                  "cost": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  "payer": "spell"
+                }
               }
             ],
             "targetSpecs": [
@@ -35,18 +50,7 @@
                   }
                 }
               }
-            ],
-            "unlessPaid": {
-              "cost": {
-                "mana": [
-                  {
-                    "type": "Generic",
-                    "value": 3
-                  }
-                ]
-              },
-              "payer": "spell"
-            }
+            ]
           }
         ]
       },

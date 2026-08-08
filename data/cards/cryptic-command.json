@@ -38,10 +38,14 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Counter",
-                "value": "spell"
+                "effects": [
+                  {
+                    "type": "Counter",
+                    "value": "spell"
+                  }
+                ]
               }
             ],
             "targetSpecs": [
@@ -56,13 +60,17 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "MoveToZone",
-                "value": [
-                  "permanent",
+                "effects": [
                   {
-                    "type": "Hand"
+                    "type": "MoveToZone",
+                    "value": [
+                      "permanent",
+                      {
+                        "type": "Hand"
+                      }
+                    ]
                   }
                 ]
               }
@@ -79,43 +87,51 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Tap",
-                "value": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Creature"
-                      }
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "Opponent"
-                      }
+                "effects": [
+                  {
+                    "type": "Tap",
+                    "value": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "Opponent"
+                          }
+                        }
+                      ]
                     }
-                  ]
-                }
+                  }
+                ]
               }
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Draw",
-                "value": [
+                "effects": [
                   {
-                    "type": "Relative",
-                    "value": {
-                      "type": "You"
-                    }
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }

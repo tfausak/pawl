@@ -20,16 +20,20 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Draw",
-                "value": [
+                "effects": [
                   {
-                    "type": "EachPlayer"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 2
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "EachPlayer"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
                   }
                 ]
               }

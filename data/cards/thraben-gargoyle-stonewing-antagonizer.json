@@ -14,10 +14,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Transform",
-                    "value": "self"
+                    "effects": [
+                      {
+                        "type": "Transform",
+                        "value": "self"
+                      }
+                    ]
                   }
                 ]
               }

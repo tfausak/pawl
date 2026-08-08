@@ -29,21 +29,25 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Untap",
-                "value": {
-                  "type": "AttackedThisTurn"
-                }
-              },
-              {
-                "type": "AddPhases",
-                "value": [
+                "effects": [
                   {
-                    "type": "ExtraCombat"
+                    "type": "Untap",
+                    "value": {
+                      "type": "AttackedThisTurn"
+                    }
                   },
                   {
-                    "type": "ExtraMain"
+                    "type": "AddPhases",
+                    "value": [
+                      {
+                        "type": "ExtraCombat"
+                      },
+                      {
+                        "type": "ExtraMain"
+                      }
+                    ]
                   }
                 ]
               }

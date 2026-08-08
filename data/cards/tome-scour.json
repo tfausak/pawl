@@ -16,17 +16,21 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Mill",
-                "value": [
+                "effects": [
                   {
-                    "type": "InSlot",
-                    "value": "target"
-                  },
-                  {
-                    "type": "Literal",
-                    "value": 5
+                    "type": "Mill",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 5
+                      }
+                    ]
                   }
                 ]
               }

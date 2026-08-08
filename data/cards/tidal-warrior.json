@@ -14,20 +14,24 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "SetLandSubtype",
-                        "value": {
-                          "type": "Island"
-                        }
-                      },
-                      "target"
+                        "type": "ModifyTarget",
+                        "value": [
+                          {
+                            "type": "UntilEndOfTurn"
+                          },
+                          {
+                            "type": "SetLandSubtype",
+                            "value": {
+                              "type": "Island"
+                            }
+                          },
+                          "target"
+                        ]
+                      }
                     ]
                   }
                 ],

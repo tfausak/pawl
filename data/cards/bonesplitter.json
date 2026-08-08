@@ -14,10 +14,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Attach",
-                    "value": "target"
+                    "effects": [
+                      {
+                        "type": "Attach",
+                        "value": "target"
+                      }
+                    ]
                   }
                 ],
                 "targetSpecs": [

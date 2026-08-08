@@ -735,7 +735,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         (warriorId, plain) = S.addCreature tidalWarrior S.alice base
         hacked = S.withEffectAt warriorId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Island Subtype.Type.Swamp) plain
         setsTo gs = case Projection.abilitiesOf warriorId gs of
-          ability : _ -> concatMap (Maybe.mapMaybe landTypeSet . Foldable.toList . Mode.effects) (Modal.modes (ActivatedAbility.modal ability))
+          ability : _ -> concatMap (Maybe.mapMaybe landTypeSet . Foldable.toList . Mode.allEffects) (Modal.modes (ActivatedAbility.modal ability))
           [] -> []
         landTypeSet effect = case effect of
           Effect.ModifyTarget _ (Modification.SetLandSubtype st) _ -> Just st

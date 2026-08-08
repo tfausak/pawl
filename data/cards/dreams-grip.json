@@ -29,10 +29,14 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Tap",
-                "value": "tapped"
+                "effects": [
+                  {
+                    "type": "Tap",
+                    "value": "tapped"
+                  }
+                ]
               }
             ],
             "targetSpecs": [
@@ -47,10 +51,14 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Untap",
-                "value": "untapped"
+                "effects": [
+                  {
+                    "type": "Untap",
+                    "value": "untapped"
+                  }
+                ]
               }
             ],
             "targetSpecs": [

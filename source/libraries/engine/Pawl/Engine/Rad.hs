@@ -32,6 +32,7 @@ import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
@@ -133,7 +134,7 @@ ability =
         Modal.MkModal
           ( Seq.singleton
               ( Mode.MkMode
-                  ( Seq.fromList
+                  ( Seq.singleton . Clause.MkClause Optionality.Mandatory Nothing . Seq.fromList $
                       [ -- "that player mills a number of cards equal to the
                         -- number of rad counters they have", counting the
                         -- nonland cards it milled.
@@ -151,8 +152,6 @@ ability =
                       ]
                   )
                   Map.empty
-                  Optionality.Mandatory
-                  Nothing
               )
           )
           (ModeSelection.ChooseExactly 1),

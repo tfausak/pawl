@@ -30,14 +30,18 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "target",
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "X"
+                        "type": "DealDamage",
+                        "value": [
+                          "target",
+                          {
+                            "type": "InSlot",
+                            "value": "X"
+                          }
+                        ]
                       }
                     ]
                   }

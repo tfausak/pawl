@@ -36,10 +36,14 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Counter",
-                    "value": "thatSpell"
+                    "effects": [
+                      {
+                        "type": "Counter",
+                        "value": "thatSpell"
+                      }
+                    ]
                   }
                 ]
               }

@@ -62,43 +62,47 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "colorIndicator": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "White"
+                                "colorIndicator": [
+                                  {
+                                    "type": "White"
+                                  }
+                                ],
+                                "name": "Soldier Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Soldier"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
                               }
-                            ],
-                            "name": "Soldier Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Soldier"
-                                }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                            ]
                           }
                         ]
                       }
@@ -119,51 +123,55 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "colorIndicator": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "White"
-                              }
-                            ],
-                            "keywords": [
-                              {
-                                "type": "Flying"
-                              },
-                              {
-                                "type": "Vigilance"
-                              }
-                            ],
-                            "name": "Angel Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 4
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 4
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Angel"
+                                "colorIndicator": [
+                                  {
+                                    "type": "White"
+                                  }
+                                ],
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  },
+                                  {
+                                    "type": "Vigilance"
+                                  }
+                                ],
+                                "name": "Angel Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 4
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 4
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Angel"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
                                 }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                              }
+                            ]
                           }
                         ]
                       }

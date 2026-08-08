@@ -30,26 +30,30 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Untap",
-                "value": {
-                  "type": "And",
-                  "value": [
-                    {
-                      "type": "HasCardType",
-                      "value": {
-                        "type": "Creature"
-                      }
-                    },
-                    {
-                      "type": "ControlledBy",
-                      "value": {
-                        "type": "You"
-                      }
+                "effects": [
+                  {
+                    "type": "Untap",
+                    "value": {
+                      "type": "And",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Creature"
+                          }
+                        },
+                        {
+                          "type": "ControlledBy",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      ]
                     }
-                  ]
-                }
+                  }
+                ]
               }
             ]
           }

@@ -16,27 +16,31 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Literal",
-                        "value": 3
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "Literal",
-                        "value": 3
-                      }
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 3
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 3
+                          }
+                        ]
+                      },
+                      "target"
                     ]
-                  },
-                  "target"
+                  }
                 ]
               }
             ],

@@ -20,22 +20,26 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "SkipNextPhase",
-                "value": [
+                "effects": [
                   {
-                    "type": "InSlot",
-                    "value": "target"
-                  },
-                  {
-                    "type": "Step",
-                    "value": {
-                      "type": "Beginning",
-                      "value": {
-                        "type": "DrawStep"
+                    "type": "SkipNextPhase",
+                    "value": [
+                      {
+                        "type": "InSlot",
+                        "value": "target"
+                      },
+                      {
+                        "type": "Step",
+                        "value": {
+                          "type": "Beginning",
+                          "value": {
+                            "type": "DrawStep"
+                          }
+                        }
                       }
-                    }
+                    ]
                   }
                 ]
               }

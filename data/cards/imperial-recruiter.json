@@ -33,27 +33,31 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Search",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "And",
+                        "type": "Search",
                         "value": [
                           {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Creature"
-                            }
+                            "type": "And",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Creature"
+                                }
+                              },
+                              {
+                                "type": "PowerAtMost",
+                                "value": 2
+                              }
+                            ]
                           },
                           {
-                            "type": "PowerAtMost",
-                            "value": 2
+                            "type": "RevealThenHand"
                           }
                         ]
-                      },
-                      {
-                        "type": "RevealThenHand"
                       }
                     ]
                   }

@@ -16,13 +16,17 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Destroy",
-                "value": [
-                  "wall",
+                "effects": [
                   {
-                    "type": "Regenerable"
+                    "type": "Destroy",
+                    "value": [
+                      "wall",
+                      {
+                        "type": "Regenerable"
+                      }
+                    ]
                   }
                 ]
               }
@@ -45,14 +49,18 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "damaged",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 1
+                    "type": "DealDamage",
+                    "value": [
+                      "damaged",
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
                   }
                 ]
               }
@@ -69,20 +77,24 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "GainKeyword",
-                    "value": {
-                      "type": "Haste"
-                    }
-                  },
-                  "hasted"
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Haste"
+                        }
+                      },
+                      "hasted"
+                    ]
+                  }
                 ]
               }
             ],

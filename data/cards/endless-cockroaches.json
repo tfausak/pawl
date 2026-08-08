@@ -42,13 +42,17 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "became",
+                    "effects": [
                       {
-                        "type": "Hand"
+                        "type": "MoveToZone",
+                        "value": [
+                          "became",
+                          {
+                            "type": "Hand"
+                          }
+                        ]
                       }
                     ]
                   }

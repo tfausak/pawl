@@ -53,6 +53,7 @@ import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.CastOffer as CastOffer
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
@@ -245,10 +246,12 @@ designateProtector pc controller oid = do
 -- and a battle with no battle types (CR 310.8a's other branch) has no such ability.
 -- `battleTypes` above is where that gate is stated once.
 --
--- Single mode, no targets, ChooseExactly 1, and Mandatory: rule 310.11b's exile is
--- not optional. The "you may" governs only the casting that follows it, which is
--- why it is the OFFER's own prompt (Prompt.OfferedCast) rather than the mode's
--- CR 603.5 optionality -- a mode-wide "may" would let a player decline the exile.
+-- Single mode, one Mandatory clause, no targets, ChooseExactly 1: rule 310.11b's
+-- exile is not optional. The "you may" governs only the casting that follows it,
+-- and it is the OFFER's own prompt (Prompt.OfferedCast) rather than CR 603.5
+-- optionality because this "may" is the RULE's, printed on no card -- so there
+-- is no printed clause for it to ride. Splitting the exile and the cast into two
+-- clauses would be the wrong shape for the same reason.
 --
 -- TWO effects for one sentence, joined by a slot, because CR 400.7 makes the two
 -- "it"s two objects: the permanent that was on the battlefield is exiled, and
@@ -262,7 +265,7 @@ siegeDefeat =
     { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.fromList [exile, offer]) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [exile, offer]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }

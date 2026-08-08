@@ -13,6 +13,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
@@ -64,12 +65,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           { TriggeredAbility.condition = TriggerCondition.SelfEnters,
             TriggeredAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Create (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing)) Map.empty Optionality.Mandatory Nothing))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Create (Quantity.Literal 1) (Text.pack "Zombie Token") EntryRiders.defaultValue Nothing)))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening = Nothing
           }
       )
-      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},"Zombie Token"]}]}]}} """
+      """ {"condition":{"type":"SelfEnters"},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Create","value":[{"type":"Literal","value":1},"Zombie Token"]}]}]}]}} """
   -- CR 603.4's intervening "if" clause is emitted only when the ability states
   -- one, so this case writes the key and the one above omits it.
   Spec.it s "MkTriggeredAbility, Sarcomancy's upkeep trigger (an intervening if)" $
@@ -81,7 +82,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
           { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn,
             TriggeredAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Quantity.Literal 1))) Map.empty Optionality.Mandatory Nothing))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.DealDamage (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (Quantity.Literal 1))))) Map.empty))
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening =
               Just
@@ -92,7 +93,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 )
           }
       )
-      """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"intervening":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Objects"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}},"modal":{"modes":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}]}]}} """
+      """ {"condition":{"type":"StepBegins","value":[{"type":"Beginning","value":{"type":"Upkeep"}},{"type":"ControllersTurn"}]},"intervening":{"measured":{"type":"Count","value":{"scope":{"type":"InZone","value":[{"type":"Battlefield"},{"type":"EachPlayer"}]},"filter":{"type":"HasSubtype","value":{"type":"Zombie"}},"aggregation":{"type":"Objects"}}},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}},"modal":{"modes":[{"clauses":[{"effects":[{"type":"DealDamage","value":["you",{"type":"Literal","value":1}]}]}]}]}} """
   -- CR 603.7: Face.delayedAbilities is a name-keyed map, rendered as a sorted
   -- array of entries so the render is deterministic. The two entries are
   -- inserted in DESCENDING name order, so a trip that emitted the map's
@@ -108,7 +109,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn,
                   TriggeredAbility.modal =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "token")))) Map.empty Optionality.Mandatory Nothing))
+                      (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Sacrifice (SlotName.MkSlotName (Text.pack "token")))))) Map.empty))
                       (ModeSelection.ChooseExactly 1),
                   TriggeredAbility.intervening = Nothing
                 }
@@ -118,14 +119,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Combat CombatStep.BeginningOfCombat) TurnScope.EachTurn,
                   TriggeredAbility.modal =
                     Modal.MkModal
-                      (Seq.singleton (Mode.MkMode (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))) Map.empty Optionality.Mandatory Nothing))
+                      (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Untap (ObjectRef.EachMatching Filter.AttackedThisTurn))))) Map.empty))
                       (ModeSelection.ChooseExactly 1),
                   TriggeredAbility.intervening = Nothing
                 }
             )
           ]
       )
-      """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Untap","value":{"type":"AttackedThisTurn"}}]}]}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}}}] """
+      """ [{"name":"each combat","ability":{"condition":{"type":"StepBegins","value":[{"type":"Combat","value":{"type":"BeginningOfCombat"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Untap","value":{"type":"AttackedThisTurn"}}]}]}]}}},{"name":"sacrifice it","ability":{"condition":{"type":"StepBegins","value":[{"type":"Ending","value":{"type":"EndStep"}},{"type":"EachTurn"}]},"modal":{"modes":[{"clauses":[{"effects":[{"type":"Sacrifice","value":"token"}]}]}]}}}] """
   -- CR 603.4: an ability stating no intervening "if" leaves only the two
   -- required keys.
   Spec.it s "an all-default value omits every optional key" $
@@ -137,7 +138,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
         { TriggeredAbility.condition = TriggerCondition.SelfEnters,
           TriggeredAbility.modal =
             Modal.MkModal
-              (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing))
+              (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
               (ModeSelection.ChooseExactly 1),
           TriggeredAbility.intervening = Nothing
         }

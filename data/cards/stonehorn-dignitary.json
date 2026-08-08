@@ -33,16 +33,20 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "SkipNextPhase",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
-                        "type": "CombatPhase"
+                        "type": "SkipNextPhase",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          {
+                            "type": "CombatPhase"
+                          }
+                        ]
                       }
                     ]
                   }

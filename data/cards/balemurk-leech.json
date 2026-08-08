@@ -61,19 +61,23 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "LoseLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "Opponent"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "LoseLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "Opponent"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

@@ -20,15 +20,19 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Transform",
-                "value": {
-                  "type": "HasSubtype",
-                  "value": {
-                    "type": "Human"
+                "effects": [
+                  {
+                    "type": "Transform",
+                    "value": {
+                      "type": "HasSubtype",
+                      "value": {
+                        "type": "Human"
+                      }
+                    }
                   }
-                }
+                ]
               }
             ]
           }

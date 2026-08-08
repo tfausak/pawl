@@ -67,32 +67,36 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "LoseLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "thatPlayer"
+                        "type": "LoseLife",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "thatPlayer"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       },
                       {
-                        "type": "Literal",
-                        "value": 2
-                      }
-                    ]
-                  },
-                  {
-                    "type": "GainLife",
-                    "value": [
-                      {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "GainLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       }
                     ]
                   }

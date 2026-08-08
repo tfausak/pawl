@@ -38,20 +38,24 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "self",
+                    "effects": [
                       {
-                        "type": "Battlefield"
+                        "type": "MoveToZone",
+                        "value": [
+                          "self",
+                          {
+                            "type": "Battlefield"
+                          }
+                        ]
                       }
-                    ]
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
                   }
-                ],
-                "optionality": {
-                  "type": "Optional"
-                }
+                ]
               }
             ]
           }

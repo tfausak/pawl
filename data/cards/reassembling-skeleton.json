@@ -23,21 +23,25 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "self",
+                    "effects": [
                       {
-                        "type": "Battlefield"
-                      },
-                      {
-                        "tapped": {
-                          "type": "Tapped"
-                        }
-                      },
-                      {
-                        "type": "Graveyard"
+                        "type": "MoveToZone",
+                        "value": [
+                          "self",
+                          {
+                            "type": "Battlefield"
+                          },
+                          {
+                            "tapped": {
+                              "type": "Tapped"
+                            }
+                          },
+                          {
+                            "type": "Graveyard"
+                          }
+                        ]
                       }
                     ]
                   }

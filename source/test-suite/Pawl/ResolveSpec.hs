@@ -49,6 +49,8 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -676,7 +678,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     let (srcId, g0) = S.addCreature prodigalSorcerer S.alice (Setup.emptyGame S.bothPlayers)
         ability = case Face.activatedAbilities (S.combinedFace prodigalSorcerer) of
           ab : _ -> ab
-          [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
+          [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g1) = Game.freshObjectId g0
         (ts, g2) = Game.freshTimestamp g1
         slot = SlotName.MkSlotName (Text.pack "target")
@@ -722,7 +724,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -738,7 +740,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     mountain <- S.printingOf s registry "Mountain"
     let base = Setup.emptyGame S.bothPlayers
         (_, g1) = S.addLibraryCard mountain S.alice base
-        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
@@ -761,7 +763,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -785,7 +787,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             []
             Nothing
         (abilId, g2) = Game.freshObjectId g1
@@ -808,7 +810,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability =
           TriggeredAbility.MkTriggeredAbility
             TriggerCondition.SelfEnters
-            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ExileAllGraveyards]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+            (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.ExileAllGraveyards]))) Map.empty)) (ModeSelection.ChooseExactly 1))
             Nothing
         (abilId, g4) = Game.freshObjectId g3
         (ts, g5) = Game.freshTimestamp g4
@@ -867,7 +869,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing))))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
@@ -942,7 +944,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
                   },
               ActivatedAbility.modal =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.singleton Effect.RestartGame) Map.empty Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton Effect.RestartGame))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
@@ -1004,7 +1006,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1081,7 +1083,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.staticAbilities = [],
               Face.spell =
                 Modal.MkModal
-                  (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]) Map.empty Optionality.Mandatory Nothing))
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.PlaySubgame slot, Effect.DealDamage (ObjectRef.InSlot slot) (Quantity.Literal 3)]))) Map.empty))
                   (ModeSelection.ChooseExactly 1),
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -1303,7 +1305,7 @@ installControlBy mindslaver controller target gs0 =
                 },
             ActivatedAbility.modal =
               Modal.MkModal
-                (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.ControlPlayerNextTurn slot]) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing)) Optionality.Mandatory Nothing))
+                (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.ControlPlayerNextTurn slot]))) (Map.singleton slot (TargetSpec.MkTargetSpec Pool.Players Nothing))))
                 (ModeSelection.ChooseExactly 1),
             ActivatedAbility.restrictions = [],
             ActivatedAbility.condition = Nothing
@@ -1556,7 +1558,7 @@ manaLeakHand island manaLeak piker bobLands =
 -- `paysFor S.bob` is the `forall r. Prompt r -> r` that Replay.record wants.
 paysFor :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 paysFor who p = case p of
-  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
     | d == who && player == who ->
         PaymentDecision.Pays
   _ -> S.identityAnswer p
@@ -2324,7 +2326,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         -- illegal (it's no longer a legal CreatureTarget), while the
         -- reserved slot -- never targeted -- stays vacuously legal.
         gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
-        mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory Nothing
+        mode = Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]))) specs
         run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore
@@ -3231,6 +3233,72 @@ countersSpec s registry = Spec.describe s "Counters" $ do
         after = S.settleSba gs2
     Spec.assertEqWith s "creature survives (net 2/1)" (S.creaturesInPlay S.alice after) 1
     Spec.assertEqWith s "no counters remain" (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject victim after)) Map.empty
+  Spec.it s "CR 122 RemoveCounters takes counters off the slot's target" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        base = S.addCounter CounterKind.MinusOneMinusOne 2 oid base0
+        slot = SlotName.MkSlotName (Text.pack "target")
+        run =
+          Resolve.applyEffect
+            oid
+            oid
+            S.alice
+            (Map.singleton slot True)
+            (Map.singleton slot (Recipient.ToCreature oid))
+            (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) slot)
+        after = snd (Engine.runGamePure S.identityAnswer base run)
+    Spec.assertEqWith s "one of the two counters is gone" (fmap Object.counters (Game.lookupObject oid after)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
+  -- CR 122 states no rule making the instruction fail when there are fewer
+  -- counters than asked for, so it takes what is there. The kind leaves the map
+  -- entirely rather than sitting at zero, which is what keeps Object.counters a
+  -- tally of what is present.
+  Spec.it s "CR 122 removing more counters than are present removes what is there" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        base = S.addCounter CounterKind.MinusOneMinusOne 1 oid base0
+        slot = SlotName.MkSlotName (Text.pack "target")
+        run =
+          Resolve.applyEffect
+            oid
+            oid
+            S.alice
+            (Map.singleton slot True)
+            (Map.singleton slot (Recipient.ToCreature oid))
+            (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot)
+        after = snd (Engine.runGamePure S.identityAnswer base run)
+    Spec.assertEqWith s "the kind is gone, not negative" (fmap Object.counters (Game.lookupObject oid after)) (Just Map.empty)
+  -- CR 608.2d over CR 608.2e's unit, on a whole card: Shed Weakness ({G} Instant,
+  -- Amonkhet 185) reads "Target creature gets +2/+2 until end of turn. You may
+  -- remove a -1/-1 counter from it." Two clauses, one target, and only the second
+  -- clause is gated -- so the pump lands whichever way the "may" is answered.
+  --
+  -- The -1/-1 counter is placed directly, as the CR 704.5q case just below does:
+  -- casting Instill Infection for it would add a draw and a second resolution
+  -- that this case does not want in the way of what it is proving.
+  Spec.it s "CR 608.2d Shed Weakness pumps either way; only the removal is optional" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    shedWeakness <- S.printingOf s registry "Shed Weakness"
+    let (victim, withFoe) = S.addCreature piker S.bob (S.landsInPlay forest 1)
+        withCounter = S.addCounter CounterKind.MinusOneMinusOne 1 victim withFoe
+        (gs, spellId) = S.handOne shedWeakness withCounter
+        -- Written out per answerer rather than through a helper taking one: a
+        -- let-bound function over an answerer would need a rank-2 argument, and
+        -- the neighbouring Deem Worthy case inlines them for the same reason.
+        --
+        -- S.identityAnswer declines every optional prompt (Script.declining), so
+        -- it is the declining half unaided; exerciseOptional is its opposite.
+        castDeclining = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+        declined = snd (Engine.runGamePure S.identityAnswer castDeclining Stack.resolveTop)
+        castExercising = snd (Engine.runGamePure exerciseOptional gs (S.cast S.alice spellId))
+        exercised = snd (Engine.runGamePure exerciseOptional castExercising Stack.resolveTop)
+    Spec.assertEqWith s "before: the -1/-1 counter makes the 2/2 a 1/1" (Projection.powerOf victim gs) (Just 1)
+    -- The discriminator. Under a MODE-wide gate, declining would skip the pump
+    -- too and this would read 1.
+    Spec.assertEqWith s "declined: pumped to 3/3 anyway" (Projection.powerOf victim declined) (Just 3)
+    Spec.assertEqWith s "declined: the counter is still there" (fmap Object.counters (Game.lookupObject victim declined)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
+    Spec.assertEqWith s "exercised: pumped to 4/4" (Projection.powerOf victim exercised) (Just 4)
+    Spec.assertEqWith s "exercised: no counters remain" (fmap Object.counters (Game.lookupObject victim exercised)) (Just Map.empty)
   Spec.it s "CR 122.2 Unsummon removes a counter-bearing creature's counters" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3767,7 +3835,7 @@ denethorBoard s registry = do
       (srcId, gs1) = S.addCreature denethor S.alice lands
       ability = case Face.activatedAbilities (S.combinedFace denethor) of
         ab : _ -> ab
-        [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
+        [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
   pure (ability, srcId, S.withMonarch S.alice (gs1 {GameState.priority = Just S.alice}))
 
 -- CR 725.1: "The monarch is a designation a player can have. There is no monarch
@@ -3991,8 +4059,8 @@ optionalEffectSpec s registry =
       -- is discriminating about the whole payload, not just about the answer.
       takeOptional :: Prompt.Prompt r -> r
       takeOptional p = case p of
-        Prompt.ChooseOptional (Decider.MkDecider d) player _ idx
-          | d == S.alice && player == S.alice && idx == ModeIndex.MkModeIndex 0 ->
+        Prompt.ChooseOptional (Decider.MkDecider d) player _ idx cIdx
+          | d == S.alice && player == S.alice && idx == ModeIndex.MkModeIndex 0 && cIdx == ClauseIndex.MkClauseIndex 0 ->
               OptionalDecision.Exercises
         Prompt.ChooseOptional {} -> OptionalDecision.Declines
         _ -> S.identityAnswer p
@@ -4103,6 +4171,44 @@ optionalEffectSpec s registry =
               Spec.assertEqWith s "the trigger left the stack" (length (GameState.stack after)) (length (GameState.stack placed) - 1)
               Spec.assertEqWith s "and no may was ever asked" (filter isOptionalResponse transcript) []
             abilities -> Spec.assertFailure s ("expected one cycling ability, got " <> show (length abilities))
+        -- CR 608.2d over CR 608.2e's unit: a "may" covers the CLAUSE it is
+        -- printed on, not the whole mode. Two clauses in one mode -- a mandatory
+        -- Draw and an optional Draw -- and declining the second must still leave
+        -- the first having happened. Driven through resolveModes directly,
+        -- because no card in the pool has two clauses yet (#335).
+        Spec.it s "CR 608.2d a declined clause skips only its own effects" $ do
+          forest <- S.printingOf s registry "Forest"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let base = Setup.emptyGame S.bothPlayers
+              -- Two cards in alice's library, so BOTH draws could find one and
+              -- the count separates "declined" from "drew off an empty library".
+              (_, gs0) = S.addLibraryCard forest S.alice base
+              (_, gs1) = S.addLibraryCard forest S.alice gs0
+              -- A Stack-zone object whose Object.owner is the effect controller
+              -- resolveModes reads, without paying to cast anything.
+              (stackId, gs) = S.spellOnStack piker S.alice gs1
+              draw = Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
+              mode =
+                Mode.MkMode
+                  ( Seq.fromList
+                      [ Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton draw),
+                        Clause.MkClause Optionality.Optional Nothing (Seq.singleton draw)
+                      ]
+                  )
+                  Map.empty
+              before = S.handSize S.alice gs
+              -- S.identityAnswer declines every optional prompt, so this is the
+              -- declining half with no bespoke answerer needed.
+              after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)])
+          Spec.assertEqWith s "the mandatory clause drew, the declined one did not" (S.handSize S.alice after) (before + 1)
+
+-- Takes every printed "may" it is offered. Rank-1 like paysFor above: the
+-- implicit forall is outermost, so this is the `forall r. Prompt r -> r` that
+-- Engine.runGamePure wants, which a let-bound local could not be.
+exerciseOptional :: Prompt.Prompt r -> r
+exerciseOptional p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
 
 -- Is this transcript entry an answer to a printed "may"? The filter both
 -- optional-effect transcript assertions share.

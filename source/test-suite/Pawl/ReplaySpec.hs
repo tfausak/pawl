@@ -22,6 +22,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.Cost as Cost.Type
@@ -314,7 +315,7 @@ combatReplaySpec s =
         -- proved to distinguish them -- a codec that collapsed them would
         -- replay a declined Renewed Faith as a taken one.
         Spec.it s "ChooseOptional records and replays both answers" $ do
-          let p = Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)
+          let p = Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0)
           Spec.assertEqWith s "exercised" (Replay.decode p (Replay.encode p OptionalDecision.Exercises)) (Just OptionalDecision.Exercises)
           Spec.assertEqWith s "declined" (Replay.decode p (Replay.encode p OptionalDecision.Declines)) (Just OptionalDecision.Declines)
         -- CR 603.5: a transcript that runs short must not silently take an
@@ -323,13 +324,13 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "declines"
-            (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)))
+            (Replay.defaultAnswer (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0)))
             OptionalDecision.Declines
         -- CR 118.12a: both answers to a resolution-time cost, so the transcript
         -- is proved to distinguish them -- a codec that collapsed them would
         -- replay a paid Mana Leak as a refused one, which is the whole card.
         Spec.it s "ChooseToPay records and replays both answers" $ do
-          let p = Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) genericThree
+          let p = Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0) genericThree
           Spec.assertEqWith s "paid" (Replay.decode p (Replay.encode p PaymentDecision.Pays)) (Just PaymentDecision.Pays)
           Spec.assertEqWith s "declined" (Replay.decode p (Replay.encode p PaymentDecision.Declines)) (Just PaymentDecision.Declines)
         -- CR 118.12a: a transcript that runs short must not spend a player's
@@ -338,13 +339,13 @@ combatReplaySpec s =
           Spec.assertEqWith
             s
             "declines"
-            (Replay.defaultAnswer (Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) genericThree))
+            (Replay.defaultAnswer (Prompt.ChooseToPay decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0) genericThree))
             PaymentDecision.Declines
         Spec.it s "a mismatched response does not decode as a may" $
           Spec.assertEqWith
             s
             "mismatch"
-            (Replay.decode (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0)) (Response.Conceded Concession.Continues))
+            (Replay.decode (Prompt.ChooseOptional decider S.alice oid (ModeIndex.MkModeIndex 0) (ClauseIndex.MkClauseIndex 0)) (Response.Conceded Concession.Continues))
             Nothing
         Spec.it s "defaultAnswer attacks with nothing" $
           Spec.assertEqWith s "no attacks" (Replay.defaultAnswer attackPrompt) []

@@ -28,27 +28,31 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "ModifyTarget",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "UntilEndOfTurn"
-                      },
-                      {
-                        "type": "ModifyPowerToughness",
+                        "type": "ModifyTarget",
                         "value": [
                           {
-                            "type": "Literal",
-                            "value": 0
+                            "type": "UntilEndOfTurn"
                           },
                           {
-                            "type": "Literal",
-                            "value": 2
-                          }
+                            "type": "ModifyPowerToughness",
+                            "value": [
+                              {
+                                "type": "Literal",
+                                "value": 0
+                              },
+                              {
+                                "type": "Literal",
+                                "value": 2
+                              }
+                            ]
+                          },
+                          "self"
                         ]
-                      },
-                      "self"
+                      }
                     ]
                   }
                 ]

@@ -21,10 +21,14 @@
             "modal": {
               "modes": [
                 {
-                  "effects": [
+                  "clauses": [
                     {
-                      "type": "Sacrifice",
-                      "value": "tokens"
+                      "effects": [
+                        {
+                          "type": "Sacrifice",
+                          "value": "tokens"
+                        }
+                      ]
                     }
                   ]
                 }
@@ -53,57 +57,61 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Create",
-                "value": [
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 3
-                  },
-                  {
-                    "faces": [
+                    "type": "Create",
+                    "value": [
                       {
-                        "colorIndicator": [
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      {
+                        "faces": [
                           {
-                            "type": "Red"
-                          }
-                        ],
-                        "keywords": [
-                          {
-                            "type": "Haste"
-                          }
-                        ],
-                        "name": "Human Token",
-                        "power": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "toughness": {
-                          "type": "Literal",
-                          "value": 1
-                        },
-                        "typeLine": {
-                          "subtypes": [
-                            {
-                              "type": "Human"
+                            "colorIndicator": [
+                              {
+                                "type": "Red"
+                              }
+                            ],
+                            "keywords": [
+                              {
+                                "type": "Haste"
+                              }
+                            ],
+                            "name": "Human Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Human"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
                             }
-                          ],
-                          "types": [
-                            {
-                              "type": "Creature"
-                            }
-                          ]
-                        }
-                      }
+                          }
+                        ]
+                      },
+                      "tokens"
                     ]
                   },
-                  "tokens"
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": "sacrifice those tokens"
+                  }
                 ]
-              },
-              {
-                "type": "ArmDelayedTrigger",
-                "value": "sacrifice those tokens"
               }
             ]
           }

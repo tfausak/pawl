@@ -32,35 +32,39 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Untap",
-                    "value": {
-                      "type": "And",
-                      "value": [
-                        {
-                          "type": "HasCardType",
-                          "value": {
-                            "type": "Creature"
-                          }
-                        },
-                        {
-                          "type": "ControlledBy",
-                          "value": {
-                            "type": "You"
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  {
-                    "type": "AddPhases",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "ExtraCombat"
+                        "type": "Untap",
+                        "value": {
+                          "type": "And",
+                          "value": [
+                            {
+                              "type": "HasCardType",
+                              "value": {
+                                "type": "Creature"
+                              }
+                            },
+                            {
+                              "type": "ControlledBy",
+                              "value": {
+                                "type": "You"
+                              }
+                            }
+                          ]
+                        }
                       },
                       {
-                        "type": "ExtraMain"
+                        "type": "AddPhases",
+                        "value": [
+                          {
+                            "type": "ExtraCombat"
+                          },
+                          {
+                            "type": "ExtraMain"
+                          }
+                        ]
                       }
                     ]
                   }

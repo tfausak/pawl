@@ -33,19 +33,23 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainLife",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 5
+                        "type": "GainLife",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 5
+                          }
+                        ]
                       }
                     ]
                   }
@@ -61,43 +65,47 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "colorIndicator": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "type": "Green"
+                                "colorIndicator": [
+                                  {
+                                    "type": "Green"
+                                  }
+                                ],
+                                "name": "Beast Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 3
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 3
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Beast"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
                               }
-                            ],
-                            "name": "Beast Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 3
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 3
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Beast"
-                                }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                            ]
                           }
                         ]
                       }

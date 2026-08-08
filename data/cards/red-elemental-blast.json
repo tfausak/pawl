@@ -16,10 +16,14 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Counter",
-                "value": "spell"
+                "effects": [
+                  {
+                    "type": "Counter",
+                    "value": "spell"
+                  }
+                ]
               }
             ],
             "targetSpecs": [
@@ -40,13 +44,17 @@
             ]
           },
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Destroy",
-                "value": [
-                  "permanent",
+                "effects": [
                   {
-                    "type": "Regenerable"
+                    "type": "Destroy",
+                    "value": [
+                      "permanent",
+                      {
+                        "type": "Regenerable"
+                      }
+                    ]
                   }
                 ]
               }

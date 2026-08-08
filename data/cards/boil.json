@@ -20,18 +20,22 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Destroy",
-                "value": [
+                "effects": [
                   {
-                    "type": "HasSubtype",
-                    "value": {
-                      "type": "Island"
-                    }
-                  },
-                  {
-                    "type": "Regenerable"
+                    "type": "Destroy",
+                    "value": [
+                      {
+                        "type": "HasSubtype",
+                        "value": {
+                          "type": "Island"
+                        }
+                      },
+                      {
+                        "type": "Regenerable"
+                      }
+                    ]
                   }
                 ]
               }

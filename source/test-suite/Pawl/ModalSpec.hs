@@ -29,6 +29,7 @@ import qualified Pawl.Support as S
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
@@ -241,8 +242,8 @@ modalReaderSpec s = Spec.describe s "M4h Modal reader" $ do
     let m =
           ModalT.MkModal
             ( Seq.fromList
-                [ Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))) Map.empty Optionality.Mandatory Nothing,
-                  Mode.MkMode (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))) Map.empty Optionality.Mandatory Nothing
+                [ Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))))) Map.empty,
+                  Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2))))) Map.empty
                 ]
             )
             (ModeSelection.ChooseExactly 1) ::

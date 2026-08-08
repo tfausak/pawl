@@ -16,30 +16,34 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "DealDamage",
-                "value": [
+                "effects": [
                   {
-                    "type": "And",
+                    "type": "DealDamage",
                     "value": [
                       {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Creature"
-                        }
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          },
+                          {
+                            "type": "HasKeyword",
+                            "value": {
+                              "type": "Flying"
+                            }
+                          }
+                        ]
                       },
                       {
-                        "type": "HasKeyword",
-                        "value": {
-                          "type": "Flying"
-                        }
+                        "type": "InSlot",
+                        "value": "X"
                       }
                     ]
-                  },
-                  {
-                    "type": "InSlot",
-                    "value": "X"
                   }
                 ]
               }

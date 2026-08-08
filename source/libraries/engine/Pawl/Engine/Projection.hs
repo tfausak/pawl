@@ -25,6 +25,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Condition as Condition.Type
@@ -1243,6 +1244,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PreventAllDamage {} -> effect
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
+  Effect.RemoveCounters {} -> effect
   Effect.GainPlayerCounters {} -> effect
   Effect.RemovePlayerCounters {} -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)
@@ -1342,8 +1344,8 @@ rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.cre
 -- CR 612.1: the same word swap over an ACTIVATED ability printed on a permanent,
 -- whose text box the rule reaches. Two parts, the payload and CR 702.178a's "as
 -- long as" gate -- which shares rewriteCondition with CR 603.4's intervening "if"
--- one function down, for that function's reason: a rewrite reaching only
--- Mode.effects would leave the ability gated on the printed word.
+-- one function down, for that function's reason: a rewrite reaching only the
+-- mode's clauses would leave the ability gated on the printed word.
 --
 -- Not implemented: the ability's activation cost is left unrewritten (#635).
 rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ActivatedAbility.ActivatedAbility Card.Type.Card
@@ -1355,8 +1357,8 @@ rewriteActivatedAbility pairs ability =
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not just
 -- the payload: the CR 603.8 condition is where the pool's word actually is, so a
--- rewrite reaching only Mode.effects would leave the card asking the printed
--- question. CR 603.4's intervening "if" shares rewriteCondition.
+-- rewrite reaching only the mode's clauses would leave the card asking the
+-- printed question. CR 603.4's intervening "if" shares rewriteCondition.
 rewriteTriggeredAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> TriggeredAbility Card.Type.Card -> TriggeredAbility Card.Type.Card
 rewriteTriggeredAbility pairs ability =
   ability
@@ -1370,7 +1372,8 @@ rewriteTriggeredAbility pairs ability =
 -- (#635).
 rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card -> Modal.Modal Card.Type.Card
 rewriteModal pairs modal =
-  let rewriteMode m = m {Mode.effects = fmap (rewriteEffect pairs) (Mode.effects m)}
+  let rewriteClause c = c {Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c)}
+      rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
    in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
 
 -- CR 612.1 through a trigger's own condition. Exhaustive rather than a wildcard,

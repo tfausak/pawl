@@ -20,14 +20,18 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 3
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
                   }
                 ]
               }
@@ -78,18 +82,22 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "OfType",
-                      "value": {
-                        "type": "Colored",
+                    "effects": [
+                      {
+                        "type": "AddMana",
                         "value": {
-                          "type": "White"
+                          "type": "OfType",
+                          "value": {
+                            "type": "Colored",
+                            "value": {
+                              "type": "White"
+                            }
+                          }
                         }
                       }
-                    }
+                    ]
                   }
                 ]
               }

@@ -303,11 +303,13 @@ data GameEvent
     -- BEFORE is strictly greater than AFTER: a removal that took nothing is not
     -- recorded, which is CountersPut's "one or more" read the other way.
     --
-    -- Recorded ONLY for CR 120.3h's damage to a battle (Pawl.Engine.Damage), which
-    -- is the one removal a rule asks a trigger about. NOT IMPLEMENTED: the engine's
-    -- other counter removals -- a loyalty cost, CR 306.8's damage to a
-    -- planeswalker, CR 704.5q's annihilation -- stay direct writes and emit
-    -- nothing, so a card triggering off one of those would not see it (#900).
+    -- Recorded by two paths: CR 120.3h's damage to a battle (Pawl.Engine.Damage),
+    -- which is the one removal a rule asks a trigger about, and
+    -- Pawl.Engine.Event.removeCounters, the funnel Effect.RemoveCounters goes
+    -- through. NOT IMPLEMENTED: the engine's other counter removals -- a loyalty
+    -- cost, CR 306.8's damage to a planeswalker, CR 704.5q's annihilation -- stay
+    -- direct writes and emit nothing, so a card triggering off one of those would
+    -- not see it (#900).
     CountersRemoved ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
   | -- | CR 709.5c: a permanent was given an UNLOCKED DESIGNATION -- the permanent,
     -- and the half the designation names. Emitted by Pawl.Engine.Event.unlockHalf,

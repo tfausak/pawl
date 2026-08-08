@@ -20,26 +20,30 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "ModifyPowerToughness",
+                    "type": "ModifyTarget",
                     "value": [
                       {
-                        "type": "Power"
+                        "type": "UntilEndOfTurn"
                       },
                       {
-                        "type": "Literal",
-                        "value": 0
-                      }
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Power"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 0
+                          }
+                        ]
+                      },
+                      "target"
                     ]
-                  },
-                  "target"
+                  }
                 ]
               }
             ],
@@ -89,20 +93,24 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "ModifyTarget",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  {
-                    "type": "GainKeyword",
-                    "value": {
-                      "type": "DoubleStrike"
-                    }
-                  },
-                  "target"
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "DoubleStrike"
+                        }
+                      },
+                      "target"
+                    ]
+                  }
                 ]
               }
             ],

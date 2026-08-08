@@ -47,19 +47,23 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainPlayerCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "EachPlayer"
-                      },
-                      {
-                        "type": "Poison"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "GainPlayerCounters",
+                        "value": [
+                          {
+                            "type": "EachPlayer"
+                          },
+                          {
+                            "type": "Poison"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }

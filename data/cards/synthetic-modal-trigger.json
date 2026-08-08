@@ -24,13 +24,17 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "bounced",
+                    "effects": [
                       {
-                        "type": "Hand"
+                        "type": "MoveToZone",
+                        "value": [
+                          "bounced",
+                          {
+                            "type": "Hand"
+                          }
+                        ]
                       }
                     ]
                   }
@@ -67,13 +71,17 @@
                 ]
               },
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "exiled",
+                    "effects": [
                       {
-                        "type": "Exile"
+                        "type": "MoveToZone",
+                        "value": [
+                          "exiled",
+                          {
+                            "type": "Exile"
+                          }
+                        ]
                       }
                     ]
                   }

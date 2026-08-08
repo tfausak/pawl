@@ -45,14 +45,18 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "DealDamage",
-                "value": [
-                  "target",
+                "effects": [
                   {
-                    "type": "Literal",
-                    "value": 7
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 7
+                      }
+                    ]
                   }
                 ]
               }
@@ -78,21 +82,25 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "DealDamage",
-                    "value": [
-                      "target",
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "DealDamage",
+                        "value": [
+                          "target",
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       }
-                    ]
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
                   }
                 ],
-                "optionality": {
-                  "type": "Optional"
-                },
                 "targetSpecs": [
                   {
                     "slot": "target",

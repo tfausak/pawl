@@ -14,18 +14,22 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "SnowSymbol"
-                    }
-                  },
-                  {
-                    "type": "AddMana",
-                    "value": {
-                      "type": "SnowSymbol"
-                    }
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "type": "SnowSymbol"
+                        }
+                      },
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "type": "SnowSymbol"
+                        }
+                      }
+                    ]
                   }
                 ]
               }

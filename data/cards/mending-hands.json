@@ -16,17 +16,21 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "PreventNextDamage",
-                "value": [
+                "effects": [
                   {
-                    "type": "UntilEndOfTurn"
-                  },
-                  "target",
-                  {
-                    "type": "Literal",
-                    "value": 4
+                    "type": "PreventNextDamage",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 4
+                      }
+                    ]
                   }
                 ]
               }

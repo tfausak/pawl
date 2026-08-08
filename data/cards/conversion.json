@@ -66,37 +66,41 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Sacrifice",
-                    "value": "self"
-                  }
-                ],
-                "unlessPaid": {
-                  "cost": {
-                    "mana": [
+                    "effects": [
                       {
-                        "type": "OfType",
-                        "value": {
-                          "type": "Colored",
-                          "value": {
-                            "type": "White"
-                          }
-                        }
-                      },
-                      {
-                        "type": "OfType",
-                        "value": {
-                          "type": "Colored",
-                          "value": {
-                            "type": "White"
-                          }
-                        }
+                        "type": "Sacrifice",
+                        "value": "self"
                       }
-                    ]
-                  },
-                  "payer": "you"
-                }
+                    ],
+                    "unlessPaid": {
+                      "cost": {
+                        "mana": [
+                          {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colored",
+                              "value": {
+                                "type": "White"
+                              }
+                            }
+                          },
+                          {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colored",
+                              "value": {
+                                "type": "White"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "payer": "you"
+                    }
+                  }
+                ]
               }
             ]
           }

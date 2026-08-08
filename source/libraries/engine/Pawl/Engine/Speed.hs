@@ -33,6 +33,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
@@ -134,10 +135,8 @@ increaseAbility =
         Modal.MkModal
           ( Seq.singleton
               ( Mode.MkMode
-                  (Seq.singleton (Effect.IncreaseSpeed (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))
+                  (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.IncreaseSpeed (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))))
                   Map.empty
-                  Optionality.Mandatory
-                  Nothing
               )
           )
           (ModeSelection.ChooseExactly 1),

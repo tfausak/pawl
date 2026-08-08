@@ -63,22 +63,26 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainPlayerCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Relative",
-                        "value": {
-                          "type": "You"
-                        }
-                      },
-                      {
-                        "type": "Experience"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 1
+                        "type": "GainPlayerCounters",
+                        "value": [
+                          {
+                            "type": "Relative",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "Experience"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
                       }
                     ]
                   }
@@ -105,28 +109,32 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "PutCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "PlusOnePlusOne"
-                      },
-                      {
-                        "type": "PlayerCounters",
+                        "type": "PutCounters",
                         "value": [
                           {
-                            "type": "Relative",
-                            "value": {
-                              "type": "You"
-                            }
+                            "type": "PlusOnePlusOne"
                           },
                           {
-                            "type": "Experience"
-                          }
+                            "type": "PlayerCounters",
+                            "value": [
+                              {
+                                "type": "Relative",
+                                "value": {
+                                  "type": "You"
+                                }
+                              },
+                              {
+                                "type": "Experience"
+                              }
+                            ]
+                          },
+                          "target"
                         ]
-                      },
-                      "target"
+                      }
                     ]
                   }
                 ],

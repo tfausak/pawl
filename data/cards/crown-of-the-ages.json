@@ -19,16 +19,20 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "AttachTarget",
-                    "value": [
-                      "target",
+                    "effects": [
                       {
-                        "type": "HasCardType",
-                        "value": {
-                          "type": "Creature"
-                        }
+                        "type": "AttachTarget",
+                        "value": [
+                          "target",
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          }
+                        ]
                       }
                     ]
                   }

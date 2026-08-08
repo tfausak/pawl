@@ -42,44 +42,48 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Destroy",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Or",
+                        "type": "Destroy",
                         "value": [
                           {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Artifact"
-                            }
+                            "type": "Or",
+                            "value": [
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Artifact"
+                                }
+                              },
+                              {
+                                "type": "HasCardType",
+                                "value": {
+                                  "type": "Enchantment"
+                                }
+                              }
+                            ]
                           },
                           {
-                            "type": "HasCardType",
-                            "value": {
-                              "type": "Enchantment"
-                            }
-                          }
+                            "type": "Regenerable"
+                          },
+                          "destroyed"
                         ]
                       },
                       {
-                        "type": "Regenerable"
-                      },
-                      "destroyed"
-                    ]
-                  },
-                  {
-                    "type": "PutCounters",
-                    "value": [
-                      {
-                        "type": "PlusOnePlusOne"
-                      },
-                      {
-                        "type": "InSlot",
-                        "value": "destroyed"
-                      },
-                      "self"
+                        "type": "PutCounters",
+                        "value": [
+                          {
+                            "type": "PlusOnePlusOne"
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "destroyed"
+                          },
+                          "self"
+                        ]
+                      }
                     ]
                   }
                 ]

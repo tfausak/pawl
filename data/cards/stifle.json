@@ -16,10 +16,14 @@
       "spell": {
         "modes": [
           {
-            "effects": [
+            "clauses": [
               {
-                "type": "Counter",
-                "value": "ability"
+                "effects": [
+                  {
+                    "type": "Counter",
+                    "value": "ability"
+                  }
+                ]
               }
             ],
             "targetSpecs": [

@@ -19,17 +19,21 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Mill",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "thatPlayer"
-                      },
-                      {
-                        "type": "InSlot",
-                        "value": "thatMuch"
+                        "type": "Mill",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "thatPlayer"
+                          },
+                          {
+                            "type": "InSlot",
+                            "value": "thatMuch"
+                          }
+                        ]
                       }
                     ]
                   }

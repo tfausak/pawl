@@ -14,70 +14,78 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "Create",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "Literal",
-                        "value": 1
-                      },
-                      {
-                        "faces": [
+                        "type": "Create",
+                        "value": [
                           {
-                            "activatedAbilities": [
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
                               {
-                                "cost": {
-                                  "components": [
-                                    {
-                                      "type": "SacrificeThis"
-                                    }
-                                  ],
-                                  "mana": []
-                                },
-                                "modal": {
-                                  "modes": [
-                                    {
-                                      "effects": [
+                                "activatedAbilities": [
+                                  {
+                                    "cost": {
+                                      "components": [
                                         {
-                                          "type": "AddMana",
-                                          "value": {
-                                            "type": "OfType",
-                                            "value": {
-                                              "type": "Colorless"
+                                          "type": "SacrificeThis"
+                                        }
+                                      ],
+                                      "mana": []
+                                    },
+                                    "modal": {
+                                      "modes": [
+                                        {
+                                          "clauses": [
+                                            {
+                                              "effects": [
+                                                {
+                                                  "type": "AddMana",
+                                                  "value": {
+                                                    "type": "OfType",
+                                                    "value": {
+                                                      "type": "Colorless"
+                                                    }
+                                                  }
+                                                }
+                                              ]
                                             }
-                                          }
+                                          ]
                                         }
                                       ]
+                                    }
+                                  }
+                                ],
+                                "name": "Eldrazi Sliver Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 1
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Eldrazi"
+                                    },
+                                    {
+                                      "type": "Sliver"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
                                     }
                                   ]
                                 }
                               }
-                            ],
-                            "name": "Eldrazi Sliver Token",
-                            "power": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "toughness": {
-                              "type": "Literal",
-                              "value": 1
-                            },
-                            "typeLine": {
-                              "subtypes": [
-                                {
-                                  "type": "Eldrazi"
-                                },
-                                {
-                                  "type": "Sliver"
-                                }
-                              ],
-                              "types": [
-                                {
-                                  "type": "Creature"
-                                }
-                              ]
-                            }
+                            ]
                           }
                         ]
                       }

@@ -31,7 +31,7 @@ import Pawl.Types.TargetSpec (TargetSpec)
 -- two alternatives into one. selectionEffects just below is what CR 700.2's
 -- selection makes of it, and is what Pawl.Engine.Mana reads.
 modeEffects :: Modal.Modal card -> [[Effect card]]
-modeEffects m = fmap (Foldable.toList . Mode.effects) (Foldable.toList (Modal.modes m))
+modeEffects m = fmap (Foldable.toList . Mode.allEffects) (Foldable.toList (Modal.modes m))
 
 -- Every effect across all modes, printed (mode, then written) order (CR
 -- 608.2c).
@@ -118,11 +118,12 @@ instanceSlot mi slot = case ModeInstance.occurrence mi of
 -- sequence"): ModeIndex order IS printed order, and the chosen Seq is sorted, so
 -- a mode chosen twice contributes two adjacent instances.
 --
--- Modes rather than a flat effect list because a mode is the unit CR 603.5's
--- "may" covers (Mode.optionality) and the unit CR 700.2c scopes targets to, so
--- a resolver that flattened first could not ask the one question per mode that
--- Resolve.resolveModes asks. The instance rides along so the prompt can name
--- which mode is asking and so the resolver can find that instance's own slots.
+-- Modes rather than a flat effect list because a mode is the unit CR 700.2c
+-- scopes targets to, and because it holds the clauses CR 603.5's "may" and CR
+-- 118.12a's "unless" each cover -- so a resolver that flattened first could ask
+-- neither question where it belongs. The instance rides along so the prompt can
+-- name which mode is asking and so the resolver can find that instance's own
+-- slots.
 chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [(ModeInstance.ModeInstance, Mode.Mode card)]
 chosenModes chosen m =
   let modeAt mi = fmap ((,) mi) (modeAtIndex (ModeInstance.index mi) m)
@@ -149,7 +150,7 @@ modeAtIndex (ModeIndex.MkModeIndex n) m = Seq.lookup (Natural.toIntSaturating n)
 -- optionality is not part of the question; resolution goes through chosenModes
 -- instead.
 modesEffects :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [Effect card]
-modesEffects chosen m = concatMap (Foldable.toList . Mode.effects . snd) (chosenModes chosen m)
+modesEffects chosen m = concatMap (Foldable.toList . Mode.allEffects . snd) (chosenModes chosen m)
 
 -- CR 601.2c/700.2c: only the CHOSEN modes' target specs (union), each instance's
 -- slots under instanceSlot's name. Two modes may be chosen at once (CR 702.42a's

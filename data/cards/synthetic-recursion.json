@@ -33,13 +33,17 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "MoveToZone",
-                    "value": [
-                      "became",
+                    "effects": [
                       {
-                        "type": "Battlefield"
+                        "type": "MoveToZone",
+                        "value": [
+                          "became",
+                          {
+                            "type": "Battlefield"
+                          }
+                        ]
                       }
                     ]
                   }

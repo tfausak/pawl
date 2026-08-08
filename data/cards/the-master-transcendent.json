@@ -51,20 +51,24 @@
           "modal": {
             "modes": [
               {
-                "effects": [
+                "clauses": [
                   {
-                    "type": "GainPlayerCounters",
-                    "value": [
+                    "effects": [
                       {
-                        "type": "InSlot",
-                        "value": "target"
-                      },
-                      {
-                        "type": "Rad"
-                      },
-                      {
-                        "type": "Literal",
-                        "value": 2
+                        "type": "GainPlayerCounters",
+                        "value": [
+                          {
+                            "type": "InSlot",
+                            "value": "target"
+                          },
+                          {
+                            "type": "Rad"
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 2
+                          }
+                        ]
                       }
                     ]
                   }

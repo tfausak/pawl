@@ -57,6 +57,7 @@ import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
@@ -504,6 +505,7 @@ effectCounts effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
+  Effect.RemoveCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.RemovePlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Tap _ -> []
@@ -648,7 +650,7 @@ cardOffendsSharedZoneScope card =
 modalReadOffends :: Set.Set SlotName.SlotName -> Modal.Modal Card.Type.Card -> Bool
 modalReadOffends abilityBound modal =
   let modeOffends mode =
-        let effects = Foldable.toList (Mode.effects mode)
+        let effects = Foldable.toList (Mode.allEffects mode)
             available =
               Set.unions
                 [ abilityBound,
@@ -714,6 +716,7 @@ effectReplacements effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
+  Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.Tap _ -> []
@@ -1008,7 +1011,7 @@ oneEffectTrigger condition effect =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -1031,7 +1034,7 @@ oneEffectActivated mana effect =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton effect) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
       ActivatedAbility.condition = Nothing
@@ -1042,10 +1045,8 @@ oneEffectActivated mana effect =
 lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card
 lintMode effects slots =
   Mode.MkMode
-    (Seq.fromList effects)
+    (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList effects)))
     (Map.fromList (fmap (\slot -> (slot, TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) slots))
-    Optionality.Mandatory
-    Nothing
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -1177,6 +1178,7 @@ effectMintedFaces effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
+  Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.Tap _ -> []
@@ -1847,6 +1849,7 @@ effectFilters effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
+  Effect.RemoveCounters _ quantity _ -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.Tap ref -> unframed (objectRefFilters ref)
@@ -1877,7 +1880,7 @@ modalFilters :: Modal.Modal Card.Type.Card -> [(Bool, Filter.Type.Filter Keyword
 modalFilters modal =
   concatMap
     ( \mode ->
-        concatMap effectFilters (Mode.effects mode)
+        concatMap effectFilters (Mode.allEffects mode)
           <> unframed (concatMap targetSpecFilters (Map.elems (Mode.targetSpecs mode)))
     )
     (Modal.modes modal)
@@ -2080,7 +2083,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
     let modeOffends castBound m =
-          let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
+          let defined = Resolve.definedSlots (Foldable.toList (Mode.allEffects m))
               -- Resolve.modeSlots and not a fold over the effects alone: CR
               -- 118.12a's "unless [a player] pays" reads a slot for its payer,
               -- which must be declared like any other.
@@ -2341,7 +2344,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Effect.Destroy ref regenerability (Just _) -> Effect.Destroy ref regenerability (Just slot)
           other -> other
         overModal f modal =
-          modal {Modal.modes = fmap (\m -> m {Mode.effects = fmap f (Mode.effects m)}) (Modal.modes modal)}
+          modal {Modal.modes = fmap (\m -> m {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses m)}) (Modal.modes modal)}
         withBind slot card =
           card
             { Face.triggeredAbilities =
@@ -2385,10 +2388,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))
+                          (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))))
                           (Map.singleton Binding.you (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
-                          Optionality.Mandatory
-                          Nothing
                       )
                   )
                   (ModeSelection.ChooseExactly 1),
@@ -2396,7 +2397,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             }
         arm face = face {Face.triggeredAbilities = offending : Face.triggeredAbilities face}
         overModal f modal =
-          modal {Modal.modes = fmap (\m -> m {Mode.effects = fmap f (Mode.effects m)}) (Modal.modes modal)}
+          modal {Modal.modes = fmap (\m -> m {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses m)}) (Modal.modes modal)}
         -- Doomed Traveler mints its Spirit from a TRIGGERED ability, so this
         -- rewrites the minting effect where the card actually prints it.
         overMint f card =
@@ -2491,7 +2492,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory Nothing))
+            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))))
             (ModeSelection.ChooseExactly 1)
         withTriggered slot card =
           card
@@ -3107,7 +3108,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           face
             { Face.spell =
                 (Face.spell face)
-                  { Modal.modes = fmap (\mode -> mode {Mode.effects = fmap f (Mode.effects mode)}) (Modal.modes (Face.spell face))
+                  { Modal.modes = fmap (\mode -> mode {Mode.clauses = fmap (\c -> c {Clause.effects = fmap f (Clause.effects c)}) (Mode.clauses mode)}) (Modal.modes (Face.spell face))
                   }
             }
         silenced = S.combinedFace silence
@@ -3323,12 +3324,12 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         slot = SlotName.MkSlotName (Text.pack "target")
         atom = Filter.Type.CanHostSubject
         buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not atom]]
-        -- A one-mode, mandatory spell running these effects and declaring these
-        -- slots -- the smallest carrier that reaches Mode.effects and
-        -- Mode.targetSpecs at once.
+        -- A one-mode, one-clause, mandatory spell running these effects and
+        -- declaring these slots -- the smallest carrier that reaches a mode's
+        -- clauses and its targetSpecs at once.
         spellOf effects specs =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.fromList effects) specs Optionality.Mandatory Nothing))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList effects))) specs))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility
