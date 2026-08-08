@@ -11,7 +11,8 @@
 -- none), CR 613.4c's layer 7c anthem narrowed by a keyword its affected
 -- objects have (Hand of the Praetors), and CR 208.5's 0 for a creature left
 -- with no value for its power or toughness (Ashaya, Soul of the Wild under
--- Blood Moon).
+-- Blood Moon), plus CR 109.5's static-ability perspective on a player-scoped
+-- count (Empyrial Armor on an opponent's creature).
 -- Gameplay-level: each card is cast or resolved through the stack and the
 -- resulting game state is asserted on.
 module Pawl.PowerToughnessSpec where
@@ -40,6 +41,7 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -555,6 +557,7 @@ spec s registry = Spec.describe s "Pawl.Engine.PowerToughness" $ do
   woodElementalSpec s registry
   handOfThePraetorsSpec s registry
   ashayaBloodMoonSpec s registry
+  empyrialArmorSpec s registry
 
 -- CR 208.5: "If a creature somehow has no value for its power, its power is 0.
 -- The same is true for toughness."
@@ -1135,7 +1138,9 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
   --
   -- This is the first static ability in the pool whose modification carries a
   -- player-scoped quantity, so it is also the first test of
-  -- Projection.applyModification's context (#155).
+  -- Projection.applyModification's context. It cannot separate the SOURCE's
+  -- controller from the AFFECTED object's, though, because here they are the same
+  -- permanent -- the Empyrial Armor group below is what does that.
   Spec.it s "CR 109.5 the count reads Omnath's controller: an opponent's green mana does not pump it" $ do
     forest <- S.printingOf s registry "Forest"
     omnath <- S.printingOf s registry "Omnath, Locus of Mana"
@@ -1152,3 +1157,94 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
 -- asks nothing that S.identityAnswer has to choose between.
 tapAll :: [ObjectId.ObjectId] -> GameState.GameState -> GameState.GameState
 tapAll oids gs = List.foldl' (\g oid -> S.runPure S.identityAnswer g (Mana.tapForMana oid)) gs oids
+
+-- Empyrial Armor ({1}{W}{W} Enchantment -- Aura), whole text: "Enchant creature.
+-- Enchanted creature gets +1/+1 for each card in your hand." Oracle text verified
+-- against Scryfall (2026-08-08); nothing is omitted from the transcription.
+--
+-- CR 109.5, last clause of the sentence that matters here: "For a static ability,
+-- this is the current controller of the object it's on." So "your hand" is the
+-- AURA's controller's hand, not the enchanted creature's controller's -- and CR
+-- 303.4e is what makes the two able to differ at all ("An Aura's controller is
+-- separate from the enchanted object's controller ... the two need not be the
+-- same").
+--
+-- CR 604.3a is the reason this lands in Projection.applyModification rather than
+-- applyCharacteristicPT: criterion (3) requires that the ability "does not
+-- directly affect the characteristics of any other objects", and this one affects
+-- the enchanted creature, so it is NOT a characteristic-defining ability. The two
+-- appliers deliberately build different Filter.Contexts -- the source's controller
+-- here, the affected object's own controller there -- and this card is what
+-- separates them.
+--
+-- CR 613.4c puts the +1/+1 in layer 7c (a modification, not a set), which is why
+-- these tests read Projection.powerOf and never PC.characteristicPT. CR 613.7a
+-- gives the continuous effect the Aura's own timestamp; nothing else on the board
+-- writes layer 7, so no ordering question arises.
+--
+-- CR 303.4m is the vacuity trap this group avoids: an ability referring to the
+-- "enchanted creature" refers to whatever the permanent is attached to, so an
+-- unattached Aura has an empty affected set and the count is never reached. The
+-- Aura is CAST for real and the attachment is asserted, so the count genuinely
+-- runs.
+empyrialArmorSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+empyrialArmorSpec s registry = Spec.describe s "Empyrial Armor" $ do
+  -- THE FALSIFIER for CR 109.5's static-ability perspective, and the first
+  -- StaticAbility in the pool whose modification carries a Quantity.Count.
+  --
+  -- The numbers are what separate the two readings, so both hand sizes are
+  -- asserted explicitly: alice holds 3 cards once the Aura is on the stack and
+  -- bob holds 1. Reading the Aura's controller gives 3/3 plus +3/+3 = 6/6;
+  -- reading the ENCHANTED CREATURE's controller gives 3/3 plus +1/+1 = 4/4. Equal
+  -- hand sizes would make the test vacuous, which is why the fixture is
+  -- deliberately lopsided.
+  --
+  -- The Aura goes on BOB's Hill Giant on purpose. Enchanting alice's own creature
+  -- would make the source's controller and the affected object's controller the
+  -- same player, and the two readings would agree.
+  Spec.it s "CR 109.5 the count is the AURA's controller's hand, not the enchanted creature's controller's" $ do
+    plains <- S.printingOf s registry "Plains"
+    island <- S.printingOf s registry "Island"
+    mountain <- S.printingOf s registry "Mountain"
+    swamp <- S.printingOf s registry "Swamp"
+    forest <- S.printingOf s registry "Forest"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    empyrialArmor <- S.printingOf s registry "Empyrial Armor"
+    -- Three Plains pay {1}{W}{W} exactly.
+    let base0 = S.landsInPlay plains 3
+        (giantId, base1) = S.addCreature hillGiant S.bob base0
+        -- S.handOne REPLACES alice's hand, so it goes first and the three extra
+        -- cards follow it.
+        (base2, armorId) = S.handOne empyrialArmor base1
+        (_, base3) = S.addHandCard island S.alice base2
+        (_, base4) = S.addHandCard mountain S.alice base3
+        (_, base5) = S.addHandCard swamp S.alice base4
+        (_, base6) = S.addHandCard forest S.bob base5
+        -- CR 104.3c: a fixture that leaves a library empty would lose the game
+        -- to a draw. Nothing here draws, but both libraries are stocked so no
+        -- later edit to this fixture can trip over that.
+        (_, base7) = S.addLibraryCard plains S.alice base6
+        (_, gs) = S.addLibraryCard forest S.bob base7
+        cast = snd (Engine.runGamePure (aimRecipient (Recipient.ToCreature giantId)) gs (S.cast S.alice armorId))
+        after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+    Spec.assertEqWith s "before the Aura, the Hill Giant is its printed 3/3" (S.powerToughnessOf giantId gs) (Just (3, 3))
+    Spec.assertEqWith s "alice holds three cards once the Aura is on the stack" (S.handSize S.alice after) 3
+    Spec.assertEqWith s "and bob holds exactly one -- the lopsidedness the test turns on" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "the Aura really attached, so the affected set is not empty (CR 303.4m)" (length (ridersOn giantId after)) 1
+    Spec.assertEqWith s "3/3 plus alice's three cards, not bob's one" (S.powerToughnessOf giantId after) (Just (6, 6))
+
+-- Every battlefield permanent attached to one host. The whole-board read an Aura
+-- test wants, because CR 400.7 mints a fresh id for the battlefield incarnation
+-- of a resolved Aura spell and the id the cast was handed names nothing there.
+ridersOn :: ObjectId.ObjectId -> GameState.GameState -> [ObjectId.ObjectId]
+ridersOn host gs =
+  filter
+    (\oid -> (Game.lookupObject oid gs >>= Object.attachedTo >>= Recipient.objectOf) == Just host)
+    (Set.toList (GameState.battlefield gs))
+
+-- Answers Prompt.ChooseTargets with one fixed recipient -- CR 601.2c's choice,
+-- which S.identityAnswer declines.
+aimRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
+aimRecipient recipient p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const recipient) sets
+  _ -> S.identityAnswer p
