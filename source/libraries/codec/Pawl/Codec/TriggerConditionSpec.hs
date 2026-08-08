@@ -244,3 +244,33 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SpellCast (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Or [Filter.HasCardType CardType.Instant, Filter.HasCardType CardType.Sorcery]]))
       """ {"type":"SpellCast","value":{"type":"And","value":[{"type":"ControlledBy","value":{"type":"You"}},{"type":"Or","value":[{"type":"HasCardType","value":{"type":"Instant"}},{"type":"HasCardType","value":{"type":"Sorcery"}}]}]}} """
+  -- CR 709.5i. The payload is a PlayerRelation, read against the controller of the
+  -- permanent that became fully unlocked. BOTH relations, since the two are what
+  -- separate "you fully unlock" from an opponent doing it.
+  Spec.it s "RoomFullyUnlocked round-trips its relation" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.RoomFullyUnlocked PlayerRelation.You)
+      """ {"type":"RoomFullyUnlocked","value":{"type":"You"}} """
+  Spec.it s "RoomFullyUnlocked round-trips the opponent relation too" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.RoomFullyUnlocked PlayerRelation.Opponent)
+      """ {"type":"RoomFullyUnlocked","value":{"type":"Opponent"}} """
+  -- CR 603.1b's "more than one trigger condition": one ability, two clauses. The
+  -- only RECURSIVE condition, so both directions of the codec call themselves.
+  --
+  -- Balemurk Leech's own pair, which is neither empty nor a singleton on purpose:
+  -- a codec that kept only the first branch, or that dropped the list entirely,
+  -- would round-trip a one-element list unchanged and pass.
+  Spec.it s "AnyOf round-trips both of its branches" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.AnyOf [TriggerCondition.PermanentEnters (Filter.HasCardType CardType.Enchantment), TriggerCondition.RoomFullyUnlocked PlayerRelation.You])
+      """ {"type":"AnyOf","value":[{"type":"PermanentEnters","value":{"type":"HasCardType","value":{"type":"Enchantment"}}},{"type":"RoomFullyUnlocked","value":{"type":"You"}}]} """

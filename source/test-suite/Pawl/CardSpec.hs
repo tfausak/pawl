@@ -60,6 +60,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.CombatStep as CombatStep
+import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
@@ -404,6 +405,11 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   -- CR 709.5h names a half, which is a CardName and not a Quantity.
   TriggerCondition.SelfHalfUnlocked _ -> []
+  -- CR 709.5i names a PlayerRelation, which holds no Count.
+  TriggerCondition.RoomFullyUnlocked _ -> []
+  -- Recursive: a branch of an AnyOf may be any condition, StateIs included, so
+  -- the traversal has to go through rather than stop here.
+  TriggerCondition.AnyOf conditions -> concatMap triggerConditionCounts conditions
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
@@ -1389,6 +1395,11 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentEnters f -> [f]
   -- CR 709.5h names a half by name; nothing about the door is a Filter.
   TriggerCondition.SelfHalfUnlocked _ -> []
+  -- CR 709.5i names a PlayerRelation; nothing about it is a Filter.
+  TriggerCondition.RoomFullyUnlocked _ -> []
+  -- Recursive, for triggerConditionCounts' reason: Balemurk Leech's AnyOf holds a
+  -- PermanentEnters, whose Filter would otherwise never be swept.
+  TriggerCondition.AnyOf conditions -> concatMap triggerConditionFilters conditions
   TriggerCondition.PermanentDies f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []
@@ -1865,6 +1876,31 @@ distinctFaceNamesOffends :: Card.Type.Card -> Bool
 distinctFaceNamesOffends card =
   let names = fmap Face.name (NonEmpty.toList (Card.Type.faces card))
    in length (List.nub names) /= length names
+
+-- Two things a TriggerCondition.AnyOf may not contain, checked at every depth so
+-- that a nested one cannot smuggle either in.
+--
+-- A CR 603.8 STATE trigger, because the two kinds of condition are gathered by
+-- different scans: Pawl.Engine.Event.stateTriggers walks the battlefield asking
+-- whether the state holds, and Event.matchesTrigger walks the event log. An
+-- ability that was both would be gathered by stateTriggers whenever any clause
+-- held (that arm answers `any`), and CR 603.8's "not again until the ability has
+-- left the stack" would then hold back the EVENT clauses too. Nothing else in the
+-- tree catches this: both classifications compile, and each is individually
+-- defensible.
+--
+-- A NESTED AnyOf, because a flat list says everything a nested one could and the
+-- nesting only multiplies the shapes the classifications above have to be right
+-- for.
+anyOfOffends :: TriggerCondition.TriggerCondition -> Bool
+anyOfOffends condition = case condition of
+  TriggerCondition.AnyOf conditions -> any inside conditions || any anyOfOffends conditions
+  _ -> False
+  where
+    inside c = case c of
+      TriggerCondition.StateIs _ -> True
+      TriggerCondition.AnyOf _ -> True
+      _ -> False
 
 -- Every claim pawl makes about how its own card files are authored, swept over
 -- the whole corpus. A sweep alone proves nothing about the lint it runs -- a
@@ -2837,6 +2873,37 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       (not (all (all (null . doors) . Card.Type.faces . Printing.card) ps))
       "the pool has a card with an unlock trigger to lint"
     Spec.assertEqWith s "every door named is a face of the card naming it" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 603.2's event triggers and CR 603.8's state triggers are gathered by two
+  -- different scans, so one ability may not be both. See anyOfOffends for the two
+  -- shapes this rejects and why each would be incoherent rather than merely odd.
+  --
+  -- Swept over the pool, with the non-vacuity assertion its neighbours carry: a
+  -- pool with no AnyOf at all would pass this without examining anything.
+  -- Balemurk Leech is the pool's one AnyOf, and it is ACCEPTED here.
+  Spec.it s "CR 603.2 no AnyOf mixes in a state trigger or nests another AnyOf" $ do
+    ps <- S.allPrintings s
+    let conditions c = fmap TriggeredAbility.condition (Face.triggeredAbilities c)
+        isAnyOf c = case c of TriggerCondition.AnyOf _ -> True; _ -> False
+        offenders = filter (anyFace (any anyOfOffends . conditions) . Printing.card) ps
+    Spec.assertBool
+      s
+      (any (anyFace (any isAnyOf . conditions) . Printing.card) ps)
+      "the pool has a card with an AnyOf condition to lint"
+    Spec.assertEqWith s "every AnyOf holds only event triggers, flat" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The REJECTING direction, against hand-built offenders rather than card files,
+  -- as the repeated-face-name lint above does it.
+  Spec.it s "the lint itself catches a state trigger and a nested AnyOf inside an AnyOf" $ do
+    let never = Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 1)
+        fine = TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.RoomFullyUnlocked PlayerRelation.You]
+    Spec.assertBool s (not (anyOfOffends fine)) "the control: two event triggers side by side are fine"
+    Spec.assertBool s (anyOfOffends (TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.StateIs never])) "a CR 603.8 state trigger inside an AnyOf is rejected"
+    Spec.assertBool s (anyOfOffends (TriggerCondition.AnyOf [fine])) "and so is a nested AnyOf"
+    -- The recursion is what the nesting check buys: a state trigger one level
+    -- down is caught too.
+    Spec.assertBool s (anyOfOffends (TriggerCondition.AnyOf [TriggerCondition.AnyOf [TriggerCondition.StateIs never]])) "including a state trigger buried one level down"
+    -- NOT an offence outside an AnyOf: a bare state trigger is how every CR 603.8
+    -- card in the pool is written, and this lint must not reject those.
+    Spec.assertBool s (not (anyOfOffends (TriggerCondition.StateIs never))) "a bare state trigger is left alone"
   Spec.it s "no mode declares a slot named enchant" $ do
     ps <- S.allPrintings s
     let offends c = any (Map.member Card.enchantSlot . Mode.targetSpecs) (Modal.modes (Face.spell c))

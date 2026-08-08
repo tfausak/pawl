@@ -439,8 +439,53 @@ data TriggerCondition
     -- The condition is about the DESIGNATION and not about who gave it: a door
     -- unlocked by CR 709.5e's special action, by CR 709.5f's keyword action, and
     -- by CR 709.5d's entry all fire it. CR 709.5i's "fully unlocks" is a second
-    -- shape -- the permanent getting the other designation while it has one, or
-    -- both at once -- and has no constructor here, since no printing in the pool
-    -- says it (#924).
+    -- shape, and RoomFullyUnlocked below is it.
     SelfHalfUnlocked CardName.CardName
+  | -- | CR 709.5i: "Some abilities trigger when a player 'fully unlocks' a
+    -- permanent with a shared type line. Such an ability triggers when that
+    -- permanent has one of the two unlocked designations and gets the other, or
+    -- when it has neither designation and gains both."
+    --
+    -- NOT self-scoped, and that is the whole difference from SelfHalfUnlocked
+    -- above: Balemurk Leech watches every Room on the board rather than its own
+    -- doors, so the bearer only supplies the perspective. The PlayerRelation reads
+    -- the permanent's CONTROLLER against CR 109.5's "you".
+    --
+    -- Which is a reading of the printed "YOU fully unlock", and not the same
+    -- sentence: the rule's subject is the player taking the action, while this
+    -- asks who controls the permanent. GameEvent.HalfUnlocked carries no actor,
+    -- and CR 709.5f's keyword action reaches Pawl.Engine.Event.unlockHalf with no
+    -- payer at all, so the actor is not available to ask about (#961).
+    --
+    -- Names no half, unlike SelfHalfUnlocked: CR 709.5i is about the permanent
+    -- becoming fully unlocked, which is a fact about ALL of its halves and so
+    -- about none of them in particular.
+    RoomFullyUnlocked PlayerRelation.PlayerRelation
+  | -- | Several conditions, any of which fires the ONE ability that bears them.
+    --
+    -- CR 603.1b's own shape: "a triggered ability may have MORE THAN ONE trigger
+    -- condition". Balemurk Leech is the pool's: "Eerie -- Whenever an enchantment
+    -- you control enters and whenever you fully unlock a Room, each opponent loses
+    -- 1 life." Eerie is an ABILITY WORD (CR 207.2c: ability words "have no special
+    -- rules meaning and no individual entries in the Comprehensive Rules"), so it
+    -- grants nothing and is not modelled; what is left is one ability with two
+    -- trigger conditions.
+    --
+    -- ONE ability rather than two, which is observable: CR 603.8's suppression,
+    -- CR 603.3b's ordering and CR 603.1b's own "all of those conditions" clause
+    -- all count abilities, and printing two would count wrong.
+    --
+    -- CR 603.1b's "all of those conditions have happened during a particular
+    -- period" is a SECOND thing a multi-condition ability can do, and nothing here
+    -- does it: this list is read as "any", which is what a card joining its
+    -- clauses with "and whenever" means. No printing in the pool carries the
+    -- "all" instruction.
+    --
+    -- Pawl.CardSpec's lint forbids a StateIs or a nested AnyOf inside one. The
+    -- first because CR 603.8's state triggers and CR 603.2's event triggers are
+    -- gathered by different scans (Pawl.Engine.Event.stateTriggers against
+    -- matchesTrigger), and an ability that was both would be gathered by neither
+    -- coherently; the second because a flat list says everything a nested one
+    -- could.
+    AnyOf [TriggerCondition]
   deriving (Eq, Ord, Show)

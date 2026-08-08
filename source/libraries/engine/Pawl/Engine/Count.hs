@@ -223,7 +223,7 @@ snapshotView shape event = case event of
   -- both would count one countering twice. It carries no snapshot either.
   -- Becomes a real view the day an EventShape names countering (#162).
   GameEvent.SpellCountered _ -> Nothing
-  GameEvent.HalfUnlocked _ _ -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing

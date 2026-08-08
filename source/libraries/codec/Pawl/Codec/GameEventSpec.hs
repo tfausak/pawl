@@ -2,10 +2,12 @@
 
 module Pawl.Codec.GameEventSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.GameEvent as GameEvent
 import qualified Pawl.Codec.ProjectedCharacteristicsSpec as ProjectedCharacteristicsSpec
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -147,3 +149,20 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.CountersRemoved (ObjectId.MkObjectId 3) CounterKind.Defense 2 0)
       """ {"type":"CountersRemoved","value":[3,{"type":"Defense"},2,0]} """
+  -- CR 709.5h's record, carrying CR 709.5i's flag. Both directions of the flag,
+  -- since it is exactly what the two rules disagree about: False is one door of
+  -- two opening, True is the last one.
+  Spec.it s "HalfUnlocked" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.HalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Roaring Furnace")) False)
+      """ {"type":"HalfUnlocked","value":[4,"Roaring Furnace",false]} """
+  Spec.it s "HalfUnlocked carrying CR 709.5i's fully-unlocked flag" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.HalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Steaming Sauna")) True)
+      """ {"type":"HalfUnlocked","value":[4,"Steaming Sauna",true]} """
