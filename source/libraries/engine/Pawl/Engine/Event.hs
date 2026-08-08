@@ -2867,6 +2867,56 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
+  -- CR 708.7's OTHER written form, read by a bystander: "whenever a permanent is
+  -- turned face up". PermanentEnters' shape against SelfEnters', and for its
+  -- reason -- the bearer frames the match rather than being it. The bearer is the
+  -- Filter.Context's source (so `Not IsSource` would be an "another"), and its
+  -- controller is the perspective CR 109.5 gives "you" in Deathmist Raptor's "a
+  -- permanent YOU CONTROL is turned face up".
+  --
+  -- NO comparison against the bearer at all, which is the whole difference from
+  -- the arm above: Aven Farseer bears no morph ability and so can never be the
+  -- permanent that turned over, and a bearer check here would make its ability
+  -- dead text. Pawl.FaceDownSpec's "a permanent turning face up puts Aven
+  -- Farseer's counter on the FARSEER" is what proves the scope, asserting the
+  -- counter's landing place by object id on a board where the watcher and the
+  -- subject are two permanents.
+  --
+  -- Read LIVE off the game as it stands, like PermanentEnters and unlike
+  -- PermanentDies: CR 708.8 leaves the permanent on the battlefield with its
+  -- normal copiable values restored, so there is nothing for CR 603.10a's
+  -- look-back to recover and the live read is what CR 603.10's first sentence
+  -- asks for. It is also the only read that can answer a narrowed form correctly
+  -- -- CR 708.2a gives a face-down permanent no subtypes and no name, so a Filter
+  -- applied to the pre-turning object would decline every "a Dragon is turned
+  -- face up" there is.
+  --
+  -- viewWithLastKnown rather than viewOfObject for PermanentEnters' reason: a
+  -- permanent turned face up and gone again before the CR 117.5 boundary is still
+  -- read as it was on the battlefield (CR 608.2h) instead of vanishing from the
+  -- match. Nothing is a permanent that is gone AND filed no last known
+  -- information, about which no Filter can honestly answer.
+  TriggerCondition.PermanentTurnedFaceUp f -> case event of
+    GameEvent.TurnedFaceUp oid -> case Projection.viewWithLastKnown oid gs oid of
+      Nothing -> False
+      Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
   -- CR 709.5i: "such an ability triggers when that permanent has one of the two
   -- unlocked designations and gets the other, or when it has neither designation
   -- and gains both." The whole of that sentence is the flag the event carries,
@@ -3285,6 +3335,20 @@ eventBindingSlots cond = case cond of
   -- condition that had been forgotten, which is exactly why it is spelled out
   -- here: Pawl.TriggerSpec pins the two against each other.
   TriggerCondition.SelfTurnedFaceUp -> Set.empty
+  -- The SAME event read by a bystander, and the answer is the same for a DIFFERENT
+  -- reason. Here CR 113.7a's source slot names the WATCHER rather than the
+  -- permanent that turned over, so a slot for the subject would be honest -- but
+  -- no printing this constructor answers reads one: Aven Farseer puts its counter
+  -- on itself, Aphetto Runecaster draws a card and Bonethorn Valesk aims its
+  -- damage. Claiming a slot would promise something eventBindings never fills,
+  -- which is RoomFullyUnlocked's position above.
+  --
+  -- `became` is what such a slot would have to be rather than a new one, CR 400.7e
+  -- being one rule with several readings -- but turning face up is NOT a zone
+  -- change (CR 708.8 leaves one permanent with one id), so nothing here is an
+  -- incarnation a card became, and the card that reads the subject is the one that
+  -- has to settle whether that slot stretches this far (#1004).
+  TriggerCondition.PermanentTurnedFaceUp _ -> Set.empty
   -- CR 701.21a's event names a player and a permanent, and this claims NEITHER --
   -- a deliberate empty, decided rather than defaulted, since eventBindings' own
   -- fallthrough would answer the same for a condition nobody wrote an arm for.
@@ -3703,6 +3767,11 @@ functionsInGraveyard cond = case cond of
   -- CR 708.7 is about a PERMANENT being turned face up, and CR 110.1 puts
   -- permanents on the battlefield alone, so CR 113.6k never reaches this.
   TriggerCondition.SelfTurnedFaceUp -> False
+  -- CR 113.6's default, one object over: the WATCHER is an ordinary permanent
+  -- doing its watching from the battlefield -- Aven Farseer is a creature -- so CR
+  -- 113.6k's exception, which is for a condition that cannot trigger from the
+  -- battlefield at all, does not apply.
+  TriggerCondition.PermanentTurnedFaceUp _ -> False
   -- CR 113.6's default: an ability of a permanent functions only while that
   -- permanent is on the battlefield. CR 113.6k's exception is for a trigger
   -- condition that CANNOT trigger from the battlefield, and this one plainly can
@@ -3815,6 +3884,10 @@ controllerTurnScoped cond = case cond of
   -- CR 702.37e offers the special action "any time you have priority", which is
   -- every turn and not only the controller's own.
   TriggerCondition.SelfTurnedFaceUp -> False
+  -- The same rule from the watcher's side, and doubly so: CR 702.37e lets any
+  -- player take the action on any turn, and the watcher is not even the player
+  -- taking it.
+  TriggerCondition.PermanentTurnedFaceUp _ -> False
   -- CR 701.21a says nothing about whose turn it is, and neither does the printed
   -- "whenever a player sacrifices a permanent".
   TriggerCondition.PermanentSacrificed -> False
@@ -3944,6 +4017,11 @@ stateTriggers gs
               -- thereafter -- so a state read would fire it again every settle,
               -- for as long as the permanent stayed on the battlefield.
               TriggerCondition.SelfTurnedFaceUp -> False
+              -- And the watcher's form is an EVENT trigger for the same reason,
+              -- more plainly still: a board on which some permanent is face up
+              -- says nothing about which of them was ever TURNED over, so there
+              -- is no state here to read at all.
+              TriggerCondition.PermanentTurnedFaceUp _ -> False
               -- CR 701.21a is a game ACTION, so this is an event trigger too: it
               -- fires on the moment the permanent is sacrificed, and the board
               -- afterwards holds no state a read could recover.

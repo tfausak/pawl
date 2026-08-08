@@ -419,6 +419,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionCounts conditions
   -- CR 708.7's condition is nullary, so there is nothing in it to be a Quantity.
   TriggerCondition.SelfTurnedFaceUp -> []
+  -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count for
+  -- PermanentEnters' reason.
+  TriggerCondition.PermanentTurnedFaceUp _ -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
   TriggerCondition.PermanentSacrificed -> []
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
@@ -1425,6 +1428,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionFilters conditions
   -- CR 708.7's condition is nullary, so there is nothing in it to be a Filter.
   TriggerCondition.SelfTurnedFaceUp -> []
+  -- Its watcher-scoped sibling carries one, and Aven Farseer's is the trivial
+  -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
+  TriggerCondition.PermanentTurnedFaceUp f -> [f]
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
   -- PermanentDies below there is no Filter to sweep.
   TriggerCondition.PermanentSacrificed -> []
