@@ -1406,9 +1406,20 @@ flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
 -- (CR 704.5j) is Pawl.Engine.Sba's, and this one is Pawl.Engine.Cast's.
 --
--- The proving card is a LABELED SYNTHETIC: "Synthetic Legendary Sorcery", a {0}
--- legendary sorcery whose one effect is "you lose 3 life". No real legendary
--- instant or sorcery is expressible today (#328).
+-- The proving card is Urza's Ruinous Blast, {4}{W} Legendary Sorcery, "Exile all
+-- nonland permanents that aren't legendary." (Its parenthetical is reminder text
+-- for this very rule and is not transcribed.) Its sweep is an
+-- ObjectRef.EachMatching over And [Not (HasCardType Land), Not (HasSupertype
+-- Legendary)] moved to exile -- the shape Evacuation already carries with a
+-- different destination and a simpler filter, so nothing new was built for it.
+--
+-- EVERY BOARD BELOW CARRIES SIX PLAINS, the positives and the negatives alike.
+-- That is what keeps the negatives from passing vacuously: a cast gate reads
+-- False for a dozen reasons that are not CR 205.4e, and the DEAREST case here is
+-- the one with a Thalia on it -- she taxes the sorcery {1} of her own
+-- ("noncreature spells cost {1} more"), so {5}{W} is the ceiling and six Plains
+-- pay it. Delete the Legendary supertype from the card and all three negatives
+-- go green, which is how the set was shown to turn on the rule and not on mana.
 --
 -- The three permanents in play across these cases are what make the assertions
 -- discriminating. Thalia, Guardian of Thraben is the pool's only legendary
@@ -1417,16 +1428,14 @@ flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
 -- control is the case that fails if the check forgets "that player controls".
 legendarySpellSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
-  -- The control for every negative below: same board, same one Mountain,
-  -- plus a legendary creature. Thalia taxes the sorcery {1} (her own
-  -- "noncreature spells cost {1} more"), which the Mountain pays -- so the
-  -- other cases, where nothing taxes it at all, are affordable a fortiori
-  -- and only CR 205.4e can be stopping them.
+  -- The control for every negative below: same six Plains, plus a legendary
+  -- creature. Thalia's tax makes this the DEAREST board of the group, so every
+  -- other case is affordable a fortiori and only CR 205.4e can be stopping them.
   Spec.it s "CR 205.4e castable while its caster controls a legendary creature" $ do
-    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
-    let (oid, gs) = inHandWith mountain sorcery 1
+    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
+    let (oid, gs) = inHandWith plains sorcery 6
         board = snd (S.addCreature thalia S.alice gs)
     Spec.assertBool s (S.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery) Facing.FaceUp) (Action.legalActions S.alice board)) "and offered as a legal action"
@@ -1434,39 +1443,39 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
   -- Beleren is the pool's only one, and it is not a creature -- so this case
   -- fails for any reading that collapsed the rule onto the creature limb.
   Spec.it s "CR 205.4e castable while its caster controls a legendary planeswalker" $ do
-    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
     jace <- S.printingOf s registry "Jace Beleren"
-    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
-    let (oid, gs) = inHandWith mountain sorcery 1
+    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
+    let (oid, gs) = inHandWith plains sorcery 6
         board = snd (S.addCreature jace S.alice gs)
     Spec.assertBool s (not (Card.isCreature (S.combinedFace jace))) "not a creature"
     Spec.assertBool s (S.castable S.alice oid board) "castable"
     Spec.assertBool s (elem (A.Cast oid (S.printingName sorcery) Facing.FaceUp) (Action.legalActions S.alice board)) "and offered as a legal action"
   Spec.it s "CR 205.4e not castable with no legendary permanent at all" $ do
-    mountain <- S.printingOf s registry "Mountain"
-    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
-    let (oid, gs) = inHandWith mountain sorcery 1
+    plains <- S.printingOf s registry "Plains"
+    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
+    let (oid, gs) = inHandWith plains sorcery 6
     Spec.assertBool s (not (S.castable S.alice oid gs)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice gs))) "and not offered"
   -- The supertype alone is not the condition: rule 205.4e names a legendary
   -- CREATURE (or planeswalker), and Mindslaver is a legendary artifact.
   Spec.it s "CR 205.4e a legendary artifact does not satisfy it" $ do
-    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
     mindslaver <- S.printingOf s registry "Mindslaver"
-    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
-    let (oid, gs) = inHandWith mountain sorcery 1
+    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
+    let (oid, gs) = inHandWith plains sorcery 6
         board = snd (S.addCreature mindslaver S.alice gs)
     Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
     Spec.assertBool s (not (any (S.isCastOf oid) (Action.legalActions S.alice board))) "and not offered"
   -- "unless THAT PLAYER controls": an opponent's legendary creature is no
-  -- help. Bob's Thalia still taxes alice (her ability is EachPlayer-scoped),
-  -- so a second Mountain keeps the spell affordable and CR 205.4e the only
-  -- thing left to fail.
+  -- help. Bob's Thalia still taxes alice (her ability is EachPlayer-scoped), so
+  -- this board is the positive one's cost exactly -- {5}{W} against six Plains
+  -- -- and CR 205.4e is the only thing left to fail.
   Spec.it s "CR 205.4e an opponent's legendary creature does not satisfy it" $ do
-    mountain <- S.printingOf s registry "Mountain"
+    plains <- S.printingOf s registry "Plains"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
-    let (oid, gs) = inHandWith mountain sorcery 2
+    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
+    let (oid, gs) = inHandWith plains sorcery 6
         board = snd (S.addCreature thalia S.bob gs)
     Spec.assertBool s (not (S.castable S.alice oid board)) "not castable"
   -- The scope of the restriction, from the other side: rule 205.4e is about
@@ -1479,17 +1488,33 @@ legendarySpellSpec s registry = Spec.describe s "LegendarySpell" $ do
     let (oid, gs) = inHandWith plains thalia 2
     Spec.assertBool s (S.castable S.alice oid gs) "castable"
     Spec.assertBool s (elem (A.Cast oid (S.printingName thalia) Facing.FaceUp) (Action.legalActions S.alice gs)) "and offered as a legal action"
-  -- Gameplay level, through the stack: the permitted cast resolves and its
-  -- effect lands, so the gate is a gate and not a silent no-op.
-  Spec.it s "CR 205.4e the permitted cast resolves" $ do
-    mountain <- S.printingOf s registry "Mountain"
+  -- Gameplay level, through the stack: the permitted cast RESOLVES, and what it
+  -- does is read off the board rather than assumed. Three survivors-or-not,
+  -- one per clause of the filter: the Goblin Piker is a nonland nonlegendary
+  -- permanent and is exiled, Thalia is legendary and stays, and the Plains are
+  -- land and stay. Nothing here turns on whose permanent it is -- the card says
+  -- "all", and CR 109.2 puts that set on the battlefield without regard to
+  -- controller, so the one Piker is alice's only because the fixture is hers.
+  --
+  -- The three are deliberately INDEPENDENT rather than one exile-contents
+  -- equality: an assertion failure ends the case, so a single list comparison
+  -- would be the only thing any of the three mutations ever tripped. Counting
+  -- just the Piker leaves the survivors to be asserted on their own, and each
+  -- clause of the filter then has an assertion that only it can turn red.
+  Spec.it s "CR 205.4e the permitted cast resolves, exiling by CR 109.2's set" $ do
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
-    let (oid, gs) = inHandWith mountain sorcery 1
-        board = snd (S.addCreature thalia S.alice gs)
+    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
+    let (oid, gs) = inHandWith plains sorcery 6
+        (thaliaId, withThalia) = S.addCreature thalia S.alice gs
+        board = snd (S.addCreature piker S.alice withThalia)
         cast = S.runPure S.identityAnswer board (S.cast S.alice oid)
         resolved = S.runPure S.identityAnswer cast Stack.resolveTop
-    Spec.assertEqWith s "alice lost 3 life" (S.lifeOf S.alice resolved) (Just 17)
+        exiled = fmap (`Projection.nameOf` resolved) (Game.zoneMembers Zone.Exile S.alice resolved)
+    Spec.assertEqWith s "the nonlegendary nonland permanent is in exile" (length (filter (== S.printingName piker) exiled)) 1
+    Spec.assertBool s (S.onBattlefield thaliaId resolved) "the legendary creature is still on the battlefield"
+    Spec.assertEqWith s "and the lands are all still on the battlefield" (S.countOnBattlefieldByName (S.printingName plains) S.alice resolved) 6
 
 -- CR 601.3: "A player can begin to cast a spell only if a rule or effect allows
 -- that player to cast it and no rule or effect prohibits that player from casting
