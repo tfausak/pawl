@@ -64,8 +64,8 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- this module must never do is grow an arm for a CARD.
 --
 -- triggeredAbilitiesOf derives its abilities from a projection's POST-LAYER
--- keyword counts, so Humility takes those three abilities
--- away for free and an Aura's layer-6 grant adds them. Its one caller is
+-- keyword counts, so Humility takes all three of those abilities away for free
+-- and an Aura's layer-6 grant adds them. Its one caller is
 -- Pawl.Engine.Event's EVENT scan; rule 702 has no state-triggered (CR 603.8) or
 -- delayed (CR 603.7) keyword ability, so the first keyword that needs one must
 -- widen those two scans.
