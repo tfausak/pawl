@@ -119,6 +119,7 @@ toJson codec e = case e of
   Effect.PreventNextDamage d r q -> Common.tagged "PreventNextDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r, Quantity.toJson q]))
   Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
+  Effect.RemoveCounters k q s -> Common.tagged "RemoveCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.RemovePlayerCounters r k q -> Common.tagged "RemovePlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
@@ -305,6 +306,9 @@ fromJson decode value = do
     "PutCounters" -> case mv of
       Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.PutCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
       _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, slot]"
+    "RemoveCounters" -> case mv of
+      Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.RemoveCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
+      _ -> Left . Text.pack $ "RemoveCounters expects [counterKind, quantity, slot]"
     "GainPlayerCounters" -> case mv of
       Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> PlayerRef.fromJson r <*> PlayerCounterKind.fromJson k <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainPlayerCounters expects [playerRef, playerCounterKind, quantity]"

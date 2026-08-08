@@ -79,6 +79,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.PreventAllDamage {} -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
+  Effect.RemoveCounters {} -> Nothing
   Effect.GainPlayerCounters {} -> Nothing
   Effect.RemovePlayerCounters {} -> Nothing
   Effect.Tap _ -> Nothing

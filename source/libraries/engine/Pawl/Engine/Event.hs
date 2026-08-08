@@ -1441,6 +1441,49 @@ putCounters cause oid kind n = do
                   -- ability off nothing.
                   recordEvent (GameEvent.CountersPut target settledKind before (before + settledCount)) bumped
 
+-- CR 122: take counters off an object, recording the CR 120.3h CountersRemoved
+-- event from the before/after pair so a trigger can read the crossing.
+--
+-- NO CR 614.16 loop, unlike putCounters above, and that asymmetry is the rule's
+-- rather than a shortcut: 614.16 replaces a PLACEMENT -- "if an effect would put
+-- one or more counters on a permanent" -- and no ReplacementEffect class in
+-- Pawl.Types.ReplacementEffect pairs with a removal, so there is nothing for a
+-- loop to offer this to.
+--
+-- SATURATING: removing more than are present leaves the kind absent from the map
+-- rather than negative, which is what keeps Object.counters a tally of what is
+-- there. CR 122 states no rule making an over-large removal fail.
+--
+-- This is not the only place counters leave an object -- CR 704.5q's
+-- annihilation and CR 122.2's zone change do not route through here, so #900's
+-- "record a removal event for every removal" is advanced by this and not closed.
+removeCounters :: ObjectId -> CounterKind.CounterKind -> Natural -> Game ()
+removeCounters oid kind n =
+  Monad.when (n > 0) . State.modify' $ \gs ->
+    -- ONE lookup answers both questions -- whether the object is there, and how
+    -- many of the kind it has -- for putCounters' reason: Map.adjust on a
+    -- missing id is a silent no-op, so proceeding would record a removal the
+    -- state does not show.
+    case Game.lookupObject oid gs of
+      Nothing -> gs
+      Just obj ->
+        let before = Map.findWithDefault 0 kind (Object.counters obj)
+            after = if n >= before then 0 else before - n
+            drop_ o =
+              o
+                { Object.counters =
+                    if after == 0
+                      then Map.delete kind (Object.counters o)
+                      else Map.insert kind after (Object.counters o)
+                }
+            dropped = gs {GameState.objects = Map.adjust drop_ oid (GameState.objects gs)}
+         in -- Nothing to remove is nothing to record: an event for a removal that
+            -- did not happen would fire a counter-watching trigger off nothing,
+            -- which is the guard putCounters puts on its own write.
+            if before == 0
+              then gs
+              else recordEvent (GameEvent.CountersRemoved oid kind before after) dropped
+
 -- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
 --
 -- CR 614.16 is the gate. Its replacement effects -- "if an effect would put one or

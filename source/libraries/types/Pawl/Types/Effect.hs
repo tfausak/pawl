@@ -446,6 +446,22 @@ data Effect card
     -- Event.changeZone. The counter's P/T effect is the projection's (CR 122.1a /
     -- 613.4c), not this opcode's.
     PutCounters CounterKind.CounterKind Quantity.Quantity SlotName.SlotName
+  | -- | CR 122: remove this many counters of this kind from the slot's target
+    -- permanent. PutCounters' mirror, and a SEPARATE constructor rather than one
+    -- signed amount for the reason RemovePlayerCounters is separate from
+    -- GainPlayerCounters: a signed delta would fuse two events the rules tell
+    -- apart, and CR 122.7's "when the Nth counter is put on" reads only the
+    -- putting direction.
+    --
+    -- Asking for more than are present removes the ones that are there and no
+    -- more; CR 122 states no rule making the instruction fail. Unlike
+    -- PutCounters this passes through no CR 614.16 gate -- that rule replaces a
+    -- PLACEMENT ("if an effect would put one or more counters on a permanent"),
+    -- and no ReplacementEffect class pairs with a removal.
+    --
+    -- The P/T consequence is the projection's (CR 122.1a / 613.4c), not this
+    -- opcode's, exactly as PutCounters' haddock says of the other direction.
+    RemoveCounters CounterKind.CounterKind Quantity.Quantity SlotName.SlotName
   | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
     -- player-counter kind. Subsumes any self-scoped player counter (energy,
     -- experience, rad) as `Relative You` -- Longtusk Cub's "you get {E}{E}".

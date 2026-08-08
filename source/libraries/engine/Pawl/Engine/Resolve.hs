@@ -196,6 +196,7 @@ slotsOf effect = case effect of
   Effect.PreventAllDamage duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
+  Effect.RemoveCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.RemovePlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.Tap ref -> objectRefSlots ref
@@ -304,6 +305,7 @@ readsX = any effectReadsX
       Effect.PreventAllDamage {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> Quantity.readsX quantity
+      Effect.RemoveCounters _ quantity _ -> Quantity.readsX quantity
       Effect.GainPlayerCounters _ _ quantity -> Quantity.readsX quantity
       Effect.RemovePlayerCounters _ _ quantity -> Quantity.readsX quantity
       Effect.Tap _ -> False
@@ -359,6 +361,7 @@ searchesLibrary effect = case effect of
   Effect.PreventAllDamage {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
+  Effect.RemoveCounters {} -> False
   Effect.GainPlayerCounters {} -> False
   Effect.RemovePlayerCounters {} -> False
   Effect.Tap _ -> False
@@ -474,6 +477,7 @@ boundSlots effect = case effect of
   Effect.PreventAllDamage {} -> Set.empty
   Effect.Counter _ -> Set.empty
   Effect.PutCounters {} -> Set.empty
+  Effect.RemoveCounters {} -> Set.empty
   Effect.GainPlayerCounters {} -> Set.empty
   Effect.RemovePlayerCounters {} -> Set.empty
   Effect.Tap _ -> Set.empty
@@ -2528,6 +2532,20 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           -- CR 122.6: through the single funnel, so CR 614's counter replacements
           -- (Hardened Scales, Doubling Season) get their opportunity.
           Just n -> Monad.when (n > 0) (Event.putCounters CounterCause.ByEffect target kind (Integer.toNaturalSaturating n))
+      _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
+      -- CR 122: PutCounters' mirror, and deliberately NOT through a CR 614.16 gate
+      -- -- that rule replaces a placement, and nothing in CR 614 replaces a removal,
+      -- so there is no loop for this to enter.
+  Effect.RemoveCounters kind quantity slot -> do
+    gs <- State.get
+    let viewOf = Projection.viewWithLastKnown source gs
+        context = Filter.MkContext (Just controller) (Just source)
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
+        Nothing -> pure () -- a player recipient has no object counters
+        Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
+          Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
+          Just n -> Monad.when (n > 0) (Event.removeCounters target kind (Integer.toNaturalSaturating n))
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
       -- CR 701.34a: "choose any number of permanents and/or players that have a
       -- counter, then give each one additional counter of each kind that permanent or

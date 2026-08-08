@@ -472,6 +472,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "creature")))
       """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},"creature"]} """
+  -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
+  -- tag would make the two indistinguishable in a card file.
+  Spec.it s "RemoveCounters" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "target")))
+      """ {"type":"RemoveCounters","value":[{"type":"MinusOneMinusOne"},{"type":"Literal","value":1},"target"]} """
   -- Every PlayerRef shape the opcode accepts: the self-scoped one, and the slot
   -- read CR 702.70a needs.
   Spec.it s "GainPlayerCounters" $ do

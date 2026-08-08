@@ -3233,6 +3233,40 @@ countersSpec s registry = Spec.describe s "Counters" $ do
         after = S.settleSba gs2
     Spec.assertEqWith s "creature survives (net 2/1)" (S.creaturesInPlay S.alice after) 1
     Spec.assertEqWith s "no counters remain" (maybe (Map.fromList [(CounterKind.PlusOnePlusOne, 99)]) Object.counters (Game.lookupObject victim after)) Map.empty
+  Spec.it s "CR 122 RemoveCounters takes counters off the slot's target" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        base = S.addCounter CounterKind.MinusOneMinusOne 2 oid base0
+        slot = SlotName.MkSlotName (Text.pack "target")
+        run =
+          Resolve.applyEffect
+            oid
+            oid
+            S.alice
+            (Map.singleton slot True)
+            (Map.singleton slot (Recipient.ToCreature oid))
+            (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) slot)
+        after = snd (Engine.runGamePure S.identityAnswer base run)
+    Spec.assertEqWith s "one of the two counters is gone" (fmap Object.counters (Game.lookupObject oid after)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
+  -- CR 122 states no rule making the instruction fail when there are fewer
+  -- counters than asked for, so it takes what is there. The kind leaves the map
+  -- entirely rather than sitting at zero, which is what keeps Object.counters a
+  -- tally of what is present.
+  Spec.it s "CR 122 removing more counters than are present removes what is there" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (oid, base0) = S.addCreature piker S.bob (Setup.emptyGame S.bothPlayers)
+        base = S.addCounter CounterKind.MinusOneMinusOne 1 oid base0
+        slot = SlotName.MkSlotName (Text.pack "target")
+        run =
+          Resolve.applyEffect
+            oid
+            oid
+            S.alice
+            (Map.singleton slot True)
+            (Map.singleton slot (Recipient.ToCreature oid))
+            (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot)
+        after = snd (Engine.runGamePure S.identityAnswer base run)
+    Spec.assertEqWith s "the kind is gone, not negative" (fmap Object.counters (Game.lookupObject oid after)) (Just Map.empty)
   Spec.it s "CR 122.2 Unsummon removes a counter-bearing creature's counters" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"

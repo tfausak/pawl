@@ -1244,6 +1244,7 @@ rewriteEffect pairs effect = case effect of
   Effect.PreventAllDamage {} -> effect
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
+  Effect.RemoveCounters {} -> effect
   Effect.GainPlayerCounters {} -> effect
   Effect.RemovePlayerCounters {} -> effect
   Effect.Tap ref -> Effect.Tap (rewriteObjectRef pairs ref)

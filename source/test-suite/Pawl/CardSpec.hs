@@ -505,6 +505,7 @@ effectCounts effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
+  Effect.RemoveCounters _ quantity _ -> quantityCounts quantity
   Effect.GainPlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.RemovePlayerCounters _ _ quantity -> quantityCounts quantity
   Effect.Tap _ -> []
@@ -715,6 +716,7 @@ effectReplacements effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
+  Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.Tap _ -> []
@@ -1176,6 +1178,7 @@ effectMintedFaces effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
+  Effect.RemoveCounters {} -> []
   Effect.GainPlayerCounters {} -> []
   Effect.RemovePlayerCounters {} -> []
   Effect.Tap _ -> []
@@ -1846,6 +1849,7 @@ effectFilters effect = case effect of
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
+  Effect.RemoveCounters _ quantity _ -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.Tap ref -> unframed (objectRefFilters ref)
