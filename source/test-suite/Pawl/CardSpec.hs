@@ -1309,6 +1309,8 @@ costComponentFilters component = case component of
   CostComponent.Sacrifice _ f -> [f]
   -- CR 702.122a's "other untapped creatures you control".
   CostComponent.TapForTotalPower _ f -> [f]
+  -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
+  CostComponent.ExileCardsFromGraveyard _ f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []

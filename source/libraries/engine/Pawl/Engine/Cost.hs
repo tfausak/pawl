@@ -477,6 +477,7 @@ isLoyaltyComponent component = case component of
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
   CostComponent.ExileThisFromGraveyard -> False
+  CostComponent.ExileCardsFromGraveyard _ _ -> False
 
 -- CR 113.6m's COST half: "an ability whose cost or effect specifies that it
 -- moves the object it's on out of a particular zone functions only in that
@@ -516,6 +517,15 @@ zoneOfComponent component = case component of
   -- CR 702.122a taps permanents on the battlefield and moves nothing out of any
   -- zone, so CR 113.6m says nothing and CR 113.6's default stands.
   CostComponent.TapForTotalPower _ _ -> Nothing
+  -- Nothing, and NOT Just Zone.Graveyard -- the one place this component parts
+  -- from ExileThisFromGraveyard above. CR 113.6m is about an ability that "moves
+  -- THE OBJECT IT'S ON out of a particular zone"; this one moves OTHER cards,
+  -- chosen from the payer's graveyard, and leaves the object carrying the cost
+  -- exactly where it was. So CR 113.6m does not reach it and CR 113.6's default
+  -- stands -- the same reading TapForTotalPower gets just above. Answering the
+  -- graveyard here would make an activated ability with this cost unactivatable
+  -- from the battlefield, which no rule asks for.
+  CostComponent.ExileCardsFromGraveyard _ _ -> Nothing
   CostComponent.DiscardCards _ -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
@@ -544,6 +554,37 @@ removeLoyalty n obj =
 -- returns a hand in a fixed order, which Prompt.ChooseDiscard offers it in.
 discardCandidates :: PlayerId -> ObjectId -> GameState -> [ObjectId]
 discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid gs)
+
+-- The cards this player may exile to pay an ExileCardsFromGraveyard component:
+-- their OWN graveyard, in its own order, narrowed by the criterion.
+--
+-- Per-owner, and that is CR 400.3 with CR 108.4: a graveyard is not a shared
+-- zone, and a card in one has no controller for a control-shaped gate to read,
+-- so Game.zoneMembers Zone.Graveyard pid is the whole of "your graveyard".
+--
+-- Matched against the PRINTED card and never a projection: nothing off the
+-- battlefield is projected (#160), so Projection.viewOfCard is the view, and a
+-- candidate whose card cannot be found matches nothing. The context carries the
+-- payer as its perspective and no source -- the criterion narrows a card by its
+-- own qualities, and CR 601.2a has already moved the spell being cast to the
+-- stack, so IsSource would have nothing in this pool to compare against anyway.
+--
+-- No `oid` exclusion, unlike discardCandidates above, and none is owed: that
+-- filter is CR 601.2a's consequence for a component that reads a HAND -- the
+-- zone the spell being cast has just left, so without it a card could be
+-- discarded to pay its own additional cost. CR 601.2a has the same effect here
+-- for free: a spell being cast is on the STACK, so it is not in this pool to
+-- exclude, whichever zone it was cast from.
+--
+-- Graveyard order rather than sorted, discardCandidates' choice and for its
+-- reason: Game.zoneMembers already returns a fixed order.
+exileCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+exileCandidates pid criterion gs =
+  let context = Filter.MkContext (Just pid) Nothing
+      matches candidate = case Game.faceOf candidate gs of
+        Nothing -> False
+        Just face -> Filter.matches context (Projection.viewOfCard face) criterion
+   in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
 
 -- The permanents this player may tap to pay a TapForTotalPower component on
 -- `oid`: every battlefield object matching the criterion, ascending, the order
@@ -679,6 +720,7 @@ lifeOwedByComponent component = case component of
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
+  CostComponent.ExileCardsFromGraveyard _ _ -> 0
 
 canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent pid oid component gs = case component of
@@ -756,6 +798,18 @@ canPayComponent pid oid component gs = case component of
   CostComponent.ExileThisFromGraveyard -> case Game.lookupObject oid gs of
     Nothing -> False
     Just obj -> Object.zone obj == Zone.Graveyard && Object.owner obj == pid
+  -- CR 118.3: "a player can't pay a cost without having the necessary resources
+  -- to pay it fully", so this is payable only if this player's own graveyard
+  -- holds at least that many matching cards. Headless Skaab with an empty
+  -- graveyard is not merely unpaid, it is never OFFERED -- Pawl.Engine.Cast.castable has
+  -- canPay as a conjunct, which is what puts the additional cost INSIDE the
+  -- total cost the way CR 601.2f says rather than after announcement.
+  --
+  -- Sacrifice's floor above, over a different pool. CR 118.10's "each payment of
+  -- a cost applies to only one spell, ability, or effect" is not enforced across
+  -- two components of ONE cost, exactly as it is not there (#104).
+  CostComponent.ExileCardsFromGraveyard n criterion ->
+    Natural.length (exileCandidates pid criterion gs) >= n
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters. GainPlayerCounters (#37) adds them; this spends them.
   CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
@@ -995,6 +1049,30 @@ payComponent pid oid component = case component of
   CostComponent.ExileThisFromGraveyard -> do
     Event.changeZone oid Zone.Exile
     pure Payment.Paid
+  -- CR 406.2's move again, through the same Event.changeZone funnel, but for
+  -- CHOSEN cards: the payer picks which, so this is a prompt and never an engine
+  -- pick. Elided only when forced -- no more candidates than the count -- which
+  -- is Sacrifice's elision and ChooseSacrifices' documented rule.
+  --
+  -- Reject-not-repair, Sacrifice's posture verbatim: an answer that is not a
+  -- size-`n` subset of the offered candidates makes the whole payment Unpaid,
+  -- which `pay`'s restore turns into a no-op.
+  --
+  -- The candidates are read ONCE, before the prompt, so the answer is checked
+  -- against the same list the player was offered.
+  CostComponent.ExileCardsFromGraveyard n criterion -> do
+    gs <- State.get
+    let candidates = exileCandidates pid criterion gs
+        decider = Decide.deciderFor pid gs
+    chosen <-
+      if Natural.length candidates <= n
+        then pure (Set.fromList candidates)
+        else Game.choose (Prompt.ChooseExilesFromGraveyard decider pid oid candidates n)
+    if Set.isSubsetOf chosen (Set.fromList candidates) && Natural.length chosen == n
+      then do
+        Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
+        pure Payment.Paid
+      else pure Payment.Unpaid
 
 -- The arithmetic half, pure and board-free.
 --

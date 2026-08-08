@@ -6,10 +6,6 @@ import qualified Pawl.Types.Filter as Filter
 -- | One component of a Pawl.Types.Cost's non-mana part, alongside its mana part
 -- (CR 601.2f).
 --
--- No component exiles a CHOSEN card from a zone (#108). ExileThisFromGraveyard
--- below names one card and prompts for nothing, so it is the "This" half of that
--- axis rather than its general form -- exactly as DiscardThis is to DiscardCards.
---
 -- Open-half card data. Pawl.Engine.Cost is the ONLY module that may case on it:
 -- the rules core reads the classification (can this be paid? does it require the
 -- tap symbol?) and never the identity of a component.
@@ -100,10 +96,11 @@ data CostComponent keyword
     -- (DiscardCards is the other), so its payability asks about a zone rather
     -- than about control -- CR 108.4 gives a card in a hand no controller at all.
     --
-    -- #108 records that a hand-reading component must exclude the spell being
-    -- cast from its candidates (CR 601.2a has already moved it to the stack).
-    -- That does not arise here: this names the object the cost is on, and a cost
-    -- on an object that is no longer in a hand is simply unpayable.
+    -- A hand-reading component must exclude the spell being cast from its
+    -- candidates, since CR 601.2a has already moved it to the stack -- see
+    -- Pawl.Engine.Cost.discardCandidates. That does not arise here: this names
+    -- the object the cost is on, and a cost on an object that is no longer in a
+    -- hand is simply unpayable.
     DiscardThis
   | -- | CR 107.14 / 118: pay N energy counters. Energy-specific, not a general
     -- PayPlayerCounters -- energy is the only player counter ever spent as a
@@ -137,9 +134,11 @@ data CostComponent keyword
     -- named.
     --
     -- DiscardThis's sibling in every respect -- it names ONE card and offers
-    -- nothing to choose, so it is not the prompting form #108 is about, and its
-    -- payability asks about a ZONE rather than about control, since CR 108.4
-    -- leaves a card in a graveyard with no controller to ask about.
+    -- nothing to choose, so it is the "This" half of the axis whose general form
+    -- is ExileCardsFromGraveyard below, exactly as DiscardThis is to
+    -- DiscardCards. Its payability asks about a ZONE rather than about control,
+    -- since CR 108.4 leaves a card in a graveyard with no controller to ask
+    -- about.
     --
     -- The ZONE is in the constructor rather than a field, and that is what makes
     -- CR 113.6m answerable off the cost alone: "an ability whose cost or effect
@@ -149,4 +148,35 @@ data CostComponent keyword
     -- second zone would be a second constructor rather than a parameter, so no arm
     -- of that reading is ever unreachable.
     ExileThisFromGraveyard
+  | -- | CR 406.2 again, in its CHOOSING form: exile this many cards matching the
+    -- Filter from the paying player's graveyard. Headless Skaab's "As an
+    -- additional cost to cast this spell, exile a creature card from your
+    -- graveyard" is the printing. A cost by CR 118.1's general reading -- "an
+    -- action or payment necessary to take another action" -- for
+    -- ExileThisFromGraveyard's stated reason, since CR 601.2f's list of what a
+    -- cost may include ends in "and so on" rather than naming exile.
+    --
+    -- Sacrifice's shape (a count plus a criterion) and not
+    -- ExileThisFromGraveyard's: the cards are CHOSEN, so this prompts and is
+    -- never an engine pick.
+    --
+    -- The ZONE is in the constructor rather than a field, ExileThisFromGraveyard's
+    -- call above: Pawl.Engine.Cost.zoneOfComponent's CR 113.6m reading is a
+    -- per-constructor match, so a cost naming a second zone is a second
+    -- constructor rather than a parameter and no arm of that reading is ever
+    -- unreachable. What THIS constructor's arm answers is Nothing, and that is a
+    -- rules fact rather than an oversight -- see that function for why CR 113.6m
+    -- does not reach a cost that moves cards other than the object it is on.
+    --
+    -- The Filter is matched against the PRINTED card and never a projection,
+    -- which is the difference from Sacrifice's note above: nothing off the
+    -- battlefield is projected (#160), so a graveyard candidate has only its
+    -- printed characteristics to be matched on.
+    --
+    -- "YOUR graveyard", per CR 400.3 and CR 108.4: a graveyard is a per-player
+    -- zone whose members are its OWNER's, so the candidates are the paying
+    -- player's own. Whose graveyard is fixed by the constructor for the same
+    -- reason the zone is, so a cost reading somebody else's would be a second
+    -- constructor rather than a field here.
+    ExileCardsFromGraveyard Natural.Natural (Filter.Filter keyword)
   deriving (Eq, Ord, Show)
