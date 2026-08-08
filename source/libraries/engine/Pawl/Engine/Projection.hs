@@ -111,8 +111,11 @@ layer m = case m of
 -- other case (CR 604.3a(3)) and is applied by applyCharacteristicPT, which
 -- builds its context from the object's own controller.
 --
--- No card in the pool discriminates the two perspectives: an Aura on an
--- opponent's creature would (#155).
+-- What discriminates the two perspectives is Empyrial Armor on an OPPONENT's
+-- creature, in Pawl.PowerToughnessSpec's "Empyrial Armor" group: "+1/+1 for each
+-- card in your hand" reads the Aura controller's hand and not the enchanted
+-- creature's controller's, and the two hands are deliberately different sizes.
+-- Building the context from `oid` instead of `src` fails that test alone.
 applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification lyr src cands gs oid m pc =
   let context = Filter.MkContext (controllerOf src gs) (Just src)
