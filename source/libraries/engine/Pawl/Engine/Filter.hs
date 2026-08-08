@@ -391,7 +391,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Vigilance -> keyword
   Keyword.Type.Flashback _ -> keyword
   Keyword.Type.Fear -> keyword
-  Keyword.Type.Morph _ -> keyword
+  Keyword.Type.Morph _ _ -> keyword
   Keyword.Type.Entwine _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
   Keyword.Type.Infect -> keyword

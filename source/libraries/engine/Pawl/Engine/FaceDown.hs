@@ -9,17 +9,23 @@
 -- action a player takes, and an action needs a place to be offered from and
 -- performed in.
 --
--- The one thing this module tells the rest of the engine about is CR 708.7's
--- event: turning a permanent face up is not a zone change, so no other funnel
--- records it, and the ability that watches for it is one the permanent only
--- regains as it turns over. That is a GameEvent constructor and never an effect's
--- identity -- Pawl.Engine.Event classifies it like any other.
+-- TWO things this module tells the rest of the engine about, and both are the
+-- same fact from opposite sides: turning a permanent face up is not a zone
+-- change, so no other funnel sees it, and the abilities that watch for it are
+-- ones the permanent only regains as it turns over.
+--
+-- CR 708.7's EVENT, recorded here because no other funnel would (Skirk
+-- Marauder's trigger reads it), and CR 614.1e's PROPOSED EVENT, raised here for
+-- the same reason (megamorph's counter rides it). Each is one constructor of
+-- an ordinary rules type and never an effect's identity -- Pawl.Engine.Event
+-- classifies both like any other.
 --
 -- THE INVARIANT: rule 702.37 is part of the rulebook, so reading
 -- Keyword.Morph's cost here is the same closed-half act as reading a Phase. This
 -- module never asks which CARD is underneath.
 module Pawl.Engine.FaceDown where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
@@ -40,6 +46,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.ProposedEvent as ProposedEvent
 
 -- CR 702.37e: "what the permanent's morph cost WOULD BE if it were face up".
 -- Nothing when the card underneath has no morph ability, which is the rule's own
@@ -117,8 +124,12 @@ turnableFaceUp pid gs =
 -- untouched. Its last sentence is the same non-event: nothing here is a
 -- battlefield entry, so no enters-the-battlefield ability is offered one.
 --
--- CR 708.11's "as [this permanent] is turned face up" abilities are NOT applied
--- (#917).
+-- CR 708.11 is the one thing here that is NOT a bare write: "if a face-down
+-- permanent would have an 'As [this permanent] is turned face up . . .' ability
+-- after it's turned face up, that ability is applied WHILE that permanent is
+-- being turned face up, NOT AFTERWARD". That is why the CR 616.1 loop runs
+-- between the two lines below rather than after both -- see the note at the
+-- call.
 turnFaceUp :: PlayerId -> ObjectId -> Game ()
 turnFaceUp pid oid = do
   before <- State.get
@@ -141,6 +152,35 @@ turnFaceUp pid oid = do
                         Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects gs)
                     }
               )
+            -- CR 708.11 / 614.1e: the "as this permanent is turned face up"
+            -- abilities, applied HERE -- after the status write and before the
+            -- event record -- which is the rule's "while that permanent is being
+            -- turned face up, not afterward" written as a position in this
+            -- function.
+            --
+            -- AFTER the status write, and that placement is what makes the rule's
+            -- "would have ... AFTER it's turned face up" answerable without a
+            -- counterfactual: the permanent has its abilities back by now (CR
+            -- 708.2a took them away only while it was face down), so
+            -- Projection.replacementsAffecting simply sees the row. Running the
+            -- loop first would collect from a permanent with no abilities at all
+            -- and apply nothing.
+            --
+            -- BEFORE the event record, and that half is observable: a CR 614.1e
+            -- ability and a CR 708.7 trigger on one card would otherwise be
+            -- ordered the wrong way round, and CR 708.11's "not afterward" is
+            -- exactly the sentence that decides it. Pawl.FaceDownSpec's second
+            -- turnFaceUp call is what proves the loop is inside the PAID branch
+            -- rather than run on every ask: a permanent that is already face up
+            -- has its megamorph row too, so a loop outside this branch would put
+            -- a second counter on.
+            --
+            -- Monad.void discards the Nothing that would mean the turning does
+            -- not happen. No arm reachable from this event returns one -- CR
+            -- 614.1e's abilities add to the turning over rather than replacing it
+            -- -- and there is nothing left to cancel by this point anyway: the
+            -- status is already written.
+            Monad.void (Event.applyReplacements (ProposedEvent.WouldTurnFaceUp oid))
             -- CR 708.7 through CR 603.2: Skirk Marauder's "when this creature is
             -- turned face up" watches for this, and this is the only place in the
             -- engine that writes it.

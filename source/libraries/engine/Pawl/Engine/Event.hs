@@ -110,6 +110,7 @@ import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import Pawl.Types.TurnWindow (TurnWindow)
 import qualified Pawl.Types.TurnWindow as TurnWindow
 import Pawl.Types.Zone (Zone)
@@ -951,6 +952,24 @@ apply batch candidate event =
       pure Nothing
     -- Unreachable: `applies` admits PhaseR only against WouldBeginPhase.
     (ReplacementEffect.PhaseR _, _) -> pure (Just event)
+    -- CR 614.1e / 702.37b: megamorph's "as this permanent is turned face up, put
+    -- a +1/+1 counter on it", applied WHILE the permanent turns over (CR 708.11)
+    -- because FaceDown.turnFaceUp raises this event there and nowhere else.
+    --
+    -- The counters go through putCounters, the CR 122.6 funnel, exactly as the
+    -- EntryR WithCounters arm's do -- so CR 614.16 applies and Hardened Scales
+    -- sees a megamorph counter the way it sees a riot one.
+    --
+    -- The event survives: turning face up is not replaced by the counter, only
+    -- accompanied by it, so Just is returned and FaceDown.turnFaceUp goes on to
+    -- record CR 708.7's event.
+    (ReplacementEffect.TurnUpR _ rewrite, ProposedEvent.WouldTurnFaceUp oid) -> case rewrite of
+      TurnUpRewrite.WithCounters kind n -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        putCounters CounterCause.ByEffect oid kind n
+        pure (Just event)
+    -- Unreachable: `applies` admits TurnUpR only against WouldTurnFaceUp.
+    (ReplacementEffect.TurnUpR _ _, _) -> pure (Just event)
 
 -- CR 614.1c / 614.12: run the entry loop for an object that has just been
 -- materialized on the battlefield.

@@ -12,6 +12,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -256,15 +257,27 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
   -- CR 702.37a's payload is a whole Cost too -- the MORPH cost, which CR 702.37e
   -- pays to turn the permanent face up, never the {3} the cast pays.
   Spec.it s "Morph carries its cost, and is not Flashback" $ do
-    let morph n = Keyword.Morph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    let morph n = Keyword.Morph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) []) MorphVariant.Plain
         flashbackOf n = Keyword.Flashback (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
     Common.assertJsonCodec
       s
       Keyword.toJson
       Keyword.fromJson
       (morph 1)
-      """ {"type":"Morph","value":{"mana":[{"type":"Generic","value":1}]}} """
+      """ {"type":"Morph","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"Plain"}]} """
     Spec.assertBool s (Keyword.toJson (morph 1) /= Keyword.toJson (flashbackOf 1)) "morph {1} is not flashback {1}"
+  -- CR 702.37b: megamorph is the SAME constructor with a different variant, so
+  -- the two must not encode alike -- a codec that dropped the variant would make
+  -- Misthoof Kirin's megamorph {1}{W} indistinguishable from a morph {1}{W}.
+  Spec.it s "Morph's variant tells megamorph from plain morph" $ do
+    let morphOf = Keyword.Morph (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1])) [])
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (morphOf MorphVariant.Mega)
+      """ {"type":"Morph","value":[{"mana":[{"type":"Generic","value":1}]},{"type":"Mega"}]} """
+    Spec.assertBool s (Keyword.toJson (morphOf MorphVariant.Mega) /= Keyword.toJson (morphOf MorphVariant.Plain)) "megamorph {1} is not morph {1}"
   -- CR 702.42a's payload is a whole Cost too, and it must not share Flashback's
   -- tag.
   Spec.it s "Entwine carries its cost, and is not Flashback" $ do
