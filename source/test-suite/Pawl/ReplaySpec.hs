@@ -364,6 +364,25 @@ combatReplaySpec s =
             "the ascending prefix"
             (Replay.defaultAnswer (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
             (Set.singleton oid)
+        -- The payload is ChooseSacrifices' exactly, which is why the CROSS-decode
+        -- is the assertion that matters: a shared Response constructor would let
+        -- a transcript's sacrifice entry answer an exile prompt, and replay would
+        -- then bin a card it should have exiled.
+        Spec.it s "ChooseExilesFromGraveyard records and replays a Set ObjectId" $ do
+          let p = Prompt.ChooseExilesFromGraveyard decider S.alice oid [oid, ObjectId.MkObjectId 8] 1
+              answer = Set.singleton (ObjectId.MkObjectId 8)
+          Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
+          Spec.assertEqWith
+            s
+            "a ChooseSacrifices transcript entry does not answer it"
+            (Replay.decode p (Replay.encode (Prompt.ChooseSacrifices decider S.alice oid [oid, ObjectId.MkObjectId 8] 1) answer))
+            Nothing
+        Spec.it s "defaultAnswer exiles the first `count` offered, in order" $
+          Spec.assertEqWith
+            s
+            "the offered prefix"
+            (Replay.defaultAnswer (Prompt.ChooseExilesFromGraveyard decider S.alice oid [oid, ObjectId.MkObjectId 8] 1))
+            (Set.singleton oid)
         Spec.it s "ChooseCost records and replays a Cost" $ do
           let printed = Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 4])) []
               alternative = Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [CostComponent.SacrificeThis]

@@ -2,13 +2,14 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Cost and the three types it cases on (Pawl.Types.Cost,
--- Pawl.Types.CostComponent, Pawl.Types.Payment), plus the two prompts the axis
+-- Pawl.Types.CostComponent, Pawl.Types.Payment), plus the prompts the axis
 -- adds. CR 118: what a cost IS, what it takes to pay one, and the alternative
 -- and additional costs that change the answer.
 --
--- The three gate cards: Greed (an amount-bearing component), Village Rites (a
--- mandatory spell-side additional cost) and Fireblast (an alternative cost with
--- no mana in it at all).
+-- The four gate cards: Greed (an amount-bearing component), Village Rites (a
+-- mandatory spell-side additional cost), Headless Skaab (an additional cost paid
+-- out of a zone that is not the battlefield) and Fireblast (an alternative cost
+-- with no mana in it at all).
 module Pawl.CostSpec where
 
 import qualified Control.Monad as Monad
@@ -56,6 +57,7 @@ import qualified Pawl.Types.Payment as Payment
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -436,6 +438,138 @@ villageRitesSpec s registry =
             _ -> False
       Spec.assertBool s (not (any isTargets asked)) "no ChooseTargets was raised"
 
+-- Headless Skaab {2}{U} Creature -- Zombie Warrior 3/6: "As an additional cost
+-- to cast this spell, exile a creature card from your graveyard. This creature
+-- enters tapped."
+--
+-- alice controls three untapped Islands and holds one Headless Skaab, with
+-- priority in her own precombat main phase. `seeds` are the cards put into
+-- graveyards, and they are the ONLY thing a case varies: every leg pays {2}{U}
+-- off the SAME three Islands, which is what keeps a negative castability
+-- assertion from passing on unaffordable mana rather than on the missing
+-- creature card. Loaded fresh inside each case that needs it -- equivalent
+-- because loading is deterministic and cached (batch-recipe.md).
+headlessSkaabBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  [(Printing.Printing, PlayerId.PlayerId)] ->
+  (ObjectId.ObjectId, GameState.GameState)
+headlessSkaabBoard island headlessSkaab seeds =
+  let base = S.landsInPlay island 3
+      seed gs (printing, pid) = snd (S.addGraveyardCard printing pid gs)
+      seeded = List.foldl' seed base seeds
+      (skaab, gs1) = S.addHandCard headlessSkaab S.alice seeded
+   in ( skaab,
+        gs1
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- Headless Skaab {2}{U} Creature -- Zombie Warrior 3/6: "As an additional cost
+-- to cast this spell, exile a creature card from your graveyard. This creature
+-- enters tapped."
+--
+-- Its rulings: "You must exile exactly one creature card from your graveyard to
+-- cast this spell; you cannot cast it without exiling a creature card, and you
+-- cannot exile additional creature cards." And: "Players can only respond once
+-- this spell has been cast and all its costs have been paid. No one can try to
+-- otherwise remove the creature card you exiled in order to prevent you from
+-- casting this spell."
+--
+-- The second is CR 601.2h and needs nothing of its own here: Pawl.Engine.Cast
+-- pays the whole cost inside the cast, with no priority round between the
+-- payment and the spell becoming cast, so there is no window for a response to
+-- open in. The first is the "exactly one" case below.
+--
+-- The gate card for CostComponent.ExileCardsFromGraveyard, the first component
+-- that exiles a CHOSEN card from a zone. Two assertions are kept deliberately
+-- apart in every negative leg: castability is asked DIRECTLY, and the cast is
+-- then attempted -- a cost that is offered and merely goes unpaid leaves an
+-- empty stack too, so the stack check alone proves nothing about the gate.
+headlessSkaabSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+headlessSkaabSpec s registry =
+  Spec.describe s "Headless Skaab" $ do
+    Spec.it s "CR 118.8 a creature card in the graveyard pays the additional cost" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      headlessSkaab <- S.printingOf s registry "Headless Skaab"
+      let (skaab, gs) = headlessSkaabBoard island headlessSkaab [(piker, S.alice)]
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice skaab)
+      Spec.assertBool s (S.castable S.alice skaab gs) "castable"
+      Spec.assertEqWith s "CR 406.2 the creature card is in exile" (length (Game.zoneMembers Zone.Exile S.alice cast)) 1
+      Spec.assertEqWith s "and the graveyard no longer holds it" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 0
+      Spec.assertEqWith s "CR 601.2h the mana cost was paid too" (S.tappedCount S.alice cast) 3
+    -- The PRIMARY negative, and deliberately not the empty-graveyard one below:
+    -- an implementation that ignores the component's Filter entirely still
+    -- refuses an empty graveyard, and only a graveyard holding exactly one
+    -- INELIGIBLE card tells the two apart.
+    Spec.it s "CR 601.2f a noncreature card in the graveyard does not pay it" $ do
+      island <- S.printingOf s registry "Island"
+      lightningBolt <- S.printingOf s registry "Lightning Bolt"
+      headlessSkaab <- S.printingOf s registry "Headless Skaab"
+      let (skaab, gs) = headlessSkaabBoard island headlessSkaab [(lightningBolt, S.alice)]
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice skaab)
+      Spec.assertBool s (not (S.castable S.alice skaab gs)) "not castable"
+      Spec.assertEqWith s "and not offered" (filter (S.isCastOf skaab) (Action.legalActions S.alice gs)) []
+      Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertEqWith s "and the Skaab is still in hand" (S.handSize S.alice cast) 1
+    Spec.it s "CR 601.2f an empty graveyard does not pay it either" $ do
+      island <- S.printingOf s registry "Island"
+      headlessSkaab <- S.printingOf s registry "Headless Skaab"
+      let (skaab, gs) = headlessSkaabBoard island headlessSkaab []
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice skaab)
+      Spec.assertBool s (not (S.castable S.alice skaab gs)) "not castable"
+      Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertEqWith s "and the Skaab is still in hand" (S.handSize S.alice cast) 1
+    -- CR 400.3 / CR 108.4: "your graveyard" is per-OWNER, and a graveyard is not
+    -- a shared zone. An implementation that swept every graveyard on the table
+    -- passes both negatives above and fails this one.
+    Spec.it s "CR 400.3 a creature card in the OPPONENT's graveyard does not pay it" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      headlessSkaab <- S.printingOf s registry "Headless Skaab"
+      let (skaab, gs) = headlessSkaabBoard island headlessSkaab [(piker, S.bob)]
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice skaab)
+      Spec.assertBool s (not (S.castable S.alice skaab gs)) "not castable"
+      Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack cast)) 0
+      Spec.assertEqWith s "and bob's graveyard is untouched" (length (Game.zoneMembers Zone.Graveyard S.bob cast)) 1
+    -- The first ruling's second clause: "you cannot exile additional creature
+    -- cards". The count is 1, which a one-card graveyard cannot tell apart from
+    -- "exile them all"; two eligible cards can, since exactly one must remain.
+    Spec.it s "CR 601.2f the count is ONE, not the whole graveyard" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      headlessSkaab <- S.printingOf s registry "Headless Skaab"
+      let (skaab, gs) = headlessSkaabBoard island headlessSkaab [(piker, S.alice), (piker, S.alice)]
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice skaab)
+      Spec.assertBool s (S.castable S.alice skaab gs) "castable"
+      Spec.assertEqWith s "one creature card exiled" (length (Game.zoneMembers Zone.Exile S.alice cast)) 1
+      Spec.assertEqWith s "and the other is still in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice cast)) 1
+    -- The second sentence, on EntryRewrite.Tapped -- the arm Zof Bloodbog
+    -- produced and this creature reuses (CR 614.1d, with CR 110.5b's default
+    -- that it overrides). The power/toughness assertion is the control: a
+    -- Skaab that entered wrong in some other way would not read 3/6.
+    Spec.it s "CR 614.1d the Skaab enters tapped, and is 3/6" $ do
+      island <- S.printingOf s registry "Island"
+      piker <- S.printingOf s registry "Goblin Piker"
+      headlessSkaab <- S.printingOf s registry "Headless Skaab"
+      let (skaab, gs) = headlessSkaabBoard island headlessSkaab [(piker, S.alice)]
+          cast = S.runPure S.identityAnswer gs (S.cast S.alice skaab)
+          resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+          -- CR 400.7 mints the resolving spell a NEW id on the battlefield, so
+          -- the permanent is identified as the battlefield's one new member
+          -- rather than by the hand id the cast started from.
+          entered =
+            Set.lookupMin (Set.difference (GameState.battlefield resolved) (GameState.battlefield gs))
+      Spec.assertEqWith
+        s
+        "CR 614.1d it entered tapped"
+        (entered >>= \oid -> Object.tapped <$> Game.lookupObject oid resolved)
+        (Just TapState.Tapped)
+      Spec.assertEqWith s "and it is 3/6" (entered >>= \oid -> S.powerToughnessOf oid resolved) (Just (3, 6))
+
 -- alice controls `n` Mountains (all tapped when `tap` is True) and holds one
 -- Fireblast, with priority in her own precombat main phase. Loaded fresh
 -- inside each case that needs it -- equivalent because loading is
@@ -625,6 +759,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
   greedSpec s registry
   villageRitesSpec s registry
+  headlessSkaabSpec s registry
   catharticReunionSpec s registry
   safeholdSentrySpec s registry
   fireblastSpec s registry

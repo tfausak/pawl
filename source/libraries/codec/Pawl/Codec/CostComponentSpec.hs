@@ -106,3 +106,19 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       fromJson
       (CostComponent.RemoveLoyaltyFromThis 1)
       """ {"type":"RemoveLoyaltyFromThis","value":1} """
+  -- CR 406.2's two halves: the one that names the object the cost is on, and
+  -- the one that names a count and a criterion.
+  Spec.it s "ExileThisFromGraveyard" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      CostComponent.ExileThisFromGraveyard
+      """ {"type":"ExileThisFromGraveyard"} """
+  Spec.it s "ExileCardsFromGraveyard" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (CostComponent.ExileCardsFromGraveyard 1 (Filter.HasCardType CardType.Creature))
+      """ {"type":"ExileCardsFromGraveyard","value":[1,{"type":"HasCardType","value":{"type":"Creature"}}]} """
