@@ -623,11 +623,13 @@ data TriggerCondition
     -- there is nothing to select among. A relation is the whole of what a card
     -- can say about who that player is.
     --
-    -- Matched against the EVENT, never against how the crown was won. CR 725.1
-    -- gives one way to become the monarch, an effect instructing a player to,
-    -- so an entry trigger's crown (Palace Jailer), a targeted crown
-    -- (Denethor, Stone Seer) and CR 725.2's stolen crown all record the one
-    -- event and all fire this. TriggerSpec's "CR 725.2 a stolen crown is a
-    -- crowning" is the test that proves the last of those.
+    -- Matched against the EVENT, never against how the crown was won: an entry
+    -- trigger's crown (Palace Jailer), a targeted crown (Denethor, Stone Seer)
+    -- and CR 725.2's stolen crown all record the same event, so the relation is
+    -- the only thing that decides whether this fires. TriggerSpec's "CR 725.2 a
+    -- stolen crown is a crowning, and fires the same trigger" is the test that
+    -- proves the last of those, which is the route with no card in it at all.
+    --
+    -- CR 725.4's departure reassignment does not reach this yet (#1052).
     PlayerBecomesMonarch PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

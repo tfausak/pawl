@@ -2634,10 +2634,13 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
   -- CR 725.1: a player BECAME the monarch. Matched against the event the
-  -- crowning records, so every route to the crown fires it alike -- CR 725.1's
-  -- own "an effect instructs a player to become the monarch" is the only way in,
-  -- and Effect.BecomeMonarch records this event whichever MonarchTarget named the
-  -- player.
+  -- crowning records, so every route through CR 725.1's "an effect instructs a
+  -- player to become the monarch" fires it alike: Effect.BecomeMonarch records
+  -- this event whichever MonarchTarget named the player, which covers an entry
+  -- trigger's crown, a targeted crown and CR 725.2's stolen crown.
+  --
+  -- CR 725.4's departure reassignment is NOT matched: Monarch.reassignOnDeparture
+  -- moves the crown without recording an event (#1052).
   --
   -- The event carries exactly one player, which is CR 725.3 ("Only one player can
   -- be the monarch at a time") rather than a simplification -- so the relation is
@@ -4485,7 +4488,7 @@ functionsInGraveyard cond = case cond of
   -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
   TriggerCondition.SagaFinalChapterTriggers _ -> False
   -- CR 113.6's default once more: Custodi Lich is a creature and watches the
-  -- crown from the battlefield, so a copy of it in a graveyard sees nothing.
+  -- crown from the battlefield, so the card sees no crowning from a graveyard.
   TriggerCondition.PlayerBecomesMonarch _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
@@ -4593,10 +4596,11 @@ controllerTurnScoped cond = case cond of
   -- a Saga's last lore counter on during anybody's turn, and the watcher is not
   -- even the Saga's controller under the Opponent relation.
   TriggerCondition.SagaFinalChapterTriggers _ -> False
-  -- The condition carries no TurnScope, and CR 725 gives a crowning no turn of
-  -- its own: an effect can instruct a player to become the monarch on anybody's
-  -- turn, and CR 725.2's crown steal falls on the ATTACKER's turn, which is not
-  -- the watcher's under any relation.
+  -- The condition carries no TurnScope, and CR 725 restricts a crowning to no
+  -- turn at all: CR 725.1's "an effect instructs a player to become the monarch"
+  -- can resolve on anybody's turn, and CR 725.2's crown steal happens in the
+  -- combat damage step of whoever is attacking. The watcher may or may not be
+  -- that player, which is exactly what makes this not controller-scoped.
   TriggerCondition.PlayerBecomesMonarch _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
