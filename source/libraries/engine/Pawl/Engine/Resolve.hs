@@ -126,6 +126,15 @@ objectRefSlots ref = case ref of
   ObjectRef.InSlot slot -> Set.singleton slot
   ObjectRef.EachMatching _ -> Set.empty
 
+-- The slots a MonarchTarget reads: only the targeted arm names one. Written out
+-- rather than routed through playerRefSlots because MonarchTarget is its own
+-- three-arm type -- CR 725.2's ControllerOfSource has no PlayerRef spelling.
+monarchTargetSlots :: MonarchTarget.MonarchTarget -> Set SlotName
+monarchTargetSlots target = case target of
+  MonarchTarget.TheController -> Set.empty
+  MonarchTarget.ControllerOfSource -> Set.empty
+  MonarchTarget.InSlot slot -> Set.singleton slot
+
 -- The one legitimate home of `case effect of`: this module is the VM's opcode
 -- semantics (design.md section 1), and everything else asks classifications.
 -- slotsOf is the read half of the dataflow lint.
@@ -194,7 +203,9 @@ slotsOf effect = case effect of
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
-  Effect.BecomeMonarch {} -> Set.empty
+  -- CR 725.1's crown names a target slot only in the InSlot arm (Denethor's
+  -- "target player"); the other two derive their player and read nothing.
+  Effect.BecomeMonarch target -> monarchTargetSlots target
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch slot -> Set.singleton slot
   Effect.Attach slot -> Set.singleton slot
@@ -2354,6 +2365,16 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             Map.lookup Binding.triggerSource chosen
               >>= Recipient.objectOf
               >>= (\o -> Projection.controllerOf o gs)
+          -- CR 601.2c's chosen player, re-checked under CR 608.2b: the slot is a
+          -- TARGET, so an illegal one crowns nobody while the rest of the ability
+          -- still resolves. Recipient has no player accessor -- CR 115.1 makes a
+          -- player a recipient in its own right rather than an object -- so the
+          -- tag is matched inline, the way every other player-slot read here does
+          -- it.
+          MonarchTarget.InSlot slot ->
+            case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+              (Just (Recipient.ToPlayer crowned), True) -> Just crowned
+              _ -> Nothing
     case newMonarch of
       Nothing -> pure ()
       Just p -> do

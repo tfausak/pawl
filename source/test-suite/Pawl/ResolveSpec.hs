@@ -64,6 +64,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Filter as Filter.Type
@@ -3706,6 +3707,172 @@ becomeMonarchSpec s registry = Spec.describe s "BecomeMonarch" $ do
     Spec.assertEqWith s "alice is monarch" (GameState.monarch after) (Just S.alice)
     Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "a BecameMonarch event was recorded"
 
+-- The slot Denethor's crown half names, and the slot its damage half names.
+denethorCrownSlot, denethorDamageSlot :: SlotName.SlotName
+denethorCrownSlot = SlotName.MkSlotName (Text.pack "player")
+denethorDamageSlot = SlotName.MkSlotName (Text.pack "damage")
+
+-- Fills every CR 601.2c slot BY NAME from `answers`, and records the map it
+-- returned.
+--
+-- Both halves matter, and both are about this being the pool's first card with
+-- TWO target slots in one mode. S.identityAnswer fills every slot with the
+-- lowest-sorting legal recipient, so left to itself it answers both slots the
+-- same shape and "bob became the monarch" could be an accident of PlayerId
+-- ordering rather than of the crown reading its own slot; overriding by name is
+-- what makes the two slots differ. Recording is how the test asserts the map it
+-- fed in is the map the engine received, instead of inferring it from the board.
+answerSlots ::
+  Map.Map SlotName.SlotName Recipient.Recipient ->
+  Prompt.Prompt r ->
+  State.State [Map.Map SlotName.SlotName Recipient.Recipient] r
+answerSlots answers p = case p of
+  Prompt.ChooseTargets {} -> do
+    let deflt = S.identityAnswer p
+        filled = Map.union (Map.intersection answers deflt) deflt
+    State.modify' (<> [filled])
+    pure filled
+  _ -> pure (S.identityAnswer p)
+
+-- Denethor, Stone Seer -- "{3}{R}, {T}, Sacrifice Denethor: Target player
+-- becomes the monarch. Denethor deals 3 damage to any target."
+--
+-- The printed card also has "When Denethor enters, scry 2"; scry is not
+-- modelled, so that trigger is omitted from data/cards/denethor-stone-seer.json
+-- (#876). The omission runs STRICTER for the card's controller: CR 701.22a's
+-- scry is a pure library-ordering benefit with no downside clause, so pawl's
+-- Denethor is a strictly worse version of the printed one and no test below can
+-- pass because of what is missing.
+--
+-- Settled under alice, who already holds the crown, with four Mountains to pay
+-- the {3}{R} and priority in hand. The first activated ability of the card is
+-- the one under test; the empty fallback is ActivateSpec.theAbility's, and would
+-- fail every assertion below rather than silently pass one.
+--
+-- FOUR seats. At two players "target player" and "the controller's one opponent"
+-- name the same seat, so a two-seat board cannot tell which arm the resolver
+-- took; three separate the crown's target (bob) from the damage's (carol) from
+-- the controller (alice). The fourth (dave) is what lets CR 608.2b's
+-- all-targets-illegal case be reached by conceding both targets without CR
+-- 104.2a ending the game first.
+denethorBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ActivatedAbility.ActivatedAbility Card.Type.Card, ObjectId.ObjectId, GameState.GameState)
+denethorBoard s registry = do
+  denethor <- S.printingOf s registry "Denethor, Stone Seer"
+  mountain <- S.printingOf s registry "Mountain"
+  let lands = List.foldl' (\gs _ -> snd (S.addCreature mountain S.alice gs)) (Setup.emptyGame S.fourPlayers) [1 .. 4 :: Int]
+      (srcId, gs1) = S.addCreature denethor S.alice lands
+      ability = case Face.activatedAbilities (S.combinedFace denethor) of
+        ab : _ -> ab
+        [] -> ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
+  pure (ability, srcId, S.withMonarch S.alice (gs1 {GameState.priority = Just S.alice}))
+
+-- CR 725.1: "The monarch is a designation a player can have. There is no monarch
+-- in a game until an effect instructs a player to become the monarch." Every
+-- BecomeMonarch before this one derived the player it crowned -- the resolving
+-- controller, or CR 725.2's controller of the damaging creature. Denethor is the
+-- first card in the pool whose crown reads a TARGET slot, so the player it names
+-- is the activator's CHOICE, announced under CR 601.2c and re-checked under CR
+-- 608.2b like any other target.
+--
+-- CR 601.2c is what lets the two slots coexist: "if the spell uses the word
+-- 'target' in multiple places, the same object or player can be chosen once for
+-- each instance of the word 'target'". Denethor writes it twice, so the crown
+-- and the damage are independent choices that may or may not land on one player.
+targetedMonarchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
+  Spec.it s "CR 725.1/725.3 the crown goes to the TARGETED player, not the controller and not the damage's target" $ do
+    (ability, srcId, gs0) <- denethorBoard s registry
+    let answers = Map.fromList [(denethorCrownSlot, Recipient.ToPlayer S.bob), (denethorDamageSlot, Recipient.ToPlayer S.carol)]
+        act = do Activate.activateAbility S.alice srcId ability; Stack.resolveTop
+        ((_, after), asked) = State.runState (Engine.runGame (answerSlots answers) gs0 act) []
+    Spec.assertEqWith s "alice held the crown going in" (GameState.monarch gs0) (Just S.alice)
+    Spec.assertEqWith s "CR 601.2c asked once, for both slots, and got the map fed in" asked [answers]
+    Spec.assertEqWith s "CR 725.3 the crown moved to bob, the targeted player" (GameState.monarch after) (Just S.bob)
+    Spec.assertBool s (elem (GameEvent.BecameMonarch S.bob) (S.eventsOf after)) "and the crowning event names bob"
+    Spec.assertEqWith s "CR 115.4 carol, the any-target, took the 3" (S.lifeOf S.carol after) (Just 17)
+    Spec.assertEqWith s "bob took none of it" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertEqWith s "and neither did alice" (S.lifeOf S.alice after) (Just 20)
+    Spec.assertEqWith s "the cost sacrificed Denethor into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "and the ability left the stack" (GameState.stack after) []
+
+  -- CR 725.3: "Only one player can be the monarch at a time. As a player becomes
+  -- the monarch, the current monarch ceases to be the monarch." The unseating is
+  -- observable only through CR 725.2's inherent end-step draw, which belongs to
+  -- whoever holds the crown -- so alice, who held it, must stop drawing and bob,
+  -- who took it, must start.
+  Spec.it s "CR 725.3 the unseated monarch stops drawing at end step, and the new one starts" $ do
+    (ability, srcId, gs0) <- denethorBoard s registry
+    piker <- S.printingOf s registry "Goblin Piker"
+    let answers = Map.fromList [(denethorCrownSlot, Recipient.ToPlayer S.bob), (denethorDamageSlot, Recipient.ToPlayer S.carol)]
+        act = do Activate.activateAbility S.alice srcId ability; Stack.resolveTop
+        ((_, after), _) = State.runState (Engine.runGame (answerSlots answers) gs0 act) []
+        -- CR 104.3c: a seat asked to draw from an empty library loses instead, so
+        -- both candidates get a card. That also makes "drew nothing" mean the
+        -- trigger did not fire rather than that there was nothing to take.
+        stocked = snd (S.addLibraryCard piker S.bob (snd (S.addLibraryCard piker S.alice after)))
+        endStep = Phase.Ending EndingStep.EndStep
+        endStepOf pid gs = Event.recordEvent (GameEvent.StepBegan endStep pid) (gs {GameState.phase = endStep, GameState.activePlayer = pid})
+        run gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+    Spec.assertEqWith s "bob really has the crown" (GameState.monarch after) (Just S.bob)
+    Spec.assertEqWith s "CR 725.2 bob, the new monarch, draws on his own end step" (length (Game.zoneMembers Zone.Hand S.bob (run (endStepOf S.bob stocked)))) 1
+    Spec.assertEqWith s "CR 725.3 alice, unseated, draws nothing on hers" (length (Game.zoneMembers Zone.Hand S.alice (run (endStepOf S.alice stocked)))) 0
+
+  -- CR 608.2b: "If all its targets, for every instance of the word 'target', are
+  -- now illegal, the spell or ability doesn't resolve. ... Otherwise, the spell
+  -- or ability will resolve normally. Illegal targets, if any, won't be affected
+  -- by parts of a resolving spell's effect for which they're illegal. Other parts
+  -- of the effect for which those targets are not illegal may still affect them."
+  --
+  -- Denethor is the first card in the pool that can reach the PARTIAL clause: it
+  -- takes two targets in one mode, so exactly one of them can go illegal. A
+  -- conceding player is the lever: CR 104.3a takes them out of the game
+  -- immediately, so Target.playerRecipients -- which is built from
+  -- Game.stillPlaying -- stops offering them, and both of Denethor's slots take
+  -- players. CR 800.4 is what lets the game go on around the concession.
+  Spec.it s "CR 608.2b one illegal target does not fizzle the ability, and the other half still happens" $ do
+    (ability, srcId, gs0) <- denethorBoard s registry
+    let answers = Map.fromList [(denethorCrownSlot, Recipient.ToPlayer S.bob), (denethorDamageSlot, Recipient.ToPlayer S.carol)]
+        activated = snd (State.evalState (Engine.runGame (answerSlots answers) gs0 (Activate.activateAbility S.alice srcId ability)) [])
+        concede = Departure.depart Departure.Type.Conceded
+        resolveAfter f = S.runPure S.identityAnswer (f activated) Stack.resolveTop
+        damageIllegal = resolveAfter (concede S.carol)
+        crownIllegal = resolveAfter (concede S.bob)
+        bothIllegal = resolveAfter (concede S.bob . concede S.carol)
+    Spec.assertEqWith s "the ability waits on the stack with both targets chosen" (length (GameState.stack activated)) 1
+    -- The damage's target is gone; the crown's is not, so the crown still moves.
+    Spec.assertEqWith s "carol illegal: bob is still crowned" (GameState.monarch damageIllegal) (Just S.bob)
+    Spec.assertEqWith s "and the 3 damage went nowhere" (fmap (`S.lifeOf` damageIllegal) [S.alice, S.bob, S.dave]) [Just 20, Just 20, Just 20]
+    -- The mirror: the crown's target is gone, the damage's is not.
+    Spec.assertEqWith s "bob illegal: the crown does not move" (GameState.monarch crownIllegal) (Just S.alice)
+    Spec.assertBool s (notElem (GameEvent.BecameMonarch S.bob) (S.eventsOf crownIllegal)) "and nobody was crowned"
+    Spec.assertEqWith s "but carol still took the 3" (S.lifeOf S.carol crownIllegal) (Just 17)
+    -- Both gone: CR 608.2b's first clause, the ability does not resolve. Denethor
+    -- cannot tell that apart from resolving with both slots skipped -- every
+    -- effect it has is slot-gated, so the two produce the same board -- so what
+    -- is asserted here is the OUTCOME, which the rule fixes either way. The
+    -- discriminating half of CR 608.2b is the partial clause above.
+    Spec.assertEqWith s "both illegal: no crown moves" (GameState.monarch bothIllegal) (Just S.alice)
+    Spec.assertEqWith s "and no damage is dealt" (fmap (`S.lifeOf` bothIllegal) [S.alice, S.dave]) [Just 20, Just 20]
+    Spec.assertEqWith s "the ability leaves the stack either way" (GameState.stack bothIllegal) []
+
+  -- The classification half, asserted directly because nothing else in the tree
+  -- can see it. slotsOf is the READ side of the D4 dataflow lint and has no
+  -- runtime consumer: Resolve.resolveModes re-derives CR 608.2b's legality from
+  -- the card's declared targetSpecs, so the gameplay cases above pass whatever
+  -- slotsOf answers. And the lint that would otherwise catch a wrong answer --
+  -- CardSpec's "every mode's slot reads equal its declared slots" -- sweeps
+  -- Face.spell alone, while an ACTIVATED ability gets the subset-shaped lint,
+  -- which too FEW reads pass (#1043). So this is what pins the arm.
+  Spec.it s "CR 725.1 slotsOf reads the targeted monarch's slot, and only that arm's" $ do
+    let slot = SlotName.MkSlotName (Text.pack "player")
+    Spec.assertEqWith s "the targeted arm names its slot" (Resolve.slotsOf (Effect.BecomeMonarch (MonarchTarget.InSlot slot))) (Set.singleton slot)
+    Spec.assertEqWith s "the resolving controller names none" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.TheController)) Set.empty
+    Spec.assertEqWith s "and neither does CR 725.2's crown steal" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)) Set.empty
+
 -- Palace Jailer's ruling (Scryfall, 2021-03-19): "If you're not the monarch as
 -- Palace Jailer's second ability resolves, the creature will be exiled until
 -- there's a new monarch and that player is one of your opponents. The creature
@@ -4750,6 +4917,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   playerSacrificesSpec s registry
   createEmblemSpec s registry
   becomeMonarchSpec s registry
+  targetedMonarchSpec s registry
   exileUntilMonarchSpec s registry
   actOfTreasonSpec s registry
   optionalEffectSpec s registry
