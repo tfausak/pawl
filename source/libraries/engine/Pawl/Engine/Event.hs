@@ -2172,6 +2172,23 @@ declarationsOf bearer gs =
         _ -> False
    in length (Seq.filter declaredIt (GameState.events gs))
 
+-- CR 102.1: does this turn belong to the scope? `active` is "the player whose
+-- turn it is", and `own` is the seat the scope is read against -- the player
+-- Pawl.Types.TurnScope deliberately names none of, since each reader supplies
+-- its own: CR 109.5's "you" for a triggered ability (CR 603.3a), the CR 602.2
+-- activator for an activated one.
+--
+-- OpponentsTurn is "not you" rather than an enumeration of opponents, which is
+-- CR 102.2 in a two-player game and CR 806.1 in a Free-for-All: there "a group
+-- of players compete as individuals against each other", so every other seat is
+-- an opponent. Wrong only for CR 102.3's teams, which pawl has no format for
+-- (#175).
+turnScopeAdmits :: TurnScope.TurnScope -> PlayerId -> PlayerId -> Bool
+turnScopeAdmits scope active own = case scope of
+  TurnScope.EachTurn -> True
+  TurnScope.ControllersTurn -> active == own
+  TurnScope.OpponentsTurn -> active /= own
+
 -- CR 603.2: does this condition fire on this event, for the permanent that bears
 -- it? `bearer` is the object whose ability this is and `you` its controller (CR
 -- 603.3a, CR 109.5); both are part of the match because the scan visits EVERY
@@ -2249,9 +2266,7 @@ matchesTrigger gs bearer you cond event = case cond of
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
-      began == wanted && case scope of
-        TurnScope.EachTurn -> True
-        TurnScope.ControllersTurn -> active == you
+      began == wanted && turnScopeAdmits scope active you
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.SpellCast {} -> False
@@ -2824,10 +2839,19 @@ matchesTrigger gs bearer you cond event = case cond of
   -- Cast.castSpell does. So no CR 608.2h fallback is reachable, and the `Nothing`
   -- below is the id naming nothing at all, about which no Filter can honestly
   -- answer.
-  TriggerCondition.SpellCast f -> case event of
+  --
+  -- The TurnScope is the second half, and it comes from the GAME STATE rather
+  -- than from the event: GameEvent.SpellCast records the caster and the spell,
+  -- never the turn, and CR 601.2i's trigger is checked in the same settle the
+  -- cast happened in -- so the active player standing now is the one the cast
+  -- happened under. Read against `you`, CR 109.5's controller of the ability (CR
+  -- 603.3a), exactly as the StepBegins arm above reads its own.
+  TriggerCondition.SpellCast f scope -> case event of
     GameEvent.SpellCast caster spell _ -> case Game.lookupObject spell gs of
       Nothing -> False
-      Just _ -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
+      Just _ ->
+        turnScopeAdmits scope (GameState.activePlayer gs) you
+          && Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -3209,7 +3233,7 @@ eventBindings cond event = case (cond, event) of
   -- Filter in hand, so a slot it names has to hold for every cast the condition
   -- can match. Both do: GameEvent.SpellCast carries an ObjectId and a PlayerId
   -- unconditionally, so no shape of the event withholds either.
-  (TriggerCondition.SpellCast _, GameEvent.SpellCast caster spell _) ->
+  (TriggerCondition.SpellCast _ _, GameEvent.SpellCast caster spell _) ->
     Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
   -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
   -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
@@ -3411,7 +3435,7 @@ eventBindingSlots cond = case cond of
   -- Guaranteed for the reason the spell is -- GameEvent.SpellCast carries a
   -- PlayerId unconditionally -- so the promise holds for every cast the Filter
   -- can admit.
-  TriggerCondition.SpellCast _ -> Set.fromList [Binding.castSpell, Binding.triggerPlayer]
+  TriggerCondition.SpellCast _ _ -> Set.fromList [Binding.castSpell, Binding.triggerPlayer]
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -3873,7 +3897,7 @@ functionsInGraveyard cond = case cond of
   TriggerCondition.SelfLastCounterRemoved _ -> False
   -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
   -- and a card in a graveyard sees nothing cast.
-  TriggerCondition.SpellCast _ -> False
+  TriggerCondition.SpellCast _ _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -3891,11 +3915,16 @@ functionsInGraveyard cond = case cond of
 -- force a decision rather than defaulting to False.
 controllerTurnScoped :: TriggerCondition -> Bool
 controllerTurnScoped cond = case cond of
-  -- The one arm carrying a TurnScope, and the whole content of this
-  -- classification (CR 603.3a, CR 109.5).
+  -- One of the two arms carrying a TurnScope, and the one the lint below this
+  -- was written for (CR 603.3a, CR 109.5).
   TriggerCondition.StepBegins _ TurnScope.ControllersTurn -> True
   -- "Each <step>" admits every player's turn, the pairing the lint rejects.
   TriggerCondition.StepBegins _ TurnScope.EachTurn -> False
+  -- And "during an opponent's <step>" admits every turn but the controller's,
+  -- which is not the controller's turn either. No card prints it, so the lint
+  -- cannot reach this arm; answering it any other way would make the
+  -- classification wrong for the sake of an unreachable case.
+  TriggerCondition.StepBegins _ TurnScope.OpponentsTurn -> False
   -- CR 702.179d's "during YOUR turn" is the same restriction StepBegins spells
   -- with a TurnScope, written into the condition itself because rule 702.179d
   -- states it there. No card bears this condition, so the lint this feeds cannot
@@ -3962,10 +3991,14 @@ controllerTurnScoped cond = case cond of
   -- action's restriction rather than this condition's.
   TriggerCondition.SelfCountersReached _ _ -> False
   TriggerCondition.SelfLastCounterRemoved _ -> False
-  -- CR 601.2i says nothing about whose turn it is, and CR 117.1a lets an instant
-  -- be cast on anybody's. A card printing "during an opponent's turn" would be
-  -- narrowing this condition, and none does (#911).
-  TriggerCondition.SpellCast _ -> False
+  -- CR 601.2i says nothing about whose turn it is and CR 117.1a lets an instant
+  -- be cast on anybody's, so the answer is the condition's own TurnScope --
+  -- StepBegins' arms one more time, and for its reason (CR 603.3a, CR 109.5).
+  -- Brineborn Cutthroat's OpponentsTurn is turn-scoped and is not the
+  -- CONTROLLER's turn, which is the only thing this classification asks.
+  TriggerCondition.SpellCast _ TurnScope.ControllersTurn -> True
+  TriggerCondition.SpellCast _ TurnScope.EachTurn -> False
+  TriggerCondition.SpellCast _ TurnScope.OpponentsTurn -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -4069,7 +4102,7 @@ stateTriggers gs
               -- not re-run its final chapter for as long as it sits there.
               TriggerCondition.SelfCountersReached _ _ -> False
               TriggerCondition.SelfLastCounterRemoved _ -> False
-              TriggerCondition.SpellCast _ -> False
+              TriggerCondition.SpellCast _ _ -> False
               -- CR 709.5i is an EVENT trigger, for CR 709.5h's reason one arm up:
               -- it fires on the LAST designation arriving, and CR 709.5c leaves
               -- the permanent holding both thereafter, so a state read would fire

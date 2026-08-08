@@ -3659,6 +3659,115 @@ kambalSpec s registry =
           Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.bob after) 1
           Spec.assertEqWith s "and nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
 
+-- CR 601.2i's trigger narrowed by WHOSE TURN the cast happened on, which is a
+-- second axis beside the Filter: CR 601.2i says nothing about the turn, and CR
+-- 117.1a lets an instant be cast on anybody's, so the restriction has to come
+-- from the condition. Pawl.Types.TurnScope is the type that says it, the same
+-- one TriggerCondition.StepBegins carries.
+--
+-- Brineborn Cutthroat, {1}{U} Creature -- Merfolk Pirate 2/1: "Flash. Whenever
+-- you cast a spell during an opponent's turn, put a +1/+1 counter on this
+-- creature." Two narrowings again, on two different axes -- "you cast" is
+-- Filter.ControlledBy You against CR 109.5's "you" (CR 603.3a), and "during an
+-- opponent's turn" is TurnScope.OpponentsTurn read against the same player --
+-- and only the second is new here.
+--
+-- Fog, {G} Instant "Prevent all combat damage that would be dealt this turn", is
+-- the spell cast: it TARGETS NOTHING, so no answerer choice enters the fixture,
+-- and no combat happens here, so its resolution moves nothing an assertion
+-- reads.
+--
+-- THREE SEATS, and this is what earns the third: at two players "the active
+-- player is not you" and "the active player is bob" are the same sentence, so a
+-- scope that had hard-coded the one other seat would still answer right. carol's
+-- turn is the case only a third seat can make.
+--
+-- THE TURNS ARE SET ON THE FIXTURE rather than played out. Whose turn it is
+-- reaches the condition as GameState.activePlayer and nothing else, so three
+-- assignments say exactly what three turn cycles would -- and CR 104.3c stays
+-- out of it, three untap/draw steps at three seats being three chances to deck a
+-- fixture library.
+--
+-- BOTH the counter and the projected power are asserted, because CR 122.1a is
+-- what makes the counter mean anything: a counter that landed but never reached
+-- the CR 613.4c layer would leave the count right and the creature a 2/1.
+brinebornCutthroatSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+brinebornCutthroatSpec s registry =
+  let -- alice bears the Cutthroat and three Forests, one per Fog: no untap step
+      -- runs between the casts below, so the lands are not reused. bob and carol
+      -- get nothing at all -- they are turns here, not casters.
+      board forest cutthroat =
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature forest pid g')) g [1 .. (n :: Int)]
+            withLands = addLands S.alice 3 S.threePlayerGame
+            (cutthroatId, withCutthroat) = S.addCreature cutthroat S.alice withLands
+         in ( cutthroatId,
+              withCutthroat
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+      -- alice keeps priority throughout: CR 117.1a lets her cast an instant on
+      -- anybody's turn, which is the whole premise of the card.
+      onTurnOf pid gs = gs {GameState.activePlayer = pid, GameState.priority = Just S.alice}
+      countersOn = S.counterOf CounterKind.PlusOnePlusOne
+   in Spec.describe s "SpellCast during an opponent's turn" $ do
+        -- THE case, in one run so the counts accumulate: the same caster and the
+        -- same spell three times over, one turn apart each.
+        Spec.it s "CR 601.2i Brineborn Cutthroat counts only the casts on another player's turn" $ do
+          forest <- S.printingOf s registry "Forest"
+          fog <- S.printingOf s registry "Fog"
+          cutthroat <- S.printingOf s registry "Brineborn Cutthroat"
+          let (cutthroatId, base) = board forest cutthroat
+              (fog1, g1) = S.addHandCard fog S.alice base
+              (fog2, g2) = S.addHandCard fog S.alice g1
+              (fog3, g3) = S.addHandCard fog S.alice g2
+              afterAlice = castAndResolve S.alice fog1 (onTurnOf S.alice g3)
+              afterBob = castAndResolve S.alice fog2 (onTurnOf S.bob afterAlice)
+              afterCarol = castAndResolve S.alice fog3 (onTurnOf S.carol afterBob)
+              graveyardOf gs = length (Game.zoneMembers Zone.Graveyard S.alice gs)
+          Spec.assertEqWith s "no counter before anything is cast" (countersOn cutthroatId g3) 0
+          -- Positive control: all three casts really happened and really
+          -- resolved, so any silence below is the scope's answer rather than a
+          -- fixture that ran out of mana on the second Fog.
+          Spec.assertEqWith s "each Fog resolved into alice's graveyard in turn" (graveyardOf afterAlice, graveyardOf afterBob, graveyardOf afterCarol) (1, 2, 3)
+          -- ONE TUPLE over the three turns rather than three assertions, so a
+          -- scope read the wrong way round shows its whole trajectory at once:
+          -- alice's own turn is the seat that must NOT count, bob's is the first
+          -- that must, and carol's is the seat that is neither the caster nor the
+          -- one other player -- which is what "an opponent's" has to mean (CR
+          -- 102.2, CR 806.1).
+          Spec.assertEqWith
+            s
+            "only bob's and carol's turns put a counter on"
+            (countersOn cutthroatId afterAlice, countersOn cutthroatId afterBob, countersOn cutthroatId afterCarol)
+            (0, 1, 2)
+          -- And the same three states read through the CR 613.4c layer, so a
+          -- counter that landed without reaching the projected P/T is caught.
+          Spec.assertEqWith
+            s
+            "CR 122.1a moves the printed 2/1 with them"
+            (S.powerToughnessOf cutthroatId afterAlice, S.powerToughnessOf cutthroatId afterBob, S.powerToughnessOf cutthroatId afterCarol)
+            (Just (2, 1), Just (3, 2), Just (4, 3))
+        -- CR 702.8a's flash, which the trigger above does not touch: casting an
+        -- INSTANT on an opponent's turn is CR 117.1a and says nothing about the
+        -- Cutthroat's own keyword. Goblin Piker is the control -- an ordinary
+        -- creature spell, in the same hand on the same turn with its mana paid
+        -- for -- so the only difference between the two answers is the keyword.
+        Spec.it s "CR 702.8a flash lets the Cutthroat itself be cast on an opponent's turn" $ do
+          island <- S.printingOf s registry "Island"
+          mountain <- S.printingOf s registry "Mountain"
+          cutthroat <- S.printingOf s registry "Brineborn Cutthroat"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+              lands = addLands mountain S.alice 3 (addLands island S.alice 2 S.threePlayerGame)
+              (cutthroatId, withCutthroat) = S.addHandCard cutthroat S.alice lands
+              (pikerId, gs) = S.addHandCard piker S.alice withCutthroat
+              bobsTurn = (onTurnOf S.bob gs) {GameState.phase = Phase.PrecombatMain}
+          Spec.assertBool s (S.castable S.alice cutthroatId bobsTurn) "flash makes the Cutthroat castable on bob's turn"
+          Spec.assertBool s (not (S.castable S.alice pikerId bobsTurn)) "and a creature without it is not"
+
 -- The events a trigger condition GENUINELY fires on (Event.matchesTrigger's own
 -- arms are the spec), so eventBindings is exercised through its matching arm
 -- rather than through its `_ -> Map.empty` fallthrough. A pair that did not
@@ -3749,7 +3858,7 @@ representativeEvents cond =
         -- halves are bound whichever ids the event names -- the spell under
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
         -- on the pair.
-        TriggerCondition.SpellCast _ -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
+        TriggerCondition.SpellCast _ _ -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -3803,7 +3912,13 @@ everyTriggerCondition =
     TriggerCondition.PlayerLosesLife PlayerRelation.Opponent,
     TriggerCondition.SelfCountersReached CounterKind.Lore 1,
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
-    TriggerCondition.SpellCast Filter.Type.IsSource,
+    -- BOTH scopes, unlike StepBegins' one above: the TurnScope is new on this
+    -- condition, and the pin below asserts eventBindingSlots against what
+    -- eventBindings stamps for every event -- so an arm that had cased on the
+    -- scope and stamped nothing under one of them would go unseen if only one
+    -- were listed.
+    TriggerCondition.SpellCast Filter.Type.IsSource TurnScope.EachTurn,
+    TriggerCondition.SpellCast Filter.Type.IsSource TurnScope.OpponentsTurn,
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
@@ -5590,4 +5705,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   youngPyromancerSpec s registry
   presenceOfTheMasterSpec s registry
   kambalSpec s registry
+  brinebornCutthroatSpec s registry
   handOfThePraetorsSpec s registry
