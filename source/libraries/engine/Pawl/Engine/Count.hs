@@ -153,12 +153,16 @@ playersFor context gs ref =
 -- CR 608.2h: the view of a past event, built from the snapshot the event
 -- recorded rather than from any object that may no longer exist.
 --
--- The snapshot fills the characteristic fields it records: card types, colours,
--- subtypes, keywords (CR 109.3 counts abilities among an object's
--- characteristics), power and mana value. Everything that is not a
--- characteristic is vacuously empty over a past event -- controller, identity and playerIdentity
--- are Nothing, and combat status, attachment, tokenhood, tap status and what the
--- object did this turn are all False.
+-- The snapshot fills the characteristic fields it records (see viewOfSnapshot
+-- below): card types, colours, subtypes, keywords (CR 109.3 counts abilities
+-- among an object's characteristics), power and mana value. Everything that is
+-- not a characteristic is vacuously empty over a past event -- identity and
+-- playerIdentity are Nothing, and combat status, attachment, tokenhood, tap
+-- status and what the object did this turn are all False.
+--
+-- `controller` is the exception, and it is the EVENT rather than the snapshot
+-- that answers: CR 601.2a makes the player who cast a spell its controller, so
+-- a recorded cast can say who "you've cast" means and a recorded move cannot.
 --
 -- `supertypes` is the odd one out: it IS a characteristic and
 -- ProjectedCharacteristics records it, but this view leaves it empty, so a
@@ -168,65 +172,42 @@ snapshotView shape event = case event of
   GameEvent.Moved zc snapshot -> case shape of
     EventShape.MovedBetween from to ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to
-        then
-          Just
-            Filter.MkView
-              { Filter.cardTypes = PC.cardTypes snapshot,
-                Filter.supertypes = Set.empty,
-                Filter.colors = PC.colors snapshot,
-                Filter.subtypes = PC.subtypes snapshot,
-                Filter.keywords = Map.keysSet (PC.keywords snapshot),
-                Filter.power = PC.power snapshot,
-                -- CR 202.3 off the snapshot, which carries the number: a
-                -- ProjectedCharacteristics records a mana value, so this reads
-                -- what the object's was AT THE EVENT rather than throwing the
-                -- question away.
-                --
-                -- Nothing means that object had no card behind it, exactly as it
-                -- does live. Not implemented there: CR 202.3a's 0 for an ability
-                -- on the stack (#674).
-                Filter.manaValue = PC.manaValue snapshot,
-                Filter.controller = Nothing,
-                Filter.identity = Nothing,
-                Filter.playerIdentity = Nothing,
-                Filter.attacking = False,
-                Filter.blocking = False,
-                Filter.attackedThisTurn = False,
-                Filter.attachedToCreature = False,
-                Filter.attachedToPermanent = False,
-                Filter.canHostSubject = False,
-                Filter.token = False,
-                Filter.tapped = False,
-                -- CR 122.1: a ProjectedCharacteristics records no counters --
-                -- CR 613.4c has already folded them into the power and
-                -- toughness above -- so a past event carries none to read, the
-                -- position `supertypes` is in (#646). A quantity asking an
-                -- event snapshot for a counter tally is answered 0 rather than
-                -- with what was on the object (#993).
-                Filter.counters = Map.empty
-              }
+        then -- Not implemented: who controlled the object, which the cast arm
+        -- below does supply, so ControlledBy is vacuously False over a move
+        -- (#1000).
+          Just (viewOfSnapshot Nothing snapshot)
         else Nothing
+    EventShape.SpellCast -> Nothing
   GameEvent.DamageDealt _ -> Nothing
   -- CR 615.13's record names a recipient and an amount and snapshots no
   -- characteristics, so there is nothing for a Filter to look at.
   GameEvent.DamagePrevented _ _ -> Nothing
   GameEvent.StepBegan _ _ -> Nothing
-  -- CR 601.2i's cast names the spell by id and snapshots no characteristics: an
-  -- EventShape matches against a snapshot, and the spell is still on the stack to
-  -- be read live (TriggerCondition.SpellCast is what reads it).
-  GameEvent.SpellCast {} -> Nothing
+  -- CR 601.2i's cast, read from the snapshot the event took as the spell became
+  -- cast rather than off the stack: by the time a look-back count folds the log
+  -- that spell has resolved or been countered, so the live object is gone.
+  -- TriggerCondition.SpellCast is the other reader and does read it live, which
+  -- it can -- CR 601.2i's trigger is checked while the spell is still there.
+  GameEvent.SpellCast caster _spell snapshot -> case shape of
+    -- CR 601.2a: "that player becomes its controller", so the caster the event
+    -- recorded IS the view's controller and Filter.ControlledBy You answers "a
+    -- spell you've cast". The spell's id is deliberately left out of the view
+    -- for the reason the Moved arm leaves its own out: a look-back view is of a
+    -- past event rather than of an object, and Filter.IsSource asking about one
+    -- would be asking about an incarnation that no longer exists.
+    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) snapshot)
+    EventShape.MovedBetween _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
   -- the same discard emits is what carries one -- so there is nothing here for
   -- an EventShape to match against.
   GameEvent.Discarded {} -> Nothing
-  -- A reveal DOES carry a characteristics snapshot, unlike the two above, and
-  -- is still Nothing here: every EventShape is a shape of ZONE CHANGE, and CR
-  -- 701.20b says a reveal is not one. This becomes a real view the day an
-  -- EventShape names revealing (#162).
+  -- A reveal DOES carry a characteristics snapshot, as the two arms above do,
+  -- and is still Nothing here: no EventShape names revealing. This becomes a
+  -- real view the day one does (#162).
   GameEvent.Revealed _ _ -> Nothing
-  -- The same reason: an attacker being declared (CR 508.2b) is not a zone
-  -- change.
+  -- The same reason, with no snapshot to offer either: no EventShape names an
+  -- attacker being declared (CR 508.2b).
   GameEvent.AttackerDeclared _ -> Nothing
   -- A countering (CR 701.6a) does move the spell, but this event is not that
   -- move: Event.counter records a Moved event alongside this one, and matching
@@ -240,7 +221,47 @@ snapshotView shape event = case event of
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
   -- CR 122.6's placement names an object by id and snapshots no characteristics,
-  -- and putting counters on a permanent is not a zone change, which is what every
-  -- EventShape names.
+  -- and no EventShape names it either.
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+
+-- The Filter.View a recorded snapshot yields, shared by every arm of
+-- snapshotView above so that two shapes of event cannot disagree about what a
+-- snapshot says. The `controller` is the arm's to supply, since it is the one
+-- field no ProjectedCharacteristics carries and the events differ on whether
+-- they recorded a player at all.
+viewOfSnapshot :: Maybe PlayerId -> PC.ProjectedCharacteristics -> Filter.View
+viewOfSnapshot mController snapshot =
+  Filter.MkView
+    { Filter.cardTypes = PC.cardTypes snapshot,
+      Filter.supertypes = Set.empty,
+      Filter.colors = PC.colors snapshot,
+      Filter.subtypes = PC.subtypes snapshot,
+      Filter.keywords = Map.keysSet (PC.keywords snapshot),
+      Filter.power = PC.power snapshot,
+      -- CR 202.3 off the snapshot, which carries the number: a
+      -- ProjectedCharacteristics records a mana value, so this reads what the
+      -- object's was AT THE EVENT rather than throwing the question away.
+      --
+      -- Nothing means that object had no card behind it, exactly as it does
+      -- live. Not implemented there: CR 202.3a's 0 for an ability on the stack
+      -- (#674).
+      Filter.manaValue = PC.manaValue snapshot,
+      Filter.controller = mController,
+      Filter.identity = Nothing,
+      Filter.playerIdentity = Nothing,
+      Filter.attacking = False,
+      Filter.blocking = False,
+      Filter.attackedThisTurn = False,
+      Filter.attachedToCreature = False,
+      Filter.attachedToPermanent = False,
+      Filter.canHostSubject = False,
+      Filter.token = False,
+      Filter.tapped = False,
+      -- CR 122.1: a ProjectedCharacteristics records no counters -- CR 613.4c
+      -- has already folded them into the power and toughness above -- so a past
+      -- event carries none to read, the position `supertypes` is in (#646). A
+      -- quantity asking an event snapshot for a counter tally is answered 0
+      -- rather than with what was on the object (#993).
+      Filter.counters = Map.empty
+    }

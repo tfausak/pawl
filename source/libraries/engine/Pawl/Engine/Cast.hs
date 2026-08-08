@@ -994,7 +994,16 @@ castProposed pid sid face castFrom candidates before = do
                           -- on the stack, which is what a "whenever you cast a
                           -- [type] spell" trigger reads its characteristics off
                           -- (TriggerCondition.SpellCast).
-                          State.modify' (Event.recordEvent (GameEvent.SpellCast pid sid))
+                          --
+                          -- The snapshot is projected off the SAME state the
+                          -- event is appended to, and taken here rather than
+                          -- left to a reader for GameEvent.Moved's reason: by
+                          -- the time a look-back count folds the log, `sid` has
+                          -- resolved or been countered and the projection would
+                          -- have nothing to read. CR 601.2i has already applied
+                          -- the effects that modify the spell as it is cast, so
+                          -- this records what became cast.
+                          State.modify' (\g -> Event.recordEvent (GameEvent.SpellCast pid sid (Projection.project sid g)) g)
                           -- Stamped on `sid` itself, the incarnation CR 601.2a
                           -- put on the stack, rather than on whatever is on top
                           -- of it now.

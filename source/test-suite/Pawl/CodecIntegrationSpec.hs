@@ -191,8 +191,9 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
     -- and a CR 120.3c planeswalker Recipient; StepBegan; SpellCast;
     -- BecameMonarch; Discarded, both causes; AttackerDeclared;
     -- SpellCountered; LoyaltyAbilityActivated) needed no registry fixture --
-    -- a synthetic stand-in snapshot proves Moved/Revealed just as well as a
-    -- real one proves the shape -- so it moved to Pawl.Codec.GameEventSpec.
+    -- a synthetic stand-in snapshot proves Moved/Revealed/SpellCast just as
+    -- well as a real one proves the shape -- so it moved to
+    -- Pawl.Codec.GameEventSpec.
     -- CR 701.20a: the reveal's whole payload IS the snapshot, so it is the
     -- one GameEvent whose round-trip failing would silently erase what the
     -- players were shown rather than merely mislabel it. Typhoid Rats for

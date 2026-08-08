@@ -1,12 +1,14 @@
 -- Covers Pawl.Engine.Count, Pawl.Types.Count, Pawl.Types.Scope, Pawl.Types.PlayerRef,
 -- Pawl.Types.EventShape and Pawl.Types.Aggregation. Unit-level: the fold is driven
 -- against a stubbed ViewOf so the evaluator is tested apart from the projection
--- that supplies it (Pawl.PowerToughnessSpec covers the wiring). The one
--- exception is the Aggregation.Greatest case that folds a PROJECTED power --
--- a stub has no power to read, so that case supplies a real projection and says
--- so.
+-- that supplies it (Pawl.PowerToughnessSpec covers the wiring). Two exceptions,
+-- each of which says so where it sits: the Aggregation.Greatest case that folds
+-- a PROJECTED power, since a stub has no power to read; and the Aetherflux
+-- Reservoir group at the foot of the module, which is gameplay level because
+-- what it proves is that a count folds what Pawl.Engine.Cast actually recorded.
 module Pawl.CountSpec where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
@@ -14,6 +16,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Departure as Departure
+import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
@@ -30,6 +33,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -317,3 +321,116 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Aggregation.Greatest Quantity.Type.Power)
         viewOf = S.stubView [(a1, Set.singleton CardType.Land, Set.singleton Subtype.Swamp, Just S.alice)]
     Spec.assertEqWith s "undeterminable" (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs count) Nothing
+
+  aetherfluxReservoirSpec s registry
+
+-- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
+-- turn", the first count whose scope is a shape of event that is NOT a zone
+-- change. GAMEPLAY LEVEL, unlike the rest of this module -- the whole point is
+-- that the count sees what Pawl.Engine.Cast recorded, so a stubbed ViewOf would
+-- prove nothing about the wiring, and the trigger, the log and the fold have to
+-- meet.
+--
+-- Aetherflux Reservoir, {4} Artifact: "Whenever you cast a spell, you gain 1 life
+-- for each spell you've cast this turn." Its second ability (Pay 50 life: this
+-- artifact deals 50 damage to any target) is on the card and deliberately never
+-- activated here -- S.identityAnswer takes no action at all -- so a stray
+-- activation would show up as a 50-point swing rather than hiding.
+--
+-- WHY THE COUNT IS CUMULATIVE AND NOT FLAT. 1 + 2 + 3 = 6, and so does a flat
+-- 2-per-cast; the RUNNING TOTAL after each cast is what tells the two apart, so
+-- every case below asserts after every cast rather than at the end.
+--
+-- THE TRIGGERING SPELL COUNTS ITSELF. CR 601.2i records the cast and fires the
+-- trigger in that order -- the spell "becomes cast", THEN abilities that trigger
+-- on a cast trigger -- so the event is already in the log before the ability is
+-- even put on the stack, let alone resolved. The first cast gaining 1 rather
+-- than 0 is the assertion that proves it.
+--
+-- Fog, {G} Instant, is the spell cast: one mana, no targets, and its CR 615
+-- combat-damage prevention has nothing to act on outside combat, so nothing but
+-- the life total moves. THREE seats, so "an opponent cast it" and "bob cast it"
+-- are different sentences (Pawl.TriggerSpec's Young Pyromancer group makes the
+-- same argument).
+aetherfluxReservoirSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aetherfluxReservoirSpec s registry =
+  let -- alice has the Reservoir and six Forests, bob two Forests, carol nothing.
+      -- Six covers the four Fogs the turn-boundary case casts, none of which
+      -- untaps: no untap step runs between them.
+      board forest reservoir =
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature forest pid g')) g [1 .. (n :: Int)]
+            withLands = addLands S.bob 2 (addLands S.alice 6 S.threePlayerGame)
+            (_, withReservoir) = S.addCreature reservoir S.alice withLands
+         in withReservoir
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      -- One Fog into `caster`'s hand, cast, and the stack run down -- which
+      -- resolves both the Reservoir trigger and the Fog itself.
+      castFog fog caster gs =
+        let (oid, gs1) = S.addHandCard fog caster gs
+            cast = S.runPure S.identityAnswer gs1 (S.cast caster oid)
+         in S.runPure S.identityAnswer cast Engine.priorityLoop
+      lifeChange base gs pid = do
+        before <- S.lifeOf pid base
+        after <- S.lifeOf pid gs
+        pure (after - before)
+   in Spec.describe s "Aetherflux Reservoir" $ do
+        Spec.it s "CR 608.2i three casts in one turn gain 1, then 2, then 3" $ do
+          forest <- S.printingOf s registry "Forest"
+          reservoir <- S.printingOf s registry "Aetherflux Reservoir"
+          fog <- S.printingOf s registry "Fog"
+          let base = board forest reservoir
+              one = castFog fog S.alice base
+              two = castFog fog S.alice one
+              three = castFog fog S.alice two
+              gained = lifeChange base
+          Spec.assertEqWith s "the first cast counts ITSELF, so 1" (gained one S.alice) (Just 1)
+          Spec.assertEqWith s "the second sees two casts, so 3 in total" (gained two S.alice) (Just 3)
+          Spec.assertEqWith s "the third sees three casts, so 6 in total" (gained three S.alice) (Just 6)
+        -- The "you" half of BOTH filters -- the trigger's and the count's --
+        -- and they need separating, because each is invisible where the other
+        -- is being read. alice casts FIRST so that a Reservoir that wrongly
+        -- triggered on bob's cast would have something to count: with an empty
+        -- log the wrong trigger gains 0 and hides.
+        --
+        --   after alice's cast   1  (the trigger's filter says nothing yet)
+        --   after bob's cast     1  -- a trigger that ignored "you cast" makes it 2
+        --   after alice's second 3  -- a count that ignored "you've cast" makes it 4
+        --
+        -- carol is the third seat: she is neither the caster nor the ability's
+        -- controller, so "an opponent cast it" and "bob cast it" are different
+        -- sentences here.
+        Spec.it s "CR 601.2a a spell an OPPONENT cast neither triggers nor counts" $ do
+          forest <- S.printingOf s registry "Forest"
+          reservoir <- S.printingOf s registry "Aetherflux Reservoir"
+          fog <- S.printingOf s registry "Fog"
+          let base = board forest reservoir
+              byAlice = castFog fog S.alice base
+              thenByBob = castFog fog S.bob byAlice
+              thenByAliceAgain = castFog fog S.alice thenByBob
+              gained = lifeChange base
+          Spec.assertEqWith s "alice's own cast gains 1" (gained byAlice S.alice) (Just 1)
+          Spec.assertEqWith s "bob's cast fires nothing, so alice is still at 1" (gained thenByBob S.alice) (Just 1)
+          Spec.assertEqWith s "and gains bob nothing" (gained thenByBob S.bob) (Just 0)
+          Spec.assertEqWith s "and gains carol nothing" (gained thenByBob S.carol) (Just 0)
+          Spec.assertEqWith s "alice's second counts only her own two, so 3 in total" (gained thenByAliceAgain S.alice) (Just 3)
+        -- "This turn", moved on its own. Without this a lifetime tally passes
+        -- every assertion above.
+        Spec.it s "CR 608.2i the count is THIS turn's: it resets at the handoff" $ do
+          forest <- S.printingOf s registry "Forest"
+          reservoir <- S.printingOf s registry "Aetherflux Reservoir"
+          fog <- S.printingOf s registry "Fog"
+          let base = board forest reservoir
+              three = castFog fog S.alice (castFog fog S.alice (castFog fog S.alice base))
+              -- The turn passes to bob. alice keeps her Forests -- no untap step
+              -- runs -- and casts an instant on his turn, so the only thing that
+              -- changed is which turn it is.
+              handed = S.runPure S.identityAnswer three Engine.handoffTurn
+              onBobsTurn = handed {GameState.phase = Phase.PrecombatMain, GameState.priority = Just S.alice}
+              fourth = castFog fog S.alice onBobsTurn
+              gained = lifeChange base
+          Spec.assertEqWith s "six over alice's own turn" (gained three S.alice) (Just 6)
+          Spec.assertEqWith s "the handoff itself gains nothing" (gained handed S.alice) (Just 6)
+          Spec.assertEqWith s "and the next turn's first cast gains 1, not 4" (gained fourth S.alice) (Just 7)

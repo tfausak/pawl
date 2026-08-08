@@ -24,7 +24,8 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | At least one case per GameEvent constructor. HalfUnlocked gets two, since CR
 -- 709.5i's flag is a Bool whose two values are what that rule turns on and a
--- codec that dropped it would round-trip one of them unchanged. The Moved/Revealed cases carry a
+-- codec that dropped it would round-trip one of them unchanged. The
+-- Moved/Revealed/SpellCast cases carry a
 -- stand-in snapshot: this sublibrary sits above Pawl.Registry and Pawl.Engine,
 -- so it cannot build a real one. The registry-backed round-trips over real
 -- snapshots stay in Pawl.CodecIntegrationSpec.
@@ -72,8 +73,11 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.SpellCast (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7))
-      """ {"type":"SpellCast","value":[0,7]} """
+      (GameEvent.SpellCast (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 7) ProjectedCharacteristicsSpec.testCharacteristics)
+      ( "{\"type\":\"SpellCast\",\"value\":[0,7,"
+          <> ProjectedCharacteristicsSpec.testCharacteristicsJson
+          <> "]}"
+      )
   Spec.it s "BecameMonarch" $
     Common.assertJsonCodec
       s
