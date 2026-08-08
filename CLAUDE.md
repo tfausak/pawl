@@ -48,6 +48,10 @@ first question.
 - A landed unit's authoritative detail:
   `docs/superpowers/`
 
+- Dispatched as a subagent?
+  `docs/agents/` --- `implementing.md` if you hold the build and will open a PR,
+  `researching.md` if you are read-only
+
 ## Workflow
 
 `CONTRIBUTING.md` has the loop --- issue, branch, TDD, draft PR --- and applies
@@ -56,6 +60,12 @@ to agents as written. What it doesn't say:
 - Agents usually work in a fresh `git worktree`, which starts without the
   gitignored `cabal.project.local`. Copy it in from the primary checkout before
   the first build, or a locally green build says nothing about CI.
+
+- Derive against `origin/main`, not the working checkout. The primary checkout
+  drifts --- it sat 47 commits behind during one drain run --- so a grep there
+  reports a type as absent that landed hours ago, and every line number in an
+  issue body is stale besides. `git fetch` first, then read through
+  `git show origin/main:<path>` or a worktree cut from it.
 
 - Self-review the branch before opening the PR, and fix the findings on the
   branch. At minimum: re-check every CR citation against `docs/rules.txt`, and
@@ -147,6 +157,15 @@ to agents as written. What it doesn't say:
     the line you just wrote, confirm the new test *fails*, put it back. Three
     tests in one drain run would otherwise have shipped green and proved
     nothing. If nothing fails, say so in the PR rather than implying coverage.
+
+4.  Find the sites `-Werror` won't. A `{}` or `_` pattern absorbs a new
+    constructor or field silently, and the recurring ones are
+    `Pawl.Engine.Event`'s `eventBindings` fallthrough, `Pawl.TriggerSpec`'s
+    hand-kept `everyTriggerCondition` and `representativeEvents`, and
+    `Pawl.CardSpec`'s filter and keyword traversals --- the last of which
+    already dropped a payload once, when landwalk's `Subtype` became a `Filter`.
+    Grep the sibling constructor, read every hit, and record in the PR which
+    ones you read and why each is right as it stands.
 
 ## Code conventions
 
