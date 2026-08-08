@@ -138,7 +138,19 @@ data View = MkView
     --
     -- Empty for every candidate with no counters to read: a printed card off the
     -- battlefield, a player, an event snapshot.
-    counters :: Map.Map CounterKind.CounterKind Natural.Natural
+    counters :: Map.Map CounterKind.CounterKind Natural.Natural,
+    -- CR 701.54a-b: which player this candidate is the Ring-bearer FOR, or Nothing
+    -- for the overwhelming majority of permanents, which carry no such
+    -- designation. Read straight off Object.ringBearerFor -- CR 701.54b makes it a
+    -- designation rather than a characteristic, so no projection writes it, and
+    -- the field remembers the player rather than being a bare flag because CR
+    -- 701.54a ends the designation when another player gains control (see
+    -- Pawl.Engine.Ring.endOnControlChange).
+    --
+    -- Nothing for every candidate with no object to read it off: a printed card
+    -- off the battlefield, a player, an event snapshot -- the vacuous posture
+    -- power and controller already take.
+    ringBearerFor :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Show)
 
@@ -184,7 +196,11 @@ playerView pid =
       -- CR 122.1 puts counters on an object OR a player, and a player's are
       -- Player.counters, read by Quantity.PlayerCounters. This field is the
       -- OBJECT half, so a player view has none of it.
-      counters = Map.empty
+      counters = Map.empty,
+      -- CR 701.54b: Ring-bearer is a designation A PERMANENT can have, and a
+      -- player is not one -- the same shape CR 725.1's monarch has with the two
+      -- sides swapped.
+      ringBearerFor = Nothing
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -291,6 +307,16 @@ matches context view predicate = case predicate of
   -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
   Filter.IsTapped -> tapped view
+  -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
+  -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
+  -- CR 701.54a ends the designation when another creature takes it, and the next
+  -- projection stops matching with nothing to unwind.
+  --
+  -- Vacuously False with no perspective, the posture ControlledBy and IsPlayer
+  -- take: "your Ring-bearer" is unanswerable when there is no "you".
+  Filter.IsRingBearer -> case (ringBearerFor view, perspective context) of
+    (Just designated, Just you) -> designated == you
+    _ -> False
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
@@ -303,9 +329,10 @@ matches context view predicate = case predicate of
 -- arm rather than learning what is inside each one.
 --
 -- HasSubtype and HasKeyword are the atoms REWRITTEN here. The rest name a card
--- type, a supertype, a colour, a number, a relation, a status, or a keyword
--- FAMILY, none of which CR 612's word swap reaches -- see the HasKeywordFamily
--- arm below for why the family is in that list while HasKeyword is not. Written
+-- type, a supertype, a colour, a number, a relation, a status, a designation, or a
+-- keyword FAMILY, none of which CR 612's word swap reaches -- see the
+-- HasKeywordFamily arm below for why the family is in that list while HasKeyword
+-- is not. Written
 -- out exhaustively rather than with a catch-all, so a later atom that can carry a
 -- subtype fails to compile here instead of silently going unrewritten.
 --
@@ -348,6 +375,7 @@ rewrite pairs predicate = case predicate of
   Filter.CanHostSubject -> predicate
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
+  Filter.IsRingBearer -> predicate
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as

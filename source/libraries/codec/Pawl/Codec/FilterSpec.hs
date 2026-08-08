@@ -174,6 +174,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsTapped
       """ {"type":"IsTapped"} """
+  Spec.it s "IsRingBearer" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsRingBearer
+      """ {"type":"IsRingBearer"} """
   Spec.it s "And" $
     Common.assertJsonCodec
       s

@@ -527,7 +527,12 @@ viewOfCard face =
           -- battlefield, but this builder describes a printed FACE rather than
           -- an object, so there is nothing here for one to be on. The vacuous
           -- posture power and controller already take.
-          Filter.counters = Map.empty
+          Filter.counters = Map.empty,
+          -- CR 701.54b: the designation rides an OBJECT (Object.ringBearerFor),
+          -- and this builder describes a printed face. Nothing is not a lost
+          -- distinction either: CR 701.54a designates a creature its controller
+          -- controls, so only a battlefield permanent ever carries one.
+          Filter.ringBearerFor = Nothing
         }
 
 -- CR 508.3a: does this event record THIS object being declared as an attacker?
@@ -608,7 +613,13 @@ viewOfCharacteristics oid pc controller counters gs =
       -- every zone change), so it is a constant input to the projection.
       Filter.token = Game.isToken oid gs,
       Filter.tapped = Game.isTapped oid gs,
-      Filter.counters = counters
+      Filter.counters = counters,
+      -- CR 701.54b: a designation rather than a characteristic, so it comes off
+      -- Object.ringBearerFor rather than off `pc` -- the posture `tapped` and
+      -- `token` already take. Nothing for an id naming no object, which is what
+      -- viewWithLastKnown's CR 608.2h path hands this function: a designation dies
+      -- with the permanent (CR 400.7), and no last-known record keeps one.
+      Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id that names
@@ -1933,6 +1944,15 @@ filterReads f = case f of
   Filter.Type.IsToken -> Set.empty
   -- CR 110.5: tap status is not a characteristic, so no layer writes it.
   Filter.Type.IsTapped -> Set.empty
+  -- Reads nothing, which is a claim about the rules and not a default: no
+  -- Modification writes Object.ringBearerFor -- CR 701.54a's designation is made by
+  -- a keyword action a resolution performs, and CR 701.54b keeps it off the
+  -- copiable values -- so no CR 613 layer can move a set this atom selects, and CR
+  -- 613.8a's clause (b) can never hold on its account. The position IsToken is in.
+  -- The set the atom appears in may still be movable through its OTHER conjuncts:
+  -- Pawl.Engine.Ring.theRingIsLegendary pairs it with ControlledBy, which reads
+  -- Controller, so the emblem's set moves with CR 613.1b's layer 2 as it should.
+  Filter.Type.IsRingBearer -> Set.empty
   -- CR 202.3 reads the printed mana cost, and no Modification writes one -- there
   -- is no mana-cost Aspect for this to name, because nothing could change it.
   Filter.Type.ManaValueAtMost _ -> Set.empty

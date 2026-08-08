@@ -31,18 +31,24 @@ import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Layout as Layout
+import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.StaticAbility as StaticAbility
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 
@@ -60,12 +66,15 @@ theRingName = CardName.MkCardName (Text.pack "The Ring")
 -- Every field but the name is at its empty value, which is CR 114.3 stated
 -- directly -- "an emblem has no types, no mana cost, and no color".
 --
--- Not implemented: all four of CR 701.54c's abilities, so `staticAbilities` is
--- empty. The base one is "Your Ring-bearer is legendary and can't be blocked by
--- creatures with greater power" (#707); the two-, three- and four-temptation ones
--- are triggered, and an emblem's triggered ability never fires because the trigger
--- scans read only the battlefield, where CR 114.4 puts an emblem's abilities in
--- the command zone (#709).
+-- CR 701.54c's base ability is `theRingIsLegendary` below, which is the whole of
+-- `staticAbilities`. CR 114.4 is what makes one ability on an object in the command
+-- zone do anything at all -- "abilities of emblems function in the command zone" --
+-- and Pawl.Engine.Projection.gatherGiven walks the command zone for exactly that.
+--
+-- Not implemented: the SECOND clause of that base ability, "and can't be blocked by
+-- creatures with greater power" (#707). The two-, three- and four-temptation
+-- abilities are triggered, and an emblem's triggered ability never fires because
+-- the trigger scans read only the battlefield (#709).
 theRingEmblem :: Card.Card
 theRingEmblem =
   Card.MkCard
@@ -83,7 +92,7 @@ theRingEmblem =
               Face.keywords = Set.empty,
               Face.colorIndicator = Set.empty,
               Face.characteristicPT = Nothing,
-              Face.staticAbilities = [],
+              Face.staticAbilities = [theRingIsLegendary],
               Face.spell = Face.defaultSpell,
               Face.activatedAbilities = [],
               Face.replacementEffects = [],
@@ -105,12 +114,47 @@ theRingEmblem =
             }
     }
 
+-- | CR 701.54c's first clause, "Your Ring-bearer is legendary", as the emblem's one
+-- static ability. Rulebook text minted here rather than card data, on this module's
+-- own terms: rule 701.54c prints The Ring's text, and Birthday Escape does not.
+--
+-- The affected set is CR 701.54e's definition of "is your Ring-bearer", spelled
+-- across the three places that hold its three conjuncts. Affected.Matching carries
+-- the "on the battlefield" one itself; ControlledBy You is "under your control",
+-- whose "you" is CR 109.5's -- the emblem's controller, which CR 114.2 makes the
+-- player it was minted for; and IsRingBearer is "has the Ring-bearer designation",
+-- asked of that same perspective. The control conjunct is the RULE and not
+-- belt-and-braces: CR 701.54e states it in as many words.
+--
+-- No creature-ness conjunct, for the reason isRingBearerOf below gives at length:
+-- CR 701.54e's "a creature" is the antecedent of the phrase, not a fourth
+-- condition, and rule 701.54c's own sentence adds none either. A Ring-bearer turned
+-- into a land by Song of the Dryads is a legendary land.
+--
+-- One AddSupertype and no more, per CR 205.4b: a supertype is gained and never set,
+-- so the Ring-bearer keeps whatever supertypes it already had. Unconditional, since
+-- CR 701.54c gates the two-, three- and four-temptation abilities on a temptation
+-- count and this one on nothing.
+theRingIsLegendary :: StaticAbility.StaticAbility
+theRingIsLegendary =
+  StaticAbility.MkStaticAbility
+    { StaticAbility.affected =
+        Affected.Matching
+          ( Filter.And
+              [ Filter.IsRingBearer,
+                Filter.ControlledBy PlayerRelation.You
+              ]
+          ),
+      StaticAbility.condition = Nothing,
+      StaticAbility.modifications = NonEmpty.singleton (Modification.AddSupertype Supertype.Legendary)
+    }
+
 -- CR 701.54c: does this player already have an emblem named The Ring?
 --
 -- By NAME, which is the rule's own test, rather than by comparing the whole card
--- against theRingEmblem above. The two agree today and would stop agreeing the
--- moment #707 gives the emblem its abilities, since a card is only equal to
--- itself -- and the rule would still be asking about the name.
+-- against theRingEmblem above. Comparing cards would answer alike today and stop
+-- the moment the emblem's abilities change under it -- a card is only equal to
+-- itself, while the rule asks about the name however the emblem's text grows.
 --
 -- zoneMembers slices the command zone by OWNER, which is the right cut: CR 114.2
 -- makes an emblem owned and controlled by the player who got it, and nothing
@@ -201,10 +245,16 @@ tempt pid = do
 -- so CHANGES with no event to notice it, while this designation is stored.
 --
 -- Running in the settle loop is indistinguishable from checking continuously
--- TODAY, and what makes it so is what pawl cannot yet express rather than a rule:
--- nothing reads the designation at all (#707, #708), so there is no reader to
--- catch a stale one between passes. When one lands, the claim has to be re-argued
--- against it -- CR 704.3 is about when state-based actions are CHECKED and settles
+-- TODAY, and the argument is now about the readers there are rather than about
+-- there being none. Both of them -- theRingIsLegendary above, and isRingBearerOf
+-- below -- ask CR 701.54e's "under your control" alongside the designation, so a
+-- mark this sweep has not yet lifted is a mark whose controller has already
+-- changed, and both answer False on it regardless. Pawl.RingSpec pins that window
+-- open with an unsettled Act of Treason. What the sweep buys is that the mark does
+-- not come BACK when control does; no single projection can ask that.
+--
+-- The claim has to be re-argued for the first reader that drops the control
+-- conjunct -- CR 704.3 is about when state-based actions are CHECKED and settles
 -- nothing about how finely a designation can be observed.
 --
 -- ONLY EVER CLEARS. That is the rule, not a conservatism: 701.54a ENDS the
@@ -250,9 +300,15 @@ endOnControlChange = do
 -- into a land by Song of the Dryads is still designated. The caller supplies the
 -- creature restriction its own printed sentence carries.
 --
--- Read by no rule yet -- what would read it is the emblem's own abilities, and
--- none of the four has a carrier (#707, #709). It is here because it is the rule's
--- own predicate and Pawl.RingSpec proves the designation through it.
+-- The IMPERATIVE spelling of the same three conjuncts theRingIsLegendary above
+-- spells as a Filter, for a caller with no Filter and no projection fold in hand.
+-- The two must not drift: this one reads Projection.controllerOf where the Filter's
+-- ControlledBy reads the partial projection's controller, which is CR 613.1b's
+-- layer 2 either way.
+--
+-- Still read by no RULE -- what would read it is the emblem's remaining abilities,
+-- and none of those has a carrier (#707's blocking clause, #709). Pawl.RingSpec
+-- proves the designation through it.
 isRingBearerOf :: PlayerId -> ObjectId -> GameState.GameState -> Bool
 isRingBearerOf pid oid gs =
   Set.member oid (GameState.battlefield gs)
