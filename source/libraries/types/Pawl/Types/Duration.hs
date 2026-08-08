@@ -5,8 +5,11 @@ import qualified Pawl.Types.Condition as Condition
 -- | How long a stored continuous effect lasts, as the CARD says it (CR 611.2).
 -- PRINTED data: this is what appears in card JSON. The game stores
 -- Pawl.Types.Expiry instead, and Pawl.Engine.Expiry.arm is the one-way door between
--- them. Static-ability effects carry no Duration -- they last while their
--- source and ability do, which is "while re-derived from the battlefield".
+-- them. A static ability's effect normally carries no Duration -- it lasts
+-- while its source and ability do, which is "while re-derived from the
+-- battlefield" -- and the one exception is StaticAbility.lingers, the clause
+-- that gives such an effect a duration to keep running out AFTER its permanent
+-- has gone.
 data Duration
   = UntilEndOfTurn -- CR 514.2
   | Indefinite -- CR 611.2a: "lasts until the end of the game" (Magical Hack)

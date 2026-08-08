@@ -42,6 +42,9 @@
               ]
             }
           },
+          "lingers": {
+            "type": "UntilEndOfTurn"
+          },
           "modifications": [
             {
               "type": "LoseAllAbilities"
