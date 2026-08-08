@@ -3767,6 +3767,11 @@ representativeEvents cond =
         -- CR 708.7's own event, and the only one this condition admits, on the
         -- BEARER -- so the pair really matches.
         TriggerCondition.SelfTurnedFaceUp -> one (GameEvent.TurnedFaceUp departed)
+        -- The same event for the watcher-scoped form, and the only one it admits.
+        -- `departed` again, so the pair really matches: the Filter this condition
+        -- is instantiated with below is the trivial one, which admits whatever the
+        -- id resolves to.
+        TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp departed)
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- payload is arbitrary: the condition compares nothing, so any sacrifice
         -- matches and the floor is the same for all of them.
@@ -3808,6 +3813,7 @@ everyTriggerCondition =
     -- pin below would catch it.
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
     TriggerCondition.SelfTurnedFaceUp,
+    TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
     TriggerCondition.PermanentSacrificed
   ]
 
