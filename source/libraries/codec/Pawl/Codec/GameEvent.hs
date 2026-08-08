@@ -37,7 +37,7 @@ toJson e = case e of
     Common.tagged "CountersPut" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.CountersRemoved oid kind before after ->
     Common.tagged "CountersRemoved" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
-  GameEvent.HalfUnlocked oid name -> Common.tagged "HalfUnlocked" . Just . Common.array $ [ObjectId.toJson oid, CardName.toJson name]
+  GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Common.array $ [ObjectId.toJson oid, CardName.toJson name, Common.boolean fully]
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ ObjectId.toJson oid
 
 fromJson :: Value.Value -> Either Text.Text GameEvent.GameEvent
@@ -62,6 +62,6 @@ fromJson value = do
       GameEvent.CountersPut <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     ("CountersRemoved", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
       GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
-    ("HalfUnlocked", Just (Value.Array (Array.MkArray [oid, name]))) -> GameEvent.HalfUnlocked <$> ObjectId.fromJson oid <*> CardName.fromJson name
+    ("HalfUnlocked", Just (Value.Array (Array.MkArray [oid, name, fully]))) -> GameEvent.HalfUnlocked <$> ObjectId.fromJson oid <*> CardName.fromJson name <*> Common.asBoolean fully
     ("TurnedFaceUp", Just v) -> GameEvent.TurnedFaceUp <$> ObjectId.fromJson v
     _ -> Left . Text.pack $ "unknown GameEvent: " <> t

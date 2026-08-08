@@ -297,7 +297,17 @@ data GameEvent
     --
     -- NOT emitted for a LOCK (CR 709.5g): nothing in the pool locks a door, and no
     -- rule asks a trigger about one (#924).
-    HalfUnlocked ObjectId.ObjectId CardName.CardName
+    --
+    -- The Bool is CR 709.5i's "fully unlocks": True when the permanent has ALL of
+    -- its halves unlocked once this designation has been written. Carried on the
+    -- event rather than re-derived when a trigger is matched, because by then the
+    -- board has moved on -- a Room that left the battlefield, or whose other door
+    -- was opened in the same settle, would answer a question about the present
+    -- rather than about the moment the designation was given. Computed at the two
+    -- write sites from one helper (Pawl.Engine.Event.fullyUnlockedAfter), so the
+    -- entry designation (CR 709.5d) and the later one (CR 709.5f) cannot disagree
+    -- about what "fully" means.
+    HalfUnlocked ObjectId.ObjectId CardName.CardName Bool
   | -- | CR 708.7: a face-down permanent was turned face up. CR 708.8 makes that a
     -- change to one permanent's copiable values rather than a zone change, so no
     -- Moved event describes it and nothing else in this list carries it.
