@@ -190,7 +190,8 @@ before staging.
 `Modal.modeEffects` and `Modal.modesEffects` flatten one level further.
 `Resolve.slotsOf`, `Resolve.definedSlots` and `Resolve.armedAbilities` walk clauses. The
 two CR 612 text-change `rewriteMode` sites (`Projection`, `Resolve`) gain a nested
-`fmap`. 50 lint sites in `Pawl.CardSpec`. And the inline `MkMode` mints in `Face`,
+`fmap`. `Mode.effects` has 16 reader sites in all, across seven files -- six of them the
+lint family in `Pawl.CardSpec`. And the inline `MkMode` mints in `Face`,
 `Keyword` (five), `Monarch`, `Battle`, `Rad` and `Speed` each wrap their effects in one
 default clause.
 
