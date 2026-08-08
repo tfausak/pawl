@@ -1,12 +1,15 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
--- Covers Pawl.Engine.FaceDown, Pawl.Engine.Card.faceDownFace and the face-down
--- arms threaded through Pawl.Engine.Game.faceOf, Pawl.Engine.Cast,
+-- Covers Pawl.Engine.FaceDown, Pawl.Engine.Card.faceDownFace, the
+-- Effect.TurnFaceDown arm of Pawl.Engine.Resolve, and the face-down arms
+-- threaded through Pawl.Engine.Game.faceOf, Pawl.Engine.Cast,
 -- Pawl.Engine.Cost.costsFor, Pawl.Engine.Event.changeZoneFaceDown and
 -- Pawl.Engine.Stack -- rule 708 as far as morph reaches it.
 --
--- THREE morph cards carry this file, one per part of rule 708 it reaches.
+-- THREE morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
+-- part of them this file reaches, and a fourth card carries the TURN-FACE-DOWN
+-- half.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
@@ -29,6 +32,13 @@
 -- the damage, CR 708.2a's face-down 2/2 and the printed 2 power -- so the damage
 -- is asserted as a LIFE-TOTAL DELTA on the chosen target and never as a board
 -- fact, which is the one reading none of the others can fake.
+--
+-- Backslide is the TURN-FACE-DOWN half's card, and the Tracker is its victim
+-- again for the same reason. {1}{U} Instant, "Turn target creature with a morph
+-- ability face down. / Cycling {U}" -- CR 702.37e's keyword FAMILY on the
+-- targeting side, which is what Goblin Piker (2/1, no keywords) is on the board
+-- to prove: it is a creature in the same pool and only the family filter keeps
+-- Backslide off it.
 module Pawl.FaceDownSpec where
 
 import qualified Data.Map.Strict as Map
@@ -42,6 +52,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -58,12 +69,107 @@ import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TapState as TapState
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "FaceDown" $ do
   offerSpec s registry
   castSpec s registry
   turnFaceUpSpec s registry
+  turnFaceDownSpec s registry
+
+-- CR 708.2a in the OTHER direction: a face-up permanent turned face down, which
+-- is Backslide's Effect.TurnFaceDown.
+--
+-- ONE board carries every case. alice controls Ainok Tracker -- 3/3, first
+-- strike, morph {4}{R} -- and Goblin Piker -- 2/1, no keywords at all -- and
+-- holds Backslide, {1}{U} "Turn target creature with a morph ability face down".
+-- The Tracker is the victim on purpose: 3/3 differs from CR 708.2a's 2/2 on BOTH
+-- axes, so "it became a 2/2" cannot pass on a permanent nothing touched.
+turnFaceDownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnFaceDownSpec s registry = Spec.describe s "Turning face down" $ do
+  -- THE PROVING TEST, and its discriminating leg is the target set: CR 702.37e's
+  -- "a morph ability" is a keyword FAMILY, so Backslide reaches the Tracker
+  -- whatever its morph cost happens to be and never reaches the Piker. Asserted
+  -- EXACTLY rather than by membership, which is what makes the exclusion mean
+  -- something -- the Piker is a creature on the same battlefield and the pool
+  -- offers it; only the filter takes it off.
+  Spec.it s "CR 702.37e / 708.2a Backslide turns the morph creature face down and leaves the other alone" $ do
+    island <- S.printingOf s registry "Island"
+    backslide <- S.printingOf s registry "Backslide"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, spell, morphling, vanilla) = backslideBoard island backslide ainok piker
+    case S.spellTargetSpec backslide of
+      Nothing -> Spec.assertFailure s "Backslide declares no target slot"
+      Just theSpec ->
+        Spec.assertEqWith
+          s
+          "CR 702.37e only the creature with a morph ability is a legal target"
+          (Target.legalRecipients (Just S.alice) spell theSpec gs)
+          (Set.singleton (Recipient.ToCreature morphling))
+    -- THE BEFORE control: the Tracker really is its printed self to begin with,
+    -- so every assertion below is about the resolution and not about the fixture.
+    Spec.assertEqWith s "the printed 3/3 before" (S.powerToughnessOf morphling gs) (Just (3, 3))
+    Spec.assertEqWith s "face up before" (fmap Object.facing (Game.lookupObject morphling gs)) (Just Facing.FaceUp)
+    let after = S.runPure (aimAtCreature morphling) gs (Cast.castSpell S.alice spell (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceDown)
+    Spec.assertEqWith s "CR 708.2a a 2/2, not the printed 3/3" (S.powerToughnessOf morphling after) (Just (2, 2))
+    Spec.assertEqWith s "CR 708.2a no name" (Projection.nameOf morphling after) noName
+    Spec.assertEqWith s "CR 708.2a no subtypes, not Dog Scout" (Projection.subtypesOf morphling after) Set.empty
+    Spec.assertBool s (not (Projection.hasKeyword Keyword.FirstStrike morphling after)) "CR 708.2a no text, so no first strike"
+    -- The untargeted creature is untouched, which is CR 115.1 as much as rule 708:
+    -- one target, one victim.
+    Spec.assertEqWith s "the Piker is still face up" (fmap Object.facing (Game.lookupObject vanilla after)) (Just Facing.FaceUp)
+    Spec.assertEqWith s "and still the printed 2/1" (S.powerToughnessOf vanilla after) (Just (2, 1))
+    Spec.assertEqWith s "and still named" (Projection.nameOf vanilla after) (S.printingName piker)
+
+  -- CR 708.2a lists the copiable CHARACTERISTICS and nothing else, so everything
+  -- that is not a characteristic rides through: marked damage, counters and the
+  -- tap state all belong to the permanent rather than to its face.
+  --
+  -- THE DISCRIMINATOR for the opcode writing one status field rather than minting
+  -- a CR 400.7 incarnation -- a fresh object would arrive undamaged, uncountered
+  -- and untapped, and every assertion here would fail at once.
+  --
+  -- The +1/+1 counter is also CR 613.4c over the substituted values: 2/2 base
+  -- plus the counter is 3/3, where the untouched permanent would have been 4/4.
+  Spec.it s "CR 708.2a damage, counters and tap state survive the turn face down" $ do
+    island <- S.printingOf s registry "Island"
+    backslide <- S.printingOf s registry "Backslide"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (base, spell, morphling, _) = backslideBoard island backslide ainok piker
+        gs = tap morphling (S.addCounter CounterKind.PlusOnePlusOne 1 morphling (S.markDamage morphling 1 base))
+    Spec.assertEqWith s "the printed 3/3 plus a counter before" (S.powerToughnessOf morphling gs) (Just (4, 4))
+    let after = S.runPure (aimAtCreature morphling) gs (Cast.castSpell S.alice spell (S.printingName backslide) Facing.FaceUp >> Stack.resolveTop)
+    Spec.assertEqWith s "CR 708.2a it is face down" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceDown)
+    Spec.assertEqWith s "CR 708.2a the marked damage survives" (S.damageOf morphling after) (Just 1)
+    Spec.assertEqWith s "CR 708.2a the +1/+1 counter survives" (S.counterOf CounterKind.PlusOnePlusOne morphling after) 1
+    Spec.assertEqWith s "CR 708.2a it is still tapped" (fmap Object.tapped (Game.lookupObject morphling after)) (Just TapState.Tapped)
+    Spec.assertEqWith s "CR 613.4c the counter applies over the 2/2" (S.powerToughnessOf morphling after) (Just (3, 3))
+
+-- alice with two untapped Islands, Backslide in hand, and two creatures on the
+-- battlefield: the morph printing and the one with no keywords.
+backslideBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId)
+backslideBoard island backslide ainok piker =
+  let (gs0, spell) = S.handOne backslide (S.landsInPlay island 2)
+      (morphling, gs1) = S.addCreature ainok S.alice gs0
+      (vanilla, gs2) = S.addCreature piker S.alice gs1
+   in (gs2, spell, morphling, vanilla)
+
+-- CR 701.26a's state, written straight onto the permanent: this file is about
+-- rule 708 rather than about how the permanent came to be tapped.
+tap :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+tap oid gs =
+  gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) oid (GameState.objects gs)}
+
+-- Backslide's one target slot, answered with the named creature. Not left to
+-- S.identityAnswer: the point of the case is which creature was chosen.
+aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimAtCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  _ -> S.identityAnswer p
 
 -- CR 708.2a's name: the empty one, which matches no printed card.
 noName :: CardName.CardName

@@ -1129,6 +1129,7 @@ rewriteEffect pairs effect = case effect of
   Effect.ControlPlayerNextTurn _ -> effect
   Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
   Effect.Sacrifice _ -> effect
+  Effect.TurnFaceDown _ -> effect
   Effect.RemoveFromCombat _ -> effect
   Effect.MoveToZone ref zone riders mSlot mOrigin -> Effect.MoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin
   Effect.Draw {} -> effect

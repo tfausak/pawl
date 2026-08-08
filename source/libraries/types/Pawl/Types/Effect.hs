@@ -491,6 +491,28 @@ data Effect card
     -- they apply to transforming a permanent." So this opcode is the transform
     -- WORDING only, and a card printing "convert" needs its own (#698).
     Transform ObjectRef.ObjectRef
+  | -- | CR 708.2a: turn the named permanent face down. Backslide's "turn target
+    -- creature with a morph ability face down" is the card it exists for.
+    --
+    -- NOT the same act as Transform above, which CR 701.27b keeps separate in as
+    -- many words: turning a permanent over so its other face is up is a different
+    -- game action from turning it face down. This opcode lists NO characteristics,
+    -- so CR 708.2a's second clause supplies them -- "it becomes a 2/2 face-down
+    -- creature with no text, no name, no subtypes, and no mana cost", and "these
+    -- values are the COPIABLE values of that object's characteristics". A copiable
+    -- swap, not a CR 613 layer, which is why the whole of it is one status field:
+    -- Pawl.Engine.Game.faceOf substitutes Pawl.Engine.Card.faceDownFace for every
+    -- characteristic read the moment the field says FaceDown.
+    --
+    -- A bare SlotName rather than Transform's ObjectRef, the posture
+    -- RemoveFromCombat below takes: no card in the pool turns a SET face down.
+    -- Ixidron's "turn all other nontoken creatures face down" is the wording that
+    -- would want EachMatching, and it is not here.
+    --
+    -- An effect that DOES list characteristics -- Cyber Conversion's "it's a 2/2
+    -- Cyberman artifact creature" -- is not this opcode and is not implemented
+    -- (#957).
+    TurnFaceDown SlotName.SlotName
   | -- | CR 506.4: an effect that specifically removes a permanent from combat --
     -- the rule's one clause a card ASKS for rather than a condition the engine has
     -- to notice, which is why it is an opcode and not a sampler like
