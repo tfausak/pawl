@@ -419,13 +419,13 @@ everyManaType =
 -- CR 202.3g values the symbol at 1 rather than 2), and it is no typed demand
 -- because it consumes no supply. Zero for every other symbol.
 --
--- CR 107.4f's ways, and CR 107.4e's monocolored hybrid ways, are collapsed to ONE
+-- CR 107.4f's ways, and BOTH of CR 107.4e's hybrids' ways, are collapsed to ONE
 -- before payment by `announce`, which is what CR 118.13a and CR 601.2b call for --
 -- so those enumerations reach payment only where nothing announced (a cost paid
--- during a resolution or for a special action, CR 118.13b/c, #373). CR 107.4e's
--- COLOUR/COLOUR hybrid is the one still settled at payment (#729), and its single
--- way here is why: both halves are one mana of a stated type, so they are one
--- demand over two types rather than two ways.
+-- during a resolution or for a special action, CR 118.13b/c, #373). The
+-- colour/colour hybrid still gets a single way here rather than two, because both
+-- halves are one mana of a stated type: unannounced, they are one demand over two
+-- types, which is exactly the permission the symbol grants.
 waysOf :: ManaSymbol -> [(Maybe Demand, Natural, Natural)]
 waysOf symbol = case symbol of
   ManaSymbol.OfType t -> [(Just (ofTypes (Set.singleton t)), 0, 0)]
@@ -667,14 +667,10 @@ monocoloredHybridGeneric = 2
 -- ability's cost through the same rule.
 --
 -- Returns CR 601.2b's own phrase -- the "nonhybrid equivalent cost", a mana cost
--- with no Phyrexian and no monocolored hybrid symbol left in it -- and the life
--- the announcement committed. Pawl.Engine.Cost.announce turns that life into CR
--- 119.4's payment, so nothing below this function ever sees a mana symbol that
--- spends no mana.
---
--- CR 107.4e's COLOUR/COLOUR hybrid is the one "paid in multiple ways" symbol
--- still not announced here, so it rides through and is settled by
--- Pawl.Engine.Mana.spend's search at payment time (#729).
+-- with no Phyrexian symbol and neither of CR 107.4e's hybrids left in it -- and
+-- the life the announcement committed. Pawl.Engine.Cost.announce turns that life
+-- into CR 119.4's payment, so nothing below this function ever sees a mana symbol
+-- that spends no mana.
 --
 -- ONE SYMBOL AT A TIME, in printed order, each question asked knowing the answers
 -- before it. What makes that sound is the OFFER: a route is offered only if the
@@ -787,6 +783,19 @@ announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
         case announced of
           HybridPayment.PaysTyped -> go (asTyped : done) committed rest
           HybridPayment.PaysGeneric -> go (asGeneric : done) committed rest
+      -- CR 107.4e: "a hybrid symbol such as {W/U} can be paid with either white
+      -- or blue mana." Both ways spend ONE mana and commit no life, so this
+      -- announcement moves neither CR 601.2f's total nor any reduction -- which
+      -- is what sets it apart from the monocolored hybrid just above. What it
+      -- decides is WHICH mana of an oversupplied pool is spent, and so what is
+      -- left floating afterwards.
+      symbol@(ManaSymbol.Hybrid a b) : rest -> do
+        gs <- State.get
+        let offers = filter (\half -> stillPayable done rest gs committed [ManaSymbol.OfType half]) (hybridHalves a b)
+        announced <-
+          choose a offers $
+            Prompt.AnnounceHybridHalf (Decide.deciderFor pid gs) pid oid symbol
+        go (ManaSymbol.OfType announced : done) committed rest
       other : rest -> go (other : done) committed rest
 
 -- Every way the announcements of a cost's UNANNOUNCED tail could go, as the
@@ -797,10 +806,9 @@ announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
 -- asking whether it is payable.
 --
 -- One entry for a tail with nothing to announce, so this is the identity case for
--- every cost `announce` leaves untouched, and 2^(number of Phyrexian and
--- monocolored hybrid symbols) otherwise. Other symbols ride through in place --
--- CR 107.4e's colour/colour hybrid among them, since it is not announced (#729)
--- -- which is what keeps a completion a cost and not merely a set of choices.
+-- every cost `announce` leaves untouched, and 2^(number of Phyrexian and hybrid
+-- symbols) otherwise. Every other symbol rides through in place, which is what
+-- keeps a completion a cost and not merely a set of choices.
 completions :: [ManaSymbol] -> [([ManaSymbol], Natural)]
 completions symbols = case symbols of
   [] -> [([], 0)]
@@ -816,7 +824,23 @@ completions symbols = case symbols of
   ManaSymbol.MonocoloredHybrid manaType : rest ->
     [(ManaSymbol.OfType manaType : tail_, life) | (tail_, life) <- completions rest]
       <> [(ManaSymbol.Generic monocoloredHybridGeneric : tail_, life) | (tail_, life) <- completions rest]
+  -- CR 107.4e's colour/colour half: one mana of either component type, and
+  -- neither way commits life. Expanded here rather than ridden through so that
+  -- every completion really is CR 601.2b's NONHYBRID equivalent cost -- the
+  -- thing CR 601.2f is defined over.
+  ManaSymbol.Hybrid a b : rest ->
+    concatMap
+      (\half -> [(ManaSymbol.OfType half : tail_, life) | (tail_, life) <- completions rest])
+      (hybridHalves a b)
   other : rest -> [(other : tail_, life) | (tail_, life) <- completions rest]
+
+-- CR 107.4e's two ways for a colour/colour hybrid, as the mana types they name.
+-- The ONE place `Hybrid t t` is collapsed: that symbol is degenerate rather than
+-- illegal (Pawl.Types.ManaSymbol) and means `OfType t`, so it is one way and not
+-- two -- which keeps `announce` from asking a question with one answer written
+-- twice, and keeps `completions` from returning the same cost twice.
+hybridHalves :: ManaType -> ManaType -> [ManaType]
+hybridHalves a b = if a == b then [a] else [a, b]
 
 -- CR 118.3: can this MANA cost be paid at all, with nothing else claiming the
 -- resources? Pure, because Action.legalActions reaches it (through

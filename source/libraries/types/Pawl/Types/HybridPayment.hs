@@ -13,8 +13,8 @@ module Pawl.Types.HybridPayment where
 -- by CR 107.4e (Pawl.Types.ManaSymbol.MonocoloredHybrid carries the {2/X} shape
 -- ONLY). CR 107.4e's OTHER half -- the colour/colour hybrid {W/U} -- is not this
 -- type and could not use it: its two ways are two COLOURS, not one type against
--- an amount of generic mana, so announcing it needs a payload naming which half
--- (#729).
+-- an amount of generic mana, so its announcement answers with the mana type
+-- itself (Pawl.Types.Prompt.AnnounceHybridHalf).
 data HybridPayment
   = -- | CR 107.4e: one mana of the symbol's stated type.
     PaysTyped

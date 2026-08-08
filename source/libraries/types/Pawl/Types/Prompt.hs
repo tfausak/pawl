@@ -805,8 +805,10 @@ data Prompt r where
   -- in one cost put DISTINGUISHABLE questions on the wire.
   --
   -- CR 107.4e's MONOCOLORED half only ({2/R}), which is the half whose two ways
-  -- spend a different NUMBER of mana. A colour/colour hybrid ({W/U}) is still not
-  -- announced and could not be answered with a HybridPayment anyway (#729).
+  -- spend a different NUMBER of mana. The colour/colour hybrid ({W/U}) is
+  -- AnnounceHybridHalf below, and it is a separate constructor because its two
+  -- ways are two mana TYPES rather than one type against an amount of generic
+  -- mana, which is not a HybridPayment.
   --
   -- One prompt per symbol, in printed order, and the NonEmpty is the routes
   -- actually payable given the announcements already made -- the
@@ -819,6 +821,34 @@ data Prompt r where
   -- Elided when only one route is payable -- no source of the symbol's type, or
   -- too few mana on the board for the {2}.
   AnnounceHybridPayment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaType.ManaType -> NonEmpty.NonEmpty HybridPayment.HybridPayment -> Prompt HybridPayment.HybridPayment
+  -- | CR 601.2b's same sentence for CR 107.4e's COLOUR/COLOUR half ({G/U}):
+  -- "the player announces the nonhybrid equivalent cost they intend to pay",
+  -- which for this symbol is WHICH of its two mana types the one mana will be.
+  -- CR 118.13a puts that choice HERE rather than at payment. The ObjectId is
+  -- the spell or the permanent whose ability is being activated (CR 602.2b);
+  -- the ManaSymbol is the hybrid symbol itself, so a {G/U} and a {R/W} in one
+  -- cost put DISTINGUISHABLE questions on the wire.
+  --
+  -- Answered with a ManaType and not with a left/right flag, the
+  -- ChooseReductionHalf posture: the answer IS the nonhybrid equivalent, so
+  -- nothing downstream has to re-read the symbol to learn what was announced.
+  --
+  -- BOTH WAYS SPEND ONE MANA, so unlike AnnounceHybridPayment above this
+  -- announcement never changes CR 601.2f's total and no cost reduction turns on
+  -- it. What it changes is WHICH unit of an oversupplied pool is consumed, and
+  -- so what floats afterwards -- with {G}{U} in the pool a {G/U} leaves the
+  -- other, and the two boards differ (Pawl.ManaSpec's Gyre Engineer case).
+  --
+  -- One prompt per symbol, in printed order, and the NonEmpty is the halves
+  -- actually payable given the announcements already made -- the
+  -- AnnouncePhyrexianPayment contract, for the same CR 601.2b last sentence.
+  -- Two {G/U}s in one cost ask two identical questions, which is sound here
+  -- because the answers are interchangeable: both demand one mana of the named
+  -- type, so which prompt got which is not observable.
+  --
+  -- Elided when only one half is payable -- no source of the other type -- and
+  -- for the degenerate `Hybrid t t`, whose halves are one type.
+  AnnounceHybridHalf :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ManaSymbol.ManaSymbol -> NonEmpty.NonEmpty ManaType.ManaType -> Prompt ManaType.ManaType
   -- | CR 118.7e: "If a cost is reduced by an amount of mana represented by a
   -- hybrid mana symbol, the player paying that cost chooses one half of that
   -- symbol at the time the cost reduction is applied (see rule 601.2f)."
