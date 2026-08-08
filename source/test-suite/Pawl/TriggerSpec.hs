@@ -6112,7 +6112,17 @@ secondPlacementPassSpec s registry =
           boon <- S.printingOf s registry "Historian's Boon"
           let (sagaId, _, advanced) = boardOf benalia boon
               ((_, resolved), _) = State.runState (Engine.runGame orderReversing advanced Engine.priorityLoop) []
-          Spec.assertEqWith s "one 4/4 Angel token" (S.countOnBattlefieldByName angelToken S.alice resolved) 1
+          Spec.assertEqWith s "one Angel token" (S.countOnBattlefieldByName angelToken S.alice resolved) 1
+          -- The whole printed payload, so the card's data is exercised and not
+          -- merely its name: "a 4/4 white Angel creature token with flying and
+          -- vigilance". Chapter III creates nothing, so the one token is it.
+          case S.tokensOf resolved of
+            [token] -> do
+              Spec.assertEqWith s "4/4" (S.powerToughnessOf token resolved) (Just (4, 4))
+              Spec.assertEqWith s "an Angel" (Projection.subtypesOf token resolved) (Set.singleton Subtype.Angel)
+              Spec.assertBool s (Map.member Keyword.Type.Flying (Projection.keywordsOf token resolved)) "with flying"
+              Spec.assertBool s (Map.member Keyword.Type.Vigilance (Projection.keywordsOf token resolved)) "and vigilance"
+            other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
           Spec.assertBool s (not (S.onBattlefield sagaId resolved)) "and the Saga's story is told, so CR 704.5s sacrifices it"
 
 -- The chapter numbers of `oid`'s own chapter abilities currently on the stack (CR
