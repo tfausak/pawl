@@ -1,0 +1,113 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "PayLife",
+                "value": 50
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 50
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "pool": {
+                        "type": "AnyTarget"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Aetherflux Reservoir",
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SpellCast",
+            "value": {
+              "type": "ControlledBy",
+              "value": {
+                "type": "You"
+              }
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "GainLife",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Count",
+                        "value": {
+                          "aggregation": {
+                            "type": "Objects"
+                          },
+                          "filter": {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          "scope": {
+                            "type": "InHistory",
+                            "value": {
+                              "type": "SpellCast"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -2695,7 +2695,7 @@ matchesTrigger gs bearer you cond event = case cond of
   -- below is the id naming nothing at all, about which no Filter can honestly
   -- answer.
   TriggerCondition.SpellCast f -> case event of
-    GameEvent.SpellCast caster spell -> case Game.lookupObject spell gs of
+    GameEvent.SpellCast caster spell _ -> case Game.lookupObject spell gs of
       Nothing -> False
       Just _ -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
@@ -2727,7 +2727,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked oid name _ -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
-    GameEvent.SpellCast _ _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
@@ -2759,7 +2759,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.TurnedFaceUp oid -> oid == bearer
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.HalfUnlocked {} -> False
-    GameEvent.SpellCast _ _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
@@ -2801,7 +2801,7 @@ matchesTrigger gs bearer you cond event = case cond of
           PlayerRelation.Opponent -> controller /= you
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
-    GameEvent.SpellCast _ _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
@@ -2829,7 +2829,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> True
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.HalfUnlocked {} -> False
-    GameEvent.SpellCast _ _ -> False
+    GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     -- CR 700.4 again, from this side: a sacrifice DOES record a Moved event, and
@@ -3029,7 +3029,7 @@ eventBindings cond event = case (cond, event) of
   -- Filter in hand, so a slot it names has to hold for every cast the condition
   -- can match. Both do: GameEvent.SpellCast carries an ObjectId and a PlayerId
   -- unconditionally, so no shape of the event withholds either.
-  (TriggerCondition.SpellCast _, GameEvent.SpellCast caster spell) ->
+  (TriggerCondition.SpellCast _, GameEvent.SpellCast caster spell _) ->
     Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
   -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
   -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
