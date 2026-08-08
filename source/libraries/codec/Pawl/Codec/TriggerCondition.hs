@@ -47,6 +47,7 @@ toJson c = case c of
   TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
   TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
+  TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ PlayerRelation.toJson r
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
 fromJson value = do
@@ -80,4 +81,5 @@ fromJson value = do
     ("SelfTurnedFaceUp", _) -> Right TriggerCondition.SelfTurnedFaceUp
     ("PermanentTurnedFaceUp", Just v) -> TriggerCondition.PermanentTurnedFaceUp <$> Filter.fromJson Keyword.fromJson v
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
+    ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> PlayerRelation.fromJson v
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t

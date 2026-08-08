@@ -443,10 +443,16 @@ advanceSagas pid = do
 -- choice to a controller over every triggered ability they control, not over some
 -- subset.
 --
--- CR 603.3b's other half -- first place the triggers whose condition ISN'T
--- another ability triggering, then the rest, as a separate pass -- is not
--- implemented here (#49); it is vacuous while nothing in the card pool triggers
--- off another ability triggering. Advancing scannedThrough makes an event fire
+-- CR 603.3b's TWO-PART process, in the rule's own order: first every trigger
+-- whose condition isn't another ability triggering, APNAP with each controller's
+-- own order; then all the rest, APNAP again. Both passes come out of ONE gathered
+-- batch (`gathered` below), so the split is by CONDITION and never by which round
+-- of the gather found a trigger -- Event.reactsToAbilityTriggering is the
+-- classification, exhaustive so a new condition has to choose its pass.
+--
+-- The second pass has something to hold because `reactions` records a
+-- GameEvent.AbilityTriggered for every trigger in the batch and scans it before
+-- anything is placed; see that function. Advancing scannedThrough makes an event fire
 -- its triggers once (CR 603.2c) WITHOUT discarding the record. Targets are
 -- chosen as the ability is placed (CR 603.3d). Returns whether any were placed.
 --
@@ -463,8 +469,9 @@ advanceSagas pid = do
 -- AT this scan. The DELAYED entry is still CONSUMED regardless, because CR
 -- 603.7b spends the one shot on the trigger event, which happened.
 --
--- The Bool this returns is computed from `ordered`, not the pre-filter
--- `pending`, so it still tells the truth in exactly the case CR 800.4d creates:
+-- The Bool this returns is computed from the two placed passes, not from the
+-- pre-filter `pending`, so it still tells the truth in exactly the case CR 800.4d
+-- creates:
 -- a departed player's delayed ability firing with nothing else pending would
 -- otherwise report `True` on a step that put nothing on the stack.
 --
@@ -519,9 +526,94 @@ placePendingTriggers = do
         GameState.controlWhenTriggered = Map.empty,
         GameState.delayedTriggers = surviving
       }
-  ordered <- orderPending (pending <> inherent <> revving <> irradiated)
-  Monad.mapM_ placeOne ordered
-  pure (not (null ordered))
+  gathered <- reactions (pending <> inherent <> revving <> irradiated)
+  -- CR 603.3b's two sentences, run one after the other rather than ordered
+  -- together and placed at the end. The rule's first sentence PUTS its abilities
+  -- on the stack before its second is reached, and that is observable twice over:
+  -- Pawl.Types.Asked hands the ordering prompt the game as it stands, so a player
+  -- choosing the second pass's order sees the first pass already on the stack;
+  -- and CR 603.3d has each ability choose its targets as it is put there, against
+  -- that same stack.
+  first <- orderPending (filter (not . reacts) gathered)
+  Monad.mapM_ placeOne first
+  second <- orderPending (filter reacts gathered)
+  Monad.mapM_ placeOne second
+  pure (not (null first) || not (null second))
+
+-- CR 603.3b's classification, asked of one pending trigger: does its condition
+-- name another ability triggering? A SOURCELESS inherent ability (CR 725.2, CR
+-- 702.179d, CR 728.1) is classified the same way as any other, through its own
+-- condition, so it needs no special case.
+reacts :: PendingTrigger.PendingTrigger -> Bool
+reacts = Event.reactsToAbilityTriggering . TriggeredAbility.condition . PendingTrigger.ability
+
+-- CR 603.3b: "if MULTIPLE ABILITIES HAVE TRIGGERED since the last time a player
+-- received priority" -- so an ability that triggers off another ability
+-- triggering is part of the SAME batch, not of the next one, and has to be
+-- gathered before any of the batch goes on the stack.
+--
+-- That is what this does: record a GameEvent.AbilityTriggered for every trigger
+-- gathered so far, scan those new events for the abilities they in turn fire, and
+-- repeat until a round finds nothing. The result is every trigger of the batch,
+-- which `placePendingTriggers` then splits into the rule's two passes by
+-- condition.
+--
+-- MINTING AN EVENT rather than having the second pass inspect the pending set
+-- directly. An ability triggering is a game event -- rule 603.3b says so by
+-- making it a trigger condition -- so it belongs in CR 608.2i's log beside every
+-- other event, and every existing piece of machinery then applies to it
+-- unchanged: Event.eventTriggers' battlefield-and-graveyard scan, CR 603.4's
+-- intervening "if", CR 603.3a's controller sample, eventBindings. A private scan
+-- over the pending set would have been a second matching path for one condition,
+-- recording nothing a later reader could see.
+--
+-- Only EVENT triggers are scanned in these rounds. CR 603.8's state triggers are
+-- already gathered once by `gatherTriggers`, and a state trigger's condition is a
+-- fact about the game state rather than an event, so no round could add one. A CR
+-- 603.7 DELAYED ability whose trigger event is another ability triggering is not
+-- gathered here and has no producer (#1026).
+--
+-- No artificial bound on the rounds. A pair of abilities each triggering off the
+-- other is a genuine loop in the rules too (CR 104.4b's draw), and stopping short
+-- would be the engine deciding a game the rules do not; nothing in the pool
+-- reaches a second round, since a chapter ability's triggering fires only
+-- Historian's Boon and the Boon's triggering fires nothing.
+reactions :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrigger]
+reactions batch
+  | null batch = pure []
+  | otherwise = do
+      State.modify' (\g -> List.foldl' (flip Event.recordEvent) g (Maybe.mapMaybe triggeredEvent batch))
+      gs <- State.get
+      let fresh = Event.reactionTriggers (Event.unscannedEvents gs) gs
+      -- The round's own events are consumed here, and CR 603.3a's sample is
+      -- spent with them for the reason the batch's own is cleared above: the
+      -- next round's recordEvent re-takes it, this having left nothing unscanned.
+      State.modify'
+        ( \g ->
+            g
+              { GameState.scannedThrough = Natural.length (GameState.events g),
+                GameState.controlWhenTriggered = Map.empty
+              }
+        )
+      rest <- reactions fresh
+      pure (batch <> rest)
+
+-- CR 603.3b's record of one ability triggering: its source (CR 113.7), its
+-- controller as it triggered (CR 603.3a) and its trigger condition.
+--
+-- Nothing for a SOURCELESS ability, which is the one shape the event cannot
+-- describe -- CR 725.2's monarch pair, CR 702.179d's speed increase and CR
+-- 728.1's rad counters hang on no object, so there is no id to name (#1026).
+triggeredEvent :: PendingTrigger.PendingTrigger -> Maybe GameEvent.GameEvent
+triggeredEvent pending = case PendingTrigger.source pending of
+  TriggerSource.Sourceless -> Nothing
+  TriggerSource.OfObject oid ->
+    Just
+      ( GameEvent.AbilityTriggered
+          oid
+          (PendingTrigger.controller pending)
+          (TriggeredAbility.condition (PendingTrigger.ability pending))
+      )
 
 -- Put one triggered ability from the ordered batch on the stack. What it hangs
 -- on decides how: an ability BORNE by an object goes through placeBorne, where

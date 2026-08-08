@@ -1418,6 +1418,12 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
   TriggerCondition.PermanentSacrificed -> condition
+  -- CR 603.3b's second class carries only a PlayerRelation. The word "Saga" is in
+  -- the rule (CR 714.1) rather than in the card's data here, so there is no
+  -- subtype word for CR 612.1 to swap -- and a text-changing effect that made a
+  -- permanent stop being a Saga would be read off the projection this rewrites,
+  -- not out of the condition.
+  TriggerCondition.SagaFinalChapterTriggers _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

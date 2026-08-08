@@ -338,3 +338,19 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.PermanentSacrificed
       """ {"type":"PermanentSacrificed"} """
+  -- CR 603.3b's second class. The relation is the only payload: which Saga and
+  -- which chapter are read off the event and the source's projection.
+  Spec.it s "SagaFinalChapterTriggers round-trips its relation" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You)
+      """ {"type":"SagaFinalChapterTriggers","value":{"type":"You"}} """
+  Spec.it s "SagaFinalChapterTriggers round-trips the opponent relation too" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SagaFinalChapterTriggers PlayerRelation.Opponent)
+      """ {"type":"SagaFinalChapterTriggers","value":{"type":"Opponent"}} """

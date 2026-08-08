@@ -495,8 +495,10 @@ data Prompt r where
   -- more are all EQUAL, which ChooseReplacement elides (#590): the equality holds
   -- up to their bindings, and nothing here has read those to check.
   --
-  -- CR 603.3b's two-part process is vacuous while no condition triggers on another
-  -- ability triggering; this carries the note, not the machinery.
+  -- Asked ONCE PER PASS of CR 603.3b's two-part process, not once per batch: the
+  -- rule gives the own-order choice inside each pass, so a player controlling one
+  -- trigger of each class is asked nothing at all. The entries offered are
+  -- therefore always all of one class.
   OrderTriggers :: Decider.Decider -> PlayerId.PlayerId -> [TriggerEntry.TriggerEntry] -> Prompt [Natural.Natural]
   -- | CR 615.7: with damage from two or more applicable sources at once, the
   -- shielded player or the permanent's controller chooses which damage the shield

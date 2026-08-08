@@ -18,7 +18,9 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
@@ -194,3 +196,12 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.PermanentSacrificed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 6))
       """ {"type":"PermanentSacrificed","value":[0,6]} """
+  -- CR 603.3b: the ability's source (CR 113.7), its controller as it triggered
+  -- (CR 603.3a) and the condition that says which ability it was.
+  Spec.it s "AbilityTriggered" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.AbilityTriggered (ObjectId.MkObjectId 7) (PlayerId.MkPlayerId 1) (TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You))
+      """ {"type":"AbilityTriggered","value":[7,1,{"type":"SagaFinalChapterTriggers","value":{"type":"You"}}]} """
