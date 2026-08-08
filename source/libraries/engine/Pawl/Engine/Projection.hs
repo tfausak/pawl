@@ -1361,6 +1361,10 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 708.7 names no subtype at all -- the condition is nullary -- so a CR 612.1
   -- text change has nothing in it to rewrite.
   TriggerCondition.SelfTurnedFaceUp -> condition
+  -- Its watcher-scoped sibling DOES carry a Filter, so a text change reaches this
+  -- one: "whenever a Dragon is turned face up" becomes "whenever a Knight is"
+  -- under CR 612.1, exactly as PermanentEnters' does.
+  TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
   TriggerCondition.PermanentSacrificed -> condition

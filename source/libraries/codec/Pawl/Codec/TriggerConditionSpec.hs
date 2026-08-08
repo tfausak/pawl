@@ -297,6 +297,27 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfTurnedFaceUp
       """ {"type":"SelfTurnedFaceUp"} """
+  -- CR 708.7's other written form. Aven Farseer says only "a permanent", which is
+  -- Filter's trivial `And []` -- so the encoded value carries an EMPTY filter
+  -- rather than no filter at all, which is what keeps the narrowed printings
+  -- below spellable in the same constructor.
+  Spec.it s "PermanentTurnedFaceUp round-trips with the trivial Filter" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PermanentTurnedFaceUp (Filter.And []))
+      """ {"type":"PermanentTurnedFaceUp","value":{"type":"And","value":[]}} """
+  -- The same condition NARROWED, which is Deathmist Raptor's "whenever a permanent
+  -- you control is turned face up": the Filter is the whole difference between the
+  -- two printings, so it has to survive both directions.
+  Spec.it s "PermanentTurnedFaceUp round-trips with a narrowing Filter" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PermanentTurnedFaceUp (Filter.ControlledBy PlayerRelation.You))
+      """ {"type":"PermanentTurnedFaceUp","value":{"type":"ControlledBy","value":{"type":"You"}}} """
   -- CR 603.10a's sacrifice family. Nullary: "a player" is neither PlayerRelation
   -- arm and "a permanent" names no Filter, so there is nothing to encode.
   Spec.it s "PermanentSacrificed" $

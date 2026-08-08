@@ -501,13 +501,38 @@ data TriggerCondition
     --
     -- SELF-scoped. CR 603.6a's second written form has a counterpart here --
     -- "whenever a permanent is turned face up", borne by some other permanent
-    -- entirely -- and it has NO constructor (#959). Skirk Marauder is the
+    -- entirely -- and that is PermanentTurnedFaceUp below. Skirk Marauder is the
     -- printing this one answers.
     --
     -- No PAYLOAD. CR 702.37e's morph cost, the player who took the special
     -- action and the characteristics the permanent regained are all things a
     -- printed ability could in principle say "that much" about, and none does.
     SelfTurnedFaceUp
+  | -- | The SAME rule read by a BYSTANDER: CR 708.7's other written form,
+    -- "whenever a permanent is turned face up", borne by a permanent that is NOT
+    -- the one turning over. Aven Farseer's.
+    --
+    -- Two constructors for exactly PermanentEnters' and SelfEnters' reason, and
+    -- PermanentDies' and SelfDies': that one is a bare comparison of ids, while
+    -- this one has to READ the permanent's characteristics to answer a narrowed
+    -- form. Nothing about the bearer is part of the match; the bearer is the
+    -- Filter.Context's source, and its controller is CR 109.5's "you" in
+    -- Deathmist Raptor's "a permanent YOU CONTROL is turned face up".
+    --
+    -- FILTERED rather than payload-free even though Aven Farseer says only "a
+    -- permanent", which is Filter's trivial `And []`: the narrowed printings
+    -- exist (Deathmist Raptor, Hamza), and "another" would be
+    -- Filter.Not Filter.IsSource inside the Filter (#163) rather than a third
+    -- constructor.
+    --
+    -- A LIVE read, unlike PermanentDies': CR 708.8 leaves the permanent on the
+    -- battlefield with its normal copiable values back, so CR 603.10a's list of
+    -- look-back exceptions does not reach this condition and CR 603.10's first
+    -- sentence governs. The Filter reads the permanent as it is AFTER the
+    -- turning, which is what makes "a creature is turned face up" answerable at
+    -- all -- a face-down permanent is a 2/2 with no subtypes (CR 708.2a), so
+    -- reading it before would answer every narrowed form wrong.
+    PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
   | -- | CR 603.10a: "whenever a player sacrifices a permanent". One of the four
     -- look-back families that rule names, and the second pawl builds.
     --

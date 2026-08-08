@@ -8,8 +8,9 @@
 -- Pawl.Engine.Stack -- rule 708 as far as morph reaches it.
 --
 -- THREE morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
--- part of them this file reaches, and a fourth card carries the TURN-FACE-DOWN
--- half.
+-- part of them this file reaches, a fourth card carries the TURN-FACE-DOWN
+-- half, and a fifth -- Aven Farseer, which has no morph ability at all -- is the
+-- WATCHER of rule 708.7's other written form.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
@@ -26,12 +27,24 @@
 -- neither the face-down 2/2 nor the printed 2/1 -- and differs from the printed
 -- pair on BOTH axes, so no single stale read produces it.
 --
--- Skirk Marauder is the TRIGGER's card, and the only printing rule 708.7 needs.
+-- Skirk Marauder is the SELF-SCOPED trigger's card -- rule 708.7's first written
+-- form, the one whose bearer is the permanent that turns over.
 -- {1}{R} Creature -- Goblin 2/1, "Morph {2}{R} / When this creature is turned
 -- face up, it deals 2 damage to any target." Three different 2s meet on it --
 -- the damage, CR 708.2a's face-down 2/2 and the printed 2 power -- so the damage
 -- is asserted as a LIFE-TOTAL DELTA on the chosen target and never as a board
 -- fact, which is the one reading none of the others can fake.
+--
+-- Aven Farseer is the WATCHER's card, and the only printing rule 708.7's second
+-- written form needs. {1}{W} Creature -- Bird Soldier 1/1, "Flying / Whenever a
+-- permanent is turned face up, put a +1/+1 counter on this creature." It bears
+-- no morph ability, so it can never be the permanent that turns over: the bearer
+-- and the event's subject are two different objects by construction, which is
+-- the whole content of this form. Ainok Tracker is what turns over in front of
+-- it, chosen over Skirk Marauder (which carries a turned-face-up trigger of its
+-- own, so the two conditions could not be told apart) and over Misthoof Kirin
+-- (whose megamorph puts a SECOND +1/+1 counter on the board, on the permanent
+-- the assertions have to prove the Farseer's counter did NOT land on).
 --
 -- Backslide is the TURN-FACE-DOWN half's card, and the Tracker is its victim
 -- again for the same reason. {1}{U} Instant, "Turn target creature with a morph
@@ -599,6 +612,110 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         let again = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice permanent)
         Spec.assertEqWith s "CR 708.11 asking again adds no second counter" (S.counterOf CounterKind.PlusOnePlusOne permanent again) 1
         Spec.assertEqWith s "CR 708.11 and it is still a 3/2" (S.powerToughnessOf permanent again) (Just (3, 2))
+
+  -- THE PROVING TEST for CR 708.7's SECOND written form -- the watcher-scoped
+  -- one. Aven Farseer stands on the battlefield doing nothing; Ainok Tracker is
+  -- cast face down for CR 702.37a's {3} in front of it and turned face up for its
+  -- {4}{R} morph cost, and the counter Aven Farseer's ability puts on lands on
+  -- THE FARSEER.
+  --
+  -- ASSERTED BY OBJECT ID on both permanents, which is the vacuity trap this case
+  -- is built around: the Farseer is a 1/1 and a face-down permanent is CR 708.2a's
+  -- 2/2, so "some permanent is a 2/2" is true of this board before anything
+  -- happens at all. The two are read separately and the Tracker's own counter
+  -- count is asserted at zero, so a counter that landed on the wrong permanent
+  -- fails here rather than passing as the right answer on the wrong object.
+  --
+  -- AINOK TRACKER AND NOT SKIRK MARAUDER, and not by taste: the Marauder bears a
+  -- SelfTurnedFaceUp trigger, so on a board with both, a bug that fired the
+  -- Farseer's ability under the self-scoped condition would be invisible. The
+  -- Tracker bears no triggered ability at all, so the only condition that can
+  -- fire on this board is the Farseer's. Misthoof Kirin was rejected for the
+  -- other reason: CR 702.37b's megamorph counter would put a +1/+1 counter on the
+  -- permanent that turned over, which is exactly the object this case has to show
+  -- receives none.
+  --
+  -- THE BEFORE assertions are the negative: the Farseer entered the battlefield,
+  -- the face-down Tracker entered it, and a whole priority round was run over
+  -- both -- and the Farseer is still the printed 1/1 with no counter. A permanent
+  -- ENTERING is not a permanent being TURNED face up (CR 708.8's last sentence),
+  -- and nothing about the face-down entry (CR 708.3) is this condition's event.
+  --
+  -- Eight Mountains: {3} for the face-down cast and {4}{R} for the morph cost.
+  -- The Farseer is seated on the battlefield rather than cast, its own {1}{W}
+  -- being no part of what this proves.
+  Spec.it s "CR 708.7 a permanent turning face up puts Aven Farseer's counter on the FARSEER" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    farseer <- S.printingOf s registry "Aven Farseer"
+    case farseerBoard mountain farseer ainok 8 of
+      Nothing -> Spec.assertFailure s "the morph cast did not reach the battlefield"
+      Just (board, watcher, morphling) -> do
+        -- The bearer and the event's subject are two different objects, which is
+        -- the whole content of this written form. Stated outright so no assertion
+        -- below can quietly be about one permanent twice.
+        Spec.assertBool s (watcher /= morphling) "the watcher and the permanent that turns over are two objects"
+        let before = S.runPure S.identityAnswer board Engine.priorityLoop
+        Spec.assertEqWith s "CR 708.8 two entries and a priority round fired nothing" (S.counterOf CounterKind.PlusOnePlusOne watcher before) 0
+        Spec.assertEqWith s "so the Farseer is still the printed 1/1" (S.powerToughnessOf watcher before) (Just (1, 1))
+        Spec.assertEqWith s "CR 708.2a and the Tracker is the face-down 2/2" (S.powerToughnessOf morphling before) (Just (2, 2))
+        -- The control: the action really is on offer, so a silent engine below
+        -- cannot be a permanent that simply never turned over.
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [morphling]
+        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice morphling >> Engine.priorityLoop)
+        -- CR 708.7 through CR 603.2: the counter is on the WATCHER.
+        Spec.assertEqWith s "CR 708.7 the Farseer took the +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne watcher after) 1
+        Spec.assertEqWith s "CR 613.4c so the 1/1 is a 2/2" (S.powerToughnessOf watcher after) (Just (2, 2))
+        -- And NOT on the permanent that turned over, which is what separates this
+        -- condition from SelfTurnedFaceUp.
+        Spec.assertEqWith s "CR 708.7 the Tracker took none" (S.counterOf CounterKind.PlusOnePlusOne morphling after) 0
+        Spec.assertEqWith s "CR 708.8 so it is the printed 3/3 and not a 4/4" (S.powerToughnessOf morphling after) (Just (3, 3))
+        Spec.assertEqWith s "CR 110.5 face up" (fmap Object.facing (Game.lookupObject morphling after)) (Just Facing.FaceUp)
+        -- {3} for the cast and {4}{R} for the morph cost: eight, which is a
+        -- multiple of neither printed cost alone.
+        Spec.assertEqWith s "CR 702.37a/702.37e eight mana in all" (S.tappedCount S.alice after) 8
+
+  -- CR 708.8's last sentence again, from the WATCHER's side and with the stronger
+  -- fixture: the same Ainok Tracker cast FACE UP for its printed {5}{R} was never
+  -- turned face up, so the Farseer's ability stays silent.
+  --
+  -- The pair to the case above, and the second leg ruling out an arm that matched
+  -- a battlefield ENTRY. It is the leg that survives the fixture: the case above
+  -- catches such an arm on its before assertions, but only because the Tracker is
+  -- cast face down on the same board -- move that cast out of the fixture and the
+  -- before assertions go quiet, while this case still fails. A creature that
+  -- arrived face up was never turned over, however it got there.
+  Spec.it s "CR 708.8 an Ainok Tracker cast FACE UP was never turned face up" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    ainok <- S.printingOf s registry "Ainok Tracker"
+    farseer <- S.printingOf s registry "Aven Farseer"
+    let (base, card) = morphBoard mountain ainok 6
+        (watcher, seated) = S.addCreature farseer S.alice base
+        (cast, entered) = castAndResolve ainok Facing.FaceUp seated card
+        settled = S.runPure S.identityAnswer cast Engine.priorityLoop
+    case entered of
+      Nothing -> Spec.assertFailure s "the ordinary cast did not reach the battlefield"
+      Just permanent -> do
+        -- The control: it really did arrive, face up and printed, so the silence
+        -- below is CR 708.7 and not an empty battlefield.
+        Spec.assertEqWith s "CR 110.5b the printed 3/3 arrived" (S.powerToughnessOf permanent settled) (Just (3, 3))
+        Spec.assertEqWith s "face up" (fmap Object.facing (Game.lookupObject permanent settled)) (Just Facing.FaceUp)
+        Spec.assertEqWith s "CR 708.7 nothing was turned face up, so the Farseer took no counter" (S.counterOf CounterKind.PlusOnePlusOne watcher settled) 0
+        Spec.assertEqWith s "and is still the printed 1/1" (S.powerToughnessOf watcher settled) (Just (1, 1))
+
+-- alice with Aven Farseer already on the battlefield and a face-down permanent
+-- of the morph printing beside it, on a board of `n` lands three of which CR
+-- 702.37a's {3} has tapped. Nothing if the morph cast did not land.
+--
+-- The Farseer is seated BEFORE the cast on purpose: it is therefore watching when
+-- the face-down permanent enters, which is what makes the before assertions a
+-- real negative rather than a permanent that was not there yet.
+farseerBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+farseerBoard land farseer morph n =
+  let (gs0, card) = morphBoard land morph n
+      (watcher, gs1) = S.addCreature farseer S.alice gs0
+      (after, entered) = castAndResolve morph Facing.FaceDown gs1 card
+   in fmap (\permanent -> (after, watcher, permanent)) entered
 
 -- The one target slot of Skirk Marauder's ability, answered with `who` rather
 -- than left to S.identityAnswer's lowest-sorting candidate -- which is alice, the

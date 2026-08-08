@@ -45,6 +45,7 @@ toJson c = case c of
   -- directions of this codec call themselves.
   TriggerCondition.AnyOf cs -> Common.tagged "AnyOf" . Just . Common.array $ fmap toJson cs
   TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
+  TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
@@ -77,5 +78,6 @@ fromJson value = do
     ("RoomFullyUnlocked", Just v) -> TriggerCondition.RoomFullyUnlocked <$> PlayerRelation.fromJson v
     ("AnyOf", Just (Value.Array (Array.MkArray cs))) -> TriggerCondition.AnyOf <$> traverse fromJson cs
     ("SelfTurnedFaceUp", _) -> Right TriggerCondition.SelfTurnedFaceUp
+    ("PermanentTurnedFaceUp", Just v) -> TriggerCondition.PermanentTurnedFaceUp <$> Filter.fromJson Keyword.fromJson v
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t
