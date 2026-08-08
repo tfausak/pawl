@@ -180,3 +180,13 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.TurnedFaceUp (ObjectId.MkObjectId 5))
       """ {"type":"TurnedFaceUp","value":5} """
+  -- CR 701.21a: the sacrificing player and the permanent, in that order, and the
+  -- id is the PRE-MOVE one -- the record is written before the zone change, which
+  -- is CR 603.10a's look-back.
+  Spec.it s "PermanentSacrificed" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.PermanentSacrificed (PlayerId.MkPlayerId 0) (ObjectId.MkObjectId 6))
+      """ {"type":"PermanentSacrificed","value":[0,6]} """
