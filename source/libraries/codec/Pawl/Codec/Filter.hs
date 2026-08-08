@@ -49,6 +49,7 @@ toJson encode filter_ = case filter_ of
   Filter.CanHostSubject -> Common.nullary "CanHostSubject"
   Filter.IsToken -> Common.nullary "IsToken"
   Filter.IsTapped -> Common.nullary "IsTapped"
+  Filter.IsRingBearer -> Common.nullary "IsRingBearer"
   Filter.And fs -> Common.tagged "And" . Just . Common.array $ fmap (toJson encode) fs
   Filter.Or fs -> Common.tagged "Or" . Just . Common.array $ fmap (toJson encode) fs
   Filter.Not f -> Common.tagged "Not" . Just $ toJson encode f
@@ -77,6 +78,7 @@ fromJson decode value = do
     ("CanHostSubject", _) -> Right Filter.CanHostSubject
     ("IsToken", _) -> Right Filter.IsToken
     ("IsTapped", _) -> Right Filter.IsTapped
+    ("IsRingBearer", _) -> Right Filter.IsRingBearer
     ("And", Just (Value.Array (Array.MkArray vs))) -> Filter.And <$> traverse (fromJson decode) vs
     ("Or", Just (Value.Array (Array.MkArray vs))) -> Filter.Or <$> traverse (fromJson decode) vs
     ("Not", Just v) -> Filter.Not <$> fromJson decode v

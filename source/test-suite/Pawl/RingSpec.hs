@@ -34,6 +34,7 @@ import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.Zone as Zone
 
 -- How many times the Ring has tempted this player (CR 701.54c).
@@ -102,6 +103,12 @@ twoCreatureBoard island piker escape lands =
       -- the order they were added.
       (lower, higher) = if a < b then (a, b) else (b, a)
    in (lower, higher, spellId, gs)
+
+-- CR 205.4 off the PROJECTION, which is where CR 613.1d's layer 4 writes a granted
+-- supertype -- never off the printed type line, which is what the Ring-bearer case
+-- below is about.
+isLegendary :: ObjectId -> GameState.GameState -> Bool
+isLegendary oid gs = Set.member Supertype.Legendary (Projection.supertypesOf oid gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
@@ -261,3 +268,86 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
       (Just (Projection.nameOf bearer copied))
     Spec.assertEqWith s "the original is still the Ring-bearer" (markedFor S.alice copied) [bearer]
     Spec.assertEqWith s "and nothing else carries the designation" (length (markedFor S.alice copied)) 1
+  -- CR 701.54c's base tier: the emblem has "Your Ring-bearer is legendary and can't
+  -- be blocked by creatures with greater power." The FIRST clause is what this case
+  -- proves -- a layer-4 supertype grant (CR 613.1d, CR 205.4b) whose affected set is
+  -- CR 701.54e's Ring-bearer, carried by an emblem in the command zone (CR 114.4).
+  --
+  -- Observed through CR 205.4e's legendary-spell cast restriction rather than
+  -- through CR 704.5j's legend rule: making ONE creature legendary does not fire the
+  -- legend rule, which needs two same-named legendary permanents under one
+  -- controller, while CR 205.4e reads "controls a legendary creature" off the
+  -- PROJECTION and so sees the grant.
+  --
+  -- Both creatures are Goblin Pikers, which is deliberate on both counts: nothing
+  -- printed here is legendary, so assertion one has nothing else to satisfy it, and
+  -- only one of the two is ever the Ring-bearer, so CR 704.5j never has a pair to
+  -- act on.
+  --
+  -- ANTI-VACUITY. "The legendary sorcery is not castable" is a cast gate, and a cast
+  -- gate reads False for a dozen reasons that have nothing to do with CR 205.4e --
+  -- wrong phase, unpayable cost, a non-empty stack. `withThalia` is the same board
+  -- plus the pool's one printed legendary creature, with no Ring anywhere: it
+  -- asserts True, so the negative below discriminates.
+  Spec.it s "CR 701.54c the Ring-bearer is legendary, which CR 205.4e sees" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    escape <- S.printingOf s registry "Birthday Escape"
+    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
+    thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
+    let withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) (S.landsInPlay island 2) [1 .. (2 :: Int)]
+        (a, g1) = S.addCreature piker S.alice withLibrary
+        (b, g2) = S.addCreature piker S.alice g1
+        -- Ring.tempt sorts its candidates, so name them in that order.
+        (lower, higher) = if a < b then (a, b) else (b, a)
+        (g3, firstEscape) = S.handOne escape g2
+        (secondEscape, g4) = S.addHandCard escape S.alice g3
+        (sorceryId, gs) = S.addHandCard sorcery S.alice g4
+        withThalia = snd (S.addCreature thalia S.alice gs)
+        -- The first temptation takes the LAST candidate, the second the FIRST, so
+        -- the grant has to move backwards along the list.
+        tempted = castAndResolve lastCandidate S.alice firstEscape gs
+        moved = castAndResolve S.identityAnswer S.alice secondEscape tempted
+    Spec.assertBool s (not (S.castable S.alice sorceryId gs)) "CR 205.4e refuses the legendary sorcery before the Ring"
+    Spec.assertBool s (S.castable S.alice sorceryId withThalia) "but allows it beside a printed legendary creature, so the refusal above is CR 205.4e's"
+    Spec.assertEqWith s "the chosen creature is the Ring-bearer" (markedFor S.alice tempted) [higher]
+    Spec.assertBool s (isLegendary higher tempted) "CR 701.54c makes the Ring-bearer legendary"
+    Spec.assertBool s (not (isLegendary lower tempted)) "and reaches nothing else"
+    Spec.assertBool s (S.castable S.alice sorceryId tempted) "so CR 205.4e now allows the legendary sorcery"
+    -- CR 701.54a's first ending, read through the grant: the emblem's affected set is
+    -- re-derived every projection, so moving the designation moves the supertype.
+    Spec.assertEqWith s "the designation moved" (markedFor S.alice moved) [lower]
+    Spec.assertBool s (isLegendary lower moved) "the new Ring-bearer is legendary"
+    Spec.assertBool s (not (isLegendary higher moved)) "and the old one stopped being"
+  -- CR 701.54e's SECOND conjunct, "under your control", which
+  -- Ring.theRingIsLegendary spells as a ControlledBy You beside the designation
+  -- atom. The only window in which that conjunct is observable at all: after the
+  -- control change and BEFORE Ring.endOnControlChange's settle-loop sample lifts the
+  -- mark. Once the sample has run there is no designation left for the conjunct to
+  -- reject, which is why this case resolves Act of Treason WITHOUT settling
+  -- afterwards -- every other case here goes through castAndResolve, which settles.
+  --
+  -- What it pins: dropping the conjunct makes alice's stolen creature legendary FOR
+  -- ALICE here, and CR 701.54e says it is not hers to read at all once bob controls
+  -- it. The two assertions above the claim are the anti-vacuity pair -- the mark has
+  -- to still be there, and control has to have actually moved, or "not legendary" is
+  -- true for a reason that is not the control clause.
+  Spec.it s "CR 701.54e a stolen Ring-bearer is not legendary while its mark survives" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    escape <- S.printingOf s registry "Birthday Escape"
+    treason <- S.printingOf s registry "Act of Treason"
+    mountain <- S.printingOf s registry "Mountain"
+    let (_, withLibrary) = S.addLibraryCard piker S.alice (S.landsInPlay island 1)
+        (bearer, g1) = S.addCreature piker S.alice withLibrary
+        withBobsLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.bob g)) g1 [1 .. (3 :: Int)]
+        (g2, escapeId) = S.handOne escape withBobsLands
+        (treasonId, g3) = S.addHandCard treason S.bob g2
+        designated = castAndResolve S.identityAnswer S.alice escapeId g3
+        bobsTurn = designated {GameState.activePlayer = S.bob, GameState.priority = Just S.bob}
+        cast = S.runPure S.identityAnswer bobsTurn (S.cast S.bob treasonId)
+        unsettled = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertBool s (isLegendary bearer designated) "alice's Ring-bearer is legendary before the theft"
+    Spec.assertEqWith s "the mark has not been lifted yet" (markedFor S.alice unsettled) [bearer]
+    Spec.assertEqWith s "but bob controls it already (CR 613.1b)" (Projection.controllerOf bearer unsettled) (Just S.bob)
+    Spec.assertBool s (not (isLegendary bearer unsettled)) "CR 701.54e's control clause refuses it to alice"

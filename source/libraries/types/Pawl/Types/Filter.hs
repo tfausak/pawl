@@ -210,6 +210,30 @@ data Filter keyword
     -- IsToken it is not immutable -- a permanent taps and untaps constantly --
     -- but mutability is not what filterReads asks about.
     IsTapped
+  | -- | CR 701.54e: the candidate "is your Ring-bearer" -- the permanent carrying
+    -- the Ring-bearer designation made for the perspective player. The Ring's own
+    -- "YOUR Ring-bearer is legendary" (CR 701.54c), which is rulebook text rather
+    -- than a card's, so Pawl.Engine.Ring mints it.
+    --
+    -- Context-relative like IsSource and ControlledBy: the atom carries no
+    -- PlayerId, and whose Ring-bearer is asked comes from the Context's
+    -- perspective (CR 109.5). It needs no PlayerRelation payload either, unlike
+    -- ControlledBy -- CR 701.54e is only ever asked as "YOUR Ring-bearer", and an
+    -- opponent-relative spelling would be an arm no rule and no card asks for.
+    --
+    -- ONE of CR 701.54e's three conjuncts, not all three: this asks only about the
+    -- designation, and the rule's "on the battlefield under your control" is
+    -- spelled by the surrounding set -- Affected.Matching's own battlefield gate
+    -- and a ControlledBy You conjunct beside this atom. Pawl.Engine.Ring's
+    -- isRingBearerOf is the same three conjuncts assembled for a caller with no
+    -- Filter in hand.
+    --
+    -- Uncharacteristic, for IsAttacking's reason: CR 701.54b makes Ring-bearer a
+    -- DESIGNATION a permanent has, which CR 109.3's characteristic list has no
+    -- room for and which the same rule says is not a copiable value. Like IsToken
+    -- it is uncharacteristic AND unwritable by any CR 613 layer, which is what
+    -- lets Pawl.Engine.Projection.filterReads declare it as reading nothing.
+    IsRingBearer
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

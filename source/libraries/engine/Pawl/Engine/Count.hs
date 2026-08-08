@@ -263,5 +263,12 @@ viewOfSnapshot mController snapshot =
       -- event carries none to read, the position `supertypes` is in (#646). A
       -- quantity asking an event snapshot for a counter tally is answered 0
       -- rather than with what was on the object (#993).
-      Filter.counters = Map.empty
+      Filter.counters = Map.empty,
+      -- CR 701.54b: a designation, which a ProjectedCharacteristics does not carry
+      -- and never could -- CR 109.3's characteristic list has no room for one. So a
+      -- past event records none, the position `supertypes` and `counters` are in
+      -- (#646). Nothing rather than a remembered player: an event snapshot is not
+      -- an object, and "is your Ring-bearer" is a question about a permanent on the
+      -- battlefield now (CR 701.54e), not about one at the moment of an event.
+      Filter.ringBearerFor = Nothing
     }
