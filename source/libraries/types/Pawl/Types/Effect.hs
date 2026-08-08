@@ -324,11 +324,11 @@ data Effect card
     -- token minted. Tidal Wave is the first; Thatcher Revolt is the second. See
     -- Pawl.Engine.Resolve.namesEveryToken.
     --
-    -- A GROUP slot is visible to a later effect of the same resolution on either
-    -- path, since its reader goes to live bindings. A single-object slot is not
-    -- on the ABILITY path: resolveModes' `chosen` map is computed once before
-    -- the fold begins, so a later Sacrifice or Destroy there still reads the
-    -- pre-Create snapshot (the spell path re-reads, and does see it).
+    -- EITHER slot is visible to a later effect of the same resolution on either
+    -- path (CR 608.2c). A group slot's reader goes straight to live bindings; a
+    -- single-object slot rides the target map, which both resolveSpellWith and
+    -- resolveModes re-read before each effect. Harried Dronesmith's "It gains
+    -- haste until end of turn" is the singular case, on a triggered ability.
     Create Quantity.Quantity card EntryRiders.EntryRiders (Maybe SlotName.SlotName)
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition. Fog and Drudge

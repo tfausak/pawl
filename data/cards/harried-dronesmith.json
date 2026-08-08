@@ -1,0 +1,168 @@
+{
+  "faces": [
+    {
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "StepBegins",
+              "value": [
+                {
+                  "type": "Ending",
+                  "value": {
+                    "type": "EndStep"
+                  }
+                },
+                {
+                  "type": "ControllersTurn"
+                }
+              ]
+            },
+            "modal": {
+              "modes": [
+                {
+                  "effects": [
+                    {
+                      "type": "Sacrifice",
+                      "value": "token"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "name": "sacrifice it"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Harried Dronesmith",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Combat",
+                "value": {
+                  "type": "BeginningOfCombat"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Create",
+                    "value": [
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      },
+                      {
+                        "faces": [
+                          {
+                            "keywords": [
+                              {
+                                "type": "Flying"
+                              }
+                            ],
+                            "name": "Thopter Token",
+                            "power": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "toughness": {
+                              "type": "Literal",
+                              "value": 1
+                            },
+                            "typeLine": {
+                              "subtypes": [
+                                {
+                                  "type": "Thopter"
+                                }
+                              ],
+                              "types": [
+                                {
+                                  "type": "Artifact"
+                                },
+                                {
+                                  "type": "Creature"
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      },
+                      "token"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Haste"
+                        }
+                      },
+                      "token"
+                    ]
+                  },
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": "sacrifice it"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Artificer"
+          },
+          {
+            "type": "Human"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
