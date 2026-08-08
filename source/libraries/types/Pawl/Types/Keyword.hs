@@ -252,10 +252,25 @@ data Keyword
     -- triggers -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds
     -- from the projection's per-keyword count.
     Poisonous Natural.Natural
+  | -- | 702.86a: whenever this creature attacks, defending player sacrifices N
+    -- permanents. N rides the constructor, as Poisonous' does, and for the same
+    -- reason: CR 702.86b says each instance triggers separately, so
+    -- `Annihilator 1` twice is two abilities and two sacrifices rather than one
+    -- ability for 2 -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf
+    -- builds from the projection's per-keyword count.
+    --
+    -- The SECOND keyword rule 702 states as a triggered ability, after poisonous
+    -- (702.70a) and before battle cry (702.91a), and minted the same way. What
+    -- it adds to those two is the PLAYER: rule 702.86a names the defending
+    -- player, whom CR 508.5 reads off what the creature is attacking -- so
+    -- Pawl.Engine.Combat.declareAttackers computes it as the attack is declared
+    -- and GameEvent.AttackerDeclared carries it, and the minted ability reads it
+    -- back through the reserved Pawl.Engine.Binding.triggerPlayer slot.
+    Annihilator Natural.Natural
   | Infect -- 702.90
   | -- | 702.91a: whenever this creature attacks, each other attacking creature gets
-    -- +1/+0 until end of turn. The SECOND keyword rule 702 states as a triggered
-    -- ability, after poisonous (702.70a), and so the second one
+    -- +1/+0 until end of turn. The THIRD keyword rule 702 states as a triggered
+    -- ability, after poisonous (702.70a) and annihilator (702.86a), and so the third one
     -- Pawl.Engine.Keyword MINTS rather than merely consults. Nullary, because rule
     -- 702.91a takes no parameter -- and unlike flying's or lifelink's nullary
     -- siblings, its reader takes the per-keyword count rather than membership,

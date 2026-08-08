@@ -536,7 +536,7 @@ viewOfCard face =
 -- out of the answer.
 declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
 declaredIt oid event = case event of
-  GameEvent.AttackerDeclared declared -> declared == oid
+  GameEvent.AttackerDeclared declared _ -> declared == oid
   _ -> False
 
 -- Shared assembly: fill a View from a projection's characteristics, a supplied

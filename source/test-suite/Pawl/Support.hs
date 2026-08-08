@@ -1074,7 +1074,7 @@ attackerDeclarationsOf :: GameState.GameState -> [ObjectId.ObjectId]
 attackerDeclarationsOf gs = Maybe.mapMaybe declared (Foldable.toList (GameState.events gs))
   where
     declared event = case event of
-      GameEvent.AttackerDeclared oid -> Just oid
+      GameEvent.AttackerDeclared oid _ -> Just oid
       _ -> Nothing
 
 -- The characteristics of nothing: Projection.project on an id with no card in

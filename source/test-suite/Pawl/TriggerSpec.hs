@@ -23,7 +23,11 @@
 -- `interveningSpec`. Also Pawl.Engine.Keyword: CR
 -- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousSpec`. CR
--- 702.91 battle cry, the second such keyword, and with it the CR 603.3b
+-- 702.86 annihilator, the second such keyword, whose "defending player" (CR
+-- 508.5) rides the declaration event through the same reserved slot, at three
+-- seats so that player is not the attacker's only opponent --
+-- `annihilatorSpec`. CR
+-- 702.91 battle cry, the third such keyword, and with it the CR 603.3b
 -- ordering payload's ability discriminator -- two DISTINCT abilities of one
 -- source, ordered both ways with different boards, and two triggers of the SAME
 -- ability staying indistinguishable, with Hero of Bladehold -- `battleCrySpec`.
@@ -166,6 +170,7 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
@@ -331,7 +336,7 @@ scanSpec s registry =
     -- so "the first time" is "this is the only one so far".
     Spec.it s "SelfAttacks FirstTimeEachTurn matches only the first declaration" $ do
       let bearer = ObjectId.MkObjectId 1
-          declared = GameEvent.AttackerDeclared bearer
+          declared = GameEvent.AttackerDeclared bearer S.bob
           gsWith events = S.withEvents events (Setup.emptyGame S.bothPlayers)
           matches frequency events =
             Event.matchesTrigger (gsWith events) bearer S.alice (TriggerCondition.SelfAttacks frequency) declared
@@ -342,7 +347,7 @@ scanSpec s registry =
       Spec.assertBool s (matches TriggerFrequency.EveryTime [declared, declared]) "EveryTime matches the second too"
       -- The count is per bearer, not per turn: two creatures declared
       -- together are each attacking for the first time.
-      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2), declared]) "another creature's declaration does not spend this one's first time"
+      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2) S.bob, declared]) "another creature's declaration does not spend this one's first time"
       -- CR 508.3a's last sentence, unchanged by the frequency: a
       -- non-declaration event never matches.
       Spec.assertBool s (not (Event.matchesTrigger (gsWith [declared]) bearer S.alice (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn) (GameEvent.StepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice))) "a step beginning is not an attack"
@@ -1901,10 +1906,120 @@ poisonousSpec s registry =
               Spec.assertEqWith s "bob has three poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
               Spec.assertEqWith s "and took the Piker's two" (S.lifeOf S.bob after) (Just 18)
 
+-- CR 702.86a: "Annihilator is a triggered ability. 'Annihilator N' means
+-- 'Whenever this creature attacks, defending player sacrifices N permanents.'"
+-- The second keyword in this pool whose rule text IS a triggered ability, after
+-- CR 702.70a's poisonous and before CR 702.91a's battle cry, so it is minted by
+-- Pawl.Engine.Keyword and gathered by the same Pawl.Engine.Event.eventTriggers
+-- scan.
+--
+-- Slivdrazi Monstrosity is the card, and it reaches annihilator the long way
+-- round: "Eldrazi you control are Slivers in addition to their other types"
+-- (layer 4) feeds "Slivers you control have devoid and annihilator 1" (layer 6),
+-- so a Slaughter Drone -- printed an Eldrazi with no annihilator anywhere on it
+-- -- is what attacks. That dependency is CR 613.8's, already pinned for the
+-- devoid half in Pawl.ColorSpec.
+--
+-- What separates this keyword from its two siblings is the PLAYER: rule 702.86a
+-- names the DEFENDING player, whom CR 508.5 reads off what the creature is
+-- attacking, and CR 508.5a makes that one specific player determined per
+-- attacking creature. THREE SEATS is what makes that assertable -- at two
+-- players "the defending player" and "the attacker's one opponent" are the same
+-- player, so an implementation that bound the wrong one would pass.
+annihilatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+annihilatorSpec s registry =
+  let -- Declares `attacker` and nothing else, attacks `who`, declines all
+      -- blocks, and sacrifices the LAST candidate offered.
+      --
+      -- Every clause is there to keep an assertion from passing by accident.
+      -- Declaring one creature keeps the trigger count at one, so "annihilator 1
+      -- sacrificed one permanent" is not two abilities coinciding. Declining
+      -- blocks keeps combat damage from removing a permanent the edict did not
+      -- take. And taking the LAST candidate rather than the first is what proves
+      -- the PROMPT is honoured: Replay.defaultAnswer takes the first `count`
+      -- candidates, so an engine that ignored the answer would take the other
+      -- permanent.
+      declaring :: ObjectId.ObjectId -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+      declaring attacker who p = case p of
+        Prompt.ChooseDefender {} -> who
+        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+        Prompt.DeclareBlockers {} -> Map.empty
+        Prompt.ChooseSacrifices _ _ _ candidates _ -> Set.fromList (take 1 (reverse candidates))
+        _ -> S.aggressiveAnswer p
+      -- alice fields Slivdrazi Monstrosity and a Slaughter Drone; bob and carol
+      -- each field a Goblin Piker and a Mountain.
+      --
+      -- TWO permanents each, and that is the point: Effect.PlayerSacrifices
+      -- elides the prompt when the candidates do not outnumber the count (CR
+      -- 609.3), so a player with exactly one permanent would prove only the
+      -- forced path. One of the two is a LAND, which rule 702.86a's unqualified
+      -- "N permanents" admits -- and which is the permanent that goes.
+      board = do
+        slivdrazi <- S.printingOf s registry "Slivdrazi Monstrosity"
+        drone <- S.printingOf s registry "Slaughter Drone"
+        piker <- S.printingOf s registry "Goblin Piker"
+        mountain <- S.printingOf s registry "Mountain"
+        pure (S.threePlayerCombat [slivdrazi, drone] [piker, mountain] [piker, mountain])
+   in Spec.describe s "Annihilator" $ do
+        -- CR 702.86b: "If a creature has multiple instances of annihilator, each
+        -- triggers separately." The count is a MULTIPLICITY, exactly as CR
+        -- 702.70b makes poisonous'. The falsifier is a mint that collapses the
+        -- count to one ability.
+        Spec.it s "CR 702.86b each instance of annihilator is its own ability" $ do
+          Spec.assertEqWith s "annihilator 1 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Annihilator 1) 2)) [Keyword.annihilator 1, Keyword.annihilator 1]
+          Spec.assertEqWith s "and annihilator 2 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Annihilator 2) 1)) [Keyword.annihilator 2]
+        -- CR 508.5 through CR 603.2: the declaration event carries the defending
+        -- player, and the scan stamps them under the reserved slot rule 702.86a's
+        -- "defending player" reads. The falsifier is an arm that binds the
+        -- attacking side instead.
+        Spec.it s "CR 603.2 the defending player rides the declaration in the reserved slot" $ do
+          let bindings = Event.eventBindings (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (ObjectId.MkObjectId 7) S.carol)
+          Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.carol))
+        -- CR 613.8's dependency, read off the projection before any attack: WHICH
+        -- permanents actually carry the granted keyword. Without this the two
+        -- board cases below could pass off a keyword nobody has.
+        Spec.it s "CR 702.86 Slivdrazi Monstrosity grants annihilator 1 to the Slivers it makes" $ do
+          (gs, ours, yours, _) <- board
+          case (ours, yours) of
+            (slivdrazi : drone : _, piker : _) -> do
+              Spec.assertBool s (Projection.hasKeyword (Keyword.Type.Annihilator 1) drone gs) "the Eldrazi, made a Sliver, has annihilator 1"
+              Spec.assertBool s (Projection.hasKeyword (Keyword.Type.Annihilator 1) slivdrazi gs) "and so does Slivdrazi itself, being a Sliver"
+              Spec.assertBool s (not (Projection.hasKeyword (Keyword.Type.Annihilator 1) piker gs)) "bob's creature, which alice does not control, does not"
+            _ -> Spec.assertFailure s "fixture should have two permanents a side"
+        -- The proving test. alice attacks bob, so CR 508.5 makes bob the
+        -- defending player and rule 702.86a makes him sacrifice one permanent of
+        -- HIS choice -- the Mountain, which is the candidate the interpreter
+        -- named and not the one the engine's fallback would have taken. carol,
+        -- an opponent who was not attacked, loses nothing.
+        Spec.it s "CR 702.86a the attacked player sacrifices one permanent of their own choosing" $ do
+          (gs, ours, yours, hers) <- board
+          case (ours, yours, hers) of
+            (_ : drone : _, bobsPiker : bobsMountain : _, carolsPiker : carolsMountain : _) -> do
+              let after = S.runCombat (declaring drone S.bob) gs
+              Spec.assertEqWith s "bob is left with only the Piker" (Game.zoneMembers Zone.Battlefield S.bob after) [bobsPiker]
+              Spec.assertBool s (notElem bobsMountain (Game.zoneMembers Zone.Battlefield S.bob after)) "and the permanent he named, the Mountain, is what went"
+              Spec.assertEqWith s "carol, not the defending player, sacrifices nothing" (Game.zoneMembers Zone.Battlefield S.carol after) [carolsPiker, carolsMountain]
+            _ -> Spec.assertFailure s "fixture should have two permanents a side"
+        -- CR 508.5a: the defending player is one SPECIFIC player, and which one
+        -- is settled by CR 506.2a's choice. The only difference between this run
+        -- and the one above is the answer to Prompt.ChooseDefender, so an
+        -- implementation that bound the attacker's controller, or "the opponent",
+        -- or a fixed seat cannot pass both.
+        Spec.it s "CR 508.5 the sacrifice follows whichever opponent was attacked" $ do
+          (gs, ours, yours, hers) <- board
+          case (ours, yours, hers) of
+            (slivdrazi : drone : _, bobsPiker : bobsMountain : _, carolsPiker : _) -> do
+              let after = S.runCombat (declaring drone S.carol) gs
+              Spec.assertEqWith s "carol, attacked this time, is left with only the Piker" (Game.zoneMembers Zone.Battlefield S.carol after) [carolsPiker]
+              Spec.assertEqWith s "and bob, untouched, keeps both" (Game.zoneMembers Zone.Battlefield S.bob after) [bobsPiker, bobsMountain]
+              Spec.assertEqWith s "alice, who controls the ability, sacrifices nothing" (Game.zoneMembers Zone.Battlefield S.alice after) [slivdrazi, drone]
+            _ -> Spec.assertFailure s "fixture should have two permanents a side"
+
 -- CR 702.91a: "Battle cry is a triggered ability. 'Battle cry' means 'Whenever
 -- this creature attacks, each other attacking creature gets +1/+0 until end of
--- turn.'" The second keyword in this pool whose rule text IS a triggered
--- ability, after CR 702.70a's poisonous, so it is minted by Pawl.Engine.Keyword
+-- turn.'" The third keyword in this pool whose rule text IS a triggered
+-- ability, after CR 702.70a's poisonous and CR 702.86a's annihilator, so it is
+-- minted by Pawl.Engine.Keyword
 -- and gathered by the same Pawl.Engine.Event.eventTriggers scan.
 --
 -- Hero of Bladehold is the card, and it is here for a second reason: battle cry
@@ -3821,7 +3936,11 @@ representativeEvents cond =
         TriggerCondition.OpponentLostLifeDuringYourTurn -> one (GameEvent.LifeLost S.bob 2)
         TriggerCondition.SelfCycled -> one (GameEvent.Discarded S.alice departed DiscardCause.ToPayCyclingCost)
         TriggerCondition.PlayerDiscards _ -> one (GameEvent.Discarded S.alice departed DiscardCause.Ordinary)
-        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed)
+        -- CR 508.5's defending player, and deliberately NOT the attacker's own
+        -- controller: eventBindings binds this field under `thatPlayer`, so an
+        -- arm that bound the attacking side instead would still agree with
+        -- eventBindingSlots here if the two coincided.
+        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -5676,6 +5795,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   monarchOrderingSpec s registry
   interveningSpec s registry
   poisonousSpec s registry
+  annihilatorSpec s registry
   battleCrySpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry

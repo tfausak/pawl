@@ -131,7 +131,30 @@ data GameEvent
     -- creature put onto the battlefield attacking, and the combat record cannot
     -- tell the two apart. Only Pawl.Engine.Combat.declareAttackers appends this,
     -- and putOntoBattlefieldAttacking deliberately does not.
-    AttackerDeclared ObjectId.ObjectId
+    --
+    -- The PlayerId is CR 508.5's defending player FOR THIS CREATURE -- the
+    -- player it is attacking, the controller of the planeswalker it is
+    -- attacking, or the protector of the battle it is attacking -- computed by
+    -- Pawl.Engine.Combat.declareAttackers as the declaration is written down.
+    -- CR 702.86a's annihilator is what reads it.
+    --
+    -- Carried rather than derived, and CR 508.5 is itself the argument: that
+    -- rule reads the defending player off what the creature is attacking, and
+    -- both the planeswalker and the battle forms need the BOARD to answer.
+    -- Pawl.Engine.Event.eventBindings takes no game state, so a derivation there
+    -- is not available at all; and by the time a trigger resolves, the attacked
+    -- planeswalker can be gone, which is the case CR 508.5's second sentence is
+    -- about. Stamping the answer at declaration time is that rule's own moment.
+    --
+    -- CR 508.5a is why this is ONE player rather than a set: in a multiplayer
+    -- game "defending player" means one specific defending player, determined
+    -- individually per attacking creature -- which is exactly one field per
+    -- declared attacker.
+    --
+    -- NOT the AttackTarget itself. That is a wider payload for a different
+    -- question -- CR 508.3a's attacks-a-permanent form, CR 508.3b and CR 508.3e,
+    -- which need trigger conditions no card in the pool declares (#538).
+    AttackerDeclared ObjectId.ObjectId PlayerId.PlayerId
   | -- | CR 701.20a: a player revealed a card.
     --
     -- A reveal is the one game action whose entire content is INFORMATION, so

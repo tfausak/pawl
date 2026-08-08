@@ -415,6 +415,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Morph _ _ -> keyword
   Keyword.Type.Entwine _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
+  -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
+  Keyword.Type.Annihilator _ -> keyword
   Keyword.Type.Infect -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Menace -> keyword

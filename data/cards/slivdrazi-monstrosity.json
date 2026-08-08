@@ -205,6 +205,13 @@
               "value": {
                 "type": "Devoid"
               }
+            },
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Annihilator",
+                "value": 1
+              }
             }
           ]
         }

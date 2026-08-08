@@ -1278,10 +1278,34 @@ declareAttackers pid = do
               -- written, so the board a trigger's intervening-if clause reads (CR
               -- 603.4) already has these creatures attacking.
               --
-              -- The event names the creature and not what it was announced as
-              -- attacking, so CR 508.3a's attacks-a-permanent form, CR 508.3b and
-              -- CR 508.3e are unavailable (#538).
-              State.modify' (\g -> List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid) h) g attacking)
+              -- The event names the creature and CR 508.5's defending player for
+              -- it, but not what it was announced as attacking, so CR 508.3a's
+              -- attacks-a-permanent form, CR 508.3b and CR 508.3e are still
+              -- unavailable (#538).
+              --
+              -- The defending player is computed HERE, per creature, because
+              -- here is the moment CR 508.5 reads: the rule resolves "defending
+              -- player" through what the creature is attacking, and both the
+              -- planeswalker and the battle forms need the board to answer.
+              -- CR 508.5a is what makes it per creature rather than per
+              -- declaration.
+              --
+              -- `defender` when the target names no player, which is CR 506.2's
+              -- own answer and not an invention: attackTargets offered only the
+              -- defending player themselves, planeswalkers they control and
+              -- battles they protect, so every announced target's defending
+              -- player IS this player. Reaching the fallback at all needs the
+              -- attacked permanent to have left the battlefield between the
+              -- announcement and this line -- a mana ability paid for a CR 508.1h
+              -- cost to attack is the only window, and no card in the pool can
+              -- put a planeswalker or a battle through it. Total rather than a
+              -- Maybe in the event, which every reader would then discard.
+              State.modify'
+                ( \g ->
+                    let grants = Projection.controlGrants g
+                        defendingFor oid = Maybe.fromMaybe defender ((\t -> defendingPlayerOf grants t g) =<< Map.lookup oid recorded)
+                     in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid (defendingFor oid)) h) g attacking
+                )
 
 -- CR 508.4: a creature put onto the battlefield attacking has its controller
 -- choose what it is attacking as it enters. Resolve calls this for each permanent
