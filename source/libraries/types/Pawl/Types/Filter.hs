@@ -2,6 +2,7 @@ module Pawl.Types.Filter where
 
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -39,13 +40,33 @@ data Filter keyword
     -- MEMBERSHIP, not equality of an ability list: the projection stores keywords
     -- as a count because CR 702 instances stack, and this asks only whether the
     -- key is present. For a parameterized keyword that makes `HasKeyword (Toxic
-    -- 2)` ask about toxic 2 specifically rather than toxic in general, which no
-    -- card in the pool needs either way (#522).
+    -- 2)` ask about toxic 2 SPECIFICALLY, which is the narrow question and the
+    -- right one: CR 702.14a's "[type]walk" is a written ability in its own right,
+    -- so Quagmire's "creatures with swampwalk" must not reach islandwalk. Ask the
+    -- family with HasKeywordFamily below; Pawl.FilterSpec pins the pair apart.
     --
     -- Read through the PROJECTION wherever one exists, so a creature that gains
     -- flying at CR 613.1f layer 6 matches and a Humility'd one stops matching;
     -- Projection.viewOfCard is the printed-card fallback off the battlefield.
     HasKeyword keyword
+  | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
+    -- its payload -- Flensing Raptor's "another target creature you control with
+    -- toxic", which a Phyrexian Mite with toxic 1 and a creature with toxic 3
+    -- satisfy alike (CR 702.164a).
+    --
+    -- A SIBLING of HasKeyword above rather than a widening of it, because the two
+    -- questions are both real: this one is what card text asks when it names the
+    -- ability, and that one is what it asks when it names the written instance.
+    -- Widening HasKeyword in place would have made `HasKeyword (Toxic 2)` and
+    -- `HasKeyword (Toxic 3)` observably the same value.
+    --
+    -- CONCRETE where HasKeyword is parametric, which is why the parameter above
+    -- survives: Pawl.Types.KeywordFamily is payload-free and imports nothing, so
+    -- naming it here opens no cycle. Nullary keywords have no family constructor,
+    -- so the two atoms partition rather than overlap -- there is exactly one way
+    -- to write "a creature with flying" and exactly one to write "a creature with
+    -- toxic". Answered off the PROJECTION for HasKeyword's reason.
+    HasKeywordFamily KeywordFamily.KeywordFamily
   | PowerAtLeast Integer -- CR 208.1: the object's power is >= this literal.
   | -- | CR 208.1 in the other direction: the object's power is <= this literal --
     -- Ezuri, Claw of Progress' "a creature you control with power 2 or less".

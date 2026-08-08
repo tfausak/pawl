@@ -1813,6 +1813,10 @@ filterReads f = case f of
   -- CR 613.1f: layer 6 adds and removes abilities, so this atom's answer moves
   -- under the fold as HasCardType's moves under layer 4.
   Filter.Type.HasKeyword _ -> Set.singleton Keywords
+  -- The same aspect, since it reads the same set one step coarser: a creature
+  -- granted toxic 1 at layer 6 starts satisfying "with toxic" as surely as one
+  -- granted flying starts satisfying "with flying".
+  Filter.Type.HasKeywordFamily _ -> Set.singleton Keywords
   Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
   Filter.Type.PowerAtMost _ -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller

@@ -2,10 +2,11 @@ module Pawl.Engine.Filter where
 
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Filter as Filter
-import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -25,11 +26,12 @@ data View = MkView
     colors :: Set.Set Color.Color,
     subtypes :: Set.Set Subtype.Subtype,
     -- CR 702: the keyword abilities the candidate has. A SET and not the
-    -- projection's Map Keyword Natural, because HasKeyword asks membership and
-    -- nothing else. Read from the PROJECTION on the battlefield and from the
+    -- projection's Map Keyword Natural, because neither reader needs the count:
+    -- HasKeyword asks membership, and HasKeywordFamily scans for a key whose
+    -- family matches. Read from the PROJECTION on the battlefield and from the
     -- printed card off it, so a creature that gains flying at layer 6 matches and
     -- a Humility'd one (CR 613.1f) does not.
-    keywords :: Set.Set Keyword.Keyword,
+    keywords :: Set.Set Keyword.Type.Keyword,
     power :: Maybe Integer,
     -- CR 202.3: the candidate's mana value (CR 202.3a gives a costless object
     -- 0). On the battlefield it comes off the CR 613 projection, so CR 707.2's
@@ -176,7 +178,7 @@ data Context = MkContext
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
 -- supplied Context, not information baked into the predicate.
-matches :: Context -> View -> Filter.Filter Keyword.Keyword -> Bool
+matches :: Context -> View -> Filter.Filter Keyword.Type.Keyword -> Bool
 matches context view predicate = case predicate of
   Filter.HasCardType t -> Set.member t (cardTypes view)
   Filter.HasSupertype s -> Set.member s (supertypes view)
@@ -187,6 +189,17 @@ matches context view predicate = case predicate of
   -- makes "target creature with flying" (Plummet, CR 702.9) track a grant and a
   -- Humility alike rather than the printed type line.
   Filter.HasKeyword k -> Set.member k (keywords view)
+  -- CR 702.164a and CR 702.14a: the same read one step coarser, asking which
+  -- keyword each ability IS rather than how it is written -- so Flensing Raptor's
+  -- "creature you control with toxic" reaches toxic 1 and toxic 3 alike.
+  --
+  -- SCANNED rather than looked up, because the projection is keyed by the whole
+  -- keyword and a family is not a key. Nothing stores the families beside them:
+  -- a derived set that some later code sampled and others recomputed is this
+  -- repository's recurring bug, and the set being scanned is a single object's
+  -- abilities, never the board.
+  Filter.HasKeywordFamily f ->
+    any ((== Just f) . Keyword.familyOf) (keywords view)
   Filter.PowerAtLeast n -> case power view of
     Nothing -> False
     Just p -> p >= n
@@ -269,16 +282,17 @@ matches context view predicate = case predicate of
 -- arm rather than learning what is inside each one.
 --
 -- HasSubtype and HasKeyword are the atoms REWRITTEN here. The rest name a card
--- type, a supertype, a colour, a number, a relation or a status, none of which CR
--- 612's word swap reaches. Written out exhaustively rather than with a catch-all,
--- so a later atom that can carry a subtype fails to compile here instead of
--- silently going unrewritten.
+-- type, a supertype, a colour, a number, a relation, a status, or a keyword
+-- FAMILY, none of which CR 612's word swap reaches -- see the HasKeywordFamily
+-- arm below for why the family is in that list while HasKeyword is not. Written
+-- out exhaustively rather than with a catch-all, so a later atom that can carry a
+-- subtype fails to compile here instead of silently going unrewritten.
 --
 -- CR 612.2's family gate is not restated on the HasSubtype arm, for the reason
 -- Pawl.Engine.Projection's type-line half gives: a HasSubtype atom may name a
 -- word of any family, so the family the word is used as IS the family the word
 -- belongs to, and the exact `lookup` already asks CR 612.2's question.
-rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter Keyword.Keyword -> Filter.Filter Keyword.Keyword
+rewrite :: [(Subtype.Subtype, Subtype.Subtype)] -> Filter.Filter Keyword.Type.Keyword -> Filter.Filter Keyword.Type.Keyword
 rewrite pairs predicate = case predicate of
   Filter.HasSubtype s -> Filter.HasSubtype (Maybe.fromMaybe s (lookup s pairs))
   Filter.And fs -> Filter.And (fmap (rewrite pairs) fs)
@@ -292,6 +306,13 @@ rewrite pairs predicate = case predicate of
   -- rewriteKeyword below is the descent, shared with the two sites that rewrite
   -- a keyword rather than a filter over one.
   Filter.HasKeyword k -> Filter.HasKeyword (rewriteKeyword pairs k)
+  -- Untouched, where the atom above is rewritten, and the contrast is CR 612's
+  -- rather than an omission: rule 612.1's swap acts on a WORD in the text, and a
+  -- family names no word. Magical Hack turning "Swamp" into "Island" turns a
+  -- swampwalk into an islandwalk, so "creature with swampwalk" has to follow it;
+  -- "creature with landwalk" still reads landwalk afterwards, and CR 702.14a's
+  -- generic term is not itself a land type to swap.
+  Filter.HasKeywordFamily _ -> predicate
   Filter.PowerAtLeast _ -> predicate
   Filter.PowerAtMost _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
@@ -335,14 +356,14 @@ rewrite pairs predicate = case predicate of
 -- Not rewritten: the Cost that cycling, flashback, morph and entwine carry. A cost may
 -- hold a Filter through CostComponent.Sacrifice, which is the ability-cost half
 -- of #635 one carrier over.
-rewriteKeyword :: [(Subtype.Subtype, Subtype.Subtype)] -> Keyword.Keyword -> Keyword.Keyword
+rewriteKeyword :: [(Subtype.Subtype, Subtype.Subtype)] -> Keyword.Type.Keyword -> Keyword.Type.Keyword
 rewriteKeyword pairs keyword = case keyword of
   -- CR 702.14a's "[type]walk".
-  Keyword.Landwalk criterion -> Keyword.Landwalk (rewrite pairs criterion)
+  Keyword.Type.Landwalk criterion -> Keyword.Type.Landwalk (rewrite pairs criterion)
   -- CR 702.29e's "[Type]cycling", rule 702's other "[type]": "usually a subtype
   -- (as in 'mountaincycling')", so it holds a basic land type exactly as
   -- swampwalk does.
-  Keyword.Cycling cost criterion -> Keyword.Cycling cost (fmap (rewrite pairs) criterion)
+  Keyword.Type.Cycling cost criterion -> Keyword.Type.Cycling cost (fmap (rewrite pairs) criterion)
   -- CR 702.11d's "hexproof from [quality]", rule 702's third carrier of a word.
   -- Not a "[type]" like the two above -- CR 702.11d's quality is any quality, and
   -- the ones cards actually print tend to name a card type or a colour -- but CR
@@ -351,36 +372,36 @@ rewriteKeyword pairs keyword = case keyword of
   -- is swapped; Elenda, Saint of Dusk's "hexproof from instants" comes back
   -- unchanged because its atom holds no subtype word. CR 702.11b's unqualified
   -- hexproof is the Nothing, which `fmap` leaves standing.
-  Keyword.Hexproof quality -> Keyword.Hexproof (fmap (rewrite pairs) quality)
-  Keyword.Deathtouch -> keyword
-  Keyword.Defender -> keyword
-  Keyword.DoubleStrike -> keyword
-  Keyword.FirstStrike -> keyword
-  Keyword.Flash -> keyword
-  Keyword.Banding -> keyword
-  Keyword.Phasing -> keyword
-  Keyword.Aftermath -> keyword
-  Keyword.Flying -> keyword
-  Keyword.Haste -> keyword
-  Keyword.Indestructible -> keyword
-  Keyword.Lifelink -> keyword
-  Keyword.Reach -> keyword
-  Keyword.Shroud -> keyword
-  Keyword.Trample -> keyword
-  Keyword.Vigilance -> keyword
-  Keyword.Flashback _ -> keyword
-  Keyword.Fear -> keyword
-  Keyword.Morph _ -> keyword
-  Keyword.Entwine _ -> keyword
-  Keyword.Poisonous _ -> keyword
-  Keyword.Infect -> keyword
-  Keyword.BattleCry -> keyword
-  Keyword.Menace -> keyword
-  Keyword.Devoid -> keyword
+  Keyword.Type.Hexproof quality -> Keyword.Type.Hexproof (fmap (rewrite pairs) quality)
+  Keyword.Type.Deathtouch -> keyword
+  Keyword.Type.Defender -> keyword
+  Keyword.Type.DoubleStrike -> keyword
+  Keyword.Type.FirstStrike -> keyword
+  Keyword.Type.Flash -> keyword
+  Keyword.Type.Banding -> keyword
+  Keyword.Type.Phasing -> keyword
+  Keyword.Type.Aftermath -> keyword
+  Keyword.Type.Flying -> keyword
+  Keyword.Type.Haste -> keyword
+  Keyword.Type.Indestructible -> keyword
+  Keyword.Type.Lifelink -> keyword
+  Keyword.Type.Reach -> keyword
+  Keyword.Type.Shroud -> keyword
+  Keyword.Type.Trample -> keyword
+  Keyword.Type.Vigilance -> keyword
+  Keyword.Type.Flashback _ -> keyword
+  Keyword.Type.Fear -> keyword
+  Keyword.Type.Morph _ -> keyword
+  Keyword.Type.Entwine _ -> keyword
+  Keyword.Type.Poisonous _ -> keyword
+  Keyword.Type.Infect -> keyword
+  Keyword.Type.BattleCry -> keyword
+  Keyword.Type.Menace -> keyword
+  Keyword.Type.Devoid -> keyword
   -- CR 702.122a's N is a number and not a word, so CR 612.2 has nothing to swap.
-  Keyword.Crew _ -> keyword
-  Keyword.Riot -> keyword
-  Keyword.Daybound -> keyword
-  Keyword.Nightbound -> keyword
-  Keyword.Toxic _ -> keyword
-  Keyword.StartYourEngines -> keyword
+  Keyword.Type.Crew _ -> keyword
+  Keyword.Type.Riot -> keyword
+  Keyword.Type.Daybound -> keyword
+  Keyword.Type.Nightbound -> keyword
+  Keyword.Type.Toxic _ -> keyword
+  Keyword.Type.StartYourEngines -> keyword

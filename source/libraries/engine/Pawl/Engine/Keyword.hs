@@ -26,6 +26,7 @@ import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -701,6 +702,58 @@ entryReplacementsFor keyword count = case keyword of
 -- Membership rather than a count, because the gate asks whether there is any.
 mintsEntryReplacement :: Keyword -> Bool
 mintsEntryReplacement keyword = not (null (entryReplacementsFor keyword 1))
+
+-- CR 702: WHICH KEYWORD this is, with its payload dropped -- the classification
+-- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
+-- control with toxic" reaches toxic 1 and toxic 3 alike (CR 702.164a).
+--
+-- Nothing for a NULLARY keyword, and not because the answer is unknown: a nullary
+-- keyword has no payload to drop, so Filter.HasKeyword already asks its family
+-- question exactly. Pawl.Types.KeywordFamily has no constructor for one, which is
+-- what keeps "a creature with flying" from having two spellings.
+--
+-- EXHAUSTIVE, with no wildcard, and that is the point of writing it out. This
+-- classification is a second enumeration to keep in step with rule 702 --
+-- Pawl.Types.CounterKind refuses one for CR 122.1b's fifteen counter keywords for
+-- exactly that reason -- and the case below is what makes the difference: adding
+-- a Keyword constructor fails to compile until its family is decided. A wildcard
+-- would silently answer Nothing for the next parameterized keyword.
+familyOf :: Keyword -> Maybe KeywordFamily.KeywordFamily
+familyOf keyword = case keyword of
+  Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
+  Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
+  Keyword.Cycling _ _ -> Just KeywordFamily.Cycling
+  Keyword.Flashback _ -> Just KeywordFamily.Flashback
+  Keyword.Morph _ -> Just KeywordFamily.Morph
+  Keyword.Entwine _ -> Just KeywordFamily.Entwine
+  Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
+  Keyword.Crew _ -> Just KeywordFamily.Crew
+  Keyword.Toxic _ -> Just KeywordFamily.Toxic
+  Keyword.Deathtouch -> Nothing
+  Keyword.Defender -> Nothing
+  Keyword.DoubleStrike -> Nothing
+  Keyword.FirstStrike -> Nothing
+  Keyword.Flash -> Nothing
+  Keyword.Flying -> Nothing
+  Keyword.Haste -> Nothing
+  Keyword.Indestructible -> Nothing
+  Keyword.Lifelink -> Nothing
+  Keyword.Reach -> Nothing
+  Keyword.Shroud -> Nothing
+  Keyword.Trample -> Nothing
+  Keyword.Vigilance -> Nothing
+  Keyword.Banding -> Nothing
+  Keyword.Phasing -> Nothing
+  Keyword.Fear -> Nothing
+  Keyword.Infect -> Nothing
+  Keyword.BattleCry -> Nothing
+  Keyword.Menace -> Nothing
+  Keyword.Devoid -> Nothing
+  Keyword.Aftermath -> Nothing
+  Keyword.Riot -> Nothing
+  Keyword.Daybound -> Nothing
+  Keyword.Nightbound -> Nothing
+  Keyword.StartYourEngines -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.

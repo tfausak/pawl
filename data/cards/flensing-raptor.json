@@ -1,0 +1,139 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Flying"
+        },
+        {
+          "type": "Toxic",
+          "value": 1
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Flensing Raptor",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 2
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "ModifyPowerToughness",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          }
+                        ]
+                      },
+                      "target"
+                    ]
+                  },
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      {
+                        "type": "GainKeyword",
+                        "value": {
+                          "type": "Flying"
+                        }
+                      },
+                      "target"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "IsSource"
+                            }
+                          },
+                          {
+                            "type": "ControlledBy",
+                            "value": {
+                              "type": "You"
+                            }
+                          },
+                          {
+                            "type": "HasKeywordFamily",
+                            "value": {
+                              "type": "Toxic"
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Creatures"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Bird"
+          },
+          {
+            "type": "Phyrexian"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

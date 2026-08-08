@@ -1216,6 +1216,9 @@ canHostSubjects predicate = case predicate of
   -- run -- but still a Filter position a card author can write the atom into,
   -- which is the only thing this lint is about.
   Filter.Type.HasKeyword keyword -> sum (fmap canHostSubjects (keywordFilters keyword))
+  -- Zero and not a descent, unlike the atom above: a family is payload-free, so
+  -- there is no Filter position inside it for a card author to reach.
+  Filter.Type.HasKeywordFamily _ -> 0
   Filter.Type.HasCardType _ -> 0
   Filter.Type.HasSupertype _ -> 0
   Filter.Type.HasColor _ -> 0

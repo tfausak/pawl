@@ -75,6 +75,14 @@ soleTargetSpec modal = case Map.elems (Modal.allTargetSpecs modal) of
   [only] -> Just only
   _ -> Nothing
 
+-- soleTargetSpec, off the one TRIGGERED ability a printing declares rather than
+-- off its spell. Same rationale: the spec is read out of the committed card, so
+-- the case exercises the codec's parse and never a hand-built TargetSpec.
+triggerTargetSpec :: Printing.Printing -> Maybe TargetSpec.TargetSpec
+triggerTargetSpec printing = case Face.triggeredAbilities (S.combinedFace printing) of
+  [ability] -> soleTargetSpec (TriggeredAbility.modal ability)
+  _ -> Nothing
+
 -- `pid` controls the restricted creature -- a Blurred Mongoose or a Slippery
 -- Bogle -- and a Goblin Piker, and nothing else. The Piker is the CONTROL in
 -- every rule-702 case below: it is a legal target of everything the restricted
@@ -1171,3 +1179,38 @@ spec s registry = Spec.describe s "Pawl.Engine.Target" $ do
     Spec.assertEqWith s "with exile empty when the trigger resolved (the card was shuffled in)" (Set.size (GameState.exile shuffledIn)) 0
     Spec.assertEqWith s "and empty when it fizzled too (the card was taken to hand)" (Set.size (GameState.exile fizzled)) 0
     Spec.assertEqWith s "with the ability off the stack" (length (GameState.stack fizzled)) 0
+
+  -- CR 702.164a: "Toxic is a static ability. It is written 'toxic N,' where N is
+  -- a number." Flensing Raptor's enters trigger reads "another target creature
+  -- you control with toxic", which names the ABILITY rather than one written
+  -- instance -- Filter.HasKeywordFamily, where every other keyword narrowing in
+  -- the pool is Filter.HasKeyword. So a single filter has to reach both the
+  -- toxic 1 Raptor beside it and the toxic 2 Branchblight Stalker (#522).
+  --
+  -- TWO Ns is the whole point of the board: a HasKeyword-shaped implementation
+  -- could match the entering Raptor's own toxic 1 and would still fail on the
+  -- Stalker, so one toxic creature would not discriminate.
+  --
+  -- The Piker is the control, as in the rule-702 cases above -- without it,
+  -- "the creature without toxic is excluded" could pass on an empty legal set.
+  -- Bob's Stalker separates the family question from the CR 109.5 controller one,
+  -- and the entering Raptor itself pins CR 601.2c's "another" (Not IsSource).
+  Spec.it s "CR 702.164a Flensing Raptor's trigger reaches toxic 1 and toxic 2 alike, and nothing else" $ do
+    raptor <- S.printingOf s registry "Flensing Raptor"
+    stalker <- S.printingOf s registry "Branchblight Stalker"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let gs0 = Setup.emptyGame S.bothPlayers
+        (otherRaptorId, gs1) = S.addCreature raptor S.alice gs0
+        (stalkerId, gs2) = S.addCreature stalker S.alice gs1
+        (pikerId, gs3) = S.addCreature piker S.alice gs2
+        (hisStalkerId, gs4) = S.addCreature stalker S.bob gs3
+        (enteringId, board) = S.entersWithTrigger raptor S.alice gs4
+    case triggerTargetSpec raptor of
+      Nothing -> Spec.assertFailure s "Flensing Raptor's trigger should declare one target slot"
+      Just theSpec -> do
+        let legal = Target.legalRecipients (Just S.alice) enteringId theSpec board
+        Spec.assertBool s (Set.member (Recipient.ToCreature otherRaptorId) legal) "the Raptor beside it has toxic 1, and is legal"
+        Spec.assertBool s (Set.member (Recipient.ToCreature stalkerId) legal) "Branchblight Stalker has toxic 2, and is legal too"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature pikerId) legal)) "Goblin Piker has no toxic at all"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature enteringId) legal)) "CR 601.2c: not the entering Raptor itself"
+        Spec.assertBool s (not (Set.member (Recipient.ToCreature hisStalkerId) legal)) "CR 109.5: not bob's toxic creature"
