@@ -214,7 +214,7 @@ becomesUnattached pcs gs oid = case Game.lookupObject oid gs of
 -- an Aura that is also a creature is attached, so it detaches HERE and CR 704.5m's
 -- fallsOff buries it on the next pass. The rule's "then" IS that pass boundary.
 -- Only the state-based half lives here; the RESTRICTION half ("can't enchant
--- anything") is Pawl.Engine.Resolve.attachmentFor's first Aura conjunct.
+-- anything") is Pawl.Engine.Attach.attachmentFor's first Aura conjunct.
 cannotBeAttached :: Map.Map ObjectId PC.ProjectedCharacteristics -> GameState -> ObjectId -> Bool
 cannotBeAttached pcs gs oid = case Game.lookupObject oid gs of
   Nothing -> False

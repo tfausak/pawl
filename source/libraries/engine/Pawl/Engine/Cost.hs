@@ -750,7 +750,7 @@ canPayComponent pid oid component gs = case component of
   -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
   -- effect" is not enforced across two components of ONE cost (#104).
   CostComponent.Sacrifice n criterion ->
-    Natural.length (Replacement.sacrificeCandidates pid criterion gs) >= n
+    Natural.length (Replacement.sacrificeCandidates pid (Just oid) criterion gs) >= n
   -- CR 702.122a: payable iff SOME subset of the candidates reaches the
   -- threshold. Which is decided without enumerating one, because the greatest
   -- total any subset can reach is the sum of the candidates' POSITIVE powers:
@@ -911,7 +911,7 @@ payComponent pid oid component = case component of
   -- no-op.
   CostComponent.Sacrifice n criterion -> do
     gs <- State.get
-    let candidates = Replacement.sacrificeCandidates pid criterion gs
+    let candidates = Replacement.sacrificeCandidates pid (Just oid) criterion gs
         decider = Decide.deciderFor pid gs
     chosen <-
       if Natural.length candidates <= n

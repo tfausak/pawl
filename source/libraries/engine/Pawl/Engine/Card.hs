@@ -956,7 +956,7 @@ enchantSpecs face = case enchantSpec face of
 -- enchant." This is where that rule lives -- the ONE spec every reader of an
 -- enchant ability gets, so CR 601.2c's target legality (Pawl.Engine.Cast), CR
 -- 303.4c's admission re-check (Pawl.Engine.Sba.fallsOff) and CR 701.3a's attach
--- (Pawl.Engine.Resolve.attachmentFor) cannot disagree about what "all of them"
+-- (Pawl.Engine.Attach.attachmentFor) cannot disagree about what "all of them"
 -- means. Nothing for a face with no enchant ability at all, which is every
 -- non-Aura (the CardSpec lint holds the biconditional).
 --

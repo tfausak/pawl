@@ -104,6 +104,12 @@ data Response
     -- ChoseRiot is distinct from ChoseOptional: a transcript that answered one
     -- as-enters "may" must not silently answer a different one.
     ChosePayLifeOnEntry OptionalDecision.OptionalDecision
+  | -- | CR 303.4k: whether an Aura being turned face up exercised its printed
+    -- "you may attach it" (Exercises) or left itself unattached (Declines).
+    -- Distinct from ChoseRiot and ChosePayLifeOnEntry for their own reason, one
+    -- event class over: turning face up is not an entry, so a transcript that
+    -- answered an as-enters "may" must not answer this one.
+    ChoseTurnUpAttachment OptionalDecision.OptionalDecision
   | -- | CR 614.1c: the colour a player chose as an object entered.
     ChoseColor Color.Color
   | -- | CR 201.4 / 614.1c: the card name a player chose as an object entered.

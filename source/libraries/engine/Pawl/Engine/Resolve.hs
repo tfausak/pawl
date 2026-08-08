@@ -11,6 +11,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -100,7 +101,6 @@ import qualified Pawl.Types.Sickness as Sickness
 import Pawl.Types.SlotName (SlotName)
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
-import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -940,68 +940,6 @@ alreadyTurnedFor resolving victim gs = case Game.lookupObject resolving gs of
       Source.OfToken _ -> False
       Source.OfEmblem _ -> False
       Source.OfInherentTrigger _ _ -> False
-
--- CR 701.3a/701.3b: may `src` legally be attached to `destination` right now?
---
--- CR 701.3a's last sentence is the whole rule -- an Aura, Equipment or
--- Fortification can't be attached to something it couldn't enchant, equip or
--- fortify -- so this dispatches on which `src` is, read through the PROJECTION, so
--- that an Equipment that lost the subtype (CR 301.5c) and a permanent animated
--- into a creature both answer correctly.
---
--- Equipment is CR 301.5's creature test. Aura is CR 303.4's enchant ability, asked
--- through Target.admittedRecipients rather than a hand-rolled creature test, which
--- honours an enchant spec that narrows further for free. Admission and not target
--- legality: CR 702.5a gives the enchant ability both jobs and this is the second,
--- so rule 702's targeting restrictions do not reach here. CR 109.5's "you" on that
--- spec is the AURA's controller, not the moving effect's. An Aura with no enchant
--- ability cannot arise -- the CardSpec lint holds the biconditional.
---
--- The Aura branch's first test is CR 303.4d's "an Aura that's also a creature
--- can't enchant anything", whose state-based half is Sba.cannotBeAttached.
--- Unreachable in this pool, written because it costs one comparison. The Equipment
--- branch has no counterpart: CR 301.5c's matching restriction carries a
--- reconfigure exception nothing here can express (#193).
---
--- The first guard -- the destination naming `src` itself -- is CR 301.5c and CR
--- 303.4d at once. Nothing for a source that is neither, per CR 701.3b; there is no
--- Subtype.Fortification to case on.
---
--- Answers with the RECIPIENT to store rather than a Bool, since CR 303.4
--- attachment is to an object or player and Object.attachedTo records which -- and
--- the tag must be the one the moving permanent's OWN rules reference the
--- destination by, not the one the moving effect targeted it with. Taking the
--- answer from the spec's candidate list is what keeps Sba's CR 303.4c re-check
--- able to compare against that same list later, so `destination` is matched by
--- which object or player it names rather than by how the caller tagged it.
-attachmentFor :: ObjectId -> Recipient -> GameState -> Maybe Recipient
-attachmentFor src destination gs
-  | Recipient.objectOf destination == Just src = Nothing
-  -- CR 301.5, "it can't legally be attached to anything that isn't a creature" --
-  -- which is also why a player destination falls to Nothing here rather than
-  -- getting a branch of its own.
-  | Set.member Subtype.Equipment subtypes = case Recipient.objectOf destination of
-      Just oid | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
-      _ -> Nothing
-  | Set.member Subtype.Aura subtypes =
-      if Projection.isCreatureOf src gs
-        then Nothing
-        else case Game.faceOf src gs >>= Card.enchantSpec of
-          Nothing -> Nothing
-          Just spec ->
-            List.find
-              (names destination)
-              (Set.toList (Target.admittedRecipients (Projection.controllerOf src gs) src spec gs))
-  | otherwise = Nothing
-  where
-    subtypes = Projection.subtypesOf src gs
-    -- Same object, or same player, however either was tagged. Two object tags
-    -- (ToCreature / ToObject) name one object; ToPlayer is the only player tag,
-    -- so those compare whole.
-    names a b = case (Recipient.objectOf a, Recipient.objectOf b) of
-      (Just x, Just y) -> x == y
-      (Nothing, Nothing) -> a == b
-      _ -> False
 
 -- The players a PlayerRef names DURING a resolution, read from the slots this
 -- resolution filled rather than the source's bindings (which is what
@@ -2439,7 +2377,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- The slot's recipient is a PROPOSED destination; what gets stored is the
         -- recipient the moving permanent's own rules name it by (attachmentFor),
         -- and Nothing there is CR 701.3b's illegal attach.
-        case attachmentFor source recipient gs of
+        case Attach.attachmentFor source recipient gs of
           Nothing -> pure ()
           Just attachment -> do
             let alreadyThere = case Game.lookupObject source gs of
@@ -2468,79 +2406,29 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         Nothing -> pure () -- a player recipient: nothing on the battlefield moves
         Just subject -> do
           gs <- State.get
-          let host = Game.lookupObject subject gs >>= Object.attachedTo >>= Recipient.objectOf
-              -- One candidate's view, with the one field a projection cannot fill:
-              -- whether the SUBJECT could legally be attached here (CR 701.3a).
-              -- Answered by attachmentFor, the same function the move goes through
-              -- below, so an offer and a move cannot disagree. Lazy, so a filter
-              -- that never names the atom pays nothing.
-              viewOf oid =
-                (Projection.viewOfObject oid gs)
-                  { Filter.canHostSubject = Maybe.isJust (attachmentFor subject (Recipient.ToObject oid) gs)
-                  }
-              -- The destinations the card's own TEXT admits: battlefield
-              -- permanents matching the Filter, less the one the subject already
-              -- holds. That exclusion is CR 701.3b's second sentence -- attaching
-              -- a permanent to what it is already attached to "does nothing" --
-              -- and it is also how Crown of the Ages' "ANOTHER creature" is
-              -- spelled, so a card omitting the word would behave identically.
-              --
-              -- Narrowed to destinations the move would be LEGAL for only when the
-              -- card SAYS so, which is Filter.CanHostSubject's whole job: Aura
-              -- Graft's "another permanent IT CAN ENCHANT" narrows, and Crown of
-              -- the Ages' bare "another creature" does not. Narrowing a filter
-              -- that does not carry the atom would answer CR 303.4j's question on
-              -- the player's behalf, and CR 303.4j exists precisely because the
-              -- choice can land somewhere the subject may not go.
-              --
-              -- Ascending, so both the elision below and a transcript are
-              -- deterministic. The filter context is this effect's own -- CR
-              -- 109.5's "you" is the ability's controller and IsSource is its
-              -- source -- because the destination filter IS the ability's card
-              -- text, unlike PlayerSacrifices', which is read against the victim.
-              candidates =
-                List.sort
-                  ( filter
-                      (\oid -> Just oid /= host && Filter.matches (Filter.MkContext (Just controller) (Just source)) (viewOf oid) filter_)
-                      (Set.toList (GameState.battlefield gs))
-                  )
-          case candidates of
-            -- CR 609.3: the effect does as much as it can, and with no
-            -- destination the text admits that is nothing.
-            [] -> pure ()
-            first : rest -> do
-              destination <- case rest of
-                -- One destination is no choice at all, and the effect is not a
-                -- "may" -- where the rules leave nothing to ask, don't prompt.
-                -- The elision is not re-derived for an optional attach (#359).
-                [] -> pure first
-                second : more -> do
-                  let offered = first NonEmpty.:| (second : more)
-                  -- FILTERED, NOT TRUSTED, the ChooseBoundToken posture: an
-                  -- answer naming something that was never offered falls back to
-                  -- the first candidate, since the effect is mandatory and must
-                  -- pick something.
-                  answer <- Game.choose (Prompt.ChooseAttachment (Decide.deciderFor controller gs) controller subject offered)
-                  pure (if List.elem answer (NonEmpty.toList offered) then answer else first)
-              gs1 <- State.get
-              -- CR 303.4j, for an Aura -- "the Aura doesn't move" -- and CR
-              -- 701.3b's first sentence for the rest. A FAILURE MODE, not a
-              -- fizzle: the ability resolved, and the only thing that did not
-              -- happen is the move. In particular the subject stays attached to
-              -- its old host rather than becoming unattached, so CR 704.5m has
-              -- nothing to bury.
-              -- The destination was chosen as an object off the battlefield, so
-              -- it is proposed as a bare ToObject and attachmentFor re-tags it
-              -- the way the subject's own enchant spec references it.
-              case attachmentFor subject (Recipient.ToObject destination) gs1 of
-                Nothing -> pure ()
-                Just attachment -> do
-                  -- CR 701.3c: attaching to a DIFFERENT object gives it a new
-                  -- timestamp, which CR 613.7 orders layer effects by. Always a
-                  -- different object here -- the current host was never offered.
-                  let (ts, gs2) = Game.freshTimestamp gs1
-                      move o = o {Object.attachedTo = Just attachment, Object.timestamp = ts}
-                  State.put gs2 {GameState.objects = Map.adjust move subject (GameState.objects gs2)}
+          -- The destinations the card's own TEXT admits, and NOTHING MORE.
+          -- Narrowed to destinations the move would be LEGAL for only when the
+          -- card SAYS so, which is Filter.CanHostSubject's whole job: Aura
+          -- Graft's "another permanent IT CAN ENCHANT" narrows, and Crown of the
+          -- Ages' bare "another creature" does not. Narrowing a filter that does
+          -- not carry the atom would answer CR 303.4j's question on the player's
+          -- behalf, and CR 303.4j exists precisely because the choice can land
+          -- somewhere the subject may not go. That is the contrast with CR
+          -- 303.4k at Attach.turnUpHosts, where the rule itself does the
+          -- narrowing and leaves no such backstop open.
+          --
+          -- CR 609.3 when Attach.hostsFor is empty: the effect does as much as it
+          -- can, and with no destination the text admits that is nothing. The
+          -- elision at one candidate is Attach.chooseHost's, and it is not
+          -- re-derived for an optional attach (#359).
+          destination <- Attach.chooseHost controller subject (Attach.hostsFor controller source subject filter_ gs)
+          -- The destination was chosen as an object off the battlefield, so it is
+          -- proposed as a bare ToObject and Attach.attach re-tags it the way the
+          -- subject's own enchant spec references it. Always a DIFFERENT object
+          -- than the current host, which hostsFor never offers, so CR 701.3c's
+          -- restamp is always earned -- and CR 303.4j's refusal, for a
+          -- destination the subject may not go to, happens inside Attach.attach.
+          Monad.mapM_ (Attach.attach subject . Recipient.ToObject) destination
       _ -> pure ()
   Effect.ExileUntilMonarch slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

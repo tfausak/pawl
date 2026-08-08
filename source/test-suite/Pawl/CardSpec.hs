@@ -120,6 +120,7 @@ import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -1731,17 +1732,30 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.PayLifeOrTapped _ -> []
   EntryRewrite.SacrificeAnyNumber f _ -> [f]
 
--- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat
--- is "one or more counters would be put on a creature YOU control", and EntryR's
+-- The Filter a TurnUpRewrite carries. CR 303.4k's destination text -- Gift of
+-- Doom's "you may attach it to a creature" -- and NOT framed, even though an
+-- attach is what it describes: the enchant-ability narrowing is added by
+-- Pawl.Engine.Attach.turnUpHosts because rule 303.4k mandates it, so a card
+-- writing Filter.CanHostSubject here would be stating a rule rather than its own
+-- text. That is why this list feeds `unframed` with every other position.
+turnUpRewriteFilters :: TurnUpRewrite.TurnUpRewrite -> [Filter.Type.Filter Keyword.Keyword]
+turnUpRewriteFilters turnUpRewrite = case turnUpRewrite of
+  TurnUpRewrite.WithCounters _ _ -> []
+  TurnUpRewrite.MayAttachTo f -> [f]
+
+-- CR 614.1c-e: three replacement patterns narrow by a Filter. CounterPattern.onWhat
+-- is "one or more counters would be put on a creature YOU control"; EntryR's
 -- whole pattern is one -- CR 614.1c's "as [THIS PERMANENT] enters" (Filter.IsSource)
 -- and CR 614.1d's "[Objects] enter [the battlefield] . . ." (Gather Specimens'
--- creature clause). The other five narrow by zone, damage, destruction, token or
+-- creature clause) -- and TurnUpR's is CR 614.1e's "as [THIS PERMANENT] is turned
+-- face up". The other four narrow by zone, damage, destruction, token or
 -- phase, none of which holds one.
 --
--- EntryR's REWRITE holds one too, on a second axis: its pattern says which
--- objects entering it applies to, and entryRewriteFilters above says which
--- cards a name choice inside it may name and which permanents an as-enters
--- sacrifice may take.
+-- EntryR's and TurnUpR's REWRITES hold one too, on a second axis: each pattern
+-- says which objects the replacement applies to, and entryRewriteFilters and
+-- turnUpRewriteFilters above say which cards a name choice inside it may name,
+-- which permanents an as-enters sacrifice may take, and where CR 303.4k's
+-- attachment may land.
 replacementEffectFilters :: ReplacementEffect.ReplacementEffect -> [Filter.Type.Filter Keyword.Keyword]
 replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.CounterR counterPattern _ -> [CounterPattern.onWhat counterPattern]
@@ -1750,7 +1764,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DamageR _ _ -> []
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR _ _ -> []
-  ReplacementEffect.TurnUpR turnUpPattern _ -> [turnUpPattern]
+  ReplacementEffect.TurnUpR turnUpPattern turnUpRewrite -> turnUpPattern : turnUpRewriteFilters turnUpRewrite
   ReplacementEffect.PhaseR _ -> []
 
 -- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
@@ -1769,9 +1783,13 @@ unframed = fmap ((,) False)
 
 -- Every Filter one effect carries, paired with whether an ATTACH frames it.
 -- Exactly one arm answers True: Effect.AttachTarget's destination, which is the
--- only Filter position Pawl.Engine.Resolve evaluates against a view whose
--- `canHostSubject` is filled in (the AttachTarget arm of applyEffectWith, from
--- attachmentFor). Everywhere else the field is False by construction --
+-- only CARD-AUTHORED Filter position evaluated against a view whose
+-- `canHostSubject` is filled in (Pawl.Engine.Attach.hostsFor, from
+-- attachmentFor). TurnUpRewrite.MayAttachTo reaches the same evaluator and is
+-- still unframed, deliberately: CR 303.4k's enchant-ability conjunct is added by
+-- Attach.turnUpHosts because the rule mandates it, so the atom appearing in that
+-- card's data would be a card restating a rule. Everywhere else the field is
+-- False by construction --
 -- Projection.viewOfCard, Projection.viewOfCharacteristics, Filter.playerView and
 -- Count's event snapshot all set it so -- because outside an attach there is no
 -- subject for CR 701.3a to be about. Widening the subject so that another

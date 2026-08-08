@@ -205,6 +205,23 @@ combatReplaySpec s =
         -- CR 614.1c: a transcript that runs short spends no life.
         Spec.it s "defaultAnswer declines the life payment" $
           Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChoosePayLifeOnEntry decider S.alice oid 3)) OptionalDecision.Declines
+        -- CR 303.4k: the fourth OptionalDecision-valued prompt, and the first
+        -- that is NOT an as-enters one -- Gift of Doom's "as this Aura is turned
+        -- face up, you may attach it to a creature". The three above are rejected
+        -- explicitly for the reason ChoosePayLifeOnEntry rejects the other two: a
+        -- transcript that answered one "may" must not be read as an answer to a
+        -- different one, and here the two boards a mix-up produces differ by a
+        -- permanent -- CR 704.5m buries the Aura this one declines.
+        Spec.it s "ChooseTurnUpAttachment records and replays an OptionalDecision, and rejects every other may" $ do
+          let p = Prompt.ChooseTurnUpAttachment decider S.alice oid
+          Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
+          Spec.assertEqWith s "a riot answer is not an answer to it" (Replay.decode p (Response.ChoseRiot OptionalDecision.Exercises)) Nothing
+          Spec.assertEqWith s "nor is an as-enters life payment" (Replay.decode p (Response.ChosePayLifeOnEntry OptionalDecision.Exercises)) Nothing
+          Spec.assertEqWith s "nor is a printed may" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 303.4k: a transcript that runs short moves no permanent.
+        Spec.it s "defaultAnswer declines the turn-up attachment" $
+          Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChooseTurnUpAttachment decider S.alice oid)) OptionalDecision.Declines
         -- CR 614.1c / 105.1: a colour chosen as a permanent enters. Every one of
         -- the five is round-tripped, because a codec that collapsed two of them
         -- would replay a Painter's Servant naming blue as one naming white --
