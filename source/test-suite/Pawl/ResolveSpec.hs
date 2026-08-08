@@ -4996,11 +4996,126 @@ corrosiveGaleSpec s registry = Spec.describe s "CorrosiveGale" $ do
     Spec.assertEqWith s "no damage marked on the grounded Bird Maiden" (markedOn maidenId after) (Just 0)
     Spec.assertBool s (S.onBattlefield maidenId after) "so it survives"
 
+-- CR 701.16a: "'Investigate' means 'Create a Clue token.' See rule 111.10f."
+-- The keyword action is pure shorthand for a Create, which is why Thraben
+-- Inspector needs no opcode of its own: the card data spells CR 111.10f's
+-- predefined Clue out literally ("a colorless Clue artifact token with '{2},
+-- Sacrifice this token: Draw a card.'"), which is the "given, not derived" side
+-- of Effect.Create's own doc comment rather than a lookup of the predefined
+-- definition.
+--
+-- Gameplay level throughout: the Inspector is cast from hand for {W}, its
+-- CR 603.6a enters trigger is placed by the settle and resolved off the stack,
+-- and the Clue's own ability is then activated and resolved.
+--
+-- Alice keeps THREE Plains so that after the {W} exactly two stay untapped --
+-- the Clue's {2} -- and a Goblin Piker sits in her library so the draw has
+-- something to find (CR 104.3c would otherwise decide the game first) and so
+-- the drawn card is identifiable by name rather than by a count that the
+-- Inspector's own 1/2 could coincide with.
+investigateBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
+investigateBoard s registry = do
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  inspector <- S.printingOf s registry "Thraben Inspector"
+  let (gs0, spellId) = S.handOne inspector (S.landsInPlay plains 3)
+      (_, gs1) = S.addLibraryCard piker S.alice gs0
+      cast = S.runPure S.identityAnswer gs1 (S.cast S.alice spellId)
+      -- The settle is what places the CR 603.6a trigger; the second resolveTop
+      -- is the trigger itself.
+      entered = S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+  pure (S.runPure S.identityAnswer entered (Stack.resolveTop >> Engine.settleForPriority))
+
+-- The one Clue on the board, by the fact that it is the only token there.
+clueOf :: GameState.GameState -> Maybe ObjectId.ObjectId
+clueOf gs = case S.tokensOf gs of
+  [oid] -> Just oid
+  _ -> Nothing
+
+-- The untapped lands on the board -- on this board, alice's Plains and nothing
+-- else. Used to build the one-mana board from the two-mana board by tapping one
+-- more land and changing nothing else.
+untappedPlains :: GameState.GameState -> [ObjectId.ObjectId]
+untappedPlains gs =
+  [ oid
+  | oid <- Set.toList (GameState.battlefield gs),
+    Set.member CardType.Land (Projection.cardTypesOf oid gs),
+    fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+  ]
+
+investigateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+investigateSpec s registry = Spec.describe s "Investigate" $ do
+  Spec.it s "CR 701.16a Thraben Inspector's ETB creates one colorless Clue artifact token" $ do
+    after <- investigateBoard s registry
+    -- Three Plains, the Inspector and exactly one more permanent. Stated as a
+    -- total rather than as "one token" so that a Create minting two fails here
+    -- as well as at clueOf below.
+    Spec.assertEqWith s "five permanents: three Plains, the Inspector and one more" (Set.size (GameState.battlefield after)) 5
+    Spec.assertEqWith s "the Inspector resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Thraben Inspector") S.alice after) 1
+    case clueOf after of
+      Nothing -> Spec.assertFailure s "expected exactly one token on the battlefield"
+      Just clueId -> do
+        -- CR 111.4: investigate does not name its token, so the name is the
+        -- subtype plus the word "Token".
+        Spec.assertEqWith s "the token is named Clue Token" (fmap Face.name (Game.faceOf clueId after)) (Just . CardName.MkCardName $ Text.pack "Clue Token")
+        Spec.assertEqWith s "CR 111.10f: an artifact" (Projection.cardTypesOf clueId after) (Set.singleton CardType.Artifact)
+        Spec.assertEqWith s "CR 111.10f: with subtype Clue" (Projection.subtypesOf clueId after) (Set.singleton Subtype.Clue)
+        -- CR 202.2b ("objects with no colored mana symbols in their mana costs
+        -- are colorless") plus CR 202.2e (a color indicator is the other way an
+        -- object gets a color): the token face carries neither, which is how
+        -- the card data spells "colorless". The falsifier for the clause being
+        -- asserted rather than assumed -- a token face given colorIndicator
+        -- White fails here and nowhere else.
+        Spec.assertEqWith s "CR 111.10f: and colorless" (Projection.colorsOf clueId after) Set.empty
+        -- CR 111.2: the player who creates a token controls it.
+        Spec.assertEqWith s "CR 111.2: alice created it, so alice controls it" (Projection.controllerOf clueId after) (Just S.alice)
+  Spec.it s "CR 111.10f the Clue's {2} is real: one untapped Plains cannot pay it" $ do
+    -- The negative board differs from the positive one ONLY in how many lands
+    -- are untapped: same permanents, same phase, same empty stack. Without
+    -- that, "not activatable" would pass for any of the reasons a cost check
+    -- can fail.
+    twoMana <- investigateBoard s registry
+    case (clueOf twoMana, untappedPlains twoMana) of
+      (Just clueId, first : _) -> do
+        let oneMana = S.tapObject first twoMana
+        Spec.assertEqWith s "two Plains untapped after the {W}" (length (untappedPlains twoMana)) 2
+        Spec.assertEqWith s "one on the negative board" (length (untappedPlains oneMana)) 1
+        case Activate.abilitiesFor clueId twoMana of
+          [ability] -> do
+            Spec.assertBool s (Activate.activatable S.alice clueId ability twoMana) "two mana pays {2}"
+            Spec.assertBool s (not (Activate.activatable S.alice clueId ability oneMana)) "one does not"
+          other -> Spec.assertFailure s ("expected exactly one activated ability on the Clue, got " <> show (length other))
+      _ -> Spec.assertFailure s "expected one token and at least one untapped Plains"
+  Spec.it s "CR 111.10f cracking the Clue draws a card, and the token ceases to exist (CR 111.7)" $ do
+    before <- investigateBoard s registry
+    case clueOf before of
+      Nothing -> Spec.assertFailure s "expected exactly one token on the battlefield"
+      Just clueId -> case Activate.abilitiesFor clueId before of
+        [ability] -> do
+          let activated = S.runPure S.identityAnswer before (Activate.activateAbility S.alice clueId ability)
+              after = S.runPure S.identityAnswer activated (Stack.resolveTop >> Engine.settleForPriority)
+          Spec.assertEqWith s "alice's hand was empty before" (S.handSize S.alice before) 0
+          -- Named, not counted -- and NOT through S.countByName, which spans
+          -- hand and library together and so cannot tell "drawn" from "still
+          -- in the library". The hand's own member is what says the Piker
+          -- moved, and the emptied library is the other half of it.
+          Spec.assertEqWith s "alice drew the Goblin Piker" (fmap (`S.soleFaceName` after) (Game.zoneMembers Zone.Hand S.alice after)) [CardName.MkCardName $ Text.pack "Goblin Piker"]
+          Spec.assertEqWith s "and her library is empty" (length (Game.zoneMembers Zone.Library S.alice after)) 0
+          Spec.assertBool s (not (S.onBattlefield clueId after)) "the Clue was sacrificed as a cost"
+          -- CR 111.7: a token in any zone other than the battlefield ceases to
+          -- exist, so the honest assertion is that it exists nowhere -- NOT
+          -- that it reached the graveyard.
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject clueId after)) "CR 111.7: and no longer exists in any zone"
+          Spec.assertEqWith s "alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+          Spec.assertEqWith s "three Plains are now tapped: the {W} and the {2}" (S.tappedCount S.alice after) 3
+        other -> Spec.assertFailure s ("expected exactly one activated ability on the Clue, got " <> show (length other))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
   plummetSpec s registry
   corrosiveGaleSpec s registry
+  investigateSpec s registry
   resolveSpec s registry
   fizzleSpec s registry
   indestructibleSpec s registry
