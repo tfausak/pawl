@@ -76,6 +76,11 @@ data Filter keyword
     -- admits every land, instant and player on the board, while this admits none
     -- of them. Both arms answer False for an absent power, so neither is
     -- reachable from the other, and Pawl.FilterSpec pins that pair apart.
+    --
+    -- Answered off the PROJECTION on the battlefield and off the printed power
+    -- box everywhere else (Projection.printedPower), which is what Imperial
+    -- Recruiter's "creature card with power 2 or less" reads as it searches a
+    -- library.
     PowerAtMost Integer
   | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
     -- Command's "creature card with mana value 2 or less".
@@ -85,12 +90,11 @@ data Filter keyword
     -- may reach. Nothing in the pool asks for a mana value floor, and an unused
     -- arm is the speculative construction the project forbids.
     --
-    -- Unlike the two power atoms above, this is answerable OFF the battlefield,
-    -- which is the point: rule 202.3 reads the printed mana cost, which exists in
-    -- every zone,
-    -- and the graveyard is where the card asking is looking (CR 115.2's other
-    -- zone half, via Pool.CardsInGraveyard). No Modification writes a mana cost,
-    -- so there is nothing projected to read instead.
+    -- Answerable OFF the battlefield, as the two power atoms above are and for
+    -- the same reason: rule 202.3 reads the printed mana cost, which exists in
+    -- every zone, and the graveyard is where the card asking is looking (CR 115.2's
+    -- other zone half, via Pool.CardsInGraveyard). No Modification writes a mana
+    -- cost, so there is nothing projected to read instead.
     ManaValueAtMost Integer
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
   | -- | The candidate IS the evaluation's source object. Context-relative like
