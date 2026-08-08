@@ -314,9 +314,9 @@ data Gathered = MkGathered
     -- CR 613.6's decision point: the lowest layer reached by any part of this
     -- part's effect. The layer fold gets this for free by visiting layers in
     -- order and memoizing on gEffect; a caller outside the fold
-    -- (abilitiesRemoved) has no memo, so the answer is carried rather than
-    -- re-derived at the wrong layer (#326). Equal to gLayer for a one-part
-    -- effect.
+    -- (abilitiesRemoved) carries it instead of re-deriving it at the wrong layer
+    -- (#326), and uses it as the bound it runs the fold to when it wants that
+    -- memo (decisionsUpTo). Equal to gLayer for a one-part effect.
     gLowest :: Layer,
     gTimestamp :: Timestamp,
     gModification :: Modification
@@ -1625,20 +1625,37 @@ removesAbilities m = case m of
 -- own layer-7b 1/1.
 --
 -- Each remover's affected set is judged at CR 613.6's decision point -- gLowest,
--- not layer 6 -- which is the same answer projectWith's `decided` memo reaches
--- inside the fold. The two must not disagree, or the fold strips an object this
--- gate did not. Humility cannot tell the readings apart, layer 6 being its lowest;
--- Titania's Song can, pairing a layer-4 type change with the layer-6 removal over
--- a set that reads the card type its layer-4 part writes.
+-- not layer 6 -- and this gate must reach the same answer the fold did, or the
+-- fold strips an object this gate did not. For a MULTI-PART remover it is not
+-- re-derived at all: decisionsUpTo hands back projectWith's own `decided` memo,
+-- so the two cannot drift.
 --
--- Grouped by that layer so one projection serves every remover deciding there, and
--- lazily enough that `any` short-circuits before projecting for a layer it never
--- reaches.
+-- Re-deriving it is what went wrong before. projectUpTo excludes the decision
+-- layer entirely, while the fold decides against the state that layer's earlier
+-- effects have already produced (CR 613.7 timestamp order, CR 613.8 dependency
+-- order). Humility cannot tell those readings apart -- layer 6 is its lowest, and
+-- its set is Matching (HasCardType Creature), which reads card types that layer 6
+-- does not write. Titania's Song beside a Liquimetal Coating can: the Coating's
+-- layer-4 AddCardType puts a permanent inside "each noncreature artifact" for the
+-- fold, which animated it, and outside it for a pre-layer-4 reading, which then
+-- let it keep its abilities.
 --
--- Still an approximation in one place: projectUpTo excludes the whole decision
--- layer, while the fold decides against the state same-layer predecessors have
--- already produced (CR 613.7/613.8). They disagree only when another effect in
--- that layer moves the remover's set, which no card in the pool does (#510).
+-- Widening projectUpTo to `<= lyr` instead would be exactly wrong, and CR 613.6's
+-- third Example says why: "All noncreature artifacts become 2/2 artifact
+-- creatures until end of turn ... the power- and toughness-setting effect is
+-- applied to those same permanents in layer 7b, even though those permanents
+-- aren't noncreature artifacts by then." Once the whole of layer 4 has run, the
+-- Song's own AddCardType has applied and its set answers False about every
+-- permanent it just animated. The memo is the only reading that is neither too
+-- early nor too late, because it was taken at the instant the effect applied.
+--
+-- SINGLE-PART removers (gEffect = Nothing) are not memoized by the fold, so they
+-- keep the projectUpTo reading. Grouped by decision layer so one projection and
+-- one memo serve every remover deciding there, and lazily enough that `any`
+-- short-circuits before building either for a layer it never reaches.
+--
+-- Not implemented: a single-part remover whose affected set another effect in its
+-- own decision layer moves (#1008).
 --
 -- Not asked of the remover's own source: whether a stripper was itself stripped is
 -- a question about order WITHIN layer 6, which the fold settles by CR 613.7
@@ -1650,7 +1667,11 @@ abilitiesRemoved cands gs oid =
   let byLowest = Map.fromListWith (<>) [(gLowest c, [c]) | c <- cands, removesAbilities (gModification c)]
       removesAt (lyr, cs) =
         let partial = projectUpTo lyr cands oid gs
-         in any (\c -> affects (gSource c) oid (gAffected c) partial gs) cs
+            decided = decisionsUpTo lyr cands oid gs
+            removes c = case gEffect c >>= (`Map.lookup` decided) of
+              Just answer -> answer
+              Nothing -> affects (gSource c) oid (gAffected c) partial gs
+         in any removes cs
    in any removesAt (Map.toList byLowest)
 
 -- CR 702.114a: devoid is the static ability "This object is colorless". PRINTED,
@@ -2045,10 +2066,22 @@ applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
 -- whenever a count reads strictly earlier layers, under-reading one over its own
 -- layer or later (#157).
 projectWith :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
+projectWith admits cands =
+  -- Bound before `oid` so the candidate-only work inside projectDeciding is
+  -- shared across the board, exactly as calling it directly would.
+  let forObject = projectDeciding admits cands
+   in \oid gs -> fst (forObject oid gs)
+
+-- The fold itself, returning CR 613.6's decision memo beside the characteristics
+-- it produced. abilitiesRemoved is the one caller that wants the memo: the
+-- question "did this remover's set include `oid`?" is settled inside the fold and
+-- cannot be re-derived from a layer-bounded view without contradicting either CR
+-- 613.6 or CR 613.7/613.8 -- see the comment there.
+projectDeciding :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
 -- Candidates-in, then a worker taking the object: everything derived from the
 -- candidate list alone is bound before `oid`, so projectAll shares it across the
 -- board instead of rebuilding it per object.
-projectWith admits cands = forObject
+projectDeciding admits cands = forObject
   where
     -- Layers 5 and 7a are always visited, even with no gathered effect there: an
     -- object's own CDAs are not gathered candidates. For an object with neither,
@@ -2228,7 +2261,8 @@ projectWith admits cands = forObject
                         ordered = List.sortOn gTimestamp (filter (\c -> gLayer c == lyr && applies c) cands)
                         step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
                      in (List.foldl' step seeded ordered, decided')
-       in noncreaturePT oid gs (fst (List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers))
+          (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
+       in (noncreaturePT oid gs folded, decisions)
 
 -- CR 208.3: "A noncreature permanent has no power or toughness, even if it's a
 -- card with a power and toughness printed on it (such as a Vehicle)." Applied to
@@ -2311,6 +2345,24 @@ projectFrom cands oid gs = noValuePT (projectWith (const True) cands oid gs)
 -- argument this serves.
 projectUpTo :: Layer -> [Gathered] -> ObjectId -> GameState -> ProjectedCharacteristics
 projectUpTo bound = projectWith (< bound)
+
+-- CR 613.6's answers, as the fold itself reached them, for every multi-part
+-- effect whose lowest layer is at or below `bound`: keyed by gEffect, True when
+-- the effect's affected set held `oid` at the layer it started to apply.
+--
+-- Bounded INCLUSIVELY, unlike projectUpTo, and that is the whole point: an
+-- effect deciding at `bound` decides against what its same-layer predecessors
+-- have already produced (CR 613.7 timestamp order, CR 613.8 dependency order),
+-- so the layer has to be run to reach the answer. Running it does not spoil the
+-- answer, because the answer was recorded as the effect applied rather than read
+-- off the finished layer -- which is the trap `< bound` was avoiding and
+-- `<= bound` on projectUpTo would fall into.
+--
+-- Terminates for the same reason projectUpTo does: a Count met while layer
+-- `bound` is being applied still sees `< bound`, so the nesting strictly
+-- descends a finite Layer.
+decisionsUpTo :: Layer -> [Gathered] -> ObjectId -> GameState -> Map (ObjectId, Natural) Bool
+decisionsUpTo bound cands oid gs = snd (projectDeciding (<= bound) cands oid gs)
 
 -- Project every battlefield object against ONE gather: O(gather + P*fold) instead
 -- of the O(P*(gather+fold)) of calling project per object. The hot path for SBA
