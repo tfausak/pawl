@@ -273,6 +273,7 @@ movedOf event = case event of
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -295,6 +296,7 @@ damageOf event = case event of
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -317,6 +319,7 @@ revealOf event = case event of
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
+  GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -2326,6 +2329,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2372,6 +2376,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2393,6 +2398,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2420,6 +2426,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2454,6 +2461,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2492,6 +2500,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2524,6 +2533,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2553,6 +2563,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2585,6 +2596,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2617,6 +2629,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2662,6 +2675,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2697,6 +2711,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2731,6 +2746,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2776,6 +2792,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2817,6 +2834,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2864,6 +2882,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2900,6 +2919,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2927,6 +2947,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2969,6 +2990,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
@@ -2995,6 +3017,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked oid name _ -> oid == bearer && name == half
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
@@ -3026,6 +3049,7 @@ matchesTrigger gs bearer you cond event = case cond of
   TriggerCondition.SelfTurnedFaceUp -> case event of
     GameEvent.TurnedFaceUp oid -> oid == bearer
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
@@ -3076,6 +3100,7 @@ matchesTrigger gs bearer you cond event = case cond of
       Nothing -> False
       Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
@@ -3119,6 +3144,7 @@ matchesTrigger gs bearer you cond event = case cond of
           PlayerRelation.Opponent -> controller /= you
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
@@ -3145,6 +3171,7 @@ matchesTrigger gs bearer you cond event = case cond of
   -- bearer nor `you` is consulted and the event's payload goes unread.
   TriggerCondition.PermanentSacrificed -> case event of
     GameEvent.PermanentSacrificed {} -> True
+    GameEvent.AbilityTriggered {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
@@ -3171,6 +3198,121 @@ matchesTrigger gs bearer you cond event = case cond of
   -- CR 603.2 matches an event against "a triggered ability's trigger event", and
   -- the ability is one ability.
   TriggerCondition.AnyOf conditions -> any (\c -> matchesTrigger gs bearer you c event) conditions
+  -- CR 603.3b's second class, the one condition in this type whose event is
+  -- another ability triggering: "whenever the final chapter ability of a Saga you
+  -- control triggers".
+  --
+  -- The event carries the triggered ability's SOURCE, its CONTROLLER as it
+  -- triggered (CR 603.3a) and its trigger CONDITION, and all three are read:
+  --
+  --   * the condition must be a chapter ability's (CR 714.2b, through
+  --     Saga.chapterOfCondition, so this and the SelfCountersReached arm above
+  --     cannot drift about what a chapter symbol is);
+  --   * its chapter must be the source's FINAL chapter number (CR 714.2d), which
+  --     is why the source's projection is read rather than the event alone;
+  --   * the source must be a Saga with one or more chapter abilities
+  --     (Saga.tracksLore, CR 714.1 / 704.5s's own phrase). CR 714.2d gives a
+  --     permanent with no chapter abilities a final chapter number of 0, so
+  --     without that conjunct a "{r0}" chapter ability on any permanent at all
+  --     would match -- no card prints one, and the gate is still the one the
+  --     rule states.
+  --
+  -- NOT self-scoped: Historian's Boon is an enchantment watching somebody else's
+  -- permanent, so the bearer contributes only CR 109.5's perspective through
+  -- `you`, which the PlayerRelation reads the event's controller against.
+  --
+  -- The source is read LIVE (Projection.project), which needs no CR 608.2h
+  -- fallback and is not a shortcut: CR 704.5s's exemption keeps a Saga on the
+  -- battlefield for exactly as long as a chapter ability of its own has triggered
+  -- and not yet left the stack, so the Saga whose final chapter fired this event
+  -- is still standing at the CR 117.5 boundary that scans for it. A Saga a
+  -- replacement or another player's effect took away in the same batch projects
+  -- as an object with no subtypes, which Saga.tracksLore declines -- the same
+  -- silence CR 603.10 would give a look-back that found nothing (#1028).
+  TriggerCondition.SagaFinalChapterTriggers relation -> case event of
+    GameEvent.AbilityTriggered srcId controller fired ->
+      ( case relation of
+          PlayerRelation.You -> controller == you
+          PlayerRelation.Opponent -> controller /= you
+      )
+        && ( let pc = Projection.project srcId gs
+              in Saga.tracksLore pc && Saga.chapterOfCondition fired == Just (Saga.finalChapterOf pc)
+           )
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+
+-- CR 603.3b: is this trigger condition "another ability triggering"? The
+-- classification the rule's two-part placement turns on -- False puts a trigger
+-- in the FIRST pass and True in the second, which is where
+-- Pawl.Engine.Engine.placePendingTriggers reads it.
+--
+-- Exhaustive with no wildcard, for eventBindingSlots' reason and more sharply: a
+-- wildcard would silently give every future condition the first pass, and a
+-- condition in the wrong pass is a resolution order the player can see.
+--
+-- `any` for CR 603.1b's multi-condition ability, which is the conservative
+-- reading rather than the exact one: rule 603.3b asks about the trigger
+-- condition that actually fired, and a PendingTrigger does not record WHICH of an
+-- AnyOf's clauses matched (#1027). No printing mixes the two classes in one
+-- ability -- Historian's Boon writes its two sentences as two abilities.
+reactsToAbilityTriggering :: TriggerCondition -> Bool
+reactsToAbilityTriggering cond = case cond of
+  -- The one condition of this class in the pool, and the reason the rule's second
+  -- pass exists at all.
+  TriggerCondition.SagaFinalChapterTriggers _ -> True
+  TriggerCondition.AnyOf conditions -> any reactsToAbilityTriggering conditions
+  -- Everything else names something that happened to the board or to a player,
+  -- which is CR 603.3b's first class in as many words.
+  TriggerCondition.SelfEnters -> False
+  TriggerCondition.PermanentEnters _ -> False
+  TriggerCondition.StepBegins _ _ -> False
+  -- CR 603.8: a state trigger's condition is a fact about the game state, and a
+  -- game state is not an ability triggering.
+  TriggerCondition.StateIs _ -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+  TriggerCondition.SelfCycled -> False
+  TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.SelfAttacks _ -> False
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+  TriggerCondition.SelfDies -> False
+  TriggerCondition.PermanentDies _ -> False
+  TriggerCondition.SelfLeavesTheBattlefield -> False
+  -- CR 701.6a's countering is a spell or ability DOING something, not one
+  -- triggering, so Baral takes the first pass like every other watcher.
+  TriggerCondition.SpellOrAbilityCounters _ -> False
+  TriggerCondition.DamageToPlayerPrevented _ -> False
+  TriggerCondition.PlayerGainsLife _ -> False
+  TriggerCondition.PlayerLosesLife _ -> False
+  -- CR 714.2b's own condition is a counter placement, which is what makes a
+  -- chapter ability itself a FIRST-pass trigger -- the other half of the pair
+  -- this whole classification exists to separate.
+  TriggerCondition.SelfCountersReached _ _ -> False
+  TriggerCondition.SelfLastCounterRemoved _ -> False
+  TriggerCondition.SpellCast _ _ -> False
+  TriggerCondition.SelfHalfUnlocked _ -> False
+  TriggerCondition.RoomFullyUnlocked _ -> False
+  TriggerCondition.SelfTurnedFaceUp -> False
+  TriggerCondition.PermanentTurnedFaceUp _ -> False
+  TriggerCondition.PermanentSacrificed -> False
 
 -- CR 603.2: the bindings the EVENT contributes to a trigger it has just fired --
 -- the environment in which the ability's "that player" / "that creature" is read.
@@ -3569,6 +3711,12 @@ eventBindingSlots cond = case cond of
   -- PlayerId unconditionally -- so the promise holds for every cast the Filter
   -- can admit.
   TriggerCondition.SpellCast _ _ -> Set.fromList [Binding.castSpell, Binding.triggerPlayer]
+  -- CR 603.3b's second class binds NOTHING, a deliberate empty rather than a
+  -- default: GameEvent.AbilityTriggered names the Saga and the player who
+  -- controls the chapter ability, and Historian's Boon's "create a 4/4 white
+  -- Angel" reads neither. A card printing "that Saga" or "that player" is what
+  -- would earn a slot (#1029).
+  TriggerCondition.SagaFinalChapterTriggers _ -> Set.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -3654,6 +3802,11 @@ looksBack condition = case condition of
   TriggerCondition.SpellCast _ _ -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
+  -- CR 603.3b's second class names no zone change at all -- its event is another
+  -- ability triggering -- so CR 603.10a's four families cannot reach it. Its
+  -- bearer is a permanent standing on the battlefield watching a Saga, and CR
+  -- 603.10's first sentence is what reads it.
+  TriggerCondition.SagaFinalChapterTriggers _ -> False
 
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
@@ -3838,6 +3991,7 @@ eventTriggers events gs =
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
+        GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -3945,6 +4099,7 @@ eventTriggers events gs =
         GameEvent.HalfUnlocked {} -> Map.empty
         GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.PermanentSacrificed {} -> Map.empty
+        GameEvent.AbilityTriggered {} -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -4149,6 +4304,9 @@ functionsInGraveyard cond = case cond of
   -- CR 113.6's default: Young Pyromancer watches the stack from the battlefield,
   -- and a card in a graveyard sees nothing cast.
   TriggerCondition.SpellCast _ _ -> False
+  -- CR 113.6's default a last time: Historian's Boon is an enchantment watching
+  -- the battlefield's Sagas, and a card in a graveyard sees no chapter fire.
+  TriggerCondition.SagaFinalChapterTriggers _ -> False
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -4250,6 +4408,11 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SpellCast _ TurnScope.ControllersTurn -> True
   TriggerCondition.SpellCast _ TurnScope.EachTurn -> False
   TriggerCondition.SpellCast _ TurnScope.OpponentsTurn -> False
+  -- CR 714.3c's turn-based action falls on the Saga controller's own turn, but
+  -- nothing restricts this CONDITION to it: CR 714.3a's entry replacement can put
+  -- a Saga's last lore counter on during anybody's turn, and the watcher is not
+  -- even the Saga's controller under the Opponent relation.
+  TriggerCondition.SagaFinalChapterTriggers _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -4328,6 +4491,10 @@ stateTriggers gs
               TriggerCondition.DamageToPlayerPrevented _ -> False
               TriggerCondition.PlayerGainsLife _ -> False
               TriggerCondition.PlayerLosesLife _ -> False
+              -- CR 603.3b's condition is an EVENT trigger too, and the event is
+              -- another ability triggering: nothing about it is a state a settle
+              -- could re-read.
+              TriggerCondition.SagaFinalChapterTriggers _ -> False
               -- CR 709.5h is an EVENT trigger: it fires on the permanent BEING
               -- GIVEN the designation, which CR 709.5c leaves it holding
               -- thereafter, so a state read would fire it again every time the
@@ -4504,6 +4671,17 @@ gatherTriggers grouped gs =
       (fromDelayed, surviving) = delayedPending events gs
       undecided = eventTriggers grouped gs <> stateTriggers gs
    in (filter (interveningHolds gs) undecided <> fromDelayed, surviving)
+
+-- | CR 603.3b: the abilities a round of GameEvent.AbilityTriggered records fires,
+-- for Pawl.Engine.Engine.reactions to fold into the same batch.
+--
+-- `gatherTriggers`' event half alone. The other two sources are deliberately not
+-- re-run: CR 603.8's state triggers were gathered once for this batch already and
+-- match no event at all, so a second call would duplicate every one of them; and
+-- the CR 603.7 delayed store's watermark is spent by the same one call, so
+-- re-running it would consume entries against events they never matched.
+reactionTriggers :: [(EventGroup, GameEvent)] -> GameState -> [PendingTrigger]
+reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events gs)
 
 -- CR 603.4: the ability doesn't trigger at all when its intervening "if" is false
 -- as the trigger event occurs. Checked at the gather rather than at placement,

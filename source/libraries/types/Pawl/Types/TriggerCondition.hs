@@ -573,4 +573,37 @@ data TriggerCondition
     -- Not self-scoped: the bearer watches every sacrifice on the board, so it
     -- contributes neither an identity nor CR 109.5's perspective.
     PermanentSacrificed
+  | -- | CR 603.3b's own second class: a trigger condition that IS another ability
+    -- triggering. "Whenever the final chapter ability of a Saga you control
+    -- triggers" -- Historian's Boon's, and the only printed condition of this
+    -- shape.
+    --
+    -- Matched against GameEvent.AbilityTriggered, which Pawl.Engine.Engine
+    -- appends for each gathered trigger before the batch goes on the stack. That
+    -- is what makes this condition observable at all: every other condition here
+    -- describes something that happened to the board, and this one describes
+    -- something the rules did.
+    --
+    -- Being in this class is the whole reason CR 603.3b has two passes, and
+    -- Pawl.Engine.Event.reactsToAbilityTriggering is where that classification
+    -- lives -- exhaustively, so a new condition must decide which pass it takes
+    -- rather than defaulting into the first.
+    --
+    -- THREE things are checked together, and none of them is separable into a
+    -- Filter over the source: the ability must be a CHAPTER ability (CR 714.2b's
+    -- condition), its chapter must be its source's FINAL chapter number (CR
+    -- 714.2d), and the source must be a Saga with chapter abilities (CR 714.1 /
+    -- 704.5s's "Saga permanent with one or more chapter abilities"). The middle
+    -- one is a comparison between the event and the source's projection, which no
+    -- Filter atom can express.
+    --
+    -- The PlayerRelation reads the TRIGGERED ability's controller (CR 603.3a,
+    -- carried on the event) against CR 109.5's "you", the watching ability's
+    -- controller. PlayerDiscards' shape, not a Self- condition's: the bearer is
+    -- an enchantment watching a Saga that is a different permanent entirely.
+    --
+    -- No payload for WHICH Saga or WHICH chapter. Historian's Boon's effect names
+    -- neither, so Pawl.Engine.Event.eventBindingSlots answers empty; a card
+    -- printing "that Saga" is what would earn a slot.
+    SagaFinalChapterTriggers PlayerRelation.PlayerRelation
   deriving (Eq, Ord, Show)

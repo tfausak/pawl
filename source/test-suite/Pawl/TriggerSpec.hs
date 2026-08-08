@@ -123,6 +123,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Saga as Saga
 -- Aliased Condition.Type, not Condition, per the project-wide convention
 -- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
 -- and must not collide.
@@ -4219,6 +4220,13 @@ representativeEvents cond =
         -- payload is arbitrary: the condition compares nothing, so any sacrifice
         -- matches and the floor is the same for all of them.
         TriggerCondition.PermanentSacrificed -> one (GameEvent.PermanentSacrificed S.alice departed)
+        -- CR 603.3b's own event, and the only one this condition admits. The
+        -- pair does NOT actually match here -- `departed` projects as no Saga on
+        -- the empty board Event.matchesTrigger is asked about -- which is fine
+        -- for what this pins: eventBindings contributes nothing for this
+        -- condition under any event, so the floor is empty either way.
+        TriggerCondition.SagaFinalChapterTriggers _ ->
+          one (GameEvent.AbilityTriggered departed S.alice (TriggerCondition.SelfCountersReached CounterKind.Lore 3))
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -4263,7 +4271,8 @@ everyTriggerCondition =
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
     TriggerCondition.SelfTurnedFaceUp,
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
-    TriggerCondition.PermanentSacrificed
+    TriggerCondition.PermanentSacrificed,
+    TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -6016,6 +6025,115 @@ handOfThePraetorsSpec s registry =
           -- proves the seat is the only thing the silence above turns on.
           Spec.assertEqWith s "the same board poisons bob for alice's own cast" (poisonOf S.bob byAlice) 1
 
+-- CR 603.3b's TWO-PART placement, verbatim: "First, each player, in APNAP order,
+-- puts each triggered ability they control with a trigger condition that isn't
+-- another ability triggering on the stack in any order they choose. ... Second,
+-- each player, in APNAP order, puts all remaining triggered abilities they
+-- control on the stack in any order they choose."
+--
+-- The pool's one producer of the second class, and the only printed card of the
+-- shape: Historian's Boon, "{3}{W} Enchantment -- Whenever the final chapter
+-- ability of a Saga you control triggers, create a 4/4 white Angel creature token
+-- with flying and vigilance", paired with History of Benalia.
+--
+-- Two lore counters on the Saga and alice's precombat main phase: CR 714.3c's
+-- turn-based action puts the third on, chapter III triggers (CR 714.2b), and the
+-- Boon's second ability triggers off THAT triggering. Chapter III is first-class
+-- and the Boon second-class, so the Boon goes on the stack above it and resolves
+-- first, whatever order alice would have preferred.
+--
+-- WHAT THIS ASSERTS AND WHAT IT DOES NOT. The resulting BOARD is the same either
+-- way -- chapter III pumps Knights alice controls and the Boon's token is an
+-- Angel -- so the assertion is on stack order and on what alice was asked, both
+-- of which a player sees, and not on a board difference. A Saga whose final
+-- chapter read "creatures you control" would give a stronger discriminator; none
+-- is in the pool.
+--
+-- `orderReversing` is what keeps the stack assertion from passing for the wrong
+-- reason. Under a single APNAP pass alice controls both triggers and IS asked,
+-- and this answerer names chapter III LAST -- which puts it on TOP and makes it
+-- resolve first, the exact inversion. Under the rule's two passes she controls
+-- one trigger in each and is asked nothing at all, so the answerer is inert. That
+-- is why the recorded prompt list is expected EMPTY rather than merely free of
+-- mixed batches: CR 603.3b's own-order choice is offered inside a pass.
+secondPlacementPassSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+secondPlacementPassSpec s registry =
+  let boardOf benalia boon =
+        let (sagaId, base) = S.addCreature benalia S.alice (Setup.emptyGame S.bothPlayers)
+            (boonId, withBoon) = S.addCreature boon S.alice base
+            withCounters = S.addCounter CounterKind.Lore 2 sagaId withBoon
+            ready =
+              withCounters
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+         in (sagaId, boonId, S.runPure S.identityAnswer ready (Engine.runTurnBasedActions Phase.PrecombatMain))
+      -- Answers CR 603.3b's ordering prompt with the offered indices REVERSED --
+      -- the canonical order names the chapter ability first, so this names it
+      -- last, and the answer is the order the triggers are PUT on the stack --
+      -- while recording every batch it was offered.
+      orderReversing :: Prompt.Prompt r -> State.State [[TriggerEntry.TriggerEntry]] r
+      orderReversing p = case p of
+        Prompt.OrderTriggers _ _ entries -> do
+          State.modify' (<> [entries])
+          pure (reverse (zipWith const [0 ..] entries))
+        _ -> pure (S.identityAnswer p)
+      -- The stack from the TOP down, named by each triggered ability's source (CR
+      -- 113.7). Anything on the stack that is not a triggered ability is dropped,
+      -- and nothing here puts one there.
+      triggerSourcesOnStack gs =
+        Maybe.mapMaybe
+          ( \sid -> case fmap Object.source (Game.lookupObject sid gs) of
+              Just (Source.OfTrigger srcId _) -> Just srcId
+              _ -> Nothing
+          )
+          (GameState.stack gs)
+      angelToken = CardName.MkCardName (Text.pack "Angel Token")
+   in Spec.describe s "SecondPlacementPass" $ do
+        Spec.it s "CR 603.3b the ability triggered by another ability's triggering is placed SECOND, so it resolves first" $ do
+          benalia <- S.printingOf s registry "History of Benalia"
+          boon <- S.printingOf s registry "Historian's Boon"
+          let (sagaId, boonId, advanced) = boardOf benalia boon
+              ((_, settled), asked) = State.runState (Engine.runGame orderReversing advanced Engine.settleForPriority) []
+          Spec.assertEqWith s "the turn-based action put the third lore counter on" (S.counterOf CounterKind.Lore sagaId advanced) 3
+          -- Both triggered, and the Boon's is ABOVE chapter III -- the whole of CR
+          -- 603.3b's second pass, read off the stack the player sees.
+          Spec.assertEqWith s "the Boon's trigger sits on top of the Saga's chapter III" (triggerSourcesOnStack settled) [boonId, sagaId]
+          -- Not merely "an ability of the Saga": the one underneath must be the
+          -- FINAL chapter, since that is what the Boon's condition names.
+          Spec.assertEqWith s "and the one underneath is chapter III" (chaptersOnStackFrom sagaId settled) [3]
+          -- The secondary check, and secondary because it can hold vacuously: with
+          -- one trigger in each pass alice has nothing to order, so she is asked
+          -- nothing. Under a single pass she is asked once, with both entries.
+          Spec.assertEqWith s "alice was never offered the two abilities in one ordering" (fmap length asked) []
+        Spec.it s "CR 603.3b the Boon's Angel really arrives, and CR 704.5s still takes the Saga" $ do
+          benalia <- S.printingOf s registry "History of Benalia"
+          boon <- S.printingOf s registry "Historian's Boon"
+          let (sagaId, _, advanced) = boardOf benalia boon
+              ((_, resolved), _) = State.runState (Engine.runGame orderReversing advanced Engine.priorityLoop) []
+          Spec.assertEqWith s "one Angel token" (S.countOnBattlefieldByName angelToken S.alice resolved) 1
+          -- The whole printed payload, so the card's data is exercised and not
+          -- merely its name: "a 4/4 white Angel creature token with flying and
+          -- vigilance". Chapter III creates nothing, so the one token is it.
+          case S.tokensOf resolved of
+            [token] -> do
+              Spec.assertEqWith s "4/4" (S.powerToughnessOf token resolved) (Just (4, 4))
+              Spec.assertEqWith s "an Angel" (Projection.subtypesOf token resolved) (Set.singleton Subtype.Angel)
+              Spec.assertBool s (Map.member Keyword.Type.Flying (Projection.keywordsOf token resolved)) "with flying"
+              Spec.assertBool s (Map.member Keyword.Type.Vigilance (Projection.keywordsOf token resolved)) "and vigilance"
+            other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+          Spec.assertBool s (not (S.onBattlefield sagaId resolved)) "and the Saga's story is told, so CR 704.5s sacrifices it"
+
+-- The chapter numbers of `oid`'s own chapter abilities currently on the stack (CR
+-- 714.2, CR 704.5s).
+chaptersOnStackFrom :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
+chaptersOnStackFrom oid gs =
+  let from sid = case fmap Object.source (Game.lookupObject sid gs) of
+        Just (Source.OfTrigger srcId ability) | srcId == oid -> Saga.chapterOf ability
+        _ -> Nothing
+   in Maybe.mapMaybe from (GameState.stack gs)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -6033,6 +6151,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   towershellOnsetSpec s registry
   towershellSkipSpec s registry
   orderingSpec s registry
+  secondPlacementPassSpec s registry
   monarchOrderingSpec s registry
   interveningSpec s registry
   poisonousSpec s registry

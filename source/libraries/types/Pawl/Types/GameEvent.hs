@@ -11,6 +11,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
 -- | CR 608.2i: one entry of the turn-scoped record of what happened. Effects
@@ -388,4 +389,33 @@ data GameEvent
     -- payload being what a card printing "whenever YOU sacrifice" or "sacrifice a
     -- creature ... return IT" would need.
     PermanentSacrificed PlayerId.PlayerId ObjectId.ObjectId
+  | -- | CR 603.3b: an ABILITY TRIGGERED. The one entry in this log that describes
+    -- something the rules did rather than something that happened to the board,
+    -- and it is here because rule 603.3b names it as a trigger event in as many
+    -- words: it splits the placement of a batch by whether an ability's "trigger
+    -- condition ... isn't another ability triggering".
+    --
+    -- Appended by Pawl.Engine.Engine.placePendingTriggers, once per gathered
+    -- trigger, BEFORE that batch is put onto the stack -- which is what lets the
+    -- abilities reacting to it be gathered into the SAME batch and placed in rule
+    -- 603.3b's second pass. Recording it after placement would put them in the
+    -- next batch instead.
+    --
+    -- The ObjectId is the triggered ability's SOURCE (CR 113.7), which is how
+    -- "the final chapter ability of a SAGA you control" finds the Saga. The
+    -- PlayerId is the ability's CONTROLLER as it triggered (CR 603.3a), so
+    -- "you control" is answered against the same sample every other part of the
+    -- batch uses rather than against the board a later event may have changed.
+    --
+    -- The TriggerCondition says WHICH ability triggered. That is the honest
+    -- identifier rather than a shortcut: CR 714.2 makes a chapter symbol "a
+    -- keyword ability that represents a triggered ability", and CR 714.2b writes
+    -- that ability's trigger condition out -- so a card asking whether a chapter
+    -- ability triggered is asking about a condition. Nothing in the rules core
+    -- reads the ability's EFFECT off this.
+    --
+    -- No entry for a SOURCELESS inherent ability (CR 725.2's monarch pair, CR
+    -- 702.179d's speed increase, CR 728.1's rad counters) and none for a CR 603.7
+    -- delayed ability, so nothing can trigger off one of those triggering (#1026).
+    AbilityTriggered ObjectId.ObjectId PlayerId.PlayerId TriggerCondition.TriggerCondition
   deriving (Eq, Ord, Show)
