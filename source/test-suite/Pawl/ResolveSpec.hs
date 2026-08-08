@@ -3927,14 +3927,18 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
     Spec.assertEqWith s "and no damage is dealt" (fmap (`S.lifeOf` bothIllegal) [S.alice, S.dave]) [Just 20, Just 20]
     Spec.assertEqWith s "the ability leaves the stack either way" (GameState.stack bothIllegal) []
 
-  -- The classification half, asserted directly because nothing else in the tree
-  -- can see it. slotsOf is the READ side of the D4 dataflow lint and has no
-  -- runtime consumer: Resolve.resolveModes re-derives CR 608.2b's legality from
-  -- the card's declared targetSpecs, so the gameplay cases above pass whatever
-  -- slotsOf answers. And the lint that would otherwise catch a wrong answer --
-  -- CardSpec's "every mode's slot reads equal its declared slots" -- sweeps
-  -- Face.spell alone, while an ACTIVATED ability gets the subset-shaped lint,
-  -- which too FEW reads pass (#1043). So this is what pins the arm.
+  -- The classification half, asserted directly. slotsOf is the READ side of the
+  -- D4 dataflow lint and has no runtime consumer: Resolve.resolveModes re-derives
+  -- CR 608.2b's legality from the card's declared targetSpecs, so the gameplay
+  -- cases above pass whatever slotsOf answers.
+  --
+  -- The InSlot line is now ALSO covered by CardSpec's dataflow lint, which since
+  -- #1043 states its equality over an activated ability's modes too -- reverting
+  -- this arm to Set.empty fails Denethor there as well as here. Kept rather than
+  -- deleted for the two lines the lint cannot reach: no card in the pool uses
+  -- TheController or ControllerOfSource, so an arm wrongly REPORTING a slot for
+  -- either would be swept by nothing. Those are the arm-level pin; the first line
+  -- is a locality convenience, keeping all three answers in one place.
   Spec.it s "CR 725.1 slotsOf reads the targeted monarch's slot, and only that arm's" $ do
     let slot = SlotName.MkSlotName (Text.pack "player")
     Spec.assertEqWith s "the targeted arm names its slot" (Resolve.slotsOf (Effect.BecomeMonarch (MonarchTarget.InSlot slot))) (Set.singleton slot)

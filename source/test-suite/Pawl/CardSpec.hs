@@ -629,10 +629,20 @@ cardOffendsSharedZoneScope :: Face.Face Card.Type.Card -> Bool
 cardOffendsSharedZoneScope card =
   any (scopeOffends . Count.Type.scope) (cardCounts card)
 
--- The shared shape of all three ability read lints: every slot an effect of ONE
--- MODE reads must be bound for that mode, given `abilityBound` -- the slots the
--- ABILITY binds whichever mode is chosen, which is the only part that differs
--- between the three.
+-- The shared shape of the D4 dataflow lint, over EVERY carrier a card can hang
+-- modes off: its spell, and its activated, triggered and delayed abilities. The
+-- claim is an EQUALITY -- what ONE MODE reads, less what that mode mints and less
+-- what the carrier binds on its own, is exactly what that mode DECLARES. So a
+-- read nothing binds is rejected (an effect naming CR 400.7e's `became` under a
+-- condition that never binds it would silently no-op), and so is a declared spec
+-- no effect reads (a card announcing a target it ignores).
+--
+-- `abilityBound` is the only part that differs between the carriers: the slots
+-- that carrier binds whichever mode is chosen. It is subtracted from the READ
+-- side rather than added to the declared one, and that is forced rather than
+-- chosen -- the "no reserved binding slot is ever a declared target slot" sweep
+-- below forbids a card DECLARING any of these names, so adding them to the
+-- declared side would make the two rules mutually unsatisfiable (#1043).
 --
 -- PER MODE, never through Modal.allEffects and Modal.allTargetSpecs. Those are
 -- unions across every mode, and comparing one union against the other lets a
@@ -645,22 +655,19 @@ cardOffendsSharedZoneScope card =
 --
 -- Resolve.definedSlots is per mode for the mirror reason: under a ChooseExactly
 -- 1 selection mode B is never resolved alongside mode A, so a token mode A mints
--- is not there for mode B to read. This is the shape the spell lint's modeOffends
--- has had all along; these three now match it.
-modalReadOffends :: Set.Set SlotName.SlotName -> Modal.Modal Card.Type.Card -> Bool
-modalReadOffends abilityBound modal =
+-- is not there for mode B to read.
+modalSlotsOffend :: Set.Set SlotName.SlotName -> Modal.Modal Card.Type.Card -> Bool
+modalSlotsOffend abilityBound modal =
   let modeOffends mode =
         let effects = Foldable.toList (Mode.allEffects mode)
-            available =
-              Set.unions
-                [ abilityBound,
-                  Resolve.definedSlots effects,
-                  Map.keysSet (Mode.targetSpecs mode)
-                ]
+            -- A slot DEFINED in this mode (a Create's minted token, or a
+            -- PlaySubgame's bound subgame outcome) and then read by a later
+            -- effect is legitimate dataflow, not an undeclared target.
+            defined = Resolve.definedSlots effects
             -- The whole MODE's reads, not just its effect list's: CR 118.12a's
             -- "unless [a player] pays" names its payer by slot too.
             wanted = Resolve.modeSlots mode
-         in not (Set.isSubsetOf wanted available)
+         in Set.difference (Set.difference wanted defined) abilityBound /= Map.keysSet (Mode.targetSpecs mode)
    in any modeOffends (Modal.modes modal)
 
 -- Every ReplacementEffect a card AUTHORS: the ones it PRINTS
@@ -862,19 +869,21 @@ cardSlotNamesCollide card =
 
 -- The TRIGGERED-ability half of the D4 dataflow lint: every slot one of a
 -- triggered ability's effects READS must be a slot something binds for that
--- ability. Without it, an effect naming CR 400.7e's `became` under a condition
--- that never binds it loads, places its trigger, misses the lookup and silently
--- no-ops (Resolve's MoveToZone arm moves nothing for a slot that names no
--- object).
+-- ability, and every slot it DECLARES must be read. Without the first half, an
+-- effect naming CR 400.7e's `became` under a condition that never binds it
+-- loads, places its trigger, misses the lookup and silently no-ops (Resolve's
+-- MoveToZone arm moves nothing for a slot that names no object); without the
+-- second, an ability announces a target it ignores.
 --
--- A SUBSET check, never the spell lint's equality, and that is forced rather
--- than chosen: Pawl.Engine.Binding.triggerSource's comment spells out that an
--- equality-style lint widened over an ability's modes is mutually unsatisfiable
--- with the "a reserved slot is never a declared target slot" rule unless it
--- first subtracts every reserved name from the read side. The delayed-ability
--- lint below took the subset shape for the same reason, and this follows it.
+-- The spell lint's EQUALITY, which modalSlotsOffend now applies to every carrier
+-- (#1043). It was a subset check for as long as the bound side was UNIONED into
+-- the declared one, which Pawl.Engine.Binding.triggerSource's comment shows is
+-- mutually unsatisfiable with the "a reserved slot is never a declared target
+-- slot" rule; subtracting the bound names from the READ side instead -- what the
+-- spell lint always did with its cast-time pair -- is what makes the equality
+-- statable here.
 --
--- The available side, and why each part of it is available:
+-- What answers a read, and why each part of it answers one:
 --
 --   * Binding.triggerSource (CR 113.7, the object whose ability triggered) and
 --     Binding.you (CR 109.5, the ability's controller) are stamped for EVERY
@@ -888,16 +897,17 @@ cardSlotNamesCollide card =
 --     lint.
 --   * Resolve.definedSlots covers a slot the ability's own effects MINT rather
 --     than read: a Create's token (CR 603.7c's "it"), a PlaySubgame's loser.
---     The same exemption both existing lints take.
+--     The same exemption every carrier takes.
 --   * the ability's own declared target specs (CR 601.2c / 700.2c) are the
---     ordinary chosen targets -- contributed by modalReadOffends, one MODE's at
---     a time, so a mode reading a slot only another mode declares is caught.
+--     ordinary chosen targets -- the side modalSlotsOffend compares AGAINST, one
+--     MODE's at a time, so a mode reading a slot only another mode declares is
+--     caught and so is a mode declaring a slot only another mode reads.
 --
--- The first two are what this passes to modalReadOffends as `abilityBound`: they
+-- The first two are what this passes to modalSlotsOffend as `abilityBound`: they
 -- are stamped for the ability, not for a mode, so every mode gets them.
 triggeredAbilityOffends :: TriggeredAbility.TriggeredAbility Card.Type.Card -> Bool
 triggeredAbilityOffends ability =
-  modalReadOffends
+  modalSlotsOffend
     ( Set.unions
         [ Set.fromList [Binding.triggerSource, Binding.you],
           Event.eventBindingSlots (TriggeredAbility.condition ability)
@@ -906,15 +916,16 @@ triggeredAbilityOffends ability =
     (TriggeredAbility.modal ability)
 
 -- The ACTIVATED-ability half of the same lint: every slot one of an
--- activated ability's effects READS must be a slot the ACTIVATION binds. Without
--- it, an ability naming CR 109.5's `you` loads, activates, misses the lookup and
--- silently no-ops, exactly as an unbound `became` does above.
+-- activated ability's effects READS must be a slot the ACTIVATION binds, and
+-- every slot it DECLARES must be read. Without the first half, an ability naming
+-- CR 109.5's `you` loads, activates, misses the lookup and silently no-ops,
+-- exactly as an unbound `became` does above.
 --
--- A SUBSET check, never an equality, for the reason
--- Pawl.Engine.Binding.triggerSource's comment gives and the two lints around it
--- take.
+-- The same EQUALITY as every other carrier (#1043); see modalSlotsOffend and the
+-- triggered lint above for why subtracting the bound names from the read side is
+-- what makes it statable.
 --
--- The available side is what Pawl.Engine.Activate.activateAbility stamps on the
+-- What answers a read is what Pawl.Engine.Activate.activateAbility stamps on the
 -- ability object as it goes on the stack, and nothing else:
 --
 --   * Binding.triggerSource. CR 113.7: "The source of an activated ability on
@@ -922,7 +933,7 @@ triggeredAbilityOffends ability =
 --     activation, so Longtusk Cub's "put a +1/+1 counter on Longtusk Cub" is a
 --     slot read.
 --   * the ability's own declared target specs, one MODE's at a time
---     (modalReadOffends). CR 602.2b: "The remainder of the process for
+--     (modalSlotsOffend). CR 602.2b: "The remainder of the process for
 --     activating an ability is identical to the process for casting a spell
 --     listed in rules 601.2b-i", which is what routes an activation through CR
 --     601.2c's target announcement -- and CR 700.2c scopes it to the chosen
@@ -941,7 +952,7 @@ triggeredAbilityOffends ability =
 --     leaving it out would reject a read that works (#14 is what would make one
 --     sayable).
 --   * Resolve.definedSlots, the slot an effect of this ability MINTS rather than
---     reads. The same exemption all three sibling lints take.
+--     reads. The same exemption every sibling carrier takes.
 --
 -- What is NOT on it is the point:
 --
@@ -968,7 +979,7 @@ activatedAbilityOffends ability =
         if declaresVariable (Cost.Type.mana (ActivatedAbility.cost ability))
           then Set.singleton Binding.variableX
           else Set.empty
-   in modalReadOffends (Set.union (Set.fromList [Binding.triggerSource, Binding.you]) announcedX) (ActivatedAbility.modal ability)
+   in modalSlotsOffend (Set.union (Set.fromList [Binding.triggerSource, Binding.you]) announcedX) (ActivatedAbility.modal ability)
 
 -- CR 603.7 / 109.5: does this card arm a delayed ability "on your next turn"
 -- whose condition is not scoped to its controller's turn?
@@ -1136,8 +1147,8 @@ powerToughnessSlots card =
 -- read: those ask what THIS card executes, and widening that view would change
 -- all of them at once.
 --
--- Not applied to the ability READ lints built on modalReadOffends, which still
--- stop at the printed face (#1010).
+-- Not applied to the ability dataflow lints built on modalSlotsOffend, which
+-- still stop at the printed face (#1010).
 mintedFaces :: Face.Face Card.Type.Card -> [Face.Face Card.Type.Card]
 mintedFaces card =
   let minted = concatMap effectMintedFaces (cardResolutionEffects card)
@@ -2076,24 +2087,16 @@ anyOfOffends condition = case condition of
 -- pair their sweep with a hand-built offender proving the REJECTING direction.
 lintSpec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 lintSpec s registry = Spec.describe s "Lint" $ do
-  -- The D4 dataflow lint: every slot an effect reads is declared, and every
-  -- declared slot is read. Equality, not subset: a spec no effect reads is a
-  -- card announcing a target it ignores -- representable in Magic, not in this
-  -- pool. Loosen to superset if such a card ever lands.
+  -- The SPELL half of the D4 dataflow lint: every slot an effect reads is
+  -- declared, and every declared slot is read. Equality, not subset: a spec no
+  -- effect reads is a card announcing a target it ignores -- representable in
+  -- Magic, not in this pool. Loosen to superset if such a card ever lands.
+  --
+  -- The ability carriers get the same equality through the same
+  -- modalSlotsOffend, in the three sweeps further down (#1043).
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
-    let modeOffends castBound m =
-          let defined = Resolve.definedSlots (Foldable.toList (Mode.allEffects m))
-              -- Resolve.modeSlots and not a fold over the effects alone: CR
-              -- 118.12a's "unless [a player] pays" reads a slot for its payer,
-              -- which must be declared like any other.
-              reads_ = Resolve.modeSlots m
-           in -- A slot DEFINED in this mode (a Create's minted token, or a
-              -- PlaySubgame's bound subgame outcome) and then read by a later
-              -- effect is legitimate dataflow, not an undeclared target -- the
-              -- same definedSlots exemption the delayed-ability lint below uses.
-              Set.difference (Set.difference reads_ defined) castBound /= Map.keysSet (Mode.targetSpecs m)
-        -- What CASTING binds rather than a target spec declaring it, subtracted
+    let -- What CASTING binds rather than a target spec declaring it, subtracted
         -- from the READ side. It cannot be added to the declared side instead:
         -- the "no reserved binding slot is ever a declared target slot" sweep
         -- below forbids a card declaring either of these, so the two rules would
@@ -2117,7 +2120,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 if declaresVariable (Face.manaCost card)
                   then Set.fromList [Binding.you, Binding.variableX]
                   else Set.singleton Binding.you
-           in any (modeOffends castBound) (Modal.modes (Face.spell card))
+           in modalSlotsOffend castBound (Face.spell card)
         offenders =
           filter
             (anyFace cardOffends . Printing.card)
@@ -2569,17 +2572,19 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- reason the lint above takes it: the binding effect can live in the ability
   -- that arms, not only in a spell mode.
   --
-  -- Through modalReadOffends, so a delayed ability with modes is read PER MODE
+  -- Through modalSlotsOffend, so a delayed ability with modes is read PER MODE
   -- (#570) -- and so a mode's own declared target specs count, which this lint
   -- omitted entirely. CR 603.3d puts a delayed ability on the stack "identical
   -- to the process for casting a spell listed in rules 601.2c-d", so a slot it
   -- declares really is announced; declaredTargetSlots already counts delayed
   -- abilities' specs on the DECLARING side, and this is the matching read side.
+  -- Since #1043 that comparison is the spell lint's EQUALITY, so a delayed
+  -- ability declaring a spec no effect of its reads fails here too.
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
     let cardOffends card =
           let bound = Set.insert Binding.triggerSource (Resolve.definedSlots (cardResolutionEffects card))
-           in any (modalReadOffends bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
+           in any (modalSlotsOffend bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []
   -- A delayed ability may not DECLARE a target spec under a name its own card
@@ -2593,9 +2598,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- Rejected rather than resolved by precedence: the card would be saying two
   -- different things under one name, which is a card-data mistake and not a rules
   -- question the engine should have an answer to. The neighbouring "every slot a
-  -- delayed ability reads is bound by its card" lint cannot catch it -- that one
-  -- is a SUBSET check with both sides on the available list, so a name appearing
-  -- in both passes it twice over.
+  -- delayed ability reads is bound by its card" lint could not catch it while it
+  -- was a SUBSET check: both sides were on the available list, so a name
+  -- appearing in both passed it twice over. Under #1043's equality it rejects the
+  -- same shape as a side effect, whether or not the ability reads the name back
+  -- -- a read is answered by the bound side and so cancels, and no read leaves the
+  -- read side empty, so either way the declared spec goes unmatched. Kept anyway:
+  -- it states the claim that is actually true of the data (a name may not be both
+  -- declared and defined) rather than deriving it from a dataflow count, and it
+  -- names the offending card outright.
   Spec.it s "no delayed ability declares a target spec under a slot its card defines" $ do
     ps <- S.allPrintings s
     let offenders = filter (anyFace shadowsDefinedSlot . Printing.card) ps
@@ -2647,11 +2658,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     -- nothing for this to reject, whatever its delayed abilities are scoped to.
     tidalWave <- S.printingOf s registry "Tidal Wave"
     Spec.assertBool s (not (onsetOffends (S.combinedFace tidalWave))) "a card with no onset is not swept up"
-  -- The same subset shape over a card's TRIGGERED abilities, which is where
+  -- The same equality over a card's TRIGGERED abilities, which is where
   -- the condition-specific reserved slots live -- CR 400.7e's `became` and
-  -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for the available
-  -- side and for why this cannot be an equality check.
-  Spec.it s "every slot a triggered ability reads is bound for its condition" $ do
+  -- CR 702.70a's `thatPlayer`. See triggeredAbilityOffends for what answers a
+  -- read there.
+  Spec.it s "every slot a triggered ability reads is bound for its condition, and every slot it declares is read" $ do
     ps <- S.allPrintings s
     let cardOffends = any triggeredAbilityOffends . Face.triggeredAbilities
         offenders = filter (anyFace cardOffends . Printing.card) ps
@@ -2689,14 +2700,14 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (not (any triggeredAbilityOffends (Face.triggeredAbilities (S.combinedFace roaches))))
       "the real card's dies trigger is accepted"
-  -- The same subset shape over a card's ACTIVATED abilities, and the one
-  -- available side with no event slot on it at all: an activation is not an
-  -- event. See activatedAbilityOffends for the whole of it.
+  -- The same equality over a card's ACTIVATED abilities, the one carrier with no
+  -- event slot answering a read at all: an activation is not an event. See
+  -- activatedAbilityOffends for the whole of it.
   --
   -- Brothers of Fire is what this caught: its "and 1 damage to you" reads CR
   -- 109.5's slot from an ACTIVATED ability, which nothing bound until
   -- Activate.activateAbility started stamping it (#569).
-  Spec.it s "every slot an activated ability reads is bound for its activation" $ do
+  Spec.it s "every slot an activated ability reads is bound for its activation, and every slot it declares is read" $ do
     ps <- S.allPrintings s
     let abilitiesOf p = fmap ((,) (Face.name (S.combinedFace p))) (Face.activatedAbilities (S.combinedFace p))
         abilities = concatMap abilitiesOf ps
@@ -2829,6 +2840,45 @@ lintSpec s registry = Spec.describe s "Lint" $ do
       s
       (triggeredAbilityOffends (secondModeReads TriggerCondition.SelfEnters))
       "and a later mode is still rejected when the condition binds nothing"
+  -- The DECLARED-BUT-UNREAD half of the ability lints, which the spell lint has
+  -- always had and the three ability ones acquired with #1043. Before that they
+  -- were subset checks, so an ability announcing a target no effect of its reads
+  -- passed -- and so did an Effect whose Resolve.slotsOf arm UNDER-REPORTED,
+  -- since a forgotten read only shrinks the read side that the subset check let
+  -- be small. Reverting Resolve.slotsOf's BecomeMonarch arm to Set.empty left the
+  -- entire suite green when Denethor, Stone Seer landed (#1040); under the
+  -- equality it fails, because Denethor's ability declares two slots and would
+  -- then read one.
+  --
+  -- Every carrier gets a case: what makes this an ability-side gap is that the
+  -- claim was stated for Face.spell alone, so proving it on one ability would not
+  -- show it reaching the others.
+  Spec.it s "the lint itself catches an ability declaring a slot no effect reads" $ do
+    denethor <- S.printingOf s registry "Denethor, Stone Seer"
+    let creature = SlotName.MkSlotName (Text.pack "creature")
+        victim = SlotName.MkSlotName (Text.pack "victim")
+        tap slot = Effect.Tap (ObjectRef.InSlot slot)
+        -- One mode declaring two specs and reading only one of them: Denethor's
+        -- exact shape under a slotsOf arm that forgot a read.
+        unread = [lintMode [tap creature] [creature, victim]]
+        read_ = [lintMode [tap creature] [creature]]
+        -- The delayed lint calls modalSlotsOffend itself, with the whole card's
+        -- minted slots on the bound side; nothing here mints, so the bound side
+        -- is CR 113.7's source alone.
+        delayed modes = modalSlotsOffend (Set.singleton Binding.triggerSource) (TriggeredAbility.modal (modalTrigger TriggerCondition.SelfDies modes))
+    Spec.assertBool s (activatedAbilityOffends (modalActivated unread)) "an activated ability declaring an unread slot is rejected"
+    Spec.assertBool s (not (activatedAbilityOffends (modalActivated read_))) "and reading everything it declares is accepted"
+    Spec.assertBool s (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDies unread)) "a triggered ability declaring an unread slot is rejected"
+    Spec.assertBool s (not (triggeredAbilityOffends (modalTrigger TriggerCondition.SelfDies read_))) "and reading everything it declares is accepted"
+    Spec.assertBool s (delayed unread) "a delayed ability declaring an unread slot is rejected"
+    Spec.assertBool s (not (delayed read_)) "and reading everything it declares is accepted"
+    -- The real card whose landing exposed the gap, accepted: its ability declares
+    -- a player slot for the crown and an `any target` slot for the damage, and
+    -- Resolve.slotsOf reports both.
+    Spec.assertBool
+      s
+      (not (any activatedAbilityOffends (Face.activatedAbilities (S.combinedFace denethor))))
+      "Denethor, Stone Seer's two-slot ability is accepted"
   -- CR 400.1: every InZone Count over a shared zone (battlefield, stack,
   -- exile, command) must pair with PlayerRef.EachPlayer -- the type
   -- permits any PlayerRef there, but only EachPlayer is meaningful for a

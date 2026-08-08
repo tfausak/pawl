@@ -42,16 +42,17 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 -- self-referential opcode. No card's targetSpecs may name it (lint-enforced): a
 -- source is not a target.
 --
--- Hazard for a future lint. CardSpec.hs's "declared slots == read slots"
--- equality lint walks only a card's SPELL modes, and the ability lints are all
--- SUBSET checks that put this slot on the available side -- so neither collides
--- with the rule above today. But an equality-style lint widened to an ability's
--- modes WOULD be unsatisfiable, because Resolve.slotsOf returns this slot for
--- an effect that reads it while the rule forbids the matching targetSpecs
--- entry. Such a lint must subtract the reserved names (this one, variableX,
--- chosenModes, copySource, you, thatPlayer, became, thatSpell) from the read
--- side; loosening it to a subset check instead would silently retire its
--- "declared but never read" half.
+-- Hazard this comment used to only predict, and which #1043 then resolved.
+-- CardSpec.hs's "declared slots == read slots" equality lint now walks a card's
+-- ABILITY modes as well as its spell's, and it would indeed be unsatisfiable
+-- stated naively -- Resolve.slotsOf returns this slot for an effect that reads
+-- it, while the rule above forbids the matching targetSpecs entry. What makes it
+-- statable is the discipline this comment named: CardSpec.modalSlotsOffend
+-- SUBTRACTS the reserved names its carrier binds (this one, variableX,
+-- chosenModes, copySource, you, thatPlayer, became, thatSpell) from the READ side
+-- before comparing, rather than adding them to the declared side. Loosening it
+-- back to a subset check would silently retire its "declared but never read"
+-- half, which is the shape the ability lints carried until #1043.
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
