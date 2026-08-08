@@ -403,23 +403,24 @@ chooseLegendVictims (controller, candidates) = do
 --    Written regardless, because it costs one `case` and it is what the rule
 --    says.
 --
--- The CLOCK is Object.timestamp -- when the permanent entered the battlefield (CR
--- 613.7d) -- and NOT a separate record of when it became world. The two are the
--- same instant for every board pawl can reach TODAY, which is a fact about what
--- pawl cannot yet express rather than a fact about Magic. All three ways they
--- could come apart are missing capabilities:
+-- Not implemented: a per-object "world since" clock. The CLOCK read here is
+-- Object.timestamp -- when the permanent entered the battlefield (CR 613.7d) --
+-- and NOT a record of when it became world. The two are the same instant for
+-- every board pawl can reach TODAY, which is a fact about the card pool rather
+-- than a fact about Magic. All three ways they could come apart are closed by
+-- something checkable:
 --
--- 1. A supertype gained or lost on the battlefield: no Modification arm changes a
---    supertype (#311).
+-- 1. A supertype gained or lost on the battlefield. Modification.AddSupertype
+--    and RemoveSupertype apply at layer 4, so this is now expressible in
+--    general -- but no card in the pool moves the WORLD supertype, which
+--    Pawl.CardSpec's "no card adds or removes the world supertype" corpus lint
+--    holds (#998).
 -- 2. A permanent that BECOMES a copy of a world permanent, which needs no
 --    supertype-changing effect at all (CR 707.2). pawl copies only as an object
 --    ENTERS, the same moment it is stamped; CR 707.3's on-the-battlefield half is
 --    #313, and Crystalline Resonance is the card that would break this reading.
 -- 3. A restamp with no zone change. CR 701.3c's is the only one, and it needs the
 --    world permanent to be attachable, which no world printing is.
---
--- Whichever of #311 or #313 lands first has to give this rule a clock of its own:
--- a per-object "world since", sampled where the supertype set is established.
 --
 -- Read off the PROJECTION rather than the printed type line, for the reason
 -- legendGroups is: CR 707.2 makes a copy of a world permanent world too.

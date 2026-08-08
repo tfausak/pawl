@@ -89,6 +89,8 @@ layer m = case m of
   Modification.SetCreatureSubtype _ -> Layer.Type
   Modification.AddCreatureSubtype _ -> Layer.Type
   Modification.AddCardType _ -> Layer.Type
+  Modification.AddSupertype _ -> Layer.Type
+  Modification.RemoveSupertype _ -> Layer.Type
   Modification.ChangeSubtypeWord _ _ -> Layer.Text
   Modification.SetController _ -> Layer.Control
   Modification.SetControllerToSource -> Layer.Control
@@ -159,6 +161,19 @@ applyModification lyr src cands gs oid m pc =
           pc {PC.subtypes = Set.insert s (PC.subtypes pc)}
         Modification.AddCardType t ->
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
+        -- CR 205.4b: a gain is an INSERT into the supertype set, so every other
+        -- supertype the object had survives, and neither its card types nor its
+        -- subtypes are touched. Granting one the object already has is the
+        -- identity -- CR 205.4 gives an object a SET of supertypes, so a second
+        -- Leyline of Singularity does not make a creature legendary twice the way
+        -- CR 613.1f's two keyword grants stack.
+        Modification.AddSupertype t ->
+          pc {PC.supertypes = Set.insert t (PC.supertypes pc)}
+        -- CR 205.4b's other direction, a DELETE for the same reason: removing one
+        -- supertype leaves the rest, and removing one the object never had is the
+        -- identity rather than an error.
+        Modification.RemoveSupertype t ->
+          pc {PC.supertypes = Set.delete t (PC.supertypes pc)}
         -- CR 305.7's set, with the type written into card data.
         Modification.SetLandSubtype s -> setLandSubtypeTo s pc
         -- CR 305.7's set again, with the type read off the source's own entry
@@ -360,16 +375,8 @@ affects source oid a partial gs = case a of
             && Filter.matches (Filter.MkContext (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
--- CR 205.4a: supertypes are read from the printed type line -- no Modification
--- arm changes a supertype (#311). Empty when the object has no underlying card.
-printedSupertypes :: ObjectId -> GameState -> Set Supertype.Supertype
-printedSupertypes oid gs = case Game.faceOf oid gs of
-  Nothing -> Set.empty
-  Just face -> TypeLine.supertypes (Face.typeLine face)
-
--- The characteristics view of a battlefield/stack object: its CR 613 projection,
--- its printed supertypes (CR 205.4a), and its projected controller (CR 613.1b;
--- Nothing when the id is unknown).
+-- The characteristics view of a battlefield/stack object: its CR 613 projection
+-- and its projected controller (CR 613.1b; Nothing when the id is unknown).
 viewOfObject :: ObjectId -> GameState -> Filter.View
 viewOfObject oid gs = viewOfObjectGiven Map.empty (controlGrants gs) oid gs
 
@@ -532,9 +539,8 @@ declaredIt oid event = case event of
   GameEvent.AttackerDeclared declared -> declared == oid
   _ -> False
 
--- Shared assembly: fill a View from a projection's characteristics plus the
--- printed supertypes (not projected), a supplied controller and supplied
--- counters.
+-- Shared assembly: fill a View from a projection's characteristics, a supplied
+-- controller and supplied counters.
 --
 -- The COUNTERS come in as an argument for the reason the controller does: CR
 -- 109.3's characteristic list has no counters in it, so a ProjectedCharacteristics
@@ -546,7 +552,10 @@ viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.
 viewOfCharacteristics oid pc controller counters gs =
   Filter.MkView
     { Filter.cardTypes = PC.cardTypes pc,
-      Filter.supertypes = printedSupertypes oid gs,
+      -- CR 205.4 / 613.1d off the PROJECTION, beside cardTypes rather than off
+      -- the printed type line: layer 4 writes supertypes too, so a permanent
+      -- Leyline of Singularity made legendary matches "legendary permanent".
+      Filter.supertypes = PC.supertypes pc,
       Filter.colors = PC.colors pc,
       Filter.subtypes = PC.subtypes pc,
       -- CR 109.3 / 613.1f: abilities are characteristics and layer 6 writes them,
@@ -833,6 +842,8 @@ freezeQuantities gs oid you m =
         Modification.SetCreatureSubtype _ -> Just m
         Modification.AddCreatureSubtype _ -> Just m
         Modification.AddCardType _ -> Just m
+        Modification.AddSupertype _ -> Just m
+        Modification.RemoveSupertype _ -> Just m
         Modification.ChangeSubtypeWord _ _ -> Just m
         Modification.SetController _ -> Just m
         Modification.SetControllerToSource -> Just m
@@ -856,6 +867,8 @@ quantitiesOf m = case m of
   Modification.SetCreatureSubtype _ -> []
   Modification.AddCreatureSubtype _ -> []
   Modification.AddCardType _ -> []
+  Modification.AddSupertype _ -> []
+  Modification.RemoveSupertype _ -> []
   Modification.ChangeSubtypeWord _ _ -> []
   Modification.SetController _ -> []
   Modification.SetControllerToSource -> []
@@ -1089,8 +1102,11 @@ rewriteModification pairs m =
         Modification.SetBasePowerToughness _ _ -> acc
         Modification.ModifyPowerToughness _ _ -> acc
         -- CR 205.2a's card types are a different list from CR 205.3's subtypes,
-        -- so this position holds no word a subtype pair could name.
+        -- so this position holds no word a subtype pair could name. CR 205.4a's
+        -- supertypes are a third list, and the two arms below hold one of those.
         Modification.AddCardType _ -> acc
+        Modification.AddSupertype _ -> acc
+        Modification.RemoveSupertype _ -> acc
         -- The two words of a STORED text change are the choice its own
         -- resolution announced (CR 608.2d), not words printed on the object this
         -- rewrite walks. A text changer's PRINTED clause is reached instead, by
@@ -1582,6 +1598,11 @@ removesAbilities m = case m of
   Modification.AddLandSubtype _ -> False
   Modification.ChangeSubtypeWord _ _ -> False
   Modification.AddCardType _ -> False
+  -- CR 205.4b changes a supertype and says nothing about abilities. CR 305.7's
+  -- strip is the land arms' alone, and a permanent that becomes legendary or
+  -- stops being snow keeps every ability it had.
+  Modification.AddSupertype _ -> False
+  Modification.RemoveSupertype _ -> False
   Modification.SetColor _ -> False
   Modification.AddColor _ -> False
   Modification.AddChosenColor -> False
@@ -1796,6 +1817,12 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
 data Aspect
   = Types
   | Subtypes
+  | -- CR 205.4 / 613.1d: layer 4 writes supertypes as well as card types and
+    -- subtypes, so an effect whose affected set names one ("each nonbasic land")
+    -- can be moved by another effect the way HasCardType's is. A third aspect
+    -- rather than a share of Types, because CR 205.4b keeps the two independent:
+    -- nothing that writes a card type writes a supertype.
+    Supertypes
   | Colors
   | -- CR 109.3 counts abilities among an object's characteristics and CR 613.1f
     -- writes them, so a keyword is an aspect exactly as a subtype is.
@@ -1808,9 +1835,8 @@ data Aspect
 -- projected characteristic must be classified here, or CR 613.8a would silently
 -- stop seeing dependencies through it.
 --
--- Several arms read nothing a modification can write. CR 205.4a supertypes come
--- off the printed type line; IsSource and IsPlayer ask who the candidate is; and
--- IsToken asks what it is represented by.
+-- Several arms read nothing a modification can write. IsSource and IsPlayer ask
+-- who the candidate is, and IsToken asks what it is represented by.
 --
 -- IsAttacking reads nothing either, which CR 506.4 makes look otherwise: that rule
 -- removes a permanent from combat when its controller changes or it stops being a
@@ -1833,7 +1859,7 @@ data Aspect
 filterReads :: Filter.Type.Filter Keyword.Type.Keyword -> Set Aspect
 filterReads f = case f of
   Filter.Type.HasCardType _ -> Set.singleton Types
-  Filter.Type.HasSupertype _ -> Set.empty
+  Filter.Type.HasSupertype _ -> Set.singleton Supertypes
   Filter.Type.HasColor _ -> Set.singleton Colors
   Filter.Type.HasSubtype _ -> Set.singleton Subtypes
   -- CR 613.1f: layer 6 adds and removes abilities, so this atom's answer moves
@@ -1910,6 +1936,8 @@ modificationWrites m = case m of
   Modification.AddCreatureSubtype _ -> Set.singleton Subtypes
   Modification.ChangeSubtypeWord _ _ -> Set.fromList [Subtypes, Keywords]
   Modification.AddCardType _ -> Set.singleton Types
+  Modification.AddSupertype _ -> Set.singleton Supertypes
+  Modification.RemoveSupertype _ -> Set.singleton Supertypes
   Modification.SetColor _ -> Set.singleton Colors
   Modification.AddColor _ -> Set.singleton Colors
   Modification.AddChosenColor -> Set.singleton Colors
@@ -2524,6 +2552,8 @@ grantsMintingKeyword m = case m of
   Modification.SetCreatureSubtype _ -> False
   Modification.AddCreatureSubtype _ -> False
   Modification.AddCardType _ -> False
+  Modification.AddSupertype _ -> False
+  Modification.RemoveSupertype _ -> False
   Modification.ChangeSubtypeWord _ _ -> False
   Modification.SetController _ -> False
   Modification.SetControllerToSource -> False

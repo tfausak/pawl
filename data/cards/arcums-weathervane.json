@@ -1,0 +1,161 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 2
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "Indefinite"
+                      },
+                      {
+                        "type": "RemoveSupertype",
+                        "value": {
+                          "type": "Snow"
+                        }
+                      },
+                      "target"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Snow"
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 2
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "ModifyTarget",
+                    "value": [
+                      {
+                        "type": "Indefinite"
+                      },
+                      {
+                        "type": "AddSupertype",
+                        "value": {
+                          "type": "Snow"
+                        }
+                      },
+                      "target"
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "target",
+                    "spec": {
+                      "filter": {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Land"
+                            }
+                          },
+                          {
+                            "type": "HasSupertype",
+                            "value": {
+                              "type": "Basic"
+                            }
+                          },
+                          {
+                            "type": "Not",
+                            "value": {
+                              "type": "HasSupertype",
+                              "value": {
+                                "type": "Snow"
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      "pool": {
+                        "type": "Permanents"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Arcum's Weathervane",
+      "typeLine": {
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

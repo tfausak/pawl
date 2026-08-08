@@ -1,0 +1,75 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Leyline of Singularity",
+      "openingHandActions": [
+        [
+          {
+            "type": "MoveToZone",
+            "value": [
+              "self",
+              {
+                "type": "Battlefield"
+              }
+            ]
+          }
+        ]
+      ],
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "Not",
+              "value": {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Land"
+                }
+              }
+            }
+          },
+          "modifications": [
+            {
+              "type": "AddSupertype",
+              "value": {
+                "type": "Legendary"
+              }
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
