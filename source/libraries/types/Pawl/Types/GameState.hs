@@ -20,6 +20,7 @@ import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.RestartSignal as RestartSignal
@@ -66,12 +67,17 @@ data GameState = MkGameState
     -- (CR 702.26f) hand it back to somebody else. A stored player is that
     -- sentence; Pawl.Engine.Projection.controllerOf is not.
     --
-    -- What DOESN'T live here is why a permanent phased out. Phasing back in on
-    -- one's own is CR 702.26a's business and is read off the permanent's keywords;
-    -- an unattached permanent phased out by an effect has no phasing ability and
-    -- so is not among those that phase in. Nor is the indirect half of CR 702.26g
-    -- represented -- no Aura or Equipment can phase out today (#928).
-    phasedOut :: Map.Map ObjectId.ObjectId PlayerId.PlayerId,
+    -- The row also says WHICH of rule 702.26's two schedules the permanent is
+    -- on, which is CR 702.26g's own distinction: a permanent that phased out
+    -- directly phases in during its player's next untap step, while one that
+    -- phased out indirectly "won't phase in by itself" and comes back with the
+    -- permanent it is attached to. See Pawl.Types.PhasedOut.
+    --
+    -- What DOESN'T live here is why a permanent phased out DIRECTLY. Phasing
+    -- back in on one's own is CR 702.26a's business and is read off the
+    -- permanent's keywords; an unattached permanent phased out by an effect has
+    -- no phasing ability and so is not among those that phase in.
+    phasedOut :: Map.Map ObjectId.ObjectId PhasedOut.PhasedOut,
     exile :: Set.Set ObjectId.ObjectId,
     -- | CR 400.1: the command zone -- a shared collection (not per-player), keyed
     -- into `objects` like `battlefield`/`exile`. Emblems live here.

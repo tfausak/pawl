@@ -624,6 +624,7 @@ library types
     Pawl.Types.PaymentDecision
     Pawl.Types.PendingTrigger
     Pawl.Types.Phase
+    Pawl.Types.PhasedOut
     Pawl.Types.PhasePattern
     Pawl.Types.PhaseSelector
     Pawl.Types.PhyrexianPayment
