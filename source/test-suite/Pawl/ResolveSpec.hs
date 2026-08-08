@@ -108,6 +108,7 @@ import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
@@ -3073,7 +3074,7 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
     Spec.assertEqWith s "and still does" (Projection.controllerOf oid after) (Just S.alice)
     Spec.assertEqWith s "its settle under alice is untouched" (fmap Object.sickness (Game.lookupObject oid after)) (Just (Sickness.Settled S.alice))
 
-gainPlayerCountersSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+gainPlayerCountersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
   Spec.it s "CR 107.14 GainPlayerCounters gives the resolving controller energy" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -3081,6 +3082,52 @@ gainPlayerCountersSpec s registry = Spec.describe s "GainPlayerCounters" $ do
         act = Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.GainPlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Energy (Quantity.Literal 2))
         after = S.runPure S.identityAnswer gs0 act
     Spec.assertEqWith s "alice has two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
+  -- CR 122.1: `EachPlayer` on GainPlayerCounters had no card producer until
+  -- Ichor Rats ({1}{B}{B} Creature -- Phyrexian Rat 2/1, "Infect. When this
+  -- creature enters, each player gets a poison counter."), and design.md
+  -- section 4 says an implemented, unproven arm is not done. This case is
+  -- what proves it.
+  --
+  -- THREE seats, and the caster's own counter is the discriminator. At two
+  -- seats `EachPlayer` and `Relative Opponent` differ only in whether the
+  -- caster is included, so a single wrong `Opponent` authoring would be
+  -- invisible against the Prologue to Phyresis cases (which prove the
+  -- `Relative Opponent` arm, in proliferateSpec below) -- alice holding a
+  -- poison counter is the one reading `Relative Opponent` cannot produce, at
+  -- any number of seats. The counts are asserted as one tuple because every
+  -- number here is 1: three separate checks would let a partial answer look
+  -- like a coincidence rather than a failure.
+  Spec.it s "CR 122.1 whole card: Ichor Rats poisons all three players, the caster included" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    ichorRats <- S.printingOf s registry "Ichor Rats"
+    -- Three Swamps for the {1}{B}{B}. S.landsInPlay builds its own two-seat
+    -- game, so a three-seat board adds them one at a time instead.
+    let withMana = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (3 :: Int)]
+        (gs, spellId) = S.handOne ichorRats withMana
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
+        poisonIn g = (S.playerCounterOf PlayerCounterKind.Poison S.alice g, S.playerCounterOf PlayerCounterKind.Poison S.bob g, S.playerCounterOf PlayerCounterKind.Poison S.carol g)
+    -- Nobody is poisoned before the Rats resolve, so the 1s below are the
+    -- effect's doing rather than the fixture's.
+    Spec.assertEqWith s "the table starts clean" (poisonIn gs) (0, 0, 0)
+    Spec.assertEqWith s "the Rats resolved onto the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Ichor Rats") S.alice settled) 1
+    Spec.assertEqWith s "alice, bob and carol each got one" (poisonIn settled) (1, 1, 1)
+  -- The gameplay-level consequence: CR 704.5c's tenth poison counter. carol
+  -- sits on nine, so the counter `EachPlayer` hands her is the one that loses
+  -- her the game -- and alice, the caster, is poisoned in the same resolution
+  -- without reaching ten.
+  Spec.it s "CR 704.5c Ichor Rats' counter is carol's tenth, and she loses the game" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    ichorRats <- S.printingOf s registry "Ichor Rats"
+    let withMana = List.foldl' (\g _ -> snd (S.addCreature swamp S.alice g)) S.threePlayerGame [1 .. (3 :: Int)]
+        nearlyDead = S.addPlayerCounter PlayerCounterKind.Poison 9 S.carol withMana
+        (gs, spellId) = S.handOne ichorRats nearlyDead
+        cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+        settled = snd (Engine.runGamePure S.identityAnswer cast Engine.priorityLoop)
+        statusOf pid = fmap Player.status (Map.lookup pid (GameState.players settled))
+    Spec.assertEqWith s "carol reached ten" (S.playerCounterOf PlayerCounterKind.Poison S.carol settled) 10
+    Spec.assertEqWith s "and lost the game" (statusOf S.carol) (Just (Status.Departed Departure.Type.Lost))
+    Spec.assertEqWith s "alice, who cast it, is poisoned but playing" (S.playerCounterOf PlayerCounterKind.Poison S.alice settled, statusOf S.alice) (1, Just Status.Playing)
 
 -- Answers Prompt.ChooseProliferate by taking everything on offer. Its sibling
 -- declines everything: between them the tests prove the ANSWER decides who gets
@@ -3137,8 +3184,9 @@ proliferateSpec s registry = Spec.describe s "Proliferate" $ do
     Spec.assertEqWith s "the bare Piker gained nothing" (S.counterOf CounterKind.PlusOnePlusOne bare after) 0
     Spec.assertEqWith s "the countered one moved" (S.counterOf CounterKind.PlusOnePlusOne src after) 2
   -- CR 102.2 / 109.5: `Relative Opponent` on GainPlayerCounters had no card
-  -- producer until Prologue to Phyresis (#267). The arm was implemented and
-  -- unproven, which design.md section 4 says is not done.
+  -- producer until Prologue to Phyresis. The arm was implemented and
+  -- unproven, which design.md section 4 says is not done; these cases are
+  -- what prove it.
   Spec.it s "CR 122.1 whole card: Prologue to Phyresis poisons the opponent, not the caster" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
