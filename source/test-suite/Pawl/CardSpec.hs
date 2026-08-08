@@ -1629,6 +1629,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
   EntryRewrite.Tapped -> []
+  EntryRewrite.PayLifeOrTapped _ -> []
   EntryRewrite.SacrificeAnyNumber f _ -> [f]
 
 -- CR 614.1c-d: two replacement patterns narrow by a Filter. CounterPattern.onWhat

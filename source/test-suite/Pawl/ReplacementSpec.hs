@@ -502,6 +502,41 @@ castOrPassAnswer p = case p of
           [] -> Action.Pass
   _ -> S.identityAnswer p
 
+-- castOrPassAnswer's sibling for the CR 614.1c pay-life-or-enter-tapped cases:
+-- play the land, and answer its as-enters "you may pay N life" the given way.
+-- Every other prompt falls through to S.playLandAnswer, so the two cases differ
+-- in the OptionalDecision and in nothing else.
+payLifeOnEntryAnswer :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+payLifeOnEntryAnswer decision p = case p of
+  Prompt.ChoosePayLifeOnEntry {} -> decision
+  _ -> S.playLandAnswer p
+
+-- alice's precombat main phase with the stack empty, the modal double-faced card
+-- and the {W} creature in hand, and NOTHING else in the game: the land face is
+-- the only mana source there will be, which is what makes the creature's fate
+-- read the land's tap state.
+razorgrassBoard :: Printing.Printing -> Printing.Printing -> GameState.GameState
+razorgrassBoard razorgrass warden =
+  let (_, withField) = S.addHandCard razorgrass S.alice (Setup.emptyGame S.bothPlayers)
+      (_, filled) = S.addHandCard warden S.alice withField
+   in filled
+        { GameState.phase = Phase.PrecombatMain,
+          GameState.activePlayer = S.alice,
+          GameState.priority = Just S.alice
+        }
+
+-- How many Soul Wardens made it to the battlefield.
+wardenOut :: GameState.GameState -> Int
+wardenOut gs =
+  let wardenName = CardName.MkCardName (Text.pack "Soul Warden")
+   in length [o | o <- Set.toList (GameState.battlefield gs), Projection.nameOf o gs == wardenName]
+
+-- Whether a life loss of exactly this size, by this player, was RECORDED -- the
+-- channel a card that watches for life loss reads, and the half of CR 119.4 a
+-- bare subtraction from the life total would not satisfy.
+lostLife :: PlayerId.PlayerId -> Natural.Natural -> GameState.GameState -> Bool
+lostLife pid n gs = GameEvent.LifeLost pid n `elem` GameState.events gs
+
 -- Stonehorn Dignitary {3}{W} Creature -- Rhino Soldier 1/4: "When this creature
 -- enters, target opponent skips their next combat phase." (oracle checked on
 -- Scryfall)
@@ -1753,6 +1788,65 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
           s
           "and the same land untapped pays for it"
           (ratsOut (S.runPure castOrPassAnswer (untap permId played) Engine.priorityLoop))
+          1
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  -- CR 614.1c: "Effects that read ... 'As [this permanent] enters . . .' ... are
+  -- replacement effects." Razorgrass Field -- the land face of the modal
+  -- double-faced Razorgrass Ambush // Razorgrass Field -- prints one of exactly
+  -- that shape with a PRICE in it: "As this land enters, you may pay 3 life. If
+  -- you don't, it enters tapped."
+  --
+  -- The pair of cases below is one fixture answered two ways, so nothing but the
+  -- answer differs between them. Played through the real priority loop, the whole
+  -- path a player takes to CR 305.1, exactly as the Zof Bloodbog case above is.
+  --
+  -- What each case measures is not the tap-state field this same code just wrote
+  -- but what a PLAYER gets for the 3 life: Soul Warden, a {W} creature, sits in
+  -- the hand beside the land, and the land's "{T}: Add {W}" is the only mana in
+  -- the game. So declining leaves the Warden uncast and paying gets it onto the
+  -- battlefield -- Activate.activatable is deliberately NOT asked, since CR
+  -- 605.3b keeps a mana ability off the stack and it answers False for one on
+  -- every board.
+  --
+  -- The life is asserted twice over: the total, and CR 119.4's "in other words,
+  -- the player loses that much life" as a recorded GameEvent.LifeLost. The second
+  -- is the channel every life-loss trigger in the pool reads -- Mindcrank's and
+  -- Exquisite Blood's "whenever an opponent loses life" watch this same
+  -- GameEvent -- so a payment that quietly subtracted from the total instead of
+  -- going through the CR 119.4 door would pass the first assertion and fail this
+  -- one.
+  --
+  -- Soul Warden's own "whenever ANOTHER creature enters" cannot move the total:
+  -- it is the only creature in the fixture, and both life assertions are read off
+  -- the board the land play left, before it is ever cast.
+  Spec.it s "CR 614.1c Razorgrass Field DECLINED enters tapped and costs no life" $ do
+    razorgrass <- S.printingOf s registry "Razorgrass Ambush"
+    warden <- S.printingOf s registry "Soul Warden"
+    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Declines) (razorgrassBoard razorgrass warden) Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered tapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and cost nothing" (S.lifeOf S.alice played) (Just 20)
+        Spec.assertBool s (not (lostLife S.alice 3 played)) "no life loss was recorded"
+        Spec.assertEqWith
+          s
+          "so the {W} creature in hand stays there -- no mana to cast it with"
+          (wardenOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
+          0
+      other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
+  Spec.it s "CR 614.1c Razorgrass Field PAID FOR enters untapped, for exactly 3 life" $ do
+    razorgrass <- S.printingOf s registry "Razorgrass Ambush"
+    warden <- S.printingOf s registry "Soul Warden"
+    let played = S.runPure (payLifeOnEntryAnswer OptionalDecision.Exercises) (razorgrassBoard razorgrass warden) Engine.priorityLoop
+    case Set.toList (GameState.battlefield played) of
+      [permId] -> do
+        Spec.assertEqWith s "the land entered untapped" (fmap Object.tapped (Game.lookupObject permId played)) (Just TapState.Untapped)
+        Spec.assertEqWith s "20 - 3" (S.lifeOf S.alice played) (Just 17)
+        Spec.assertBool s (lostLife S.alice 3 played) "the payment was recorded as a life loss (CR 119.4)"
+        Spec.assertEqWith
+          s
+          "and the untapped land pays for the {W} creature"
+          (wardenOut (S.runPure castOrPassAnswer played Engine.priorityLoop))
           1
       other -> Spec.assertFailure s ("expected one permanent, got " <> show (length other))
   Spec.it s "CR 707.5 declining the copy leaves a 0/0 that dies (CR 704.5f)" $ do

@@ -191,6 +191,20 @@ combatReplaySpec s =
         -- counter on the board.
         Spec.it s "defaultAnswer declines riot's counter" $
           Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChooseRiot decider S.alice oid)) OptionalDecision.Declines
+        -- CR 614.1c / 119.4: the other as-enters "may", and the one that costs
+        -- something. A separate Response constructor for ChooseRiot's reason
+        -- carried one step further: three OptionalDecision-valued prompts now
+        -- exist, and a transcript that answered any of them must not be read as an
+        -- answer to another -- so both of the others are rejected explicitly.
+        Spec.it s "ChoosePayLifeOnEntry records and replays an OptionalDecision, and rejects the other as-enters mays" $ do
+          let p = Prompt.ChoosePayLifeOnEntry decider S.alice oid 3
+          Monad.forM_ [OptionalDecision.Declines, OptionalDecision.Exercises] $ \decision ->
+            Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p decision)) (Just decision)
+          Spec.assertEqWith s "a riot answer is not an answer to it" (Replay.decode p (Response.ChoseRiot OptionalDecision.Exercises)) Nothing
+          Spec.assertEqWith s "nor is a printed may" (Replay.decode p (Response.ChoseOptional OptionalDecision.Exercises)) Nothing
+        -- CR 614.1c: a transcript that runs short spends no life.
+        Spec.it s "defaultAnswer declines the life payment" $
+          Spec.assertEqWith s "declines" (Replay.defaultAnswer (Prompt.ChoosePayLifeOnEntry decider S.alice oid 3)) OptionalDecision.Declines
         -- CR 614.1c / 105.1: a colour chosen as a permanent enters. Every one of
         -- the five is round-tripped, because a codec that collapsed two of them
         -- would replay a Painter's Servant naming blue as one naming white --

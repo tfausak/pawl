@@ -12,7 +12,8 @@ import qualified Pawl.Types.Keyword as Keyword
 -- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChooseCardNames is Null
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
 -- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
--- Bloodbog and Headless Skaab (CR 614.1d).
+-- Bloodbog and Headless Skaab (CR 614.1d); PayLifeOrTapped is Razorgrass Field
+-- (CR 614.1c).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
 -- makes CR 707.2 fall out with no further machinery. CR 707.5's second half is
@@ -172,9 +173,40 @@ data EntryRewrite
     -- runs before the Moved event is recorded, so no trigger scan and no
     -- state-based action can see the interim untapped object, the same footing
     -- UnderSourceControl's write to Object.enteredUnder stands on.
-    --
-    -- Not implemented: CR 614.1c's optional-cost variant of the same rewrite --
-    -- "As this land enters, you may pay 3 life. If you don't, it enters tapped"
-    -- (#950).
     Tapped
+  | -- | CR 614.1c: "As [this permanent] enters, you may pay N life. If you don't,
+    -- it enters tapped" (Razorgrass Field, the land face of Razorgrass Ambush //
+    -- Razorgrass Field). Tapped's rewrite with a PRICE on avoiding it, and the
+    -- one entry rewrite whose choice is paid for in life.
+    --
+    -- CR 614.1c and not CR 614.1d, unlike Tapped beside it: the printed sentence
+    -- opens "As this land enters", which is rule 614.1c's second quoted shape,
+    -- rather than the bare "[This permanent] enters . . ." rule 614.1d names.
+    -- Both are replacement effects and both run through the CR 616.1 loop, so
+    -- the split changes nothing about how this applies -- it is recorded because
+    -- the two arms cite different subrules and a reader will ask why.
+    --
+    -- THE AMOUNT RIDES THE CONSTRUCTOR, and the printed cards settle it: the
+    -- modal-double-faced lands print 3 while the Ravnica shocklands (Steam Vents,
+    -- Godless Shrine) print the same sentence with 2. Nothing in rule 614.1c
+    -- fixes the number, so this is the WithCounters position -- a payload the
+    -- card writes -- and not the Riot or Tapped one, where a rule fixes both
+    -- halves.
+    --
+    -- CARD-TYPE-AGNOSTIC for Tapped's reason: nothing here or in
+    -- Pawl.Engine.Event's arm gates on Land, even though every printing of the
+    -- sentence so far is one.
+    --
+    -- The declining half is Tapped's write, verbatim -- the status is stamped on
+    -- the already-materialized incarnation rather than routed through the tap
+    -- funnel -- so declining here and Zof Bloodbog's unconditional sentence leave
+    -- the same board. The paying half goes through CR 119.4's life-payment door
+    -- (Pawl.Engine.Event.payLife), so it records a life loss and a card watching
+    -- for one sees it.
+    --
+    -- A Natural and not a Quantity, the position Pawl.Types.CostComponent.PayLife
+    -- takes: the printed number is a literal on every card that prints this
+    -- sentence, and CR 614.12a settles the choice before the permanent enters, so
+    -- there is no board for a variable amount to be measured against yet.
+    PayLifeOrTapped Natural.Natural
   deriving (Eq, Ord, Show)

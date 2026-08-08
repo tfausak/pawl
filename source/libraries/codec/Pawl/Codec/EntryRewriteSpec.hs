@@ -92,6 +92,16 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       EntryRewrite.Tapped
       """ {"type":"Tapped"} """
+  -- CR 614.1c: the same tap-state rewrite with a price on avoiding it, and the
+  -- amount is card text rather than a rule's, so unlike Tapped above it carries a
+  -- payload.
+  Spec.it s "PayLifeOrTapped (Razorgrass Field)" $
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      (EntryRewrite.PayLifeOrTapped 3)
+      """ {"type":"PayLifeOrTapped","value":3} """
   -- CR 616.1b: a control rewrite, payload-free because CR 109.5 derives the
   -- player.
   Spec.it s "UnderSourceControl (Gather Specimens)" $
