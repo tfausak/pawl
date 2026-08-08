@@ -1007,12 +1007,23 @@ castProposed pid sid face castFrom candidates before = do
                           -- Stamped on `sid` itself, the incarnation CR 601.2a
                           -- put on the stack, rather than on whatever is on top
                           -- of it now.
+                          --
+                          -- CR 109.5: "The words 'you' and 'your' on an object
+                          -- refer to the object's controller, its would-be
+                          -- controller (if a player is attempting to play, cast,
+                          -- or activate it)". `pid` is both here -- the caster is
+                          -- the spell's controller -- so the slot is stamped
+                          -- alongside the chosen targets, as
+                          -- Activate.activateAbility does for CR 109.5's
+                          -- activated-ability sentence and Engine.placeBorne for
+                          -- its triggered-ability one. Char's "and 2 damage to
+                          -- you" is what reads it (Pawl.CastSpec's Char case).
                           State.modify'
                             ( \g ->
                                 g
                                   { GameState.objects =
                                       Map.adjust
-                                        (\o -> o {Object.bindings = Binding.fromChoices chosen mAmount chosenModes})
+                                        (\o -> o {Object.bindings = Binding.setYou pid (Binding.fromChoices chosen mAmount chosenModes)})
                                         sid
                                         (GameState.objects g)
                                   }

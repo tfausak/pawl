@@ -866,7 +866,10 @@ cardSlotNamesCollide card =
 --   * Binding.triggerSource (CR 113.7, the object whose ability triggered) and
 --     Binding.you (CR 109.5, the ability's controller) are stamped for EVERY
 --     triggered ability as it is placed (Engine.placeBorne, Binding.setYou), so
---     they need no agreement with the condition.
+--     they need no agreement with the condition. `you` is stamped for every
+--     ACTIVATION and every SPELL too, by rule 109.5's other sentences -- which is
+--     why the spell lint subtracts it on the read side rather than listing it
+--     here.
 --   * Event.eventBindingSlots is the condition-SPECIFIC half -- CR 400.7e's
 --     `became`, CR 702.70a's `thatPlayer` -- and is the whole point of this
 --     lint.
@@ -914,6 +917,8 @@ triggeredAbilityOffends ability =
 --   * Binding.you. CR 109.5: "For an activated ability, this is the player who
 --     activated the ability" -- stamped for every activation alongside the
 --     source slot, so Brothers of Fire's "and 1 damage to you" is a slot read.
+--     Cast.castSpell stamps it for every SPELL as well (Char), which the spell
+--     lint takes on its read side.
 --   * Binding.variableX, and ONLY when the ability's own cost prints an {X}:
 --     CR 601.2b's "the player announces the value of that variable", measured
 --     against what CR 602.2b calls "an activated ability's analog to a spell's
@@ -2042,7 +2047,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- pool. Loosen to superset if such a card ever lands.
   Spec.it s "every mode's slot reads equal its declared slots" $ do
     ps <- S.allPrintings s
-    let modeOffends announcedX m =
+    let modeOffends castBound m =
           let defined = Resolve.definedSlots (Foldable.toList (Mode.effects m))
               -- Resolve.modeSlots and not a fold over the effects alone: CR
               -- 118.12a's "unless [a player] pays" reads a slot for its payer,
@@ -2052,20 +2057,32 @@ lintSpec s registry = Spec.describe s "Lint" $ do
               -- PlaySubgame's bound subgame outcome) and then read by a later
               -- effect is legitimate dataflow, not an undeclared target -- the
               -- same definedSlots exemption the delayed-ability lint below uses.
-              Set.difference (Set.difference reads_ defined) announcedX /= Map.keysSet (Mode.targetSpecs m)
-        -- CR 601.2b's X is an ordinary slot read since #14 retired Quantity.X, so
-        -- it arrives here like any other -- but casting binds it rather than a
-        -- target spec declaring it, so it belongs on the AVAILABLE side exactly
-        -- when the cost prints an {X}. That IS the "reads X iff the cost declares
-        -- {X}" lint, now falling out of the ordinary comparison instead of
-        -- needing its own pass. activatedAbilityOffends says the same thing about
-        -- an activation cost.
+              Set.difference (Set.difference reads_ defined) castBound /= Map.keysSet (Mode.targetSpecs m)
+        -- What CASTING binds rather than a target spec declaring it, subtracted
+        -- from the READ side. It cannot be added to the declared side instead:
+        -- the "no reserved binding slot is ever a declared target slot" sweep
+        -- below forbids a card declaring either of these, so the two rules would
+        -- be mutually unsatisfiable.
+        --
+        --   * Binding.you, unconditionally. CR 109.5's first sentence covers a
+        --     spell ("the object's controller, its would-be controller (if a
+        --     player is attempting to play, cast, or activate it)"), and
+        --     Pawl.Engine.Cast.castSpell stamps the caster for EVERY spell at CR
+        --     601.2i -- so Char's "and 2 damage to you" is a slot read on a spell
+        --     exactly as Brothers of Fire's is on an activated ability.
+        --   * Binding.variableX, and only when the cost prints an {X}. CR 601.2b's
+        --     X is an ordinary slot read since #14 retired Quantity.X, so it
+        --     arrives here like any other -- but casting binds it, so it belongs
+        --     here exactly when the cost declares it. That IS the "reads X iff the
+        --     cost declares {X}" lint, now falling out of the ordinary comparison
+        --     instead of needing its own pass. activatedAbilityOffends says the
+        --     same thing about an activation cost.
         cardOffends card =
-          let announcedX =
+          let castBound =
                 if declaresVariable (Face.manaCost card)
-                  then Set.singleton Binding.variableX
-                  else Set.empty
-           in any (modeOffends announcedX) (Modal.modes (Face.spell card))
+                  then Set.fromList [Binding.you, Binding.variableX]
+                  else Set.singleton Binding.you
+           in any (modeOffends castBound) (Modal.modes (Face.spell card))
         offenders =
           filter
             (anyFace cardOffends . Printing.card)

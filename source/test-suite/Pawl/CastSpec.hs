@@ -379,11 +379,18 @@ castSpec s registry = Spec.describe s "Cast" $ do
         Nothing -> Spec.assertFailure s "stack id should resolve"
         Just obj -> do
           Spec.assertEqWith s "one Mountain tapped" (S.tappedCount S.alice gs) 1
+          -- The `you` entry alongside it is CR 109.5's, stamped for every spell
+          -- rather than chosen -- so these two are the whole of the recipients the
+          -- cast bound, and nothing was asked for to get the second.
           Spec.assertEqWith
             s
-            "the Piker is the target"
+            "the Piker is the target, and alice is CR 109.5's you"
             (Binding.targetsOf (Object.bindings obj))
-            (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToCreature (S.pikerOf base)))
+            ( Map.fromList
+                [ (SlotName.MkSlotName (Text.pack "target"), Recipient.ToCreature (S.pikerOf base)),
+                  (Binding.you, Recipient.ToPlayer S.alice)
+                ]
+            )
   Spec.it s "casting a {X}{R} spell at X=3 stamps amount 3 and pays {3}{R}" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
@@ -744,6 +751,58 @@ answerRecordingTargetObject p = case p of
 -- check: a cast that reverses leaves the card exactly where it was).
 inHandNamed :: String -> GameState.GameState -> Int
 inHandNamed name gs = length (filter (nameOnStack (CardName.MkCardName $ Text.pack name) gs) (Game.zoneMembers Zone.Hand S.alice gs))
+
+-- Aims every CR 601.2c target slot at BOB THE PLAYER, and takes the identity
+-- fallback elsewhere.
+--
+-- Bob and not alice, and the player and not their creature, for the same reason:
+-- Char's two damage instructions name different recipients, and every wrong
+-- wiring that collapses them onto one recipient has to be distinguishable. A
+-- test that aimed the target slot at alice would see 20 -> 14 whether CR 109.5's
+-- `you` bound anything or not.
+answerTargetingBob :: Prompt.Prompt r -> r
+answerTargetingBob p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  _ -> S.identityAnswer p
+
+charSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+charSpec s registry = Spec.describe s "Char" $ do
+  -- CR 109.5 on a SPELL: "The words 'you' and 'your' on an object refer to the
+  -- object's controller". Char -- "Char deals 4 damage to any target and 2 damage
+  -- to you" -- is the shape that cannot be answered without a binding: CR 115.4's
+  -- "any target" is an ordinary chosen slot, but the second instruction names a
+  -- player nothing chose, and pawl's damage opcode reaches a player only through a
+  -- bound recipient. So the cast has to stamp the caster under the `you` slot, as
+  -- CR 109.5's activated- and triggered-ability sentences already make
+  -- Pawl.Engine.Activate.activateAbility and Pawl.Engine.Engine's trigger
+  -- placement do.
+  --
+  -- CR 608.2c has the controller follow the instructions "in the order written",
+  -- and these two are separate instructions naming different recipients rather
+  -- than one naming both -- which is what the untouched Piker below pins. Their
+  -- ORDER is unobservable here: neither instruction can change what the other
+  -- does, so this case makes no claim about it.
+  Spec.it s "CR 109.5/120.3a Char deals 4 to bob and 2 to its caster" $ do
+    char <- S.printingOf s registry "Char"
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pikerId, board) = S.addCreature piker S.bob (S.landsInPlay mountain 3)
+        (gs0, oid) = S.handOne char board
+        after = snd (Engine.runGamePure answerTargetingBob gs0 (do S.cast S.alice oid; Stack.resolveTop))
+    -- CR 120.3a: damage dealt to a player makes them lose that much life.
+    Spec.assertEqWith s "bob took the 4 aimed at him" (S.lifeOf S.bob after) (Just 16)
+    -- The whole point of the unit. Without the stamp the second instruction's
+    -- recipient lookup misses and the instruction is a silent no-op, leaving alice
+    -- at 20 -- a Char strictly better for its controller than the printed card.
+    Spec.assertEqWith s "alice took the 2 Char deals to its controller" (S.lifeOf S.alice after) (Just 18)
+    -- Neither instruction went anywhere near bob's creature. 4 damage would have
+    -- killed a 2/1 outright, so a battlefield that still holds it is the check
+    -- that the target slot was answered with the PLAYER, and 0 marked damage is
+    -- the check that the `you` instruction did not spill onto it.
+    Spec.assertEqWith s "bob's Piker took no damage" (S.damageOf pikerId after) (Just 0)
+    Spec.assertEqWith s "bob's Piker is still on the battlefield" (S.onBattlefield pikerId after) True
+    Spec.assertEqWith s "Char resolved out of hand" (inHandNamed "Char" after) 0
+    Spec.assertEqWith s "three Mountains paid {2}{R}" (S.tappedCount S.alice after) 3
 
 blazeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 blazeSpec s registry = Spec.describe s "Blaze" $ do
@@ -1950,6 +2009,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   magicalHackSpec s registry
   blazeSpec s registry
   vitalizingCascadeSpec s registry
+  charSpec s registry
   corrosiveGaleSpec s registry
   waxWaneSpec s registry
   aftermathSpec s registry
