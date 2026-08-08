@@ -1,0 +1,122 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              },
+              {
+                "type": "SacrificeThis"
+              }
+            ],
+            "mana": [
+              {
+                "type": "Generic",
+                "value": 3
+              },
+              {
+                "type": "OfType",
+                "value": {
+                  "type": "Colored",
+                  "value": {
+                    "type": "Red"
+                  }
+                }
+              }
+            ]
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "BecomeMonarch",
+                    "value": {
+                      "type": "InSlot",
+                      "value": "player"
+                    }
+                  },
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "damage",
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      }
+                    ]
+                  }
+                ],
+                "targetSpecs": [
+                  {
+                    "slot": "damage",
+                    "spec": {
+                      "pool": {
+                        "type": "AnyTarget"
+                      }
+                    }
+                  },
+                  {
+                    "slot": "player",
+                    "spec": {
+                      "pool": {
+                        "type": "Players"
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Denethor, Stone Seer",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Noble"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

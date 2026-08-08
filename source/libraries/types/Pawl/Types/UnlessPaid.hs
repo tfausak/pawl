@@ -41,10 +41,10 @@ data UnlessPaid = MkUnlessPaid
     --
     -- A slot and not the resolving controller, which is the question this card
     -- family forces: Mana Leak's payer is the TARGETED spell's controller, who
-    -- controls nothing about the resolution. The MonarchTarget precedent, one
-    -- step more general: that type enumerates its two cases because pawl has no
-    -- general "which player" spec for effects, and a slot name is what a spell's
-    -- own target namespace already offers.
+    -- controls nothing about the resolution. Pawl.Types.MonarchTarget's InSlot
+    -- arm is the same call made at a different opcode: pawl has no general
+    -- "which player" spec for effects, and a slot name is what a spell's own
+    -- target namespace already offers.
     payer :: SlotName.SlotName,
     -- | What that player is offered the chance to pay. A whole Cost and not a
     -- bare ManaCost, so Pawl.Engine.Cost.canPay and .pay are the one payment

@@ -593,9 +593,11 @@ data Effect card
     -- emblem reuses the whole ability pipeline, first-order and tied to Card by
     -- Card's own instantiation exactly as Create's is.
     CreateEmblem card
-  | -- | CR 725: a player becomes the monarch. Targetless; the beneficiary is named
-    -- by the MonarchTarget (the resolving controller, or the controller of the
-    -- ability's bound source). Emits GameEvent.BecameMonarch.
+  | -- | CR 725: a player becomes the monarch. The beneficiary is named by the
+    -- MonarchTarget: the resolving controller, the controller of the ability's
+    -- bound source, or -- Denethor, Stone Seer's "target player becomes the
+    -- monarch" -- a target slot, which is the one arm that makes this opcode
+    -- target. Emits GameEvent.BecameMonarch.
     BecomeMonarch MonarchTarget.MonarchTarget
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that
     -- designation. Tovolar, Dire Overlord's upkeep trigger is `ItBecomes Night`.
