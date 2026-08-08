@@ -17,6 +17,7 @@ import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -178,6 +179,10 @@ data Response
     -- monocolored hybrid mana symbol, so a Flame Javelin cast for {6} replays as
     -- that and not as {R}{R}{R}.
     AnnouncedHybridPayment HybridPayment.HybridPayment
+  | -- | CR 118.13a / 601.2b: which half of a colour/colour hybrid mana symbol a
+    -- caster announced they would pay, as the mana type it resolved to, so a
+    -- Slippery Bogle paid with blue replays as that and not as green.
+    AnnouncedHybridHalf ManaType.ManaType
   | -- | CR 118.7e: which half of a hybrid mana symbol in a cost REDUCTION its
     -- payer chose as CR 601.2f applied it. The symbol the half resolved to, so a
     -- {2/B} reduction taken as {2} replays as that and not as one black mana.

@@ -93,6 +93,7 @@ encode p answer = case p of
   Prompt.ChooseToPay {} -> Response.ChoseToPay answer
   Prompt.AnnouncePhyrexianPayment {} -> Response.AnnouncedPhyrexianPayment answer
   Prompt.AnnounceHybridPayment {} -> Response.AnnouncedHybridPayment answer
+  Prompt.AnnounceHybridHalf {} -> Response.AnnouncedHybridHalf answer
   Prompt.ChooseReductionHalf {} -> Response.ChoseReductionHalf answer
 
 -- The inverse of 'encode'. Nothing when the logged response does not match the
@@ -254,6 +255,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.AnnounceHybridPayment {} -> case response of
     Response.AnnouncedHybridPayment way -> Just way
+    _ -> Nothing
+  Prompt.AnnounceHybridHalf {} -> case response of
+    Response.AnnouncedHybridHalf half -> Just half
     _ -> Nothing
   Prompt.ChooseReductionHalf {} -> case response of
     Response.ChoseReductionHalf half -> Just half
@@ -446,6 +450,9 @@ defaultAnswer p = case p of
   -- CR 118.13a again, for CR 107.4e's monocolored hybrid: every offered route is
   -- payable, and the prompt is raised only where two are.
   Prompt.AnnounceHybridPayment _ _ _ _ offers -> NonEmpty.head offers
+  -- CR 118.13a once more, for CR 107.4e's colour/colour hybrid: every offered
+  -- half is payable, and the prompt is raised only where two are.
+  Prompt.AnnounceHybridHalf _ _ _ _ offers -> NonEmpty.head offers
   -- CR 118.7e: both halves are legal answers, so the first offered one is as
   -- deterministic a default as any -- and unlike the announcements above it can
   -- never make a cost unpayable, since CR 601.2f floors a reduction at {0}.

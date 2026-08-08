@@ -308,10 +308,9 @@ greatestPayableX payableAt cost =
 -- Pawl.Engine.Cast and Pawl.Engine.Activate call at exactly that moment, one step
 -- before CR 601.2f's total.
 --
--- CR 107.4f's Phyrexian symbol and CR 107.4e's MONOCOLORED hybrid ({2/R}) are
--- announced. CR 107.4e's colour/colour hybrid ({W/U}) is the one "paid in
--- multiple ways" symbol still not announced here (#729): Pawl.Engine.Mana
--- resolves it at payment.
+-- Every mana symbol payable in multiple ways is announced here: CR 107.4f's
+-- Phyrexian symbol, and both of CR 107.4e's hybrids -- the monocolored {2/R} and
+-- the colour/colour {W/U}.
 --
 -- The life the announcement committed becomes a CostComponent.PayLife, which is
 -- the rule's own words rather than a re-encoding: CR 107.4f pays 2 life for the
@@ -1218,10 +1217,11 @@ applyAdjustments adjustments cost =
       costManaTypeOf symbol = case symbol of
         ManaSymbol.Generic _ -> Nothing
         ManaSymbol.OfType manaType -> Just manaType
-        -- CR 107.4e names TWO types, so no one type can be read off it. The same
-        -- elision costGenericOf's MonocoloredHybrid arm makes -- pawl announces no
-        -- choice of half for a colour/colour hybrid (#729) -- and Edgewalker's
-        -- ruling is what the elision costs.
+        -- CR 107.4e names TWO types, so no one type can be read off it -- and a
+        -- symbol still spelled {G/U} here is one CR 601.2b has not named, since
+        -- Pawl.Engine.Mana.announce leaves an OfType behind when it does and the
+        -- arm above reads that. What still arrives unannounced is CR 118.13b/c's
+        -- costs (#373), and Edgewalker's ruling is what that costs.
         ManaSymbol.Hybrid _ _ -> Nothing
         -- Same reason: a symbol still spelled {2/R} here is one CR 601.2b has not
         -- named -- Pawl.Engine.Mana.announce leaves an OfType behind when it
