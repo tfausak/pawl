@@ -22,7 +22,6 @@ import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Game (Game)
-import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HybridPayment as HybridPayment
@@ -41,7 +40,6 @@ import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
-import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.ProductionTag as ProductionTag
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -608,7 +606,7 @@ payCost pid cost = do
       let budget = Maybe.fromMaybe 0 (lifeNeeded pid cost gs)
       case spend budget cost (Game.poolOf pid gs) of
         Just (left, life) -> do
-          State.put (payLife pid life (setPool pid left gs))
+          State.put (Event.payLife pid life (setPool pid left gs))
           pure True
         Nothing -> case manaSources pid gs of
           [] -> pure False
@@ -948,7 +946,7 @@ sourceOptions yields =
 --      that reads the PLAYER rather than the board, and the only one a cost that
 --      spends no life anywhere can never fail: every resolution of such a cost
 --      costs 0 life and commits none, and CR 119.4b lets anyone pay 0 -- see
---      canPayLife.
+--      Event.canPayLife.
 --
 -- Clauses 1 and 2 are asked of ONE board at a time, and that is the whole of
 -- #450's fix. Asking them of a per-source union instead lets one source's first
@@ -1008,7 +1006,7 @@ payableResolutions pid committed cost gs =
                   hallHolds wanted = demandedIn wanted <= couldServe wanted
                in Natural.length supplies >= Natural.length demands + generic
                     && all hallHolds subsets
-         in canPayLife pid (committed + life) gs && any fits boards
+         in Event.canPayLife pid (committed + life) gs && any fits boards
    in filter payable (resolutions cost)
 
 -- The least life any payable resolution of this cost costs, or Nothing when none
@@ -1022,38 +1020,3 @@ lifeNeeded :: PlayerId -> ManaCost -> GameState -> Maybe Natural
 lifeNeeded pid cost gs = case payableResolutions pid 0 cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing
-
--- CR 119.4: a player may pay an amount of life greater than 0 only if their life
--- total is at least that amount.
---
--- Lives here rather than in Pawl.Engine.Cost so that CR 107.4f's Phyrexian symbol
--- and CR 119.4's own PayLife component share one reading of the rule;
--- Pawl.Engine.Cost imports this module, so the dependency only goes one way.
---
--- CR 119.4b is answered BEFORE the lookup, not by the `>=` that would usually
--- absorb it: players can ALWAYS pay 0 life, whatever their total and even where
--- an effect says they can't pay life. So a player the map does not hold must not
--- turn a zero payment into an unpayable one -- and a cost with no Phyrexian
--- symbol and no PayLife component asks payableResolutions' life clause about 0
--- and nothing else, so that clause cannot change any answer such a cost used to
--- give.
-canPayLife :: PlayerId -> Natural -> GameState -> Bool
-canPayLife pid n gs =
-  n == 0 || case Map.lookup pid (GameState.players gs) of
-    Nothing -> False
-    Just player -> Player.life player >= toInteger n
-
--- CR 119.4: the payment is subtracted from the player's life total. A direct
--- subtraction, and the CR 704.5a state-based action that may follow is the
--- existing one in Pawl.Engine.Sba -- paying to exactly 0 is a legal payment, not
--- a barred one.
-payLife :: PlayerId -> Natural -> GameState -> GameState
-payLife pid n gs =
-  -- CR 119.4's own last clause, "in other words, the player loses that much
-  -- life", is why the payment is recorded as a life loss like any other. CR
-  -- 119.4b's always-payable 0 loses nothing and so records nothing.
-  (if n == 0 then id else Event.recordEvent (GameEvent.LifeLost pid n))
-    gs
-      { GameState.players =
-          Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)
-      }

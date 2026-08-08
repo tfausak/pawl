@@ -86,6 +86,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import Pawl.Types.PhaseSelector (PhaseSelector)
+import qualified Pawl.Types.Player as Player
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
@@ -137,6 +138,61 @@ recordEvent event gs =
    in if GameState.scannedThrough gs < Natural.length (GameState.events gs)
         then recorded
         else recorded {GameState.controlWhenTriggered = Projection.controlOverrides gs}
+
+-- CR 119.4: a player may pay an amount of life greater than 0 only if their life
+-- total is at least that amount.
+--
+-- Lives HERE, beside recordEvent, and not in Pawl.Engine.Mana or
+-- Pawl.Engine.Cost, because paying life is a recorded game event and this module
+-- owns those. All three readers of CR 119.4 then share one reading of it: CR
+-- 107.4f's Phyrexian symbol and CR 119.4's own PayLife cost component through
+-- Pawl.Engine.Mana and Pawl.Engine.Cost, which import this module, and CR
+-- 614.1c's as-enters "you may pay N life" in `apply` below, which could not
+-- import Pawl.Engine.Mana at all -- that module imports this one.
+--
+-- CR 119.4b is answered BEFORE the lookup, not by the `>=` that would usually
+-- absorb it: players can ALWAYS pay 0 life, whatever their total and even where
+-- an effect says they can't pay life. So a player the map does not hold must not
+-- turn a zero payment into an unpayable one -- and a cost with no Phyrexian
+-- symbol and no PayLife component asks Pawl.Engine.Mana.payableResolutions' life
+-- clause about 0 and nothing else, so that clause cannot change any answer such a
+-- cost used to give.
+canPayLife :: PlayerId -> Natural -> GameState -> Bool
+canPayLife pid n gs =
+  n == 0 || case Map.lookup pid (GameState.players gs) of
+    Nothing -> False
+    Just player -> Player.life player >= toInteger n
+
+-- CR 119.4: the payment is subtracted from the player's life total. A direct
+-- subtraction, and the CR 704.5a state-based action that may follow is the
+-- existing one in Pawl.Engine.Sba -- paying to exactly 0 is a legal payment, not
+-- a barred one.
+payLife :: PlayerId -> Natural -> GameState -> GameState
+payLife pid n gs =
+  -- CR 119.4's own last clause, "in other words, the player loses that much
+  -- life", is why the payment is recorded as a life loss like any other. CR
+  -- 119.4b's always-payable 0 loses nothing and so records nothing.
+  (if n == 0 then id else recordEvent (GameEvent.LifeLost pid n))
+    gs
+      { GameState.players =
+          Map.adjust (\p -> p {Player.life = Player.life p - toInteger n}) pid (GameState.players gs)
+      }
+
+-- CR 110.5b: stamp the tapped status onto an entering permanent, the write shared
+-- by EntryRewrite.Tapped (CR 614.1d) and by EntryRewrite.PayLifeOrTapped's
+-- declining half (CR 614.1c) -- which is why it is one function: the two
+-- sentences differ in what they charge and not in what they leave on the board.
+--
+-- ENTERS TAPPED, not "enters, then is tapped". The status goes straight onto the
+-- object rather than through the tap funnel, so the permanent never transitions
+-- from untapped to tapped and nothing watching for that can fire. See the arms in
+-- `apply` for why stamping the already-materialized incarnation is
+-- observationally the same as minting it tapped.
+enterTapped :: ObjectId -> Game ()
+enterTapped oid =
+  State.modify' $ \gs ->
+    let stamp obj = obj {Object.tapped = TapState.Tapped}
+     in gs {GameState.objects = Map.adjust stamp oid (GameState.objects gs)}
 
 -- The zone change an event describes, if it is one.
 movedOf :: GameEvent -> Maybe ZoneChange
@@ -843,10 +899,47 @@ apply batch candidate event =
       -- No prompt, and none is owed: rule 614.1d's rewrite has no choice in it.
       EntryRewrite.Tapped -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        State.modify' $ \gs ->
-          let stamp obj = obj {Object.tapped = TapState.Tapped}
-           in gs {GameState.objects = Map.adjust stamp oid (GameState.objects gs)}
+        enterTapped oid
         pure (Just event)
+      -- CR 614.1c with CR 119.4: "As this land enters, you may pay N life. If you
+      -- don't, it enters tapped" (Razorgrass Field). The arm above's write, with a
+      -- price on avoiding it -- so declining here leaves exactly the board Zof
+      -- Bloodbog's unconditional sentence leaves, down to the same stamp.
+      --
+      -- NEVER ELIDED where the payment is possible. Life against an untapped land
+      -- is a real fork on any board -- it is why the cycle is printed -- so the
+      -- prompt is raised every time the entering object has a controller who can
+      -- afford it.
+      --
+      -- Through payLife, CR 119.4's own door, and NOT a subtraction from the life
+      -- total: rule 119.4's last clause makes the payment a life loss like any
+      -- other, so a card watching for life loss sees this one.
+      EntryRewrite.PayLifeOrTapped n -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the arms above's reason: the object is
+          -- materialized on the battlefield before this loop runs, so controllerOf
+          -- falls back to its owner. Tapped rather than untapped, because with
+          -- nobody to ask nobody paid -- which is the card's own stated default,
+          -- "if you don't, it enters tapped".
+          Nothing -> do
+            enterTapped oid
+            pure (Just event)
+          Just controller -> do
+            -- CR 119.4: a player may pay N life only if their life total is at
+            -- least N. Below that, declining is the only legal answer -- a forced
+            -- selection, not an elision of options a player could tell apart --
+            -- so the prompt is skipped rather than asked and overruled. CR 119.4b
+            -- keeps 0 payable at any total, so a zero amount is still asked.
+            answer <-
+              if canPayLife controller n gs
+                then Game.choose (Prompt.ChoosePayLifeOnEntry (Decide.deciderFor controller gs) controller oid n)
+                else pure OptionalDecision.Declines
+            case answer of
+              OptionalDecision.Exercises -> State.modify' (payLife controller n)
+              OptionalDecision.Declines -> enterTapped oid
+            pure (Just event)
     -- Unreachable: `applies` admits EntryR only against WouldEnter.
     (ReplacementEffect.EntryR _ _, _) -> pure (Just event)
     (ReplacementEffect.DamageR pat rewrite, ProposedEvent.WouldDealDamage de) -> case rewrite of

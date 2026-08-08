@@ -98,6 +98,12 @@ data Response
     -- ChoseOptional, which records CR 603.5's "may" during a RESOLUTION: this one
     -- is answered inside a zone change, as the permanent enters.
     ChoseRiot OptionalDecision.OptionalDecision
+  | -- | CR 614.1c / 119.4: whether a permanent's controller paid the life its
+    -- "as this enters, you may pay N life" ability asked for (Exercises) or let
+    -- it enter tapped (Declines). Distinct from ChoseRiot for the reason
+    -- ChoseRiot is distinct from ChoseOptional: a transcript that answered one
+    -- as-enters "may" must not silently answer a different one.
+    ChosePayLifeOnEntry OptionalDecision.OptionalDecision
   | -- | CR 614.1c: the colour a player chose as an object entered.
     ChoseColor Color.Color
   | -- | CR 201.4 / 614.1c: the card name a player chose as an object entered.
