@@ -2947,6 +2947,118 @@ greatestSpec s registry = Spec.describe s "Greatest" $ do
         cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice drew three, not four" (S.handSize S.alice after) 3
+  -- CR 202.3b, second sentence: "If a permanent or spell is a copy of the back
+  -- face of a nonmodal double-faced object (even if the card representing that
+  -- copy is itself a double-faced card), the mana value of the copy is 0."
+  --
+  -- The NUMBER is the whole of what this adds to the Darksteel Myr case above.
+  -- CR 707.2 already makes the Clone read the copied object's mana value rather
+  -- than its own printed {3}{U}, and CR 712.8e already makes the copied object
+  -- -- a transformed Thraben Gargoyle // Stonewing Antagonizer -- read its FRONT
+  -- face's {1}. Without this rule the copy inherits that 1; with it the source
+  -- and the copy report DIFFERENT mana values off the same copiable snapshot,
+  -- and CR 202.3b is the only thing separating them.
+  --
+  -- The Gargoyle is BOB's, for the Darksteel Myr case's reason: it leaves the
+  -- Clone alone among "artifacts YOU control", so the maximum folds over one
+  -- member and the hand size is that member's mana value and nothing else. Both
+  -- faces are Artifact Creature, so the copy is in the fold whichever face was
+  -- copied and the card type is not what changes.
+  --
+  -- 0 is a dangerous number to assert: an empty fold, a copy that never
+  -- happened and a Clone left as its printed 0/0 self all draw nothing too. So
+  -- the copy is IDENTIFIED before its mana value is read -- its name, card types
+  -- and 4/2 body say it really is Stonewing Antagonizer under alice's control --
+  -- and bob's source is asserted at 1 in the same breath, which is what shows
+  -- the 0 is the copy's own answer rather than a mana value reader that broke.
+  Spec.it s "CR 202.3b a Clone copying a TRANSFORMED Stonewing Antagonizer has mana value 0, not the front face's 1" $ do
+    island <- S.printingOf s registry "Island"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    clone <- S.printingOf s registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    oneWithTheMachine <- S.printingOf s registry "One with the Machine"
+    case cloneOfGargoyle True island gargoyle clone piker oneWithTheMachine of
+      (_, [], _) -> Spec.assertFailure s "no copy on alice's battlefield"
+      (source, copy : _, after) -> do
+        Spec.assertEqWith s "the copy is Stonewing Antagonizer" (Projection.nameOf copy after) antagonizerName
+        Spec.assertEqWith s "an artifact creature alice controls" (Projection.cardTypesOf copy after, Projection.controllerOf copy after) (Set.fromList [CardType.Artifact, CardType.Creature], Just S.alice)
+        Spec.assertEqWith s "with the back face's 4/2 body" (S.powerToughnessOf copy after) (Just (4, 2))
+        Spec.assertEqWith s "CR 712.8e: bob's transformed permanent still reads its front face's 1" (Filter.manaValue (Projection.viewOfObject source after)) (Just 1)
+        Spec.assertEqWith s "CR 202.3b: the copy of that back face reads 0" (Filter.manaValue (Projection.viewOfObject copy after)) (Just 0)
+        Spec.assertEqWith s "so alice drew nothing" (S.handSize S.alice after) 0
+        Spec.assertEqWith s "and her library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 10
+  -- The control, and the reason the case above is not passed by an engine that
+  -- answers 0 for every copy: the SAME fixture with the Gargoyle left front-face
+  -- up. CR 202.3b's second sentence is about a copy of the BACK face, so a copy
+  -- of the front face keeps CR 707.2's ordinary answer -- the copied object's
+  -- {1} -- and alice draws one card rather than none.
+  Spec.it s "CR 707.2 a Clone copying the UNTRANSFORMED Thraben Gargoyle keeps that face's mana value" $ do
+    island <- S.printingOf s registry "Island"
+    gargoyle <- S.printingOf s registry "Thraben Gargoyle"
+    clone <- S.printingOf s registry "Clone"
+    piker <- S.printingOf s registry "Goblin Piker"
+    oneWithTheMachine <- S.printingOf s registry "One with the Machine"
+    case cloneOfGargoyle False island gargoyle clone piker oneWithTheMachine of
+      (_, [], _) -> Spec.assertFailure s "no copy on alice's battlefield"
+      (source, copy : _, after) -> do
+        Spec.assertEqWith s "the copy is Thraben Gargoyle" (Projection.nameOf copy after) gargoyleName
+        Spec.assertEqWith s "an artifact creature alice controls" (Projection.cardTypesOf copy after, Projection.controllerOf copy after) (Set.fromList [CardType.Artifact, CardType.Creature], Just S.alice)
+        Spec.assertEqWith s "with the front face's 2/2 body" (S.powerToughnessOf copy after) (Just (2, 2))
+        Spec.assertEqWith s "bob's permanent reads 1" (Filter.manaValue (Projection.viewOfObject source after)) (Just 1)
+        Spec.assertEqWith s "and so does the copy of it" (Filter.manaValue (Projection.viewOfObject copy after)) (Just 1)
+        Spec.assertEqWith s "so alice drew one" (S.handSize S.alice after) 1
+
+-- The two names Thraben Gargoyle // Stonewing Antagonizer prints, for the CR
+-- 202.3b pair above.
+gargoyleName, antagonizerName :: CardName.CardName
+gargoyleName = CardName.MkCardName (Text.pack "Thraben Gargoyle")
+antagonizerName = CardName.MkCardName (Text.pack "Stonewing Antagonizer")
+
+-- The board the two CR 202.3b cases share, differing only in `turnOver`: bob's
+-- Thraben Gargoyle, turned over or not; alice's Clone copying it; then alice
+-- casting One with the Machine and its draw resolving. Answers with bob's
+-- permanent, the creatures alice controls, and the state after the draw.
+--
+-- The printings come in the order a case fetches them: Island, Thraben
+-- Gargoyle, Clone, Goblin Piker, One with the Machine.
+cloneOfGargoyle ::
+  Bool ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+cloneOfGargoyle turnOver island gargoyle clone piker oneWithTheMachine =
+  let base = S.landsInPlay island 4
+      (source, withGargoyle) = S.addCreature gargoyle S.bob base
+      turned = if turnOver then transformEveryCreature withGargoyle else withGargoyle
+      (_, staged) = S.spellOnStack clone S.alice turned
+      -- CR 614.12a: the copy choice happens inside the Clone's own entry, and
+      -- bob's Gargoyle is the only creature on the battlefield to offer.
+      entered = snd (Engine.runGamePure copyTheOnlyTarget staged (Stack.resolveTop >> Engine.settleForPriority))
+      -- CR 400.7 minted a new id when the Clone left the stack, so the copy is
+      -- found by what it IS: the only creature alice controls, her other four
+      -- permanents being Islands.
+      copies = filter (\oid -> Projection.isCreatureOf oid entered) (Game.zoneMembers Zone.Battlefield S.alice entered)
+      -- CR 104.3c: ten cards is far more than the one this draws at most, so
+      -- alice cannot deck herself before the assertion.
+      withLib = stockLibrary piker S.alice 10 entered
+      (gs, spellId) = S.handOne oneWithTheMachine withLib
+      cast = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+      after = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
+   in (source, copies, after)
+
+-- "Transform each creature" applied straight, which is Moonmist's shape (CR
+-- 701.27a) with a wider filter. Stonewing Antagonizer prints no way back and the
+-- Gargoyle here is BOB's, so paying its own {6} would need a board of bob's
+-- lands that says nothing about CR 202.3b.
+transformEveryCreature :: GameState.GameState -> GameState.GameState
+transformEveryCreature gs =
+  S.runPure
+    S.identityAnswer
+    gs
+    (Resolve.applyEffect S.noSource S.noSource S.alice Map.empty Map.empty (Effect.Transform (ObjectRef.EachMatching (Filter.Type.HasCardType CardType.Creature))))
 
 -- Answers the CR 614.12a copy choice with the first legal target and delegates
 -- everything else, for a fixture where exactly one creature is legal.
