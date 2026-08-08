@@ -66,6 +66,8 @@ import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
+import Pawl.Types.ModeInstance (ModeInstance)
+import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
@@ -494,7 +496,7 @@ namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
 --
 -- Modes rather than a flat effect list because CR 603.5's "may" is a property of
 -- the mode. A text change rewrites EFFECTS only, so optionality passes through.
-modesOf :: ObjectId -> GameState -> [(ModeIndex, Mode.Mode Card.Type.Card)]
+modesOf :: ObjectId -> GameState -> [(ModeInstance, Mode.Mode Card.Type.Card)]
 modesOf oid gs = case Game.lookupObject oid gs of
   Nothing -> []
   Just obj -> case Game.faceOf oid gs of
@@ -560,7 +562,12 @@ resolveSpellWith runSubgame oid = do
         -- CR 608.2b/700.2c: re-validate only the CHOSEN modes' slots -- an
         -- unchosen mode's slot was never filled and is not part of this
         -- resolution's legality question.
-        let specs = Card.modesTargetSpecs (Binding.modesOf (Object.bindings obj)) face
+        let chosenSelection = Binding.modesOf (Object.bindings obj)
+            specs = Card.modesTargetSpecs chosenSelection face
+            -- CR 700.2d: the slots the MODES own, which is `specs` minus CR
+            -- 303.4a's enchant slot -- the one the card itself declares, and so
+            -- the one every chosen instance can still read.
+            modeSpecs = Modal.modesTargetSpecs chosenSelection (Face.spell face)
             legalSlot slot recipient = case Map.lookup slot specs of
               -- CR 608.2b is about TARGETS. A slot with no target spec is a
               -- RESERVED binding -- a trigger's source, a token this resolution
@@ -571,9 +578,10 @@ resolveSpellWith runSubgame oid = do
               then Event.changeZone oid Zone.Graveyard
               else do
                 let effectController = spellController obj oid gs
-                Monad.forM_ (modesOf oid gs) $ \(idx, mode) -> do
+                Monad.forM_ (modesOf oid gs) $ \(mi, mode) -> do
                   -- CR 603.5 / 608.2d: a printed "may" is answered here, between
                   -- the preceding mode's instructions and this one's.
+                  let idx = ModeInstance.index mi
                   taken <- exercises oid effectController idx mode
                   -- CR 118.12a: and then this mode's "unless [a player] pays",
                   -- offered only for a mode that is happening at all. The
@@ -584,11 +592,23 @@ resolveSpellWith runSubgame oid = do
                   -- run. A later mode's gate is asked after an earlier mode's
                   -- effects, which no card reaches: the pool's one unlessPaid is
                   -- a single-mode spell.
+                  --
+                  -- Both maps are projected into THIS instance's view (CR 700.2d):
+                  -- the legality is decided against the instance-named slot, then
+                  -- renamed to the printed one the mode's own text reads. Deciding
+                  -- it after the rename would look every slot up in `specs` and
+                  -- miss, and CR 608.2b's re-validation would silently pass.
                   gatePaid <-
                     if taken
                       then
                         let chosenAtStart = Binding.targetsOf (Object.bindings obj)
-                         in paid oid oid idx (Map.mapWithKey legalSlot chosenAtStart) chosenAtStart mode
+                         in paid
+                              oid
+                              oid
+                              idx
+                              (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) (Map.mapWithKey legalSlot chosenAtStart))
+                              (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenAtStart)
+                              mode
                       else pure False
                   let applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
@@ -596,7 +616,14 @@ resolveSpellWith runSubgame oid = do
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
                         let chosenNow = Binding.targetsOf bindingsNow
                             legalityNow = Map.mapWithKey legalSlot chosenNow
-                        applyEffectWith runSubgame oid oid effectController legalityNow chosenNow eff
+                        applyEffectWith
+                          runSubgame
+                          oid
+                          oid
+                          effectController
+                          (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) legalityNow)
+                          (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenNow)
+                          eff
                   Monad.when (taken && not gatePaid) (Monad.forM_ (Mode.effects mode) applyOne)
                 finishSpell oid face effectController
 
@@ -641,13 +668,16 @@ resolveSpell = resolveSpellWith noSubgame
 --
 -- Takes the modes rather than a flat effect list plus a spec map: the specs ARE
 -- the union of those modes' own (CR 700.2c).
-resolveModes :: ObjectId -> ObjectId -> [(ModeIndex, Mode.Mode Card.Type.Card)] -> Game ()
+resolveModes :: ObjectId -> ObjectId -> [(ModeInstance, Mode.Mode Card.Type.Card)] -> Game ()
 resolveModes stackId srcId modes = do
   gs <- State.get
   case Game.lookupObject stackId gs of
     Nothing -> pure ()
     Just obj ->
-      let specs = Map.unions (fmap (Mode.targetSpecs . snd) modes)
+      -- CR 700.2d: instance-named, not printed-named -- two instances of one
+      -- repeated mode declare one printed slot and fill two, and this union would
+      -- otherwise collapse them.
+      let specs = Map.unions (fmap (\(mi, mode) -> Map.mapKeys (Modal.instanceSlot mi) (Mode.targetSpecs mode)) modes)
           chosen = Binding.targetsOf (Object.bindings obj)
           legalSlot slot recipient = case Map.lookup slot specs of
             -- CR 608.2b is about TARGETS. A slot with no target spec is a
@@ -671,15 +701,21 @@ resolveModes stackId srcId modes = do
           -- and never revisited, and `obj` is the ability object itself, so a
           -- stolen permanent's later controller must not override it.
           effectController = Object.owner obj
-          resolveOne (idx, mode) = do
+          resolveOne (mi, mode) = do
             -- CR 603.5 / 608.2d: the printed "may", answered as this mode's
             -- instructions are applied. Run only when `fizzles` is False, so the
             -- question is never asked about an ability that never resolves.
+            let idx = ModeInstance.index mi
+                -- CR 700.2d: this instance's own slots under the names its mode
+                -- prints, with every other instance's removed -- the spell path's
+                -- projection, applied to both maps so they cannot disagree.
+                viewLegality = Modal.instanceView specs mi (Mode.targetSpecs mode) legality
+                viewChosen = Modal.instanceView specs mi (Mode.targetSpecs mode) chosen
             taken <- exercises stackId effectController idx mode
             -- CR 118.12a: then the "unless [a player] pays", against the same
             -- slots -- see the spell path for why it follows the "may".
-            gatePaid <- if taken then paid stackId srcId idx legality chosen mode else pure False
-            Monad.when (taken && not gatePaid) (Monad.mapM_ (applyEffect stackId srcId effectController legality chosen) (Mode.effects mode))
+            gatePaid <- if taken then paid stackId srcId idx viewLegality viewChosen mode else pure False
+            Monad.when (taken && not gatePaid) (Monad.mapM_ (applyEffect stackId srcId effectController viewLegality viewChosen) (Mode.effects mode))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)

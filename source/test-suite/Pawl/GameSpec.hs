@@ -189,7 +189,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
           base
             { GameState.objects =
                 Map.adjust
-                  (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Nothing Set.empty})
+                  (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Nothing Seq.empty})
                   (ObjectId.MkObjectId 0)
                   (GameState.objects base)
             }
@@ -1980,7 +1980,7 @@ restartOnStack mountain =
             Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled S.bob,
-            Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+            Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,

@@ -1,0 +1,117 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Mystic Confluence",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Counter",
+                "value": "spell"
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "spell",
+                "spec": {
+                  "pool": {
+                    "type": "Spells"
+                  }
+                }
+              }
+            ],
+            "unlessPaid": {
+              "cost": {
+                "mana": [
+                  {
+                    "type": "Generic",
+                    "value": 3
+                  }
+                ]
+              },
+              "payer": "spell"
+            }
+          },
+          {
+            "effects": [
+              {
+                "type": "MoveToZone",
+                "value": [
+                  "creature",
+                  {
+                    "type": "Hand"
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "creature",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "effects": [
+              {
+                "type": "Draw",
+                "value": [
+                  {
+                    "type": "Relative",
+                    "value": {
+                      "type": "You"
+                    }
+                  },
+                  {
+                    "type": "Literal",
+                    "value": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "selection": {
+          "type": "ChooseExactlyWithRepeats",
+          "value": 3
+        }
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

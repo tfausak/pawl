@@ -4,6 +4,7 @@ module Pawl.Types.Prompt where
 
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
@@ -25,6 +26,7 @@ import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -323,11 +325,22 @@ data Prompt r where
   ReturnCommander :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt CommandZoneDecision.CommandZoneDecision
   -- | CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
-  -- whose targets are all fillable (CR 700.2a). The Natural is how many to choose.
-  -- The answer is the chosen subset. Prompted before X and targets, and ONLY when
-  -- #legal > count; a forced selection is not asked -- which is every entwined
-  -- cast, where CR 702.42a's "all modes" leaves no subset to pick.
-  ChooseModes :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Set.Set ModeIndex.ModeIndex -> Natural.Natural -> Prompt (Set.Set ModeIndex.ModeIndex)
+  -- whose targets are all fillable (CR 700.2a). The ModeSelection is the printed
+  -- instruction being satisfied: how many modes to choose, and whether CR 700.2d
+  -- lets the same one be chosen more than once.
+  --
+  -- The answer is a Seq and not a Set, because that instruction's exception makes
+  -- a mode nameable twice; the engine rejects an answer with a repeat under the
+  -- ordinary instruction, and sorts the answer either way (CR 608.2c).
+  --
+  -- The whole selection rather than a bare count, because the count alone cannot
+  -- say how many answers there are -- the answerer needs the exception to know
+  -- that one legal mode can still satisfy "choose three".
+  --
+  -- Prompted before X and targets, and ONLY when there is a real choice to make: a
+  -- forced selection is not asked, which is every entwined cast, where CR 702.42a's
+  -- "all modes" leaves no subset to pick.
+  ChooseModes :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Set.Set ModeIndex.ModeIndex -> ModeSelection.ModeSelection -> Prompt (Seq.Seq ModeIndex.ModeIndex)
   -- | CR 707.5 / 614.1c / 614.12a: as an object enters AS A COPY, its controller
   -- chooses which permanent to copy. The ObjectId is the entering object; the
   -- [ObjectId] is the legal copy targets, pre-filtered by the engine; Nothing is

@@ -8,10 +8,13 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Modal as Modal
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.CardName as CardName
@@ -341,8 +344,15 @@ defaultAnswer p = case p of
   Prompt.CastWhileSearching {} -> Nothing
   -- CR 601.2b: X=0 is always payable.
   Prompt.ChooseX {} -> 0
-  -- The first `count` legal modes, deterministically.
-  Prompt.ChooseModes _ _ _ legal count -> Set.fromList (List.genericTake count (Set.toAscList legal))
+  -- The first `count` legal modes, deterministically -- and under CR 700.2d's
+  -- "You may choose the same mode more than once" the LEAST legal mode that many
+  -- times, since there may be fewer legal modes than the count and the answer
+  -- still has to satisfy the instruction.
+  Prompt.ChooseModes _ _ _ legal selection ->
+    let count = Modal.countOf selection
+     in if Modal.allowsRepeatsIn selection
+          then maybe Seq.empty (Seq.replicate (Natural.toIntSaturating count)) (Set.lookupMin legal)
+          else Seq.fromList (List.genericTake count (Set.toAscList legal))
   -- CR 707.5: declining to copy is always legal.
   Prompt.ChooseCopyTarget {} -> Nothing
   -- CR 208.2b: asked only when the list has two or more shapes.

@@ -5,8 +5,7 @@ import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import Data.Sequence (Seq)
-import Data.Set (Set)
-import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import Pawl.Types.Binding (Binding)
@@ -305,8 +304,8 @@ setEventAmount n = Map.insert eventAmount (toAmount n)
 
 -- The modes chosen for a spell, read from its binding environment. Empty when
 -- absent (defensive; cast always stamps it, forced or prompted).
-modesOf :: Map SlotName Binding -> Set ModeIndex
-modesOf m = Maybe.fromMaybe Set.empty (Binding.modes =<< Map.lookup chosenModes m)
+modesOf :: Map SlotName Binding -> Seq ModeIndex
+modesOf m = Maybe.fromMaybe Seq.empty (Binding.modes =<< Map.lookup chosenModes m)
 
 -- Project the chosen targets (CR 601.2c) out of a binding environment, dropping
 -- slots with no target.
@@ -341,7 +340,7 @@ setCopy pc = Map.insert copySource (Binding.empty {Binding.copy = Just pc})
 fromChoices ::
   Map SlotName Recipient ->
   Maybe Natural ->
-  Set ModeIndex ->
+  Seq ModeIndex ->
   Map SlotName Binding
 fromChoices targets mAmount mModes =
   let fromTargets = fmap (\r -> Binding.empty {Binding.target = Just r}) targets
@@ -349,7 +348,7 @@ fromChoices targets mAmount mModes =
         Nothing -> fromTargets
         Just n ->
           Map.insertWith mergeBinding variableX (Binding.empty {Binding.amount = Just n}) fromTargets
-   in if Set.null mModes
+   in if Seq.null mModes
         then withX
         else Map.insertWith mergeBinding chosenModes (Binding.empty {Binding.modes = Just mModes}) withX
 

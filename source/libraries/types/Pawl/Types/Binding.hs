@@ -1,7 +1,6 @@
 module Pawl.Types.Binding where
 
 import qualified Data.Sequence as Seq
-import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.ModeIndex as ModeIndex
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -27,11 +26,13 @@ data Binding = MkBinding
     -- | CR 601.2b: the value chosen for a variable in the cost (X). Read by
     -- Quantity.evaluate. Nothing for a slot with no amount.
     amount :: Maybe Natural.Natural,
-    -- | CR 700.2 / 601.2b: the modes chosen for a modal spell, by index. A Set: no
-    -- duplicate modes (CR 700.2d "same mode more than once" is future), and Set's
-    -- ordering IS printed order (CR 608.2c), so resolution reads them pre-sorted.
+    -- | CR 700.2 / 601.2b: the modes chosen for a modal spell, by index. A Seq and
+    -- not a Set, because CR 700.2d's "You may choose the same mode more than once"
+    -- makes one index appear several times; it is kept sorted ascending by the
+    -- casting path, so ordering IS printed order (CR 608.2c) and resolution reads
+    -- the modes pre-sorted with a repeated mode's occurrences adjacent.
     -- Stored only under the reserved Binding.chosenModes slot. Nothing elsewhere.
-    modes :: Maybe (Set.Set ModeIndex.ModeIndex),
+    modes :: Maybe (Seq.Seq ModeIndex.ModeIndex),
     -- | CR 707.2 / 707.5: the copiable-value snapshot a permanent copies AS IT
     -- ENTERS. Stored only under Pawl.Engine.Binding.copySource; the layer fold
     -- reads it as the layer-1 seed. Nothing for a non-copy object.

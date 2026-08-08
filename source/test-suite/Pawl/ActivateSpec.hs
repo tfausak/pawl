@@ -79,11 +79,11 @@ findFirst p = case p of
     [] -> Nothing
   _ -> S.identityAnswer p
 
--- Answers ChooseModes with the empty set, which is an illegal answer to any
--- selection demanding one or more -- the reject-not-repair trigger.
+-- Answers ChooseModes with the empty selection, which is an illegal answer to
+-- any selection demanding one or more -- the reject-not-repair trigger.
 chooseNoModes :: Prompt.Prompt r -> r
 chooseNoModes p = case p of
-  Prompt.ChooseModes {} -> Set.empty
+  Prompt.ChooseModes {} -> Seq.empty
   _ -> S.identityAnswer p
 
 -- The single ability of a printing (all M3e gates have exactly one). Total: the

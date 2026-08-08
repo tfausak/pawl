@@ -65,6 +65,7 @@ import Pawl.Types.Game (Game)
 import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -560,7 +561,7 @@ placeBorne srcId pending = do
       decider = Decide.deciderFor controller gs
       modal = TriggeredAbility.modal ability
       legal = Target.fillableModes (Just controller) srcId Map.empty modal gs
-      count = Modal.selectionCount modal
+      selection = Modal.Type.selection modal
       obj =
         Object.MkObject
           { Object.owner = controller,
@@ -586,17 +587,18 @@ placeBorne srcId pending = do
             Object.unlockedHalves = Set.empty
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
-  if Natural.length legal < count
-    then -- CR 603.3c: fewer legal modes than the selection demands -- for
-    -- ChooseExactly 1, no legal mode at all -- removes the ability.
+  if not (Modal.selectionPossible legal selection)
+    then -- CR 603.3c: no selection satisfies the instruction -- ordinarily fewer
+    -- legal modes than it demands, and for ChooseExactly 1 no legal mode at all
+    -- -- which removes the ability.
       State.modify' (Game.cease abilId)
     else do
-      -- CR 700.2b: forced when there is nothing to choose (as many legal modes
-      -- as the selection demands), prompted otherwise.
-      chosenModes <-
-        if Natural.length legal <= count
-          then pure legal
-          else Game.choose (Prompt.ChooseModes decider controller abilId legal count)
+      -- CR 700.2b: forced when there is nothing to choose, prompted otherwise;
+      -- Modal.forcedSelection tells the two apart. Sorted on the way in, for the
+      -- reason Cast.castProposed gives (CR 608.2c, CR 700.2d).
+      chosenModes <- case Modal.forcedSelection legal selection of
+        Just forced -> pure forced
+        Nothing -> fmap Seq.sort (Game.choose (Prompt.ChooseModes decider controller abilId legal selection))
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
       -- is placed. A mode with no target slots (Create, or a Draw that names its
       -- drawer without targeting) asks nothing.

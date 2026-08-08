@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
@@ -37,6 +38,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -139,9 +142,11 @@ proposedFace oid name gs = case fmap Object.facing (Game.lookupObject oid gs) of
 instantSpeed :: Face.Face Card.Type.Card -> Bool
 instantSpeed face = Card.isInstant face || Keyword.hasFlash (Face.keywords face)
 
--- CR 601.2c / 700.2a: castable when at least as many modes are fillable as the
--- selection demands. For a non-modal card (one mode, count 1) this is identical
--- to "every slot fillable".
+-- CR 601.2c / 700.2a: castable when the fillable modes admit some selection at
+-- all (Modal.selectionPossible) -- ordinarily at least as many fillable modes as
+-- the selection demands, and under CR 700.2d's exception a single fillable mode,
+-- which may then be chosen as many times as the count asks. For a non-modal card
+-- (one mode, count 1) this is identical to "every slot fillable".
 --
 -- CR 109.5 / 601.2a: the perspective a "target creature an opponent controls"
 -- slot is measured against is the player CASTING the spell. Taken as a parameter
@@ -173,8 +178,8 @@ targetable :: PlayerId -> ObjectId -> CardName.CardName -> GameState -> Bool
 targetable pid oid name gs = case proposedFace oid name gs of
   Nothing -> False
   Just face ->
-    let count = Modal.selectionCount (Face.spell face)
-     in Natural.length (Target.fillableModes (Just pid) oid (Card.enchantSpecs face) (Face.spell face) gs) >= count
+    let modal = Face.spell face
+     in Modal.selectionPossible (Target.fillableModes (Just pid) oid (Card.enchantSpecs face) modal gs) (Modal.Type.selection modal)
 
 -- CR 601.2b's X=0 floor measured at CR 601.2f's total: a candidate cost is
 -- affordable when it is payable with X=0 (the caster may always choose 0)
@@ -839,16 +844,20 @@ castProposed pid sid face castFrom candidates before = do
         EntwineDecision.Declines -> Nothing
   -- CR 700.2 normally, CR 702.42a's "all modes" when the entwine cost is being
   -- paid. The printed ModeSelection is untouched either way: entwine overrides
-  -- the count for this ONE cast, it does not reprint the card.
-  let count = case entwined of
-        Just _ -> Modal.modeCount modal
-        Nothing -> Modal.selectionCount modal
+  -- the selection for this ONE cast, it does not reprint the card. It overrides
+  -- CR 700.2d's exception along with the count, and that is the rule rather than a
+  -- simplification: "all modes" names each printed mode once, so no mode entwined
+  -- onto a spell can repeat -- and no entwine card prints the exception anyway.
+  let selection = case entwined of
+        Just _ -> ModeSelection.ChooseExactly (Modal.modeCount modal)
+        Nothing -> Modal.Type.selection modal
   -- CR 601.2b: modes are chosen BEFORE X and targets. Forced and unprompted
-  -- exactly when there is nothing to choose -- as many legal modes as the
-  -- selection demands or fewer, so every legal mode must be taken and the
-  -- options are indistinguishable. An entwined cast is always in that case:
-  -- entwineOffer has already established that every mode is legal, so `legal`
-  -- has exactly `count` members and CR 702.42a's "all modes" is the only answer.
+  -- exactly when there is nothing to choose, which Modal.forcedSelection decides
+  -- -- ordinarily as many legal modes as the selection demands or fewer, so every
+  -- legal mode must be taken and the options are indistinguishable. An entwined
+  -- cast is always in that case: entwineOffer has already established that every
+  -- mode is legal, so `legal` has exactly as many members as the selection demands
+  -- and CR 702.42a's "all modes" is the only answer.
   --
   -- Two cards hold this branch and its complement in place, both "Choose two --"
   -- of four (ModalSpec): Cryptic Command, whose last two modes take no targets
@@ -857,13 +866,18 @@ castProposed pid sid face castFrom candidates before = do
   -- all four; and Ojutai's Command, whose two targeting modes look at a graveyard
   -- and the stack, which a cast can leave empty -- exactly two choosable modes,
   -- and a spec that fails if a prompt is issued.
-  chosenModes <-
-    if Natural.length legal <= count
-      then pure legal
-      else Game.choose (Prompt.ChooseModes decider pid sid legal count)
-  -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
-  -- modes rewinds the whole cast, guarding every step below.
-  if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
+  --
+  -- Sorted on the way in, so the stored selection is in printed order (CR 608.2c)
+  -- with a repeated mode's instances adjacent (CR 700.2d). The answerer's order
+  -- carries no information: the player chooses WHICH modes, never in what order
+  -- they resolve.
+  chosenModes <- case Modal.forcedSelection legal selection of
+    Just forced -> pure forced
+    Nothing -> fmap Seq.sort (Game.choose (Prompt.ChooseModes decider pid sid legal selection))
+  -- Reject-not-repair: an answer that does not satisfy the printed instruction --
+  -- wrong size, an illegal mode, or a repeat the instruction does not permit (CR
+  -- 700.2d) -- rewinds the whole cast, guarding every step below.
+  if not (Modal.selectionSatisfiedBy legal selection chosenModes)
     then reject
     else do
       -- CR 601.2b: the cost to be paid is announced after the modes and before X
