@@ -153,6 +153,7 @@ slotsOf effect = case effect of
   -- PlaySubgame's slots take the same posture.
   Effect.Destroy ref _ _ -> objectRefSlots ref
   Effect.Sacrifice slot -> Set.singleton slot
+  Effect.TurnFaceDown slot -> Set.singleton slot
   Effect.RemoveFromCombat slot -> Set.singleton slot
   Effect.MoveToZone ref _ _ _ _ -> objectRefSlots ref
   Effect.Draw ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
@@ -261,6 +262,7 @@ readsX = any effectReadsX
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy {} -> False
       Effect.Sacrifice _ -> False
+      Effect.TurnFaceDown _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
       Effect.Draw _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
@@ -315,6 +317,7 @@ searchesLibrary effect = case effect of
   Effect.ControlPlayerNextTurn _ -> False
   Effect.Destroy {} -> False
   Effect.Sacrifice _ -> False
+  Effect.TurnFaceDown _ -> False
   Effect.RemoveFromCombat _ -> False
   Effect.MoveToZone {} -> False
   Effect.Draw {} -> False
@@ -432,6 +435,7 @@ boundSlots effect = case effect of
   Effect.RestartGame -> Set.empty
   Effect.ControlPlayerNextTurn _ -> Set.empty
   Effect.Sacrifice _ -> Set.empty
+  Effect.TurnFaceDown _ -> Set.empty
   Effect.RemoveFromCombat _ -> Set.empty
   Effect.Draw {} -> Set.empty
   Effect.Discard {} -> Set.empty
@@ -1563,6 +1567,48 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Just target -> Event.sacrifice controller target
         -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
         _ -> pure ()
+  Effect.TurnFaceDown slot ->
+    State.modify' $ \gs ->
+      case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+        (Just recipient, True) -> case Recipient.objectOf recipient of
+          Nothing -> gs -- a player is not a permanent and has no face
+          -- CR 708.2a: ONE assignment to Object.facing, and that is the whole
+          -- effect. The rule fixes what the permanent becomes -- "a 2/2 face-down
+          -- creature with no text, no name, no subtypes, and no mana cost" -- and
+          -- calls those "the COPIABLE values of that object's characteristics",
+          -- so this is a copiable swap rather than a CR 613 layer. The swap
+          -- already exists: Pawl.Engine.Game.faceOf answers with
+          -- Pawl.Engine.Card.faceDownFace for any object whose facing says
+          -- FaceDown, and every characteristic read in the engine starts there.
+          --
+          -- What is NOT written is everything CR 708.2a does not list. No CR
+          -- 400.7 incarnation is minted -- the permanent keeps its object id --
+          -- so marked damage, counters, attachments, the tapped and attacking
+          -- statuses and the CR 613.7d timestamp all ride through untouched. The
+          -- exact mirror of Pawl.Engine.FaceDown.turnFaceUp, which reverts the
+          -- same field for CR 708.8.
+          --
+          -- CR 708.2b needs no branch HERE: "a face-down permanent can't be
+          -- turned face down ... nothing happens and that effect doesn't change
+          -- any of its characteristics or their copiable values", and writing
+          -- FaceDown onto a permanent that is already FaceDown leaves the map
+          -- equal to what it was. It is not reachable in any case -- a face-down
+          -- permanent has no keywords (CR 708.2a), so no "with a morph ability"
+          -- filter admits it as a target. An effect that LISTS characteristics
+          -- would change them and does owe the guard; no such opcode exists
+          -- (#957).
+          --
+          -- No event is recorded, so nothing triggers on the turning-over --
+          -- the mirror of FaceDown.turnFaceUp's GameEvent.TurnedFaceUp is
+          -- absent (#984). CR 701.27b is what keeps it from being borrowed from
+          -- Transform: turning a permanent face down is its own game action.
+          Just target ->
+            gs
+              { GameState.objects =
+                  Map.adjust (\o -> o {Object.facing = Facing.FaceDown}) target (GameState.objects gs)
+              }
+        -- Illegal slot (CR 608.2b) or a non-object recipient: no-op.
+        _ -> gs
   Effect.RemoveFromCombat slot ->
     State.modify' $ \gs ->
       case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of

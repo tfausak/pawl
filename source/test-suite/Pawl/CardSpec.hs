@@ -480,6 +480,7 @@ effectCounts effect = case effect of
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration _ quantity -> durationCounts duration <> quantityCounts quantity
   Effect.PreventAllDamage duration _ -> durationCounts duration
+  Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> quantityCounts quantity
@@ -689,6 +690,7 @@ effectReplacements effect = case effect of
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage {} -> []
   Effect.PreventAllDamage {} -> []
+  Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters {} -> []
@@ -1694,6 +1696,7 @@ effectFilters effect = case effect of
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
   Effect.PreventAllDamage duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
+  Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
   Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
