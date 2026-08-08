@@ -35,7 +35,9 @@
 -- Endless Cockroaches -- `becameSlotSpec`, which also pins
 -- Event.eventBindingSlots (the per-condition slot set the card lint asks)
 -- against the keys eventBindings actually stamps, over every event each
--- condition admits. CR 603.4's intervening "if"
+-- condition admits. The same slot under a BYSTANDER's dies trigger, where the
+-- bearer is a third object entirely, with Promise of Tomorrow --
+-- `promiseOfTomorrowSpec`. CR 603.4's intervening "if"
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
 -- -- `lookBackInterveningSpec`. CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
@@ -3841,6 +3843,89 @@ becameSlotSpec s registry =
             )
             everyTriggerCondition
 
+-- CR 400.7e's slot under a BYSTANDER's dies trigger, the last of the four
+-- conditions that bind it (SelfDies in becameSlotSpec above,
+-- SelfLeavesTheBattlefield in leavesBattlefieldSpec, PermanentEnters in
+-- aetherFlashSpec below, and this): "Abilities that trigger when an object moves
+-- from one zone to another ... can find the new object that it became in the
+-- zone it moved to when the ability triggered, if that zone is a public zone."
+--
+-- Promise of Tomorrow, {2}{W} Enchantment, "Whenever a creature you control
+-- dies, exile it." The bearer is a THIRD object -- neither the creature that
+-- died nor its graveyard incarnation -- which is what makes "it" unambiguous
+-- here where becameSlotSpec's Endless Cockroaches had to keep two incarnations
+-- of one card apart. Not transcribed: the second ability, "at the beginning of
+-- each end step, if you control no creatures, sacrifice this enchantment and
+-- return all cards exiled with it to the battlefield under your control"
+-- (#968).
+--
+-- The discriminating assertion is WHICH id the payload moves. CR 603.10a makes
+-- Event.matchesTrigger's PermanentDies arm match on ZoneChange.departed, so
+-- "you control" is answerable from CR 608.2h last known information; but CR
+-- 400.7 deleted that id when the creature died, so the effect has to be handed
+-- ZoneChange.object -- the card now in the graveyard -- instead. Reading
+-- `departed` here would leave the creature sitting in the graveyard, which is
+-- exactly what assertions (a) and (b) below rule out.
+--
+-- CR 400.7e's public-zone proviso needs no guard: the PermanentDies arm has
+-- already required battlefield-to-graveyard, and CR 400.2 lists the graveyard
+-- among the public zones. SelfLeavesTheBattlefield is the condition where the
+-- proviso does real work, and it is guarded there.
+--
+-- Goblin Piker is the victim rather than a token, deliberately: CR 111.7 makes
+-- a token in a zone other than the battlefield cease to exist, so a token
+-- exiled out of a graveyard would leave nothing to observe and (a) would pass
+-- for the wrong reason.
+--
+-- Two seats, because "a creature YOU control" needs a creature somebody else
+-- controls to be separated from. Bob's Ogre Sentry standing untouched is that
+-- separation.
+promiseOfTomorrowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+promiseOfTomorrowSpec s registry =
+  let promiseBoard = do
+        promise <- S.printingOf s registry "Promise of Tomorrow"
+        piker <- S.printingOf s registry "Goblin Piker"
+        sentry <- S.printingOf s registry "Ogre Sentry"
+        let empty = Setup.emptyGame S.bothPlayers
+            (_, withPromise) = S.addCreature promise S.alice empty
+            (pikerId, withPiker) = S.addCreature piker S.alice withPromise
+            (sentryId, withSentry) = S.addCreature sentry S.bob withPiker
+        pure (pikerId, sentryId, withSentry)
+      -- Destroy alice's creature outright (CR 701.8a), settle so the CR 117.5
+      -- boundary scans the death and places the trigger, then resolve it.
+      killIt oid gs =
+        let killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [oid])
+            settled = S.runPure S.identityAnswer killed Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      namesIn zone pid gs =
+        fmap Face.name (Maybe.mapMaybe (\oid -> Game.faceOf oid gs) (Game.zoneMembers zone pid gs))
+      pikerName = CardName.MkCardName $ Text.pack "Goblin Piker"
+   in Spec.describe s "CR 400.7e the card a BYSTANDER's dies trigger names" $ do
+        Spec.it s "CR 700.4 whole card: alice's Goblin Piker dies and Promise of Tomorrow exiles the graveyard card" $ do
+          (pikerId, sentryId, board) <- promiseBoard
+          let (settled, after) = killIt pikerId board
+          Spec.assertEqWith s "the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject pikerId settled)) "the battlefield id is gone (CR 400.7)"
+          Spec.assertEqWith s "and the card is in the graveyard when the trigger is placed" (namesIn Zone.Graveyard S.alice settled) [pikerName]
+          -- (a), (b) and (c) as one tuple. (a) and (b) are the same fact from
+          -- both sides: an effect handed ZoneChange.departed would move an id
+          -- CR 400.7 deleted, so the exile would be empty and the graveyard
+          -- would still hold the Piker. (c) is the "you control" separation.
+          Spec.assertEqWith
+            s
+            "exiled, out of the graveyard, and bob's creature untouched"
+            (namesIn Zone.Exile S.alice after, namesIn Zone.Graveyard S.alice after, Set.member sentryId (GameState.battlefield after))
+            ([pikerName], [], True)
+        -- eventBindings in isolation, so the binding is pinned to CR 400.7e
+        -- rather than to Promise of Tomorrow's payload. The contrast with the
+        -- SelfDies arm above is only in which object the BEARER is; the slot
+        -- names ZoneChange.object either way.
+        Spec.it s "CR 400.7e eventBindings binds the ARRIVING id for PermanentDies too" $ do
+          let departed = ObjectId.MkObjectId 1
+              arrived = ObjectId.MkObjectId 2
+              died = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived Zone.Battlefield Zone.Graveyard) S.emptyCharacteristics
+          Spec.assertEqWith s "became names the graveyard incarnation" (Event.eventBindings (TriggerCondition.PermanentDies (Filter.Type.HasCardType CardType.Creature)) died) (Map.singleton Binding.became (Binding.toObject arrived))
+
 -- CR 603.4's intervening "if" on a LOOK-BACK trigger, which is the one shape
 -- where the clause has to be read against an object that no longer exists:
 -- "When the trigger event occurs, the ability checks whether the stated
@@ -5289,6 +5374,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   permanentDiesSpec s registry
   leavesBattlefieldSpec s registry
   becameSlotSpec s registry
+  promiseOfTomorrowSpec s registry
   lookBackInterveningSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry

@@ -182,9 +182,11 @@ data TriggerCondition
     -- CR 108.4 gives it no controller, and CR 108.4a would hand back its OWNER --
     -- a different player for anything its controller had stolen.
     --
-    -- Nothing about the DEAD permanent is bound for the payload to name, so a card
-    -- saying "return that creature card to your hand" is not expressible through
-    -- this condition (#616).
+    -- The CANDIDATE and what the PAYLOAD acts on are therefore two different ids,
+    -- as they are for SelfDies: CR 400.7e lets the ability find the graveyard
+    -- incarnation, and Pawl.Engine.Event.eventBindings binds THAT one -- the
+    -- ZoneChange.object -- under Pawl.Engine.Binding.became. Promise of Tomorrow's
+    -- "whenever a creature you control dies, exile it" reads it.
     PermanentDies (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6c's FIRST written form -- "when [this object] leaves the
     -- battlefield" -- taken whole: ANY other zone, so an exile, a bounce and a
