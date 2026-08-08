@@ -559,7 +559,7 @@ apply batch candidate event =
               Nothing -> pure (Just event)
               Just src2 -> do
                 State.modify' $ \g ->
-                  let stamp o = o {Object.bindings = Binding.setCopy (Projection.copiableCharacteristics src2 g) (Object.bindings o)}
+                  let stamp o = o {Object.bindings = Binding.setCopy (copiedSnapshot src2 g) (Object.bindings o)}
                    in g {GameState.objects = Map.adjust stamp oid (GameState.objects g)}
                 pure (Just event)
       -- CR 614.1c / 208.2b: Primal Plasma's choice of which printed
@@ -1063,6 +1063,43 @@ apply batch candidate event =
         pure (Just event)
     -- Unreachable: `applies` admits TurnUpR only against WouldTurnFaceUp.
     (ReplacementEffect.TurnUpR _ _, _) -> pure (Just event)
+
+-- CR 707.2 / 202.3b: the copiable values a copy takes off the object it copies.
+-- Projection.copiableCharacteristics answers all but one of them; the exception
+-- is a mana value, and only when the copied object is a nonmodal double-faced
+-- permanent with its back face up.
+--
+-- CR 202.3b's two sentences disagree about that permanent on purpose. Its first
+-- calculates the object's OWN mana value "as though it had the mana cost of its
+-- front face" -- Pawl.Engine.Card.manaCostFace, which is what
+-- copiableCharacteristics already read -- and its second says "if a permanent or
+-- spell is a copy of the back face of a nonmodal double-faced object ... the
+-- mana value of the copy is 0". So the source and its copy report DIFFERENT
+-- numbers, and the copy's cannot be derived from the snapshot alone: the front
+-- face's cost is already folded into it and nothing left in the record says
+-- which face it came off. The copied OBJECT is where that is knowable, which is
+-- why the override lives at the stamp rather than in the projection.
+--
+-- Everything else in CR 202.3 rides through untouched, including the copy's own
+-- printed cost being irrelevant (CR 707.2, the parenthetical's "even if the card
+-- representing that copy is itself a double-faced card") -- the snapshot is the
+-- COPIED object's throughout, so a Clone that is itself a Transforming card
+-- would get 0 here for the same reason a Clone printed {3}{U} does.
+--
+-- A copy OF A COPY needs no arm: the source's snapshot already carries whatever
+-- number this wrote when it entered, and its own card and face are then no
+-- longer what it reports.
+--
+-- CR 202.3b's rule is about "a permanent OR SPELL"; only the permanent half is
+-- implemented, this being an entry replacement. Nothing can copy a spell on the
+-- stack (#1006).
+copiedSnapshot :: ObjectId -> GameState -> PC.ProjectedCharacteristics
+copiedSnapshot src gs =
+  let snapshot = Projection.copiableCharacteristics src gs
+      backFace = case (Game.lookupObject src gs, Game.cardOf src gs) of
+        (Just obj, Just card) -> Card.showsBackFace card (Object.face obj)
+        _ -> False
+   in if backFace then snapshot {PC.manaValue = Just 0} else snapshot
 
 -- CR 614.1c / 614.12: run the entry loop for an object that has just been
 -- materialized on the battlefield.
