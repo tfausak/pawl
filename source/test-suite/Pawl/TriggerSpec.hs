@@ -153,6 +153,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
@@ -229,7 +230,7 @@ logSpec s registry =
       let (piker, gs) = S.addCreature pikerPrinting S.bob (Setup.emptyGame S.bothPlayers)
           expected = Projection.project piker gs
           after = S.runPure S.identityAnswer gs (Event.changeZone piker Zone.Graveyard)
-      case Foldable.toList (GameState.events after) of
+      case S.eventsOf after of
         GameEvent.Moved _ snapshot : _ -> Spec.assertEqWith s "snapshot from the origin zone" snapshot expected
         _ -> Spec.assertFailure s "expected exactly one Moved event"
     -- CR 704.5h's window is "since the last SBA check": the check CONSUMES by
@@ -288,7 +289,7 @@ scanSpec s registry =
           began ev = case ev of
             GameEvent.StepBegan p pid -> Just (p, pid)
             _ -> Nothing
-      Spec.assertEqWith s "the end step's beginning is recorded exactly once" (Maybe.mapMaybe began (Foldable.toList (GameState.events after))) [(Phase.Ending EndingStep.EndStep, S.alice)]
+      Spec.assertEqWith s "the end step's beginning is recorded exactly once" (Maybe.mapMaybe began (S.eventsOf after)) [(Phase.Ending EndingStep.EndStep, S.alice)]
     Spec.it s "CR 603.2b StepBegins matches its own step and no other" $ do
       let bearer = ObjectId.MkObjectId 1
           cond = TriggerCondition.StepBegins (Phase.Ending EndingStep.EndStep) TurnScope.EachTurn
@@ -312,13 +313,13 @@ scanSpec s registry =
           (pikerId, gs1) = S.addCreature piker S.bob gs0
           entered = ZoneChange.MkZoneChange pikerId pikerId Zone.Stack Zone.Battlefield
           gs2 = S.withEvents [GameEvent.Moved entered (Projection.project pikerId gs1)] gs1
-      Spec.assertEqWith s "no trigger" (length (fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2))) 0
+      Spec.assertEqWith s "no trigger" (length (fst (Event.gatherTriggers (Event.unscannedGrouped gs2) gs2))) 0
     Spec.it s "CR 603.6a a SelfEnters trigger still fires on its own entry" $ do
       restInPeace <- S.printingOf s registry "Rest in Peace"
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           entered = ZoneChange.MkZoneChange ripId ripId Zone.Stack Zone.Battlefield
           gs1 = S.withEvents [GameEvent.Moved entered (Projection.project ripId gs0)] gs0
-      case fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1) of
+      case fst (Event.gatherTriggers (Event.unscannedGrouped gs1) gs1) of
         [pt] -> do
           Spec.assertEqWith s "source is RiP" (PendingTrigger.source pt) (TriggerSource.OfObject ripId)
           Spec.assertEqWith s "controller is alice" (PendingTrigger.controller pt) S.alice
@@ -328,7 +329,7 @@ scanSpec s registry =
       let (ripId, gs0) = S.addCreature restInPeace S.alice (Setup.emptyGame S.bothPlayers)
           toGrave = ZoneChange.MkZoneChange ripId ripId Zone.Battlefield Zone.Graveyard
           gs1 = S.withEvents [GameEvent.Moved toGrave (Projection.project ripId gs0)] gs0
-      Spec.assertEqWith s "no triggers" (length (fst (Event.gatherTriggers (Event.unscannedEvents gs1) gs1))) 0
+      Spec.assertEqWith s "no triggers" (length (fst (Event.gatherTriggers (Event.unscannedGrouped gs1) gs1))) 0
     Spec.it s "SelfEnters matches only a battlefield destination" $ do
       let bearer = ObjectId.MkObjectId 1
           movedTo zone = GameEvent.Moved (ZoneChange.MkZoneChange bearer bearer Zone.Stack zone) S.emptyCharacteristics
@@ -372,7 +373,7 @@ scanSpec s registry =
                 GameEvent.Moved entered2 (Projection.project rip2 gs1)
               ]
               gs1
-          triggers = fst (Event.gatherTriggers (Event.unscannedEvents gs2) gs2)
+          triggers = fst (Event.gatherTriggers (Event.unscannedGrouped gs2) gs2)
       Spec.assertBool s (rip1 < rip2) "rip1 has the lower id"
       Spec.assertEqWith s "both triggers fired" (length triggers) 2
       Spec.assertEqWith s "sources in ascending ObjectId order" (fmap PendingTrigger.source triggers) (fmap TriggerSource.OfObject [rip1, rip2])
@@ -389,7 +390,7 @@ scanSpec s registry =
       let (ghoul1, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           (ghoul2, gs1) = S.addCreature khabalGhoul S.alice gs0
           event = GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice
-          triggers = fst (Event.gatherTriggers [event] gs1)
+          triggers = fst (Event.gatherTriggers [(EventGroup.first, event)] gs1)
       Spec.assertBool s (ghoul1 < ghoul2) "ghoul1 has the lower id"
       Spec.assertEqWith s "both triggers fired" (length triggers) 2
       Spec.assertEqWith s "sources in ascending ObjectId order" (fmap PendingTrigger.source triggers) (fmap TriggerSource.OfObject [ghoul1, ghoul2])
@@ -1562,7 +1563,7 @@ orderingSpec s registry =
       -- The source of the OTHER pending trigger: Tidal Wave's delayed ability,
       -- whose source is the resolved spell's id rather than any permanent.
       otherThan ghoul gs =
-        let sources = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
+        let sources = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs))
          in case filter (/= TriggerSource.OfObject ghoul) sources of
               src : _ -> src
               [] -> TriggerSource.OfObject ghoul
@@ -2829,7 +2830,7 @@ permanentEntersSpec s registry =
   let anyCreature = Filter.Type.HasCardType CardType.Creature
       anotherCreature = Filter.Type.And [anyCreature, Filter.Type.Not Filter.Type.IsSource]
       enters oid = GameEvent.Moved (ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield) S.emptyCharacteristics
-      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
+      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs))
    in Spec.describe s "PermanentEnters" $ do
         -- The gameplay-level proof, cast to resolution: alice's second Soul
         -- Warden enters and the FIRST one's trigger resolves for exactly 1
@@ -2877,7 +2878,7 @@ permanentEntersSpec s registry =
         -- -- here moved straight on to the graveyard -- is read from last known
         -- information, which for a permanent that left the battlefield is the
         -- battlefield reading. The event happened; the trigger is not lost with
-        -- the object. Same fallback eventTriggers' own `bystanders` takes for
+        -- the object. Same fallback eventTriggers' own group-scoped unions take for
         -- the bearer side.
         Spec.it s "CR 608.2h a creature that enters and leaves again still fires the trigger" $ do
           soulWarden <- S.printingOf s registry "Soul Warden"
@@ -3003,7 +3004,7 @@ graveyardTriggerSpec s registry =
           narcomoeba <- S.printingOf s registry "Narcomoeba"
           let (handCard, gs) = S.addHandCard narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
               buried = S.runPure S.identityAnswer gs (Event.changeZone handCard Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents buried) buried))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped buried) buried))) []
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice buried)) "it is in the graveyard"
         -- "from your library" doing real work, half two: dying is a move to
         -- the same graveyard from the battlefield, and is not this trigger.
@@ -3011,7 +3012,7 @@ graveyardTriggerSpec s registry =
           narcomoeba <- S.printingOf s registry "Narcomoeba"
           let (creature, gs) = S.addCreature narcomoeba S.alice (Setup.emptyGame S.bothPlayers)
               died = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents died) died))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped died) died))) []
           Spec.assertBool s (Set.member narcomoebaName (namesIn Zone.Graveyard S.alice died)) "it is in the graveyard"
         -- The zone half, isolated from the mill: a graveyard card whose only
         -- trigger functions on the battlefield (CR 113.6's default) is not
@@ -3024,7 +3025,7 @@ graveyardTriggerSpec s registry =
               (pikerCard, gs1) = S.addHandCard piker S.alice buried
               entered = S.runPure S.identityAnswer gs1 (Event.changeZone pikerCard Zone.Battlefield)
           Spec.assertBool s (Set.member (CardName.MkCardName $ Text.pack "Soul Warden") (namesIn Zone.Graveyard S.alice entered)) "the Warden is in the graveyard"
-          Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents entered) entered))) []
+          Spec.assertEqWith s "and a creature entering fires nothing" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped entered) entered))) []
 
 -- CR 113.6m for a TRIGGERED ability: "an ability whose cost or effect specifies
 -- that it moves the object it's on out of a particular zone functions only in
@@ -3081,7 +3082,7 @@ graveyardEffectZoneTriggerSpec s registry =
           Spec.assertEqWith
             s
             "exactly one trigger, from Squee"
-            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs)))
+            (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs)))
             [TriggerSource.OfObject squeeId]
         -- End to end through the real engine: the trigger is placed, resolves,
         -- and CR 400.7's funnel moves the card to alice's hand.
@@ -3113,7 +3114,7 @@ graveyardEffectZoneTriggerSpec s registry =
           squee <- S.printingOf s registry "Squee, Goblin Nabob"
           let (_, gs) = S.addCreature squee S.alice (Setup.emptyGame S.bothPlayers)
               begun = beginUpkeep gs
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents begun) begun))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped begun) begun))) []
 
 -- Serra Avatar ({4}{W}{W}{W} Creature -- Avatar, printed */*), second line: "When
 -- Serra Avatar is put into a graveyard from anywhere, shuffle it into its
@@ -3214,7 +3215,7 @@ serraAvatarSpec s registry =
         Spec.it s "CR 603.6 a Serra Avatar EXILED from the battlefield triggers nothing" $ do
           (creature, gs) <- cardIn S.addCreature
           let exiled = S.runPure S.identityAnswer gs (Event.changeZone creature Zone.Exile)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents exiled) exiled))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped exiled) exiled))) []
           Spec.assertBool s (Set.member avatarName (namesIn Zone.Exile S.alice exiled)) "it is in exile"
 
 -- CR 603.6c: leaves-the-battlefield abilities "trigger when a permanent moves
@@ -3288,7 +3289,7 @@ diesTriggerSpec s registry =
           doomedTraveler <- S.printingOf s registry "Doomed Traveler"
           let (traveler, gs) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               exiled = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Exile)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents exiled) exiled))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped exiled) exiled))) []
           Spec.assertBool s (Set.member travelerName (namesIn Zone.Exile S.alice exiled)) "it is in exile"
         -- The other half of "from the battlefield": the same card discarded
         -- reaches the same graveyard and has not died (CR 700.4).
@@ -3296,7 +3297,7 @@ diesTriggerSpec s registry =
           doomedTraveler <- S.printingOf s registry "Doomed Traveler"
           let (traveler, gs) = S.addHandCard doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               discarded = S.runPure S.identityAnswer gs (Event.changeZone traveler Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents discarded) discarded))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped discarded) discarded))) []
         -- Self-scoped: SOME OTHER creature dying is not this Traveler's
         -- death, even though the Traveler is right there to see it.
         Spec.it s "CR 603.6c another creature dying does not fire the Traveler's trigger" $ do
@@ -3305,7 +3306,7 @@ diesTriggerSpec s registry =
           let (_, withTraveler) = S.addCreature doomedTraveler S.alice (Setup.emptyGame S.bothPlayers)
               (pikerId, gs) = S.addCreature piker S.alice withTraveler
               died = S.runPure S.identityAnswer gs (Event.changeZone pikerId Zone.Graveyard)
-          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents died) died))) []
+          Spec.assertEqWith s "nothing triggered" (fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped died) died))) []
         -- CR 603.3a through CR 603.10a's look-back: "the player who controlled
         -- the ability's source at the time it triggered" is read from the game
         -- as it was immediately BEFORE the death, so a Traveler bob owns but
@@ -3319,7 +3320,7 @@ diesTriggerSpec s registry =
               stolen = S.attach aura traveler withAura
               died = S.runPure S.identityAnswer stolen (Event.changeZone traveler Zone.Graveyard)
           Spec.assertEqWith s "alice controlled it as it died" (Projection.controllerOf traveler stolen) (Just S.alice)
-          Spec.assertEqWith s "so the trigger is hers, not its owner's" (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedEvents died) died))) [S.alice]
+          Spec.assertEqWith s "so the trigger is hers, not its owner's" (fmap PendingTrigger.controller (fst (Event.gatherTriggers (Event.unscannedGrouped died) died))) [S.alice]
 
 -- CR 603.6c's SECOND written form with a BYSTANDER bearer -- "Whenever
 -- [something] is put into a graveyard from the battlefield", narrowed by CR
@@ -3353,9 +3354,13 @@ diesTriggerSpec s registry =
 -- equal to the number of experience counters you have, return it to the
 -- battlefield. Otherwise, put it into your hand." -- is not transcribed (#614).
 --
--- No case here kills the bearer and some other creature at once. A Meren that
--- departs EARLIER in a batch than the death it should be watching is not
--- offered to the scan as a candidate (#615).
+-- Two cases here kill the bearer and another creature in one batch, and they are
+-- a PAIR: CR 704.3 makes Day of Judgment's deaths one event, so Meren sees the
+-- Piker that died alongside her, while a Salt Road Skirmish that destroys her and
+-- then buries two tokens later in the same batch is a sequence, and she sees
+-- neither. Both are needed -- admitting the whole batch passes the first and
+-- answers the second 2 -- and the first is asserted for BOTH object-id orders,
+-- since that is what makes it a test of the rule rather than of the id minting.
 permanentDiesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 permanentDiesSpec s registry =
   let anotherCreatureYouControl =
@@ -3364,7 +3369,7 @@ permanentDiesSpec s registry =
             Filter.Type.ControlledBy PlayerRelation.You,
             Filter.Type.Not Filter.Type.IsSource
           ]
-      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents gs) gs))
+      sourcesOf gs = fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped gs) gs))
       experienceOf = S.playerCounterOf PlayerCounterKind.Experience
       -- alice's Meren beside one creature of `victim`'s printing, controlled by
       -- `owner`.
@@ -3399,6 +3404,88 @@ permanentDiesSpec s registry =
           Spec.assertEqWith s "the trigger reached the stack in that settle" (length (GameState.stack settled)) 1
           Spec.assertEqWith s "and alice has exactly one experience counter" (experienceOf S.alice after) 1
           Spec.assertEqWith s "bob has none" (experienceOf S.bob after) 0
+        -- CR 603.10a's own Example, played out: "Two creatures are on the
+        -- battlefield along with an artifact that has the ability 'Whenever a
+        -- creature dies, you gain 1 life.' Someone casts a spell that destroys
+        -- all artifacts, creatures, and enchantments. The artifact's ability
+        -- triggers twice, EVEN THOUGH THE ARTIFACT GOES TO ITS OWNER'S
+        -- GRAVEYARD AT THE SAME TIME AS THE CREATURES." Meren is that artifact
+        -- and the Piker is one of those creatures: CR 704.3 / CR 608.2f make
+        -- Day of Judgment's two deaths ONE event, so the look-back reads a board
+        -- on which Meren and the Piker were both still there.
+        --
+        -- BOTH ID ORDERS, which is the whole point rather than belt and braces:
+        -- the two boards differ in nothing a rule can see, so an engine that
+        -- answered by the order the ids were minted in would answer them
+        -- differently. The Meren-first board is the one that used to answer 0.
+        --
+        -- Exactly ONE counter, not two: Meren's own death is excluded by the
+        -- printed "another" (the falsifier below), so the count discriminates
+        -- between seeing her group-mate and seeing her whole group.
+        Spec.it s "CR 603.10a Meren sees the Piker that died alongside her, in either id order" $ do
+          plains <- S.printingOf s registry "Plains"
+          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+          piker <- S.printingOf s registry "Goblin Piker"
+          dayOfJudgment <- S.printingOf s registry "Day of Judgment"
+          let -- The two boards, differing only in which of the two creatures was
+              -- minted first and so which one Event.destroyIn reaches first.
+              board merenFirst =
+                let base = Setup.emptyGame S.bothPlayers
+                 in if merenFirst
+                      then snd (S.addCreature piker S.alice (snd (S.addCreature meren S.alice base)))
+                      else snd (S.addCreature meren S.alice (snd (S.addCreature piker S.alice base)))
+              run merenFirst =
+                let withLands = List.foldl' (\gs _ -> snd (S.addCreature plains S.alice gs)) (board merenFirst) [1 :: Int .. 4]
+                    (withSpell, spell) = S.handOne dayOfJudgment withLands
+                    afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+                    swept = S.runPure S.identityAnswer afterCast Stack.resolveTop
+                    settled = S.runPure S.identityAnswer swept Engine.settleForPriority
+                 in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+              (merenFirstSettled, merenFirstAfter) = run True
+              (pikerFirstSettled, pikerFirstAfter) = run False
+              creaturesLeft gs = Set.size (Set.filter (`Projection.isCreatureOf` gs) (GameState.battlefield gs))
+          Spec.assertEqWith s "the sweep left no creatures either way" (fmap creaturesLeft [merenFirstSettled, pikerFirstSettled]) [0, 0]
+          Spec.assertEqWith s "one trigger reached the stack with Meren minted first" (length (GameState.stack merenFirstSettled)) 1
+          Spec.assertEqWith s "and one with the Piker minted first" (length (GameState.stack pikerFirstSettled)) 1
+          Spec.assertEqWith s "alice has exactly one experience counter with Meren minted first" (experienceOf S.alice merenFirstAfter) 1
+          Spec.assertEqWith s "and exactly one with the Piker minted first" (experienceOf S.alice pikerFirstAfter) 1
+          Spec.assertEqWith s "bob has none either way" (fmap (experienceOf S.bob) [merenFirstAfter, pikerFirstAfter]) [0, 0]
+        -- The control that keeps the case above from being answered by simply
+        -- admitting everything in the batch. Three groups, ONE batch: alice's
+        -- Salt Road Skirmish destroys her own Meren (CR 701.8), then creates two
+        -- 1/1 Warrior tokens later in that same resolution, and the CR 117.5
+        -- settle's first state-based-action pass buries both as 0/0 under Night
+        -- of Souls' Betrayal (CR 704.5f). GameState.scannedThrough is not bumped
+        -- until the trigger scan, so all three share a batch -- and none of them
+        -- shares Meren's event.
+        --
+        -- ZERO counters is the rules answer: two creatures alice controls die
+        -- STRICTLY AFTER Meren left, so CR 603.10a's "immediately prior to the
+        -- event" reads a board she is not on. A look-back that took the whole
+        -- batch rather than the event's own group would answer 2.
+        --
+        -- The target is pinned by ObjectId rather than left to
+        -- S.identityAnswer's least Recipient, the way the Bolt above is.
+        Spec.it s "CR 603.10a a Meren who died earlier in the batch sees neither token buried later in it" $ do
+          swamp <- S.printingOf s registry "Swamp"
+          meren <- S.printingOf s registry "Meren of Clan Nel Toth"
+          night <- S.printingOf s registry "Night of Souls' Betrayal"
+          skirmish <- S.printingOf s registry "Salt Road Skirmish"
+          let (merenId, withMeren) = S.addCreature meren S.alice (Setup.emptyGame S.bothPlayers)
+              (_, withNight) = S.addCreature night S.alice withMeren
+              withLands = List.foldl' (\gs _ -> snd (S.addCreature swamp S.alice gs)) withNight [1 :: Int .. 4]
+              (withSpell, spell) = S.handOne skirmish withLands
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature merenId)) sets
+                _ -> S.identityAnswer p
+              afterCast = S.runPure answer withSpell (S.cast S.alice spell)
+              resolved = S.runPure answer afterCast Stack.resolveTop
+              settled = S.runPure answer resolved Engine.settleForPriority
+          Spec.assertEqWith s "Meren was destroyed by her controller's own spell" (Game.lookupObject merenId settled) Nothing
+          Spec.assertEqWith s "the two tokens entered and were buried as 0/0" (length (filter (\zc -> ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc == Zone.Graveyard) (S.zoneChangesOf settled))) 3
+          Spec.assertEqWith s "nothing reached the stack" (length (GameState.stack settled)) 0
+          Spec.assertEqWith s "and alice has no experience counters at all" (experienceOf S.alice settled) 0
         -- "ANOTHER", the Filter's Not IsSource arm. Meren's own death IS a
         -- creature alice controls dying, so the silence has to come from the
         -- exclusion rather than from the condition failing to see the death at
@@ -4627,6 +4714,31 @@ tramplingAnswer p = case p of
 bystanderSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 bystanderSpec s registry =
   Spec.describe s "Bystander" $ do
+    -- Which side of CR 603.10 each condition falls on, asserted directly.
+    -- Event.looksBack is a TOTAL case, so -Werror already forces a new condition
+    -- to be classified; what it cannot force is the classification being the
+    -- RIGHT one, and the four arms below are the ones a plausible wrong reading
+    -- would flip. Each is the rule read against the constructor's own printed
+    -- sentence:
+    --
+    --   * CR 603.10a names leaves-the-battlefield abilities, so "dies" is one
+    --     (CR 700.4 narrows the destination, which does not leave the family);
+    --   * and it names sacrifice triggers in as many words;
+    --   * CR 603.6c's own last sentence puts "put into a graveyard from
+    --     anywhere" OUTSIDE that family, which is the arm a wildcard would have
+    --     gotten wrong in the expensive direction;
+    --   * CR 708.8 leaves a permanent turned face up ON the battlefield, so
+    --     there is no departure for a look-back to recover.
+    Spec.it s "CR 603.10a the look-back families are the ones that rule lists" $ do
+      Spec.assertBool s (Event.looksBack (TriggerCondition.PermanentDies (Filter.Type.And []))) "a dies trigger is a leaves-the-battlefield ability"
+      Spec.assertBool s (Event.looksBack TriggerCondition.SelfLeavesTheBattlefield) "and so is the wider written form"
+      Spec.assertBool s (Event.looksBack TriggerCondition.PermanentSacrificed) "a sacrifice trigger is named outright"
+      Spec.assertBool s (not (Event.looksBack TriggerCondition.SelfPutIntoGraveyardFromAnywhere)) "CR 603.6c says put-into-a-graveyard-from-anywhere is not one"
+      Spec.assertBool s (not (Event.looksBack (TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And [])))) "and CR 708.8 leaves a turned-up permanent on the battlefield"
+      -- CR 603.1b: one ability, several conditions -- it looks back if any of
+      -- them does, and the pair below differ only in whether one does.
+      Spec.assertBool s (Event.looksBack (TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.SelfDies])) "an AnyOf containing one looks back"
+      Spec.assertBool s (not (Event.looksBack (TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.SelfTurnedFaceUp]))) "and one containing none does not"
     -- The proving test. bob holds THREE cards, so "discarded once" (one left)
     -- is distinguishable from "discarded twice" (none) and from "not at all"
     -- (three).
@@ -4672,7 +4784,7 @@ bystanderSpec s registry =
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           began = S.withEvents [GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice] gs0
           dead = S.runPure S.identityAnswer began (Event.destroy Regenerability.Regenerable [ghoul])
-          triggers = fst (Event.gatherTriggers (Event.unscannedEvents dead) dead)
+          triggers = fst (Event.gatherTriggers (Event.unscannedGrouped dead) dead)
       Spec.assertEqWith s "the Ghoul really did leave the battlefield" (Game.lookupObject ghoul dead) Nothing
       Spec.assertEqWith s "its step trigger still fired" (fmap PendingTrigger.source triggers) [TriggerSource.OfObject ghoul]
       Spec.assertEqWith s "under alice, who controlled it as it left (CR 603.3a)" (fmap PendingTrigger.controller triggers) [S.alice]
@@ -4684,7 +4796,7 @@ bystanderSpec s registry =
       let (ghoul, gs0) = S.addCreature khabalGhoul S.alice (Setup.emptyGame S.bothPlayers)
           dead = S.runPure S.identityAnswer gs0 (Event.destroy Regenerability.Regenerable [ghoul])
           began = S.runPure S.identityAnswer dead (State.modify' (Event.recordEvent (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)))
-          triggers = fst (Event.gatherTriggers (Event.unscannedEvents began) began)
+          triggers = fst (Event.gatherTriggers (Event.unscannedGrouped began) began)
       Spec.assertEqWith s "the Ghoul is gone" (Game.lookupObject ghoul began) Nothing
       Spec.assertEqWith s "and nothing triggered" (fmap PendingTrigger.source triggers) []
 
@@ -4739,7 +4851,7 @@ bystanderZoneSpec s registry =
                 [GameEvent.StepBegan upkeep S.alice]
                 (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
             after = S.runPure S.identityAnswer began (remove [squeeId, blossomId])
-        pure (squeeId, blossomId, after, fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedEvents after) after)))
+        pure (squeeId, blossomId, after, fmap PendingTrigger.source (fst (Event.gatherTriggers (Event.unscannedGrouped after) after)))
    in Spec.describe s "BystanderZone" $ do
         -- The proving leg. EXILE rather than a graveyard on purpose: it leaves
         -- the bystander reading as the only source that could offer Squee's
@@ -4808,7 +4920,7 @@ aetherFlashSpec s registry =
          in S.runPure S.identityAnswer cast Engine.priorityLoop
       namesIn zone pid gs =
         fmap Face.name (Maybe.mapMaybe (\oid -> Game.faceOf oid gs) (Game.zoneMembers zone pid gs))
-      damageEventsIn gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events gs))
+      damageEventsIn gs = Maybe.mapMaybe Event.damageOf (S.eventsOf gs)
       -- CR 120.3e's marked damage on the one battlefield permanent with this
       -- name. Nothing if it is not there, or if there is more than one of it.
       markedOn name gs =
@@ -5061,7 +5173,7 @@ towershellSkipSpec s registry = Spec.describe s "DelayedOnsetSkipped" $ do
       -- happens" -- and is why this is read before the turn ends, since
       -- Engine.handoffTurn clears the log.
       combatStepsOf pid gs =
-        [ph | GameEvent.StepBegan ph@(Phase.Combat _) who <- Foldable.toList (GameState.events gs), who == pid]
+        [ph | GameEvent.StepBegan ph@(Phase.Combat _) who <- S.eventsOf gs, who == pid]
   -- The control that makes the case below discriminating: the same board and the
   -- same line of play with the Dignitary never cast. S.aggressiveAnswer takes no
   -- action at all, and S.fightAnswer is exactly it plus casting what it can
@@ -5279,7 +5391,7 @@ lifeGainTriggerSpec s registry =
           childOfNight <- S.printingOf s registry "Child of Night"
           let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
               evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False 0 (Just S.alice) DamageKind.Combat
-              gainsIn gs = [p | GameEvent.LifeGained p _ <- Foldable.toList (GameState.events gs)]
+              gainsIn gs = [p | GameEvent.LifeGained p _ <- S.eventsOf gs]
               after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
           Spec.assertEqWith s "zero damage records nothing" (gainsIn (after 0)) []

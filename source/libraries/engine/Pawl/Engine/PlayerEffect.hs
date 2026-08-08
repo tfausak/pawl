@@ -239,7 +239,7 @@ rewritePlayerEffect pairs effect = case effect of
 castsThisTurn :: PlayerId -> GameState -> Natural
 castsThisTurn pid gs =
   let mine caster = caster == pid
-   in Natural.length (filter mine (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events gs))))
+   in Natural.length (filter mine (Maybe.mapMaybe (Game.castOf . snd) (Foldable.toList (GameState.events gs))))
 
 -- CR 601.3: a player can begin to cast a spell only if no rule or effect
 -- prohibits it. The prohibit half. Cast.permitsCastWhileSearching is not the

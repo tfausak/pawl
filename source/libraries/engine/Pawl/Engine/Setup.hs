@@ -16,6 +16,7 @@ import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Deck as Deck
+import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
@@ -86,6 +87,8 @@ emptyGame order =
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
+          GameState.nextEventGroup = EventGroup.first,
+          GameState.eventGroupDepth = 0,
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.controlWhenTriggered = Map.empty,
@@ -297,6 +300,8 @@ restartGame perform starter = do
             GameState.manaPool = Map.empty,
             GameState.combat = Combat.emptyCombat,
             GameState.events = Seq.empty,
+            GameState.nextEventGroup = EventGroup.first,
+            GameState.eventGroupDepth = 0,
             GameState.lastKnown = Map.empty,
             GameState.scannedThrough = 0,
             GameState.controlWhenTriggered = Map.empty,
@@ -395,6 +400,8 @@ subgameStateFrom starter parent =
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
+          GameState.nextEventGroup = EventGroup.first,
+          GameState.eventGroupDepth = 0,
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.controlWhenTriggered = Map.empty,

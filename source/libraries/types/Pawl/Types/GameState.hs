@@ -11,6 +11,7 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.LastKnown as LastKnown
@@ -85,7 +86,33 @@ data GameState = MkGameState
     -- change-and-emit funnels and by Engine.runStep's step-begin emission; NEVER
     -- cleared by a reader. Cleared with both watermarks at turn handoff
     -- (Engine.handoffTurn) -- not at cleanup, which is still part of this turn.
-    events :: Seq.Seq GameEvent.GameEvent,
+    --
+    -- Each entry carries the EventGroup it belongs to (CR 704.3 / CR 608.2f's
+    -- "single event"), stamped by Event.recordEvent. The log stays FLAT and both
+    -- watermarks below stay counts of ELEMENTS: a group can legitimately be half
+    -- consumed, since scannedThrough and damageScannedThrough drain the same log
+    -- at different cadences. Groups are non-decreasing along the log, because
+    -- recordEvent only ever mints a fresh one or repeats the frozen one.
+    events :: Seq.Seq (EventGroup.EventGroup, GameEvent.GameEvent),
+    -- | The group Event.recordEvent stamps on the next event it records.
+    --
+    -- Advanced past on each record, EXCEPT inside an Event.simultaneously
+    -- bracket, which is what makes every event in the bracket's body share a
+    -- group. NOT reset at turn handoff, where the log itself is cleared: nothing
+    -- compares a group against a value, only against another group, so a monotone
+    -- sequence keeps "later group" meaning what it says and the gap costs
+    -- nothing. A restarted game (CR 727.1) and a subgame (CR 729.1a) do start the
+    -- sequence over, because each is a new game rather than a later turn of this
+    -- one.
+    nextEventGroup :: EventGroup.EventGroup,
+    -- | How deep the Event.simultaneously brackets are nested. Zero means each
+    -- recorded event is its own group.
+    --
+    -- The OUTERMOST bracket wins, which is what a counter buys over a flag: a CR
+    -- 704.3 state-based-action pass whose destruction batch is itself a CR 608.2f
+    -- simultaneous action is still one event, and the nested bracket must not end
+    -- the outer one's group early.
+    eventGroupDepth :: Natural.Natural,
     -- | CR 608.2h / 113.7a: last known information, keyed by the id an object had
     -- BEFORE it left a zone.
     --

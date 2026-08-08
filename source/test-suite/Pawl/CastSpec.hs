@@ -569,8 +569,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 1 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
-        casts = Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events after))
-    Spec.assertEqWith s "no cast before" (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events gs))) []
+        casts = Maybe.mapMaybe Game.castOf (S.eventsOf after)
+    Spec.assertEqWith s "no cast before" (Maybe.mapMaybe Game.castOf (S.eventsOf gs)) []
     Spec.assertEqWith s "exactly one cast, by alice" casts [S.alice]
   Spec.it s "CR 601.2i a cast that is rejected records nothing" $ do
     -- A Bolt with no mana available: legalActions would never offer it, and
@@ -579,7 +579,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     lightningBolt <- S.printingOf s registry "Lightning Bolt"
     let (gs, oid) = S.boltInHand mountain lightningBolt 0 Phase.PrecombatMain
         after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
-    Spec.assertEqWith s "no cast recorded" (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events after))) []
+    Spec.assertEqWith s "no cast recorded" (Maybe.mapMaybe Game.castOf (S.eventsOf after)) []
 
 -- Chooses this value of X and aims every target slot at bob; other prompts take
 -- the identity fallback. Casing on a GADT prompt with an identityAnswer default

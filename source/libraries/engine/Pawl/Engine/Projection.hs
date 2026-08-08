@@ -591,7 +591,7 @@ viewOfCharacteristics oid pc controller counters gs =
       Filter.blocking = any (Set.member oid) (Map.elems (Combat.blockers (GameState.combat gs))),
       -- CR 608.2i: read from the turn's event log, not the combat record, which
       -- CR 511.3 clears at end of combat. The log spans the turn.
-      Filter.attackedThisTurn = any (declaredIt oid) (GameState.events gs),
+      Filter.attackedThisTurn = any (declaredIt oid . snd) (GameState.events gs),
       -- CR 701.3a: also not a characteristic, so the attachment comes off
       -- Object.attachedTo -- but the HOST's creature-ness is projected (layer 4
       -- can make a land a creature), so it goes through isCreatureOf. That is why
