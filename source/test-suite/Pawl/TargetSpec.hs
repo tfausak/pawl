@@ -26,6 +26,11 @@
 -- all, and the case that reads it reads Withered Wretch's off the same board so
 -- neither off-battlefield pool can swallow the other.
 --
+-- The last case is hexproof's other axis: not who is targeting but WHETHER THE
+-- KEYWORD IS THERE AT ALL. Dawnglade Regent grants it through a CR 604.2 "as
+-- long as you're the monarch" clause, so the same Doom Blade answers both ways
+-- across CR 725.5's no-monarch window.
+--
 -- Gameplay-level: every spec under test is read out of a committed card rather
 -- than hand-built, and the cases that turn on an effect cast and resolve through
 -- the stack.
