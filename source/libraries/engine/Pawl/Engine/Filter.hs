@@ -1,10 +1,13 @@
 module Pawl.Engine.Filter where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -121,7 +124,21 @@ data View = MkView
     token :: Bool,
     -- | CR 110.5a's tap status. Not a characteristic, so no projection writes it;
     -- read straight off the object.
-    tapped :: Bool
+    tapped :: Bool,
+    -- | CR 122.1: the counters on the candidate, counted per kind. Not a
+    -- characteristic -- CR 109.3's list has no counters in it -- so no projection
+    -- writes it, and it deliberately survives ALONGSIDE the power and toughness
+    -- CR 613.4c derives from it, because "does it have a +1/+1 counter" and "is
+    -- its power 3" are different questions with different answers.
+    --
+    -- Read by Pawl.Engine.Quantity's ObjectCounters arm. SUPPLIED by the
+    -- caller rather than looked up here, the posture `controller` already takes,
+    -- which is what lets Pawl.Engine.Projection.viewWithLastKnown hand over CR
+    -- 608.2h's record for an object whose id names nothing.
+    --
+    -- Empty for every candidate with no counters to read: a printed card off the
+    -- battlefield, a player, an event snapshot.
+    counters :: Map.Map CounterKind.CounterKind Natural.Natural
   }
   deriving (Eq, Show)
 
@@ -163,7 +180,11 @@ playerView pid =
       canHostSubject = False,
       -- CR 111.1: a token represents a PERMANENT, and a player is not one.
       token = False,
-      tapped = False
+      tapped = False,
+      -- CR 122.1 puts counters on an object OR a player, and a player's are
+      -- Player.counters, read by Quantity.PlayerCounters. This field is the
+      -- OBJECT half, so a player view has none of it.
+      counters = Map.empty
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and

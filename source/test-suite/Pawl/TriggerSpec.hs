@@ -41,7 +41,10 @@
 -- bearer is a third object entirely, with Promise of Tomorrow --
 -- `promiseOfTomorrowSpec`. CR 603.4's intervening "if"
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
--- -- `lookBackInterveningSpec`. CR 603.10's first sentence for a BYSTANDER -- a
+-- -- `lookBackInterveningSpec`, and the same clause asking about a COUNTER rather
+-- than a characteristic -- the one thing CR 613 folds away before the snapshot
+-- is taken -- with Promising Duskmage -- `counterLookBackSpec`.
+-- CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
 -- and Khabál Ghoul -- `bystanderSpec`, and CR 113.6m read off that same
@@ -149,6 +152,7 @@ import qualified Pawl.Types.Filter as Filter.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -4083,6 +4087,105 @@ lookBackInterveningSpec s registry =
           Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
           Spec.assertEqWith s "and no token was made" (tokensOf S.alice after) []
 
+-- The same rule read against what CR 613 does NOT leave behind. CR 122.1a folds
+-- a +1/+1 counter into the object's power and toughness at layer 7c, so a
+-- projection taken as the creature died records the RESULT of the counter and
+-- not the counter -- and "if it had a +1/+1 counter on it" is a question about
+-- the counter. LastKnown.counters is where the counter itself is filed, and
+-- Quantity.ObjectCounters is what reads it back.
+--
+-- Promising Duskmage, {2}{B} Creature -- Human Warlock 2/3: "When this creature
+-- dies, if it had a +1/+1 counter on it, draw a card."
+--
+-- Murder rather than a damage spell does the killing on purpose: the counter
+-- moves the Duskmage from 2/3 to 3/4, so any lethal-damage removal would need a
+-- different amount per leg and the two legs would stop being one fixture. CR
+-- 701.7a's destroy does not care what the toughness is.
+--
+-- Both of CR 603.4's reads are covered, and separately:
+--
+--   * the GATHER read (Event.interveningHolds) by the two legs -- the trigger
+--     reaches the stack with the counter and does not reach it without.
+--   * the RESOLUTION read (CR 608.2a, Pawl.Engine.Stack's OfTrigger arm) by the
+--     third case, which lets the trigger onto the stack and then empties the
+--     record it reads, so a wired re-check removes the ability and an unwired
+--     one draws anyway.
+counterLookBackSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+counterLookBackSpec s registry =
+  let duskmageBoard withCounter = do
+        swamp <- S.printingOf s registry "Swamp"
+        murder <- S.printingOf s registry "Murder"
+        duskmage <- S.printingOf s registry "Promising Duskmage"
+        let lands = S.landsInPlay swamp 3
+            (duskmageId, withDuskmage) = S.addCreature duskmage S.alice lands
+            countered =
+              if withCounter
+                then S.addCounter CounterKind.PlusOnePlusOne 1 duskmageId withDuskmage
+                else withDuskmage
+            -- CR 104.3c: five cards is more library than any leg can draw
+            -- through, so nothing here loses the game before the assertion runs.
+            -- No leg advances a turn either, so no draw step spends one.
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) countered [1 .. 5 :: Int]
+        pure (duskmageId, S.handOne murder stocked)
+      -- Murder's pool is Pool.Creatures and the Duskmage is the only creature on
+      -- the board, so identityAnswer's least Recipient is it.
+      murderIt (gs, spellId) =
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+            destroyed = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer destroyed Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      librarySize pid gs = length (Game.zoneMembers Zone.Library pid gs)
+      -- The COUNTER, not the power it produces. CR 122.1a makes 3/4 the visible
+      -- consequence of the +1/+1 counter and this trigger asks about neither the
+      -- 3 nor the 4, so the two facts are asserted apart.
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+   in Spec.describe s "CR 603.4 an intervening if over last known COUNTERS" $ do
+        Spec.it s "CR 122.1 with a +1/+1 counter the Duskmage's death trigger draws a card" $ do
+          (duskmageId, board) <- duskmageBoard True
+          let (settled, after) = murderIt board
+          Spec.assertEqWith s "it had one +1/+1 counter while it lived" (Map.lookup CounterKind.PlusOnePlusOne (countersOn duskmageId (fst board))) (Just 1)
+          Spec.assertEqWith s "and CR 122.1a made it a 3/4, which is a DIFFERENT fact" (Projection.powerOf duskmageId (fst board), Projection.toughnessOf duskmageId (fst board)) (Just 3, Just 4)
+          Spec.assertEqWith s "one card in hand and five in library to start" (S.handSize S.alice (fst board), librarySize S.alice (fst board)) (1, 5)
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "the Duskmage is in the graveyard" (Set.member duskmageId (GameState.battlefield after)) False
+          -- The DELTA: the Murder left the hand and one card arrived from the
+          -- library. Zero in hand and five in library is the other leg's answer,
+          -- so the two cannot be satisfied by one implementation.
+          Spec.assertEqWith s "one card drawn" (S.handSize S.alice after, librarySize S.alice after) (1, 4)
+        -- CR 603.4's "otherwise it does nothing": without the counter the
+        -- ability never triggers at all.
+        Spec.it s "CR 603.4 with no counter the same death draws nothing" $ do
+          (duskmageId, board) <- duskmageBoard False
+          let (settled, after) = murderIt board
+          Spec.assertEqWith s "no counters on it at all" (countersOn duskmageId (fst board)) Map.empty
+          Spec.assertEqWith s "a plain 2/3" (Projection.powerOf duskmageId (fst board), Projection.toughnessOf duskmageId (fst board)) (Just 2, Just 3)
+          Spec.assertEqWith s "one card in hand and five in library to start" (S.handSize S.alice (fst board), librarySize S.alice (fst board)) (1, 5)
+          Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+          Spec.assertEqWith s "the Duskmage is in the graveyard just the same" (Set.member duskmageId (GameState.battlefield after)) False
+          Spec.assertEqWith s "no card drawn" (S.handSize S.alice after, librarySize S.alice after) (0, 5)
+
+        -- CR 608.2a on its own. The record the resolution re-check reads is
+        -- emptied while the trigger sits on the stack -- something no rule can
+        -- do to last known information, which is exactly why it isolates the
+        -- second read: only a wired re-check can notice.
+        Spec.it s "CR 608.2a the intervening if is checked AGAIN as the ability resolves" $ do
+          (duskmageId, board) <- duskmageBoard True
+          let cast = S.runPure S.identityAnswer (fst board) (S.cast S.alice (snd board))
+              destroyed = S.runPure S.identityAnswer cast Stack.resolveTop
+              settled = S.runPure S.identityAnswer destroyed Engine.settleForPriority
+              forgotten =
+                settled
+                  { GameState.lastKnown =
+                      Map.adjust
+                        (\lk -> lk {LastKnown.counters = Map.empty})
+                        duskmageId
+                        (GameState.lastKnown settled)
+                  }
+              after = S.runPure S.identityAnswer forgotten Stack.resolveTop
+          Spec.assertEqWith s "the trigger reached the stack on the gather read" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "and was removed on the resolution read, drawing nothing" (S.handSize S.alice after, librarySize S.alice after) (0, 5)
+          Spec.assertEqWith s "the stack is empty either way" (GameState.stack after) []
+
 -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. / {T}: Add
 -- {C}." A nonbasic land whose whole text box is one triggered ability and one
 -- activated one, which is what makes it the pool's witness for CR 305.7's
@@ -5463,6 +5566,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   becameSlotSpec s registry
   promiseOfTomorrowSpec s registry
   lookBackInterveningSpec s registry
+  counterLookBackSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
   bystanderZoneSpec s registry

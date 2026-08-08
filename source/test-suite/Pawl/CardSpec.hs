@@ -342,6 +342,9 @@ quantityCounts quantity = case quantity of
   Quantity.Type.Speed _ -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
+  -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
+  -- against: a bare CounterKind with no Count and no Filter beside it.
+  Quantity.Type.ObjectCounters _ -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this

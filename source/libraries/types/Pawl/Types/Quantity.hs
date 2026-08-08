@@ -1,6 +1,7 @@
 module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.Count as Count
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -146,9 +147,35 @@ data Quantity
     -- unanswered, which is that field's own stated convention: a player who has
     -- never been given a rad counter has no rad counters, which is a number.
     --
-    -- The OBJECT-counter reading (CR 122.1a-e) has no arm here and needs a
-    -- different one: it must say which object, where this says which player.
+    -- The OBJECT-counter reading (CR 122.1a-e) is ObjectCounters below, which is
+    -- a different arm because it must say which OBJECT where this says which
+    -- player.
     --
     -- A LEAF, like LifeTotal, Speed and ManaCount: it holds no Quantity.
     PlayerCounters PlayerRef.PlayerRef PlayerCounterKind.PlayerCounterKind
+  | -- | CR 122.1: how many counters of a kind are on the OBJECT this quantity is
+    -- evaluated against -- Promising Duskmage's "if it had a +1/+1 counter on
+    -- it".
+    --
+    -- Power's sibling rather than PlayerCounters', and for Power's reason: it
+    -- reads the `oid` the caller supplies and is answered through the injected
+    -- ViewOf, which is what lets a caller substitute CR 608.2h last known
+    -- information for an object that is gone. That substitution is the whole
+    -- point here -- CR 613.4c folds a +1/+1 counter into layer 7c's power and
+    -- toughness, so a projection taken as the object died records the counter's
+    -- EFFECT and never the counter, and only a record of the counters themselves
+    -- can answer this.
+    --
+    -- No ObjectRef beside it: like Power, it names no object at all and takes the
+    -- one the evaluation is aimed at. Reading another object's counters would be
+    -- a Count over a zone, which is a different shape and one nothing in the pool
+    -- asks for.
+    --
+    -- A kind ABSENT from the object's counters reads as 0 rather than as
+    -- unanswered, exactly as PlayerCounters above: an object nobody put a counter
+    -- on has none, which is a number. Nothing survives only for an object the
+    -- view cannot describe at all.
+    --
+    -- A LEAF: it holds no Quantity.
+    ObjectCounters CounterKind.CounterKind
   deriving (Eq, Ord, Show)

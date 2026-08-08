@@ -1492,7 +1492,8 @@ stubView table oid =
                 Filter.attachedToPermanent = False,
                 Filter.canHostSubject = False,
                 Filter.token = False,
-                Filter.tapped = False
+                Filter.tapped = False,
+                Filter.counters = Map.empty
               }
         [] -> Nothing
 
