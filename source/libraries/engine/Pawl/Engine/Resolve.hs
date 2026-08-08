@@ -43,6 +43,8 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Clause as Clause
+import Pawl.Types.ClauseIndex (ClauseIndex)
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -241,7 +243,12 @@ modeSlots :: Mode.Mode Card.Type.Card -> Set SlotName
 modeSlots mode =
   Set.union
     (foldMap slotsOf (Mode.allEffects mode))
-    (maybe Set.empty (Set.singleton . UnlessPaid.payer) (Mode.unlessPaid mode))
+    (foldMap payerSlot (Mode.clauses mode))
+  where
+    -- Every clause's payer, not just one: CR 118.12a scopes an "unless" to the
+    -- clause it is printed on, so a mode may state more than one and each names
+    -- a slot the card owes a declaration for.
+    payerSlot = maybe Set.empty (Set.singleton . UnlessPaid.payer) . Clause.unlessPaid
 
 -- Both sides of a Condition are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Set SlotName
@@ -597,38 +604,8 @@ resolveSpellWith runSubgame oid = do
               else do
                 let effectController = spellController obj oid gs
                 Monad.forM_ (modesOf oid gs) $ \(mi, mode) -> do
-                  -- CR 603.5 / 608.2d: a printed "may" is answered here, between
-                  -- the preceding mode's instructions and this one's.
                   let idx = ModeInstance.index mi
-                  taken <- exercises oid effectController idx mode
-                  -- CR 118.12a: and then this mode's "unless [a player] pays",
-                  -- offered only for a mode that is happening at all. The
-                  -- legality and the targets are the START-of-resolution ones,
-                  -- matching CR 608.2b's single re-validation; the per-effect
-                  -- re-read below adds only slots this resolution DEFINES, and
-                  -- an "unless" is offered before any of THIS mode's effects have
-                  -- run. A later mode's gate is asked after an earlier mode's
-                  -- effects, which no card reaches: the pool's one unlessPaid is
-                  -- a single-mode spell.
-                  --
-                  -- Both maps are projected into THIS instance's view (CR 700.2d):
-                  -- the legality is decided against the instance-named slot, then
-                  -- renamed to the printed one the mode's own text reads. Deciding
-                  -- it after the rename would look every slot up in `specs` and
-                  -- miss, and CR 608.2b's re-validation would silently pass.
-                  gatePaid <-
-                    if taken
-                      then
-                        let chosenAtStart = Binding.targetsOf (Object.bindings obj)
-                         in paid
-                              oid
-                              oid
-                              idx
-                              (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) (Map.mapWithKey legalSlot chosenAtStart))
-                              (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenAtStart)
-                              mode
-                      else pure False
-                  let applyOne eff = do
+                      applyOne eff = do
                         -- Re-read the live bindings for THIS effect: a prior
                         -- PlaySubgame may have bound its loser slot.
                         bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject oid)
@@ -642,7 +619,41 @@ resolveSpellWith runSubgame oid = do
                           (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) legalityNow)
                           (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenNow)
                           eff
-                  Monad.when (taken && not gatePaid) (Monad.forM_ (Mode.allEffects mode) applyOne)
+                  -- CR 608.2e's clause is the unit both gates cover, so the pair
+                  -- is asked once per clause rather than once per mode -- between
+                  -- the preceding clause's instructions and this one's.
+                  Monad.forM_ (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))) $ \(cIdx, clause) -> do
+                    -- CR 603.5 / 608.2d: the printed "may" first.
+                    taken <- exercises oid effectController idx cIdx clause
+                    -- CR 118.12a: and then this clause's "unless [a player]
+                    -- pays", offered only for a clause that is happening at all.
+                    -- The legality and the targets are the START-of-resolution
+                    -- ones, matching CR 608.2b's single re-validation; the
+                    -- per-effect re-read above adds only slots this resolution
+                    -- DEFINES, and an "unless" is offered before any of THIS
+                    -- clause's effects have run. A later clause's gate is asked
+                    -- after an earlier clause's effects, which no card reaches:
+                    -- the pool's unlessPaid cards are all one-clause.
+                    --
+                    -- Both maps are projected into THIS instance's view (CR 700.2d):
+                    -- the legality is decided against the instance-named slot, then
+                    -- renamed to the printed one the mode's own text reads. Deciding
+                    -- it after the rename would look every slot up in `specs` and
+                    -- miss, and CR 608.2b's re-validation would silently pass.
+                    gatePaid <-
+                      if taken
+                        then
+                          let chosenAtStart = Binding.targetsOf (Object.bindings obj)
+                           in paid
+                                oid
+                                oid
+                                idx
+                                cIdx
+                                (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) (Map.mapWithKey legalSlot chosenAtStart))
+                                (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenAtStart)
+                                clause
+                        else pure False
+                    Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Clause.effects clause))
                 finishSpell oid face effectController
 
 -- CR 608.2n / 715.3d: where the spell goes as the last part of its resolution.
@@ -731,22 +742,13 @@ resolveModes stackId srcId modes = do
           -- and never revisited, and `obj` is the ability object itself, so a
           -- stolen permanent's later controller must not override it.
           effectController = Object.owner obj
-          resolveOne (mi, mode) = do
-            -- CR 603.5 / 608.2d: the printed "may", answered as this mode's
-            -- instructions are applied. Run only when `fizzles` is False, so the
-            -- question is never asked about an ability that never resolves.
+          resolveOne (mi, mode) =
             let idx = ModeInstance.index mi
                 -- CR 700.2d: this instance's own slots under the names its mode
                 -- prints, with every other instance's removed -- the spell path's
                 -- projection, applied to both maps so they cannot disagree.
                 instanceView = Modal.instanceView specs mi (Mode.targetSpecs mode)
-            taken <- exercises stackId effectController idx mode
-            -- CR 118.12a: then the "unless [a player] pays", against the
-            -- START-of-resolution slots -- the spell path's own note says why it
-            -- follows the "may", and why the gate is asked before this mode's
-            -- effects have defined anything.
-            gatePaid <- if taken then paid stackId srcId idx (instanceView legality) (instanceView chosen) mode else pure False
-            let applyOne eff = do
+                applyOne eff = do
                   -- Re-read the LIVE bindings for THIS effect (CR 608.2c), the
                   -- same shape resolveSpellWith's applyOne has: a Create's single
                   -- token (CR 111.1) reaches the sentence after the one that
@@ -759,33 +761,48 @@ resolveModes stackId srcId modes = do
                   let chosenNow = Binding.targetsOf bindingsNow
                       legalityNow = Map.mapWithKey legalSlot chosenNow
                   applyEffect stackId srcId effectController (instanceView legalityNow) (instanceView chosenNow) eff
-            Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Mode.allEffects mode))
+             in -- CR 608.2e's clause is what each gate covers, so the pair is
+                -- asked once per clause. Run only when `fizzles` is False, so no
+                -- question is asked about an ability that never resolves.
+                Monad.forM_ (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))) $ \(cIdx, clause) -> do
+                  -- CR 603.5 / 608.2d: the printed "may", answered as this
+                  -- clause's instructions are applied.
+                  taken <- exercises stackId effectController idx cIdx clause
+                  -- CR 118.12a: then the "unless [a player] pays", against the
+                  -- START-of-resolution slots -- the spell path's own note says
+                  -- why it follows the "may", and why the gate is asked before
+                  -- this clause's effects have defined anything.
+                  gatePaid <- if taken then paid stackId srcId idx cIdx (instanceView legality) (instanceView chosen) clause else pure False
+                  Monad.when (taken && not gatePaid) (Monad.mapM_ applyOne (Clause.effects clause))
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
 
--- CR 603.5 / 608.2d: does this mode's instruction list happen at all? A mandatory
--- mode always does; an optional one is its controller's call, made HERE as the
--- effect is applied -- CR 603.5 puts an optional ability on the stack regardless
--- and defers the choice to resolution.
+-- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
+-- mandatory clause always does; an optional one is its controller's call, made
+-- HERE as the effect is applied -- CR 603.5 puts an optional ability on the
+-- stack regardless and defers the choice to resolution.
+--
+-- The unit is CR 608.2e's clause and not the whole mode, so a "may" printed on
+-- one sentence leaves its neighbours to happen either way (#335).
 --
 -- `resolving` is the object on the stack, which is what the prompt names.
 -- `controller` is who "you" means (CR 405.4 for a spell, CR 113.8 for an ability)
 -- and therefore who is asked, through Decide.deciderFor so a player controlled
 -- under CR 723.1 has their controller answer.
-exercises :: ObjectId -> PlayerId -> ModeIndex -> Mode.Mode Card.Type.Card -> Game Bool
-exercises resolving controller idx mode = case Mode.optionality mode of
+exercises :: ObjectId -> PlayerId -> ModeIndex -> ClauseIndex -> Clause.Clause Card.Type.Card -> Game Bool
+exercises resolving controller idx cIdx clause = case Clause.optionality clause of
   Optionality.Mandatory -> pure True
   Optionality.Optional -> do
     gs <- State.get
     let decider = Decide.deciderFor controller gs
-    decision <- Game.choose (Prompt.ChooseOptional decider controller resolving idx)
+    decision <- Game.choose (Prompt.ChooseOptional decider controller resolving idx cIdx)
     pure $ case decision of
       OptionalDecision.Exercises -> True
       OptionalDecision.Declines -> False
 
--- CR 118.12a: does this mode's instruction list happen, given the "unless [a
--- player] pays" it may state? A mode stating none always does. One that states
+-- CR 118.12a: does this clause's instruction list happen, given the "unless [a
+-- player] pays" it may state? A clause stating none always does. One that states
 -- one offers the cost to the player its `payer` slot names, and the instructions
 -- are the OTHER branch -- that rule reads "'[Do something] unless [a player does
 -- something else]' ... means the same thing as '[A player may do something
@@ -829,8 +846,8 @@ exercises resolving controller idx mode = case Mode.optionality mode of
 --
 -- CR 118.13b's announcement -- how a symbol payable in multiple ways is being
 -- paid, chosen immediately before this payment -- is not made (#702).
-paid :: ObjectId -> ObjectId -> ModeIndex -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Mode.Mode Card.Type.Card -> Game Bool
-paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
+paid :: ObjectId -> ObjectId -> ModeIndex -> ClauseIndex -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Clause.Clause Card.Type.Card -> Game Bool
+paid resolving source idx cIdx legality chosen clause = case Clause.unlessPaid clause of
   Nothing -> pure False
   Just gate -> do
     gs <- State.get
@@ -841,7 +858,7 @@ paid resolving source idx legality chosen mode = case Mode.unlessPaid mode of
         if not (Cost.canPay payer source cost gs)
           then pure False
           else do
-            decision <- Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cost)
+            decision <- Game.choose (Prompt.ChooseToPay (Decide.deciderFor payer gs) payer resolving idx cIdx cost)
             case decision of
               PaymentDecision.Declines -> pure False
               PaymentDecision.Pays -> do

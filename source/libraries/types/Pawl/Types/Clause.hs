@@ -2,6 +2,8 @@ module Pawl.Types.Clause where
 
 import qualified Data.Sequence as Seq
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.UnlessPaid as UnlessPaid
 
 -- | CR 608.2e's own unit: one of the "multiple steps or actions, denoted by
 -- separate sentences or clauses" a spell or ability may have. `effects` is a Seq
@@ -21,7 +23,32 @@ import qualified Pawl.Types.Effect as Effect
 -- Parametric in `card` for Pawl.Types.Effect's reason -- Card embeds the
 -- payload, so a concrete `Effect Card` here would make the two modules mutually
 -- importing.
-newtype Clause card = MkClause
-  { effects :: Seq.Seq (Effect.Effect card)
+data Clause card = MkClause
+  { -- | CR 603.5's printed "may", covering this clause's effects -- see
+    -- Pawl.Types.Optionality for why the flag rides a carrier rather than
+    -- wrapping each effect, and Pawl.Engine.Resolve.exercises for where the
+    -- choice is asked.
+    --
+    -- A clause spanning two instructions is ONE question, which is what CR
+    -- 608.2d's single announcement calls for: "you may draw a card and lose 1
+    -- life" is one clause and one prompt. Two adjacent printed "may"s are two
+    -- clauses and two prompts. That grouping is structural, which is why the
+    -- span is the carrier and an individual instruction is not -- nothing about
+    -- one instruction distinguishes the two cases.
+    optionality :: Optionality.Optionality,
+    -- | CR 118.12a's "unless [a player] pays", covering the same span: that rule
+    -- is a rewriting, so this clause's effects are its "if they don't" branch.
+    -- Nothing for every card that states no such cost.
+    --
+    -- The two gates are independent, and Pawl.Engine.Resolve asks them in
+    -- printed order -- the "may" first, since a declined clause has no
+    -- instruction left for an "unless" to qualify.
+    --
+    -- NEGATIVE only: the effects run when the cost was NOT paid. CR 118.12's
+    -- other half -- "[Do something]. If [a player] does, [effect]", where they
+    -- run when it WAS paid (Standstill) -- has no producer and no representation
+    -- (#701).
+    unlessPaid :: Maybe UnlessPaid.UnlessPaid,
+    effects :: Seq.Seq (Effect.Effect card)
   }
   deriving (Eq, Ord, Show)

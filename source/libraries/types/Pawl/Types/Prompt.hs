@@ -10,6 +10,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CommandZoneDecision as CommandZoneDecision
 import qualified Pawl.Types.Concession as Concession
@@ -762,7 +763,14 @@ data Prompt r where
   -- from the stack by CR 608.2b first. That covers every optional card in the pool,
   -- all single-mode; a modal payload mixing a live mode with a dead optional one
   -- would reach this prompt with nothing to decide (#336).
-  ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Prompt OptionalDecision.OptionalDecision
+  --
+  -- The ModeIndex and the ClauseIndex together say which question this is: the
+  -- "may" covers the CLAUSE it is printed on (CR 608.2e), not the whole mode, so
+  -- a mode with two optional clauses raises two distinguishable prompts. Whether
+  -- the clause's effects can accomplish anything is deliberately NOT consulted --
+  -- that would make this prompt depend on which effects a clause holds, and the
+  -- rules core never asks an effect's identity.
+  ChooseOptional :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Prompt OptionalDecision.OptionalDecision
   -- | CR 608.2g: a cast that a RESOLVING effect specifically allows -- "if an
   -- effect specifically instructs or allows a player to cast a spell during
   -- resolution, they do so by following the steps in rules 601.2a-i". CR
@@ -783,10 +791,11 @@ data Prompt r where
   -- exactly the one object the resolving effect named, so the question is
   -- yes-or-no and is asked once.
   --
-  -- Distinct from ChooseOptional, which is CR 603.5's printed "may" over a whole
-  -- MODE. CR 310.11b's "may" governs one clause of a mandatory ability -- the
-  -- exile before it is not optional -- so a mode-wide question would make
-  -- declining the cast decline the exile too.
+  -- Distinct from ChooseOptional, which is CR 603.5's printed "may" over a clause
+  -- of a card's own text. CR 310.11b's "may" is not printed on any card at all --
+  -- it is the rule's own offer, made mid-resolution by an ability the engine
+  -- mints -- so it has no Clause to ride and no ModeIndex/ClauseIndex pair to
+  -- name it.
   --
   -- NEVER elided: CR 601.2b's own decisions aside, casting and not casting reach
   -- plainly different boards. The offer is not made at all when the rules leave
@@ -796,9 +805,12 @@ data Prompt r where
   -- | CR 118.12 / 118.12a: whether this player pays a cost a RESOLVING spell or
   -- ability offers them -- Mana Leak's "unless its controller pays {3}", which CR
   -- 118.12a rewrites as "its controller may pay {3}. If they don't, counter it."
-  -- The ObjectId is the object resolving and the ModeIndex is which of its chosen
-  -- modes is asking, both for Prompt.ChooseOptional's reasons; the Cost is what
-  -- is being offered, which is the information the answer turns on.
+  -- The ObjectId is the object resolving and the ModeIndex/ClauseIndex pair is
+  -- which clause of which chosen mode is asking, all for Prompt.ChooseOptional's
+  -- reasons; the Cost is what is being offered, which is the information the
+  -- answer turns on. The "unless" scopes to its clause exactly as the "may"
+  -- does, so a card whose "unless" governs only some of its instructions leaves
+  -- the rest to happen either way (#703).
   --
   -- The PlayerId is emphatically NOT the resolving controller, which is what
   -- separates this from every other resolution-time prompt: CR 118.12's clause
@@ -820,7 +832,7 @@ data Prompt r where
   -- one: that cost is mandatory ("sacrifice this enchantment. If you do"), so its
   -- "can't" is 118.12's "started to pay a mandatory cost" limb, which is the
   -- positive shape pawl cannot represent at all (#701).
-  ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
+  ChooseToPay :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> ModeIndex.ModeIndex -> ClauseIndex.ClauseIndex -> Cost.Cost Keyword.Keyword -> Prompt PaymentDecision.PaymentDecision
   -- | CR 601.2b: the player announces whether they intend to pay 2 life or a
   -- coloured mana cost for each Phyrexian symbol. CR 118.13a puts the choice HERE
   -- rather than at payment. The ObjectId is the spell or the permanent whose

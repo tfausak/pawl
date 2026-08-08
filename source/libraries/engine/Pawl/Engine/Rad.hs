@@ -134,7 +134,7 @@ ability =
         Modal.MkModal
           ( Seq.singleton
               ( Mode.MkMode
-                  ( Seq.singleton . Clause.MkClause . Seq.fromList $
+                  ( Seq.singleton . Clause.MkClause Optionality.Mandatory Nothing . Seq.fromList $
                       [ -- "that player mills a number of cards equal to the
                         -- number of rad counters they have", counting the
                         -- nonland cards it milled.
@@ -152,8 +152,6 @@ ability =
                       ]
                   )
                   Map.empty
-                  Optionality.Mandatory
-                  Nothing
               )
           )
           (ModeSelection.ChooseExactly 1),

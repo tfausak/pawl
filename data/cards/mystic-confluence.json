@@ -36,7 +36,18 @@
                     "type": "Counter",
                     "value": "spell"
                   }
-                ]
+                ],
+                "unlessPaid": {
+                  "cost": {
+                    "mana": [
+                      {
+                        "type": "Generic",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  "payer": "spell"
+                }
               }
             ],
             "targetSpecs": [
@@ -48,18 +59,7 @@
                   }
                 }
               }
-            ],
-            "unlessPaid": {
-              "cost": {
-                "mana": [
-                  {
-                    "type": "Generic",
-                    "value": 3
-                  }
-                ]
-              },
-              "payer": "spell"
-            }
+            ]
           },
           {
             "clauses": [

@@ -1009,7 +1009,7 @@ oneEffectTrigger condition effect =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.singleton effect))) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -1032,7 +1032,7 @@ oneEffectActivated mana effect =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.singleton effect))) Map.empty Optionality.Mandatory Nothing))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
       ActivatedAbility.condition = Nothing
@@ -1043,10 +1043,8 @@ oneEffectActivated mana effect =
 lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card
 lintMode effects slots =
   Mode.MkMode
-    (Seq.singleton (Clause.MkClause (Seq.fromList effects)))
+    (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList effects)))
     (Map.fromList (fmap (\slot -> (slot, TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) slots))
-    Optionality.Mandatory
-    Nothing
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
 -- ChooseExactly 1. The fixture the per-mode read lint needs and the one-mode
@@ -2386,10 +2384,8 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))))
+                          (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))))
                           (Map.singleton Binding.you (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
-                          Optionality.Mandatory
-                          Nothing
                       )
                   )
                   (ModeSelection.ChooseExactly 1),
@@ -2492,7 +2488,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let -- A one-mode, effectless modal declaring exactly one target slot.
         declaring slot =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) Optionality.Mandatory Nothing))
+            (Seq.singleton (Mode.MkMode Seq.empty (Map.singleton slot (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))))
             (ModeSelection.ChooseExactly 1)
         withTriggered slot card =
           card
@@ -3329,7 +3325,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- clauses and its targetSpecs at once.
         spellOf effects specs =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList effects))) specs Optionality.Mandatory Nothing))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList effects))) specs))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility

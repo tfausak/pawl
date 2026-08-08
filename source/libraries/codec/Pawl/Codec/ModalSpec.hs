@@ -50,10 +50,8 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
       ( Modal.MkModal
           ( Seq.singleton
               ( Mode.MkMode
-                  (Seq.singleton (Clause.MkClause (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
+                  (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
                   (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
-                  Optionality.Mandatory
-                  Nothing
               )
           )
           (ModeSelection.ChooseExactly 1)
@@ -64,7 +62,7 @@ spec s = Spec.describe s "Pawl.Codec.Modal" $ do
       s
       toJson
       fromJson
-      (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) Modal.defaultSelection)
+      (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) Modal.defaultSelection)
       """ {"modes":[{}]} """
   -- CR 700.2's non-modal payload is a single Mode: a modal PAYLOAD has at
   -- least one mode by invariant, so an empty `modes` array is a decode

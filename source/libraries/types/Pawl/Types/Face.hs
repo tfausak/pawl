@@ -35,7 +35,6 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
@@ -284,5 +283,5 @@ data Face card = MkFace
 defaultSpell :: Modal.Modal card
 defaultSpell =
   Modal.MkModal
-    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing))
+    (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
     (ModeSelection.ChooseExactly 1)

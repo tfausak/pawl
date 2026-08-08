@@ -51,25 +51,25 @@
                         "type": "Sacrifice",
                         "value": "self"
                       }
-                    ]
-                  }
-                ],
-                "unlessPaid": {
-                  "cost": {
-                    "mana": [
-                      {
-                        "type": "OfType",
-                        "value": {
-                          "type": "Colored",
-                          "value": {
-                            "type": "Black"
+                    ],
+                    "unlessPaid": {
+                      "cost": {
+                        "mana": [
+                          {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colored",
+                              "value": {
+                                "type": "Black"
+                              }
+                            }
                           }
-                        }
-                      }
-                    ]
-                  },
-                  "payer": "you"
-                }
+                        ]
+                      },
+                      "payer": "you"
+                    }
+                  }
+                ]
               }
             ]
           }

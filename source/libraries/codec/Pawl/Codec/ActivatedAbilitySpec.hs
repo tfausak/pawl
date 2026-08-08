@@ -62,10 +62,8 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
           ( Modal.MkModal
               ( Seq.singleton
                   ( Mode.MkMode
-                      (Seq.singleton (Clause.MkClause (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
+                      (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Attach (SlotName.MkSlotName (Text.pack "target"))))))
                       (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.ControlledBy PlayerRelation.You))))
-                      Optionality.Mandatory
-                      Nothing
                   )
               )
               (ModeSelection.ChooseExactly 1)
@@ -83,7 +81,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       fromJson
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [CostComponent.TapThis])
-          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           [ ActivationRestriction.DuringPhase (PhaseSelector.Step (Phase.Combat CombatStep.DeclareAttackers)) TurnScope.EachTurn,
             ActivationRestriction.AttackedThisStep
           ]
@@ -99,7 +97,7 @@ spec s = Spec.describe s "Pawl.Codec.ActivatedAbility" $ do
       fromJson
       ( ActivatedAbility.MkActivatedAbility
           (Cost.MkCost Nothing [])
-          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1))
+          (Modal.MkModal (Seq.singleton (Mode.MkMode Seq.empty Map.empty)) (ModeSelection.ChooseExactly 1))
           []
           Nothing
       )

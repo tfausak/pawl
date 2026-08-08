@@ -95,12 +95,12 @@
                           }
                         ]
                       }
-                    ]
+                    ],
+                    "optionality": {
+                      "type": "Optional"
+                    }
                   }
-                ],
-                "optionality": {
-                  "type": "Optional"
-                }
+                ]
               }
             ]
           }

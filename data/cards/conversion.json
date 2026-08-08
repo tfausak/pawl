@@ -73,34 +73,34 @@
                         "type": "Sacrifice",
                         "value": "self"
                       }
-                    ]
-                  }
-                ],
-                "unlessPaid": {
-                  "cost": {
-                    "mana": [
-                      {
-                        "type": "OfType",
-                        "value": {
-                          "type": "Colored",
-                          "value": {
-                            "type": "White"
+                    ],
+                    "unlessPaid": {
+                      "cost": {
+                        "mana": [
+                          {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colored",
+                              "value": {
+                                "type": "White"
+                              }
+                            }
+                          },
+                          {
+                            "type": "OfType",
+                            "value": {
+                              "type": "Colored",
+                              "value": {
+                                "type": "White"
+                              }
+                            }
                           }
-                        }
+                        ]
                       },
-                      {
-                        "type": "OfType",
-                        "value": {
-                          "type": "Colored",
-                          "value": {
-                            "type": "White"
-                          }
-                        }
-                      }
-                    ]
-                  },
-                  "payer": "you"
-                }
+                      "payer": "you"
+                    }
+                  }
+                ]
               }
             ]
           }

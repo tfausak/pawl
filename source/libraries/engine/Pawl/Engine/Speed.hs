@@ -135,10 +135,8 @@ increaseAbility =
         Modal.MkModal
           ( Seq.singleton
               ( Mode.MkMode
-                  (Seq.singleton (Clause.MkClause (Seq.singleton (Effect.IncreaseSpeed (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))))
+                  (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.IncreaseSpeed (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)))))
                   Map.empty
-                  Optionality.Mandatory
-                  Nothing
               )
           )
           (ModeSelection.ChooseExactly 1),

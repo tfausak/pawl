@@ -98,7 +98,7 @@ theAbility p = case Face.activatedAbilities (S.combinedFace p) of
 -- shape every pre-M4h single-mode ActivatedAbility now takes.
 singleModeAbility :: [Effect.Effect card] -> Map.Map SlotName.SlotName TargetSpec.TargetSpec -> Modal.Modal card
 singleModeAbility effects specs =
-  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause (Seq.fromList effects))) specs Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)
+  Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList effects))) specs)) (ModeSelection.ChooseExactly 1)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
@@ -789,7 +789,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
           ActivatedAbility.MkActivatedAbility
             (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) [])
             ( Modal.MkModal
-                (Seq.fromList [Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing, Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing])
+                (Seq.fromList [Mode.MkMode Seq.empty Map.empty, Mode.MkMode Seq.empty Map.empty])
                 (ModeSelection.ChooseExactly 1)
             )
             []

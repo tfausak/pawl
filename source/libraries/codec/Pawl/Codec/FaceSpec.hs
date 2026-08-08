@@ -40,7 +40,6 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
-import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
@@ -77,7 +76,7 @@ decodeFace = Face.fromJson Card.fromJson
 minimalModal :: Modal.Modal Card.Card
 minimalModal =
   Modal.MkModal
-    (Seq.singleton (Mode.MkMode Seq.empty Map.empty Optionality.Mandatory Nothing))
+    (Seq.singleton (Mode.MkMode Seq.empty Map.empty))
     (ModeSelection.ChooseExactly 1)
 
 -- | CR 603.6a's simplest trigger. The shape does not matter here, only that it
