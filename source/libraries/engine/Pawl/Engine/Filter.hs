@@ -31,11 +31,15 @@ data View = MkView
     -- a Humility'd one (CR 613.1f) does not.
     keywords :: Set.Set Keyword.Keyword,
     power :: Maybe Integer,
-    -- CR 202.3: the candidate's mana value, computed from its printed mana cost
-    -- (CR 202.3a gives a costless object 0). Unlike `power` this is NOT Nothing
-    -- off the battlefield -- a mana cost is printed on the card and rule 202.3
-    -- names no zone -- which is what lets ManaValueAtMost filter a graveyard.
-    -- Nothing only where there is no card to read: a player view.
+    -- CR 202.3: the candidate's mana value (CR 202.3a gives a costless object
+    -- 0). On the battlefield it comes off the CR 613 projection, so CR 707.2's
+    -- copiable mana cost is honoured -- a Clone reports what it copied. Off the
+    -- battlefield it is the printed cost's, and unlike `power` it is NOT Nothing
+    -- there -- a mana cost is printed on the card and rule 202.3 names no zone
+    -- -- which is what lets ManaValueAtMost filter a graveyard.
+    --
+    -- Nothing where there is no card to read: a player view, or an object with
+    -- no card behind it such as an ability on the stack.
     manaValue :: Maybe Integer,
     controller :: Maybe PlayerId.PlayerId,
     -- Which object this view is OF. Nothing for a printed card off the

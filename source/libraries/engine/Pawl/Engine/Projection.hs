@@ -541,15 +541,12 @@ viewOfCharacteristics oid pc controller gs =
       -- Filter.HasKeyword asks only membership.
       Filter.keywords = Map.keysSet (PC.keywords pc),
       Filter.power = PC.power pc,
-      -- CR 202.3 off the printed face, not the projection: no Modification
-      -- writes a mana cost, so there is nothing projected to read. A TOKEN has a
-      -- face (its effect-defined card) with no mana cost, so CR 202.3a gives it
-      -- 0 through the same path a card takes. Nothing only for an object with no
-      -- card at all -- an ability on the stack, whose CR 202.3a zero this does
-      -- not claim (#674). CR 712.8e is why the face comes from
-      -- Game.manaCostFaceOf rather than Game.faceOf: a transformed permanent's
-      -- mana value is its FRONT face's, where everything else here is its back's.
-      Filter.manaValue = fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs),
+      -- CR 202.3 / 707.2 off the PROJECTION, not the printed face: mana cost is
+      -- one of the copiable values, so layer 1 replaces it and a Clone entering
+      -- as a copy of Darksteel Myr reports 3 rather than its own printed 4. The
+      -- seed (baseCharacteristics) is where the printed cost is read and where
+      -- CR 712.8e's front-face rule and CR 708.2a's face-down rule are honoured.
+      Filter.manaValue = PC.manaValue pc,
       Filter.controller = controller,
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
@@ -623,6 +620,8 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
         PC.supertypes = Set.empty,
         PC.keywords = Map.empty,
         PC.colors = Set.empty,
+        -- No card, so no mana cost to read -- which is not CR 202.3a's 0 (#674).
+        PC.manaValue = Nothing,
         PC.power = Nothing,
         PC.toughness = Nothing,
         PC.loyalty = Nothing,
@@ -651,6 +650,16 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
             -- apiece; layer-6 grants add multiplicity on top (CR 702.164b).
             PC.keywords = Map.fromSet (const 1) (Face.keywords face),
             PC.colors = printedColorsOf face,
+            -- CR 202.3, derived here so the rest of the fold -- and every copy
+            -- taken off it (CR 707.2) -- reads a number rather than re-deriving
+            -- one. Game.manaCostFaceOf rather than the `face` bound above, which
+            -- is Game.faceOf's: CR 712.8e reads a transformed permanent's mana
+            -- value off its FRONT face's cost while every other characteristic
+            -- here comes off its back, and CR 708.2a's face-down face (no mana
+            -- cost, so CR 202.3a's 0) is the other case that read handles. A
+            -- TOKEN's effect-defined card has no mana cost either, so it reaches
+            -- 0 down the same path.
+            PC.manaValue = fmap Quantity.manaValueOf (Game.manaCostFaceOf oid gs),
             -- Quantity.evaluate, not Quantity.determine: CR 208.2a's "use 0
             -- instead" belongs to a CDA, and a printed star with none behind it
             -- evaluates to Nothing. A star given its value by an as-enters
