@@ -23,6 +23,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.LastKnown as LastKnown
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import Pawl.Types.Object (Object)
@@ -197,9 +198,24 @@ removeFromZones pid oid gs =
       GameState.stack = filter (/= oid) (GameState.stack gs)
     }
 
-insertIntoZone :: Zone -> PlayerId -> ObjectId -> GameState -> GameState
-insertIntoZone zone pid oid gs = case zone of
-  Zone.Library -> gs {GameState.library = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.library gs)}
+-- CR 401.2: a library is an ORDERED pile, so a library arrival needs the END it
+-- arrives at. The Seq's HEAD is the top -- Event.drawCard takes the head, which
+-- is CR 121.1's "top card of their library" -- so Top prepends and Bottom
+-- appends.
+--
+-- Every other zone ignores the position, because none of them lets an effect
+-- pick an end: the battlefield, exile and the command zone are Sets (CR 400.1's
+-- shared zones, with no order at all), CR 402.3 lets a player arrange their hand
+-- "in any convenient fashion", and the graveyard and the stack each have ONE
+-- arrival rule of their own -- CR 404.1's "on top of its owner's graveyard" and
+-- CR 405.2's "on top of all objects already there".
+insertIntoZone :: Zone -> LibraryPosition.LibraryPosition -> PlayerId -> ObjectId -> GameState -> GameState
+insertIntoZone zone position pid oid gs = case zone of
+  Zone.Library ->
+    let onto = case position of
+          LibraryPosition.Top -> (Seq.><)
+          LibraryPosition.Bottom -> flip (Seq.><)
+     in gs {GameState.library = Map.insertWith onto pid (Seq.singleton oid) (GameState.library gs)}
   Zone.Hand -> gs {GameState.hand = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.hand gs)}
   Zone.Graveyard -> gs {GameState.graveyard = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.graveyard gs)}
   Zone.Battlefield -> gs {GameState.battlefield = Set.insert oid (GameState.battlefield gs)}

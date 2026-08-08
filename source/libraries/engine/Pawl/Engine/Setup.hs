@@ -22,6 +22,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.HandActionPerformer (HandActionPerformer)
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -179,7 +180,7 @@ createDeck pid deck = do
     oid <- createCard pid printing
     State.modify' $ \gs ->
       let moved =
-            Game.insertIntoZone Zone.Command pid oid (Game.removeFromZones pid oid gs)
+            Game.insertIntoZone Zone.Command LibraryPosition.defaultValue pid oid (Game.removeFromZones pid oid gs)
           -- Object.zone tracks the zone sets, so it moves with them. A hand-written
           -- move outside Event.changeZone for createCard's own reason: this is the
           -- game being built, so there is no CR 400.7 event to emit and nothing to

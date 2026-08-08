@@ -13,6 +13,7 @@ import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.Codec.LibraryPosition as LibraryPosition
 import qualified Pawl.Codec.ManaProduction as ManaProduction
 import qualified Pawl.Codec.MillTally as MillTally
 import qualified Pawl.Codec.Modification as Modification
@@ -41,6 +42,7 @@ import qualified Pawl.Types.Effect as Effect
 -- already took here: the names never collide, since a codec module exports
 -- functions and a type module exports the type moveTail's signature needs.
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Zone as Zone
@@ -70,24 +72,27 @@ toJson codec e = case e of
   Effect.TurnFaceDown s -> Common.tagged "TurnFaceDown" (Just (SlotName.toJson s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (SlotName.toJson s))
   Effect.Counter s -> Common.tagged "Counter" (Just (SlotName.toJson s))
-  -- MoveToZone's payload is the ObjectRef and the destination zone, then three
+  -- MoveToZone's payload is the ObjectRef and the destination zone, then four
   -- independently elided extras where Create has two: the EntryRiders are
   -- dropped when they are the CR 110.5b default, the bound slot when there is
-  -- none, and CR 113.6m's origin zone when the effect states none. Everything
+  -- none, CR 113.6m's origin zone when the effect states none, and the library
+  -- position when it is the default end. Everything
   -- after the destination is
   -- therefore optional, and told apart on decode by JSON TYPE rather than by
-  -- position -- a slot name is a string, a zone is a tagged object, and the
-  -- riders are an object that is not one. `moveTail` is the decoding half.
+  -- position -- a slot name is a string, a zone and a library position are
+  -- tagged objects with disjoint tags, and the riders are an object that is
+  -- neither. `moveTail` is the decoding half.
   --
   -- The two POSITIONAL elements are exempt from that: an ObjectRef is itself
   -- told apart by JSON type (a string is InSlot, an object is EachMatching), so
   -- every card written before the ref widened still emits the same bare string.
-  Effect.MoveToZone r z riders ms mo ->
+  Effect.MoveToZone r z riders ms mo p ->
     Common.tagged "MoveToZone" . Just . Common.array $
       [ObjectRef.toJson r, Zone.toJson z]
         <> (if riders == EntryRiders.defaultValue then [] else [EntryRiders.toJson riders])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
         <> fmap Zone.toJson (Maybe.maybeToList mo)
+        <> (if p == LibraryPosition.defaultValue then [] else [LibraryPosition.toJson p])
   Effect.Draw r q -> Common.tagged "Draw" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   -- The tally is ELIDED when absent, as Destroy's bound-count slot is, so a mill
   -- nothing looks back at keeps its two-element payload.
@@ -154,39 +159,52 @@ toJson codec e = case e of
 
 -- Everything a MoveToZone payload may carry after its ObjectRef and its
 -- destination zone: the EntryRiders (CR 110.5b), the slot binding the destination
--- incarnation (CR 400.7), and the origin zone the effect names (CR 113.6m).
--- Each is optional, so they are read by JSON TYPE rather than by position -- a
--- string is the slot, and an object is the origin zone if it decodes as one and
--- the riders otherwise.
+-- incarnation (CR 400.7), the origin zone the effect names (CR 113.6m), and the
+-- end a library destination arrives at (CR 401.2). Each is optional, so they are
+-- read by JSON TYPE rather than by position -- a string is the slot, and an
+-- object is the origin zone or the library position if it decodes as one and the
+-- riders otherwise.
 --
--- ZONE FIRST is what makes that order-independent rather than merely ordered:
--- EntryRiders.fromJson defaults every field it does not find, so it would accept
--- a zone object and silently return the default riders, while Zone.fromJson
--- accepts nothing but its own tagged shape.
+-- ZONE AND POSITION FIRST is what makes that order-independent rather than
+-- merely ordered: EntryRiders.fromJson defaults every field it does not find, so
+-- it would accept either tagged object and silently return the default riders,
+-- while Zone.fromJson and LibraryPosition.fromJson accept nothing but their own
+-- tagged shapes. Those two shapes cannot be confused with each other either --
+-- no zone is named Top or Bottom.
 --
 -- A REPEATED element is an error rather than last-one-wins. Two origin zones is
 -- a card file saying something CR 113.6m's "a particular zone" cannot mean, and
 -- two of anything else is as likely a typo.
-moveTail :: [Value.Value] -> Either Text.Text (EntryRiders.EntryRiders, Maybe SlotName.SlotName, Maybe Zone.Zone)
-moveTail = go Nothing Nothing Nothing
+moveTail :: [Value.Value] -> Either Text.Text (EntryRiders.EntryRiders, Maybe SlotName.SlotName, Maybe Zone.Zone, LibraryPosition.LibraryPosition)
+moveTail = go Nothing Nothing Nothing Nothing
   where
-    go mRiders mSlot mOrigin values = case values of
-      [] -> Right (Maybe.fromMaybe EntryRiders.defaultValue mRiders, mSlot, mOrigin)
+    go mRiders mSlot mOrigin mPosition values = case values of
+      [] ->
+        Right
+          ( Maybe.fromMaybe EntryRiders.defaultValue mRiders,
+            mSlot,
+            mOrigin,
+            Maybe.fromMaybe LibraryPosition.defaultValue mPosition
+          )
       v : rest -> case v of
         Value.String _ -> case mSlot of
           Just _ -> Left . Text.pack $ "MoveToZone names two bound slots"
           Nothing -> do
             slot <- SlotName.fromJson v
-            go mRiders (Just slot) mOrigin rest
+            go mRiders (Just slot) mOrigin mPosition rest
         _ -> case Zone.fromJson v of
           Right zone -> case mOrigin of
             Just _ -> Left . Text.pack $ "MoveToZone names two origin zones"
-            Nothing -> go mRiders mSlot (Just zone) rest
-          Left _ -> case mRiders of
-            Just _ -> Left . Text.pack $ "MoveToZone names two sets of entry riders"
-            Nothing -> do
-              riders <- EntryRiders.fromJson v
-              go (Just riders) mSlot mOrigin rest
+            Nothing -> go mRiders mSlot (Just zone) mPosition rest
+          Left _ -> case LibraryPosition.fromJson v of
+            Right position -> case mPosition of
+              Just _ -> Left . Text.pack $ "MoveToZone names two library positions"
+              Nothing -> go mRiders mSlot mOrigin (Just position) rest
+            Left _ -> case mRiders of
+              Just _ -> Left . Text.pack $ "MoveToZone names two sets of entry riders"
+              Nothing -> do
+                riders <- EntryRiders.fromJson v
+                go (Just riders) mSlot mOrigin mPosition rest
 
 fromJson :: (Value.Value -> Either Text.Text card) -> Value.Value -> Either Text.Text (Effect.Effect card)
 fromJson decode value = do
@@ -228,9 +246,9 @@ fromJson decode value = do
     -- since that zone and the EntryRiders are both objects.
     "MoveToZone" -> case mv of
       Just (Value.Array (Array.MkArray (r : z : rest))) -> do
-        (riders, mSlot, mOrigin) <- moveTail rest
-        Effect.MoveToZone <$> ObjectRef.fromJson r <*> Zone.fromJson z <*> pure riders <*> pure mSlot <*> pure mOrigin
-      _ -> Left . Text.pack $ "MoveToZone expects [objectRef, zone], optionally with EntryRiders, a slot and/or an origin zone"
+        (riders, mSlot, mOrigin, position) <- moveTail rest
+        Effect.MoveToZone <$> ObjectRef.fromJson r <*> Zone.fromJson z <*> pure riders <*> pure mSlot <*> pure mOrigin <*> pure position
+      _ -> Left . Text.pack $ "MoveToZone expects [objectRef, zone], optionally with EntryRiders, a slot, an origin zone and/or a library position"
     "Draw" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Draw expects [playerRef, quantity]"

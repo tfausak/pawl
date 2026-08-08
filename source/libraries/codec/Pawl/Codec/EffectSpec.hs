@@ -28,6 +28,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.MillTally as MillTally
@@ -210,12 +211,12 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AttachTarget (SlotName.MkSlotName (Text.pack "target")) (Filter.HasCardType CardType.Creature))
       """ {"type":"AttachTarget","value":["target",{"type":"HasCardType","value":{"type":"Creature"}}]} """
-  -- MoveToZone's payload is the ObjectRef and the destination zone, then three
-  -- independently elided extras -- the EntryRiders, the bound slot and CR
-  -- 113.6m's origin zone -- so it is told apart by JSON TYPE alone, at every
-  -- length. A string is the bound slot; an object is the origin zone if it
-  -- decodes as a zone and the riders otherwise, which is why the last two cases
-  -- put a zone and a riders object side by side.
+  -- MoveToZone's payload is the ObjectRef and the destination zone, then four
+  -- independently elided extras -- the EntryRiders, the bound slot, CR 113.6m's
+  -- origin zone and CR 401.2's library position -- so it is told apart by JSON
+  -- TYPE alone, at every length. A string is the bound slot; an object is the
+  -- origin zone or the library position if it decodes as one and the riders
+  -- otherwise, which is why the cases below put those objects side by side.
   --
   -- The ObjectRef in first position is told apart the same way -- a string is
   -- InSlot, an object is EachMatching -- so every case below but the last emits
@@ -229,25 +230,25 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing Nothing)
+      (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPosition.defaultValue)
       """ {"type":"MoveToZone","value":["target",{"type":"Hand"}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone slot Zone.Exile EntryRiders.defaultValue (Just boundSlot) Nothing)
+      (Effect.MoveToZone slot Zone.Exile EntryRiders.defaultValue (Just boundSlot) Nothing LibraryPosition.defaultValue)
       """ {"type":"MoveToZone","value":["target",{"type":"Exile"},"exiled"]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone bound Zone.Battlefield attacking Nothing Nothing)
+      (Effect.MoveToZone bound Zone.Battlefield attacking Nothing Nothing LibraryPosition.defaultValue)
       """ {"type":"MoveToZone","value":["exiled",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true}]} """
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone bound Zone.Battlefield attacking (Just boundSlot) Nothing)
+      (Effect.MoveToZone bound Zone.Battlefield attacking (Just boundSlot) Nothing LibraryPosition.defaultValue)
       """ {"type":"MoveToZone","value":["exiled",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled"]} """
     -- CR 113.6m's origin zone alone, the shape a card states when its effect
     -- moves its own source out of a named zone with nothing else to say.
@@ -255,7 +256,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing (Just Zone.Graveyard))
+      (Effect.MoveToZone slot Zone.Hand EntryRiders.defaultValue Nothing (Just Zone.Graveyard) LibraryPosition.defaultValue)
       """ {"type":"MoveToZone","value":["target",{"type":"Hand"},{"type":"Graveyard"}]} """
     -- Reassembling Skeleton's own shape: riders AND an origin, two objects in a
     -- row, which only the type-directed read tells apart.
@@ -263,23 +264,43 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.MoveToZone slot Zone.Battlefield attacking Nothing (Just Zone.Graveyard))
+      (Effect.MoveToZone slot Zone.Battlefield attacking Nothing (Just Zone.Graveyard) LibraryPosition.defaultValue)
       """ {"type":"MoveToZone","value":["target",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},{"type":"Graveyard"}]} """
-    -- All three extras at once, so the encoder's order is pinned and the reader
-    -- is shown to need none of it.
+    -- All four extras at once, so the encoder's order is pinned and the reader
+    -- is shown to need none of it. The origin zone and the library position sit
+    -- next to each other here, which is the pair only their disjoint tags tell
+    -- apart.
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone slot Zone.Battlefield attacking (Just boundSlot) (Just Zone.Exile))
-      """ {"type":"MoveToZone","value":["target",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled",{"type":"Exile"}]} """
+      (Effect.MoveToZone slot Zone.Battlefield attacking (Just boundSlot) (Just Zone.Exile) LibraryPosition.Top)
+      """ {"type":"MoveToZone","value":["target",{"type":"Battlefield"},{"tapped":{"type":"Tapped"},"attacking":true},"exiled",{"type":"Exile"},{"type":"Top"}]} """
+    -- Griptide's shape: a library destination with the end it arrives at, and
+    -- nothing else. The position is the only extra, so this is what proves it is
+    -- not read positionally as the riders.
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MoveToZone slot Zone.Library EntryRiders.defaultValue Nothing Nothing LibraryPosition.Top)
+      """ {"type":"MoveToZone","value":["target",{"type":"Library"},{"type":"Top"}]} """
+    -- And the default end is ELIDED, so Unsummon's two-element payload is
+    -- unchanged by the field's arrival. Decoding that payload is what fills it
+    -- back in.
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.MoveToZone slot Zone.Library EntryRiders.defaultValue Nothing Nothing LibraryPosition.Bottom)
+      """ {"type":"MoveToZone","value":["target",{"type":"Library"}]} """
     -- Evacuation's shape: an EachMatching ref in first position, which is an
     -- object where every case above is a string.
     Common.assertJsonCodec
       s
       toJson
       fromJson
-      (Effect.MoveToZone (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Zone.Hand EntryRiders.defaultValue Nothing Nothing)
+      (Effect.MoveToZone (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)) Zone.Hand EntryRiders.defaultValue Nothing Nothing LibraryPosition.defaultValue)
       """ {"type":"MoveToZone","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"Hand"}]} """
   -- Both of Draw's PlayerRef shapes: a controller draw and a targeted one.
   Spec.it s "Draw" $ do

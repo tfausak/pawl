@@ -2776,6 +2776,90 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
     Spec.assertEqWith s "two distinct cards discarded" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 2
     Spec.assertEqWith s "one card left in bob's hand" (S.handSize S.bob after) 1
 
+-- Griptide is "Put target creature on top of its owner's library", the pool's
+-- producer for a library arrival that is NOT the bottom (#989). Everything the
+-- group asserts is one card's worth of rules: CR 400.3 picks the library (its
+-- OWNER's, not the caster's), CR 400.7 mints the incarnation that lands in it,
+-- and CR 401.2 keeps the order a thing only the position can decide.
+libraryPositionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
+  -- Three cards deep, top to bottom, because with ONE card the top and the
+  -- bottom are the same index and the two positions are indistinguishable; and
+  -- aimed at BOB's creature, because against her own "its owner's library" and
+  -- "the caster's library" would name the same library.
+  --
+  -- Three is also deep enough that the draw below is an ordinary draw rather
+  -- than CR 104.3c's loss: bob draws one of four.
+  Spec.it s "CR 400.3 / 401.2 whole card: Griptide puts the creature on TOP of its OWNER's library, and its owner draws it" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    griptide <- S.printingOf s registry "Griptide"
+    -- S.addLibraryCard puts each card ON TOP, so the LAST seeded is the head.
+    let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay island 4)
+        (deepId, g2) = S.addLibraryCard bolt S.bob g1
+        (middleId, g3) = S.addLibraryCard bolt S.bob g2
+        (oldTopId, g4) = S.addLibraryCard bolt S.bob g3
+        (gs, spellId) = S.handOne griptide g4
+        aimAtPiker :: Prompt.Prompt r -> r
+        aimAtPiker p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure aimAtPiker gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure aimAtPiker cast Stack.resolveTop)
+        -- CR 400.7 mints a FRESH id at the destination, so asserting the
+        -- battlefield id is gone is not the same claim as asserting the new one
+        -- is on top. Both are made.
+        bobsLibrary = Game.zoneMembers Zone.Library S.bob after
+    Spec.assertBool s (not (S.onBattlefield pikerId after)) "the creature left the battlefield"
+    Spec.assertEqWith s "bob's library grew by exactly one" (length bobsLibrary) 4
+    Spec.assertEqWith s "alice's library is untouched" (Game.zoneMembers Zone.Library S.alice after) []
+    case bobsLibrary of
+      arrived : rest -> do
+        Spec.assertEqWith
+          s
+          "and the card at INDEX 0 is the returned creature"
+          (fmap S.nameOf (Game.cardOf arrived after))
+          (Just (CardName.MkCardName (Text.pack "Goblin Piker")))
+        Spec.assertEqWith s "with the previous top card now at index 1" rest [oldTopId, middleId, deepId]
+        -- What makes the position OBSERVABLE rather than an internal detail:
+        -- CR 121.1's draw puts "the top card of their library" into the hand, so
+        -- a Piker in bob's hand is the rule and a Bolt is the bottom-of-library
+        -- behaviour this closes.
+        let drawn =
+              S.runPure aimAtPiker after $ do
+                State.modify' $ \g -> g {GameState.activePlayer = S.bob, GameState.turnNumber = 2}
+                S.drawStep
+        -- By NAME, not by id: the draw is itself a zone change, so CR 400.7
+        -- mints a second incarnation and the card in hand is not `arrived`
+        -- either. bob's library holds nothing but Bolts, so the name is what
+        -- tells the returned creature from the card that was on top before it.
+        Spec.assertEqWith
+          s
+          "bob draws it in his draw step"
+          (fmap (fmap S.nameOf . (`Game.cardOf` drawn)) (Game.zoneMembers Zone.Hand S.bob drawn))
+          [Just (CardName.MkCardName (Text.pack "Goblin Piker"))]
+        Spec.assertEqWith s "leaving the three he started with" (Game.zoneMembers Zone.Library S.bob drawn) [oldTopId, middleId, deepId]
+      [] -> Spec.assertFailure s "bob's library should hold the seeded cards"
+  -- The control: Unsummon states no library position at all, so its bounce must
+  -- be exactly what it was before the field existed.
+  Spec.it s "CR 400.3 the control: Unsummon on the same board still returns the creature to its owner's HAND" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay island 4)
+        (_, g2) = S.addLibraryCard bolt S.bob g1
+        (gs, spellId) = S.handOne unsummon g2
+        aimAtPiker :: Prompt.Prompt r -> r
+        aimAtPiker p = case p of
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure aimAtPiker gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure aimAtPiker cast Stack.resolveTop)
+    Spec.assertEqWith s "one card in bob's hand" (S.handSize S.bob after) 1
+    Spec.assertEqWith s "and his library is the one card it was" (length (Game.zoneMembers Zone.Library S.bob after)) 1
+
 drawCardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 drawCardSpec s registry = Spec.describe s "DrawCard" $ do
   Spec.it s "CR 121.2 drawCard moves the top library card to hand" $ do
@@ -4648,6 +4732,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   fizzleSpec s registry
   indestructibleSpec s registry
   zoneChangeSpec s registry
+  libraryPositionSpec s registry
   drawCardSpec s registry
   loseLifeSpec s registry
   greatestSpec s registry

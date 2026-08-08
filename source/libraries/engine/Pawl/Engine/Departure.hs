@@ -24,6 +24,7 @@ import Pawl.Types.Departure (Departure)
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
@@ -331,7 +332,7 @@ remainingControlledExiled pid gs =
         Nothing -> g
         Just obj ->
           let g1 = Game.removeFromZones (Object.owner obj) oid g
-              g2 = Game.insertIntoZone Zone.Exile (Object.owner obj) oid g1
+              g2 = Game.insertIntoZone Zone.Exile LibraryPosition.defaultValue (Object.owner obj) oid g1
            in g2 {GameState.objects = Map.insert oid (Object.newIncarnation obj) {Object.zone = Zone.Exile} (GameState.objects g2)}
    in List.foldl' exileOne gs theirs
 

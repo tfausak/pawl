@@ -47,7 +47,7 @@ zoneFunctionedFrom effect = case effect of
   -- A swept set is never one object, so EachMatching answers Nothing however the
   -- card file states the origin -- the same inert card-data error the note above
   -- describes for a move of somebody else's permanent.
-  Effect.MoveToZone ref _ _ _ origin -> case ref of
+  Effect.MoveToZone ref _ _ _ origin _ -> case ref of
     ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
     ObjectRef.EachMatching _ -> Nothing
   Effect.DealDamage _ _ -> Nothing
