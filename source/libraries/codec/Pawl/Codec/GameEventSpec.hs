@@ -22,7 +22,9 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChange as ZoneChange
 
--- | One case per GameEvent constructor. The Moved/Revealed cases carry a
+-- | At least one case per GameEvent constructor. HalfUnlocked gets two, since CR
+-- 709.5i's flag is a Bool whose two values are what that rule turns on and a
+-- codec that dropped it would round-trip one of them unchanged. The Moved/Revealed cases carry a
 -- stand-in snapshot: this sublibrary sits above Pawl.Registry and Pawl.Engine,
 -- so it cannot build a real one. The registry-backed round-trips over real
 -- snapshots stay in Pawl.CodecIntegrationSpec.
@@ -151,14 +153,24 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       """ {"type":"CountersRemoved","value":[3,{"type":"Defense"},2,0]} """
   -- CR 709.5c's designation, recorded by the permanent and the DOOR: CR 709.5h
   -- tells two unlock triggers on one Room apart by the half's name, so the pair
-  -- has to survive the round trip together.
+  -- has to survive the round trip together. The third field is CR 709.5i's
+  -- "fully unlocks" flag, and BOTH directions of it are here, since it is exactly
+  -- what the two rules disagree about: False is one door of two opening, True is
+  -- the last one.
   Spec.it s "HalfUnlocked" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.HalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Steaming Sauna")))
-      """ {"type":"HalfUnlocked","value":[4,"Steaming Sauna"]} """
+      (GameEvent.HalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Roaring Furnace")) False)
+      """ {"type":"HalfUnlocked","value":[4,"Roaring Furnace",false]} """
+  Spec.it s "HalfUnlocked carrying CR 709.5i's fully-unlocked flag" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.HalfUnlocked (ObjectId.MkObjectId 4) (CardName.MkCardName (Text.pack "Steaming Sauna")) True)
+      """ {"type":"HalfUnlocked","value":[4,"Steaming Sauna",true]} """
   -- CR 708.7. One id and no more: CR 708.8 makes turning face up a change to one
   -- permanent, and the payload says only which.
   Spec.it s "TurnedFaceUp" $

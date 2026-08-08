@@ -574,7 +574,7 @@ honourShuffle offered answer =
 castOf :: GameEvent -> Maybe PlayerId
 castOf event = case event of
   GameEvent.SpellCast pid _ -> Just pid
-  GameEvent.HalfUnlocked _ _ -> Nothing
+  GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.Moved _ _ -> Nothing
   GameEvent.DamageDealt _ -> Nothing

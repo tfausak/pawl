@@ -3591,7 +3591,17 @@ representativeEvents cond =
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
-        TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked departed half)
+        TriggerCondition.SelfHalfUnlocked half -> one (GameEvent.HalfUnlocked departed half False)
+        -- CR 709.5i's own event, with the flag SET -- an unset one matches
+        -- nothing, and would pin the floor against an event this condition does
+        -- not admit.
+        TriggerCondition.RoomFullyUnlocked _ -> one (GameEvent.HalfUnlocked departed (CardName.MkCardName (Text.pack "Steaming Sauna")) True)
+        -- EVERY event any branch admits, concatenated, which is what makes the
+        -- intersection below the honest floor for an AnyOf: a slot one branch
+        -- binds and another does not must not be claimed.
+        TriggerCondition.AnyOf conditions -> case conditions of
+          [] -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
+          c : cs -> Foldable.foldr1 (<>) (fmap representativeEvents (c NonEmpty.:| cs))
         -- CR 708.7's own event, and the only one this condition admits, on the
         -- BEARER -- so the pair really matches.
         TriggerCondition.SelfTurnedFaceUp -> one (GameEvent.TurnedFaceUp departed)
@@ -3624,6 +3634,13 @@ everyTriggerCondition =
     TriggerCondition.SelfLastCounterRemoved CounterKind.Defense,
     TriggerCondition.SpellCast Filter.Type.IsSource,
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
+    TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
+    -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
+    -- `became` while RoomFullyUnlocked binds nothing, so the intersection is
+    -- EMPTY -- which is the case the union-versus-intersection call in
+    -- Event.eventBindingSlots turns on. A union would claim `became` here and the
+    -- pin below would catch it.
+    TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
     TriggerCondition.SelfTurnedFaceUp
   ]
 

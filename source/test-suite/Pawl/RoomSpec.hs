@@ -6,9 +6,11 @@
 -- Pawl.Engine.Event.changeZoneAttaching writes the entering designation and
 -- records CR 709.5h's event, Pawl.Engine.Room offers and carries out CR
 -- 116.2m/709.5e's special action, and Pawl.Engine.Action/Pawl.Engine.Engine put
--- it on the menu.
+-- it on the menu. CR 709.5i's "fully unlocks" is here too, which reaches
+-- Event.fullyUnlockedAfter at both writers of an unlocked designation and
+-- Event.matchesTrigger's RoomFullyUnlocked and AnyOf arms.
 --
--- ONE printed card: Roaring Furnace // Steaming Sauna, DSK 230. Picked because
+-- TWO printed cards. Roaring Furnace // Steaming Sauna, DSK 230, picked because
 -- its two doors disagree about everything a reader can see -- {1}{R} against
 -- {3}{U}{U}, a triggered ability that fires on the door opening against a
 -- persistent pair (a static "you have no maximum hand size" and an end-step
@@ -16,11 +18,13 @@
 -- assertion here rather than in one narrow one. The persistent half is what
 -- makes the subtraction observable at all: a door whose only text is "when you
 -- unlock this door" looks the same whether its text was subtracted or its
--- trigger simply did not match.
+-- trigger simply did not match. And Balemurk Leech, DSK 84, which is the pool's
+-- one CR 709.5i trigger and the one card whose ability watches a Room it is not.
 --
 -- THREE SEATS, so "target creature an opponent controls" cannot coincide with
 -- "a creature you control": bob holds the only legal target and carol holds
--- none.
+-- none -- and so that CR 109.5's "each opponent" cannot coincide with "each
+-- player", which is what the CR 709.5i case turns on.
 module Pawl.RoomSpec where
 
 import qualified Data.List as List
@@ -309,6 +313,84 @@ spec s registry = Spec.describe s "Room" $ do
         Spec.assertEqWith s "the RED door is what is shut" (unlocksOffered after) [(permId, furnaceName)]
         let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.alice permId furnaceName))))
         Spec.assertEqWith s "and opening it fires the trigger" (S.damageOf wallId opened) (Just 3)
+      other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
+  -- CR 709.5i: "Some abilities trigger when a player 'fully unlocks' a permanent
+  -- with a shared type line. Such an ability triggers when that permanent has one
+  -- of the two unlocked designations and gets the other, or when it has neither
+  -- designation and gains both."
+  --
+  -- Balemurk Leech, DSK 84, {1}{B} Creature -- Leech 2/2: "Eerie -- Whenever an
+  -- enchantment you control enters and whenever you fully unlock a Room, each
+  -- opponent loses 1 life." Eerie is an ABILITY WORD (CR 207.2c: ability words
+  -- "have no special rules meaning"), so this is CR 603.1b's "more than one
+  -- trigger condition" on ONE ability -- Pawl.Types.TriggerCondition's AnyOf --
+  -- rather than two abilities.
+  --
+  -- THREE SEATS carry the whole weight of "each opponent": on two seats "each
+  -- opponent", "an opponent" and "each player" all coincide. alice's life total
+  -- is asserted in both directions below, and it is the single assertion that
+  -- separates CR 109.5's Opponent from EachPlayer.
+  --
+  -- The shape is a negative sandwiched between two positives on ONE board:
+  --
+  --   * the Room enters as an Enchantment alice controls, so the FIRST arm of
+  --     the AnyOf fires and each opponent drops to 19;
+  --   * that same board is the negative -- CR 709.5d gave the permanent its
+  --     FIRST designation, not its second, so CR 709.5i is not satisfied and the
+  --     Leech fired exactly once. 19 and not 18 is the whole assertion;
+  --   * CR 116.2m/709.5e's special action opens the other door, the permanent
+  --     "has one of the two unlocked designations and gets the other", and the
+  --     SECOND arm fires once for 18.
+  --
+  -- The negative discriminates only because the third step is the positive on
+  -- the same trigger and the same board: without it, an engine that never fired
+  -- the fully-unlocked arm at all would pass step two.
+  --
+  -- The Room's own CR 709.5h trigger and Eerie fire simultaneously as the Room
+  -- enters, and CR 603.3b lets alice order them on the stack. Every assertion is
+  -- therefore about the state after everything has resolved, never about the
+  -- order. The wall's damage is asserted alongside, so a board on which nothing
+  -- happened at all cannot pass.
+  --
+  -- Life totals 20/19/18 are distinct from the Leech's 2/2 and from Roaring
+  -- Furnace's 3 damage, so no assertion here can be satisfied by the wrong
+  -- quantity.
+  Spec.it s "CR 709.5i fully unlocking a Room fires once, and only on the second door" $ do
+    (roomId, wallId, gs) <- setUp s registry
+    leech <- S.printingOf s registry "Balemurk Leech"
+    let (_, board) = S.addCreature leech S.alice gs
+        after = castDoor furnaceName roomId board
+    -- CR 603.6a through the FIRST arm: a Room is an Enchantment (CR 709.5a
+    -- leaves the shared type line alone), and alice controls it.
+    Spec.assertEqWith s "the enchantment entering costs bob a life" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "and carol a life" (S.lifeOf S.carol after) (Just 19)
+    -- CR 109.5: "each opponent" is every player who is not the ability's
+    -- controller, and alice is not one of them.
+    Spec.assertEqWith s "alice loses nothing" (S.lifeOf S.alice after) (Just 20)
+    -- The board is demonstrably live rather than inert: the Room's own CR 709.5h
+    -- trigger resolved on the way in.
+    Spec.assertEqWith s "and the Room's own trigger still dealt its damage" (S.damageOf wallId after) (Just 3)
+    case roomPermanent after of
+      [permId] -> do
+        -- THE NEGATIVE. One designation, and it is the permanent's FIRST -- CR
+        -- 709.5i wants the OTHER designation arriving on a permanent that
+        -- already has one. The 19s above are the Leech having fired once, not
+        -- twice.
+        Spec.assertEqWith
+          s
+          "CR 709.5d gave one designation, so CR 709.5i is not satisfied"
+          (fmap Object.unlockedHalves (Game.lookupObject permId after))
+          (Just (Set.singleton furnaceName))
+        let opened = resolveAll (settle (snd (Engine.runGamePure S.identityAnswer after (Room.unlock S.alice permId saunaName))))
+        Spec.assertEqWith
+          s
+          "the control: CR 709.5e opened the second door"
+          (fmap Object.unlockedHalves (Game.lookupObject permId opened))
+          (Just (Set.fromList [furnaceName, saunaName]))
+        -- CR 709.5i fires ONCE, so one more life apiece and no more.
+        Spec.assertEqWith s "fully unlocking costs bob one more life" (S.lifeOf S.bob opened) (Just 18)
+        Spec.assertEqWith s "and carol one more" (S.lifeOf S.carol opened) (Just 18)
+        Spec.assertEqWith s "and alice still nothing" (S.lifeOf S.alice opened) (Just 20)
       other -> Spec.assertFailure s ("expected one Room permanent, got " <> show (length other))
   -- CR 116.2m / 709.5e's TIMING: "A player can take this action any time they
   -- have priority and the stack is empty during a main phase of their turn."
