@@ -3498,6 +3498,80 @@ presenceOfTheMasterSpec s registry =
           Spec.assertEqWith s "bob's graveyard is untouched" (graveyardOf S.bob after) 0
           Spec.assertEqWith s "and carol's" (graveyardOf S.carol after) 0
 
+-- CR 601.2i's trigger reading back the PLAYER it watched, which is the other
+-- half of the event: Binding.triggerPlayer stamped off GameEvent.SpellCast's
+-- PlayerId, alongside the spell Binding.castSpell already holds.
+--
+-- Kambal, Consul of Allocation, {1}{W}{B} Legendary Creature -- Human Advisor
+-- 2/3: "Whenever an opponent casts a noncreature spell, that player loses 2 life
+-- and you gain 2 life." The plainest printing that names the caster and reaches
+-- them through the EVENT rather than through the spell -- CR 112.2 makes the
+-- spell's controller derivable from the spell, but CR 608.2h leaves the spell
+-- possibly gone by the time the ability resolves, so the player is bound in its
+-- own right.
+--
+-- "An opponent casts" needs nothing bound: Event.matchesTrigger's SpellCast arm
+-- hands the event's caster to Projection.viewOfSpell as the spell's controller
+-- (CR 601.2a), so Filter.ControlledBy Opponent answers the printed relation
+-- against CR 109.5's "you" (CR 603.3a). It is the PAYLOAD's "that player" that
+-- needs the slot.
+--
+-- THREE SEATS, and this is the test that needs them most: at two players "that
+-- player" and "each opponent" name the same person, so a two-handed board cannot
+-- tell Kambal's PlayerRef.InSlot thatPlayer from a wrong PlayerRef.Relative
+-- Opponent. carol is the opponent who is NOT the caster, and her life total is
+-- what separates the two authorings.
+--
+-- ONE TUPLE, not three assertions: the card prints 2 for both halves, so alice's
+-- +2 and bob's -2 are the same magnitude and separate checks could agree for the
+-- wrong reason. CR 119.3 is what moves each total.
+--
+-- Boil, {3}{R} Instant "Destroy all Islands", is the noncreature spell: it
+-- TARGETS NOTHING, so no answerer choice enters the fixture, and no player here
+-- controls an Island, so its resolution moves nothing an assertion reads.
+kambalSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+kambalSpec s registry =
+  let -- alice bears Kambal and nothing else; bob gets four Mountains, which is
+      -- Boil's {3}{R} and Goblin Piker's {2}{R}. carol gets nothing at all: she
+      -- is the third seat, not a caster.
+      board mountain kambal =
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+            withLands = addLands S.bob 4 S.threePlayerGame
+            (_, withKambal) = S.addCreature kambal S.alice withLands
+         in withKambal
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "SpellCast binds the caster" $ do
+        -- THE case: the payload reaches the player the EVENT named, and not the
+        -- other opponent. A wrong PlayerRef.Relative Opponent authoring drops
+        -- carol to 18 as well, which this tuple sees.
+        Spec.it s "CR 112.2 Kambal's 'that player' is the opponent who cast it" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          kambal <- S.printingOf s registry "Kambal, Consul of Allocation"
+          boil <- S.printingOf s registry "Boil"
+          let (boilId, gs) = S.addHandCard boil S.bob (board mountain kambal)
+              after = castAndResolve S.bob boilId gs
+          Spec.assertEqWith s "everyone starts at 20" (lives gs) (Just 20, Just 20, Just 20)
+          Spec.assertEqWith s "CR 119.3: bob loses 2, alice gains 2, carol is untouched" (lives after) (Just 22, Just 18, Just 20)
+        -- The "noncreature" half of the Filter, moved on its own: the same
+        -- caster, a spell of the wrong card type. Without it a condition that
+        -- admitted every opponent's cast would be indistinguishable.
+        Spec.it s "CR 601.2i a CREATURE spell fires nothing" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          kambal <- S.printingOf s registry "Kambal, Consul of Allocation"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, gs) = S.addHandCard piker S.bob (board mountain kambal)
+              after = castAndResolve S.bob pikerId gs
+          -- Positive control: the cast really happened and really resolved, so
+          -- the silence below is the Filter's answer rather than a fixture that
+          -- never cast anything.
+          Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.bob after) 1
+          Spec.assertEqWith s "and nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
+
 -- The events a trigger condition GENUINELY fires on (Event.matchesTrigger's own
 -- arms are the spec), so eventBindings is exercised through its matching arm
 -- rather than through its `_ -> Map.empty` fallthrough. A pair that did not
@@ -3584,9 +3658,10 @@ representativeEvents cond =
         -- CR 310.11b: a removal on the BEARER that took the last counter, so the
         -- event really matches the condition Event.matchesTrigger is asked about.
         TriggerCondition.SelfLastCounterRemoved kind -> one (GameEvent.CountersRemoved departed kind 1 0)
-        -- CR 601.2i's own event, and the only one this condition admits. The
-        -- spell is bound whichever id it names, the caster is not, so the two
-        -- sides agree on `thatSpell` alone.
+        -- CR 601.2i's own event, and the only one this condition admits. Both
+        -- halves are bound whichever ids the event names -- the spell under
+        -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
+        -- on the pair.
         TriggerCondition.SpellCast _ -> one (GameEvent.SpellCast S.alice arrived)
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
@@ -5214,4 +5289,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
   presenceOfTheMasterSpec s registry
+  kambalSpec s registry
   handOfThePraetorsSpec s registry

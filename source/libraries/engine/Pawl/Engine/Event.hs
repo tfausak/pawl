@@ -2800,18 +2800,25 @@ eventBindings cond event = case (cond, event) of
   -- it can be gone -- the case CR 608.2h is about -- which is the payload's
   -- business rather than this function's: CR 701.6a's funnel no-ops on a dead id.
   --
-  -- The CASTER gets no slot alongside it. Every card in the pool that names a
-  -- player under this condition means the spell's controller, which CR 112.2
-  -- makes derivable from the spell itself; a slot would be a second name for
-  -- one player until a card says otherwise (#913).
+  -- The CASTER alongside it, under the reserved slot CR 701.9a's discard trigger
+  -- and CR 702.70a's poisonous already stamp: Kambal, Consul of Allocation's
+  -- "that player loses 2 life" is the reader, and CR 112.2 makes that player the
+  -- spell's controller -- "by default, the player who put it on the stack".
+  --
+  -- A SLOT rather than a reader that derives the controller from the bound
+  -- spell, and CR 608.2h is the argument: the spell can be GONE by the time this
+  -- ability resolves (another trigger counters it first), and a derivation would
+  -- then have to fall back to last known information for a fact the event
+  -- carried outright. The PlayerLosesLife arm binds both halves of its event for
+  -- the same reason.
   --
   -- Bound whatever the Filter admitted, which is what eventBindingSlots'
   -- per-condition promise needs -- that function answers with no event and no
   -- Filter in hand, so a slot it names has to hold for every cast the condition
-  -- can match. It does: GameEvent.SpellCast carries an ObjectId
-  -- unconditionally, so no shape of the event withholds it.
-  (TriggerCondition.SpellCast _, GameEvent.SpellCast _ spell) ->
-    Binding.setCastSpell spell Map.empty
+  -- can match. Both do: GameEvent.SpellCast carries an ObjectId and a PlayerId
+  -- unconditionally, so no shape of the event withholds either.
+  (TriggerCondition.SpellCast _, GameEvent.SpellCast caster spell) ->
+    Binding.setTriggerPlayer caster (Binding.setCastSpell spell Map.empty)
   _ -> Map.empty
 
 -- Which slots eventBindings above can stamp for a condition, as a set. A
@@ -2955,10 +2962,13 @@ eventBindingSlots cond = case cond of
   -- no CR 400.7e proviso to fail. Presence of the Master's "counter it" is what
   -- reads it.
   --
-  -- The CASTER gets no slot: under every card in the pool the player that
-  -- condition names is the spell's controller (CR 112.2), derivable from the
-  -- spell already bound here (#913).
-  TriggerCondition.SpellCast _ -> Set.singleton Binding.castSpell
+  -- And the CASTER, whom CR 112.2 makes the spell's controller: Kambal, Consul
+  -- of Allocation's "that player loses 2 life" reads it, and under that card's
+  -- Opponent-scoped Filter the player is not the "you" Binding.setYou names.
+  -- Guaranteed for the reason the spell is -- GameEvent.SpellCast carries a
+  -- PlayerId unconditionally -- so the promise holds for every cast the Filter
+  -- can admit.
+  TriggerCondition.SpellCast _ -> Set.fromList [Binding.castSpell, Binding.triggerPlayer]
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.

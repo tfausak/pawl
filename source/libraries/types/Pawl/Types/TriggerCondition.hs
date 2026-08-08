@@ -410,8 +410,11 @@ data TriggerCondition
     --
     -- The spell itself is bound for the payload to name, under the reserved
     -- Pawl.Engine.Binding.castSpell slot: Presence of the Master's "counter it"
-    -- is CR 701.6a acting on that slot. The CASTER is not separately bound,
-    -- being CR 112.2's controller of the spell already there (#913).
+    -- is CR 701.6a acting on that slot. The CASTER is bound alongside it, under
+    -- the reserved Pawl.Engine.Binding.triggerPlayer slot -- CR 112.2's
+    -- controller of the spell, which Kambal, Consul of Allocation's "that player
+    -- loses 2 life" names without going through the spell (CR 608.2h can have
+    -- taken the spell away by resolution).
     SpellCast (Filter.Filter Keyword.Keyword)
   | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
     -- the ability is given the unlocked designation for the NAMED half. "Some
