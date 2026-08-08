@@ -3932,6 +3932,44 @@ destroyAllSpec s registry = Spec.describe s "DestroyAll" $ do
     -- same cast -- so "targets nothing" is not "affects nothing".
     Spec.assertBool s (not (S.onBattlefield his (castDayOfJudgment plains dayOfJudgment g1))) "the creature still died"
 
+-- Evacuation ({3}{U}{U} instant, "Return all creatures to their owners'
+-- hands"), the pool's producer for a MoveToZone over a SET rather than over a
+-- slot. Cast off five Islands from alice's hand and resolved, for the reason
+-- castDayOfJudgment gives: the card takes no target and prompts for nothing, so
+-- a hand-built applyEffect call would differ from a real cast only in the mana.
+returnAllSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+returnAllSpec s registry = Spec.describe s "ReturnAll" $ do
+  -- CR 109.2 makes "all creatures" every creature PERMANENT on the battlefield,
+  -- and CR 400.3 files each arrival in its OWNER's hand -- so a 2/1 board splits
+  -- 2/1 across the two hands rather than piling into the caster's. The land is
+  -- what an implementation returning every permanent would trip over, and the
+  -- 2/1 asymmetry is what one returning a creature per player would.
+  Spec.it s "Evacuation returns every creature to its owner's hand and leaves a land alone" $ do
+    island <- S.printingOf s registry "Island"
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    evacuation <- S.printingOf s registry "Evacuation"
+    let (herFirst, g1) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+        (herSecond, g2) = S.addCreature piker S.alice g1
+        (his, g3) = S.addCreature piker S.bob g2
+        (land, board) = S.addCreature forest S.alice g3
+        (withSpell, spell) = S.handOne evacuation (List.foldl' (\gs _ -> snd (S.addCreature island S.alice gs)) board [1 :: Int .. 5])
+        -- The baseline is taken AFTER the cast, where the Evacuation itself has
+        -- already left alice's hand for the stack, so the two deltas below count
+        -- returning creatures and nothing else.
+        afterCast = S.runPure S.identityAnswer withSpell (S.cast S.alice spell)
+        resolved = S.runPure S.identityAnswer afterCast Stack.resolveTop
+        survivors = Set.difference (GameState.battlefield afterCast) (Set.fromList [herFirst, herSecond, his])
+    Spec.assertEqWith
+      s
+      "exactly the three creatures left the battlefield, and each owner's hand grew by their own"
+      ( GameState.battlefield resolved,
+        Set.member land (GameState.battlefield resolved),
+        S.handSize S.alice resolved - S.handSize S.alice afterCast,
+        S.handSize S.bob resolved - S.handSize S.bob afterCast
+      )
+      (survivors, True, 2, 1)
+
 -- alice is mid-combat with one creature per printing in `mine`, bob defends with
 -- one per printing in `theirs`, and alice holds a Trumpet Blast plus exactly the
 -- three Mountains that pay for it. The board sits at the declare attackers step
@@ -4519,6 +4557,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   actOfTreasonSpec s registry
   optionalEffectSpec s registry
   destroyAllSpec s registry
+  returnAllSpec s registry
   trumpetBlastSpec s registry
   auraThiefSpec s registry
   baneOfProgressSpec s registry

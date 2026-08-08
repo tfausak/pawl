@@ -21,6 +21,7 @@ import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Types.Card as Card.Type
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
+import qualified Pawl.Types.ObjectRef as ObjectRef
 import Pawl.Types.Zone (Zone)
 
 -- CR 113.6m: "an ability whose cost or effect specifies that it moves the object
@@ -42,7 +43,13 @@ import Pawl.Types.Zone (Zone)
 -- answers Nothing for it, which is the same answer the effect had before.
 zoneFunctionedFrom :: Effect Card.Type.Card -> Maybe Zone
 zoneFunctionedFrom effect = case effect of
-  Effect.MoveToZone slot _ _ _ origin -> if slot == Binding.triggerSource then origin else Nothing
+  -- Only an InSlot naming the reserved source slot can be "the object it's on".
+  -- A swept set is never one object, so EachMatching answers Nothing however the
+  -- card file states the origin -- the same inert card-data error the note above
+  -- describes for a move of somebody else's permanent.
+  Effect.MoveToZone ref _ _ _ origin -> case ref of
+    ObjectRef.InSlot slot -> if slot == Binding.triggerSource then origin else Nothing
+    ObjectRef.EachMatching _ -> Nothing
   Effect.DealDamage _ _ -> Nothing
   Effect.ModifyTarget {} -> Nothing
   Effect.ChangeText {} -> Nothing
