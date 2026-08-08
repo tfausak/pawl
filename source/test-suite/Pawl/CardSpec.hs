@@ -341,6 +341,9 @@ quantityCounts quantity = case quantity of
   -- nor a Pawl.Types.Filter, so these lints have nothing to sweep here either.
   Quantity.Type.LifeTotal _ -> []
   Quantity.Type.Speed _ -> []
+  -- CR 725.1's game-wide player designation, read as a 0/1: a PlayerRef and
+  -- nothing else, so no Count and no Filter here either.
+  Quantity.Type.IsMonarch _ -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated

@@ -27,6 +27,9 @@ toJson q = case q of
   Quantity.ManaCount c -> Common.tagged "ManaCount" . Just $ ManaCount.toJson c
   Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ PlayerRef.toJson p
   Quantity.Speed p -> Common.tagged "Speed" . Just $ PlayerRef.toJson p
+  -- CR 725.1's designation, with only a PlayerRef on the wire: the answer is a
+  -- 0/1 rather than a stored number, so there is nothing beside the reference.
+  Quantity.IsMonarch p -> Common.tagged "IsMonarch" . Just $ PlayerRef.toJson p
   Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Common.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
@@ -46,6 +49,7 @@ fromJson value = do
     ("ManaCount", Just v) -> Quantity.ManaCount <$> ManaCount.fromJson v
     ("LifeTotal", Just v) -> Quantity.LifeTotal <$> PlayerRef.fromJson v
     ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
+    ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson v
     _ -> Left . Text.pack $ "unknown Quantity: " <> t

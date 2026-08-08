@@ -1421,6 +1421,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.ManaCount _ -> quantity
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
+  Quantity.Type.IsMonarch _ -> quantity
   Quantity.Type.PlayerCounters _ _ -> quantity
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
   -- name no subtype word, not even the CR 122.1b keyword one.
