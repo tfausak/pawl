@@ -2019,6 +2019,67 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "both colours with no face shown" (Projection.colorsOf oid gs0) (Set.fromList [Color.Green, Color.White])
 
   keywordCounterSpec s registry
+  supertypeSpec s registry
+
+-- CR 205.4b / 613.1d layer 4, through a whole card: Arcum's Weathervane
+-- ({2} Artifact, "{2}, {T}: Target snow land is no longer snow." / "{2}, {T}:
+-- Target nonsnow basic land becomes snow.", checked against Scryfall
+-- 2026-08-08) is the pool's printed REMOVAL of a supertype, and the grant
+-- beside it. Both abilities are Indefinite, which is CR 611.2a's own reading of
+-- text that states no duration: "If no duration is stated, it lasts until the
+-- end of the game."
+--
+-- The rule these prove is CR 205.4b's last sentence: "When an object gains or
+-- loses a supertype, it retains any other supertypes it had." A Snow-Covered
+-- Mountain is basic AND snow, so removing snow from it leaves basic behind, and
+-- an ordinary Mountain gaining snow keeps basic too. Asserting the whole
+-- supertype SET rather than one membership is what makes that observable.
+--
+-- Leyline of Singularity's grant is proved at gameplay level in
+-- Pawl.DamageSpec's legend rule group instead, since CR 704.5j is what makes a
+-- gained supertype visible on the board.
+supertypeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+supertypeSpec s registry = Spec.describe s "Supertype" $ do
+  Spec.it s "CR 205.4b Arcum's Weathervane takes snow off a Snow-Covered Mountain and leaves basic" $ do
+    (before, after) <- weathervaneChain s registry "Snow-Covered Mountain" 0
+    Spec.assertEqWith s "it starts basic and snow" before (Set.fromList [Supertype.Basic, Supertype.Snow])
+    Spec.assertEqWith s "and ends basic alone" after (Set.singleton Supertype.Basic)
+
+  Spec.it s "CR 205.4b Arcum's Weathervane makes a plain Mountain snow and leaves basic" $ do
+    (before, after) <- weathervaneChain s registry "Mountain" 1
+    Spec.assertEqWith s "it starts basic alone" before (Set.singleton Supertype.Basic)
+    Spec.assertEqWith s "and ends basic and snow" after (Set.fromList [Supertype.Basic, Supertype.Snow])
+
+-- Put the named land and an Arcum's Weathervane onto alice's battlefield with
+-- enough Forests to pay the {2}, activate the Weathervane's ability at `which`
+-- aimed at that land, resolve it, and report the land's supertypes before and
+-- after. The answerer names the land outright rather than relying on which
+-- object id it drew, so the two Forests standing in for mana cannot be aimed at
+-- by accident.
+weathervaneChain :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> String -> Int -> m (Set.Set Supertype.Supertype, Set.Set Supertype.Supertype)
+weathervaneChain s registry landName which = do
+  land <- S.printingOf s registry landName
+  forest <- S.printingOf s registry "Forest"
+  weathervane <- S.printingOf s registry "Arcum's Weathervane"
+  let (landId, g0) = S.addCreature land S.alice (Setup.emptyGame S.bothPlayers)
+      (_, g1) = S.addCreature forest S.alice g0
+      (_, g2) = S.addCreature forest S.alice g1
+      (vaneId, board) = S.addCreature weathervane S.alice g2
+      before = Projection.supertypesOf landId board
+  case drop which (Projection.abilitiesOf vaneId board) of
+    [] -> do
+      Spec.assertFailure s "expected the Weathervane to project both of its activated abilities"
+      pure (before, before)
+    ability : _ ->
+      let after = S.runPure (aimingAt landId) board (do Activate.activateAbility S.alice vaneId ability; Stack.resolveTop)
+       in pure (before, Projection.supertypesOf landId after)
+
+-- Answers every target choice with `oid`, and everything else as the identity
+-- interpreter does.
+aimingAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimingAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  _ -> S.identityAnswer p
 
 -- CR 122.1b: "A keyword counter on a permanent ... causes that object to gain
 -- that keyword", and CR 613.1f puts that grant in LAYER 6 -- not the layer 7c
