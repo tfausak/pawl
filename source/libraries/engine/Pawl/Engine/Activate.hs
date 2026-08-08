@@ -309,7 +309,7 @@ loyaltyOk pid srcId ability gs =
     || (Turn.sorcerySpeedWindow pid gs && not (loyaltyActivatedThisTurn srcId gs))
 
 loyaltyActivatedThisTurn :: ObjectId -> GameState -> Bool
-loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (GameState.events gs)
+loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcId) (fmap snd (GameState.events gs))
 
 -- CR 602.2b's routing of an activation cost through CR 601.2b, at the X=0 FLOOR:
 -- an ability is affordable when its activation cost is payable with X=0, since

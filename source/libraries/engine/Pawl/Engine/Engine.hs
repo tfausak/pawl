@@ -489,7 +489,9 @@ placePendingTriggers :: Game Bool
 placePendingTriggers = do
   gs <- State.get
   let evs = Event.unscannedEvents gs
-      (pending, surviving) = Event.gatherTriggers evs gs
+      -- The GROUPED view of the same snapshot, which the CR 603.10a look-back in
+      -- Event.eventTriggers needs and the three inherent gatherers below do not.
+      (pending, surviving) = Event.gatherTriggers (Event.unscannedGrouped gs) gs
       -- CR 725.2: the monarch's inherent triggers hang on no object, so
       -- Event.gatherTriggers -- which asks each battlefield permanent what it
       -- triggers -- has nowhere to find them. Gathered separately, from the SAME

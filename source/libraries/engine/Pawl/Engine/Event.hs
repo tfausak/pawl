@@ -69,6 +69,8 @@ import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import Pawl.Types.EventGroup (EventGroup)
+import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
@@ -133,12 +135,66 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- On a hot path, and paid once per batch: controlOverrides costs one controlGrants
 -- walk plus one controllerOfGiven per object a layer-2 effect names, and the
 -- common board names none. Measured below the benchmark suite's noise floor.
+--
+-- The group stamped on the entry is CR 704.3 / CR 608.2f's "single event": a
+-- fresh one per record, unless a `simultaneously` bracket is open, in which case
+-- every event in its body shares the one the bracket froze. Only advanced at
+-- depth 0, which is what freezes it.
 recordEvent :: GameEvent -> GameState -> GameState
 recordEvent event gs =
-  let recorded = gs {GameState.events = GameState.events gs Seq.|> event}
+  let group = GameState.nextEventGroup gs
+      recorded =
+        gs
+          { GameState.events = GameState.events gs Seq.|> (group, event),
+            GameState.nextEventGroup =
+              if GameState.eventGroupDepth gs == 0
+                then EventGroup.next group
+                else group
+          }
    in if GameState.scannedThrough gs < Natural.length (GameState.events gs)
         then recorded
         else recorded {GameState.controlWhenTriggered = Projection.controlOverrides gs}
+
+-- CR 704.3 / CR 608.2f: run `body` as ONE event, so every event it records
+-- shares an EventGroup and CR 603.10a's look-back can tell "at the same time"
+-- from "one after the other".
+--
+-- A BRACKET rather than a parameter, because the sites that know a body is one
+-- event are not the sites that record its events: CR 704.3's state-based-action
+-- pass drives half a dozen funnels, and CR 701.8's batched destruction runs a CR
+-- 616.1 replacement loop per member. Everything either reaches is inside the one
+-- event by the same rule.
+--
+-- Every caller must be able to cite the rule that makes its body a single event;
+-- a bracket placed wider than such a rule reaches silently fuses two real events,
+-- which is exactly the error this type exists to make impossible.
+--
+-- The OUTERMOST bracket wins. Nesting keeps the depth above zero, so an inner
+-- bracket neither mints a group nor ends the outer one's -- the same posture CR
+-- 616.1g's nested entry loops already take, where the outer event owns the inner
+-- ones.
+--
+-- The group is spent on exit whether or not the body recorded anything, so a
+-- bracket leaves a gap rather than leaking its group to the next event.
+--
+-- Not bracketed: CR 510.2's combat damage, CR 608.2f's other multi-object
+-- resolution effects, token creation and CR 508.1's attacker declaration, so the
+-- events each records are read as a sequence (#441).
+simultaneously :: Game a -> Game a
+simultaneously body = do
+  State.modify' (\gs -> gs {GameState.eventGroupDepth = GameState.eventGroupDepth gs + 1})
+  result <- body
+  State.modify' $ \gs ->
+    let depth = GameState.eventGroupDepth gs
+        left = if depth == 0 then 0 else depth - 1
+     in gs
+          { GameState.eventGroupDepth = left,
+            GameState.nextEventGroup =
+              if left == 0
+                then EventGroup.next (GameState.nextEventGroup gs)
+                else GameState.nextEventGroup gs
+          }
+  pure result
 
 -- CR 119.4: a player may pay an amount of life greater than 0 only if their life
 -- total is at least that amount.
@@ -270,17 +326,27 @@ revealOf event = case event of
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
 
+-- CR 117.5: the events the trigger scan has not yet consumed, WITH the
+-- EventGroup each belongs to. Only eventTriggers wants the groups; every other
+-- reader takes unscannedEvents below.
+--
+-- The drop counts ELEMENTS, not groups, and must keep doing so: the two
+-- watermarks drain this log at different cadences, so a group can be half
+-- consumed.
+unscannedGrouped :: GameState -> [(EventGroup, GameEvent)]
+unscannedGrouped gs =
+  Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.scannedThrough gs)) (GameState.events gs))
+
 -- CR 117.5: the events the trigger scan has not yet consumed.
 unscannedEvents :: GameState -> [GameEvent]
-unscannedEvents gs =
-  Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.scannedThrough gs)) (GameState.events gs))
+unscannedEvents = fmap snd . unscannedGrouped
 
 -- The events the STATE-BASED ACTION check has not yet consumed -- CR 704.5h's
 -- "since the last state-based action check", and the same boundary CR 903.9a
 -- names. Pawl.Engine.Commander.returnable is the other reader.
 unscannedSbaEvents :: GameState -> [GameEvent]
 unscannedSbaEvents gs =
-  Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs))
+  fmap snd (Foldable.toList (Seq.drop (Natural.toIntSaturating (GameState.damageScannedThrough gs)) (GameState.events gs)))
 
 -- CR 704.5h: the damage the state-based-action check has not yet consumed.
 unscannedDamage :: GameState -> [DamageEvent]
@@ -1904,8 +1970,16 @@ destroyInBatch asOf regenerability oids = Monad.void (destroyIn (Just asOf) rege
 -- printed ability, so the frozen board holds nothing for the destruction loop to
 -- find. It is passed anyway because the rule, not the pool, says the two loops are
 -- one event.
+--
+-- The whole body is ONE event, which is what `simultaneously` stamps on
+-- everything it records: CR 608.2f makes an action taken on multiple objects
+-- simultaneous, and every caller here hands a batch that one effect named. That
+-- is the same sentence the three readings above already rest on -- a batch judged
+-- against one board, not a sequence -- so the bracket adds no claim they do not.
+-- Day of Judgment's deaths are the case it decides, and CR 603.10a's own Example
+-- is why they must not be a sequence.
 destroyIn :: Maybe GameState -> Regenerability.Regenerability -> [ObjectId] -> Game [ObjectId]
-destroyIn asOf regenerability oids = do
+destroyIn asOf regenerability oids = simultaneously $ do
   live <- State.get
   let gs = Maybe.fromMaybe live asOf
       doomed = filter (\oid -> Maybe.isJust (Game.lookupObject oid live) && not (Projection.hasKeyword Keyword.Type.Indestructible oid gs)) oids
@@ -2213,7 +2287,7 @@ declarationsOf bearer gs =
   let declaredIt event = case event of
         GameEvent.AttackerDeclared oid _ -> oid == bearer
         _ -> False
-   in length (Seq.filter declaredIt (GameState.events gs))
+   in length (Seq.filter (declaredIt . snd) (GameState.events gs))
 
 -- CR 102.1: does this turn belong to the scope? `active` is "the player whose
 -- turn it is", and `own` is the seat the scope is read against -- the player
@@ -3654,6 +3728,81 @@ isPlayerRecipient r = case r of
   Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
 
+-- CR 603.10a: is this one of the conditions the game "looks back in time" for?
+--
+-- The rule states a CLOSED list of four families -- "leaves-the-battlefield
+-- abilities, abilities that trigger when a player sacrifices a permanent,
+-- abilities that trigger when a card leaves a graveyard, and abilities that
+-- trigger when an object that all players can see is put into a hand or library"
+-- -- and CR 603.10b through CR 603.10g add six more, none of which pawl has a
+-- condition for. Everything else takes CR 603.10's first sentence.
+--
+-- A TOTAL case, with no wildcard, which is the whole reason this is a function
+-- rather than a guard at the use site: a new condition must be READ against that
+-- list, and a wildcard would silently give it whichever answer was convenient.
+-- -Werror is what makes that a compile error rather than a rules bug.
+--
+-- Not a case on an EFFECT's identity. CR 603.10a enumerates trigger CONDITIONS,
+-- the way rule 702 enumerates keywords, so asking which family a condition falls
+-- in is reading the rulebook rather than reading a card.
+--
+-- What the answer decides is narrow: whether a bearer that left the battlefield
+-- in the event's OWN group is offered for this ability. A bearer that left at a
+-- later group is offered either way (CR 603.10's first sentence), and a
+-- condition's own matcher still has the last word.
+looksBack :: TriggerCondition -> Bool
+looksBack condition = case condition of
+  -- CR 603.6c's two written forms, which CR 603.10a names first:
+  -- leaves-the-battlefield abilities. CR 700.4 narrows the second to a
+  -- graveyard, and narrowing the destination does not leave the family.
+  TriggerCondition.SelfDies -> True
+  TriggerCondition.PermanentDies _ -> True
+  TriggerCondition.SelfLeavesTheBattlefield -> True
+  -- CR 603.10a's second family in as many words: "abilities that trigger when a
+  -- player sacrifices a permanent".
+  TriggerCondition.PermanentSacrificed -> True
+  -- CR 603.1b: one ability, several conditions. It looks back if ANY of them
+  -- does -- the ability is on the rule's list if the rule reaches it at all, and
+  -- a condition that does not look back is unaffected, since its own matcher
+  -- still has to admit the candidate.
+  TriggerCondition.AnyOf conditions -> any looksBack conditions
+  -- CR 603.6c's own last sentence puts this OUTSIDE the family: a card put into
+  -- a graveyard from anywhere is not a leaves-the-battlefield ability, and CR
+  -- 603.10's normal reading applies. The constructor's own Haddock argues it.
+  TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> False
+  -- Library to graveyard, which is on none of CR 603.10a's four families: a card
+  -- leaving a LIBRARY is not a card leaving a graveyard, and the bearer this
+  -- reads is the CR 400.7 incarnation that arrived.
+  TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
+  -- CR 708.8 leaves the permanent on the battlefield, so there is no departure
+  -- for a look-back to recover and the live read is what CR 603.10's first
+  -- sentence asks for. Both written forms.
+  TriggerCondition.SelfTurnedFaceUp -> False
+  TriggerCondition.PermanentTurnedFaceUp _ -> False
+  -- Entries, not departures (CR 603.6a). The rule's own CR 603.6a checks "all
+  -- permanents on the battlefield (including the newcomers)" AFTER the event.
+  TriggerCondition.SelfEnters -> False
+  TriggerCondition.PermanentEnters _ -> False
+  -- Turn structure, the stack, damage, life, counters and the rest: none names a
+  -- zone change at all, so CR 603.10a's list cannot reach them.
+  TriggerCondition.StepBegins _ _ -> False
+  TriggerCondition.StateIs _ -> False
+  TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
+  TriggerCondition.OpponentLostLifeDuringYourTurn -> False
+  TriggerCondition.SelfCycled -> False
+  TriggerCondition.PlayerDiscards _ -> False
+  TriggerCondition.SelfAttacks _ -> False
+  TriggerCondition.SpellOrAbilityCounters _ -> False
+  TriggerCondition.DamageToPlayerPrevented _ -> False
+  TriggerCondition.PlayerGainsLife _ -> False
+  TriggerCondition.PlayerLosesLife _ -> False
+  TriggerCondition.SelfCountersReached _ _ -> False
+  TriggerCondition.SelfLastCounterRemoved _ -> False
+  TriggerCondition.SpellCast _ _ -> False
+  TriggerCondition.SelfHalfUnlocked _ -> False
+  TriggerCondition.RoomFullyUnlocked _ -> False
+
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
 -- permanent with nothing to do with the event.
@@ -3672,14 +3821,14 @@ isPlayerRecipient r = case r of
 -- state-based actions, so every permanent that left anywhere inside the batch is
 -- missing even for events it was plainly there for.
 --
--- So each event contributes the permanents that left the battlefield LATER in the
--- same batch, read from CR 608.2h last known information -- `bystanders` below.
--- Four things make that exact rather than approximate:
+-- So each event contributes the permanents that left the battlefield at a LATER
+-- EVENT GROUP in the same batch, read from CR 608.2h last known information --
+-- `laterGroups` below. Four things make that exact rather than approximate:
 --
 --   * The same reading, one event later. A permanent removed by a later event
 --     existed immediately after this one, which is what the rule asks. It reaches
 --     the event's own newcomer for free: a creature entering as a 0/0 and buried
---     by CR 704.5f leaves at a later index than its entry.
+--     by CR 704.5f leaves at a later group than its entry.
 --   * No double fire, structurally: `lastKnown` is written by the zone change that
 --     DELETES an id, and CR 400.7 mints a fresh id per move, so no id is in both.
 --   * The right snapshot: `lastKnown` holds the permanent as it was on the
@@ -3688,18 +3837,24 @@ isPlayerRecipient r = case r of
 --     traversed ascending, so extras sort in rather than being appended.
 --
 -- CR 603.10a is the other half of that rule, the exception rather than the normal
--- case: a DEPARTURE event also contributes the permanent it took off the
--- battlefield, and for that one the last-known reading is what the rule asks for
+-- case, and it contributes twice. A DEPARTURE event contributes the permanent it
+-- took off the battlefield (`leftBattlefield`), and every event contributes the
+-- permanents that left at its OWN group (`sameGroup`) -- for a look-back
+-- condition alone, since only those read "the appearance of objects immediately
+-- prior to the event". For both, the last-known reading is what the rule asks for
 -- rather than a repair for a late boundary.
 --
+-- Which conditions those are is `looksBack`, a total case over TriggerCondition
+-- and never a wildcard: CR 603.10a states a closed list, so a condition the rule
+-- has not been read against must be classified rather than defaulted.
+--
 -- Not reconstructed: a permanent that ENTERED later in the batch and left before
--- the boundary is still offered to the batch's earlier events (#441); nor is
--- `bystanders`' mirror, so a look-back condition borne by a permanent that dies
--- alongside the one it watches answers by object id (#615).
+-- the boundary is still offered to the batch's earlier events (#441).
 --
 -- Events outer, permanents inner (ascending by id): the deterministic canonical
--- order the CR 603.3b ordering prompt indexes into.
-eventTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
+-- order the CR 603.3b ordering prompt indexes into. Groups do not disturb it --
+-- they decide which permanents an event is offered, never in what order.
+eventTriggers :: [(EventGroup, GameEvent)] -> GameState -> [PendingTrigger]
 eventTriggers events gs =
   let projected = Projection.projectAll gs
       -- The control-grant list is the same for every permanent in this scan
@@ -3723,9 +3878,9 @@ eventTriggers events gs =
       -- Pawl.Engine.Activate.abilitiesForGiven puts on its battlefield arm.
       --
       -- Applied to BOTH readings that say "this permanent was on the
-      -- battlefield": the live `onBattlefield` set, and the `bystanders` suffix
-      -- union, which is CR 603.10's first sentence recovering a permanent that
-      -- WAS on the battlefield at this event and has left by the CR 117.5
+      -- battlefield": the live `onBattlefield` set, and the two group-scoped
+      -- unions below (`laterGroups` and `sameGroup`), which recover a permanent
+      -- that WAS on the battlefield at this event and has left by the CR 117.5
       -- boundary. Last known information (CR 608.2h) is how that permanent is
       -- read, not a statement about which zone it is being read IN, so the zone
       -- CR 113.6m compares against is the battlefield either way.
@@ -3800,13 +3955,15 @@ eventTriggers events gs =
       -- different value in this one -- eventBindings binds it under `became`.
       --
       -- Empty for a permanent that ceased without a zone change running over it,
-      -- which files no last known information. That hole is `bystanders`' too.
+      -- which files no last known information. That hole is the two group-scoped
+      -- unions' too.
       --
       -- Parameterized by which of the departed permanent's abilities to offer,
       -- because the two callers below want different sets out of one recovery:
-      -- `leftBattlefield` is CR 603.10a and takes them all, `bystanders` is CR
-      -- 603.10's first sentence and takes only the ones CR 113.6m leaves
-      -- functioning on the battlefield.
+      -- `leftBattlefield` is CR 603.10a's look-back at the event's own departure
+      -- and takes them all, while `laterGroups` and `sameGroup` read a permanent
+      -- that was standing on the battlefield when the event happened and so take
+      -- only the ones CR 113.6m leaves functioning there.
       departedFrom pick event = case event of
         GameEvent.Moved zc _
           | ZoneChange.from zc == Zone.Battlefield && ZoneChange.to zc /= Zone.Battlefield ->
@@ -3839,20 +3996,30 @@ eventTriggers events gs =
       -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
       -- above gives.
       leftBattlefield = departedFrom abilitiesOf
-      -- CR 603.10's first sentence, per EVENT: the permanents still on the
+      -- The batch cut into its CR 704.3 / CR 608.2f events. Groups are
+      -- non-decreasing along the log (Event.recordEvent only mints a fresh one or
+      -- repeats the frozen one), so the members of one event are contiguous and
+      -- an adjacent grouping is exact rather than approximate.
+      groups = List.groupBy (\a b -> fst a == fst b) events
+      departuresIn block = Map.unions (fmap (departedFrom battlefieldAbilitiesOf . snd) block)
+      -- CR 603.10's first sentence, per EVENT GROUP: the permanents still on the
       -- battlefield when each event happened that have left by the CR 117.5
-      -- boundary. Entry i is the union of `leftBattlefield` over the events AFTER
-      -- i -- strictly later, so an event's own departure is not in its own entry.
-      -- That is not an optimisation: the departing permanent does not exist
-      -- immediately after the event that removed it, and reaches that one event
-      -- only through CR 603.10a's look-back, which `leftBattlefield` supplies
-      -- separately.
+      -- boundary. Entry i is the union of `leftBattlefield` over the events at a
+      -- strictly LATER group -- so neither an event's own departure nor a
+      -- SIMULTANEOUS one is in its entry. That is not an optimisation: a
+      -- permanent removed by this same event does not exist immediately after it,
+      -- and reaches it only through the look-back below.
       --
-      -- A right scan rather than a lookup table: scanr shares each suffix's union
-      -- with the one before, so the batch costs one pass. Building the union per
-      -- event would be quadratic, and a combat damage step's batch is a whole
-      -- board's worth of deaths. `drop 1` is the alignment, shifting scanr's
-      -- "from i onward" to "from i+1 onward".
+      -- Strictly later GROUP, never strictly later index: two events of one group
+      -- happened at the same time, so neither is "after" the other, and ordering
+      -- them by the order the implementation happened to record them in is the
+      -- order-dependence this whole binding exists to remove (#615).
+      --
+      -- A right scan over the groups rather than a lookup table: scanr shares each
+      -- suffix's union with the one before, so the batch costs one pass, and a
+      -- whole-board combat death batch that collapses into ONE group now costs one
+      -- union rather than one per death. `drop 1` is the alignment, shifting
+      -- scanr's "from i onward" to "from i+1 onward".
       --
       -- The controller and abilities are the ones the permanent had as it LEFT --
       -- one moment after the event that triggered them, not at it (#603). Nothing
@@ -3864,7 +4031,32 @@ eventTriggers events gs =
       -- The proving case is Squee, Goblin Nabob leaving the battlefield after an
       -- upkeep began in the same batch, in Pawl.TriggerSpec's
       -- `bystanderZoneSpec`.
-      bystanders = drop 1 (List.scanr (\event acc -> Map.union (departedFrom battlefieldAbilitiesOf event) acc) Map.empty events)
+      laterGroups = drop 1 (List.scanr (\block acc -> Map.union (departuresIn block) acc) Map.empty groups)
+      -- CR 603.10a, the other half of that rule: for a LOOK-BACK condition the
+      -- board that matters is "the appearance of objects immediately prior to the
+      -- event", on which every permanent this same event removed was still
+      -- standing. So a bearer that departed in the event's OWN group is offered
+      -- alongside the strictly-later ones.
+      --
+      -- CR 603.10a's own Example is this and nothing else: an artifact watching
+      -- creatures die "triggers twice, even though the artifact goes to its
+      -- owner's graveyard at the same time as the creatures". Meren of Clan Nel
+      -- Toth dying to Day of Judgment beside a Goblin Piker is that Example with
+      -- an experience counter in place of the life, and Pawl.TriggerSpec proves
+      -- it for BOTH object-id orders.
+      --
+      -- Narrowed to the conditions that rule lists, by `looksBack` below, and
+      -- narrowed HERE rather than at the match: admitting the bearer for a
+      -- CR 603.10 first-sentence condition would say a permanent existed
+      -- immediately after the event that removed it. The other direction is the
+      -- one that would answer the sequential case wrong -- a Meren destroyed by
+      -- one part of a resolution must not see creatures buried by a LATER part,
+      -- which is a different group and so absent from this entry.
+      --
+      -- Not filtered against the entry above: an id departs at exactly one group,
+      -- so the two maps are disjoint, and `leftBattlefield`'s unfiltered offer of
+      -- the event's own departure wins over this one by Map.unions' left bias.
+      sameGroup = fmap (Map.map (fmap (filter (looksBack . TriggeredAbility.condition))) . departuresIn) groups
       -- CR 702.29c: the card that was just cycled, wherever it landed. The
       -- candidate source that is neither on the battlefield nor a permanent that
       -- left it -- which is exactly what that rule asks for:
@@ -3947,9 +4139,9 @@ eventTriggers events gs =
       -- braces. `inGraveyards` genuinely overlaps `cycledCard` on purpose -- a card
       -- cycled into a graveyard is honestly a member of both -- and the winner
       -- offers that card's printed abilities unfiltered, a superset either way.
-      candidates event gone = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, gone, cycledCard event, inGraveyards])
-      scanOne (event, gone) = concatMap (forOne event) (candidates event gone)
-   in concatMap scanOne (zip events bystanders)
+      candidates event later same = Map.toAscList (Map.unions [onBattlefield, leftBattlefield event, later, same, cycledCard event, inGraveyards])
+      scanOne later same event = concatMap (forOne event) (candidates event later same)
+   in concat (List.zipWith3 (\block later same -> concatMap (scanOne later same . snd) block) groups laterGroups sameGroup)
 
 -- CR 113.6m, read off a TRIGGERED ability: "an ability whose cost or effect
 -- specifies that it moves the object it's on out of a particular zone functions
@@ -4460,14 +4652,19 @@ settleOnsets gs =
 -- Everything that has triggered and is not yet on the stack, from all three
 -- sources, plus the delayed store as it stands afterwards. One function, so
 -- Pawl.Engine.Engine never needs to know how many sources there are.
-gatherTriggers :: [GameEvent] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
-gatherTriggers events gs =
-  let -- Already CR 603.4-filtered: delayedPending has to run the check itself,
+--
+-- Takes the GROUPED events, because eventTriggers is the one gatherer whose
+-- answer depends on which of them were simultaneous (CR 603.10a). The other two
+-- take the events alone.
+gatherTriggers :: [(EventGroup, GameEvent)] -> GameState -> ([PendingTrigger], Seq.Seq DelayedTrigger)
+gatherTriggers grouped gs =
+  let events = fmap snd grouped
+      -- Already CR 603.4-filtered: delayedPending has to run the check itself,
       -- since which entries survive in its second component depends on the
       -- answer. Running it over these again would be a redundant no-op, the
       -- GameState being the same one, so only the other two are filtered here.
       (fromDelayed, surviving) = delayedPending events gs
-      undecided = eventTriggers events gs <> stateTriggers gs
+      undecided = eventTriggers grouped gs <> stateTriggers gs
    in (filter (interveningHolds gs) undecided <> fromDelayed, surviving)
 
 -- | CR 603.3b: the abilities a round of GameEvent.AbilityTriggered records fires,

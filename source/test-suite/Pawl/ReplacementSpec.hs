@@ -269,7 +269,7 @@ stepSkipSpec s registry = Spec.describe s "Skip" $ do
         Engine.runStep
         Engine.runStep
       runTwo gs = snd (Engine.runGamePure S.identityAnswer gs twoSteps)
-      began step gs = List.elem (GameEvent.StepBegan step S.alice) (foldr (:) [] (GameState.events gs))
+      began step gs = List.elem (GameEvent.StepBegan step S.alice) (S.eventsOf gs)
   -- The control. Without Eon Hub the upkeep step begins normally, so the
   -- trigger fires and resolves.
   Spec.it s "CR 500.6 without a skip the upkeep step begins and its trigger fires" $ do
@@ -347,7 +347,7 @@ fatigueSpec s registry = Spec.describe s "Fatigue" $ do
       -- intervening turn would contribute is a longer log, not a different
       -- answer.
       runDraw gs = snd (Engine.runGamePure S.identityAnswer (atDraw gs) Engine.runStep)
-      begun gs = length (filter (== GameEvent.StepBegan drawStep S.alice) (foldr (:) [] (GameState.events gs)))
+      begun gs = length (filter (== GameEvent.StepBegan drawStep S.alice) (S.eventsOf gs))
       libraryOf pid gs = length (Game.zoneMembers Zone.Library pid gs)
       armed gs = length (GameState.replacements gs)
       -- alice: two Islands per Fatigue to cast, a stocked library to draw from,
@@ -535,7 +535,7 @@ wardenOut gs =
 -- channel a card that watches for life loss reads, and the half of CR 119.4 a
 -- bare subtraction from the life total would not satisfy.
 lostLife :: PlayerId.PlayerId -> Natural.Natural -> GameState.GameState -> Bool
-lostLife pid n gs = GameEvent.LifeLost pid n `elem` GameState.events gs
+lostLife pid n gs = GameEvent.LifeLost pid n `elem` S.eventsOf gs
 
 -- Stonehorn Dignitary {3}{W} Creature -- Rhino Soldier 1/4: "When this creature
 -- enters, target opponent skips their next combat phase." (oracle checked on
@@ -577,7 +577,7 @@ stonehornSpec s registry = Spec.describe s "Stonehorn Dignitary" $ do
       -- never appears, which is CR 614.6's "if an event is replaced, it never
       -- happens" -- and is why this is read at the postcombat main phase rather
       -- than after the turn, since Engine.handoffTurn clears the log.
-      stepsBegunBy pid gs = [ph | GameEvent.StepBegan ph who <- foldr (:) [] (GameState.events gs), who == pid]
+      stepsBegunBy pid gs = [ph | GameEvent.StepBegan ph who <- S.eventsOf gs, who == pid]
       combatStepsOf pid gs = [ph | ph@(Phase.Combat _) <- stepsBegunBy pid gs]
       armed gs = length (GameState.replacements gs)
   -- The control: the same board with the creature never cast. bob's combat

@@ -6,7 +6,6 @@
 module Pawl.ResolveSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
@@ -2246,7 +2245,7 @@ stifleSpec s registry = Spec.describe s "Stifle" $ do
     -- NO damage marked is rule 701.6a's "none of its effects occur".
     Spec.assertEqWith s "the Piker survived" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
     Spec.assertEqWith s "with no damage marked on it at all" (fmap (\oid -> fmap Object.damage (Game.lookupObject oid after)) entrantId) (Just (Just 0))
-    Spec.assertEqWith s "no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events after)))) []
+    Spec.assertEqWith s "no damage was ever dealt" (fmap DamageEvent.amount (Maybe.mapMaybe Event.damageOf (S.eventsOf after))) []
     -- CR 608.2n again: the countered trigger went nowhere. alice's graveyard is
     -- empty (no Piker corpse, and no residue of the trigger), and bob's holds
     -- only the Stifle that did the countering.
@@ -2815,7 +2814,7 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
     Spec.assertEqWith s "bob drew two" (S.handSize S.bob after) 2
     Spec.assertEqWith s "and lost two life" (S.lifeOf S.bob after) (fmap (subtract 2) (S.lifeOf S.bob gs))
     Spec.assertEqWith s "alice, who cast it, lost none" (S.lifeOf S.alice after) (S.lifeOf S.alice gs)
-    Spec.assertBool s (not (any isDamage (GameState.events after))) "no damage was dealt (CR 119.2)"
+    Spec.assertBool s (not (any isDamage (S.eventsOf after))) "no damage was dealt (CR 119.2)"
   -- CR 704.5a: life lost without damage still reaches the state-based
   -- action -- the same check a CR 119.4 pay-life cost answers to. Bob is at
   -- two, so the second clause is lethal though nothing dealt damage.
@@ -3621,7 +3620,7 @@ becomeMonarchSpec s registry = Spec.describe s "BecomeMonarch" $ do
     let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         after = S.runPure S.identityAnswer gs0 (Resolve.applyEffect src src S.alice Map.empty Map.empty (Effect.BecomeMonarch MonarchTarget.TheController))
     Spec.assertEqWith s "alice is monarch" (GameState.monarch after) (Just S.alice)
-    Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (GameState.events after)) "a BecameMonarch event was recorded"
+    Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "a BecameMonarch event was recorded"
 
 -- Palace Jailer's ruling (Scryfall, 2021-03-19): "If you're not the monarch as
 -- Palace Jailer's second ability resolves, the creature will be exiled until

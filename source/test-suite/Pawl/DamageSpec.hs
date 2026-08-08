@@ -1504,7 +1504,7 @@ damageEventsTo oid gs =
         GameEvent.DamageDealt de ->
           if DamageEvent.target de == Recipient.ToCreature oid then [de] else []
         _ -> []
-   in concatMap pick (GameState.events gs)
+   in concatMap pick (S.eventsOf gs)
 
 -- Sinks the whole assignment into the first creature recipient offered. This is
 -- the discriminating answer for #29: if the engine still offers a departed

@@ -571,6 +571,7 @@ library types
     Pawl.Types.EntryRewrite
     Pawl.Types.EntryRiders
     Pawl.Types.EntwineDecision
+    Pawl.Types.EventGroup
     Pawl.Types.EventShape
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase

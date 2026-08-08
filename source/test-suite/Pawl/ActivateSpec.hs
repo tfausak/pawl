@@ -5,7 +5,6 @@
 module Pawl.ActivateSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
-import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -730,7 +729,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
     -- happens while the card is still in the library, so it precedes the
     -- move in the log. Swapping the two would leave every other assertion
     -- here passing.
-    case (List.findIndex (Maybe.isJust . Event.revealOf) (Foldable.toList (GameState.events after)), List.findIndex ((== Just Zone.Hand) . fmap ZoneChange.to . Event.movedOf) (Foldable.toList (GameState.events after))) of
+    case (List.findIndex (Maybe.isJust . Event.revealOf) (S.eventsOf after), List.findIndex ((== Just Zone.Hand) . fmap ZoneChange.to . Event.movedOf) (S.eventsOf after)) of
       (Just revealed, Just moved) -> Spec.assertBool s (revealed < moved) "the reveal is logged before the move into the hand"
       indices -> Spec.assertFailure s ("expected both a reveal and a move into the hand, got " <> show indices)
 
@@ -748,7 +747,7 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
     case Activate.abilitiesFor oid gs of
       [ability] -> do
         let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
-            events = Foldable.toList (GameState.events activated)
+            events = S.eventsOf activated
         Spec.assertEqWith s "Alice revealed Barkhide Mauler" (S.revealsOf activated) [(S.alice, CardName.MkCardName $ Text.pack "Barkhide Mauler")]
         Spec.assertEqWith s "and the draw has not resolved, so this is the announcement" (length (GameState.stack activated)) 1
         case (List.findIndex (Maybe.isJust . Event.revealOf) events, List.findIndex ((== Just Zone.Graveyard) . fmap ZoneChange.to . Event.movedOf) events) of

@@ -19,7 +19,7 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Data.Text.IO as TextIO
-import qualified Numeric.Natural as Natural
+import Numeric.Natural (Natural)
 import qualified Pawl.Cards as Cards
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Script as Script
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Action as A
@@ -60,6 +61,7 @@ import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -1029,7 +1031,7 @@ countOnBattlefieldByName wanted pid gs =
           Source.OfInherentTrigger _ _ -> False
    in length (filter named (Game.zoneMembers Zone.Battlefield pid gs))
 
-damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural.Natural
+damageOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
 damageOf oid gs = fmap Object.damage (Game.lookupObject oid gs)
 
 -- Projection.powerOf and Projection.toughnessOf, paired -- the shape an
@@ -1038,25 +1040,32 @@ damageOf oid gs = fmap Object.damage (Game.lookupObject oid gs)
 powerToughnessOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe (Integer, Integer)
 powerToughnessOf oid gs = (,) <$> Projection.powerOf oid gs <*> Projection.toughnessOf oid gs
 
-markDamage :: ObjectId.ObjectId -> Natural.Natural -> GameState.GameState -> GameState.GameState
+markDamage :: ObjectId.ObjectId -> Natural -> GameState.GameState -> GameState.GameState
 markDamage oid n gs =
   gs {GameState.objects = Map.adjust (\o -> o {Object.damage = n}) oid (GameState.objects gs)}
+
+-- The events recorded so far this turn, in order, WITHOUT the EventGroup each
+-- carries. Which events were simultaneous is a question only
+-- Pawl.Engine.Event.eventTriggers asks (CR 603.10a), and it reads the log itself;
+-- an assertion about what happened wants the events alone.
+eventsOf :: GameState.GameState -> [GameEvent.GameEvent]
+eventsOf = fmap snd . Foldable.toList . GameState.events
 
 -- The damage events recorded so far this turn, in order. Replaces the
 -- GameState.damageEvents list P4 folded into the one turn-scoped log.
 damageEventsOf :: GameState.GameState -> [DamageEvent.DamageEvent]
-damageEventsOf gs = Maybe.mapMaybe Event.damageOf (Foldable.toList (GameState.events gs))
+damageEventsOf gs = Maybe.mapMaybe Event.damageOf (eventsOf gs)
 
 -- The zone changes recorded so far this turn, in order.
 zoneChangesOf :: GameState.GameState -> [ZoneChange.ZoneChange]
-zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (Foldable.toList (GameState.events gs))
+zoneChangesOf gs = Maybe.mapMaybe Event.movedOf (eventsOf gs)
 
 -- Who revealed what, so far this turn, in order (CR 701.20a). Projects the
 -- snapshot down to the card's NAME: a reveal shows every characteristic, but the
 -- name is what identifies the card to the table and the only part an assertion
 -- can write down legibly. A test that needs more reads Event.revealOf directly.
 revealsOf :: GameState.GameState -> [(PlayerId.PlayerId, CardName.CardName)]
-revealsOf gs = fmap (fmap PC.name) (Maybe.mapMaybe Event.revealOf (Foldable.toList (GameState.events gs)))
+revealsOf gs = fmap (fmap PC.name) (Maybe.mapMaybe Event.revealOf (eventsOf gs))
 
 -- The battlefield objects that are tokens (CR 111.1) rather than cards.
 tokensOf :: GameState.GameState -> [ObjectId.ObjectId]
@@ -1071,7 +1080,7 @@ tokensOf gs = filter isToken (Set.toList (GameState.battlefield gs))
 -- last sentence turns on the difference, since a creature put onto the
 -- battlefield attacking is in that record and never appears here.
 attackerDeclarationsOf :: GameState.GameState -> [ObjectId.ObjectId]
-attackerDeclarationsOf gs = Maybe.mapMaybe declared (Foldable.toList (GameState.events gs))
+attackerDeclarationsOf gs = Maybe.mapMaybe declared (eventsOf gs)
   where
     declared event = case event of
       GameEvent.AttackerDeclared oid _ -> Just oid
@@ -1089,10 +1098,24 @@ emptyCharacteristics = Projection.project (ObjectId.MkObjectId 999) (Setup.empty
 -- replaces read like an append, so nesting two calls silently dropped the first
 -- (#164), and the two-event case had to be spelled with a trailing
 -- Event.recordEvent.
+--
+-- Each event gets its OWN EventGroup, which is what a hand-built list means: the
+-- fixture states a sequence, and nothing in it says two of the events were the
+-- single event CR 704.3 or CR 608.2f describes. A test that wants simultaneity
+-- goes through the funnels that stamp it (Event.simultaneously), since a fixture
+-- asserting it directly would be asserting the answer.
+--
+-- GameState.nextEventGroup is advanced PAST them for the same reason: a test that
+-- goes on to run a real funnel is continuing the sequence, so what that funnel
+-- records must land in a LATER group. Leaving the counter where it was would put
+-- the fixture's last event and the funnel's first in one group and claim they
+-- were simultaneous.
 withEvents :: [GameEvent.GameEvent] -> GameState.GameState -> GameState.GameState
 withEvents events gs =
   gs
-    { GameState.events = Seq.fromList events,
+    { GameState.events = Seq.fromList (zipWith (\n event -> (EventGroup.MkEventGroup n, event)) [0 ..] events),
+      GameState.nextEventGroup = EventGroup.MkEventGroup (Natural.length events),
+      GameState.eventGroupDepth = 0,
       GameState.scannedThrough = 0,
       GameState.damageScannedThrough = 0
     }
@@ -1164,7 +1187,7 @@ tapObject oid gs =
 -- Put `n` counters of a kind directly onto an object's per-incarnation state,
 -- bypassing the PutCounters opcode -- so a projection or SBA test can set up
 -- counters without resolving a spell.
-addCounter :: CounterKind.CounterKind -> Natural.Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+addCounter :: CounterKind.CounterKind -> Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 addCounter kind n oid gs =
   let bump obj = obj {Object.counters = Map.insertWith (+) kind n (Object.counters obj)}
    in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
@@ -1201,14 +1224,14 @@ attachTo rider host gs =
 -- Put `n` counters of a player-counter kind directly onto a player, bypassing
 -- the diversion/effect that would add them -- so an SBA or cost test can set up
 -- poison or energy without resolving anything.
-addPlayerCounter :: PlayerCounterKind.PlayerCounterKind -> Natural.Natural -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
+addPlayerCounter :: PlayerCounterKind.PlayerCounterKind -> Natural -> PlayerId.PlayerId -> GameState.GameState -> GameState.GameState
 addPlayerCounter kind n pid gs =
   let bump player = player {Player.counters = Map.insertWith (+) kind n (Player.counters player)}
    in gs {GameState.players = Map.adjust bump pid (GameState.players gs)}
 
 -- How many counters of a kind an object has (absent kind = zero). The object
 -- mirror of playerCounterOf below.
-counterOf :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState -> Natural.Natural
+counterOf :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState -> Natural
 counterOf kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 
@@ -1218,7 +1241,7 @@ onBattlefield :: ObjectId.ObjectId -> GameState.GameState -> Bool
 onBattlefield oid gs = fmap Object.zone (Game.lookupObject oid gs) == Just Zone.Battlefield
 
 -- How many counters of a kind a player has (absent kind = zero).
-playerCounterOf :: PlayerCounterKind.PlayerCounterKind -> PlayerId.PlayerId -> GameState.GameState -> Natural.Natural
+playerCounterOf :: PlayerCounterKind.PlayerCounterKind -> PlayerId.PlayerId -> GameState.GameState -> Natural
 playerCounterOf kind pid gs =
   maybe 0 (Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
 
@@ -1312,6 +1335,8 @@ oneMountainState mountain ph =
           GameState.manaPool = Map.empty,
           GameState.combat = Combat.emptyCombat,
           GameState.events = Seq.empty,
+          GameState.nextEventGroup = EventGroup.first,
+          GameState.eventGroupDepth = 0,
           GameState.lastKnown = Map.empty,
           GameState.scannedThrough = 0,
           GameState.controlWhenTriggered = Map.empty,

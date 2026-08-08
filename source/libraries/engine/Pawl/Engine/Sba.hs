@@ -468,8 +468,21 @@ checkStateBasedActions = Monad.void performStateBasedActions
 -- Monadic because CR 704.5f's put-into-graveyard and CR 704.5g's destruction both
 -- go through funnels that can raise a CR 616 replacement prompt: a creature dying
 -- with two applicable death-replacements must ask its controller which to apply.
+--
+-- The whole pass is ONE event, which Event.simultaneously stamps on everything it
+-- records: CR 704.3 performs all applicable state-based actions "simultaneously
+-- as a single event". That is the rule every classification below already rests
+-- on -- each is computed from the SAME pre-pass board -- so the bracket only
+-- carries into the event log a fact this function has always asserted. What it
+-- buys is CR 603.10a's look-back: a permanent this pass buries is on the board a
+-- permanent it buries alongside is read against.
+--
+-- The bracket spans the whole pass and not each victim, which is the rule's own
+-- scope: the put-into-graveyard batch, the destruction batch and the departures
+-- are one check, and splitting them would make CR 704.3's "simultaneously" a
+-- sequence again.
 performStateBasedActions :: Game Bool
-performStateBasedActions = do
+performStateBasedActions = Event.simultaneously $ do
   gs <- State.get
   let -- CR 704.5f/g are checked against the state BEFORE any of them apply: SBAs
       -- are simultaneous. Project the whole board once (one gather) and judge each
