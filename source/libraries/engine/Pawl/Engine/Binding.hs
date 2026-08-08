@@ -55,30 +55,33 @@ copySource = SlotName.MkSlotName (Text.pack "copySource")
 triggerSource :: SlotName
 triggerSource = SlotName.MkSlotName (Text.pack "self")
 
--- CR 109.5: the reserved slot under which an ability's CONTROLLER is bound
--- ("you"), so a targetless self-referential clause -- Sarcomancy's "deals 1
--- damage to you" -- is a slot read rather than a new opcode.
+-- CR 109.5: the reserved slot under which a spell's or an ability's CONTROLLER
+-- is bound ("you"), so a targetless self-referential clause -- Sarcomancy's
+-- "deals 1 damage to you" -- is a slot read rather than a new opcode.
 --
--- Stamped on BOTH ability paths, because the rule defines the word for both:
--- "For an activated ability, this is the player who activated the ability. For
--- a triggered ability, this is the controller of the object when the ability
--- triggered". Pawl.Engine.Activate.activateAbility answers the first;
--- Pawl.Engine.Engine.placeBorne answers the second. CR 725.2's monarch pair is
--- the third stamp site (Pawl.Engine.Monarch.placeInherent): those abilities
--- have no object for CR 109.5's second sentence to name a controller of, and CR
--- 725.2 supplies one itself -- "controlled by the player who was the monarch at
--- the time the abilities triggered".
+-- Stamped on ALL THREE carriers, because rule 109.5 defines the word for all
+-- three. "The words 'you' and 'your' on an object refer to the object's
+-- controller, its would-be controller (if a player is attempting to play, cast,
+-- or activate it)" covers a spell, and Pawl.Engine.Cast.castSpell answers it at
+-- CR 601.2i with the caster, who is the spell's controller. "For an activated
+-- ability, this is the player who activated the ability. For a triggered
+-- ability, this is the controller of the object when the ability triggered"
+-- covers the other two: Pawl.Engine.Activate.activateAbility answers the first,
+-- Pawl.Engine.Engine.placeBorne the second. CR 725.2's monarch pair is the fourth
+-- stamp site (Pawl.Engine.Monarch.placeInherent): those abilities have no object
+-- for CR 109.5's triggered-ability sentence to name a controller of, and CR 725.2
+-- supplies one itself -- "controlled by the player who was the monarch at the
+-- time the abilities triggered".
 --
--- A SPELL binds nothing here (#719). Every spell in the pool that says "you"
--- says it through an opcode carrying a PlayerRef, which Pawl.Engine.Resolve
--- answers from the resolving controller with no slot involved; a spell mode
--- reading this slot is a failing test rather than a silent no-op, under the same
--- "declared slots == read slots" equality lint that forbids declaring it.
+-- Most spells that say "you" never touch this slot: they say it through an
+-- opcode carrying a PlayerRef, which Pawl.Engine.Resolve answers from the
+-- resolving controller with no slot involved. The shape that needs the slot is
+-- damage, whose recipient is an ObjectRef whose only player-reaching arm is a
+-- bound one -- Char's "and 2 damage to you" (Pawl.CastSpec's Char case).
 --
 -- "No card's targetSpecs may name it" is lint-enforced as for the names above,
--- by a sweep that has to reach the ABILITIES to mean anything here: a card
--- declaring a "you" target spec on one would be prompted for a target and have
--- the answer clobbered by setYou.
+-- and reaches spells and abilities alike: a card declaring a "you" target spec
+-- would be prompted for a target and have the answer clobbered by setYou.
 you :: SlotName
 you = SlotName.MkSlotName (Text.pack "you")
 
