@@ -308,4 +308,21 @@ data GameEvent
     -- entry designation (CR 709.5d) and the later one (CR 709.5f) cannot disagree
     -- about what "fully" means.
     HalfUnlocked ObjectId.ObjectId CardName.CardName Bool
+  | -- | CR 708.7: a face-down permanent was turned face up. CR 708.8 makes that a
+    -- change to one permanent's copiable values rather than a zone change, so no
+    -- Moved event describes it and nothing else in this list carries it.
+    --
+    -- The PERMANENT by id and nothing else. CR 702.37e's special action turns
+    -- over exactly one permanent, and the id is all any reading of the rule
+    -- needs: the SELF-scoped condition compares it against the bearer, and the
+    -- watcher-scoped form CR 708.7 also admits would filter on it (#959).
+    --
+    -- No PLAYER, for the reason HalfUnlocked carries none: CR 702.37e's action
+    -- has a taker, but the trigger is worded about the permanent BEING turned
+    -- face up, and CR 603.3a reads the ability's controller off its source.
+    --
+    -- One DIRECTION only. Turning a permanent face down (CR 708.2a's first
+    -- sentence) is the opposite change and would be its own event -- and no
+    -- printed card triggers on it, so there would be nothing to feed.
+    TurnedFaceUp ObjectId.ObjectId
   deriving (Eq, Ord, Show)

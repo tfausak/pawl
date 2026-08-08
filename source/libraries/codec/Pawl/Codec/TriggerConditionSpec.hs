@@ -2,9 +2,11 @@
 
 module Pawl.Codec.TriggerConditionSpec where
 
+import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
@@ -18,6 +20,9 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Types.TurnScope as TurnScope
 
+-- | At least one case per TriggerCondition constructor. RoomFullyUnlocked gets
+-- two, one per PlayerRelation, since CR 109.5's "you" against "an opponent" is
+-- the whole of that payload.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
   -- CR 603.6a.
@@ -244,6 +249,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SpellCast (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Or [Filter.HasCardType CardType.Instant, Filter.HasCardType CardType.Sorcery]]))
       """ {"type":"SpellCast","value":{"type":"And","value":[{"type":"ControlledBy","value":{"type":"You"}},{"type":"Or","value":[{"type":"HasCardType","value":{"type":"Instant"}},{"type":"HasCardType","value":{"type":"Sorcery"}}]}]}} """
+  -- CR 709.5h. The payload is the DOOR's own name (CR 709.4a), which is what
+  -- separates two unlock triggers printed on one Room.
+  Spec.it s "SelfHalfUnlocked round-trips its door" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")))
+      """ {"type":"SelfHalfUnlocked","value":"Steaming Sauna"} """
   -- CR 709.5i. The payload is a PlayerRelation, read against the controller of the
   -- permanent that became fully unlocked. BOTH relations, since the two are what
   -- separate "you fully unlock" from an opponent doing it.
@@ -274,3 +288,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.AnyOf [TriggerCondition.PermanentEnters (Filter.HasCardType CardType.Enchantment), TriggerCondition.RoomFullyUnlocked PlayerRelation.You])
       """ {"type":"AnyOf","value":[{"type":"PermanentEnters","value":{"type":"HasCardType","value":{"type":"Enchantment"}}},{"type":"RoomFullyUnlocked","value":{"type":"You"}}]} """
+  -- CR 708.7. Nullary: the bearer is CR 113.7a's source and the rule leaves
+  -- nothing else for the condition to name.
+  Spec.it s "SelfTurnedFaceUp" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfTurnedFaceUp
+      """ {"type":"SelfTurnedFaceUp"} """

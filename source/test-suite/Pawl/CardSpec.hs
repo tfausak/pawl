@@ -410,6 +410,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Recursive: a branch of an AnyOf may be any condition, StateIs included, so
   -- the traversal has to go through rather than stop here.
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionCounts conditions
+  -- CR 708.7's condition is nullary, so there is nothing in it to be a Quantity.
+  TriggerCondition.SelfTurnedFaceUp -> []
   -- CR 603.6a's Filter is a predicate over the entering permanent, and a
   -- Filter holds no Count (Pawl.Types.Filter's atoms are all characteristics).
   TriggerCondition.PermanentEnters _ -> []
@@ -1400,6 +1402,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Recursive, for triggerConditionCounts' reason: Balemurk Leech's AnyOf holds a
   -- PermanentEnters, whose Filter would otherwise never be swept.
   TriggerCondition.AnyOf conditions -> concatMap triggerConditionFilters conditions
+  -- CR 708.7's condition is nullary, so there is nothing in it to be a Filter.
+  TriggerCondition.SelfTurnedFaceUp -> []
   TriggerCondition.PermanentDies f -> [f]
   TriggerCondition.StateIs condition -> conditionFilters condition
   TriggerCondition.SelfEnters -> []

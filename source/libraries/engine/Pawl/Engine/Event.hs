@@ -157,6 +157,7 @@ movedOf event = case event of
   -- change; this one only says the move WAS a countering. The Discarded case.
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -177,6 +178,7 @@ damageOf event = case event of
   GameEvent.AttackerDeclared _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -197,6 +199,7 @@ revealOf event = case event of
   GameEvent.AttackerDeclared _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.HalfUnlocked {} -> Nothing
+  GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
   GameEvent.LifeGained _ _ -> Nothing
@@ -2017,6 +2020,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2061,6 +2065,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2082,6 +2087,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2107,6 +2113,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2139,6 +2146,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2175,6 +2183,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2205,6 +2214,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2232,6 +2242,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2262,6 +2273,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2292,6 +2304,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2335,6 +2348,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2368,6 +2382,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2400,6 +2415,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.Revealed _ _ -> False
     GameEvent.AttackerDeclared _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2443,6 +2459,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2482,6 +2499,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2527,6 +2545,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
@@ -2561,6 +2580,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2586,6 +2606,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AttackerDeclared _ -> False
     GameEvent.SpellCountered _ -> False
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.LoyaltyAbilityActivated _ -> False
     GameEvent.LifeLost _ _ -> False
     GameEvent.LifeGained _ _ -> False
@@ -2617,6 +2638,7 @@ matchesTrigger gs bearer you cond event = case cond of
       Nothing -> False
       Just _ -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
@@ -2641,6 +2663,38 @@ matchesTrigger gs bearer you cond event = case cond of
   -- other door was the one that opened must not fire this ability.
   TriggerCondition.SelfHalfUnlocked half -> case event of
     GameEvent.HalfUnlocked oid name _ -> oid == bearer && name == half
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.SpellCast _ _ -> False
+    GameEvent.CountersRemoved {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 708.7 through CR 603.2: the bearer is the permanent that turned over.
+  -- SelfEnters' shape -- a bare comparison of ids, with nothing about the
+  -- permanent's characteristics read, so no CR 608.2h fallback is reachable.
+  --
+  -- The BEARER check is what keeps one player's face-up Skirk Marauder from
+  -- firing off a different permanent turning over; Pawl.FaceDownSpec seats a
+  -- second face-down permanent on the same board to prove it.
+  --
+  -- Nothing here asks whether the permanent had ALREADY entered the battlefield.
+  -- CR 708.7 leaves turning face up something only a permanent can be doing, and
+  -- FaceDown.turnFaceUp is the sole writer of this event -- CR 708.3's
+  -- face-down ENTRY writes a Moved event and never this one, which is what makes
+  -- CR 708.8's last sentence fall out rather than needing a clause.
+  TriggerCondition.SelfTurnedFaceUp -> case event of
+    GameEvent.TurnedFaceUp oid -> oid == bearer
+    GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast _ _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
@@ -2681,6 +2735,7 @@ matchesTrigger gs bearer you cond event = case cond of
         Just controller -> case relation of
           PlayerRelation.You -> controller == you
           PlayerRelation.Opponent -> controller /= you
+    GameEvent.TurnedFaceUp _ -> False
     GameEvent.SpellCast _ _ -> False
     GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
@@ -3008,6 +3063,12 @@ eventBindingSlots cond = case cond of
   TriggerCondition.AnyOf conditions -> case fmap eventBindingSlots conditions of
     [] -> Set.empty
     slots : rest -> List.foldl' Set.intersection slots rest
+  -- CR 708.7's event names the permanent and nothing else, and CR 113.7a's source
+  -- slot already names it -- so this is a DELIBERATE empty rather than an arm
+  -- nobody wrote. eventBindings' fallthrough would answer the same for a
+  -- condition that had been forgotten, which is exactly why it is spelled out
+  -- here: Pawl.TriggerSpec pins the two against each other.
+  TriggerCondition.SelfTurnedFaceUp -> Set.empty
   -- CR 601.2i's spell, the object the event names and nobody the bearer already
   -- does. Guaranteed given a match for the reason CR 615.13's amount is:
   -- GameEvent.SpellCast carries an ObjectId unconditionally, so no shape of the
@@ -3203,6 +3264,7 @@ eventTriggers events gs =
         GameEvent.AttackerDeclared _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
+        GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -3273,6 +3335,7 @@ eventTriggers events gs =
         GameEvent.AttackerDeclared _ -> Map.empty
         GameEvent.SpellCountered _ -> Map.empty
         GameEvent.HalfUnlocked {} -> Map.empty
+        GameEvent.TurnedFaceUp _ -> Map.empty
         GameEvent.LoyaltyAbilityActivated _ -> Map.empty
         GameEvent.LifeLost _ _ -> Map.empty
         GameEvent.LifeGained _ _ -> Map.empty
@@ -3404,6 +3467,9 @@ functionsInGraveyard cond = case cond of
   -- of whose clauses only works on the battlefield is not a graveyard ability.
   -- Vacuously True for the empty list, which no card writes.
   TriggerCondition.AnyOf conditions -> all functionsInGraveyard conditions
+  -- CR 708.7 is about a PERMANENT being turned face up, and CR 110.1 puts
+  -- permanents on the battlefield alone, so CR 113.6k never reaches this.
+  TriggerCondition.SelfTurnedFaceUp -> False
   -- CR 603.8's state triggers are not event triggers, so this scan is not their
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> False
@@ -3508,6 +3574,9 @@ controllerTurnScoped cond = case cond of
   -- enough to make the answer no. Vacuously True for the empty list, which no card
   -- writes.
   TriggerCondition.AnyOf conditions -> all controllerTurnScoped conditions
+  -- CR 702.37e offers the special action "any time you have priority", which is
+  -- every turn and not only the controller's own.
+  TriggerCondition.SelfTurnedFaceUp -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
@@ -3629,6 +3698,11 @@ stateTriggers gs
               -- thereafter, so a state read would fire it again every time the
               -- board settles.
               TriggerCondition.SelfHalfUnlocked _ -> False
+              -- CR 708.7 is an EVENT trigger for the same reason: it fires on the
+              -- permanent BEING turned face up, and CR 708.8 leaves it face up
+              -- thereafter -- so a state read would fire it again every settle,
+              -- for as long as the permanent stayed on the battlefield.
+              TriggerCondition.SelfTurnedFaceUp -> False
               -- CR 714.2b is an EVENT trigger too: it fires on the moment counters
               -- are PUT ON, not on the count standing at or above N -- which is
               -- exactly the difference CR 603.8 draws, and the reason a Saga does

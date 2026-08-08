@@ -9,6 +9,12 @@
 -- action a player takes, and an action needs a place to be offered from and
 -- performed in.
 --
+-- The one thing this module tells the rest of the engine about is CR 708.7's
+-- event: turning a permanent face up is not a zone change, so no other funnel
+-- records it, and the ability that watches for it is one the permanent only
+-- regains as it turns over. That is a GameEvent constructor and never an effect's
+-- identity -- Pawl.Engine.Event classifies it like any other.
+--
 -- THE INVARIANT: rule 702.37 is part of the rulebook, so reading
 -- Keyword.Morph's cost here is the same closed-half act as reading a Phase. This
 -- module never asks which CARD is underneath.
@@ -18,6 +24,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Cost as Cost
+import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
@@ -25,6 +32,7 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
 import Pawl.Types.Game (Game)
+import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
@@ -110,7 +118,7 @@ turnableFaceUp pid gs =
 -- battlefield entry, so no enters-the-battlefield ability is offered one.
 --
 -- CR 708.11's "as [this permanent] is turned face up" abilities are NOT applied
--- (#917), and no ability triggers on the turning-over either (#918).
+-- (#917).
 turnFaceUp :: PlayerId -> ObjectId -> Game ()
 turnFaceUp pid oid = do
   before <- State.get
@@ -125,7 +133,7 @@ turnFaceUp pid oid = do
           -- CR 708.8: the copiable values revert, which for pawl is the status
           -- flipping -- Game.faceOf reads it, so the substitution simply stops
           -- applying and the card's own face answers again.
-          Payment.Paid ->
+          Payment.Paid -> do
             State.modify'
               ( \gs ->
                   gs
@@ -133,3 +141,22 @@ turnFaceUp pid oid = do
                         Map.adjust (\o -> o {Object.facing = Facing.FaceUp}) oid (GameState.objects gs)
                     }
               )
+            -- CR 708.7 through CR 603.2: Skirk Marauder's "when this creature is
+            -- turned face up" watches for this, and this is the only place in the
+            -- engine that writes it.
+            --
+            -- AFTER the status write, matching CR 702.37e's own order. Not
+            -- observable either way: CR 117.5's scan runs at
+            -- Engine.settleForPriority and reads the log later, never between
+            -- these two lines, so no reader can see the permanent mid-turnover.
+            --
+            -- Inside the PAID branch, which IS observable: turnFaceUp is a
+            -- no-op for a permanent that is already face up (canTurnFaceUp's
+            -- first conjunct), and such a permanent has its text back -- so an
+            -- event recorded unconditionally would fire the ability again on a
+            -- second, refused call. Pawl.FaceDownSpec asks twice to prove it.
+            -- The unpaid branch is quiet for a different reason: CR 702.37e's
+            -- reject-not-repair restores the state the attempt began with, log
+            -- and all, and CR 708.2a leaves the still-face-down permanent with
+            -- no ability that could have seen the event anyway.
+            State.modify' (Event.recordEvent (GameEvent.TurnedFaceUp oid))

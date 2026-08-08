@@ -1310,6 +1310,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- Recursive, since CR 612.1 reaches whatever the branches hold: an AnyOf over a
   -- PermanentEnters has a Filter inside it that a text-changing effect can rewrite.
   TriggerCondition.AnyOf conditions -> TriggerCondition.AnyOf (fmap (rewriteTriggerCondition pairs) conditions)
+  -- CR 708.7 names no subtype at all -- the condition is nullary -- so a CR 612.1
+  -- text change has nothing in it to rewrite.
+  TriggerCondition.SelfTurnedFaceUp -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

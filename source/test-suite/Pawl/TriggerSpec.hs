@@ -3602,6 +3602,9 @@ representativeEvents cond =
         TriggerCondition.AnyOf conditions -> case conditions of
           [] -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
           c : cs -> Foldable.foldr1 (<>) (fmap representativeEvents (c NonEmpty.:| cs))
+        -- CR 708.7's own event, and the only one this condition admits, on the
+        -- BEARER -- so the pair really matches.
+        TriggerCondition.SelfTurnedFaceUp -> one (GameEvent.TurnedFaceUp departed)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3637,7 +3640,8 @@ everyTriggerCondition =
     -- EMPTY -- which is the case the union-versus-intersection call in
     -- Event.eventBindingSlots turns on. A union would claim `became` here and the
     -- pin below would catch it.
-    TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You]
+    TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
+    TriggerCondition.SelfTurnedFaceUp
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
