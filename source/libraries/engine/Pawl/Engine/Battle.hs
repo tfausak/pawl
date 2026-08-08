@@ -246,10 +246,12 @@ designateProtector pc controller oid = do
 -- and a battle with no battle types (CR 310.8a's other branch) has no such ability.
 -- `battleTypes` above is where that gate is stated once.
 --
--- Single mode, no targets, ChooseExactly 1, and Mandatory: rule 310.11b's exile is
--- not optional. The "you may" governs only the casting that follows it, which is
--- why it is the OFFER's own prompt (Prompt.OfferedCast) rather than the mode's
--- CR 603.5 optionality -- a mode-wide "may" would let a player decline the exile.
+-- Single mode, one Mandatory clause, no targets, ChooseExactly 1: rule 310.11b's
+-- exile is not optional. The "you may" governs only the casting that follows it,
+-- and it is the OFFER's own prompt (Prompt.OfferedCast) rather than CR 603.5
+-- optionality because this "may" is the RULE's, printed on no card -- so there
+-- is no printed clause for it to ride. Splitting the exile and the cast into two
+-- clauses would be the wrong shape for the same reason.
 --
 -- TWO effects for one sentence, joined by a slot, because CR 400.7 makes the two
 -- "it"s two objects: the permanent that was on the battlefield is exiled, and

@@ -1441,8 +1441,10 @@ putCounters cause oid kind n = do
                   -- ability off nothing.
                   recordEvent (GameEvent.CountersPut target settledKind before (before + settledCount)) bumped
 
--- CR 122: take counters off an object, recording the CR 120.3h CountersRemoved
--- event from the before/after pair so a trigger can read the crossing.
+-- CR 122: take counters off an object, recording a CountersRemoved event from
+-- the before/after pair so a trigger can read the crossing. That event's other
+-- producer is CR 120.3h's damage to a battle; it belongs to neither rule in
+-- particular.
 --
 -- NO CR 614.16 loop, unlike putCounters above, and that asymmetry is the rule's
 -- rather than a shortcut: 614.16 replaces a PLACEMENT -- "if an effect would put

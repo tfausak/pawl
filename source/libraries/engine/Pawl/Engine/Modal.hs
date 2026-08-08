@@ -118,11 +118,12 @@ instanceSlot mi slot = case ModeInstance.occurrence mi of
 -- sequence"): ModeIndex order IS printed order, and the chosen Seq is sorted, so
 -- a mode chosen twice contributes two adjacent instances.
 --
--- Modes rather than a flat effect list because a mode is the unit CR 603.5's
--- "may" covers (Mode.optionality) and the unit CR 700.2c scopes targets to, so
--- a resolver that flattened first could not ask the one question per mode that
--- Resolve.resolveModes asks. The instance rides along so the prompt can name
--- which mode is asking and so the resolver can find that instance's own slots.
+-- Modes rather than a flat effect list because a mode is the unit CR 700.2c
+-- scopes targets to, and because it holds the clauses CR 603.5's "may" and CR
+-- 118.12a's "unless" each cover -- so a resolver that flattened first could ask
+-- neither question where it belongs. The instance rides along so the prompt can
+-- name which mode is asking and so the resolver can find that instance's own
+-- slots.
 chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Modal.Modal card -> [(ModeInstance.ModeInstance, Mode.Mode card)]
 chosenModes chosen m =
   let modeAt mi = fmap ((,) mi) (modeAtIndex (ModeInstance.index mi) m)

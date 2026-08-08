@@ -234,8 +234,8 @@ durationSlots duration = case duration of
   Duration.ForAsLongAs condition -> conditionSlots condition
   Duration.UntilEndOfCombat -> Set.empty
 
--- Every slot a whole MODE reads: its effect list's, plus the one CR 118.12a's
--- "unless [a player] pays" names its payer by. What the D4 dataflow lint asks,
+-- Every slot a whole MODE reads: every clause's effects', plus every payer CR
+-- 118.12a's "unless [a player] pays" names. What the D4 dataflow lint asks,
 -- since a payer slot no effect ALSO reads would otherwise dangle unnoticed. Mana
 -- Leak's Counter happens to read the very slot its "unless" names, so the lint's
 -- answer is the same either way for the one card in the pool; a card whose payer
