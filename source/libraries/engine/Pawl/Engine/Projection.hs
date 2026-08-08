@@ -1418,6 +1418,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition
   TriggerCondition.PlayerDiscards _ -> condition
+  TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition

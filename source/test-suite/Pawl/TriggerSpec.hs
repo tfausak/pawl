@@ -93,7 +93,11 @@
 -- trigger again, this time with a payload that aims at a TARGET PLAYER and the
 -- keyword half of the spell filter (CR 702.90 infect), which is the pool's first
 -- poison counter given to someone chosen rather than derived, with Hand of the
--- Praetors -- `handOfThePraetorsSpec`.
+-- Praetors -- `handOfThePraetorsSpec`. CR 725.1's crowning trigger, matched
+-- against the EVENT so an entry's crown, a targeted crown and CR 725.2's stolen
+-- crown all fire it alike, read through CR 109.5's "you" on a three-seat board
+-- where "you" and "an opponent" come apart, with Custodi Lich --
+-- `monarchTriggerSpec`.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -4226,6 +4230,13 @@ representativeEvents cond =
         -- condition under any event, so the floor is empty either way.
         TriggerCondition.SagaFinalChapterTriggers _ ->
           one (GameEvent.AbilityTriggered departed S.alice (TriggerCondition.SelfCountersReached CounterKind.Lore 3))
+        -- CR 725.1's own event, and the only one this condition admits. CR 725.3
+        -- makes it name exactly one player, so there is no second shape of the
+        -- event for the floor to differ on. bob rather than the perspective
+        -- player, on the SelfAttacks arm's reasoning: an arm that stamped CR
+        -- 109.5's "you" instead of the crowned player would still agree with
+        -- eventBindingSlots here if the two coincided.
+        TriggerCondition.PlayerBecomesMonarch _ -> one (GameEvent.BecameMonarch S.bob)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -4271,7 +4282,14 @@ everyTriggerCondition =
     TriggerCondition.SelfTurnedFaceUp,
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
     TriggerCondition.PermanentSacrificed,
-    TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You
+    TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
+    -- BOTH relations, on the SpellCast pair's reasoning above: an eventBindings
+    -- arm that had cased on the relation and stamped nothing under one of them
+    -- would go unseen if only one were listed. Custodi Lich prints the You form;
+    -- the Opponent form is the one no card in the pool bears yet (#1051), which
+    -- is exactly the inhabitant a hand-kept list is most likely to drop.
+    TriggerCondition.PlayerBecomesMonarch PlayerRelation.You,
+    TriggerCondition.PlayerBecomesMonarch PlayerRelation.Opponent
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -6133,6 +6151,172 @@ chaptersOnStackFrom oid gs =
         _ -> Nothing
    in Maybe.mapMaybe from (GameState.stack gs)
 
+-- Custodi Lich, {3}{B}{B} Creature -- Zombie Cleric 4/2: "When this creature
+-- enters, you become the monarch. Whenever you become the monarch, target player
+-- sacrifices a creature of their choice." Both printed sentences are in
+-- data/cards/custodi-lich.json; nothing is omitted.
+--
+-- The pool's producer for TriggerCondition.PlayerBecomesMonarch (CR 725.1). The
+-- card is its own trigger's cause -- the first ability crowns its controller and
+-- the second watches that crowning -- which makes the whole chain observable off
+-- one entry, and CR 725.2's crown steal reaches the same condition by a route
+-- the card has nothing to do with.
+--
+-- THREE SEATS throughout. At two players "you" and "an opponent" name
+-- complementary halves of a two-element set, so a relation-free arm and a You
+-- arm agree on every board; the third seat is what makes crowning somebody who
+-- is neither the Lich's controller nor the sacrifice victim expressible.
+--
+-- Distinct power/toughness on every creature (Lich 4/2, Boggart Brute 3/2,
+-- Goblin Piker 2/1, Bird Maiden 1/2, Bog Wraith 3/3) so no assertion below can
+-- pass on a numeric coincidence, and bob holds TWO creatures so CR 701.21a's
+-- choice is a real prompt rather than a forced single candidate.
+monarchTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+monarchTriggerSpec s registry =
+  let -- Names `victim` for every target slot that offers them. S.identityAnswer
+      -- picks the least Recipient, which would aim the edict at alice herself.
+      targetsPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      targetsPlayer victim p = case p of
+        Prompt.ChooseTargets _ _ _ sets ->
+          Map.mapMaybe
+            (\legal -> if Set.member (Recipient.ToPlayer victim) legal then Just (Recipient.ToPlayer victim) else Set.lookupMin legal)
+            sets
+        _ -> S.identityAnswer p
+      resolveAll :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      resolveAll answer gs = snd (Engine.runGamePure answer gs Engine.priorityLoop)
+      -- bob's two creatures and carol's one, on top of whatever the caller
+      -- built. carol is the control seat: nothing in either test should ever
+      -- touch her, so a payload that hit "a player" rather than the targeted one
+      -- is visible.
+      bystanders piker birdMaiden bogWraith base =
+        let (_, g1) = S.addCreature piker S.bob base
+            (_, g2) = S.addCreature birdMaiden S.bob g1
+         in snd (S.addCreature bogWraith S.carol g2)
+      -- CR 725.2's crown steal, driven by the damage EVENT rather than by a full
+      -- combat: Monarch.inherentMatch reads the recorded DamageEvent, and
+      -- ExpirySpec's monarch group drives the same rule the same way.
+      combatDamageTo monarch damager =
+        S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False 0 Nothing DamageKind.Combat)]
+   in Spec.describe s "MonarchTrigger" $ do
+        -- The whole chain off one entry: CR 603.6a's entry trigger crowns alice,
+        -- Effect.BecomeMonarch records CR 725.1's event, and the second ability
+        -- matches it.
+        Spec.it s "CR 725.1 Custodi Lich whole card: entering crowns alice, and that crowning fires her edict" $ do
+          custodiLich <- S.printingOf s registry "Custodi Lich"
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          bogWraith <- S.printingOf s registry "Bog Wraith"
+          let base = bystanders piker birdMaiden bogWraith (Setup.emptyGame S.threePlayers)
+              (lich, gs) = S.entersWithTrigger custodiLich S.alice base
+              after = resolveAll (targetsPlayer S.bob) gs
+          Spec.assertEqWith s "no monarch before the Lich resolved its entry trigger" (GameState.monarch gs) Nothing
+          Spec.assertEqWith s "CR 725.1 alice is the monarch" (GameState.monarch after) (Just S.alice)
+          Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the crowning recorded its event"
+          Spec.assertEqWith s "CR 701.21a the targeted bob lost exactly one of his two" (S.creaturesInPlay S.bob after) 1
+          Spec.assertEqWith s "carol, untargeted, lost none" (S.creaturesInPlay S.carol after) 1
+          Spec.assertBool s (S.onBattlefield lich after) "and alice's own Lich is untouched"
+          Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
+        -- CR 603.3a / 109.5: the relation is read against the ABILITY'S
+        -- CONTROLLER, so a crowning of somebody else is silence. Denethor, Stone
+        -- Seer's "target player becomes the monarch" is the pool's one way to
+        -- crown a chosen player, and it records the very same event the test
+        -- above matched -- so what separates the two tests is WHO was crowned and
+        -- nothing else.
+        Spec.it s "CR 603.3a/109.5 a crowning of bob does not fire alice's Custodi Lich" $ do
+          custodiLich <- S.printingOf s registry "Custodi Lich"
+          denethor <- S.printingOf s registry "Denethor, Stone Seer"
+          mountain <- S.printingOf s registry "Mountain"
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          bogWraith <- S.printingOf s registry "Bog Wraith"
+          let base = bystanders piker birdMaiden bogWraith (Setup.emptyGame S.threePlayers)
+              lands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) base [1 .. 4 :: Int]
+              -- addCreature, not entersWithTrigger: the Lich is ALREADY on the
+              -- battlefield with its entry trigger long since resolved, so the
+              -- only crowning in this test is Denethor's.
+              (lich, g1) = S.addCreature custodiLich S.alice lands
+              (denethorId, g2) = S.addCreature denethor S.alice g1
+              gs = g2 {GameState.priority = Just S.alice}
+              -- Denethor's two slots, named separately (CR 601.2c lets one
+              -- ability write "target" twice): the crown goes to bob, and the 3
+              -- damage to CAROL the player, so nothing on the board dies and a
+              -- creature count that moved can only have been a sacrifice. Any
+              -- OTHER slot -- which today means only the Lich's edict, if it
+              -- wrongly fired -- takes bob, so a trigger that should have stayed
+              -- silent is loud when it does not.
+              denethorAnswers = Map.fromList [(SlotName.MkSlotName (Text.pack "player"), Recipient.ToPlayer S.bob), (SlotName.MkSlotName (Text.pack "damage"), Recipient.ToPlayer S.carol)]
+              answer :: Prompt.Prompt r -> r
+              answer p = case p of
+                Prompt.ChooseTargets _ _ _ sets ->
+                  Map.mapMaybeWithKey
+                    ( \slot legal -> case Map.lookup slot denethorAnswers of
+                        Just wanted | Set.member wanted legal -> Just wanted
+                        _ -> if Set.member (Recipient.ToPlayer S.bob) legal then Just (Recipient.ToPlayer S.bob) else Set.lookupMin legal
+                    )
+                    sets
+                _ -> S.identityAnswer p
+              activated = case Face.activatedAbilities (S.combinedFace denethor) of
+                ability : _ -> S.runPure answer gs (Activate.activateAbility S.alice denethorId ability)
+                [] -> gs
+              after = resolveAll answer activated
+          Spec.assertEqWith s "no monarch going in" (GameState.monarch gs) Nothing
+          Spec.assertEqWith s "CR 725.1 bob, the targeted player, took the crown" (GameState.monarch after) (Just S.bob)
+          Spec.assertBool s (elem (GameEvent.BecameMonarch S.bob) (S.eventsOf after)) "and the event names bob, so there really was a crowning to match"
+          Spec.assertBool s (S.onBattlefield lich after) "alice's Lich is still on the battlefield to have watched it"
+          -- The discriminating trio: nobody sacrificed anything. Under a
+          -- relation-free arm bob would have lost one, and under an inverted
+          -- relation so would whoever the edict targeted.
+          Spec.assertEqWith s "bob kept both of his" (S.creaturesInPlay S.bob after) 2
+          Spec.assertEqWith s "carol kept hers" (S.creaturesInPlay S.carol after) 1
+          -- The ability really resolved in full, so "no sacrifice" cannot mean
+          -- "nothing happened": carol took Denethor's 3.
+          Spec.assertEqWith s "CR 115.4 carol, the any-target, took the 3" (S.lifeOf S.carol after) (Just 17)
+          Spec.assertEqWith s "the stack is empty, so no trigger is waiting" (GameState.stack after) []
+        -- CR 725.2's crown steal reaches the SAME condition by a route the card
+        -- has nothing to do with: the inherent ability has no source, and
+        -- Monarch.inherentMatch rather than Event.matchesTrigger is what fires
+        -- it. What the Lich matches is the crowning, not the entry that usually
+        -- causes one.
+        Spec.it s "CR 725.2 a stolen crown is a crowning, and fires the same trigger" $ do
+          custodiLich <- S.printingOf s registry "Custodi Lich"
+          boggartBrute <- S.printingOf s registry "Boggart Brute"
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          bogWraith <- S.printingOf s registry "Bog Wraith"
+          let base = bystanders piker birdMaiden bogWraith (S.withMonarch S.bob (Setup.emptyGame S.threePlayers))
+              (lich, g1) = S.addCreature custodiLich S.alice base
+              (brute, gs) = S.addCreature boggartBrute S.alice g1
+              after = resolveAll (targetsPlayer S.bob) (combatDamageTo S.bob brute gs)
+          Spec.assertEqWith s "bob wore the crown going in" (GameState.monarch gs) (Just S.bob)
+          Spec.assertEqWith s "CR 725.2 alice's creature took it off him" (GameState.monarch after) (Just S.alice)
+          Spec.assertBool s (S.onBattlefield lich after) "the Lich watched from the battlefield"
+          Spec.assertEqWith s "CR 725.1 alice's trigger fired: the targeted bob sacrificed one" (S.creaturesInPlay S.bob after) 1
+          Spec.assertEqWith s "carol lost none" (S.creaturesInPlay S.carol after) 1
+          Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+        -- The discriminating twin of the test above: the SAME board, the same
+        -- inherent ability, the same event shape -- only the creature that dealt
+        -- the damage differs, so the crown lands on carol instead of alice. An
+        -- arm that ignored the relation would fire here too.
+        Spec.it s "CR 725.2/109.5 a crown stolen by carol does not fire alice's trigger" $ do
+          custodiLich <- S.printingOf s registry "Custodi Lich"
+          boggartBrute <- S.printingOf s registry "Boggart Brute"
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          bogWraith <- S.printingOf s registry "Bog Wraith"
+          let base = bystanders piker birdMaiden bogWraith (S.withMonarch S.bob (Setup.emptyGame S.threePlayers))
+              (lich, g1) = S.addCreature custodiLich S.alice base
+              (_, gs) = S.addCreature boggartBrute S.alice g1
+              wraith = case filter (\oid -> S.soleFaceName oid gs == S.printingName bogWraith) (Game.zoneMembers Zone.Battlefield S.carol gs) of
+                oid : _ -> oid
+                [] -> S.noSource
+              after = resolveAll (targetsPlayer S.bob) (combatDamageTo S.bob wraith gs)
+          Spec.assertEqWith s "CR 725.2 carol took the crown" (GameState.monarch after) (Just S.carol)
+          Spec.assertBool s (elem (GameEvent.BecameMonarch S.carol) (S.eventsOf after)) "and the crowning event names carol"
+          Spec.assertBool s (S.onBattlefield lich after) "alice's Lich is still there, and still silent"
+          Spec.assertEqWith s "bob kept both of his" (S.creaturesInPlay S.bob after) 2
+          Spec.assertEqWith s "carol kept hers" (S.creaturesInPlay S.carol after) 1
+          Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   logSpec s registry
@@ -6186,3 +6370,4 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   kambalSpec s registry
   brinebornCutthroatSpec s registry
   handOfThePraetorsSpec s registry
+  monarchTriggerSpec s registry
