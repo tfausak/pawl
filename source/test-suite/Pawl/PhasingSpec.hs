@@ -11,8 +11,15 @@
 -- about a card. Goblin Piker stands beside it in the cases that need a permanent
 -- WITHOUT phasing, as the falsifier for an action that phased out the board.
 --
--- What is NOT asserted, because no card in the pool can reach it: CR 702.26g-j's
--- indirect phasing (#928), effects that phase a permanent out (#929), CR
+-- Pacifism joins them for CR 702.26g's indirect half, which needs an Aura and a
+-- host: it is the pool's minimal pair with the Crocodile, since its enchant pool
+-- is creatures.
+--
+-- What is NOT asserted, because no card in the pool can reach it: CR 702.26i's
+-- DIRECTLY phased-out Aura, which needs an Aura or Equipment that itself has
+-- phasing (#1032) -- CR 702.26h's tie-break between the two ways of phasing out
+-- is written in Pawl.Engine.Phasing and needs that same card to be observable --
+-- effects that phase a permanent out (#929), CR
 -- 702.26e/f's continuous-effect consequences (#930), and CR 702.26n's schedule for
 -- a permanent phased out under a player who has since left the game (#931) -- CR
 -- 702.26k's own clause is asserted below. CR 506.4's removal from combat is in
@@ -40,8 +47,10 @@ import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
@@ -79,14 +88,138 @@ tap oid gs =
 crocodileBoard :: Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
 crocodileBoard crocodile = S.addCreature crocodile S.alice (Setup.emptyGame S.bothPlayers)
 
+-- `owner` controls a Sandbar Crocodile, with an Aura `enchanter` controls
+-- attached to it. Attached directly, which is Pawl.CombatSpec's `pacifying`
+-- posture and for its reason: both printings are real, and a state fixture is
+-- the only way to reach an untap step with the Aura already on.
+enchantedCrocodile ::
+  Printing.Printing ->
+  Printing.Printing ->
+  PlayerId.PlayerId ->
+  PlayerId.PlayerId ->
+  GameState.GameState ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+enchantedCrocodile crocodile pacifism owner enchanter gs =
+  let (crocId, withCroc) = S.addCreature crocodile owner gs
+      (auraId, withAura) = S.addCreature pacifism enchanter withCroc
+   in (crocId, auraId, S.attach auraId crocId withAura)
+
+attachedHostOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Recipient.Recipient
+attachedHostOf oid gs = Game.lookupObject oid gs >>= Object.attachedTo
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Phasing" $ do
   phaseOutSpec s registry
   phaseInSpec s registry
   controllerSpec s registry
+  indirectSpec s registry
   untapOrderSpec s registry
   nonexistenceSpec s registry
   departureSpec s registry
+
+indirectSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+indirectSpec s registry = Spec.describe s "Indirect" $ do
+  -- CR 702.26g's first two sentences: "when a permanent phases out, any Auras,
+  -- Equipment, or Fortifications attached to that permanent phase out at the
+  -- same time. This alternate way of phasing out is known as phasing out
+  -- 'indirectly'."
+  --
+  -- alice controls both halves, which is the case that keeps CR 702.26a's "that
+  -- player" and the Aura's own controller from having to be told apart; the
+  -- split board is the labelled case below.
+  Spec.it s "CR 702.26g an Aura attached to a permanent that phases out phases out with it" $ do
+    crocodile <- S.printingOf s registry "Sandbar Crocodile"
+    pacifism <- S.printingOf s registry "Pacifism"
+    let (crocId, auraId, board) = enchantedCrocodile crocodile pacifism S.alice S.alice (Setup.emptyGame S.bothPlayers)
+        after = untapStep S.alice board
+    Spec.assertEqWith s "both were on the battlefield before the step" (fmap (`onBattlefield` board) [crocId, auraId]) [True, True]
+    Spec.assertEqWith s "and neither is afterwards" (fmap (`onBattlefield` after) [crocId, auraId]) [False, False]
+    -- The Crocodile phased out on CR 702.26a's own schedule; the Aura, which has
+    -- no phasing of its own, phased out because rule 702.26g dragged it.
+    Spec.assertEqWith s "the Crocodile phased out directly" (Phasing.phasedOutStatus crocId after) (Just (PhasedOut.Directly S.alice))
+    Spec.assertEqWith s "and the Aura indirectly" (Phasing.phasedOutStatus auraId after) (Just (PhasedOut.Indirectly S.alice))
+  -- CR 704.5m -- "if an Aura is attached to an illegal object or player, or is
+  -- not attached to an object or player, that Aura is put into its owner's
+  -- graveyard" -- is what CR 702.26g exists to keep off this Aura. Without the
+  -- indirect half the Aura is left on the battlefield with a host the game no
+  -- longer treats as existing, and the next state-based check buries it.
+  --
+  -- The second Pacifism is the POSITIVE CONTROL for a negative assertion: it is
+  -- attached to nothing, so rule 704.5m names it, and its arrival in the
+  -- graveyard is what proves the settle pass actually ran. Without it, an
+  -- assertion that the first Aura is not in the graveyard would pass just as
+  -- happily against a settle that never happened.
+  --
+  -- Counted rather than named, because CR 400.7 mints a fresh incarnation on the
+  -- way to the graveyard and the id that arrives is not the id that left. One
+  -- card there is the loose Aura; two would be rule 704.5m taking the phased-out
+  -- one as well, which is what this test exists to catch.
+  Spec.it s "CR 704.5m does not bury an Aura that phased out with its host" $ do
+    crocodile <- S.printingOf s registry "Sandbar Crocodile"
+    pacifism <- S.printingOf s registry "Pacifism"
+    let (_, auraId, enchanted) = enchantedCrocodile crocodile pacifism S.alice S.alice (Setup.emptyGame S.bothPlayers)
+        (looseId, board) = S.addCreature pacifism S.alice enchanted
+        settled = S.settleSba (untapStep S.alice board)
+    Spec.assertEqWith s "alice's graveyard was empty before" (length (Game.zoneMembers Zone.Graveyard S.alice board)) 0
+    Spec.assertEqWith s "and holds exactly one card after, so the pass ran" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
+    Spec.assertEqWith s "the one it buried is the unattached Aura" (onBattlefield looseId settled) False
+    Spec.assertEqWith s "the phased-out Aura is still phased out" (Phasing.isPhasedOut auraId settled) True
+    Spec.assertEqWith s "still exists" (Maybe.isJust (Game.lookupObject auraId settled)) True
+    Spec.assertEqWith s "and is still attached to its host" (attachedHostOf auraId settled) (attachedHostOf auraId board)
+  -- CR 702.26g's last sentence: "an Aura, Equipment, or Fortification that phased
+  -- out indirectly won't phase in by itself, but instead phases in along with the
+  -- permanent it's attached to."
+  Spec.it s "CR 702.26g the Aura phases in with its host, still attached" $ do
+    crocodile <- S.printingOf s registry "Sandbar Crocodile"
+    pacifism <- S.printingOf s registry "Pacifism"
+    let (crocId, auraId, board) = enchantedCrocodile crocodile pacifism S.alice S.alice (Setup.emptyGame S.bothPlayers)
+        gone = untapStep S.alice board
+        back = untapStep S.alice gone
+    Spec.assertEqWith s "both are back on the battlefield" (fmap (`onBattlefield` back) [crocId, auraId]) [True, True]
+    Spec.assertEqWith s "neither has a phased-out row left" (fmap (`Phasing.isPhasedOut` back) [crocId, auraId]) [False, False]
+    Spec.assertEqWith s "and the Aura is still attached to the Crocodile" (attachedHostOf auraId back) (Just (Recipient.ToCreature crocId))
+    -- And CR 704.5m has nothing to say about it once it is back, which is the
+    -- second half of "phases in ATTACHED".
+    Spec.assertEqWith s "which a settle pass leaves alone" (elem auraId (Game.zoneMembers Zone.Graveyard S.alice (S.settleSba back))) False
+  -- "Won't phase in by itself", as a board where by itself and with its host are
+  -- different answers: alice's Pacifism on BOB's Crocodile. The Aura phased out
+  -- under alice, so a schedule read off the stored player would bring it back at
+  -- HER untap step, alone, with its host still gone.
+  --
+  -- Labelled separately because the split changes who CR 702.26a's "that player"
+  -- is: bob controls the permanent with phasing, so it is bob's untap step that
+  -- moves anything at all here.
+  Spec.it s "CR 702.26g an indirectly phased-out Aura does not phase in on its own controller's schedule" $ do
+    crocodile <- S.printingOf s registry "Sandbar Crocodile"
+    pacifism <- S.printingOf s registry "Pacifism"
+    let (crocId, auraId, board) = enchantedCrocodile crocodile pacifism S.bob S.alice (Setup.emptyGame S.bothPlayers)
+        gone = untapStep S.bob board
+        alices = untapStep S.alice gone
+        bobs = untapStep S.bob alices
+    Spec.assertEqWith s "bob's untap step took both" (fmap (`onBattlefield` gone) [crocId, auraId]) [False, False]
+    Spec.assertEqWith s "the Aura phased out under alice, who controls it" (Phasing.phasedOutStatus auraId gone) (Just (PhasedOut.Indirectly S.alice))
+    Spec.assertEqWith s "alice's untap step brings back neither" (fmap (`onBattlefield` alices) [crocId, auraId]) [False, False]
+    Spec.assertEqWith s "and bob's brings back both" (fmap (`onBattlefield` bobs) [crocId, auraId]) [True, True]
+    Spec.assertEqWith s "with the Aura still on the Crocodile" (attachedHostOf auraId bobs) (Just (Recipient.ToCreature crocId))
+  -- CR 702.26j: "abilities that trigger when a permanent becomes attached or
+  -- unattached from an object or player don't trigger when that permanent phases
+  -- in or out." Asserted as the stronger fact that the phasing event appends
+  -- NOTHING to CR 608.2i's log across either transition -- which also restates CR
+  -- 702.26d's "zone-change triggers don't trigger".
+  --
+  -- NOT a proof of a rule 702.26j guard, because there is none to guard: pawl has
+  -- no attach or unattach event and no trigger condition keyed to one (#1033), so
+  -- this assertion would pass against an engine that had never heard of the rule.
+  -- It is a regression fence for the day one exists.
+  Spec.it s "CR 702.26j/702.26d neither transition emits an event" $ do
+    crocodile <- S.printingOf s registry "Sandbar Crocodile"
+    pacifism <- S.printingOf s registry "Pacifism"
+    let (_, _, board) = enchantedCrocodile crocodile pacifism S.alice S.alice (Setup.emptyGame S.bothPlayers)
+        gone = untapStep S.alice board
+        back = untapStep S.alice gone
+        events = length . GameState.events
+    Spec.assertEqWith s "phasing out logged nothing" (events gone) (events board)
+    Spec.assertEqWith s "and phasing in logged nothing" (events back) (events gone)
 
 phaseOutSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 phaseOutSpec s registry = Spec.describe s "PhaseOut" $ do
