@@ -106,7 +106,7 @@ spec s = Spec.describe s "Pawl.Codec.Modification" $ do
       Modification.fromJson
       (Modification.AddSupertype Supertype.Legendary)
       """ {"type":"AddSupertype","value":{"type":"Legendary"}} """
-  -- layer 4, CR 205.4b removal (Thermal Flux -> isn't snow).
+  -- layer 4, CR 205.4b removal (Arcum's Weathervane -> no longer snow).
   Spec.it s "RemoveSupertype" $
     Common.assertJsonCodec
       s

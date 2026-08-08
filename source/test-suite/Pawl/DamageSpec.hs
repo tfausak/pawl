@@ -919,8 +919,9 @@ legendRuleSpec s registry =
 
     -- CR 613.1d layer 4 / CR 205.4b / CR 704.5j, at gameplay level and end to
     -- end: Leyline of Singularity's "All nonland permanents are legendary" is
-    -- the pool's only printed GRANT of a supertype, and the legend rule is what
-    -- makes the grant observable. Two Goblin Pikers are a legal board until the
+    -- the pool's only printed grant of the LEGENDARY supertype, and the legend
+    -- rule is what makes the grant observable on the board rather than only in a
+    -- projection. Two Goblin Pikers are a legal board until the
     -- Leyline resolves; afterwards they are two same-named legends under one
     -- controller and CR 704.5j buries one.
     --

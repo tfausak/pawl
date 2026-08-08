@@ -69,9 +69,9 @@ data Modification
     -- SetCreatureSubtype already take: no printing grants two at once, and a card
     -- that did would author two modifications.
     AddSupertype Supertype.Supertype
-  | -- | layer 4, CR 613.1d / 205.4b: this object loses a supertype (Thermal Flux's
-    -- "Target snow permanent isn't snow until end of turn"). The removal beside
-    -- the grant above, and the same rule governs it: the object's OTHER supertypes
+  | -- | layer 4, CR 613.1d / 205.4b: this object loses a supertype (Arcum's
+    -- Weathervane's "Target snow land is no longer snow"). The removal beside the
+    -- grant above, and the same rule governs it: the object's OTHER supertypes
     -- survive, and neither its card types nor its subtypes move.
     RemoveSupertype Supertype.Supertype
   | ChangeSubtypeWord Subtype.Subtype Subtype.Subtype -- layer 3, CR 612 (Magical Hack, Artificial Evolution: from -> to)

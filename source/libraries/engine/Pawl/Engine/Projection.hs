@@ -163,9 +163,10 @@ applyModification lyr src cands gs oid m pc =
           pc {PC.cardTypes = Set.insert t (PC.cardTypes pc)}
         -- CR 205.4b: a gain is an INSERT into the supertype set, so every other
         -- supertype the object had survives, and neither its card types nor its
-        -- subtypes are touched. Leyline of Singularity making a legendary
-        -- artifact land's nonland half legendary changes nothing, since the set
-        -- already holds it.
+        -- subtypes are touched. Granting one the object already has is the
+        -- identity -- CR 205.4 gives an object a SET of supertypes, so a second
+        -- Leyline of Singularity does not make a creature legendary twice the way
+        -- CR 613.1f's two keyword grants stack.
         Modification.AddSupertype t ->
           pc {PC.supertypes = Set.insert t (PC.supertypes pc)}
         -- CR 205.4b's other direction, a DELETE for the same reason: removing one
@@ -1817,10 +1818,10 @@ data Aspect
   = Types
   | Subtypes
   | -- CR 205.4 / 613.1d: layer 4 writes supertypes as well as card types and
-    -- subtypes, so an effect whose affected set names one (Thermal Flux's
-    -- "nonsnow permanent") can be moved by another effect the way HasCardType's
-    -- is. A third aspect rather than a share of Types, because CR 205.4b keeps
-    -- the two independent: nothing that writes a card type writes a supertype.
+    -- subtypes, so an effect whose affected set names one ("each nonbasic land")
+    -- can be moved by another effect the way HasCardType's is. A third aspect
+    -- rather than a share of Types, because CR 205.4b keeps the two independent:
+    -- nothing that writes a card type writes a supertype.
     Supertypes
   | Colors
   | -- CR 109.3 counts abilities among an object's characteristics and CR 613.1f
