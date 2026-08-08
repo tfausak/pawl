@@ -1,6 +1,5 @@
 module Pawl.EventSpec where
 
-import qualified Data.Foldable as Foldable
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
@@ -42,7 +41,7 @@ counteringsOf gs =
   let counteringOf event = case event of
         GameEvent.SpellCountered c -> Just c
         _ -> Nothing
-   in Maybe.mapMaybe counteringOf (Foldable.toList (GameState.events gs))
+   in Maybe.mapMaybe counteringOf (S.eventsOf gs)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Event" $ do

@@ -10,7 +10,6 @@ module Pawl.CountSpec where
 
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
-import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Binding as Binding
@@ -175,12 +174,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
         creatureSnapshot = S.emptyCharacteristics {PC.cardTypes = Set.singleton CardType.Creature}
         died = GameEvent.Moved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Battlefield Zone.Graveyard) creatureSnapshot
         exiled = GameEvent.Moved (ZoneChange.MkZoneChange S.noSource S.noSource Zone.Graveyard Zone.Exile) creatureSnapshot
-        gs =
-          gs0
-            { GameState.events = Seq.fromList [died, exiled],
-              GameState.scannedThrough = 0,
-              GameState.damageScannedThrough = 0
-            }
+        gs = S.withEvents [died, exiled] gs0
         count =
           Count.Type.MkCount
             (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))

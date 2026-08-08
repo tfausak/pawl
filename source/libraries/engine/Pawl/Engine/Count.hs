@@ -63,7 +63,7 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- (CR 608.2h last-known information), never from a live object -- a token has
   -- no printed card at all (CR 111.3) and an animated land died as a creature.
   Scope.InHistory shape ->
-    let views = Maybe.mapMaybe (snapshotView shape) (Foldable.toList (GameState.events gs))
+    let views = Maybe.mapMaybe (snapshotView shape . snd) (Foldable.toList (GameState.events gs))
         kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
      in aggregate quantityOf aggregation kept
   where
