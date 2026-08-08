@@ -289,13 +289,21 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
   -- wrong phase, unpayable cost, a non-empty stack. `withThalia` is the same board
   -- plus the pool's one printed legendary creature, with no Ring anywhere: it
   -- asserts True, so the negative below discriminates.
+  --
+  -- The five Plains beside the two Islands are that assertion's mana. Urza's
+  -- Ruinous Blast is {4}{W}, and Thalia taxes it {1} on the `withThalia` board,
+  -- so {5}{W} is the dearest the sorcery ever gets here and seven lands cover it
+  -- -- while the Islands, the only source of Birthday Escape's {U}, are what the
+  -- two temptations spend, leaving the five Plains for the {4}{W} boards.
   Spec.it s "CR 701.54c the Ring-bearer is legendary, which CR 205.4e sees" $ do
     island <- S.printingOf s registry "Island"
+    plains <- S.printingOf s registry "Plains"
     piker <- S.printingOf s registry "Goblin Piker"
     escape <- S.printingOf s registry "Birthday Escape"
-    sorcery <- S.printingOf s registry "Synthetic Legendary Sorcery"
+    sorcery <- S.printingOf s registry "Urza's Ruinous Blast"
     thalia <- S.printingOf s registry "Thalia, Guardian of Thraben"
-    let withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) (S.landsInPlay island 2) [1 .. (2 :: Int)]
+    let withPlains = List.foldl' (\g _ -> snd (S.addCreature plains S.alice g)) (S.landsInPlay island 2) [1 .. (5 :: Int)]
+        withLibrary = List.foldl' (\g _ -> snd (S.addLibraryCard piker S.alice g)) withPlains [1 .. (2 :: Int)]
         (a, g1) = S.addCreature piker S.alice withLibrary
         (b, g2) = S.addCreature piker S.alice g1
         -- Ring.tempt sorts its candidates, so name them in that order.
