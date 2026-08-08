@@ -3267,6 +3267,38 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot)
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "the kind is gone, not negative" (fmap Object.counters (Game.lookupObject oid after)) (Just Map.empty)
+  -- CR 608.2d over CR 608.2e's unit, on a whole card: Shed Weakness ({G} Instant,
+  -- Amonkhet 185) reads "Target creature gets +2/+2 until end of turn. You may
+  -- remove a -1/-1 counter from it." Two clauses, one target, and only the second
+  -- clause is gated -- so the pump lands whichever way the "may" is answered.
+  --
+  -- The -1/-1 counter is placed directly, as the CR 704.5q case just below does:
+  -- casting Instill Infection for it would add a draw and a second resolution
+  -- that this case does not want in the way of what it is proving.
+  Spec.it s "CR 608.2d Shed Weakness pumps either way; only the removal is optional" $ do
+    forest <- S.printingOf s registry "Forest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    shedWeakness <- S.printingOf s registry "Shed Weakness"
+    let (victim, withFoe) = S.addCreature piker S.bob (S.landsInPlay forest 1)
+        withCounter = S.addCounter CounterKind.MinusOneMinusOne 1 victim withFoe
+        (gs, spellId) = S.handOne shedWeakness withCounter
+        -- Written out per answerer rather than through a helper taking one: a
+        -- let-bound function over an answerer would need a rank-2 argument, and
+        -- the neighbouring Deem Worthy case inlines them for the same reason.
+        --
+        -- S.identityAnswer declines every optional prompt (Script.declining), so
+        -- it is the declining half unaided; exerciseOptional is its opposite.
+        castDeclining = snd (Engine.runGamePure S.identityAnswer gs (S.cast S.alice spellId))
+        declined = snd (Engine.runGamePure S.identityAnswer castDeclining Stack.resolveTop)
+        castExercising = snd (Engine.runGamePure exerciseOptional gs (S.cast S.alice spellId))
+        exercised = snd (Engine.runGamePure exerciseOptional castExercising Stack.resolveTop)
+    Spec.assertEqWith s "before: the -1/-1 counter makes the 2/2 a 1/1" (Projection.powerOf victim gs) (Just 1)
+    -- The discriminator. Under a MODE-wide gate, declining would skip the pump
+    -- too and this would read 1.
+    Spec.assertEqWith s "declined: pumped to 3/3 anyway" (Projection.powerOf victim declined) (Just 3)
+    Spec.assertEqWith s "declined: the counter is still there" (fmap Object.counters (Game.lookupObject victim declined)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
+    Spec.assertEqWith s "exercised: pumped to 4/4" (Projection.powerOf victim exercised) (Just 4)
+    Spec.assertEqWith s "exercised: no counters remain" (fmap Object.counters (Game.lookupObject victim exercised)) (Just Map.empty)
   Spec.it s "CR 122.2 Unsummon removes a counter-bearing creature's counters" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
@@ -4169,6 +4201,14 @@ optionalEffectSpec s registry =
               -- declining half with no bespoke answerer needed.
               after = S.runPure S.identityAnswer gs (Resolve.resolveModes stackId stackId [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)])
           Spec.assertEqWith s "the mandatory clause drew, the declined one did not" (S.handSize S.alice after) (before + 1)
+
+-- Takes every printed "may" it is offered. Rank-1 like paysFor above: the
+-- implicit forall is outermost, so this is the `forall r. Prompt r -> r` that
+-- Engine.runGamePure wants, which a let-bound local could not be.
+exerciseOptional :: Prompt.Prompt r -> r
+exerciseOptional p = case p of
+  Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+  _ -> S.identityAnswer p
 
 -- Is this transcript entry an answer to a printed "may"? The filter both
 -- optional-effect transcript assertions share.
