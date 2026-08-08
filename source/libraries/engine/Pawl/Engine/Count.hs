@@ -80,6 +80,17 @@ slots slotsOfQuantity count = case Count.Type.aggregation count of
   Aggregation.DistinctCardTypes -> Set.empty
   Aggregation.Greatest quantity -> slotsOfQuantity quantity
 
+-- Does the per-member quantity of a count satisfy the predicate? slots' shape
+-- with a Bool in place of a Set, and injected for the same module-cycle reason:
+-- Pawl.Engine.Quantity.readsX is the one caller and this module cannot import
+-- it. The two aggregations carrying no quantity answer False for the reason they
+-- answer the empty set above -- there is nothing there to ask.
+anyQuantity :: (quantity -> Bool) -> Count.Type.Count quantity -> Bool
+anyQuantity predicate count = case Count.Type.aggregation count of
+  Aggregation.Objects -> False
+  Aggregation.DistinctCardTypes -> False
+  Aggregation.Greatest quantity -> predicate quantity
+
 keep :: Filter.Type.Filter Keyword.Type.Keyword -> Filter.Context -> Maybe Filter.View -> Maybe Filter.View
 keep predicate context mv = case mv of
   Nothing -> Nothing

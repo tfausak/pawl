@@ -266,6 +266,43 @@ slots quantity = case quantity of
   -- reference of any sort, the object being the one the evaluation is aimed at.
   Quantity.ObjectCounters _ -> Set.empty
 
+-- Does this quantity read CR 601.2b's announced X? Since #14 retired X's
+-- dedicated constructor, that read is a Quantity.InSlot naming
+-- Binding.variableX, and it can sit anywhere inside a quantity rather than only
+-- at its root -- so answering needs the same recursion slots above has, and an
+-- equality test against a bare X does not answer it at all.
+--
+-- Resolve.readsX is the one caller: it asks "does this card read X?" for the lint
+-- that pairs a read against the cost's {X} (CR 107.3, CR 107.3a, CR 118.4).
+-- Vitalizing Cascade's "X plus 3" is the card that distinguishes the two
+-- answers.
+--
+-- Written out arm by arm rather than as a filter over slots, for the reason slots
+-- itself is: a new Quantity constructor must make its author answer "does this
+-- read X?" explicitly, rather than inherit whatever the other function decided.
+readsX :: Quantity -> Bool
+readsX quantity = case quantity of
+  Quantity.InSlot slot -> slot == Binding.variableX
+  -- The whole point of the recursion: Vitalizing Cascade's "X plus 3" is
+  -- Plus X (Literal 3), which reads X without being equal to it.
+  Quantity.Plus a b -> readsX a || readsX b
+  -- Terminating for the reason slots' Count arm is: a Greatest's payload is a
+  -- strictly smaller subterm.
+  Quantity.Count c -> Count.anyQuantity readsX c
+  -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
+  -- The four references below (ManaCount's, LifeTotal's, Speed's,
+  -- PlayerCounters') are PlayerRefs, whose InSlot names a TARGET slot rather
+  -- than an amount one, and X is only ever an amount.
+  Quantity.Literal _ -> False
+  Quantity.ManaValue -> False
+  Quantity.Power -> False
+  Quantity.Star -> False
+  Quantity.ManaCount _ -> False
+  Quantity.LifeTotal _ -> False
+  Quantity.Speed _ -> False
+  Quantity.PlayerCounters _ _ -> False
+  Quantity.ObjectCounters _ -> False
+
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A
 -- land has no mana cost (CR 202.1b), so its mana value is 0 (CR 202.3a).

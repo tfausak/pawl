@@ -395,7 +395,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
-        after = snd (Engine.runGamePure answerX3 gs0 (S.cast S.alice oid))
+        after = snd (Engine.runGamePure (answerXOf 3) gs0 (S.cast S.alice oid))
     case GameState.stack after of
       [] -> Spec.assertFailure s "expected the spell on the stack"
       top : _ -> case Game.lookupObject top after of
@@ -581,12 +581,12 @@ castSpec s registry = Spec.describe s "Cast" $ do
         after = S.runPure S.identityAnswer gs (S.cast S.alice oid)
     Spec.assertEqWith s "no cast recorded" (Maybe.mapMaybe Game.castOf (Foldable.toList (GameState.events after))) []
 
--- Chooses X=3 and aims every target slot at bob; other prompts take the identity
--- fallback. Casing on a GADT prompt with an identityAnswer default is the liar
--- pattern from the illegal-target test.
-answerX3 :: Prompt.Prompt r -> r
-answerX3 p = case p of
-  Prompt.ChooseX {} -> 3
+-- Chooses this value of X and aims every target slot at bob; other prompts take
+-- the identity fallback. Casing on a GADT prompt with an identityAnswer default
+-- is the liar pattern from the illegal-target test.
+answerXOf :: Natural -> Prompt.Prompt r -> r
+answerXOf n p = case p of
+  Prompt.ChooseX {} -> n
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
   _ -> S.identityAnswer p
 
@@ -703,18 +703,11 @@ magicalHackSpec s registry = Spec.describe s "MagicalHack" $ do
     -- recipient (and there is no mana either), so it is uncastable.
     Spec.assertBool s (not (S.castable S.alice hackId gs)) "no target -> uncastable"
 
--- Aims every target slot at bob and chooses X=0; the X=0 castability floor.
-answerX0 :: Prompt.Prompt r -> r
-answerX0 p = case p of
-  Prompt.ChooseX {} -> 0
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
-  _ -> S.identityAnswer p
-
 -- Answers Prompt.ChooseX with the affordability bound the prompt carries, and
 -- records that bound in the State. The log is how a test sees a payload nothing
 -- on the board records; answering WITH it is what proves the bound is payable
 -- rather than merely reported. Aims every target slot at bob, and takes the
--- identity fallback elsewhere (the liar pattern answerX3 uses).
+-- identity fallback elsewhere (the liar pattern answerXOf uses).
 answerAtBound :: Prompt.Prompt r -> State.State [Natural] r
 answerAtBound p = case p of
   Prompt.ChooseX _ _ _ bound -> do
@@ -819,7 +812,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 4)
-        after = snd (Engine.runGamePure answerX3 gs0 (do S.cast S.alice oid; Stack.resolveTop))
+        after = snd (Engine.runGamePure (answerXOf 3) gs0 (do S.cast S.alice oid; Stack.resolveTop))
     Spec.assertEqWith s "Bob at 17" (S.lifeOf S.bob after) (Just 17)
     Spec.assertEqWith s "four Mountains paid {3}{R}" (S.tappedCount S.alice after) 4
   Spec.it s "Blaze at X=0 is castable and deals nothing (the X=0 floor)" $ do
@@ -828,7 +821,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 1)
-        after = snd (Engine.runGamePure answerX0 gs0 (do S.cast S.alice oid; Stack.resolveTop))
+        after = snd (Engine.runGamePure (answerXOf 0) gs0 (do S.cast S.alice oid; Stack.resolveTop))
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "one Mountain paid {R}" (S.tappedCount S.alice after) 1
     Spec.assertEqWith s "Blaze resolved out of hand" (inHandNamed "Blaze" after) 0
@@ -836,7 +829,7 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     blaze <- S.printingOf s registry "Blaze"
     mountain <- S.printingOf s registry "Mountain"
     let (gs0, oid) = S.handOne blaze (S.landsInPlay mountain 1)
-        after = snd (Engine.runGamePure answerX3 gs0 (S.cast S.alice oid))
+        after = snd (Engine.runGamePure (answerXOf 3) gs0 (S.cast S.alice oid))
     Spec.assertEqWith s "still in hand" (inHandNamed "Blaze" after) 1
     Spec.assertEqWith s "no mana spent" (S.tappedCount S.alice after) 0
     Spec.assertEqWith s "Bob unharmed" (S.lifeOf S.bob after) (Just 20)
@@ -931,6 +924,37 @@ blazeSpec s registry = Spec.describe s "Blaze" $ do
     Spec.assertEqWith s "the taxed bound is 2" bounds [2]
     Spec.assertEqWith s "Bob at 18" (S.lifeOf S.bob after) (Just 18)
     Spec.assertEqWith s "four Mountains paid {2}{R} plus Thalia's {1}" (S.tappedCount S.alice after) 4
+
+-- Vitalizing Cascade ({X}{G}{W} Instant, "You gain X plus 3 life"), the pool's
+-- first card whose X is not a bare X: the life-gain's quantity is
+-- Plus X (Literal 3), so CR 601.2b's announced value is one summand of a
+-- compound quantity rather than the whole of it.
+--
+-- THE ARITHMETIC, and it is why X=2 and X=1 rather than any other pair. Off five
+-- lands 20 life becomes 25 and 24, and no other reading of the printed quantity
+-- lands on either: "X plus X" gives 24 and 22, the literal 3 alone gives 23 and
+-- 23, and X alone gives 22 and 21. Two values pin both the slope and the
+-- intercept, which one cannot -- and X=3 would have been the vacuous choice,
+-- since "X plus 3", "X plus X" and "3 plus 3" all reach 26 there.
+--
+-- Five lands, not the four the announcement costs: CR 601.2b's bound off this
+-- board is X=3, so the life total is the value alice NAMED and not the largest
+-- one she could have paid for.
+vitalizingCascadeSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+vitalizingCascadeSpec s registry = Spec.describe s "VitalizingCascade" $ do
+  Spec.it s "CR 119.3 gains X plus 3 life, the announced X inside a sum (CR 107.3a)" $ do
+    cascade <- S.printingOf s registry "Vitalizing Cascade"
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    let board = snd (S.addCreature plains S.alice (snd (S.addCreature plains S.alice (S.landsInPlay forest 3))))
+        (gs0, oid) = S.handOne cascade board
+        gainedAt x = snd (Engine.runGamePure (answerXOf x) gs0 (do S.cast S.alice oid; Stack.resolveTop))
+        atTwo = gainedAt 2
+    Spec.assertEqWith s "alice at 25, so X=2 was read as one summand of X+3" (S.lifeOf S.alice atTwo) (Just 25)
+    Spec.assertEqWith s "and at 24 for X=1, which fixes the summand as X and not another 3" (S.lifeOf S.alice (gainedAt 1)) (Just 24)
+    Spec.assertEqWith s "bob untouched, the gain being the controller's own" (S.lifeOf S.bob atTwo) (Just 20)
+    Spec.assertEqWith s "four of the five lands paid {2}{G}{W}" (S.tappedCount S.alice atTwo) 4
+    Spec.assertEqWith s "and it resolved out of hand" (inHandNamed "Vitalizing Cascade" atTwo) 0
 
 -- Corrosive Gale ({X}{G/P} Sorcery, "Corrosive Gale deals X damage to each
 -- creature with flying"), the only card in the pool -- and one of only two ever
@@ -1984,6 +2008,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   sicknessSpec s registry
   magicalHackSpec s registry
   blazeSpec s registry
+  vitalizingCascadeSpec s registry
   charSpec s registry
   corrosiveGaleSpec s registry
   waxWaneSpec s registry
