@@ -1,0 +1,111 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 5
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Dawnglade Regent",
+      "power": {
+        "type": "Literal",
+        "value": 8
+      },
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Matching",
+            "value": {
+              "type": "ControlledBy",
+              "value": {
+                "type": "You"
+              }
+            }
+          },
+          "condition": {
+            "comparison": {
+              "type": "AtLeast"
+            },
+            "measured": {
+              "type": "IsMonarch",
+              "value": {
+                "type": "Relative",
+                "value": {
+                  "type": "You"
+                }
+              }
+            },
+            "threshold": {
+              "type": "Literal",
+              "value": 1
+            }
+          },
+          "modifications": [
+            {
+              "type": "GainKeyword",
+              "value": {
+                "type": "Hexproof"
+              }
+            }
+          ]
+        }
+      ],
+      "toughness": {
+        "type": "Literal",
+        "value": 8
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfEnters"
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "BecomeMonarch",
+                    "value": {
+                      "type": "TheController"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Elk"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
