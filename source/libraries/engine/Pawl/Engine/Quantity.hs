@@ -175,6 +175,21 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.PlayerCounters ref kind -> case Count.playersFor context gs ref of
     Just [pid] -> fmap (toInteger . Map.findWithDefault 0 kind . Player.counters) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
+  -- CR 122.1's OBJECT reading, through the injected view exactly as the Power
+  -- arm above is -- so this arm never learns whether it is looking at a live
+  -- projection or a CR 608.2h snapshot, and Projection.viewWithLastKnown is what
+  -- answers Promising Duskmage's "if it had a +1/+1 counter on it" for a creature
+  -- CR 400.7 has already deleted.
+  --
+  -- Filter.counters rather than Object.counters: reading the object directly
+  -- would work while it lived and answer nothing at all once it died, which is
+  -- the whole case this arm exists for.
+  --
+  -- A kind the map does not hold answers 0 rather than Nothing, the convention
+  -- Object.counters and the PlayerCounters arm above both keep. The outer Nothing
+  -- means the VIEW could not describe the object -- it is gone and nothing was
+  -- filed under its id.
+  Quantity.ObjectCounters kind -> fmap (toInteger . Map.findWithDefault 0 kind . Filter.counters) (viewOf oid)
 
 -- CR 208.2a, last sentence: an undeterminable number is 0, including inside a
 -- calculation. TOTAL where evaluate is partial -- an Integer, never a Maybe.
@@ -213,6 +228,7 @@ substituteStar star quantity = case quantity of
   Quantity.LifeTotal _ -> quantity
   Quantity.Speed _ -> quantity
   Quantity.PlayerCounters _ _ -> quantity
+  Quantity.ObjectCounters _ -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -246,6 +262,9 @@ slots quantity = case quantity of
   Quantity.Speed _ -> Set.empty
   -- And a fifth. The PlayerCounterKind beside it names no slot either.
   Quantity.PlayerCounters _ _ -> Set.empty
+  -- A bare CounterKind, which names no slot at all -- this arm carries no
+  -- reference of any sort, the object being the one the evaluation is aimed at.
+  Quantity.ObjectCounters _ -> Set.empty
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A

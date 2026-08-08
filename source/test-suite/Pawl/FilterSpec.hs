@@ -1,6 +1,7 @@
 -- Covers Pawl.Types.Filter, Pawl.Types.PlayerRelation, Pawl.Engine.Filter.
 module Pawl.FilterSpec where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Spec as Spec
@@ -40,7 +41,8 @@ blackCreature =
       Filter.attachedToPermanent = False,
       Filter.canHostSubject = False,
       Filter.token = False,
-      Filter.tapped = False
+      Filter.tapped = False,
+      Filter.counters = Map.empty
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -64,7 +66,8 @@ devoidBigCreature =
       Filter.attachedToPermanent = False,
       Filter.canHostSubject = False,
       Filter.token = False,
-      Filter.tapped = False
+      Filter.tapped = False,
+      Filter.counters = Map.empty
     }
 
 -- A creature whose only ability is the given keyword -- the toxic N and landwalk

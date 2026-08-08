@@ -1,0 +1,90 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Black"
+            }
+          }
+        }
+      ],
+      "name": "Promising Duskmage",
+      "power": {
+        "type": "Literal",
+        "value": 2
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 3
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfDies"
+          },
+          "intervening": {
+            "comparison": {
+              "type": "AtLeast"
+            },
+            "measured": {
+              "type": "ObjectCounters",
+              "value": {
+                "type": "PlusOnePlusOne"
+              }
+            },
+            "threshold": {
+              "type": "Literal",
+              "value": 1
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "effects": [
+                  {
+                    "type": "Draw",
+                    "value": [
+                      {
+                        "type": "Relative",
+                        "value": {
+                          "type": "You"
+                        }
+                      },
+                      {
+                        "type": "Literal",
+                        "value": 1
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Human"
+          },
+          {
+            "type": "Warlock"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

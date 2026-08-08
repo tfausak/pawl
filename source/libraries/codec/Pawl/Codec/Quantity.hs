@@ -3,6 +3,7 @@ module Pawl.Codec.Quantity where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Count as Count
+import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.ManaCount as ManaCount
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Codec.PlayerRef as PlayerRef
@@ -27,6 +28,9 @@ toJson q = case q of
   Quantity.LifeTotal p -> Common.tagged "LifeTotal" . Just $ PlayerRef.toJson p
   Quantity.Speed p -> Common.tagged "Speed" . Just $ PlayerRef.toJson p
   Quantity.PlayerCounters p k -> Common.tagged "PlayerCounters" . Just . Common.array $ [PlayerRef.toJson p, PlayerCounterKind.toJson k]
+  -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
+  -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
+  Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ CounterKind.toJson k
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -43,6 +47,7 @@ fromJson value = do
     ("LifeTotal", Just v) -> Quantity.LifeTotal <$> PlayerRef.fromJson v
     ("Speed", Just v) -> Quantity.Speed <$> PlayerRef.fromJson v
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
+    ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson v
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)

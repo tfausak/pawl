@@ -196,7 +196,14 @@ snapshotView shape event = case event of
                 Filter.attachedToPermanent = False,
                 Filter.canHostSubject = False,
                 Filter.token = False,
-                Filter.tapped = False
+                Filter.tapped = False,
+                -- CR 122.1: a ProjectedCharacteristics records no counters --
+                -- CR 613.4c has already folded them into the power and
+                -- toughness above -- so a past event carries none to read, the
+                -- position `supertypes` is in (#646). A quantity asking an
+                -- event snapshot for a counter tally is answered 0 rather than
+                -- with what was on the object (#993).
+                Filter.counters = Map.empty
               }
         else Nothing
   GameEvent.DamageDealt _ -> Nothing

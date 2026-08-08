@@ -1608,7 +1608,12 @@ changeZoneAttaching asOf oid requestedDest seed tapped under shown facing = do
                     -- carries as its source (CR 113.7) -- and from the same
                     -- `snapshot` the Moved event below records, so the two
                     -- readings of "what was it" cannot drift apart.
-                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj)) (GameState.lastKnown g1)
+                    --
+                    -- The counters come off `obj`, the PRE-MOVE object, and not
+                    -- off the incarnation `mkObj` builds: CR 122.2 makes them
+                    -- cease to exist on the zone change, so the last moment they
+                    -- can be recorded is this one.
+                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj)) (GameState.lastKnown g1)
                   }
           newId <- placeObject pid mkObj dest
           -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and
