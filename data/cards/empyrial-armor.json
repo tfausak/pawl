@@ -1,0 +1,116 @@
+{
+  "faces": [
+    {
+      "enchant": [
+        {
+          "pool": {
+            "type": "Creatures"
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Empyrial Armor",
+      "staticAbilities": [
+        {
+          "affected": {
+            "type": "Attached"
+          },
+          "modifications": [
+            {
+              "type": "ModifyPowerToughness",
+              "value": [
+                {
+                  "type": "Count",
+                  "value": {
+                    "aggregation": {
+                      "type": "Objects"
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": []
+                    },
+                    "scope": {
+                      "type": "InZone",
+                      "value": [
+                        {
+                          "type": "Hand"
+                        },
+                        {
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "Count",
+                  "value": {
+                    "aggregation": {
+                      "type": "Objects"
+                    },
+                    "filter": {
+                      "type": "And",
+                      "value": []
+                    },
+                    "scope": {
+                      "type": "InZone",
+                      "value": [
+                        {
+                          "type": "Hand"
+                        },
+                        {
+                          "type": "Relative",
+                          "value": {
+                            "type": "You"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Aura"
+          }
+        ],
+        "types": [
+          {
+            "type": "Enchantment"
+          }
+        ]
+      }
+    }
+  ]
+}
