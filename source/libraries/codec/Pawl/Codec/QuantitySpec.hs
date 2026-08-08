@@ -129,6 +129,23 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.LifeTotal (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"LifeTotal","value":{"type":"InSlot","value":"target"}} """
+  -- CR 725.1, with a PlayerRef and nothing else on the wire: the arm answers a
+  -- 0/1 rather than carrying a number. Dawnglade Regent's "you're the monarch"
+  -- is the Relative arm; the InSlot arm beside it is the one a recursive decoder
+  -- could lose a payload through, so both are round-tripped, as LifeTotal's are.
+  Spec.it s "IsMonarch, relative and from a slot" $ do
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You))
+      """ {"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}} """
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.IsMonarch (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"IsMonarch","value":{"type":"InSlot","value":"target"}} """
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do

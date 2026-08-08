@@ -164,6 +164,24 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Speed ref -> case Count.playersFor context gs ref of
     Just [pid] -> fmap (maybe 0 toInteger . Player.speed) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
+  -- CR 725.1: is that player the monarch? LifeTotal's and Speed's arm again --
+  -- read live off GameState, resolved through the same Count.playersFor, and
+  -- Nothing for a reference naming anything but exactly one player.
+  --
+  -- CR 725.5 is applied HERE and only here: NO MONARCH answers Just 0, not
+  -- Nothing. GameState.monarch of Nothing means CR 725.1's "there is no monarch
+  -- in a game until an effect instructs a player to become the monarch", and a
+  -- 0 on the measured side of a static ability's "as long as" clause makes that
+  -- ability's continuous effect do nothing -- which is exactly what CR 725.5
+  -- prescribes. Nothing would instead collapse to False through
+  -- Condition.holds' undeterminable path, which reaches the same answer for
+  -- this comparison by accident and would be the wrong claim about the rule.
+  --
+  -- Not implemented: a reference naming several players is unanswered, so no
+  -- card can ask whether an OPPONENT is the monarch in a multiplayer game (#1019).
+  Quantity.IsMonarch ref -> case Count.playersFor context gs ref of
+    Just [pid] -> Just (if GameState.monarch gs == Just pid then 1 else 0)
+    _ -> Nothing
   -- CR 122.1: how many counters of a kind that player has. The third arm on
   -- LifeTotal's and Speed's terms -- live, one player only, through the same
   -- Count.playersFor.
@@ -227,6 +245,7 @@ substituteStar star quantity = case quantity of
   Quantity.ManaCount _ -> quantity
   Quantity.LifeTotal _ -> quantity
   Quantity.Speed _ -> quantity
+  Quantity.IsMonarch _ -> quantity
   Quantity.PlayerCounters _ _ -> quantity
   Quantity.ObjectCounters _ -> quantity
 
@@ -260,7 +279,9 @@ slots quantity = case quantity of
   Quantity.LifeTotal _ -> Set.empty
   -- And a fourth: LifeTotal's sibling carries a PlayerRef in the same position.
   Quantity.Speed _ -> Set.empty
-  -- And a fifth. The PlayerCounterKind beside it names no slot either.
+  -- And a fifth, CR 725.1's designation -- a PlayerRef and nothing else.
+  Quantity.IsMonarch _ -> Set.empty
+  -- And a sixth. The PlayerCounterKind beside it names no slot either.
   Quantity.PlayerCounters _ _ -> Set.empty
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
@@ -290,7 +311,7 @@ readsX quantity = case quantity of
   -- strictly smaller subterm.
   Quantity.Count c -> Count.anyQuantity readsX c
   -- Every remaining arm is a LEAF holding no Quantity, so none can hide an X.
-  -- The four references below (ManaCount's, LifeTotal's, Speed's,
+  -- The five references below (ManaCount's, LifeTotal's, Speed's, IsMonarch's,
   -- PlayerCounters') are PlayerRefs, whose InSlot names a TARGET slot rather
   -- than an amount one, and X is only ever an amount.
   Quantity.Literal _ -> False
@@ -300,6 +321,7 @@ readsX quantity = case quantity of
   Quantity.ManaCount _ -> False
   Quantity.LifeTotal _ -> False
   Quantity.Speed _ -> False
+  Quantity.IsMonarch _ -> False
   Quantity.PlayerCounters _ _ -> False
   Quantity.ObjectCounters _ -> False
 
