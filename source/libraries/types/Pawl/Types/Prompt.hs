@@ -659,6 +659,29 @@ data Prompt r where
   -- NonEmpty rather than []: the caller does not raise this when no destination
   -- exists, and a fallback must be total.
   ChooseAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- | CR 303.4k with CR 614.1e: whether an Aura being turned face up exercises its
+  -- printed "you MAY attach it" (Gift of Doom). The ObjectId is the Aura turning
+  -- over, and CR 303.4k names the player -- "the Aura's controller".
+  --
+  -- An OptionalDecision and a prompt of its own rather than a decline arm on
+  -- ChooseAttachment beside it, because the two questions are asked by different
+  -- authorities and a transcript must tell their answers apart: the "may" is the
+  -- CARD's, and WHICH host is rule 303.4k's own "they MUST choose a legal object
+  -- or player". ChooseAttachment then does its ordinary job, elision and all.
+  -- ChooseRiot and ChoosePayLifeOnEntry are the shape this follows -- a card
+  -- stating a "may" inside a replacement effect, one arm per question.
+  --
+  -- Not ChooseOptional, which is CR 603.5's printed "may" over a MODE of a
+  -- resolving spell or ability. Turning a permanent face up is a special action
+  -- (CR 116.2b) and nothing is resolving, so there is no stack object to carry
+  -- and no ModeIndex to index.
+  --
+  -- NEVER ELIDED where it is asked at all. Declining leaves the Aura attached to
+  -- nothing, and CR 704.5m puts an unattached Aura into its owner's graveyard --
+  -- so the two answers reach a board with the permanent and a board without it.
+  -- Pawl.Engine.Event does not ask when the rule leaves nothing to decide: with
+  -- no legal host the "may" has no exercisable side.
+  ChooseTurnUpAttachment :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 601.2b: the player announces their intention to pay any alternative or
   -- additional costs. Issued after the modes and before X and targets, at that
   -- rule's own position. The [Cost] is the PAYABLE candidates, pre-filtered through

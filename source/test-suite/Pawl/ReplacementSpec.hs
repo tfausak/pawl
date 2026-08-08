@@ -1353,9 +1353,9 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
     case land of
       Nothing -> Spec.assertFailure s "fixture did not build a land"
       Just landId -> do
-        Spec.assertBool s (Replacement.matchesPermanent g1 (Filter.Type.HasCardType CardType.Creature) piker) "the creature matches HasCardType Creature"
-        Spec.assertBool s (not (Replacement.matchesPermanent g1 (Filter.Type.HasCardType CardType.Creature) landId)) "the land does not match HasCardType Creature"
-        Spec.assertBool s (Replacement.matchesPermanent g1 (Filter.Type.And []) landId) "the trivial filter matches the land too"
+        Spec.assertBool s (Replacement.matchesPermanent g1 Nothing (Filter.Type.HasCardType CardType.Creature) piker) "the creature matches HasCardType Creature"
+        Spec.assertBool s (not (Replacement.matchesPermanent g1 Nothing (Filter.Type.HasCardType CardType.Creature) landId)) "the land does not match HasCardType Creature"
+        Spec.assertBool s (Replacement.matchesPermanent g1 Nothing (Filter.Type.And []) landId) "the trivial filter matches the land too"
   -- NOT a CR 614.5 test: this does not exercise the applied set at all. After
   -- the first Rest in Peace redirects the event to Exile, the SECOND Rest in
   -- Peace's pattern (whenDestination = Graveyard) no longer matches the

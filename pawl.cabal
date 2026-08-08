@@ -329,6 +329,7 @@ library engine
   exposed-modules:
     Pawl.Engine.Action
     Pawl.Engine.Activate
+    Pawl.Engine.Attach
     Pawl.Engine.AttackCost
     Pawl.Engine.AttackRequirement
     Pawl.Engine.Battle

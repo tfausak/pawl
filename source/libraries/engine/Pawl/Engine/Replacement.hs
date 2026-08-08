@@ -228,7 +228,7 @@ applies gs event candidate =
           -- any kind, never no kind.
           maybe True (== kind) (CounterPattern.whichKind pat)
             && matchesController gs src (CounterPattern.whose pat) oid
-            && matchesPermanent gs (CounterPattern.onWhat pat) oid
+            && matchesPermanent gs Nothing (CounterPattern.onWhat pat) oid
         (ReplacementEffect.TokenR pat _, ProposedEvent.WouldCreateTokens pid _ _) ->
           case TokenPattern.whose pat of
             ControllerRelation.Anyones -> True
@@ -376,13 +376,19 @@ matchesZoneOwner gs src rel oid =
 -- enchantment counts) and subtype membership (CR 205.3, so Blood Moon is seen).
 -- A replacement's pattern frames no player, so the perspective is Nothing.
 --
+-- The SOURCE is a parameter rather than the perspective's fixed Nothing,
+-- because the two atoms it decides are not the same question: CR 109.5's "you"
+-- is a player and IsSource names an object, and every caller below that knows
+-- which object frames the match knows it without knowing a perspective. Nothing
+-- where no object frames the match, which leaves IsSource vacuously False the
+-- way it was before this took a parameter.
+--
 -- sacrificeCandidates below is the one caller that narrows a whole battlefield
 -- with it, and Pawl.Engine.Cost reaches it through that -- so there is no
 -- duplicate matcher to keep in step (#111).
-matchesPermanent :: GameState -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
-matchesPermanent gs filter_ oid =
-  -- No source in scope at this site.
-  Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_
+matchesPermanent :: GameState -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
+matchesPermanent gs source filter_ oid =
+  Filter.matches (Filter.MkContext Nothing source) (Projection.viewOfObject oid gs) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
 -- the order Prompt.ChooseSacrifices and Prompt.ChooseAnyNumberToSacrifice offer
@@ -394,9 +400,17 @@ matchesPermanent gs filter_ oid =
 -- (EntryRewrite.SacrificeAnyNumber) asks the same question from Pawl.Engine.Event,
 -- which is BELOW Cost. One home keeps CR 701.21a's "a permanent they control"
 -- answered once.
-sacrificeCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
-sacrificeCandidates pid filter_ gs =
-  List.sort (filter (matchesPermanent gs filter_) (Projection.controls pid gs))
+--
+-- The Maybe ObjectId is what the criterion's `Not IsSource` means by "another"
+-- -- the permanent whose cost is being paid, or whose as-enters ability is
+-- asking. Gift of Doom is why it is here: its morph cost is "sacrifice ANOTHER
+-- creature", and CR 708.2a makes the face-down permanent paying that cost a
+-- creature itself, so without the frame it could pay by sacrificing itself.
+-- That is the same failure Pawl.Engine.Cost.tapCandidates records for CR
+-- 702.122a, where a Vehicle that had become a creature could crew itself.
+sacrificeCandidates :: PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
+sacrificeCandidates pid source filter_ gs =
+  List.sort (filter (matchesPermanent gs source filter_) (Projection.controls pid gs))
 
 -- CR 614.1a / 614.1c-d: does the event's subject satisfy this replacement's
 -- Filter? Both the ENTERING object of an entry replacement and the MOVING object
@@ -603,6 +617,12 @@ readsApplier re = case re of
   -- second TurnUpRewrite -- CR 208.2b's power-and-toughness setter -- has to be
   -- decided here rather than inheriting this answer.
   ReplacementEffect.TurnUpR _ (TurnUpRewrite.WithCounters _ _) -> False
+  -- CR 303.4k: "the AURA's controller" makes the choice, and the Aura is the
+  -- object the event already named -- so the player asked is read off the event
+  -- rather than off whose row is applying, and two identical rows would put the
+  -- same question to the same player. The destination Filter is the effect's own
+  -- field, inside `choose`'s comparison already.
+  ReplacementEffect.TurnUpR _ (TurnUpRewrite.MayAttachTo _) -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.

@@ -29,6 +29,7 @@ import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Attach as Attach
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
@@ -782,7 +783,7 @@ apply batch candidate event =
           Nothing -> pure (Just event)
           Just controller -> do
             let entering oid2 = oid2 == oid || Set.member oid2 batch
-                offered = filter (not . entering) (Replacement.sacrificeCandidates controller criterion gs)
+                offered = filter (not . entering) (Replacement.sacrificeCandidates controller (Just oid) criterion gs)
             chosen <-
               -- Where the rules leave nothing to ask, don't prompt: with no
               -- candidate the empty set is the only answer. ONE candidate is
@@ -1061,6 +1062,45 @@ apply batch candidate event =
         Replacement.consume (ReplacementCandidate.identity candidate)
         putCounters CounterCause.ByEffect oid kind n
         pure (Just event)
+      -- CR 303.4k with CR 614.1e: Gift of Doom's "as this Aura is turned face
+      -- up, you may attach it to a creature", applied WHILE the permanent turns
+      -- over (CR 708.11) because FaceDown.turnFaceUp raises this event there and
+      -- nowhere else -- and, decisively for this rule, AFTER it has written the
+      -- face-up status. Every characteristic Attach.turnUpHosts reads is
+      -- therefore the Aura's "as it would exist if it were face up"; see there.
+      --
+      -- CR 303.4k's "an object OR PLAYER" is narrowed to objects here, and by the
+      -- rule's own conjunction rather than by this engine: the destinations are
+      -- what the card's Filter admits, a Filter matches a battlefield permanent,
+      -- and the only printing says "a creature".
+      --
+      -- The "may" is asked FIRST and separately, since declining and finding no
+      -- legal host are different states a transcript must tell apart. Declining
+      -- leaves the Aura unattached and CR 704.5m buries it on the next
+      -- state-based pass, which is a real and quite bad outcome -- so this is
+      -- never elided, the ChooseRiot posture.
+      --
+      -- The event survives either way: turning face up is not replaced by the
+      -- attachment, only accompanied by it, so Just is returned and
+      -- FaceDown.turnFaceUp goes on to record CR 708.7's event.
+      TurnUpRewrite.MayAttachTo filter_ -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the SacrificeAnyNumber arm's reason:
+          -- the permanent is on the battlefield, so controllerOf falls back to
+          -- its owner. Attaches nothing rather than guessing at a player.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            let hosts = Attach.turnUpHosts controller oid filter_ gs
+            -- Where the rules leave nothing to ask, don't prompt: with no legal
+            -- host the "may" has no exercisable side.
+            Monad.unless (null hosts) $ do
+              decision <- Game.choose (Prompt.ChooseTurnUpAttachment (Decide.deciderFor controller gs) controller oid)
+              Monad.when (decision == OptionalDecision.Exercises) $ do
+                chosen <- Attach.chooseHost controller oid hosts
+                Monad.mapM_ (Attach.attach oid . Recipient.ToObject) chosen
+            pure (Just event)
     -- Unreachable: `applies` admits TurnUpR only against WouldTurnFaceUp.
     (ReplacementEffect.TurnUpR _ _, _) -> pure (Just event)
 

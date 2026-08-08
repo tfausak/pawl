@@ -110,10 +110,10 @@ legalRecipients perspective source spec gs =
 -- itself: protection states both halves separately (CR 702.16b for targeting, CR
 -- 702.16c for attachment), while shroud (CR 702.18) and hexproof (CR 702.11)
 -- state only the first -- so an Aura already attached to a permanent that has
--- shroud stays attached, and Resolve.attachmentFor may move one onto it.
+-- shroud stays attached, and Attach.attachmentFor may move one onto it.
 --
 -- Hence the two callers here rather than at legalRecipients:
--- Sba.stillLegalEnchant's general path (CR 303.4c) and Resolve.attachmentFor (CR
+-- Sba.stillLegalEnchant's general path (CR 303.4c) and Attach.attachmentFor (CR
 -- 701.3a). Both ask what the enchant SPEC admits; neither is a player choosing a
 -- target.
 admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
