@@ -75,6 +75,7 @@ import qualified Pawl.Codec.ModeSelectionSpec
 import qualified Pawl.Codec.ModeSpec
 import qualified Pawl.Codec.ModificationSpec
 import qualified Pawl.Codec.MonarchTargetSpec
+import qualified Pawl.Codec.MorphVariantSpec
 import qualified Pawl.Codec.ObjectIdSpec
 import qualified Pawl.Codec.ObjectRefSpec
 import qualified Pawl.Codec.OnsetSpec
@@ -115,6 +116,7 @@ import qualified Pawl.Codec.TriggerConditionSpec
 import qualified Pawl.Codec.TriggerFrequencySpec
 import qualified Pawl.Codec.TriggeredAbilitySpec
 import qualified Pawl.Codec.TurnScopeSpec
+import qualified Pawl.Codec.TurnUpRewriteSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TypeLineSpec
 import qualified Pawl.Codec.UnlessPaidSpec
@@ -306,6 +308,7 @@ spec s registry = do
   Pawl.Codec.ModeSpec.spec s
   Pawl.Codec.ModificationSpec.spec s
   Pawl.Codec.MonarchTargetSpec.spec s
+  Pawl.Codec.MorphVariantSpec.spec s
   Pawl.Codec.ObjectIdSpec.spec s
   Pawl.Codec.ObjectRefSpec.spec s
   Pawl.Codec.OnsetSpec.spec s
@@ -346,6 +349,7 @@ spec s registry = do
   Pawl.Codec.TriggerFrequencySpec.spec s
   Pawl.Codec.TriggeredAbilitySpec.spec s
   Pawl.Codec.TurnScopeSpec.spec s
+  Pawl.Codec.TurnUpRewriteSpec.spec s
   Pawl.Codec.TurnWindowSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
   Pawl.Codec.UnlessPaidSpec.spec s

@@ -7,7 +7,9 @@
 -- Pawl.Engine.Cost.costsFor, Pawl.Engine.Event.changeZoneFaceDown and
 -- Pawl.Engine.Stack -- rule 708 as far as morph reaches it.
 --
--- TWO morph cards carry the CAST and TURN-FACE-UP halves of rule 708.
+-- THREE morph cards carry the CAST and TURN-FACE-UP halves of rule 708, one per
+-- part of them this file reaches, and a fourth card carries the TURN-FACE-DOWN
+-- half.
 --
 -- Ainok Tracker is the SUBSTITUTION's card. {5}{R} Creature -- Dog Scout 3/3,
 -- "First strike / Morph {4}{R}". Every axis CR 708.2a substitutes is observable
@@ -15,6 +17,14 @@
 -- rule's 2/2, two subtypes against none, a keyword against none, a name against
 -- none, and a mana value of 6 against CR 202.3a's 0. A 2/2 morph creature would
 -- leave the headline assertion passing whether the substitution happened or not.
+--
+-- Misthoof Kirin is MEGAMORPH's card. {2}{W} Creature -- Kirin 2/1, "Flying,
+-- vigilance / Megamorph {1}{W}". Chosen for its P/T and against every 1/1
+-- megamorph creature in the pool: 1/1 plus CR 702.37b's counter is 2/2, which is
+-- CR 708.2a's face-down printing exactly, so such a card could not tell a
+-- counter that landed from one that did not. Misthoof Kirin ends a 3/2, which is
+-- neither the face-down 2/2 nor the printed 2/1 -- and differs from the printed
+-- pair on BOTH axes, so no single stale read produces it.
 --
 -- Skirk Marauder is the TRIGGER's card, and the only printing rule 708.7 needs.
 -- {1}{R} Creature -- Goblin 2/1, "Morph {2}{R} / When this creature is turned
@@ -165,10 +175,12 @@ aimAtCreature oid p = case p of
 noName :: CardName.CardName
 noName = CardName.MkCardName Text.empty
 
--- alice holds one card of a morph printing with `n` untapped Mountains in play,
--- in her own precombat main phase with priority.
+-- alice holds one card of a morph printing with `n` untapped lands in play, in
+-- her own precombat main phase with priority. The land is a parameter because
+-- the file needs two colours: Mountains for the two red morph cards and Plains
+-- for CR 702.37b's white megamorph one.
 morphBoard :: Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId)
-morphBoard mountain morph n = S.handOne morph (S.landsInPlay mountain n)
+morphBoard land morph n = S.handOne morph (S.landsInPlay land n)
 
 -- The permanent a move added to the battlefield between these two states, or
 -- Nothing when it added none or several. Identifies the new incarnation without
@@ -521,6 +533,73 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         Spec.assertEqWith s "CR 702.37a/702.37e twelve mana in all" (S.tappedCount S.alice flippedTwo) 12
       _ -> Spec.assertFailure s "both morph casts did not reach the battlefield"
 
+  -- THE PROVING TEST for CR 702.37b and CR 708.11. Misthoof Kirin is cast face
+  -- down for CR 702.37a's {3}, turned face up for its megamorph {1}{W}, and
+  -- arrives with the +1/+1 counter rule 702.37b's second clause puts on it.
+  --
+  -- MISTHOOF KIRIN AND NOT ANOTHER MEGAMORPH CREATURE, and the reason is a
+  -- vacuity trap rather than taste: Gudul Lurker and Marang River Skeleton are
+  -- 1/1, so 1/1 plus a +1/+1 counter is 2/2 -- exactly CR 708.2a's face-down
+  -- printing. A test on either would read 2/2 whether the counter landed or not.
+  -- Misthoof Kirin's 2/1 becomes 3/2, which differs from the face-down 2/2 on
+  -- BOTH axes. Ainok Survivalist and Den Protector were rejected for a different
+  -- reason: each carries a turned-face-up trigger, which would confound this with
+  -- the CR 708.7 machinery the Skirk Marauder cases above already prove.
+  --
+  -- THE BEFORE assertions are the anti-vacuity control for the whole case. If
+  -- Cast.castableSpells could not see a megamorph ability, no face-down cast
+  -- would happen at all and every assertion after the turn-up would pass by
+  -- never reaching a board -- so the 2/2 with no name and neither keyword is
+  -- asserted explicitly first.
+  --
+  -- Five Plains: {3} for the face-down cast and {1}{W} for the megamorph cost.
+  Spec.it s "CR 702.37b turning Misthoof Kirin face up for its megamorph cost puts a +1/+1 counter on it" $ do
+    plains <- S.printingOf s registry "Plains"
+    kirin <- S.printingOf s registry "Misthoof Kirin"
+    case faceDownWith plains kirin 5 of
+      Nothing -> Spec.assertFailure s "the megamorph cast did not reach the battlefield"
+      Just (before, permanent) -> do
+        -- CR 708.2a, on a card that differs from the rule's values on every axis
+        -- asserted: a 2/1 read as 2/2, a name read as none, two keywords read as
+        -- none.
+        Spec.assertEqWith s "CR 708.2a a 2/2 before, not the printed 2/1" (S.powerToughnessOf permanent before) (Just (2, 2))
+        Spec.assertEqWith s "CR 708.2a no name before" (Projection.nameOf permanent before) noName
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Flying permanent before)) "CR 708.2a no flying before"
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Vigilance permanent before)) "CR 708.2a no vigilance before"
+        Spec.assertEqWith s "CR 702.37b no counter before" (S.counterOf CounterKind.PlusOnePlusOne permanent before) 0
+        -- The control: the action really is on offer, so nothing below is a
+        -- permanent that simply never turned over.
+        Spec.assertEqWith s "CR 702.37e the action is available" (FaceDown.turnableFaceUp S.alice before) [permanent]
+        let after = S.runPure S.identityAnswer before (FaceDown.turnFaceUp S.alice permanent)
+        -- CR 702.37b: "put a +1/+1 counter on it". ONE, not two -- CR 614.5 gives
+        -- the minted row one opportunity.
+        Spec.assertEqWith s "CR 702.37b exactly one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne permanent after) 1
+        -- CR 122.1a with CR 613.4c: the printed 2/1 plus the counter. 3/2 is
+        -- neither the face-down 2/2 (the power differs) nor the printed 2/1 (both
+        -- halves differ), so no reading that skipped either the turn-up or the
+        -- counter produces it.
+        Spec.assertEqWith s "CR 702.37b a 3/2, not the printed 2/1 and not the face-down 2/2" (S.powerToughnessOf permanent after) (Just (3, 2))
+        -- CR 708.8: the face-up characteristics really came back, which is what
+        -- makes the 3/2 above the printed 2/1 plus a counter rather than some
+        -- other 3/2.
+        Spec.assertEqWith s "CR 708.8 the printed name after" (Projection.nameOf permanent after) (S.printingName kirin)
+        Spec.assertBool s (Projection.hasKeyword Keyword.Flying permanent after) "CR 708.8 flying after"
+        Spec.assertBool s (Projection.hasKeyword Keyword.Vigilance permanent after) "CR 708.8 vigilance after"
+        Spec.assertEqWith s "CR 110.5 face up after" (fmap Object.facing (Game.lookupObject permanent after)) (Just Facing.FaceUp)
+        -- {3} for the cast and {1}{W} for the megamorph cost: five, which is a
+        -- multiple of neither alone.
+        Spec.assertEqWith s "CR 702.37a/702.37b five mana in all" (S.tappedCount S.alice after) 5
+        -- THE DISCRIMINATOR for CR 708.11's "while that permanent is being turned
+        -- face up, NOT AFTERWARD". The permanent is face up now and so carries
+        -- its megamorph ability again, so a replacement loop run outside
+        -- FaceDown.turnFaceUp's paid branch -- after the turning rather than
+        -- during it -- would find the same row on this second ask and put a
+        -- SECOND counter on. The count staying at 1 is what says the counter was
+        -- applied as part of the turning over.
+        let again = S.runPure S.identityAnswer after (FaceDown.turnFaceUp S.alice permanent)
+        Spec.assertEqWith s "CR 708.11 asking again adds no second counter" (S.counterOf CounterKind.PlusOnePlusOne permanent again) 1
+        Spec.assertEqWith s "CR 708.11 and it is still a 3/2" (S.powerToughnessOf permanent again) (Just (3, 2))
+
 -- The one target slot of Skirk Marauder's ability, answered with `who` rather
 -- than left to S.identityAnswer's lowest-sorting candidate -- which is alice, the
 -- ability's own controller, and so the control rather than the positive case.
@@ -529,11 +608,10 @@ aimAt who p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
   _ -> S.identityAnswer p
 
--- A resolved face-down permanent of a morph printing on a board of `n`
--- Mountains, three of which CR 702.37a's {3} has tapped. Nothing if the cast did
--- not land.
+-- A resolved face-down permanent of a morph printing on a board of `n` lands,
+-- three of which CR 702.37a's {3} has tapped. Nothing if the cast did not land.
 faceDownWith :: Printing.Printing -> Printing.Printing -> Int -> Maybe (GameState.GameState, ObjectId.ObjectId)
-faceDownWith mountain morph n =
-  let (gs, oid) = morphBoard mountain morph n
+faceDownWith land morph n =
+  let (gs, oid) = morphBoard land morph n
       (after, entered) = castAndResolve morph Facing.FaceDown gs oid
    in fmap (\permanent -> (after, permanent)) entered

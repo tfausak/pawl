@@ -2365,7 +2365,9 @@ replacementsOf oid gs =
 -- CR 306.5b / 614.1c: a planeswalker's intrinsic "enters with loyalty counters"
 -- replacement effect, CR 310.4b's identically shaped one for a battle's defense,
 -- and rule 702.136a's riot and CR 714.3a's Saga lore counter beside them. Those
--- four are the whole list, and each arm below is one of them.
+-- four are the whole list of ENTRY replacements, and each arm below is one of
+-- them; the keyword call at the end also mints CR 702.37b's megamorph row, which
+-- is a CR 614.1e one (see below).
 --
 -- CR 310.8a's protector is NOT here, though it is also chosen as a battle enters:
 -- rule 310.8a names no ability and cites no rule 614, where CR 310.4b says
@@ -2392,12 +2394,17 @@ replacementsOf oid gs =
 -- 306.5b with one characteristic swapped for another, down to the projected card
 -- type deciding and the projected number being read.
 --
--- The riot half (CR 702.136a) is minted by Keyword.entryReplacementsOf off the
--- SAME finished projection, and the third consequence above reads the other way
--- for it: minting after the layer fold puts riot INSIDE LoseAllAbilities' reach,
+-- The KEYWORD half is minted by Keyword.mintedReplacementsOf off the SAME
+-- finished projection, and the third consequence above reads the other way for
+-- it: minting after the layer fold puts riot INSIDE LoseAllAbilities' reach,
 -- because the keyword itself is what layer 6 removes. That is the rule --
 -- Humility'd, a creature has no riot to offer a choice -- where CR 306.5b's
 -- loyalty survives because a card type is not an ability.
+--
+-- That half is not all CR 614.1c's: CR 702.37b's megamorph mints a CR 614.1e
+-- TURNED-FACE-UP row through the same call. It needs no gathering of its own,
+-- because the CR 616.1 loop matches every gathered row against the event it is
+-- offered -- so a row of one class simply never applies to an event of another.
 intrinsicReplacementsOf :: ProjectedCharacteristics -> [ReplacementEffect]
 intrinsicReplacementsOf pc =
   [ -- CR 614.1c: the entering object is the ability's own source, so the pattern
@@ -2414,7 +2421,7 @@ intrinsicReplacementsOf pc =
        | Set.member CardType.Battle (PC.cardTypes pc),
          Defense.MkDefense n <- Maybe.maybeToList (PC.defense pc)
        ]
-    <> Keyword.entryReplacementsOf (PC.keywords pc)
+    <> Keyword.mintedReplacementsOf (PC.keywords pc)
     -- CR 714.3a's intrinsic "this Saga enters with a lore counter on it", minted
     -- off the same finished projection for CR 306.5b's reason: a subtype is not an
     -- ability, so a Saga under Humility keeps it.
@@ -2460,7 +2467,7 @@ replacementsAffecting gs =
             -- And the battle disjunct is the third of the same shape, for CR
             -- 310.4b's intrinsic replacement.
             || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
-            || any Keyword.mintsEntryReplacement (Face.keywords face)
+            || any Keyword.mintsReplacement (Face.keywords face)
             || any (any grantsMintingKeyword . StaticAbility.modifications) (Face.staticAbilities face)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
@@ -2482,7 +2489,7 @@ replacementsAffecting gs =
 -- replacement rather than a build failure.
 grantsMintingKeyword :: Modification.Modification -> Bool
 grantsMintingKeyword m = case m of
-  Modification.GainKeyword k -> Keyword.mintsEntryReplacement k
+  Modification.GainKeyword k -> Keyword.mintsReplacement k
   Modification.LoseAllAbilities -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False

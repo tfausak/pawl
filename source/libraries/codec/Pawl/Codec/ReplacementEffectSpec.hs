@@ -28,6 +28,7 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -200,3 +201,13 @@ spec s = Spec.describe s "Pawl.Codec.ReplacementEffect" $ do
       ReplacementEffect.fromJson
       (ReplacementEffect.PhaseR PhasePattern.MkPhasePattern {PhasePattern.whichPhase = PhaseSelector.CombatPhase, PhasePattern.whosePhase = Just (PlayerId.MkPlayerId 1)})
       """ {"type":"PhaseR","value":{"whichPhase":{"type":"CombatPhase"},"whosePhase":1}} """
+  -- CR 614.1e / 702.37b: megamorph's "as this permanent is turned face up, put a
+  -- +1/+1 counter on it". Minted by Pawl.Engine.Keyword rather than written by a
+  -- card, and it round-trips anyway -- every arm of this type does.
+  Spec.it s "TurnUpR (megamorph, CR 702.37b)" $
+    Common.assertJsonCodec
+      s
+      ReplacementEffect.toJson
+      ReplacementEffect.fromJson
+      (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1))
+      """ {"type":"TurnUpR","value":[{"type":"IsSource"},{"type":"WithCounters","value":[{"type":"PlusOnePlusOne"},1]}]} """

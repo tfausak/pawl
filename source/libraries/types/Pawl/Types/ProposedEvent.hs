@@ -33,7 +33,13 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- is the active player, and so CR 616.1's "affected player" for the choice among
 -- applicable skips.
 --
--- Seven arms, not every replaceable event class the rules define: each of the
+-- WouldTurnFaceUp carries an ObjectId and nothing else for WouldEnter's reason:
+-- CR 708.11 has the ability applied WHILE the permanent is turning over, and
+-- Pawl.Engine.FaceDown.turnFaceUp has already written the face-up status by the
+-- time it raises this -- so every property a CR 614.1e replacement can modify is
+-- read off, and written to, the object.
+--
+-- Eight arms, not every replaceable event class the rules define: each of the
 -- rest is one more arm plus the funnel that raises it.
 data ProposedEvent
   = WouldChangeZone ZoneChange.ZoneChange
@@ -57,4 +63,9 @@ data ProposedEvent
     -- schedule entry each. Engine.runStep therefore raises this TWICE at the
     -- first step of such a phase -- once for the phase, once for the step.
     WouldBeginPhase PhaseSelector.PhaseSelector PlayerId.PlayerId
+  | -- | CR 614.1e / 708.11: a face-down permanent is being turned face up.
+    -- Raised by Pawl.Engine.FaceDown.turnFaceUp, the only place in the engine
+    -- that turns anything face up, and the one funnel CR 116.2b's special action
+    -- goes through.
+    WouldTurnFaceUp ObjectId.ObjectId
   deriving (Eq, Show)

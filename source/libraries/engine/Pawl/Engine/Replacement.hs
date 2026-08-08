@@ -84,6 +84,7 @@ import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Uses as Uses
 import Pawl.Types.ZoneChange (ZoneChange)
 import qualified Pawl.Types.ZoneChange as ZoneChange
@@ -98,6 +99,7 @@ asZoneChange event = case event of
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
 -- Every replacement effect instance in the game, in the engine's canonical
 -- order, which is what the ChooseReplacement prompt indexes into:
@@ -261,6 +263,17 @@ applies gs event candidate =
         -- 614.1c's self-scope is Filter.IsSource; 614.1d's is a characteristic
         -- filter.
         (ReplacementEffect.EntryR pat _, ProposedEvent.WouldEnter oid) -> matchesFiltered gs candidate pat oid
+        -- CR 614.1e: which permanents turning face up this replacement watches.
+        -- The same Filter language the entry arm above uses, and every producer
+        -- writes Filter.IsSource -- CR 614.1e's printed wording is always "as
+        -- THIS permanent is turned face up".
+        --
+        -- Matched against the LIVE projection, which for this event is the
+        -- permanent as it is turning over: FaceDown.turnFaceUp has already
+        -- written Facing.FaceUp when it raises the event, so CR 708.11's "would
+        -- have ... after it's turned face up" is answered by asking about the
+        -- board rather than by a counterfactual.
+        (ReplacementEffect.TurnUpR pat _, ProposedEvent.WouldTurnFaceUp oid) -> matchesFiltered gs candidate pat oid
         -- Every row below falls through to False because an arm ABOVE already
         -- matches every event of that class: a row below fires only for a
         -- MISMATCHED class, where False is the correct answer rather than a
@@ -271,6 +284,7 @@ applies gs event candidate =
         (ReplacementEffect.DestructionR _, _) -> False
         (ReplacementEffect.CounterR _ _, _) -> False
         (ReplacementEffect.TokenR _ _, _) -> False
+        (ReplacementEffect.TurnUpR _ _, _) -> False
         (ReplacementEffect.PhaseR _, _) -> False
 
 -- CR 109.5 / 614.1: does `oid` satisfy this pattern's controller relation, read
@@ -487,6 +501,9 @@ bucketOfEffect re = case re of
   ReplacementEffect.DestructionR _ -> ReplacementBucket.Other
   ReplacementEffect.CounterR _ _ -> ReplacementBucket.Other
   ReplacementEffect.TokenR _ _ -> ReplacementBucket.Other
+  -- CR 616.1a-d are all about entering the battlefield and copying; turning face
+  -- up is neither, so CR 616.1e.
+  ReplacementEffect.TurnUpR _ _ -> ReplacementBucket.Other
   -- CR 616.1a-d are all about entries and copies; a skip is none of those, so it
   -- falls to CR 616.1e.
   ReplacementEffect.PhaseR _ -> ReplacementBucket.Other
@@ -503,8 +520,8 @@ bucketOfEffect re = case re of
 -- its own candidate (CR 614.5), but the loop gives each candidate its own
 -- opportunity in any order, so which was spent first is not a board difference.
 --
--- One arm per constructor, no wildcard, and the EntryR arms split per
--- EntryRewrite, so a new constructor breaks the build HERE as well as in
+-- One arm per constructor, no wildcard, and the EntryR and TurnUpR arms split per
+-- rewrite, so a new constructor breaks the build HERE as well as in
 -- bucketOfEffect and Event.apply. A wildcard defaulting to False would hand an
 -- author who teaches Event.apply a new controller-reading rewrite an unasked choice
 -- instead of a build failure.
@@ -569,6 +586,12 @@ readsApplier re = case re of
   -- created FOR rides the EVENT, not the candidate, so Doubling Season doubles
   -- the same player's tokens whoever's row applies.
   ReplacementEffect.TokenR _ _ -> False
+  -- CR 702.37b via CR 614.1e: the counter kind and count are the effect's own
+  -- fields and they land on the object the event already named, which is
+  -- WithCounters' answer one event class over. The inner sum is cased so a
+  -- second TurnUpRewrite -- CR 208.2b's power-and-toughness setter -- has to be
+  -- decided here rather than inheriting this answer.
+  ReplacementEffect.TurnUpR _ (TurnUpRewrite.WithCounters _ _) -> False
   -- CR 614.10: a skip replaces the step or phase with nothing. The player it is
   -- ABOUT is baked into PhasePattern.whosePhase, on the EFFECT, where this
   -- comparison already sees it.
@@ -678,6 +701,9 @@ chooserOf gs event = case event of
   -- CR 616.1's "affected player": a step or phase beginning affects no object,
   -- so the player whose turn it is chooses among applicable skips.
   ProposedEvent.WouldBeginPhase _ pid -> Just pid
+  -- CR 616.1's affected object is the permanent turning over, and its controller
+  -- is CR 702.37e's "you" -- the player who took the special action.
+  ProposedEvent.WouldTurnFaceUp oid -> Projection.controllerOf oid gs
 
 -- CR 208.2b / 707.2: stamp a chosen entry shape into the object's copiable
 -- snapshot. Power and toughness are SET; keywords are UNIONED into whatever is
@@ -1042,6 +1068,7 @@ shieldRemaining re = case re of
   ReplacementEffect.DestructionR _ -> Nothing
   ReplacementEffect.CounterR _ _ -> Nothing
   ReplacementEffect.TokenR _ _ -> Nothing
+  ReplacementEffect.TurnUpR _ _ -> Nothing
   ReplacementEffect.PhaseR _ -> Nothing
 
 asDamageEvent :: ProposedEvent -> Maybe DamageEvent.DamageEvent
@@ -1053,6 +1080,7 @@ asDamageEvent event = case event of
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
 asDestruction :: ProposedEvent -> Maybe ObjectId
 asDestruction event = case event of
@@ -1063,6 +1091,7 @@ asDestruction event = case event of
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
 asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind, Natural)
 asCounters event = case event of
@@ -1073,6 +1102,7 @@ asCounters event = case event of
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
 asTokens :: ProposedEvent -> Maybe (PlayerId, Card, Natural)
 asTokens event = case event of
@@ -1083,6 +1113,7 @@ asTokens event = case event of
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldBeginPhase {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
 -- CR 500.11 / 614.1b: an extra turn is beginning, so the steps and phases IT
 -- skips become floating replacement effects, one per selector. Called by
@@ -1151,3 +1182,4 @@ asPhaseBegin event = case event of
   ProposedEvent.WouldBeDestroyed {} -> Nothing
   ProposedEvent.WouldPutCounters {} -> Nothing
   ProposedEvent.WouldCreateTokens {} -> Nothing
+  ProposedEvent.WouldTurnFaceUp {} -> Nothing

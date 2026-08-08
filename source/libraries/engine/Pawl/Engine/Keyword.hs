@@ -19,6 +19,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
@@ -32,6 +33,7 @@ import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
+import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -45,6 +47,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -114,7 +117,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Phasing -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
-  Keyword.Morph _ -> []
+  Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
@@ -170,7 +173,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Phasing -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
-  Keyword.Morph _ -> []
+  Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
@@ -276,7 +279,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
   -- doesn't use the stack (CR 116), so morph gives a permanent no activated
   -- ability. Pawl.Engine.Keyword.morphCost serves that action instead.
-  Keyword.Morph _ -> []
+  Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
@@ -449,7 +452,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- Pawl.Engine.Cast's to apply, at its Zone.Hand arm.
   Keyword.Aftermath -> [CastingPermission.CastFromGraveyard]
   Keyword.Fear -> []
-  Keyword.Morph _ -> []
+  Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
   -- cost to a cast that some other rule already allowed; it never allows one.
@@ -555,6 +558,16 @@ flashbackCost keywords =
 -- WOULD BE IF IT WERE FACE UP" -- a face-down permanent projects no keywords at
 -- all (CR 708.2a), so a projected read would find nothing to pay.
 --
+-- CR 702.37b: MEGAMORPH REACHES HERE TOO, and that is the whole reason
+-- Pawl.Types.Keyword's Morph carries a variant instead of having a sibling
+-- constructor. "A megamorph cost is a morph cost", so this function must answer
+-- for both -- and the case below has a WILDCARD, so a `Megamorph` constructor
+-- beside `Morph` would have fallen through it to Nothing, silently making every
+-- megamorph card uncastable face down (Pawl.Engine.Cast gates the face-down cast
+-- on this answer) and unturnable face up (FaceDown.canTurnFaceUp does too), with
+-- nothing for -Werror to report. Widening the constructor made this line a build
+-- failure until it was read again.
+--
 -- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
 --
 -- Nothing beyond the FIRST morph cost is reachable: a card printing two morph
@@ -563,7 +576,7 @@ flashbackCost keywords =
 morphCost :: Set Keyword -> Maybe (Cost Keyword)
 morphCost keywords =
   let costOf keyword = case keyword of
-        Keyword.Morph cost -> Just cost
+        Keyword.Morph cost _ -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
@@ -649,14 +662,21 @@ flashbackExile =
 --
 -- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's
 -- own.
-entryReplacementsOf :: Map Keyword Natural -> [ReplacementEffect]
-entryReplacementsOf counts = concatMap (uncurry entryReplacementsFor) (Map.toAscList counts)
+--
+-- CR 702.37b's megamorph rides the same function, and the name is "minted"
+-- rather than "entry" because of it: rule 702.37b's second clause is a CR 614.1e
+-- replacement rather than a CR 614.1c one, so this answers with rows of two
+-- different event classes. Every caller passes the whole list to the CR 616.1
+-- loop, which matches each row against the event it is offered, so no caller has
+-- to tell them apart.
+mintedReplacementsOf :: Map Keyword Natural -> [ReplacementEffect]
+mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toAscList counts)
 
 -- Exhaustive for abilitiesFor's reason: rule 702 keeps adding abilities that
 -- rewrite an entry, and the next one must break this build rather than silently
 -- produce nothing.
-entryReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
-entryReplacementsFor keyword count = case keyword of
+mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
+mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Riot)
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
@@ -678,7 +698,30 @@ entryReplacementsFor keyword count = case keyword of
   Keyword.Phasing -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
-  Keyword.Morph _ -> []
+  -- CR 702.37a's plain morph mints nothing: rule 702.37a is one alternative cost
+  -- and one special action, and neither rewrites an event.
+  Keyword.Morph _ MorphVariant.Plain -> []
+  -- CR 702.37b's SECOND clause, minted the way riot's is: "As this permanent is
+  -- turned face up, put a +1/+1 counter on it if its megamorph cost was paid to
+  -- turn it face up." The card says only which variant and rule 702.37b says what
+  -- it means, so no megamorph card writes a replacement effect of its own.
+  --
+  -- Filter.IsSource, because CR 614.1e's ability is the turning permanent's own
+  -- ("As THIS permanent is turned face up").
+  --
+  -- The rule's "IF ITS MEGAMORPH COST WAS PAID" is not a condition anything here
+  -- checks, and is satisfied by construction rather than elided:
+  -- Pawl.Engine.FaceDown.turnFaceUp is the only place that turns a permanent face
+  -- up, and CR 702.37e's cost is the only cost it pays -- for a megamorph card,
+  -- the megamorph cost. Not implemented: another way to turn a permanent face up
+  -- (Ixidron, Zoetic Cavern's own morph beside a granted megamorph), where the
+  -- counter would have to be withheld (#986).
+  --
+  -- ONE ROW PER INSTANCE, as riot's is, and unreachable for the same reason
+  -- (#75): two megamorph rows are equal values, so CR 614.5's (source, effect)
+  -- identity gives the second no opportunity of its own.
+  Keyword.Morph _ MorphVariant.Mega ->
+    List.genericReplicate count (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1))
   Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
@@ -700,8 +743,13 @@ entryReplacementsFor keyword count = case keyword of
 -- one.
 --
 -- Membership rather than a count, because the gate asks whether there is any.
-mintsEntryReplacement :: Keyword -> Bool
-mintsEntryReplacement keyword = not (null (entryReplacementsFor keyword 1))
+--
+-- CR 702.37b's megamorph row is behind the same gate, and needs it as much as
+-- riot does: FaceDown.turnFaceUp raises its event against a board whose only
+-- replacement effect may be the minted one, so a gate that answered False for
+-- megamorph would collect nothing and put no counter on.
+mintsReplacement :: Keyword -> Bool
+mintsReplacement keyword = not (null (mintedReplacementsFor keyword 1))
 
 -- CR 702: WHICH KEYWORD this is, with its payload dropped -- the classification
 -- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
@@ -724,7 +772,7 @@ familyOf keyword = case keyword of
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
   Keyword.Cycling _ _ -> Just KeywordFamily.Cycling
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
-  Keyword.Morph _ -> Just KeywordFamily.Morph
+  Keyword.Morph _ _ -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Crew _ -> Just KeywordFamily.Crew

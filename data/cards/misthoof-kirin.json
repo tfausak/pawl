@@ -3,27 +3,33 @@
     {
       "keywords": [
         {
+          "type": "Flying"
+        },
+        {
+          "type": "Vigilance"
+        },
+        {
           "type": "Morph",
           "value": [
             {
               "mana": [
                 {
                   "type": "Generic",
-                  "value": 2
+                  "value": 1
                 },
                 {
                   "type": "OfType",
                   "value": {
                     "type": "Colored",
                     "value": {
-                      "type": "Red"
+                      "type": "White"
                     }
                   }
                 }
               ]
             },
             {
-              "type": "Plain"
+              "type": "Mega"
             }
           ]
         }
@@ -31,19 +37,19 @@
       "manaCost": [
         {
           "type": "Generic",
-          "value": 1
+          "value": 2
         },
         {
           "type": "OfType",
           "value": {
             "type": "Colored",
             "value": {
-              "type": "Red"
+              "type": "White"
             }
           }
         }
       ],
-      "name": "Skirk Marauder",
+      "name": "Misthoof Kirin",
       "power": {
         "type": "Literal",
         "value": 2
@@ -52,45 +58,10 @@
         "type": "Literal",
         "value": 1
       },
-      "triggeredAbilities": [
-        {
-          "condition": {
-            "type": "SelfTurnedFaceUp"
-          },
-          "modal": {
-            "modes": [
-              {
-                "effects": [
-                  {
-                    "type": "DealDamage",
-                    "value": [
-                      "target",
-                      {
-                        "type": "Literal",
-                        "value": 2
-                      }
-                    ]
-                  }
-                ],
-                "targetSpecs": [
-                  {
-                    "slot": "target",
-                    "spec": {
-                      "pool": {
-                        "type": "AnyTarget"
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      ],
       "typeLine": {
         "subtypes": [
           {
-            "type": "Goblin"
+            "type": "Kirin"
           }
         ],
         "types": [

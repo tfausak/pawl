@@ -12,6 +12,7 @@ import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PhasePattern as PhasePattern
 import qualified Pawl.Codec.Scaling as Scaling
 import qualified Pawl.Codec.TokenPattern as TokenPattern
+import qualified Pawl.Codec.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Codec.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Json.Array as Array
@@ -32,6 +33,8 @@ toJson re = case re of
     Common.tagged "CounterR" . Just . Common.array $ [CounterPattern.toJson p, Scaling.toJson sc]
   ReplacementEffect.TokenR p sc ->
     Common.tagged "TokenR" . Just . Common.array $ [TokenPattern.toJson p, Scaling.toJson sc]
+  ReplacementEffect.TurnUpR p r ->
+    Common.tagged "TurnUpR" . Just . Common.array $ [Filter.toJson Keyword.toJson p, TurnUpRewrite.toJson r]
   ReplacementEffect.PhaseR p ->
     Common.tagged "PhaseR" . Just $ PhasePattern.toJson p
 
@@ -60,5 +63,9 @@ fromJson value = do
       pattern_ <- TokenPattern.fromJson p
       scaling <- Scaling.fromJson sc
       pure (ReplacementEffect.TokenR pattern_ scaling)
+    ("TurnUpR", Just (Value.Array (Array.MkArray [p, r]))) -> do
+      pattern_ <- Filter.fromJson Keyword.fromJson p
+      rewrite <- TurnUpRewrite.fromJson r
+      pure (ReplacementEffect.TurnUpR pattern_ rewrite)
     ("PhaseR", Just v) -> ReplacementEffect.PhaseR <$> PhasePattern.fromJson v
     _ -> Left . Text.pack $ "unknown ReplacementEffect: " <> t

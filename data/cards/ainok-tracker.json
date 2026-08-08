@@ -7,23 +7,28 @@
         },
         {
           "type": "Morph",
-          "value": {
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 4
-              },
-              {
-                "type": "OfType",
-                "value": {
-                  "type": "Colored",
+          "value": [
+            {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 4
+                },
+                {
+                  "type": "OfType",
                   "value": {
-                    "type": "Red"
+                    "type": "Colored",
+                    "value": {
+                      "type": "Red"
+                    }
                   }
                 }
-              }
-            ]
-          }
+              ]
+            },
+            {
+              "type": "Plain"
+            }
+          ]
         }
       ],
       "manaCost": [

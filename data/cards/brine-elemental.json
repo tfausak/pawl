@@ -4,32 +4,37 @@
       "keywords": [
         {
           "type": "Morph",
-          "value": {
-            "mana": [
-              {
-                "type": "Generic",
-                "value": 5
-              },
-              {
-                "type": "OfType",
-                "value": {
-                  "type": "Colored",
+          "value": [
+            {
+              "mana": [
+                {
+                  "type": "Generic",
+                  "value": 5
+                },
+                {
+                  "type": "OfType",
                   "value": {
-                    "type": "Blue"
+                    "type": "Colored",
+                    "value": {
+                      "type": "Blue"
+                    }
+                  }
+                },
+                {
+                  "type": "OfType",
+                  "value": {
+                    "type": "Colored",
+                    "value": {
+                      "type": "Blue"
+                    }
                   }
                 }
-              },
-              {
-                "type": "OfType",
-                "value": {
-                  "type": "Colored",
-                  "value": {
-                    "type": "Blue"
-                  }
-                }
-              }
-            ]
-          }
+              ]
+            },
+            {
+              "type": "Plain"
+            }
+          ]
         }
       ],
       "manaCost": [

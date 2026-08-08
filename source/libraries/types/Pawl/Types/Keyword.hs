@@ -3,6 +3,7 @@ module Pawl.Types.Keyword where
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.MorphVariant as MorphVariant
 
 -- | CR 702. A keyword is a CITATION, not an effect: rule 702 is part of the
 -- comprehensive rules, the same as rule 506 or rule 302. So casing on this is NOT
@@ -225,11 +226,12 @@ data Keyword
     -- cost there would be payable to cast the card FACE UP, which is the one
     -- thing a morph ability does not offer.
     --
-    -- Megamorph (CR 702.37b) is deliberately NOT this constructor with a flag
-    -- and not a sibling either: it adds an "as this permanent is turned face up"
-    -- ability (CR 708.11) that pawl cannot yet apply, so it is unimplemented
-    -- rather than modelled (#917).
-    Morph (Cost.Cost Keyword)
+    -- CR 702.37b's megamorph is THIS constructor with a variant rather than a
+    -- sibling beside it, because the rule says so twice over: "Megamorph is a
+    -- variant of the morph ability" and "A megamorph cost is a morph cost". See
+    -- Pawl.Types.MorphVariant for what the variant adds and for what a sibling
+    -- constructor would have cost.
+    Morph (Cost.Cost Keyword) MorphVariant.MorphVariant
   | -- | 702.42a: you may choose all modes of this modal spell (rule 700.2) instead
     -- of the number specified, paying an additional cost if you do.
     --
@@ -314,7 +316,7 @@ data Keyword
   | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
     -- enter with an additional +1/+1 counter on it. If you don't, it gains
     -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,
-    -- and Pawl.Engine.Keyword.entryReplacementsOf mints one from this
+    -- and Pawl.Engine.Keyword.mintedReplacementsOf mints one from this
     -- constructor the way rule 702.70a's ability is minted from Poisonous.
     --
     -- Nullary, because rule 702.136a takes no parameter, and its reader takes the

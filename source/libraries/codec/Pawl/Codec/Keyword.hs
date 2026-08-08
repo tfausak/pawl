@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Filter as Filter
+import qualified Pawl.Codec.MorphVariant as MorphVariant
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.Keyword as Keyword
@@ -44,7 +45,9 @@ toJson k = case k of
   Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
   Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Cost.toJson toJson cost
   Keyword.Fear -> Common.nullary "Fear"
-  Keyword.Morph cost -> Common.tagged "Morph" . Just $ Cost.toJson toJson cost
+  -- An ARRAY, as Cycling's is, because CR 702.37b's megamorph is the same
+  -- keyword with a second field rather than a tag of its own.
+  Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Common.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
   Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
   Keyword.Infect -> Common.nullary "Infect"
@@ -84,7 +87,7 @@ fromJson value = do
     ("Cycling", Just (Value.Array (Array.MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson fromJson c <*> Filter.optional fromJson f
     ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson fromJson v
     ("Fear", _) -> Right Keyword.Fear
-    ("Morph", Just v) -> Keyword.Morph <$> Cost.fromJson fromJson v
+    ("Morph", Just (Value.Array (Array.MkArray [c, v]))) -> Keyword.Morph <$> Cost.fromJson fromJson c <*> MorphVariant.fromJson v
     ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
     ("Infect", _) -> Right Keyword.Infect

@@ -10,6 +10,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PhasePattern as PhasePattern
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.TokenPattern as TokenPattern
+import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -61,5 +62,23 @@ data ReplacementEffect
   | DestructionR DestructionRewrite.DestructionRewrite
   | CounterR CounterPattern.CounterPattern Scaling.Scaling
   | TokenR TokenPattern.TokenPattern Scaling.Scaling
+  | -- | CR 614.1e: "As [this permanent] is turned face up . . ." A separate arm
+    -- from EntryR and not a widening of it, because CR 614.1c's event class and
+    -- this one are different events -- a permanent that turns face up does not
+    -- enter, and CR 702.37e says so ("any abilities relating to the permanent
+    -- entering the battlefield don't trigger when it's turned face up").
+    --
+    -- The Filter is EntryR's, read the same way: CR 614.1e's printed wording is
+    -- always "as THIS permanent is turned face up", so every producer today is
+    -- `Filter.IsSource`. The field is a Filter rather than nothing because CR
+    -- 614.1a puts no restriction on what a replacement may look at, and
+    -- narrowing it here would be this engine's restriction rather than a rule's.
+    --
+    -- CR 708.11 is what makes the arm reachable at all: the ability belongs to a
+    -- permanent that has no abilities while it is face down, so it "is applied
+    -- while that permanent is being turned face up, not afterward" --
+    -- Pawl.Engine.FaceDown.turnFaceUp raises the event between the status write
+    -- and the CR 708.7 record.
+    TurnUpR (Filter.Filter Keyword.Keyword) TurnUpRewrite.TurnUpRewrite
   | PhaseR PhasePattern.PhasePattern
   deriving (Eq, Ord, Show)

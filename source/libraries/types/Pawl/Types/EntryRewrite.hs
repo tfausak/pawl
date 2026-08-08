@@ -129,7 +129,7 @@ data EntryRewrite
     -- an additional +1/+1 counter on it. If you don't, it gains haste."
     --
     -- NOT written by a card. Like CR 306.5b's loyalty, this arm is minted from
-    -- the finished projection -- Pawl.Engine.Keyword.entryReplacementsOf, called
+    -- the finished projection -- Pawl.Engine.Keyword.mintedReplacementsOf, called
     -- by Pawl.Engine.Projection.intrinsicReplacementsOf -- so a card says only
     -- `Keyword.Riot` and rule 702.136a says what it means. It still round-trips
     -- through the codec, because every arm of this type does.

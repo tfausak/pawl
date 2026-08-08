@@ -755,6 +755,7 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.DamageR _ _ -> False
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR _ _ -> False
+  ReplacementEffect.TurnUpR _ _ -> False
 
 -- The third baked field the codec accepts and no card may author, and the third
 -- for the same reason phasePatternOffends gives: a card cannot name an ObjectId
@@ -774,6 +775,7 @@ damagePatternOffends replacement = case replacement of
   ReplacementEffect.EntryR _ _ -> False
   ReplacementEffect.DestructionR _ -> False
   ReplacementEffect.TokenR _ _ -> False
+  ReplacementEffect.TurnUpR _ _ -> False
 
 -- CR 615.7 versus CR 615.10: a counted shield is generated "by the resolution of
 -- a spell or ability", never by the static ability a card prints, so a printed
@@ -1256,7 +1258,7 @@ keywordFilters keyword = case keyword of
   Keyword.Entwine cost -> costFilters cost
   -- CR 702.37a: the morph cost, whose components may hold a Filter exactly as
   -- flashback's and entwine's may.
-  Keyword.Morph cost -> costFilters cost
+  Keyword.Morph cost _ -> costFilters cost
   -- CR 702.22: plain banding names no quality, so it filters nothing.
   Keyword.Banding -> []
   -- CR 702.26a: phasing names no quality -- who phases is "the permanents that
@@ -1633,6 +1635,7 @@ replacementEffectFilters replacementEffect = case replacementEffect of
   ReplacementEffect.DamageR _ _ -> []
   ReplacementEffect.DestructionR _ -> []
   ReplacementEffect.TokenR _ _ -> []
+  ReplacementEffect.TurnUpR turnUpPattern _ -> [turnUpPattern]
   ReplacementEffect.PhaseR _ -> []
 
 -- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
