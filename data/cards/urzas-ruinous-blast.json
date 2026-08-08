@@ -1,0 +1,73 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Urza's Ruinous Blast",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "MoveToZone",
+                "value": [
+                  {
+                    "type": "And",
+                    "value": [
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Land"
+                          }
+                        }
+                      },
+                      {
+                        "type": "Not",
+                        "value": {
+                          "type": "HasSupertype",
+                          "value": {
+                            "type": "Legendary"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Exile"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}
