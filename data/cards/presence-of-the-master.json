@@ -21,12 +21,17 @@
         {
           "condition": {
             "type": "SpellCast",
-            "value": {
-              "type": "HasCardType",
-              "value": {
-                "type": "Enchantment"
+            "value": [
+              {
+                "type": "HasCardType",
+                "value": {
+                  "type": "Enchantment"
+                }
+              },
+              {
+                "type": "EachTurn"
               }
-            }
+            ]
           },
           "modal": {
             "modes": [

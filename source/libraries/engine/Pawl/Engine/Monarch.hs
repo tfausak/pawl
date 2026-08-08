@@ -108,9 +108,11 @@ inherentMatch monarch cond gs event = case (cond, event) of
         Just (Binding.setTriggerSource (DamageEvent.source ev) Map.empty)
   _ -> Nothing
   where
-    scopeOk s a = case s of
-      TurnScope.EachTurn -> True
-      TurnScope.ControllersTurn -> a == monarch
+    -- The monarch is the seat this scope is read against: CR 725.2 makes these
+    -- inherent abilities "controlled by the player who was the monarch at the
+    -- time the abilities triggered", so they are the "you" CR 109.5 would give a
+    -- printed one.
+    scopeOk s a = Event.turnScopeAdmits s a monarch
 
 -- CR 725.1/725.2: the inherent triggers that fire on this batch of events, as
 -- ordinary PendingTriggers whose source is TriggerSource.Sourceless -- which is

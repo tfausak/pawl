@@ -23,3 +23,10 @@ spec s = Spec.describe s "Pawl.Codec.TurnScope" $ do
       TurnScope.fromJson
       TurnScope.ControllersTurn
       """ {"type":"ControllersTurn"} """
+  Spec.it s "OpponentsTurn" $
+    Common.assertJsonCodec
+      s
+      TurnScope.toJson
+      TurnScope.fromJson
+      TurnScope.OpponentsTurn
+      """ {"type":"OpponentsTurn"} """

@@ -9,11 +9,13 @@ toJson :: TurnScope.TurnScope -> Value.Value
 toJson s = Common.nullary $ case s of
   TurnScope.EachTurn -> "EachTurn"
   TurnScope.ControllersTurn -> "ControllersTurn"
+  TurnScope.OpponentsTurn -> "OpponentsTurn"
 
 fromJson :: Value.Value -> Either Text.Text TurnScope.TurnScope
 fromJson =
   Common.decodeNullary
     "TurnScope"
     [ ("EachTurn", TurnScope.EachTurn),
-      ("ControllersTurn", TurnScope.ControllersTurn)
+      ("ControllersTurn", TurnScope.ControllersTurn),
+      ("OpponentsTurn", TurnScope.OpponentsTurn)
     ]

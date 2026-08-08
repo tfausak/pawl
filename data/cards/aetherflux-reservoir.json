@@ -53,12 +53,17 @@
         {
           "condition": {
             "type": "SpellCast",
-            "value": {
-              "type": "ControlledBy",
-              "value": {
-                "type": "You"
+            "value": [
+              {
+                "type": "ControlledBy",
+                "value": {
+                  "type": "You"
+                }
+              },
+              {
+                "type": "EachTurn"
               }
-            }
+            ]
           },
           "modal": {
             "modes": [
