@@ -21,6 +21,11 @@
 --   * the untap step's turn-based action (CR 502.2 / 731.2), through `untapCheck`
 --   * a player merely CONTROLLING a daybound or nightbound permanent while it is
 --     neither day nor night (CR 702.145d / 702.145g), through `settle`
+--
+-- CR 702.145b's and CR 702.145e's last static ability points the other way -- it
+-- changes nothing here and instead forbids a transform elsewhere -- so it is
+-- `restrictsTransform`, a predicate Pawl.Engine.Resolve reads rather than
+-- anything this module performs.
 module Pawl.Engine.Daytime where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -52,6 +57,32 @@ hasKeyword :: Keyword.Keyword -> Map ObjectId PC.ProjectedCharacteristics -> Obj
 hasKeyword kw pcs oid = case Map.lookup oid pcs of
   Nothing -> False
   Just pc -> Map.member kw (PC.keywords pc)
+
+-- | CR 702.145b's third static ability -- "this permanent can't transform except
+-- due to its daybound ability" -- and CR 702.145e's second, its nightbound
+-- mirror. True when this permanent refuses a transform.
+--
+-- Stated as a question about the PERMANENT rather than about the instruction,
+-- because that is how both rules are worded and because it is what makes the
+-- exception fall out for free: the transform the rules DO permit is CR 702.145c's
+-- and CR 702.145f's own sweep, `turnDue` below, which reaches
+-- Pawl.Engine.Game.turnFaceOver directly and never asks this. Every other road to
+-- a turn goes through an instruction, and Pawl.Engine.Resolve's `turnOver` -- the
+-- instruction-level wrapper -- is the one caller.
+--
+-- Daybound and nightbound together, in one predicate, because the two rules
+-- forbid the same thing in the same words and neither one's clause reads the
+-- designation or the face: CR 702.145c and CR 702.145f do that, and they are
+-- `dueToTurn` below. Which of the pair a permanent has decides which of THOSE
+-- fires, and decides nothing here.
+--
+-- The PROJECTED keywords, `hasKeyword` above, for that function's own reason: a
+-- permanent stripped by Humility (CR 613.1f) has no daybound ability left, so it
+-- has no restriction either -- the restriction IS part of the ability. A GRANTED
+-- daybound brings its restriction with it by the same read.
+restrictsTransform :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Bool
+restrictsTransform pcs oid =
+  hasKeyword Keyword.Daybound pcs oid || hasKeyword Keyword.Nightbound pcs oid
 
 -- | CR 702.145c and CR 702.145f: the permanents that must turn over right now,
 -- given the designation the game has.
@@ -106,10 +137,12 @@ dueToTurn gs = case GameState.daytime gs of
 -- HERE instead, one settle later, so it enters front face up and then transforms
 -- (#772).
 --
--- CR 702.145b's and CR 702.145e's third and second ability -- "this permanent
--- can't transform except due to its daybound/nightbound ability" -- is not
--- implemented either: another effect's transform instruction still turns such a
--- permanent over (#773).
+-- This is the ONE turn CR 702.145b's and CR 702.145e's transform restriction
+-- permits, and it reaches Game.turnFaceOver DIRECTLY for exactly that reason:
+-- `restrictsTransform` above gates Pawl.Engine.Resolve's instruction-level
+-- `turnOver`, which this does not go through. Pawl.DaytimeSpec's
+-- restrictionSpec proves the pair -- a spell's transform is refused, the sweep's
+-- is not.
 turnDue :: Game Bool
 turnDue = do
   gs <- State.get

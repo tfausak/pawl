@@ -87,6 +87,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import Pawl.Types.Recipient (Recipient)
@@ -871,17 +872,31 @@ resolveAbility abilId srcId ability = do
 -- The turn itself is Game.turnFaceOver, shared with the CR 702.145c/f sweep in
 -- Pawl.Engine.Daytime, and that is where the account of what a turn writes and of
 -- the ways it declines (CR 701.27c, CR 701.27d, a card in another zone) lives.
--- What this adds is the ONE gate that belongs to an instruction rather than to
--- the act: CR 701.27f's already-turned check, alreadyTurnedFor below. A static
--- ability's turn has no such gate, which is why the split is here.
+-- What this adds is the TWO gates that belong to an instruction rather than to
+-- the act, and a static ability's turn has neither, which is why the split is
+-- here:
+--
+--   * CR 701.27f's already-turned check, alreadyTurnedFor below.
+--   * CR 702.145b's third static ability and CR 702.145e's second -- "this
+--     permanent can't transform except due to its daybound/nightbound ability" --
+--     Pawl.Engine.Daytime.restrictsTransform. The transform those rules DO permit
+--     is CR 702.145c's and CR 702.145f's sweep, which is Daytime's own and calls
+--     Game.turnFaceOver without passing through here.
+--
+-- Reading a KEYWORD is reading the rulebook, the licence Pawl.Types.Keyword's own
+-- comment states: rule 702 is as much a part of the comprehensive rules as rule
+-- 701 is. Nothing here asks which EFFECT ordered the turn.
 --
 -- `now` is minted ONCE for the whole instruction by the caller rather than per
 -- victim, because CR 608.2f processes a swept set simultaneously: two Humans
 -- transformed by one Moonmist turned over at the same moment, and a later CR
--- 701.27f comparison must not be able to tell them apart.
-turnOver :: ObjectId -> Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
-turnOver resolving now gs oid objects
+-- 701.27f comparison must not be able to tell them apart. `pcs` is hoisted for
+-- the same reason it is elsewhere -- ONE whole-board projection per instruction
+-- rather than one per victim.
+turnOver :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> Timestamp.Timestamp -> GameState -> ObjectId -> Map.Map ObjectId Object.Object -> Map.Map ObjectId Object.Object
+turnOver pcs resolving now gs oid objects
   | alreadyTurnedFor resolving oid gs = objects
+  | Daytime.restrictsTransform pcs oid = objects
   | otherwise = Game.turnFaceOver now gs oid objects
 
 -- CR 701.27f, first sentence: "If an activated or triggered ability of a
@@ -2645,10 +2660,16 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- turns nothing over, which costs a number nobody reads rather than a
       -- branch: GameState.nextTimestamp is a counter with no meaning beyond its
       -- order (CR 613.7).
+      --
+      -- ONE whole-board projection for the whole instruction too, hoisted here
+      -- and handed to every victim: CR 702.145b's restriction is read off the
+      -- layer fold, and projecting per victim would refold the board once per
+      -- Human the sweep named.
       let (now, g1) = Game.freshTimestamp gs
+          pcs = Projection.projectAll g1
        in g1
             { GameState.objects =
-                foldr (turnOver resolving now g1) (GameState.objects g1) (objectRefObjects legality chosen resolving controller source g1 ref)
+                foldr (turnOver pcs resolving now g1) (GameState.objects g1) (objectRefObjects legality chosen resolving controller source g1 ref)
             }
   -- CR 500.8: add the phases, directly after the phase this is resolving in.
   --
