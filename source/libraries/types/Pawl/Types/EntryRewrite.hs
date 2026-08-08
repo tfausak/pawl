@@ -12,7 +12,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- ChooseBasicLandType is Convincing Mirage (CR 614.1c); ChooseCardNames is Null
 -- Chamber (CR 614.1c with CR 201.4); WithCounters is CR 306.5b's intrinsic
 -- loyalty; UnderSourceControl is Gather Specimens (CR 616.1b); Tapped is Zof
--- Bloodbog (CR 614.1d).
+-- Bloodbog and Headless Skaab (CR 614.1d).
 --
 -- AsCopy and ChoiceOf write into the object's COPIABLE snapshot, which is what
 -- makes CR 707.2 fall out with no further machinery. CR 707.5's second half is
@@ -145,14 +145,20 @@ data EntryRewrite
     -- end means -- neither value is copiable (CR 707.2), so neither may be
     -- written into the snapshot AsCopy and ChoiceOf use.
     Riot
-  | -- | CR 614.1d: "This land enters tapped" (Zof Bloodbog). The one arm a
-    -- permanent's OWN printed text writes about the STATUS it enters with, where
-    -- every other writer of an entering incarnation's tap state is an EFFECT's
-    -- rider (Pawl.Types.EntryRiders' `tapped`, "put it onto the battlefield
-    -- tapped"). CR 110.5b divides the two: a permanent enters untapped "unless a
-    -- spell or ability says otherwise", and this is the ability saying otherwise
-    -- rather than the spell putting it there. A land played as CR 305.1's special
+  | -- | CR 614.1d: "This permanent enters tapped" (Zof Bloodbog's land half,
+    -- Headless Skaab's creature). The one arm a permanent's OWN printed text
+    -- writes about the STATUS it enters with, where every other writer of an
+    -- entering incarnation's tap state is an EFFECT's rider
+    -- (Pawl.Types.EntryRiders' `tapped`, "put it onto the battlefield tapped").
+    -- CR 110.5b divides the two: a permanent enters untapped "unless a spell or
+    -- ability says otherwise", and this is the ability saying otherwise rather
+    -- than the spell putting it there. A land played as CR 305.1's special
     -- action goes through no effect at all, so a rider could not reach it.
+    --
+    -- CARD-TYPE-AGNOSTIC, and deliberately: nothing here or in
+    -- Pawl.Engine.Event's arm gates on Land. CR 614.1d says "[This permanent]
+    -- enters", and a creature spell printing the same sentence gets the same
+    -- rewrite.
     --
     -- NULLARY. CR 614.1d fixes both halves -- which status, and that the permanent
     -- gets it -- so there is nothing for a card to vary, the position Riot and

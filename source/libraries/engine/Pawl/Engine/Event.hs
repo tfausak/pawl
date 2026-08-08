@@ -818,7 +818,8 @@ apply batch candidate event =
                               }
                        in gs3 {GameState.continuousEffects = eff : GameState.continuousEffects gs3}
             pure (Just event)
-      -- CR 614.1d / 110.5b: "This land enters tapped" (Zof Bloodbog). CR 110.5b
+      -- CR 614.1d / 110.5b: "This permanent enters tapped" (Zof Bloodbog's land,
+      -- Headless Skaab's creature -- the arm gates on no card type). CR 110.5b
       -- has a permanent enter untapped "unless a spell or ability says otherwise",
       -- and this is the permanent's own ability saying otherwise -- which is why
       -- it is here and not in EntryRiders, the rider a SPELL or ability writes

@@ -545,6 +545,24 @@ data Prompt r where
   -- already consumed, so two Sacrifice components of one cost each see the full
   -- candidate list (#112).
   ChooseSacrifices :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
+  -- | CR 406.2: which cards to exile from the paying player's own graveyard to
+  -- pay a cost -- Headless Skaab's "exile a creature card from your graveyard".
+  -- The ObjectId is the spell being cast or the permanent whose ability is being
+  -- activated; the [ObjectId] is the payer's graveyard cards matching the
+  -- component's criterion (the engine pre-filters, in graveyard order); the
+  -- Natural is how many.
+  --
+  -- ChooseSacrifices' shape and posture in every respect, including its Set
+  -- answer (one card cannot be exiled twice for one payment), its CR 115.1
+  -- argument for not being a target choice, and its elision -- asked ONLY when
+  -- there are more candidates than the count.
+  --
+  -- A SEPARATE arm and not ChooseSacrifices reused, even though the payloads
+  -- agree: Pawl.Types.Response gives every prompt its own constructor so a
+  -- decode can reject a response that does not match the prompt asked, and the
+  -- two questions differ in what the candidates ARE -- permanents on the
+  -- battlefield against cards in a graveyard.
+  ChooseExilesFromGraveyard :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> [ObjectId.ObjectId] -> Natural.Natural -> Prompt (Set.Set ObjectId.ObjectId)
   -- | CR 614.1c with CR 614.13a: sacrifice ANY NUMBER of the candidates as this
   -- permanent enters, which is a different question from ChooseSacrifices above
   -- and not expressible as it -- that one names how many and Pawl.Engine.Cost

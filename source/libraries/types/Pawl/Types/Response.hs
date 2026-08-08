@@ -124,6 +124,11 @@ data Response
     ChoseBoundToken ObjectId.ObjectId
   | -- | CR 701.21a: the permanents a player chose to sacrifice to pay a cost.
     ChoseSacrifices (Set.Set ObjectId.ObjectId)
+  | -- | CR 406.2: the cards a player chose to exile from their own graveyard to
+    -- pay a cost. A separate constructor from ChoseSacrifices above, for
+    -- ChoseTaps' reason below: replaying a transcript against the wrong one
+    -- would sacrifice what it should have exiled.
+    ChoseExilesFromGraveyard (Set.Set ObjectId.ObjectId)
   | -- | CR 702.122a: the permanents a player chose to TAP to pay a cost measured
     -- by their total power. A separate constructor from ChoseSacrifices above,
     -- though the payload has the same shape: replaying a transcript against the
