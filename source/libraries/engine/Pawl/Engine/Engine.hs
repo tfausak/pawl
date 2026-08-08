@@ -584,9 +584,16 @@ reactions :: [PendingTrigger.PendingTrigger] -> Game [PendingTrigger.PendingTrig
 reactions batch
   | null batch = pure []
   | otherwise = do
+      -- One CR 704.3 event group EACH, not one `Event.simultaneously` bracket
+      -- around the lot: a batch is "the abilities that have triggered since the
+      -- last time a player received priority" (CR 603.3b), and those can have
+      -- triggered off different events at different moments. Nothing reads the
+      -- grouping of these records today -- CR 603.10a's look-back is about a
+      -- permanent leaving the battlefield, and `looksBack` puts this condition
+      -- outside its four families.
       State.modify' (\g -> List.foldl' (flip Event.recordEvent) g (Maybe.mapMaybe triggeredEvent batch))
       gs <- State.get
-      let fresh = Event.reactionTriggers (Event.unscannedEvents gs) gs
+      let fresh = Event.reactionTriggers (Event.unscannedGrouped gs) gs
       -- The round's own events are consumed here, and CR 603.3a's sample is
       -- spent with them for the reason the batch's own is cleared above: the
       -- next round's recordEvent re-takes it, this having left nothing unscanned.

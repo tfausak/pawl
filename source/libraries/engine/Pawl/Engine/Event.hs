@@ -3802,6 +3802,11 @@ looksBack condition = case condition of
   TriggerCondition.SpellCast _ _ -> False
   TriggerCondition.SelfHalfUnlocked _ -> False
   TriggerCondition.RoomFullyUnlocked _ -> False
+  -- CR 603.3b's second class names no zone change at all -- its event is another
+  -- ability triggering -- so CR 603.10a's four families cannot reach it. Its
+  -- bearer is a permanent standing on the battlefield watching a Saga, and CR
+  -- 603.10's first sentence is what reads it.
+  TriggerCondition.SagaFinalChapterTriggers _ -> False
 
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
@@ -4675,7 +4680,7 @@ gatherTriggers grouped gs =
 -- match no event at all, so a second call would duplicate every one of them; and
 -- the CR 603.7 delayed store's watermark is spent by the same one call, so
 -- re-running it would consume entries against events they never matched.
-reactionTriggers :: [GameEvent] -> GameState -> [PendingTrigger]
+reactionTriggers :: [(EventGroup, GameEvent)] -> GameState -> [PendingTrigger]
 reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events gs)
 
 -- CR 603.4: the ability doesn't trigger at all when its intervening "if" is false
