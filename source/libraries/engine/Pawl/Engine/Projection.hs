@@ -69,6 +69,7 @@ import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype.Type
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import Pawl.Types.Timestamp (Timestamp)
 import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -1342,17 +1343,25 @@ rewriteTokenName from to name = case (Subtype.creatureTypeWord from, Subtype.cre
   _ -> name
 
 -- CR 612.1: the same word swap over an ACTIVATED ability printed on a permanent,
--- whose text box the rule reaches. Two parts, the payload and CR 702.178a's "as
--- long as" gate -- which shares rewriteCondition with CR 603.4's intervening "if"
--- one function down, for that function's reason: a rewrite reaching only the
--- mode's clauses would leave the ability gated on the printed word.
+-- whose text box the rule reaches. THREE parts:
 --
--- Not implemented: the ability's activation cost is left unrewritten (#635).
+-- The payload, and CR 702.178a's "as long as" gate -- which shares
+-- rewriteCondition with CR 603.4's intervening "if" one function down, for that
+-- function's reason: a rewrite reaching only the mode's clauses would leave the
+-- ability gated on the printed word.
+--
+-- And the ACTIVATION COST, printed in that same text box (CR 118.1, CR 602.1a's
+-- "everything before the colon"): Dark Heart of the Wood's "Sacrifice a Forest:"
+-- becomes "Sacrifice an Island:" under a Magical Hack naming Forest.
+-- Filter.rewriteCost is the descent, shared with the costs rule 702 states inside
+-- a keyword. Proven by Pawl.ActivateSpec's "CR 612.1 whole card: hacking Dark
+-- Heart of the Wood moves which land its cost demands".
 rewriteActivatedAbility :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> ActivatedAbility.ActivatedAbility Card.Type.Card -> ActivatedAbility.ActivatedAbility Card.Type.Card
 rewriteActivatedAbility pairs ability =
   ability
     { ActivatedAbility.modal = rewriteModal pairs (ActivatedAbility.modal ability),
-      ActivatedAbility.condition = fmap (rewriteCondition pairs) (ActivatedAbility.condition ability)
+      ActivatedAbility.condition = fmap (rewriteCondition pairs) (ActivatedAbility.condition ability),
+      ActivatedAbility.cost = Filter.rewriteCost pairs (ActivatedAbility.cost ability)
     }
 
 -- CR 612.1 over a TRIGGERED ability printed on a permanent. Three parts, not just
@@ -1368,12 +1377,25 @@ rewriteTriggeredAbility pairs ability =
     }
 
 -- The modal payload both abilities carry, rewritten once so the two cannot drift.
--- Effects only, matching Resolve.modesOf. Not implemented: a mode's target specs
--- (#635).
+-- Both halves of a mode: its clauses' effects, and its TARGET SPECS -- Arbor Elf's
+-- "{T}: Untap target Forest" must ask for an Island once a Magical Hack has named
+-- Forest, and CR 601.2c (imported by CR 602.2b) is the step whose candidate set
+-- the spec defines. Proven by Pawl.ActivateSpec's "CR 612.1 whole card: hacking
+-- Arbor Elf moves which land its ability may target".
+--
+-- Only the TargetSpec's Filter is rewritten, and the Pool is not an omission: a
+-- Pool names a rules category (CR 115's "any target", the permanents on the
+-- battlefield) rather than a word printed on the card, so CR 612.2's "used in the
+-- correct way" finds nothing in it to swap.
 rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card -> Modal.Modal Card.Type.Card
 rewriteModal pairs modal =
   let rewriteClause c = c {Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c)}
-      rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
+      rewriteTargetSpec ts = ts {TargetSpec.filter = fmap (Filter.rewrite pairs) (TargetSpec.filter ts)}
+      rewriteMode m =
+        m
+          { Mode.clauses = fmap rewriteClause (Mode.clauses m),
+            Mode.targetSpecs = fmap rewriteTargetSpec (Mode.targetSpecs m)
+          }
    in modal {Modal.modes = fmap rewriteMode (Modal.modes modal)}
 
 -- CR 612.1 through a trigger's own condition. Exhaustive rather than a wildcard,

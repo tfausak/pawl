@@ -25,6 +25,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -109,6 +110,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   variableActivationCostSpec s registry
   youOnActivatedAbilitySpec s registry
   textChangedAbilitySpec s registry
+  textChangedCostSpec s registry
+  textChangedTargetSpec s registry
   graveyardEffectZoneSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
@@ -1698,6 +1701,162 @@ tidalWarriorChain s registry hackWhere = do
       pure (forestId, board)
     Just (permId, ability) ->
       pure (forestId, S.runPure S.identityAnswer board (do Activate.activateAbility S.alice permId ability; Stack.resolveTop))
+
+-- The board the two CR 612.1 cases below share: alice controls `subject`, one
+-- Forest and one Island (both TAPPED), and a Seat of the Synod, and holds a
+-- Magical Hack. Returns the subject's id, the Forest's, the Island's, the Hack's,
+-- and the state with alice holding priority.
+--
+-- TWO distinct land types, and that is what makes either case discriminating: with
+-- only a Forest on the board, "the Forest was hacked into an Island" and "the
+-- filter was ignored" pick the same permanent.
+--
+-- Seat of the Synod ({T}: Add {U}, an Artifact Land with no land subtype at all,
+-- checked against Scryfall) pays for the Hack rather than the Island. It is
+-- neither a Forest nor an Island, so it can join neither the sacrifice candidates
+-- nor the target set, and it leaves the two lands in the same state whether the
+-- Hack was cast or not -- the hacked and unhacked runs are then a flip of one
+-- fact rather than two different boards. It is also the ONLY untapped blue source,
+-- so which permanent pays is not a coin toss.
+textChangeBoard ::
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  Printing.Printing ->
+  (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+textChangeBoard subject forest island seat magicalHack =
+  let (subjectId, g1) = S.addCreature subject S.alice (Setup.emptyGame S.bothPlayers)
+      (forestId, g2) = S.addCreature forest S.alice g1
+      (islandId, g3) = S.addCreature island S.alice g2
+      (_, g4) = S.addCreature seat S.alice g3
+      (hackId, g5) = S.addHandCard magicalHack S.alice g4
+      g6 = S.tapObject islandId (S.tapObject forestId g5)
+   in (subjectId, forestId, islandId, hackId, g6 {GameState.priority = Just S.alice})
+
+-- Cast the Hack at `subjectId`, swapping Forest for Island, and resolve it -- or,
+-- unhacked, hand the board straight back.
+withForestHackedToIsland :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+withForestHackedToIsland hacked subjectId hackId gs =
+  if hacked
+    then S.runPure (hackAt subjectId Subtype.Forest Subtype.Island) gs (do S.cast S.alice hackId; Stack.resolveTop)
+    else gs
+
+-- alice activates `oid`'s one PROJECTED ability and the stack resolves. The
+-- ability comes off Projection.abilitiesOf rather than Face.activatedAbilities,
+-- so it is the text-changed one a player would be offered.
+activateSole :: (Monad m) => Spec.Spec m n -> ObjectId.ObjectId -> GameState.GameState -> m GameState.GameState
+activateSole s oid gs = case soleProjectedAbility oid gs of
+  Nothing -> do
+    Spec.assertFailure s "expected the permanent to carry exactly one activated ability"
+    pure gs
+  Just ability -> do
+    Spec.assertBool s (Activate.activatable S.alice oid ability gs) "the ability is activatable"
+    pure (S.runPure S.identityAnswer gs (do Activate.activateAbility S.alice oid ability; Stack.resolveTop))
+
+-- CR 612.1 reaching an activated ability's ACTIVATION COST, end to end.
+--
+-- Dark Heart of the Wood {B}{G} Enchantment, "Sacrifice a Forest: You gain 3
+-- life." (checked against Scryfall). Magical Hack changes Forest to Island, and
+-- the cost must then demand the Island.
+--
+-- CR 612.1: a text-changing effect "can apply to any words or symbols printed on
+-- that object, but generally affects only that object's rules text (which appears
+-- in its text box)". CR 118.1 makes the activation cost part of what is printed
+-- there, and CR 602.2a is why fixing the projection fixes the PAYMENT: the ability
+-- on the stack "has the text of the ability that created it".
+--
+-- An enchantment rather than a creature deliberately: CR 302.6's summoning
+-- sickness gates no ability here, so nothing but the swap can decide which land
+-- dies.
+textChangedCostSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedCostSpec s registry =
+  let forestName = CardName.MkCardName (Text.pack "Forest")
+      islandName = CardName.MkCardName (Text.pack "Island")
+      run hacked = do
+        darkHeart <- S.printingOf s registry "Dark Heart of the Wood"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        seat <- S.printingOf s registry "Seat of the Synod"
+        magicalHack <- S.printingOf s registry "Magical Hack"
+        let (subjectId, _, _, hackId, g0) = textChangeBoard darkHeart forest island seat magicalHack
+            board = withForestHackedToIsland hacked subjectId hackId g0
+        after <- activateSole s subjectId board
+        pure (S.lifeOf S.alice board, after)
+   in Spec.describe s "TextChangedActivationCost" $ do
+        -- The control: unhacked, the printed word stands and the FOREST is the
+        -- only thing that can pay.
+        Spec.it s "CR 118.1 whole card: an unhacked Dark Heart of the Wood sacrifices the Forest" $ do
+          (before, after) <- run False
+          Spec.assertEqWith s "alice gained 3 life" (S.lifeOf S.alice after) (fmap (+ 3) before)
+          Spec.assertEqWith s "the Forest is gone" (S.countOnBattlefieldByName forestName S.alice after) 0
+          Spec.assertEqWith s "the Island survives" (S.countOnBattlefieldByName islandName S.alice after) 1
+        -- The swap. alice's board did not move -- the same Forest and the same
+        -- Island -- but the cost printed on the Dark Heart now reads "Sacrifice an
+        -- Island", so the Island is what dies and the Forest is not even eligible.
+        Spec.it s "CR 612.1 whole card: hacking Dark Heart of the Wood moves which land its cost demands" $ do
+          (before, after) <- run True
+          Spec.assertEqWith s "alice gained 3 life" (S.lifeOf S.alice after) (fmap (+ 3) before)
+          Spec.assertEqWith s "the Island is gone" (S.countOnBattlefieldByName islandName S.alice after) 0
+          Spec.assertEqWith s "the Forest survives" (S.countOnBattlefieldByName forestName S.alice after) 1
+
+-- CR 612.1 reaching a mode's TARGET SPEC, end to end.
+--
+-- Arbor Elf {G} Creature -- Elf Druid 1/1, "{T}: Untap target Forest." (checked
+-- against Scryfall). Magical Hack changes Forest to Island, and the ability must
+-- then be able to target only the Island.
+--
+-- CR 601.2c, imported for an activated ability by CR 602.2b, is the step whose
+-- candidate set the target spec defines, and CR 602.2a puts the projected text on
+-- the ability object that does the untapping.
+--
+-- Arbor Elf IS a creature and its cost IS the tap symbol, so CR 302.6 gates it,
+-- and `activateSole`'s Activate.activatable assertion is what keeps that gate
+-- honest here. Measured, not assumed: landing the Elf Sickness.Sick leaves BOTH
+-- cases below green once that one assertion is dropped, because
+-- Activate.activateAbility trusts its caller and re-checks nothing (the gate lives
+-- on the enumeration path, with `activatable`). So the tap states alone would not
+-- have noticed a creature that could not legally have been activated at all.
+--
+-- Both lands start TAPPED, so "the ability never resolved" and "it untapped the
+-- other land" are distinguishable board states.
+textChangedTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+textChangedTargetSpec s registry =
+  let untapped oid gs = fmap Object.tapped (Game.lookupObject oid gs) == Just TapState.Untapped
+      -- The legal recipients of the projected ability's one mode, as CR 601.2c
+      -- would offer them. A candidate-set assertion alone can pass off a list
+      -- nothing consumed, so each case below pairs it with the tap states.
+      candidates elfId gs = case soleProjectedAbility elfId gs of
+        Nothing -> []
+        Just ability -> case Seq.lookup 0 (Modal.modes (ActivatedAbility.modal ability)) of
+          Nothing -> []
+          Just mode -> fmap Set.toList (Map.elems (Target.legalSets (Just S.alice) elfId (Mode.targetSpecs mode) gs))
+      run hacked = do
+        arborElf <- S.printingOf s registry "Arbor Elf"
+        forest <- S.printingOf s registry "Forest"
+        island <- S.printingOf s registry "Island"
+        seat <- S.printingOf s registry "Seat of the Synod"
+        magicalHack <- S.printingOf s registry "Magical Hack"
+        let (elfId, forestId, islandId, hackId, g0) = textChangeBoard arborElf forest island seat magicalHack
+            board = withForestHackedToIsland hacked elfId hackId g0
+        after <- activateSole s elfId board
+        pure (elfId, forestId, islandId, board, after)
+   in Spec.describe s "TextChangedTargetSpec" $ do
+        -- The control: unhacked, "target Forest" admits the Forest alone, and the
+        -- Forest is what wakes up.
+        Spec.it s "CR 601.2c whole card: an unhacked Arbor Elf may untap only the Forest" $ do
+          (elfId, forestId, islandId, board, after) <- run False
+          Spec.assertEqWith s "only the Forest is a legal target" (candidates elfId board) [[Recipient.ToObject forestId]]
+          Spec.assertBool s (untapped forestId after) "the Forest is untapped"
+          Spec.assertBool s (not (untapped islandId after)) "the Island is still tapped"
+        -- The swap: the printed "target Forest" now reads "target Island", so the
+        -- Forest drops out of the candidate set entirely and the Island wakes up
+        -- instead.
+        Spec.it s "CR 612.1 whole card: hacking Arbor Elf moves which land its ability may target" $ do
+          (elfId, forestId, islandId, board, after) <- run True
+          Spec.assertEqWith s "only the Island is a legal target" (candidates elfId board) [[Recipient.ToObject islandId]]
+          Spec.assertBool s (untapped islandId after) "the Island is untapped"
+          Spec.assertBool s (not (untapped forestId after)) "the Forest is still tapped"
 
 -- Alice with two untapped Swamps and one Reassembling Skeleton in her graveyard,
 -- holding priority. Returns the graveyard card's id.

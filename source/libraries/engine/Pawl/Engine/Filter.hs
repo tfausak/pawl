@@ -7,6 +7,8 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
@@ -404,9 +406,13 @@ rewrite pairs predicate = case predicate of
 -- so a new one carrying a Filter must break this build rather than silently keep
 -- the printed word.
 --
--- Not rewritten: the Cost that cycling, flashback, morph and entwine carry. A cost may
--- hold a Filter through CostComponent.Sacrifice, which is the ability-cost half
--- of #635 one carrier over.
+-- The Cost that cycling, flashback, morph and entwine carry goes through
+-- rewriteCost below, for CR 612.1's own reason: rule 702 states those costs as
+-- part of the keyword, so they are printed in the text box exactly as an
+-- activated ability's activation cost is. No printing pairs one of those costs
+-- with a basic land type, so those four arms are a regression fence rather than
+-- a proven path -- Pawl.ActivateSpec's Dark Heart of the Wood is what proves
+-- rewriteCost itself.
 rewriteKeyword :: [(Subtype.Subtype, Subtype.Subtype)] -> Keyword.Type.Keyword -> Keyword.Type.Keyword
 rewriteKeyword pairs keyword = case keyword of
   -- CR 702.14a's "[type]walk".
@@ -414,7 +420,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.29e's "[Type]cycling", rule 702's other "[type]": "usually a subtype
   -- (as in 'mountaincycling')", so it holds a basic land type exactly as
   -- swampwalk does.
-  Keyword.Type.Cycling cost criterion -> Keyword.Type.Cycling cost (fmap (rewrite pairs) criterion)
+  Keyword.Type.Cycling cost criterion -> Keyword.Type.Cycling (rewriteCost pairs cost) (fmap (rewrite pairs) criterion)
   -- CR 702.11d's "hexproof from [quality]", rule 702's third carrier of a word.
   -- Not a "[type]" like the two above -- CR 702.11d's quality is any quality, and
   -- the ones cards actually print tend to name a card type or a colour -- but CR
@@ -440,10 +446,12 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Shroud -> keyword
   Keyword.Type.Trample -> keyword
   Keyword.Type.Vigilance -> keyword
-  Keyword.Type.Flashback _ -> keyword
+  -- CR 702.34a, CR 702.37a and CR 702.42a: each states a cost as part of the
+  -- keyword, so rewriteCost carries CR 612.1 into it.
+  Keyword.Type.Flashback cost -> Keyword.Type.Flashback (rewriteCost pairs cost)
   Keyword.Type.Fear -> keyword
-  Keyword.Type.Morph _ _ -> keyword
-  Keyword.Type.Entwine _ -> keyword
+  Keyword.Type.Morph cost variant -> Keyword.Type.Morph (rewriteCost pairs cost) variant
+  Keyword.Type.Entwine cost -> Keyword.Type.Entwine (rewriteCost pairs cost)
   Keyword.Type.Poisonous _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
@@ -458,3 +466,49 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Nightbound -> keyword
   Keyword.Type.Toxic _ -> keyword
   Keyword.Type.StartYourEngines -> keyword
+
+-- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
+-- necessary to take another action", and the one on an activated ability is
+-- printed in the text box that rule 612 reaches -- Dark Heart of the Wood's
+-- "Sacrifice a Forest:" is the printing, and a Magical Hack naming Forest turns it
+-- into "Sacrifice an Island:". CR 602.2a is why fixing it here is enough for the
+-- payment: the ability on the stack "has the text of the ability that created
+-- it", so it pays the cost this rewrite produced.
+--
+-- Here rather than in Pawl.Engine.Projection beside the ability rewriters, because
+-- rewriteKeyword above needs it too and Pawl.Engine.Filter cannot import
+-- Pawl.Engine.Projection. One descent, so the keyword carrier and the ability
+-- carrier cannot drift apart.
+--
+-- The MANA part is left alone and that is CR 612.2 rather than an omission: a mana
+-- symbol is a symbol and not a land type word, and "a land type word used as a
+-- land type" is the only use of these pairs the rule licenses.
+--
+-- Exhaustive rather than a catch-all, rewrite's and rewriteKeyword's stated
+-- posture: a later component that can carry a Filter must fail to compile here
+-- instead of silently keeping the printed word.
+rewriteCost :: [(Subtype.Subtype, Subtype.Subtype)] -> Cost.Cost Keyword.Type.Keyword -> Cost.Cost Keyword.Type.Keyword
+rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (Cost.components cost)}
+
+-- rewriteCost's per-component half. Three components carry a Filter and are the
+-- three that descend; the rest name a number, or the object the cost is on, and
+-- CR 612.2 finds no word in them to swap.
+--
+-- Of the three, only Sacrifice has a producer -- Dark Heart of the Wood.
+-- TapForTotalPower's and ExileCardsFromGraveyard's arms are a regression fence:
+-- no printing pairs either with a basic land type, so no test can falsify them.
+rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
+rewriteComponent pairs component = case component of
+  CostComponent.Sacrifice n criterion -> CostComponent.Sacrifice n (rewrite pairs criterion)
+  CostComponent.TapForTotalPower n criterion -> CostComponent.TapForTotalPower n (rewrite pairs criterion)
+  CostComponent.ExileCardsFromGraveyard n criterion -> CostComponent.ExileCardsFromGraveyard n (rewrite pairs criterion)
+  CostComponent.TapThis -> component
+  CostComponent.UntapThis -> component
+  CostComponent.SacrificeThis -> component
+  CostComponent.PayLife _ -> component
+  CostComponent.DiscardCards _ -> component
+  CostComponent.DiscardThis -> component
+  CostComponent.PayEnergy _ -> component
+  CostComponent.AddLoyaltyToThis _ -> component
+  CostComponent.RemoveLoyaltyFromThis _ -> component
+  CostComponent.ExileThisFromGraveyard -> component
