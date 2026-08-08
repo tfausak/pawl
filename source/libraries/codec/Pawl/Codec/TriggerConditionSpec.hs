@@ -297,3 +297,12 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfTurnedFaceUp
       """ {"type":"SelfTurnedFaceUp"} """
+  -- CR 603.10a's sacrifice family. Nullary: "a player" is neither PlayerRelation
+  -- arm and "a permanent" names no Filter, so there is nothing to encode.
+  Spec.it s "PermanentSacrificed" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.PermanentSacrificed
+      """ {"type":"PermanentSacrificed"} """

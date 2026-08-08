@@ -508,4 +508,25 @@ data TriggerCondition
     -- action and the characteristics the permanent regained are all things a
     -- printed ability could in principle say "that much" about, and none does.
     SelfTurnedFaceUp
+  | -- | CR 603.10a: "whenever a player sacrifices a permanent". One of the four
+    -- look-back families that rule names, and the second pawl builds.
+    --
+    -- NOT the same condition as SelfDies or PermanentDies, even though CR 700.4
+    -- makes every sacrifice a death: this one fires on the sacrifice AS a
+    -- sacrifice (CR 701.21a's game action), which the zone change alone cannot
+    -- say. GameEvent.PermanentSacrificed is the event, recorded beside the Moved
+    -- event rather than instead of it, so a death trigger still sees a sacrifice
+    -- and this one does not see a destruction.
+    --
+    -- NO PAYLOAD, and the omission is deliberate. Mayhem Devil says "whenever a
+    -- PLAYER sacrifices a permanent" -- any player, its own controller included --
+    -- and PlayerRelation offers only You and Opponent, so neither arm states the
+    -- printed sentence. Widening that type for one card would be speculative; the
+    -- card that prints "whenever you sacrifice" is the one that earns a relation
+    -- here. Nothing about the sacrificed PERMANENT is asked either: Mayhem Devil
+    -- says "a permanent", so there is no Filter to carry.
+    --
+    -- Not self-scoped: the bearer watches every sacrifice on the board, so it
+    -- contributes neither an identity nor CR 109.5's perspective.
+    PermanentSacrificed
   deriving (Eq, Ord, Show)

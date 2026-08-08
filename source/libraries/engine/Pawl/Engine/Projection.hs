@@ -1130,7 +1130,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Destroy ref regenerability mSlot -> Effect.Destroy (rewriteObjectRef pairs ref) regenerability mSlot
   Effect.Sacrifice _ -> effect
   Effect.RemoveFromCombat _ -> effect
-  Effect.MoveToZone {} -> effect
+  Effect.MoveToZone ref zone riders mSlot mOrigin -> Effect.MoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin
   Effect.Draw {} -> effect
   -- The tally's Filter is text like the Search arm's above (CR 612.1), so a
   -- swap reaches it; the slot it binds to is a name no card prints.
@@ -1322,6 +1322,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- CR 708.7 names no subtype at all -- the condition is nullary -- so a CR 612.1
   -- text change has nothing in it to rewrite.
   TriggerCondition.SelfTurnedFaceUp -> condition
+  -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
+  -- subtype word for CR 612.1 to swap.
+  TriggerCondition.PermanentSacrificed -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

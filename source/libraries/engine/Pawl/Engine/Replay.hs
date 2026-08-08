@@ -75,6 +75,7 @@ encode p answer = case p of
   Prompt.ChooseReplacement {} -> Response.ChoseReplacement answer
   Prompt.ChooseBoundToken {} -> Response.ChoseBoundToken answer
   Prompt.ChooseSacrifices {} -> Response.ChoseSacrifices answer
+  Prompt.ChooseExilesFromGraveyard {} -> Response.ChoseExilesFromGraveyard answer
   Prompt.ChooseAnyNumberToSacrifice {} -> Response.ChoseSacrifices answer
   Prompt.ChooseTapsForTotalPower {} -> Response.ChoseTaps answer
   Prompt.ChooseAttachment {} -> Response.ChoseAttachment answer
@@ -204,6 +205,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseSacrifices {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
+    _ -> Nothing
+  Prompt.ChooseExilesFromGraveyard {} -> case response of
+    Response.ChoseExilesFromGraveyard ids -> Just ids
     _ -> Nothing
   Prompt.ChooseAnyNumberToSacrifice {} -> case response of
     Response.ChoseSacrifices ids -> Just ids
@@ -379,6 +383,9 @@ defaultAnswer p = case p of
   Prompt.ChooseBoundToken _ _ _ candidates -> NonEmpty.head candidates
   -- The first `count` candidates, which the engine offers in ascending order.
   Prompt.ChooseSacrifices _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
+  -- CR 406.2: the first `count` candidates, the arm above's rule over the
+  -- graveyard pool the engine offers in that zone's own order.
+  Prompt.ChooseExilesFromGraveyard _ _ _ candidates count -> Set.fromList (List.genericTake count candidates)
   -- Every candidate. The maximal subset, mirroring the arm above taking the first
   -- `count` rather than the last: a deterministic fallback, not a recommendation.
   Prompt.ChooseAnyNumberToSacrifice _ _ _ candidates -> Set.fromList candidates

@@ -4,7 +4,9 @@
 -- turn-scoped clearing at handoff -- `logSpec`. The CR 603.2b step-beginning
 -- event and the CR 603.6a widened scan (every battlefield permanent, not just
 -- an enters event's newcomer) -- `scanSpec`. The `Sacrifice` opcode and its
--- reserved trigger-source slot, CR 701.21 -- `sacrificeSpec`. CR 603.6a's
+-- reserved trigger-source slot, CR 701.21 -- `sacrificeSpec`, and CR 603.10a's
+-- second look-back family, a trigger on the sacrifice AS a sacrifice, with
+-- Mayhem Devil -- `mayhemDevilSpec`. CR 603.6a's
 -- OTHER written form, "whenever a [type] enters", with Soul Warden --
 -- `permanentEntersSpec`. CR 603.8 state
 -- triggers -- `stateTriggerSpec`, and CR 612.1's basic-land-type word swap
@@ -489,6 +491,85 @@ sacrificeSpec s registry =
           bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
           selfOf oid = Map.lookup Binding.triggerSource (Binding.targetsOf (bindingsOn oid))
       Spec.assertEqWith s "the trigger names its source" (fmap selfOf (GameState.stack placed)) [Just (Recipient.ToObject ripId)]
+
+-- CR 603.10a's sacrifice family, end to end. Mayhem Devil {1}{B}{R} Creature --
+-- Devil 3/3: "Whenever a player sacrifices a permanent, this creature deals 1
+-- damage to any target."
+--
+-- THE PAIR is the point, and neither half means anything alone. CR 700.4 makes
+-- "dies" mean "is put into a graveyard from the battlefield", so every sacrifice
+-- IS a death and writes the same battlefield-to-graveyard Moved event a
+-- destruction writes. An implementation that emitted the sacrifice event from the
+-- generic zone-change funnel would pass the firing case and fail only the silent
+-- one -- which is exactly the confusion #386 describes.
+--
+-- THREE SEATS. The Devil fires on ANY player's sacrifice, its own controller's
+-- included, so alice has to be the sacrificing player -- a two-handed board where
+-- bob sacrificed would leave a wrong "opponent only" reading passing. carol is
+-- the third seat, and she absorbs the Fire-Eater's damage so that the Devil's 1
+-- lands alone on bob: pointing the two sources at the SAME player would let a
+-- single total agree for the wrong reason.
+--
+-- Ghitu Fire-Eater ({T}, Sacrifice this creature: it deals damage equal to its
+-- power to any target) is the sacrificing card, chosen because its cost
+-- sacrifices ITSELF -- so nothing is prompted about WHICH permanent, and the
+-- fixture stays free of an answerer choice that could drift.
+--
+-- ONE TUPLE of all three totals, per assertion. bob's exact 19 is also the
+-- no-double-fire pin: an event recorded both before and after the move, or a
+-- condition that matched the Moved event alongside its own, would take him to 18.
+mayhemDevilSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mayhemDevilSpec s registry =
+  let -- Answers every target slot with `who`. Split across the two runs below:
+      -- the Fire-Eater's own target is chosen as the ability is ACTIVATED, and
+      -- the Devil's trigger's when the priority loop places it, so two answerers
+      -- aim the two damage sources at two different players.
+      aimAt who p = case p of
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        _ -> S.identityAnswer p
+      board devil extra =
+        let (_, withDevil) = S.addCreature devil S.alice S.threePlayerGame
+            (extraId, withExtra) = S.addCreature extra S.alice withDevil
+         in ( extraId,
+              withExtra
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "PermanentSacrificed" $ do
+        Spec.it s "CR 603.10a Mayhem Devil fires on a sacrifice, including its own controller's" $ do
+          mayhemDevil <- S.printingOf s registry "Mayhem Devil"
+          ghituFireEater <- S.printingOf s registry "Ghitu Fire-Eater"
+          case Face.activatedAbilities (S.combinedFace ghituFireEater) of
+            [] -> Spec.assertFailure s "Ghitu Fire-Eater should declare one activated ability"
+            ability : _ -> do
+              let (fireEater, gs) = board mayhemDevil ghituFireEater
+                  -- The Fire-Eater's own damage goes to carol; the cost paid here
+                  -- is the CR 701.21a sacrifice under test.
+                  activated = S.runPure (aimAt S.carol) gs (Activate.activateAbility S.alice fireEater ability)
+                  -- The Devil's trigger is gathered and placed by the loop, so its
+                  -- target is answered here -- bob, alone.
+                  after = S.runPure (aimAt S.bob) activated Engine.priorityLoop
+              Spec.assertEqWith s "everyone starts at 20" (lives gs) (Just 20, Just 20, Just 20)
+              Spec.assertBool s (not (Set.member fireEater (GameState.battlefield activated))) "the cost really sacrificed the Fire-Eater"
+              Spec.assertEqWith s "CR 701.21a: bob takes the Devil's 1, carol the Fire-Eater's 2" (lives after) (Just 20, Just 19, Just 18)
+        -- The half that makes the half above mean something. Same board, same
+        -- Devil, a permanent that DIES without being sacrificed: CR 700.4 makes
+        -- the zone change identical, so only an engine that records the sacrifice
+        -- as a sacrifice can stay silent here.
+        Spec.it s "CR 700.4 a plain death is not a sacrifice, and fires nothing" $ do
+          mayhemDevil <- S.printingOf s registry "Mayhem Devil"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (pikerId, gs) = board mayhemDevil piker
+              killed = S.runPure S.identityAnswer gs (Event.destroy Regenerability.Regenerable [pikerId])
+              after = S.runPure (aimAt S.bob) killed Engine.priorityLoop
+          -- Positive control: the Piker really left, so the silence below is the
+          -- condition's answer rather than a fixture that destroyed nothing.
+          Spec.assertEqWith s "the Piker really died" (S.countOnBattlefieldByName (CardName.MkCardName (Text.pack "Goblin Piker")) S.alice after) 0
+          Spec.assertEqWith s "and it landed in a graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+          Spec.assertEqWith s "CR 700.4: nobody's life total moved" (lives after) (Just 20, Just 20, Just 20)
 
 -- Barbarian Outcast {1}{R} Creature -- Human Barbarian Beast 2/2:
 -- "When you control no Swamps, sacrifice this creature." CR 603.8's own example
@@ -3682,6 +3763,10 @@ representativeEvents cond =
         -- CR 708.7's own event, and the only one this condition admits, on the
         -- BEARER -- so the pair really matches.
         TriggerCondition.SelfTurnedFaceUp -> one (GameEvent.TurnedFaceUp departed)
+        -- CR 701.21a's own event, and the only one this condition admits. The
+        -- payload is arbitrary: the condition compares nothing, so any sacrifice
+        -- matches and the floor is the same for all of them.
+        TriggerCondition.PermanentSacrificed -> one (GameEvent.PermanentSacrificed S.alice departed)
 
 -- Every TriggerCondition, one inhabitant each. The payloads are arbitrary:
 -- eventBindings and eventBindingSlots both ignore them, which is itself part of
@@ -3718,7 +3803,8 @@ everyTriggerCondition =
     -- Event.eventBindingSlots turns on. A union would claim `became` here and the
     -- pin below would catch it.
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
-    TriggerCondition.SelfTurnedFaceUp
+    TriggerCondition.SelfTurnedFaceUp,
+    TriggerCondition.PermanentSacrificed
   ]
 
 -- CR 603.6c's penultimate sentence -- "An ability that attempts to do something
@@ -5353,6 +5439,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   scanSpec s registry
   permanentEntersSpec s registry
   sacrificeSpec s registry
+  mayhemDevilSpec s registry
   stateTriggerSpec s registry
   textChangedTriggerSpec s registry
   historySpec s registry

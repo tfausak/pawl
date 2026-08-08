@@ -69,7 +69,7 @@ toJson codec e = case e of
   Effect.Sacrifice s -> Common.tagged "Sacrifice" (Just (SlotName.toJson s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (SlotName.toJson s))
   Effect.Counter s -> Common.tagged "Counter" (Just (SlotName.toJson s))
-  -- MoveToZone's payload is the slot and the destination zone, then three
+  -- MoveToZone's payload is the ObjectRef and the destination zone, then three
   -- independently elided extras where Create has two: the EntryRiders are
   -- dropped when they are the CR 110.5b default, the bound slot when there is
   -- none, and CR 113.6m's origin zone when the effect states none. Everything
@@ -77,9 +77,13 @@ toJson codec e = case e of
   -- therefore optional, and told apart on decode by JSON TYPE rather than by
   -- position -- a slot name is a string, a zone is a tagged object, and the
   -- riders are an object that is not one. `moveTail` is the decoding half.
-  Effect.MoveToZone s z riders ms mo ->
+  --
+  -- The two POSITIONAL elements are exempt from that: an ObjectRef is itself
+  -- told apart by JSON type (a string is InSlot, an object is EachMatching), so
+  -- every card written before the ref widened still emits the same bare string.
+  Effect.MoveToZone r z riders ms mo ->
     Common.tagged "MoveToZone" . Just . Common.array $
-      [SlotName.toJson s, Zone.toJson z]
+      [ObjectRef.toJson r, Zone.toJson z]
         <> (if riders == EntryRiders.defaultValue then [] else [EntryRiders.toJson riders])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
         <> fmap Zone.toJson (Maybe.maybeToList mo)
@@ -147,8 +151,8 @@ toJson codec e = case e of
         then SlotName.toJson s
         else Common.array [SlotName.toJson s, CastOffer.toJson offer]
 
--- Everything a MoveToZone payload may carry after its slot and its destination
--- zone: the EntryRiders (CR 110.5b), the slot binding the destination
+-- Everything a MoveToZone payload may carry after its ObjectRef and its
+-- destination zone: the EntryRiders (CR 110.5b), the slot binding the destination
 -- incarnation (CR 400.7), and the origin zone the effect names (CR 113.6m).
 -- Each is optional, so they are read by JSON TYPE rather than by position -- a
 -- string is the slot, and an object is the origin zone if it decodes as one and
@@ -221,10 +225,10 @@ fromJson decode value = do
     -- Create's third-position rule would not survive CR 113.6m's origin zone,
     -- since that zone and the EntryRiders are both objects.
     "MoveToZone" -> case mv of
-      Just (Value.Array (Array.MkArray (s : z : rest))) -> do
+      Just (Value.Array (Array.MkArray (r : z : rest))) -> do
         (riders, mSlot, mOrigin) <- moveTail rest
-        Effect.MoveToZone <$> SlotName.fromJson s <*> Zone.fromJson z <*> pure riders <*> pure mSlot <*> pure mOrigin
-      _ -> Left . Text.pack $ "MoveToZone expects [slot, zone], optionally with EntryRiders, a slot and/or an origin zone"
+        Effect.MoveToZone <$> ObjectRef.fromJson r <*> Zone.fromJson z <*> pure riders <*> pure mSlot <*> pure mOrigin
+      _ -> Left . Text.pack $ "MoveToZone expects [objectRef, zone], optionally with EntryRiders, a slot and/or an origin zone"
     "Draw" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.Draw <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "Draw expects [playerRef, quantity]"

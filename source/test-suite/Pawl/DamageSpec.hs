@@ -21,17 +21,21 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Sba as Sba
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
+import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
+import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -62,6 +66,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Result as Result
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Status as Status
@@ -69,6 +74,107 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
+
+-- Fill every target slot with the candidate that NAMES `oid`, whatever tag the
+-- pool produced for it, falling back to the set's minimum so the interpreter
+-- stays total. PlaneswalkerSpec's `aimedAt` one spec over, and deliberately
+-- tag-blind: the group below is about how many entries CR 115.4's pool has for
+-- one permanent, so the fixture must not assert which tag it carries.
+aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+aimedAt oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets ->
+    let naming candidates = case filter (\r -> Recipient.objectOf r == Just oid) (Set.toList candidates) of
+          r : _ -> Just r
+          [] -> Set.lookupMin candidates
+     in Map.mapMaybe naming sets
+  _ -> S.identityAnswer p
+
+-- The permanent of a given name on the battlefield, found by NAME because CR
+-- 400.7 mints a new object as a spell resolves and the hand's id does not
+-- survive the cast.
+permanentNamed :: String -> GameState.GameState -> ObjectId.ObjectId
+permanentNamed name gs =
+  let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))
+   in case filter named (Set.toList (GameState.battlefield gs)) of
+        oid : _ -> oid
+        [] -> S.noSource
+
+-- CR 120.3: damage "may have one or more of the following results, depending on
+-- ... the characteristics of the damage's recipient". The results are therefore
+-- per CARD TYPE and not per recipient, so a permanent that is both a creature and
+-- a planeswalker is owed CR 120.3c (that many loyalty counters come off) AND CR
+-- 120.3e (that much damage is marked) from one damage event -- while CR 115.4
+-- still offers it as ONE candidate, since that rule lists what may be chosen
+-- rather than how many ways there are to choose it.
+--
+-- Four cards already in the pool compose the board, chained through CR 205.1b's
+-- retention clause:
+--
+--   * Liquimetal Coating: "{T}: Target permanent becomes an artifact IN ADDITION
+--     to its other types until end of turn" -- CR 205.1b's first sentence, so
+--     Jace Beleren keeps the planeswalker card type while gaining artifact.
+--   * March of the Machines: "Each noncreature artifact is an artifact creature
+--     with power and toughness each equal to its mana value" -- CR 205.1b's third
+--     sentence ("some effects state that an object becomes an 'artifact
+--     creature'; these effects also allow the object to retain all of its prior
+--     card types"), so the planeswalker type survives again. Jace's mana value is
+--     3, so he is a 3/3.
+--   * Prodigal Sorcerer: "{T}: Prodigal Sorcerer deals 1 damage to any target" is
+--     both CR 115.4's pool and the damage.
+--
+-- The whole sequence stays inside one turn, because the Coating's effect is
+-- UntilEndOfTurn.
+--
+-- ONE damage, never three. Jace's loyalty is 3 and March makes him a 3/3, so at 3
+-- damage CR 120.3c alone buries him (CR 704.5i) and CR 120.3e alone destroys him
+-- (CR 704.5g) -- an assertion that he died would pass with EITHER result
+-- implemented and neither is what this pins. At 1 the two observables are
+-- independent and neither is lethal.
+--
+-- The positives are pinned FIRST: "exactly one candidate names Jace" is a
+-- negative that passes for free on a board where the animation chain silently did
+-- nothing and Jace is a plain planeswalker.
+creaturePlaneswalkerSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+creaturePlaneswalkerSpec s registry =
+  Spec.describe s "CreatureAndPlaneswalker"
+    . Spec.it s "CR 120.3c/120.3e one ping at an animated Jace Beleren takes a loyalty counter AND marks a damage"
+    $ do
+      island <- S.printingOf s registry "Island"
+      jace <- S.printingOf s registry "Jace Beleren"
+      march <- S.printingOf s registry "March of the Machines"
+      coating <- S.printingOf s registry "Liquimetal Coating"
+      sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+      let (handGs, jaceInHand) = S.handOne jace (S.landsInPlay island 3)
+          -- Cast rather than arranged, so the three loyalty counters come from CR
+          -- 306.5b's replacement and not from a fixture.
+          board = S.runPure S.identityAnswer handGs (do S.cast S.alice jaceInHand; Stack.resolveTop)
+          jaceId = permanentNamed "Jace Beleren" board
+          (_, withMarch) = S.addCreature march S.alice board
+          (coatingId, withCoating) = S.addCreature coating S.alice withMarch
+          (sorcererId, withSorcerer) = S.addCreature sorcerer S.alice withCoating
+          ready = withSorcerer {GameState.priority = Just S.alice}
+      case (Face.activatedAbilities (S.combinedFace coating), Face.activatedAbilities (S.combinedFace sorcerer)) of
+        (coat : _, ping : _) -> do
+          let coated = S.runPure (aimedAt jaceId) ready (do Activate.activateAbility S.alice coatingId coat; Stack.resolveTop)
+          -- The positives.
+          Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf jaceId coated)) "CR 205.1b: the Coating made Jace an artifact"
+          Spec.assertBool s (Projection.isCreatureOf jaceId coated) "so March animates him"
+          Spec.assertBool s (Set.member CardType.Planeswalker (Projection.cardTypesOf jaceId coated)) "and he is STILL a planeswalker"
+          Spec.assertEqWith s "a 3/3, his mana value" (S.powerToughnessOf jaceId coated) (Just (3, 3))
+          Spec.assertEqWith s "CR 306.5b: three loyalty counters" (S.counterOf CounterKind.Loyalty jaceId coated) 3
+          Spec.assertEqWith s "and nothing marked on him yet" (S.damageOf jaceId coated) (Just 0)
+          -- CR 115.4 offers a PERMANENT, not a card type. Read off Prodigal
+          -- Sorcerer's own committed spec rather than a hand-built one.
+          let slot = SlotName.MkSlotName (Text.pack "target")
+              offered = Map.lookup slot (Modal.allTargetSpecs (ActivatedAbility.modal ping))
+              namingJace = fmap (\theSpec -> Set.filter (\r -> Recipient.objectOf r == Just jaceId) (Target.legalRecipients (Just S.alice) sorcererId theSpec coated)) offered
+          Spec.assertEqWith s "CR 115.4: Jace is one candidate, not one per card type" (fmap Set.size namingJace) (Just 1)
+          -- Both of CR 120.3's results, off one damage.
+          let pinged = S.runPure (aimedAt jaceId) coated (do Activate.activateAbility S.alice sorcererId ping; Stack.resolveTop)
+          Spec.assertEqWith s "CR 120.3c: loyalty 3 -> 2" (S.counterOf CounterKind.Loyalty jaceId pinged) 2
+          Spec.assertEqWith s "CR 120.3e: and one damage marked" (S.damageOf jaceId pinged) (Just 1)
+          Spec.assertBool s (Set.member jaceId (GameState.battlefield (S.settleSba pinged))) "CR 704.5g/704.5i: neither result was lethal"
+        _ -> Spec.assertFailure s "Liquimetal Coating and Prodigal Sorcerer should each print an activated ability"
 
 creatureSbaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 creatureSbaSpec s registry =
@@ -1899,4 +2005,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   toxicSpec s registry
   lifelinkSpec s registry
   lastKnownRiderSpec s registry
+  creaturePlaneswalkerSpec s registry
   m2cPropertySpec s registry

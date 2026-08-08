@@ -325,4 +325,30 @@ data GameEvent
     -- sentence) is the opposite change and would be its own event -- and no
     -- printed card triggers on it, so there would be nothing to feed.
     TurnedFaceUp ObjectId.ObjectId
+  | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
+    -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice in the engine
+    -- goes through -- a cost payment, Effect.Sacrifice, Effect.PlayerSacrifices
+    -- and CR 704.5s's Saga rule all reach it.
+    --
+    -- Distinct from the Moved event the same sacrifice records, and this is the
+    -- constructor's whole reason for existing: CR 700.4 makes "dies" mean "is put
+    -- into a graveyard from the battlefield", so a sacrifice IS a death and its
+    -- zone change is bit-for-bit the one a destruction or a mill writes. What
+    -- happened is not derivable from where the permanent went, so it is recorded
+    -- -- the argument GameEvent.Discarded and GameEvent.SpellCountered already
+    -- make about their own moves.
+    --
+    -- CR 603.10a is why the record is written BEFORE the zone change, naming the
+    -- PRE-MOVE id: "some zone-change triggers look back in time ... abilities that
+    -- trigger when a player sacrifices a permanent". CR 701.21a's sacrifice is the
+    -- game action, so a replacement that redirects the move (Rest in Peace) does
+    -- not un-sacrifice the permanent, and an event recorded after the move would
+    -- name an incarnation that a redirected move never produced.
+    --
+    -- Carries the SACRIFICING player, whom CR 701.21a makes the permanent's
+    -- controller, and the permanent itself. Neither is read by a trigger today
+    -- (Pawl.Engine.Event.eventBindingSlots answers empty for the condition), the
+    -- payload being what a card printing "whenever YOU sacrifice" or "sacrifice a
+    -- creature ... return IT" would need.
+    PermanentSacrificed PlayerId.PlayerId ObjectId.ObjectId
   deriving (Eq, Ord, Show)
