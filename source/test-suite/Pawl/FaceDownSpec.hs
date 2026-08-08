@@ -19,7 +19,9 @@
 -- vigilance / Megamorph {1}{W}". Chosen for its P/T and against every 1/1
 -- megamorph creature in the pool: 1/1 plus CR 702.37b's counter is 2/2, which is
 -- CR 708.2a's face-down printing exactly, so such a card could not tell a
--- counter that landed from one that did not. 2/1 -> 3/2 differs on both axes.
+-- counter that landed from one that did not. Misthoof Kirin ends a 3/2, which is
+-- neither the face-down 2/2 nor the printed 2/1 -- and differs from the printed
+-- pair on BOTH axes, so no single stale read produces it.
 --
 -- Skirk Marauder is the TRIGGER's card, and the only printing rule 708.7 needs.
 -- {1}{R} Creature -- Goblin 2/1, "Morph {2}{R} / When this creature is turned
@@ -466,9 +468,10 @@ turnFaceUpSpec s registry = Spec.describe s "Turning face up" $ do
         -- CR 702.37b: "put a +1/+1 counter on it". ONE, not two -- CR 614.5 gives
         -- the minted row one opportunity.
         Spec.assertEqWith s "CR 702.37b exactly one +1/+1 counter" (S.counterOf CounterKind.PlusOnePlusOne permanent after) 1
-        -- CR 122.1a with CR 613.4c: the printed 2/1 plus the counter. Neither 3
-        -- nor 2 is the face-down value on its axis, so this reading cannot be the
-        -- 2/2 in disguise.
+        -- CR 122.1a with CR 613.4c: the printed 2/1 plus the counter. 3/2 is
+        -- neither the face-down 2/2 (the power differs) nor the printed 2/1 (both
+        -- halves differ), so no reading that skipped either the turn-up or the
+        -- counter produces it.
         Spec.assertEqWith s "CR 702.37b a 3/2, not the printed 2/1 and not the face-down 2/2" (S.powerToughnessOf permanent after) (Just (3, 2))
         -- CR 708.8: the face-up characteristics really came back, which is what
         -- makes the 3/2 above the printed 2/1 plus a counter rather than some
