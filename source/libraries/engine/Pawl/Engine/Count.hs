@@ -155,8 +155,8 @@ playersFor context gs ref =
 --
 -- The snapshot fills the characteristic fields it records: card types, colours,
 -- subtypes, keywords (CR 109.3 counts abilities among an object's
--- characteristics) and power. Everything that is not a characteristic is
--- vacuously empty over a past event -- controller, identity and playerIdentity
+-- characteristics), power and mana value. Everything that is not a
+-- characteristic is vacuously empty over a past event -- controller, identity and playerIdentity
 -- are Nothing, and combat status, attachment, tokenhood, tap status and what the
 -- object did this turn are all False.
 --
@@ -177,12 +177,15 @@ snapshotView shape event = case event of
                 Filter.subtypes = PC.subtypes snapshot,
                 Filter.keywords = Map.keysSet (PC.keywords snapshot),
                 Filter.power = PC.power snapshot,
-                -- CR 202.3 needs a mana cost, and the snapshot is a
-                -- ProjectedCharacteristics, which records none -- so unlike
-                -- supertypes above there is no answer here being thrown away.
-                -- A ManaValueAtMost over a past event is False for every value
-                -- (#674).
-                Filter.manaValue = Nothing,
+                -- CR 202.3 off the snapshot, which carries the number: a
+                -- ProjectedCharacteristics records a mana value, so this reads
+                -- what the object's was AT THE EVENT rather than throwing the
+                -- question away.
+                --
+                -- Nothing means that object had no card behind it, exactly as it
+                -- does live. Not implemented there: CR 202.3a's 0 for an ability
+                -- on the stack (#674).
+                Filter.manaValue = PC.manaValue snapshot,
                 Filter.controller = Nothing,
                 Filter.identity = Nothing,
                 Filter.playerIdentity = Nothing,
