@@ -238,20 +238,24 @@ conditionSlots condition =
     (Quantity.slots $ Condition.Type.threshold condition)
 
 -- Does any of these effects read X? A card that reads X must declare {X} in its
--- cost -- the same reads-equal-declares contract slotsOf draws for target slots.
--- When an opcode gains a Quantity field, add its arm here: the compiler will not
--- force it, Quantity being compared by ==.
+-- cost (CR 107.3, CR 107.3a, CR 118.4) -- the same reads-equal-declares contract
+-- slotsOf draws for target slots. Quantity.readsX does the looking, so a nested
+-- X -- Vitalizing Cascade's "X plus 3", or an X inside a Count -- is seen here
+-- exactly as slotsOf sees a nested slot through Quantity.slots.
 --
--- That comparison is shallow, so an X nested inside a Plus or a Count is not
--- detected, unlike slotsOf, which recurses through Quantity.slots (#482).
+-- NOTE: when an opcode gains a Quantity FIELD, add its arm here by hand. A new
+-- OPCODE the compiler does force, this case being exhaustive over constructors;
+-- widening an existing one it does not, since an arm already written `{} ->
+-- False` keeps compiling and keeps answering False about a quantity it now
+-- carries.
 readsX :: [Effect Card.Type.Card] -> Bool
 readsX = any effectReadsX
   where
     effectReadsX effect = case effect of
-      Effect.DealDamage _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.DealDamage _ quantity -> Quantity.readsX quantity
       -- Untamed Might's "+X/+X" is an X the effect itself does not carry: it sits
       -- inside the Modification, reached through Projection.quantitiesOf.
-      Effect.ModifyTarget _ modification _ -> elem (Quantity.Type.InSlot Binding.variableX) (Projection.quantitiesOf modification)
+      Effect.ModifyTarget _ modification _ -> any Quantity.readsX (Projection.quantitiesOf modification)
       Effect.ChangeText {} -> False
       Effect.AddMana _ -> False
       Effect.Search _ _ -> False
@@ -259,7 +263,7 @@ readsX = any effectReadsX
       Effect.Proliferate -> False
       Effect.TemptWithTheRing -> False
       Effect.ExileHandThenDraw -> False
-      Effect.PlayerSacrifices _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.PlayerSacrifices _ _ quantity -> Quantity.readsX quantity
       Effect.RestartGame -> False
       Effect.ControlPlayerNextTurn _ -> False
       Effect.Destroy {} -> False
@@ -267,21 +271,21 @@ readsX = any effectReadsX
       Effect.TurnFaceDown _ -> False
       Effect.RemoveFromCombat _ -> False
       Effect.MoveToZone {} -> False
-      Effect.Draw _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.Mill _ quantity _ -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.Discard _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.LoseLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.GainLife _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.IncreaseSpeed _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.Create quantity _ _ _ -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.Draw _ quantity -> Quantity.readsX quantity
+      Effect.Mill _ quantity _ -> Quantity.readsX quantity
+      Effect.Discard _ quantity -> Quantity.readsX quantity
+      Effect.LoseLife _ quantity -> Quantity.readsX quantity
+      Effect.GainLife _ quantity -> Quantity.readsX quantity
+      Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
+      Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
-      Effect.PreventNextDamage _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.PreventNextDamage _ _ quantity -> Quantity.readsX quantity
       Effect.PreventAllDamage {} -> False
       Effect.Counter _ -> False
-      Effect.PutCounters _ quantity _ -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.GainPlayerCounters _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
-      Effect.RemovePlayerCounters _ _ quantity -> quantity == Quantity.Type.InSlot Binding.variableX
+      Effect.PutCounters _ quantity _ -> Quantity.readsX quantity
+      Effect.GainPlayerCounters _ _ quantity -> Quantity.readsX quantity
+      Effect.RemovePlayerCounters _ _ quantity -> Quantity.readsX quantity
       Effect.Tap _ -> False
       Effect.Untap _ -> False
       Effect.Transform _ -> False
