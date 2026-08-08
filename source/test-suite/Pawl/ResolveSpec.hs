@@ -80,6 +80,7 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MonarchTarget as MonarchTarget
@@ -597,7 +598,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               -- (bypassing Cast.castSpell) must stamp it chosen (mode 0), or
               -- Resolve.effectsOf/resolveSpell -- scoped to CHOSEN modes --
               -- would see no effects and no target specs at all.
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -689,7 +690,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -727,7 +728,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -740,7 +741,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]) Map.empty Optionality.Mandatory Nothing)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -766,7 +767,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -790,7 +791,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Set.empty
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -821,7 +822,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -883,7 +884,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -956,7 +957,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.bob,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -1034,7 +1035,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -1111,7 +1112,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -1319,7 +1320,7 @@ installControlBy mindslaver controller target gs0 =
             Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,
-            Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer target)) Nothing (Set.singleton (ModeIndex.MkModeIndex 0)),
+            Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer target)) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
@@ -2317,14 +2318,14 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         bindings =
           Binding.setTriggerSource
             source
-            (Binding.fromChoices (Map.singleton targetSlot (Recipient.ToCreature victim)) Nothing Set.empty)
+            (Binding.fromChoices (Map.singleton targetSlot (Recipient.ToCreature victim)) Nothing Seq.empty)
         withBindings = base4 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) abilId (GameState.objects base4)}
         -- Kill the sole real target before resolution: CR 608.2b makes it
         -- illegal (it's no longer a legal CreatureTarget), while the
         -- reserved slot -- never targeted -- stays vacuously legal.
         gone = S.runPure S.identityAnswer withBindings (Event.changeZone victim Zone.Graveyard)
         mode = Mode.MkMode (Seq.fromList [Effect.Destroy (ObjectRef.InSlot targetSlot) Regenerability.Regenerable Nothing, Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)]) specs Optionality.Mandatory Nothing
-        run = Resolve.resolveModes abilId source [(ModeIndex.MkModeIndex 0, mode)]
+        run = Resolve.resolveModes abilId source [(ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 0, mode)]
         after = snd (Engine.runGamePure S.identityAnswer gone run)
     Spec.assertEqWith s "the targetless Draw did not run: the ability fizzled" (S.handSize S.alice after) handBefore
   Spec.it s "CR 704.5a a Bolt can end the game mid-step" $ do

@@ -19,7 +19,7 @@ toJson b =
   Common.object . concat $
     [ Common.optionalPair "target" Nothing (Common.encodeMaybe Recipient.toJson) (Binding.target b),
       Common.optionalPair "amount" Nothing (Common.encodeMaybe Common.encodeNatural) (Binding.amount b),
-      Common.optionalPair "modes" Nothing (Common.encodeMaybe (Common.encodeSet ModeIndex.toJson)) (Binding.modes b),
+      Common.optionalPair "modes" Nothing (Common.encodeMaybe (Common.encodeSeq ModeIndex.toJson)) (Binding.modes b),
       Common.optionalPair "copy" Nothing (Common.encodeMaybe ProjectedCharacteristics.toJson) (Binding.copy b),
       Common.optionalPair "objects" Nothing (Common.encodeMaybe (Common.encodeSeq ObjectId.toJson)) (Binding.objects b)
     ]
@@ -29,7 +29,7 @@ fromJson value = do
   ps <- Common.asObject value
   t <- Common.defaultedField "target" Nothing (Common.decodeMaybe Recipient.fromJson) ps
   a <- Common.defaultedField "amount" Nothing (Common.decodeMaybe Common.decodeNatural) ps
-  m <- Common.defaultedField "modes" Nothing (Common.decodeMaybe (Common.decodeSet ModeIndex.fromJson)) ps
+  m <- Common.defaultedField "modes" Nothing (Common.decodeMaybe (Common.decodeSeq ModeIndex.fromJson)) ps
   c <- Common.defaultedField "copy" Nothing (Common.decodeMaybe ProjectedCharacteristics.fromJson) ps
   o <- Common.defaultedField "objects" Nothing (Common.decodeMaybe (Common.decodeSeq ObjectId.fromJson)) ps
   pure

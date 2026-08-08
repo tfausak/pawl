@@ -14,6 +14,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Modal as Modal
@@ -29,6 +30,7 @@ import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.SlotName (SlotName)
@@ -810,18 +812,18 @@ allTargetSpecs face = Map.union (enchantSpecs face) (Modal.allTargetSpecs (Face.
 modeTargetSpecs :: ModeIndex.ModeIndex -> Face.Face Card.Card -> Maybe (Map SlotName TargetSpec)
 modeTargetSpecs idx face = Modal.modeTargetSpecs idx (Face.spell face)
 
--- CR 608.2c/700.2: the CHOSEN modes only, each with its index, in printed order
--- -- the Set is already sorted by ModeIndex's Ord. Out-of-range indices
--- contribute nothing (total via Seq.lookup). Modes rather than a flat effect
--- list, for the reason Modal.chosenModes gives: the mode is the unit CR 603.5's
--- "may" covers.
-chosenModes :: Set.Set ModeIndex.ModeIndex -> Face.Face Card.Card -> [(ModeIndex.ModeIndex, Mode.Mode Card.Card)]
+-- CR 608.2c/700.2: the CHOSEN modes only, each with the instance naming which
+-- mode and which occurrence of it, in printed order -- the Seq is kept sorted by
+-- the casting path. Out-of-range indices contribute nothing (total via
+-- Seq.lookup). Modes rather than a flat effect list, for the reason
+-- Modal.chosenModes gives: the mode is the unit CR 603.5's "may" covers.
+chosenModes :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> [(ModeInstance.ModeInstance, Mode.Mode Card.Card)]
 chosenModes chosen face = Modal.chosenModes chosen (Face.spell face)
 
 -- CR 601.2c/700.2c: the target specs of the CHOSEN modes only (union), plus
 -- the card's enchant slot (CR 303.4a) if it has one. Only these slots are
 -- prompted at cast and re-validated at CR 608.2b.
-modesTargetSpecs :: Set.Set ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSpec
+modesTargetSpecs :: Seq.Seq ModeIndex.ModeIndex -> Face.Face Card.Card -> Map SlotName TargetSpec
 modesTargetSpecs chosen face = Map.union (enchantSpecs face) (Modal.modesTargetSpecs chosen (Face.spell face))
 
 isLand :: Face.Face Card.Card -> Bool

@@ -601,6 +601,7 @@ library types
     Pawl.Types.Modal
     Pawl.Types.Mode
     Pawl.Types.ModeIndex
+    Pawl.Types.ModeInstance
     Pawl.Types.ModeSelection
     Pawl.Types.Modification
     Pawl.Types.MonarchTarget

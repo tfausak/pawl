@@ -6,7 +6,7 @@ module Pawl.CoreSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
@@ -97,7 +97,7 @@ programSpec s = Spec.describe s "Pawl.Types.Program" $ do
 withBoundAmount :: Printing.Printing -> Maybe Natural.Natural -> (ObjectId.ObjectId, GameState.GameState)
 withBoundAmount mountain mAmount =
   let (oid, gs0) = S.addCreature mountain S.alice (Setup.emptyGame S.bothPlayers)
-      bindings = Binding.fromChoices Map.empty mAmount Set.empty
+      bindings = Binding.fromChoices Map.empty mAmount Seq.empty
       gs = gs0 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) oid (GameState.objects gs0)}
    in (oid, gs)
 

@@ -154,7 +154,7 @@ placeInherent pending = do
       modeCount = Seq.length (Modal.modes (TriggeredAbility.modal ability))
       -- take, not [0 .. modeCount - 1]: a ModeIndex counts in Natural, and
       -- Natural subtraction underflows when there are no modes at all.
-      allModes = Set.fromList (fmap ModeIndex.MkModeIndex (take modeCount [0 ..]))
+      allModes = Seq.fromList (fmap ModeIndex.MkModeIndex (take modeCount [0 ..]))
       bindings = Binding.setYou controller (Map.union provided (Binding.fromChoices Map.empty Nothing allModes))
       obj =
         Object.MkObject

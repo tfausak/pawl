@@ -86,6 +86,8 @@ import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeInstance as ModeInstance
 import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.ObjectRef as ObjectRef
@@ -2114,6 +2116,23 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     let offends = not . Set.null . reservedDeclarations
         offenders = filter (anyFace offends . Printing.card) ps
     Spec.assertEqWith s "no card declares a reserved slot" (fmap (S.nameOf . Printing.card) offenders) []
+  -- CR 700.2d: Pawl.Engine.Modal.instanceSlot derives the slot a REPEATED mode's
+  -- later instances fill by suffixing '#' and the occurrence, which is only a
+  -- fresh name while no card prints one. This is that condition, checked rather
+  -- than asserted -- the two sweeps above cover the names the ENGINE reserves,
+  -- and this covers the shape it derives.
+  Spec.it s "no declared or bound slot name contains the instance separator" $ do
+    ps <- S.allPrintings s
+    let hash = Text.pack "#"
+        offends face =
+          any (Text.isInfixOf hash . SlotName.unwrap) (Set.union (declaredTargetSlots face) (boundSlots face))
+        offenders = filter (anyFace offends . Printing.card) ps
+    Spec.assertEqWith s "no card names a slot containing '#'" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Not vacuous: the pool declares slots at all, and the check really rejects.
+    Spec.assertBool
+      s
+      (Text.isInfixOf hash (SlotName.unwrap (Modal.instanceSlot (ModeInstance.MkModeInstance (ModeIndex.MkModeIndex 0) 1) (SlotName.MkSlotName (Text.pack "creature")))))
+      "instanceSlot's second occurrence really uses the separator"
   -- The sweep above's other half: declaring a reserved slot as a target is not
   -- the only way a card names one. Four opcodes carry a SlotName they
   -- BIND, and a card is free to write a reserved name into any of them, which

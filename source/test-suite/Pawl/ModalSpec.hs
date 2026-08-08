@@ -70,7 +70,7 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- S.identityAnswer.
 chooseModeAt :: ModeIndex.ModeIndex -> Recipient.Recipient -> Prompt.Prompt r -> r
 chooseModeAt idx recipient p = case p of
-  Prompt.ChooseModes {} -> Set.singleton idx
+  Prompt.ChooseModes {} -> Seq.singleton idx
   Prompt.ChooseTargets _ _ _ sets -> fmap (const recipient) sets
   _ -> S.identityAnswer p
 
@@ -247,7 +247,7 @@ modalReaderSpec s = Spec.describe s "M4h Modal reader" $ do
             )
             (ModeSelection.ChooseExactly 1) ::
             ModalT.Modal Card.Type.Card
-        chosen = Set.singleton (ModeIndex.MkModeIndex 1)
+        chosen = Seq.singleton (ModeIndex.MkModeIndex 1)
     Spec.assertEqWith s "only mode 1's effect" (Modal.modesEffects chosen m) [Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 2)]
     Spec.assertEqWith s "selectionCount is the ChooseExactly count" (Modal.selectionCount m) 1
 
@@ -448,7 +448,7 @@ permanentSlot = SlotName.MkSlotName (Text.pack "permanent")
 -- its own legal set, so the answer stays total.
 chooseTwo :: [ModeIndex.ModeIndex] -> [(SlotName.SlotName, Recipient.Recipient)] -> Prompt.Prompt r -> r
 chooseTwo idxs picks p = case p of
-  Prompt.ChooseModes {} -> Set.fromList idxs
+  Prompt.ChooseModes {} -> Seq.fromList idxs
   Prompt.ChooseTargets _ _ _ sets -> Map.mapWithKey pickFor sets
   _ -> S.identityAnswer p
   where
@@ -512,10 +512,10 @@ chooseTwoSpec s registry = Spec.describe s "ChooseTwo (CR 700.2)" $ do
         (_, gs) = S.addLibraryCard piker S.alice withSpell
         answer :: Prompt.Prompt r -> r
         answer p = case p of
-          Prompt.ChooseModes _ _ _ legal count ->
-            if legal == crypticModes && count == 2
-              then Set.fromList (fmap ModeIndex.MkModeIndex [2, 3])
-              else Set.empty
+          Prompt.ChooseModes _ _ _ legal selection ->
+            if legal == crypticModes && selection == ModeSelection.ChooseExactly 2
+              then Seq.fromList (fmap ModeIndex.MkModeIndex [2, 3])
+              else Seq.empty
           _ -> S.identityAnswer p
         cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure answer cast Stack.resolveTop)
@@ -745,10 +745,10 @@ forcedTwoSpec s registry = Spec.describe s "ForcedTwo (CR 700.2a)" $ do
         (castPiker, gs) = S.spellOnStack piker S.bob withGrave
         answer :: Prompt.Prompt r -> r
         answer p = case p of
-          Prompt.ChooseModes _ _ _ legal count ->
-            if legal == ojutaiModes && count == 2
-              then Set.fromList (fmap ModeIndex.MkModeIndex [0, 2])
-              else Set.empty
+          Prompt.ChooseModes _ _ _ legal selection ->
+            if legal == ojutaiModes && selection == ModeSelection.ChooseExactly 2
+              then Seq.fromList (fmap ModeIndex.MkModeIndex [0, 2])
+              else Seq.empty
           Prompt.ChooseTargets _ _ _ sets ->
             Map.mapWithKey
               (\slot _ -> if slot == creatureSlot then Recipient.ToObject deadPiker else Recipient.ToObject castPiker)
@@ -759,6 +759,169 @@ forcedTwoSpec s registry = Spec.describe s "ForcedTwo (CR 700.2a)" $ do
     Spec.assertBool s (notElem castPiker (GameState.stack after)) "bob's creature spell was countered"
     Spec.assertEqWith s "the graveyard Piker is on the battlefield under alice" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice after) 1
     Spec.assertEqWith s "alice is still at 20: mode 1 was not chosen" (S.lifeOf S.alice after) (Just 20)
+
+-- Mystic Confluence's three modes, in printed order (CR 700.2 /
+-- data/cards/mystic-confluence.json), under "Choose three. You may choose the
+-- same mode more than once.":
+--   0. counter target spell unless its controller pays {3} -- slot "spell"
+--   1. return target creature to its owner's hand          -- slot "creature"
+--   2. draw a card                                         -- no slot
+confluenceModes :: Set.Set ModeIndex.ModeIndex
+confluenceModes = Set.fromList (fmap ModeIndex.MkModeIndex [0, 1, 2])
+
+drawMode, bounceMode :: ModeIndex.ModeIndex
+drawMode = ModeIndex.MkModeIndex 2
+bounceMode = ModeIndex.MkModeIndex 1
+
+-- alice has five Islands ({3}{U}{U}) and Mystic Confluence in hand, over a
+-- library of `libraryCards` Goblin Pikers. CR 104.3c is live, so the library is
+-- deep enough that drawing three from one resolution -- plus anything else the
+-- fixture draws -- cannot deck her; a shallower one would fail these tests by
+-- ending the game rather than by counting wrong.
+confluenceBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> (GameState.GameState, ObjectId.ObjectId)
+confluenceBoard island mysticConfluence libraryCard libraryCards =
+  let stocked = foldr (\_ gs -> snd (S.addLibraryCard libraryCard S.alice gs)) (S.landsInPlay island 5) [1 .. libraryCards]
+   in S.handOne mysticConfluence stocked
+
+-- CR 700.2d's exception, "some modal spells include the instruction 'You may
+-- choose the same mode more than once' ... If a particular mode is chosen
+-- multiple times, the spell is treated as if that mode appeared that many times
+-- in sequence." Mystic Confluence is the pool's one printing of it.
+repeatedModeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+repeatedModeSpec s registry = Spec.describe s "RepeatedModes (CR 700.2d)" $ do
+  -- The discriminating case: ONE mode, three times, and the count is what
+  -- separates a real repetition from a selection that merely tolerated the
+  -- answer. The hand is empty when the spell leaves it (handOne puts exactly one
+  -- card there and it is the one being cast), so three cards is a delta of three
+  -- from zero and cannot coincide with a starting hand.
+  Spec.it s "CR 700.2d choosing 'draw a card' three times draws three cards" $ do
+    island <- S.printingOf s registry "Island"
+    mysticConfluence <- S.printingOf s registry "Mystic Confluence"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, spellId) = confluenceBoard island mysticConfluence piker 10
+        -- The answer insists on the prompt really offering all three modes under
+        -- the repeating instruction: anything else answers with an empty
+        -- selection, which Cast.castProposed rejects and rewinds, and then every
+        -- assertion below fails.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes _ _ _ legal selection ->
+            if legal == confluenceModes && selection == ModeSelection.ChooseExactlyWithRepeats 3
+              then Seq.replicate 3 drawMode
+              else Seq.empty
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "Mystic Confluence resolved into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "alice drew three cards, not one" (S.handSize S.alice after) 3
+    Spec.assertEqWith s "and they came off the library" (length (Game.zoneMembers Zone.Library S.alice after)) 7
+
+  -- The mixed case: two DIFFERENT modes, one of them repeated, so both the count
+  -- and the identity of what happened are exercised at once. The two bounces get
+  -- two independent target slots (CR 700.2d's "different targets may be chosen"),
+  -- and they are aimed at two different creatures -- an engine that collapsed the
+  -- repeated mode's slots into one would bounce one creature and leave the other.
+  Spec.it s "CR 700.2d bounce twice plus draw: two different creatures are returned" $ do
+    island <- S.printingOf s registry "Island"
+    mysticConfluence <- S.printingOf s registry "Mystic Confluence"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (board, spellId) = confluenceBoard island mysticConfluence piker 10
+        (pikerId, withPiker) = S.addCreature piker S.bob board
+        (wallId, gs) = S.addCreature wallOfStone S.bob withPiker
+        -- Mode 1's printed slot is "creature"; its second instance fills
+        -- Modal.instanceSlot's derived name. The answer aims the two at two
+        -- different creatures by name, and refuses to answer a set that does not
+        -- offer exactly those two slots.
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes {} -> Seq.fromList [bounceMode, bounceMode, drawMode]
+          Prompt.ChooseTargets _ _ _ sets ->
+            Map.mapWithKey
+              (\slot _ -> if slot == creatureSlot then Recipient.ToCreature pikerId else Recipient.ToCreature wallId)
+              sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertBool s (not (Set.member pikerId (GameState.battlefield after))) "bob's Piker left the battlefield"
+    Spec.assertBool s (not (Set.member wallId (GameState.battlefield after))) "bob's Wall of Stone left the battlefield too"
+    Spec.assertEqWith s "both are in bob's hand" (S.handSize S.bob after) 2
+    Spec.assertEqWith s "alice drew exactly one card (the draw mode was chosen once)" (S.handSize S.alice after) 1
+
+  -- The two slots really are two, asserted on the prompt rather than inferred
+  -- from the board: a card whose repeated mode's slots collapsed would offer one.
+  Spec.it s "CR 601.2c a twice-chosen targeting mode is prompted for two slots" $ do
+    island <- S.printingOf s registry "Island"
+    mysticConfluence <- S.printingOf s registry "Mystic Confluence"
+    piker <- S.printingOf s registry "Goblin Piker"
+    wallOfStone <- S.printingOf s registry "Wall of Stone"
+    let (board, spellId) = confluenceBoard island mysticConfluence piker 10
+        (pikerId, withPiker) = S.addCreature piker S.bob board
+        (_, gs) = S.addCreature wallOfStone S.bob withPiker
+        modal = Face.spell (S.combinedFace mysticConfluence)
+        twiceBounced = Seq.fromList [bounceMode, bounceMode, drawMode]
+    Spec.assertEqWith
+      s
+      "choosing the bounce mode twice declares two target slots"
+      (Map.size (Modal.modesTargetSpecs twiceBounced modal))
+      2
+    Spec.assertEqWith
+      s
+      "choosing it once declares one"
+      (Map.size (Modal.modesTargetSpecs (Seq.fromList [bounceMode, drawMode, drawMode]) modal))
+      1
+    let answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          Prompt.ChooseModes {} -> twiceBounced
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+    -- CR 700.2d: "the same player or object may be chosen as the target for each
+    -- of those modes" -- so aiming both instances at ONE creature is legal, and
+    -- the cast goes through rather than being rewound.
+    Spec.assertEqWith s "aiming both bounces at one creature is a legal cast" (length (GameState.stack cast)) 1
+
+  -- The negative leg, and the one that proves the flag GATES the behaviour rather
+  -- than the engine simply always allowing repeats: Cryptic Command prints the
+  -- ordinary instruction, so CR 700.2d's default applies and a repeated choice is
+  -- not a legal answer. Cast.castProposed's reject-not-repair rewinds the whole
+  -- cast, leaving the card in hand.
+  Spec.it s "CR 700.2d a modal card without the permission rejects a repeated mode" $ do
+    island <- S.printingOf s registry "Island"
+    crypticCommand <- S.printingOf s registry "Cryptic Command"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (board, spellId, _) = crypticBoard island crypticCommand piker
+        (_, gs) = S.addLibraryCard piker S.alice board
+        answer :: Prompt.Prompt r -> r
+        answer p = case p of
+          -- Mode 3 is "draw a card", twice -- a size-2 answer to a "choose two",
+          -- so only the repetition can make it illegal.
+          Prompt.ChooseModes {} -> Seq.replicate 2 (ModeIndex.MkModeIndex 3)
+          _ -> S.identityAnswer p
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure answer cast Stack.resolveTop)
+    Spec.assertEqWith s "the cast was rewound: Cryptic Command is still in alice's hand" (S.handSize S.alice after) 1
+    Spec.assertBool s (null (GameState.stack after)) "nothing reached the stack"
+    Spec.assertEqWith s "no card was drawn: alice's library is untouched" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+    Spec.assertEqWith s "and her graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+
+-- Modal.combinations' two halves, side by side: the same inputs under CR 700.2d's
+-- default and under its exception. The enumeration Pawl.Engine.Mana reads when a
+-- mana ability has several modes, which no card in the pool prints -- so it is
+-- checked directly.
+combinationsSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
+combinationsSpec s = Spec.describe s "Combinations (CR 700.2d)" $ do
+  Spec.it s "without repeats, size-2 sublists of three options" $
+    Spec.assertEq s (Modal.combinations 2 "abc") ["ab", "ac", "bc"]
+
+  Spec.it s "with repeats, the multisubsets, printed order kept" $
+    Spec.assertEq s (Modal.combinationsWithRepeats 2 "abc") ["aa", "ab", "ac", "bb", "bc", "cc"]
+
+  -- The boundary that matters: fewer options than the count. The default has no
+  -- selection at all; the exception has exactly one.
+  Spec.it s "one option satisfies any count only under the exception" $ do
+    Spec.assertEqWith s "default: none" (Modal.combinations 3 "a") []
+    Spec.assertEqWith s "exception: one" (Modal.combinationsWithRepeats 3 "a") ["aaa"]
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
@@ -773,3 +936,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Modal" $ do
   triggerModalSpec s registry
   chooseTwoSpec s registry
   forcedTwoSpec s registry
+  repeatedModeSpec s registry
+  combinationsSpec s

@@ -1,6 +1,7 @@
 module Pawl.Types.Response where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Action as Action
@@ -82,8 +83,10 @@ data Response
     CastWhileSearched (Maybe (ObjectId.ObjectId, CardName.CardName))
   | -- | CR 601.2b: the value of X a caster chose.
     ChoseX Natural.Natural
-  | -- | CR 601.2b: the mode(s) a caster chose for a modal spell.
-    ChoseModes (Set.Set ModeIndex.ModeIndex)
+  | -- | CR 601.2b: the mode(s) a caster chose for a modal spell. A Seq, since CR
+    -- 700.2d's "You may choose the same mode more than once" makes one index
+    -- appear several times.
+    ChoseModes (Seq.Seq ModeIndex.ModeIndex)
   | -- | CR 707.5: the permanent a copy chose to copy (Nothing = declined).
     ChoseCopyTarget (Maybe ObjectId.ObjectId)
   | -- | CR 208.2b: the index of the entry shape a player chose as an object

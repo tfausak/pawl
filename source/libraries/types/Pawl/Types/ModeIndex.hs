@@ -8,7 +8,8 @@ import qualified Numeric.Natural as Natural
 -- resolves modes in the order written, CR 700.2d treats a mode chosen twice as
 -- "appear[ing] that many times in sequence," CR 700.2g copies modes by position.
 -- A newtype, not a bare Natural, so the reference is typed. Ord is load-bearing:
--- ModeIndex is a Set element (the chosen modes) and its ordering IS printed order.
+-- the chosen modes are kept SORTED by it (a Seq, since CR 700.2d lets one index
+-- appear twice), and its ordering IS printed order.
 newtype ModeIndex = MkModeIndex
   { unwrap :: Natural.Natural
   }

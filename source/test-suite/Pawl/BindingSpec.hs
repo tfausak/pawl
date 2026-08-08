@@ -43,23 +43,25 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
   Spec.it s "fromChoices projects a slot's chosen target" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         r = Recipient.ToPlayer S.alice
-        m = Binding.fromChoices (Map.singleton slot r) Nothing Set.empty
+        m = Binding.fromChoices (Map.singleton slot r) Nothing Seq.empty
     Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot r
 
   Spec.it s "fromChoices stores X under the reserved slot" $ do
-    let m = Binding.fromChoices Map.empty (Just 3) Set.empty
+    let m = Binding.fromChoices Map.empty (Just 3) Seq.empty
     Spec.assertEq s (Binding.amountOf Binding.variableX m) $ Just 3
 
   Spec.it s "amountOf is Nothing for an absent slot" $ do
     Spec.assertEq s (Binding.amountOf Binding.variableX Map.empty) Nothing
 
-  Spec.it s "modesOf round-trips a stamped set of chosen modes" $ do
-    let chosen = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2]
+  -- CR 700.2d: the stamped selection is a Seq, so a repeated mode survives the
+  -- round trip -- a Set here would silently collapse the two 2s into one.
+  Spec.it s "modesOf round-trips a stamped sequence of chosen modes, repeats and all" $ do
+    let chosen = Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2, ModeIndex.MkModeIndex 2]
         m = Binding.fromChoices Map.empty Nothing chosen
     Spec.assertEq s (Binding.modesOf m) chosen
 
   Spec.it s "modesOf is empty for an absent slot" $ do
-    Spec.assertEq s (Binding.modesOf Map.empty) Set.empty
+    Spec.assertEq s (Binding.modesOf Map.empty) Seq.empty
 
   Spec.it s "setCopy then copyOf round-trips the snapshot" $ do
     Spec.assertEq s (Binding.copyOf (Binding.setCopy sampleSnapshot Map.empty)) $ Just sampleSnapshot

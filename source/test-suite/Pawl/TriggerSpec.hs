@@ -1120,15 +1120,15 @@ delayedSpec s registry =
               -- Stands in for a modal arming spell's own captured chosenModes --
               -- built with the SAME Binding.fromChoices Cast.castSpell uses, so
               -- the collision is the real production shape, not a fabricated one.
-              captured = Binding.fromChoices Map.empty Nothing (Set.singleton (ModeIndex.MkModeIndex 7))
+              captured = Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 7))
               pending = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject (ObjectId.MkObjectId 0)) S.alice ability captured
               after = snd (Engine.runGamePure S.identityAnswer (Setup.emptyGame S.bothPlayers) (Engine.placeOne pending))
               placedModes = case GameState.stack after of
                 placedId : _ -> case Game.lookupObject placedId after of
                   Just obj -> Binding.modesOf (Object.bindings obj)
-                  Nothing -> Set.empty
-                [] -> Set.empty
-          Spec.assertEqWith s "the ability's own mode (0), not the captured spell's mode (7)" placedModes (Set.singleton (ModeIndex.MkModeIndex 0))
+                  Nothing -> Seq.empty
+                [] -> Seq.empty
+          Spec.assertEqWith s "the ability's own mode (0), not the captured spell's mode (7)" placedModes (Seq.singleton (ModeIndex.MkModeIndex 0))
         -- CR 800.4d: "If a triggered ability that would be controlled by a
         -- player who has left the game would be put onto the stack, it isn't
         -- put on the stack." CR 800.4d's own example is a delayed ability, and

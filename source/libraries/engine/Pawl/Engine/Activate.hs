@@ -4,6 +4,7 @@ import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
@@ -22,7 +23,6 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
-import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Card as Card
@@ -35,6 +35,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.Keyword (Keyword)
+import qualified Pawl.Types.Modal as Modal.Type
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Payment as Payment
@@ -380,8 +381,9 @@ activatableGiven grants pcs pid srcId ability gs =
     && sicknessOkGiven pcs pid srcId ability gs
     && restrictionsOk pid ability gs
     && loyaltyOk pid srcId ability gs
-    && Natural.length (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
-      >= Modal.selectionCount (ActivatedAbility.modal ability)
+    && Modal.selectionPossible
+      (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
+      (Modal.Type.selection (ActivatedAbility.modal ability))
     && payableCost pid srcId gs (ActivatedAbility.cost ability)
 
 -- CR 602.2a: an ability activated from a hidden zone reveals the card that has
@@ -467,20 +469,21 @@ activateAbility pid srcId ability = do
             GameState.stack = abilId : GameState.stack gs2
           }
       decider = Decide.deciderFor pid gs
-      -- CR 602.2b/700.2a, mirroring Cast.castSpell's mode block: as many legal
-      -- modes as the selection demands (or fewer) is FORCED, unprompted -- every
-      -- single-mode ability is exactly {ModeIndex 0}. A real choice (more legal
-      -- modes than the selection demands) issues ChooseModes.
+      -- CR 602.2b/700.2a, mirroring Cast.castSpell's mode block: a selection with
+      -- one answer is FORCED, unprompted -- every single-mode ability is exactly
+      -- {ModeIndex 0}. A real choice issues ChooseModes. Modal.forcedSelection is
+      -- what tells the two apart, CR 700.2d's exception included.
       legal = Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs
-      count = Modal.selectionCount (ActivatedAbility.modal ability)
+      selection = Modal.Type.selection (ActivatedAbility.modal ability)
   State.put onStack
-  chosenModes <-
-    if Natural.length legal <= count
-      then pure legal
-      else Game.choose (Prompt.ChooseModes decider pid abilId legal count)
-  -- Reject-not-repair: an answer that is not a size-`count` subset of the legal
-  -- modes makes the whole activation a no-op, guarding every step below.
-  if not (Set.isSubsetOf chosenModes legal && Natural.length chosenModes == count)
+  -- Sorted on the way in, for the reason Cast.castProposed gives: printed order
+  -- (CR 608.2c), with a repeated mode's instances adjacent (CR 700.2d).
+  chosenModes <- case Modal.forcedSelection legal selection of
+    Just forced -> pure forced
+    Nothing -> fmap Seq.sort (Game.choose (Prompt.ChooseModes decider pid abilId legal selection))
+  -- Reject-not-repair: an answer that does not satisfy the printed instruction
+  -- makes the whole activation a no-op, guarding every step below.
+  if not (Modal.selectionSatisfiedBy legal selection chosenModes)
     then State.put before
     else do
       -- CR 602.2b routes the rest of the activation through CR 601.2b-i, so CR

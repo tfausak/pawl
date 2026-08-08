@@ -1109,7 +1109,7 @@ auraTargetSpec s registry = Spec.describe s "AuraTarget" $ do
     let base = S.landsInPlay swamp 1
         (creature, withCreature) = S.addCreature piker S.bob base
         (gs, spellId) = S.handOne unholyStrength withCreature
-        specs = Card.modesTargetSpecs (Set.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
+        specs = Card.modesTargetSpecs (Seq.singleton (ModeIndex.MkModeIndex 0)) (S.combinedFace unholyStrength)
     Spec.assertEqWith s "one slot, the enchant slot" (Set.singleton Card.enchantSlot) (Map.keysSet specs)
     Spec.assertEqWith
       s

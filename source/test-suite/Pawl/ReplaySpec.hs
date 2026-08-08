@@ -7,6 +7,7 @@ import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
 import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
@@ -43,6 +44,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
 import qualified Pawl.Types.ModeIndex as ModeIndex
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.MulliganOffer as MulliganOffer
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -106,15 +108,15 @@ combatReplaySpec s =
         Spec.it s "ChooseX records and replays a Natural" $ do
           let p = Prompt.ChooseX decider S.alice oid 2
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p 4)) (Just (4 :: Natural.Natural))
-        -- CR 601.2b / 700.2a: a modal choice (Response.ChoseModes, a Set
+        -- CR 601.2b / 700.2a: a modal choice (Response.ChoseModes, a Seq
         -- ModeIndex) round-trips through the DecisionLog exactly like every
         -- other response -- no JSON codec is involved: Response has never had
         -- one (only Prompt/Response answers get serialized, via Replay's
         -- encode/decode, not Pawl.Codec's JSON arms).
-        Spec.it s "ChooseModes records and replays a Set ModeIndex" $ do
+        Spec.it s "ChooseModes records and replays a Seq ModeIndex" $ do
           let legal = Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 1]
-              p = Prompt.ChooseModes decider S.alice oid legal 1
-              answer = Set.singleton (ModeIndex.MkModeIndex 1)
+              p = Prompt.ChooseModes decider S.alice oid legal (ModeSelection.ChooseExactly 1)
+              answer = Seq.singleton (ModeIndex.MkModeIndex 1)
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         -- CR 702.42a: whether the entwine cost was paid decides how many modes
         -- the spell has, so a transcript that lost it would replay a different
@@ -826,15 +828,15 @@ replaySpec s registry =
     -- placed (Engine.placeOne prompts ChooseModes) records/replays exactly
     -- like a spell's ChooseModes -- a Response.ChoseModes round-trips through
     -- the DecisionLog byte-identically.
-    Spec.it s "Aether Channeler's trigger ChooseModes records and replays a Set ModeIndex" $ do
+    Spec.it s "Aether Channeler's trigger ChooseModes records and replays a Seq ModeIndex" $ do
       acPrinting <- S.printingOf s registry "Aether Channeler"
       let (acId, gs) = S.addCreature acPrinting S.alice (Setup.emptyGame S.bothPlayers)
           decider = Decide.deciderFor S.alice gs
       case Face.triggeredAbilities (S.combinedFace acPrinting) of
         [ability] -> do
           let legal = Target.fillableModes Nothing acId Map.empty (TriggeredAbility.modal ability) gs
-              p = Prompt.ChooseModes decider S.alice acId legal 1
-              answer = Set.singleton (ModeIndex.MkModeIndex 2)
+              p = Prompt.ChooseModes decider S.alice acId legal (ModeSelection.ChooseExactly 1)
+              answer = Seq.singleton (ModeIndex.MkModeIndex 2)
           Spec.assertEqWith s "legal modes are 0 and 2 (bounce self-excluded)" legal (Set.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2])
           Spec.assertEqWith s "round trip" (Replay.decode p (Replay.encode p answer)) (Just answer)
         _ -> Spec.assertFailure s "Aether Channeler must have exactly one triggered ability"

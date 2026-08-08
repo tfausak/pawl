@@ -148,7 +148,7 @@ aimAtObject oid p = case p of
 -- and falls to S.identityAnswer's white rather than being papered over.
 blasting :: ModeIndex.ModeIndex -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 blasting idx oid p = case p of
-  Prompt.ChooseModes {} -> Set.singleton idx
+  Prompt.ChooseModes {} -> Seq.singleton idx
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
   _ -> S.identityAnswer p
 
@@ -163,7 +163,7 @@ blasting idx oid p = case p of
 -- not exist until CR 601.2a has minted it (CR 400.7).
 blastingSelfIfOffered :: ModeIndex.ModeIndex -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 blastingSelfIfOffered idx oid p = case p of
-  Prompt.ChooseModes {} -> Set.singleton idx
+  Prompt.ChooseModes {} -> Seq.singleton idx
   Prompt.ChooseTargets _ _ self sets ->
     fmap
       (\set -> if Set.member (Recipient.ToObject self) set then Recipient.ToObject self else Recipient.ToObject oid)
