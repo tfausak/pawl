@@ -104,9 +104,9 @@ twoCreatureBoard island piker escape lands =
       (lower, higher) = if a < b then (a, b) else (b, a)
    in (lower, higher, spellId, gs)
 
--- CR 205.4 off the PROJECTION, which is where CR 613.1d's layer 4 writes a granted
--- supertype -- never off the printed type line, which is what the Ring-bearer case
--- below is about.
+-- CR 205.4: is this object legendary? Read off the PROJECTION, which is where CR
+-- 613.1d's layer 4 writes a granted supertype -- never off the printed type line,
+-- which for the two cases below says nothing about it either way.
 isLegendary :: ObjectId -> GameState.GameState -> Bool
 isLegendary oid gs = Set.member Supertype.Legendary (Projection.supertypesOf oid gs)
 
@@ -329,9 +329,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Ring" $ do
   --
   -- What it pins: dropping the conjunct makes alice's stolen creature legendary FOR
   -- ALICE here, and CR 701.54e says it is not hers to read at all once bob controls
-  -- it. The two assertions above the claim are the anti-vacuity pair -- the mark has
-  -- to still be there, and control has to have actually moved, or "not legendary" is
-  -- true for a reason that is not the control clause.
+  -- it. The three assertions above the claim are the anti-vacuity set -- the grant
+  -- has to have been there to begin with, the mark has to still be there, and
+  -- control has to have actually moved, or "not legendary" is true for a reason that
+  -- is not the control clause.
   Spec.it s "CR 701.54e a stolen Ring-bearer is not legendary while its mark survives" $ do
     island <- S.printingOf s registry "Island"
     piker <- S.printingOf s registry "Goblin Piker"
