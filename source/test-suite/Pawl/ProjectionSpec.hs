@@ -474,6 +474,59 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertEqWith s "CR 613.4b: base power is its mana value" (Projection.powerOf coatingId gs) (Just 2)
     Spec.assertEqWith s "CR 613.4b: base toughness too" (Projection.toughnessOf coatingId gs) (Just 2)
 
+  -- The same card one layer deeper: CR 613.6 fixes Titania's Song's set at layer
+  -- 4, and CR 613.7/613.8 say that layer's EARLIER effects have already applied
+  -- when the question is asked. Liquimetal Coating's AddCardType is one of them,
+  -- so a permanent it turned into an artifact is inside "each noncreature
+  -- artifact" -- and the removal half has to agree with the animation half.
+  --
+  -- Bad Moon is the coated permanent because it satisfies three things at once:
+  -- it is a noncreature, nonartifact permanent, its mana value is 2 rather than
+  -- 0 (a land would be a 0/0 and CR 704.5f would bury it before anything could
+  -- be read), and its ability is an ANTHEM, so whether the Song silenced it is
+  -- observable on a bystander rather than on Bad Moon alone.
+  --
+  -- ORDER IS LOAD-BEARING: the Coating's ability resolves BEFORE the Song
+  -- arrives. With the Song out first the Coating is itself a noncreature
+  -- artifact, loses its abilities (the test above proves exactly that), and
+  -- could not be activated at all.
+  Spec.it s "CR 613.6 Titania's Song strips a permanent Liquimetal Coating made an artifact in the same layer" $ do
+    liquimetalCoating <- S.printingOf s registry "Liquimetal Coating"
+    titaniasSong <- S.printingOf s registry "Titania's Song"
+    badMoon <- S.printingOf s registry "Bad Moon"
+    bogWraith <- S.printingOf s registry "Bog Wraith"
+    let (moonId, g0) = S.addCreature badMoon S.alice (Setup.emptyGame S.bothPlayers)
+        (wraithId, g1) = S.addCreature bogWraith S.alice g0
+        (coatingId, g2) = S.addCreature liquimetalCoating S.alice g1
+        ability = case Face.activatedAbilities (S.combinedFace liquimetalCoating) of
+          ab : _ -> Just ab
+          [] -> Nothing
+    case ability of
+      Nothing -> Spec.assertFailure s "Liquimetal Coating should print one activated ability"
+      Just coat -> do
+        let ready = g2 {GameState.priority = Just S.alice}
+            activated = snd (Engine.runGamePure (aimAtObject moonId) ready (Activate.activateAbility S.alice coatingId coat))
+            coated = snd (Engine.runGamePure (aimAtObject moonId) activated Stack.resolveTop)
+            sung = snd (S.addCreature titaniasSong S.bob coated)
+            -- The control: the same three permanents plus the Song, with the
+            -- Coating's ability never activated. Without it the whole test would
+            -- pass for the wrong reason if the activation silently no-opped.
+            unsung = snd (S.addCreature titaniasSong S.bob g2)
+        Spec.assertBool s (Set.member CardType.Artifact (Projection.cardTypesOf moonId coated)) "the Coating made Bad Moon an artifact"
+        -- Assertion 1: the animation half of the Song reached it.
+        Spec.assertBool s (Projection.isCreatureOf moonId sung) "CR 613.1d: the Song animates it at layer 4"
+        -- Assertion 2: base 2/2 from CR 613.4b, and NOT 3/3 -- Bad Moon's own
+        -- anthem would pump a black creature, itself included, if the Song had
+        -- not taken the ability away at layer 6.
+        Spec.assertEqWith s "CR 613.1f: base 2/2, unpumped, because its own anthem is gone" (Projection.powerOf moonId sung) (Just 2)
+        -- Assertion 3: the same removal seen from outside. This is the one that
+        -- fails when the removal gate reads a pre-layer-4 board.
+        Spec.assertEqWith s "CR 613.1f: and gone for bystanders too, so the Wraith is 3/3" (Projection.powerOf wraithId sung) (Just 3)
+        -- Assertion 4, the control: no Coating activation, so Bad Moon is not a
+        -- noncreature ARTIFACT, the Song passes it over, and the anthem lives.
+        Spec.assertBool s (not (Projection.isCreatureOf moonId unsung)) "control: uncoated, the Song does not animate Bad Moon"
+        Spec.assertEqWith s "control: so the anthem still pumps the Wraith to 4/4" (Projection.powerOf wraithId unsung) (Just 4)
+
   Spec.it s "CR 704.5g Humility's toughness drop makes an already-damaged creature die" $ do
     warMammoth <- S.printingOf s registry "War Mammoth"
     mountain <- S.printingOf s registry "Mountain"
