@@ -313,12 +313,14 @@ basePoolGiven pcs context pool gs = case pool of
   Pool.Creatures -> creatureRecipientsGiven pcs gs
   Pool.Players -> playerRecipients gs
   Pool.AnyTarget ->
-    Set.unions
-      [ creatureRecipientsGiven pcs gs,
-        planeswalkerRecipientsGiven pcs gs,
-        battleRecipientsGiven pcs gs,
-        playerRecipients gs
-      ]
+    Set.union
+      (playerRecipients gs)
+      ( onePerObject
+          [ creatureRecipientsGiven pcs gs,
+            planeswalkerRecipientsGiven pcs gs,
+            battleRecipientsGiven pcs gs
+          ]
+      )
   Pool.Permanents -> permanentRecipients gs
   Pool.Spells -> spellRecipients gs
   Pool.Abilities -> abilityRecipients gs
@@ -348,11 +350,14 @@ creatureRecipientsGiven pcs gs =
 -- ToPlaneswalker. The same walk creatureRecipientsGiven makes and shares its
 -- projection with, asking Projection.isPlaneswalkerGiven instead.
 --
--- The tag is what CR 120.3c needs and CR 120.3e must not get, which is why this
--- is a pool of its own rather than a widened creatureRecipients: the two answers
--- to "what does damage to this do" are picked here, once, and carried on the
--- recipient. A permanent with BOTH card types would therefore appear under both
--- tags, which is one target choice too many (#503).
+-- A pool of its own rather than a widened creatureRecipients, because the two
+-- describe different candidate sets: CR 306 planeswalkers and CR 302 creatures
+-- overlap but neither contains the other, and Pool.Creatures must not start
+-- offering planeswalkers. The TAG is not what settles which of CR 120.3's results
+-- damage to the candidate has -- Pawl.Engine.Damage.damagedCardTypes settles that
+-- off the projection when the damage is applied -- so a permanent with both card
+-- types is deduplicated to one candidate by onePerObject below rather than
+-- appearing once per tag.
 planeswalkerRecipients :: GameState -> Set Recipient
 planeswalkerRecipients gs = planeswalkerRecipientsGiven (Projection.projectAll gs) gs
 
@@ -367,9 +372,9 @@ planeswalkerRecipientsGiven pcs gs =
 
 -- CR 115.4: battles on the battlefield, per playing player's zone, tagged
 -- ToBattle. planeswalkerRecipientsGiven's twin one card type over, sharing the same
--- walk and the same projection, and a pool of its own for the same reason: CR
--- 120.3h's answer to "what does damage to this do" is picked here, once, and
--- carried on the recipient.
+-- walk and the same projection, and a pool of its own for the same reason: CR 310
+-- battles are a candidate set that neither contains nor is contained by the other
+-- two.
 --
 -- The walk is over each still-playing player's slice of the battlefield, which
 -- Game.zoneMembers cuts by OWNER -- the same walk the two arms above make, and the
@@ -377,10 +382,6 @@ planeswalkerRecipientsGiven pcs gs =
 -- battle's controller nor its protector narrows the candidates. Being a legal
 -- target is not being attackable (CR 310.8b): a "deals 3 damage to any target"
 -- spell may name a battle whose protector the caster is.
---
--- A permanent that is both a battle and a creature would appear under both tags,
--- which is one target choice too many (#503) -- planeswalkerRecipientsGiven's
--- caveat, unchanged.
 battleRecipients :: GameState -> Set Recipient
 battleRecipients gs = battleRecipientsGiven (Projection.projectAll gs) gs
 
@@ -392,6 +393,34 @@ battleRecipientsGiven pcs gs =
         $ concatMap
           (filter isBattleId . (\pid -> Game.zoneMembers Zone.Battlefield pid gs))
           (Game.stillPlaying gs)
+
+-- CR 115.4 lists what may be chosen -- "creatures, players, planeswalkers, or
+-- battles" -- rather than how many ways there are to choose one, so a PERMANENT
+-- with more than one of those card types is one candidate and not one per card
+-- type. Liquimetal Coating plus March of the Machines makes Jace Beleren an
+-- artifact creature planeswalker (CR 205.1b), and offering him twice would be one
+-- target choice too many.
+--
+-- The survivor keeps the earliest list's tag, and which that is carries no rules
+-- weight: Pawl.Engine.Damage.damagedCardTypes reads the recipient's PROJECTED
+-- card types as the damage is applied, so every one of CR 120.3's results the
+-- permanent is owed applies whichever tag it was chosen under. What the fixed
+-- order buys is that the answer is deterministic, which CR 608.2b's
+-- re-validation needs: it re-derives this very set and asks whether the recipient
+-- already chosen is still in it.
+--
+-- Players are unioned in outside this, because CR 115.1 makes a player a
+-- recipient in its own right rather than an object, so no permanent can collide
+-- with one.
+onePerObject :: [Set Recipient] -> Set Recipient
+onePerObject sets =
+  let step (seen, kept) recipient = case Recipient.objectOf recipient of
+        Nothing -> (seen, recipient : kept)
+        Just oid ->
+          if Set.member oid seen
+            then (seen, kept)
+            else (Set.insert oid seen, recipient : kept)
+   in Set.fromList (snd (Foldable.foldl' step (Set.empty, []) (concatMap Set.toList sets)))
 
 -- CR 115: players still in the game, tagged ToPlayer.
 playerRecipients :: GameState -> Set Recipient

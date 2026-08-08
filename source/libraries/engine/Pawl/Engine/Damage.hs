@@ -17,6 +17,7 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AttackTarget (AttackTarget)
 import qualified Pawl.Types.AttackTarget as AttackTarget
+import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
@@ -346,18 +347,18 @@ gatherCombatDamage assigns = do
 --
 -- ToCreature, ToPlaneswalker, ToBattle and ToPlayer pass through untouched. Each
 -- is produced either by combat (CR 510.1b-d) or by a CR 601.2c target chosen out
--- of a typed Pool, so what it names was already classified when the recipient was
--- built; re-asking here would be a second, later reading of the same question,
--- which is what CR 608.2b's target re-validation is for and this is not.
+-- of a typed Pool, so CR 120.1a's gate has already been passed; re-asking it here
+-- would be a second, later reading of that question, which is what CR 608.2b's
+-- target re-validation is for and this is not.
 --
 -- Rule 120.1a's three object kinds are now all three classifiable, so a ToObject
 -- naming none of them is CR 120.1a's "can't" and nothing else.
 --
--- The creature test comes first, and for a permanent that is both a creature and
--- a planeswalker or a battle that is the wrong answer -- CR 120.3c, CR 120.3e and
--- CR 120.3h all apply and one Recipient cannot carry two (#503). Unreachable
--- today: nothing in the pool prints two of those card types, and no effect in it
--- adds a creature type to a planeswalker or a battle.
+-- The order of the three tests settles only WHICH tag a permanent with more than
+-- one of those card types is given, never what damage to it does: damagedCardTypes
+-- below reads the recipient's projected card types as the damage is applied, so a
+-- permanent that is both a creature and a planeswalker gets CR 120.3c and CR
+-- 120.3e whichever arm classified it.
 damageRecipient :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
 damageRecipient gs recipient = case recipient of
   Recipient.ToPlayer _ -> Just recipient
@@ -369,6 +370,45 @@ damageRecipient gs recipient = case recipient of
     | Projection.isPlaneswalkerOf oid gs -> Just (Recipient.ToPlaneswalker oid)
     | Projection.isBattleOf oid gs -> Just (Recipient.ToBattle oid)
     | otherwise -> Nothing
+
+-- CR 120.3: "damage may have one or more of the following results, depending on
+-- ... the characteristics of the damage's recipient". ONE OR MORE, and the
+-- characteristics are the recipient's -- so the results damage to a permanent has
+-- are keyed to the set of CR 120.1a card types it has, not to a single choice
+-- among them. This is that set, narrowed to the three card types CR 120.1a admits
+-- and CR 120.3c/120.3e/120.3h give results to.
+--
+-- A permanent really can hold two of them at once: Liquimetal Coating makes Jace
+-- Beleren an artifact "in addition to its other types" and March of the Machines
+-- then makes that noncreature artifact an artifact creature, both under CR
+-- 205.1b's retention clause, leaving a 3/3 artifact creature planeswalker that is
+-- owed CR 120.3c AND CR 120.3e off one damage event. Pawl.DamageSpec's
+-- CreatureAndPlaneswalker group is the proof.
+--
+-- The recipient's own TAG is unioned in rather than replaced by the projection,
+-- and the union is what keeps this from ever taking a result away. The tag is the
+-- classification made where the recipient was built -- CR 510.1b's combat
+-- recipient, CR 601.2c's chosen target -- and it is the only reading left for a
+-- permanent that is no longer there to be projected, which is CR 608.2h's last
+-- known information. The projection is what CR 120.3 actually asks for and what
+-- one tag cannot express.
+--
+-- Empty for a player, who is CR 120.3a/120.3b's business and has no card types at
+-- all, and for a ToObject naming nothing (CR 608.2h) or naming a permanent that
+-- is none of the three (CR 120.1a's "can't").
+damagedCardTypes :: GameState -> Recipient.Recipient -> Set.Set CardType.CardType
+damagedCardTypes gs recipient =
+  let tagged = case recipient of
+        Recipient.ToCreature _ -> Set.singleton CardType.Creature
+        Recipient.ToPlaneswalker _ -> Set.singleton CardType.Planeswalker
+        Recipient.ToBattle _ -> Set.singleton CardType.Battle
+        Recipient.ToObject _ -> Set.empty
+        Recipient.ToPlayer _ -> Set.empty
+      projected = case Recipient.objectOf recipient of
+        Nothing -> Set.empty
+        Just oid -> Set.intersection damageable (Projection.cardTypesOf oid gs)
+      damageable = Set.fromList [CardType.Battle, CardType.Creature, CardType.Planeswalker]
+   in Set.union tagged projected
 
 -- CR 120.3e / 120.3a: mark damage on creatures, drain life from players -- AND
 -- record each event into GameState.events. The change-and-emit funnel for
@@ -394,60 +434,77 @@ damageRecipient gs recipient = case recipient of
 -- The batch is also the unit CR 615.13 counts preventions in, which is the other
 -- half of what resolveDamageBatch answers: one Prevention per prevention effect
 -- that applied to this batch, carrying the total it prevented.
+--
+-- CR 120.4b and CR 120.4c only. CR 120.4a's excess-damage rewrite does not happen
+-- here or anywhere (#980).
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
-  let markOne g ev = case DamageEvent.target ev of
-        Recipient.ToCreature oid ->
-          if DamageEvent.dealtByInfect ev
-            then -- CR 120.3d / 702.90c: -1/-1 counters, no marked damage. Added
-            -- directly (not via Event.putCounters): this is a consequence of
-            -- a damage event that already ran the CR 616 replacement loop, so
-            -- a "would put -1/-1 from infect" CR 614 sub-replacement is out of
-            -- scope (#122).
-              let addMinus obj = obj {Object.counters = Map.insertWith (+) CounterKind.MinusOneMinusOne (DamageEvent.amount ev) (Object.counters obj)}
-               in g {GameState.objects = Map.adjust addMinus oid (GameState.objects g)}
-            else
-              let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
-               in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
-        -- CR 306.8 / CR 120.3c: damage dealt to a planeswalker removes that many
-        -- loyalty counters. Removed DIRECTLY, for the reason the infect arm above
-        -- gives: this is a result of a damage event that has already run its CR
-        -- 616.1 loop, so a "would remove counters" sub-replacement is out of
-        -- scope (#122) -- and CR 614.16 scales counters an effect PUTS on, never
-        -- removal.
-        --
-        -- Floored at 0 rather than wrapped, because Object.counters is Natural:
-        -- CR 306.5c makes loyalty the COUNT of loyalty counters. CR 704.5i then
-        -- reads the 0 and buries it; nothing here destroys anything (CR 120.5).
-        Recipient.ToPlaneswalker oid ->
-          let have obj = Map.findWithDefault 0 CounterKind.Loyalty (Object.counters obj)
-              strip obj =
-                obj
-                  { Object.counters =
-                      Map.insert
-                        CounterKind.Loyalty
-                        (Natural.minusSaturating (have obj) (DamageEvent.amount ev))
-                        (Object.counters obj)
-                  }
-           in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
-        -- CR 310.6 / CR 120.3h: damage dealt to a battle removes that many defense
-        -- counters from it. The planeswalker arm above with a different counter
-        -- kind, and written the same way for the same three reasons: directly rather
-        -- than through a "would remove counters" sub-replacement (#122), floored at
-        -- 0 because Object.counters is Natural and CR 122.1g makes defense the
-        -- COUNT, and destroying nothing (CR 120.5) -- CR 704.5v reads the 0.
-        Recipient.ToBattle oid ->
-          let have obj = Map.findWithDefault 0 CounterKind.Defense (Object.counters obj)
-              strip obj =
-                obj
-                  { Object.counters =
-                      Map.insert
-                        CounterKind.Defense
-                        (Natural.minusSaturating (have obj) (DamageEvent.amount ev))
-                        (Object.counters obj)
-                  }
-           in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
+  let -- CR 120.3d / 702.90c and CR 120.3e: the creature result. Counters are added
+      -- directly (not via Event.putCounters) because this is a consequence of a
+      -- damage event that already ran the CR 616 replacement loop, so a "would put
+      -- -1/-1 from infect" CR 614 sub-replacement is out of scope (#122).
+      markCreature ev oid g =
+        if DamageEvent.dealtByInfect ev
+          then
+            let addMinus obj = obj {Object.counters = Map.insertWith (+) CounterKind.MinusOneMinusOne (DamageEvent.amount ev) (Object.counters obj)}
+             in g {GameState.objects = Map.adjust addMinus oid (GameState.objects g)}
+          else
+            let hurt obj = obj {Object.damage = Object.damage obj + DamageEvent.amount ev}
+             in g {GameState.objects = Map.adjust hurt oid (GameState.objects g)}
+      -- CR 306.8 / CR 120.3c and CR 310.6 / CR 120.3h: damage dealt to a
+      -- planeswalker removes that many LOYALTY counters, and damage dealt to a
+      -- battle that many DEFENSE counters. One function, because the two rules
+      -- differ in nothing but the counter kind and read the same three ways:
+      -- removed directly rather than through a "would remove counters"
+      -- sub-replacement (#122) -- and CR 614.16 scales counters an effect PUTS on,
+      -- never removal -- floored at 0 rather than wrapped, because Object.counters
+      -- is Natural while CR 306.5c makes loyalty and CR 122.1g defense the COUNT of
+      -- those counters, and destroying nothing (CR 120.5): CR 704.5i and CR 704.5v
+      -- are what read the 0.
+      removeCounters kind ev oid g =
+        let have obj = Map.findWithDefault 0 kind (Object.counters obj)
+            strip obj =
+              obj
+                { Object.counters =
+                    Map.insert
+                      kind
+                      (Natural.minusSaturating (have obj) (DamageEvent.amount ev))
+                      (Object.counters obj)
+                }
+         in g {GameState.objects = Map.adjust strip oid (GameState.objects g)}
+      -- CR 120.3's "one or more of the following results", read off
+      -- damagedCardTypes: every result the recipient's card types earn it applies,
+      -- rather than the first one that matches. A permanent that is both a creature
+      -- and a planeswalker takes CR 120.3e's mark AND loses CR 120.3c's loyalty
+      -- counters from one event.
+      --
+      -- `board` is the state the batch is applied AGAINST and not the accumulator,
+      -- so every event in one CR 120.4b batch classifies its recipient off the same
+      -- board -- CR 510.2's simultaneity, which an earlier event in the fold must
+      -- not disturb.
+      onPermanent board ev oid g =
+        let types = damagedCardTypes board (DamageEvent.target ev)
+            results =
+              [ (CardType.Creature, markCreature ev oid),
+                (CardType.Planeswalker, removeCounters CounterKind.Loyalty ev oid),
+                (CardType.Battle, removeCounters CounterKind.Defense ev oid)
+              ]
+            apply h (cardType, result) = if Set.member cardType types then result h else h
+         in List.foldl' apply g results
+      markOne board g ev = case DamageEvent.target ev of
+        -- Every object-shaped recipient goes through one arm, INCLUDING
+        -- Recipient.ToObject: CR 120.1a's three card types are what decide the
+        -- results, and onPermanent asks the projection for them rather than
+        -- trusting the tag. Combat never builds a ToObject (CR 510.1b-d name a
+        -- creature, a player, a planeswalker or a battle) and the one producer that
+        -- can -- Resolve's DealDamage arm, naming a permanent generically -- runs
+        -- every recipient through damageRecipient above first, so this arm is
+        -- defensive; what it must not be is a silent drop.
+        Recipient.ToCreature oid -> onPermanent board ev oid g
+        Recipient.ToPlaneswalker oid -> onPermanent board ev oid g
+        Recipient.ToBattle oid -> onPermanent board ev oid g
+        Recipient.ToObject oid -> onPermanent board ev oid g
         Recipient.ToPlayer pid ->
           -- The two poison diversions are different shapes and BOTH apply. CR
           -- 120.3b / 702.90b: infect REPLACES the damage's result with poison
@@ -472,13 +529,6 @@ applyDamage events = do
                   then givePoison (DamageEvent.amount ev + toxic) player
                   else givePoison toxic (drain player)
            in g {GameState.players = Map.adjust hit pid (GameState.players g)}
-        -- CR 120.1a, and defensive: combat never builds this shape (CR 510.1b-d
-        -- name a creature, a player or a planeswalker), and the one producer that
-        -- can -- Resolve's DealDamage arm, naming a permanent generically -- runs
-        -- every recipient through damageRecipient above first. Doing anything
-        -- here would be the wrong answer if anything did reach it: nothing has
-        -- said which of CR 120.3's results applies.
-        Recipient.ToObject _ -> g
       -- CR 120.3f: lifelink damage gains its source's controller that much life,
       -- IN ADDITION to the damage's other results. A second pass over the same
       -- survivors, deliberately not a branch inside markOne: "in addition" is
@@ -555,11 +605,15 @@ applyDamage events = do
       --
       -- Read as a BEFORE/AFTER pair off the two boards rather than summed out of
       -- the events, so the record describes what actually came off: the floor in
-      -- markOne above means 4 damage to a defense-1 battle removes one counter,
+      -- removeCounters above means 4 damage to a defense-1 battle removes one counter,
       -- not four.
-      battleHit ev = case DamageEvent.target ev of
-        Recipient.ToBattle oid -> Just oid
-        _ -> Nothing
+      --
+      -- Every PERMANENT a surviving event named, not only the ones tagged
+      -- ToBattle: whether a defense counter actually came off is what the
+      -- before/after pair below answers, so this need not classify the recipient a
+      -- second time -- and a permanent that is a battle under some other tag (CR
+      -- 120.3h alongside CR 120.3e) is therefore not missed.
+      battleHit ev = Recipient.objectOf (DamageEvent.target ev)
       removalOn before after oid =
         let was = Battle.defenseOn oid before
             now = Battle.defenseOn oid after
@@ -577,7 +631,7 @@ applyDamage events = do
   -- the canonical order the prompt indexes into.
   State.modify'
     ( \gs ->
-        let marked = List.foldl' markOne gs survivors
+        let marked = List.foldl' (markOne gs) gs survivors
             gained = List.foldl' gainOne marked survivors
             noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) gained prevented
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
