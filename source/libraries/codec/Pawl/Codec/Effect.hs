@@ -67,6 +67,7 @@ toJson codec e = case e of
     Common.tagged "Destroy" . Just . Common.array $
       [ObjectRef.toJson s, Regenerability.toJson r] <> fmap SlotName.toJson (Maybe.maybeToList ms)
   Effect.Sacrifice s -> Common.tagged "Sacrifice" (Just (SlotName.toJson s))
+  Effect.TurnFaceDown s -> Common.tagged "TurnFaceDown" (Just (SlotName.toJson s))
   Effect.RemoveFromCombat s -> Common.tagged "RemoveFromCombat" (Just (SlotName.toJson s))
   Effect.Counter s -> Common.tagged "Counter" (Just (SlotName.toJson s))
   -- MoveToZone's payload is the ObjectRef and the destination zone, then three
@@ -219,6 +220,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [sv, rv, nv])) -> Effect.Destroy <$> ObjectRef.fromJson sv <*> Regenerability.fromJson rv <*> (Just <$> SlotName.fromJson nv)
       _ -> Left . Text.pack $ "Destroy expects [objectRef, regenerability], optionally with a slot"
     "Sacrifice" -> Common.withValue mv (fmap Effect.Sacrifice . SlotName.fromJson)
+    "TurnFaceDown" -> Common.withValue mv (fmap Effect.TurnFaceDown . SlotName.fromJson)
     "RemoveFromCombat" -> Common.withValue mv (fmap Effect.RemoveFromCombat . SlotName.fromJson)
     "Counter" -> Common.withValue mv (fmap Effect.Counter . SlotName.fromJson)
     -- Read by JSON TYPE and not by position, which is `moveTail`'s whole job:

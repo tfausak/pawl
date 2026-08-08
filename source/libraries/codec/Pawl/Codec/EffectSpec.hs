@@ -519,6 +519,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Transform (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
       """ {"type":"Transform","value":{"type":"HasCardType","value":{"type":"Creature"}}} """
+  -- CR 708.2a. One slot and no ObjectRef, since Backslide names a target and
+  -- nothing in the pool sweeps a set face down.
+  Spec.it s "TurnFaceDown" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.TurnFaceDown (SlotName.MkSlotName (Text.pack "target")))
+      """ {"type":"TurnFaceDown","value":"target"} """
   Spec.it s "RemoveFromCombat" $
     Common.assertJsonCodec
       s

@@ -64,6 +64,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.ControlPlayerNextTurn _ -> Nothing
   Effect.Destroy {} -> Nothing
   Effect.Sacrifice _ -> Nothing
+  Effect.TurnFaceDown _ -> Nothing
   Effect.RemoveFromCombat _ -> Nothing
   Effect.Draw {} -> Nothing
   Effect.Mill {} -> Nothing
