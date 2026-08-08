@@ -1,0 +1,46 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Green"
+            }
+          }
+        }
+      ],
+      "name": "Moonmist",
+      "spell": {
+        "modes": [
+          {
+            "effects": [
+              {
+                "type": "Transform",
+                "value": {
+                  "type": "HasSubtype",
+                  "value": {
+                    "type": "Human"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
