@@ -675,13 +675,11 @@ flashbackExile =
 -- "other Spiders you control have riot") adds it, both for free.
 --
 -- ONE ROW PER INSTANCE, because CR 702.136b says each instance works separately:
--- a creature with riot twice should be asked twice, and may take a counter for
--- one instance and haste for the other.
---
--- Not implemented: the two rows are EQUAL VALUES, and CR 614.5's identity here is
--- (source, effect value), so a second instance gets no second opportunity and the
--- second ask never happens (#75). The replication is written the rule's way
--- anyway, so that closing #75 makes rule 702.136b right with no change here.
+-- a creature with riot twice is asked twice, and may take a counter for one
+-- instance and haste for the other. The two rows are EQUAL VALUES, so what gives
+-- the second its own CR 614.5 opportunity is the instance ordinal
+-- Pawl.Engine.Replacement.collect assigns (see Pawl.Types.CandidateId); the
+-- proving test is Pawl.ReplacementSpec's "CR 702.136b riot twice".
 --
 -- The pattern is Filter.IsSource: CR 614.1c's ability is the entering object's
 -- own.
@@ -742,9 +740,9 @@ mintedReplacementsFor keyword count = case keyword of
   -- (Ixidron, Zoetic Cavern's own morph beside a granted megamorph), where the
   -- counter would have to be withheld (#986).
   --
-  -- ONE ROW PER INSTANCE, as riot's is, and unreachable for the same reason
-  -- (#75): two megamorph rows are equal values, so CR 614.5's (source, effect)
-  -- identity gives the second no opportunity of its own.
+  -- ONE ROW PER INSTANCE, as riot's is, and reached the same way -- the instance
+  -- ordinal, not the effect value, is what separates two equal rows. Unexercised
+  -- here: no card grants megamorph to a creature that already has it.
   Keyword.Morph _ MorphVariant.Mega ->
     List.genericReplicate count (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1))
   Keyword.Menace -> []
