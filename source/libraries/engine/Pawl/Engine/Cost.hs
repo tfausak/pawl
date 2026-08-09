@@ -389,7 +389,12 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announce manaActivations pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
+    -- The components' claims are read here rather than inside Mana.announce,
+    -- which cannot reach removalClaim: this module imports that one, not the
+    -- other way about. Nothing announcing changes the board, so reading them once
+    -- is the same answer every offer would have got.
+    gs <- State.get
+    (announced, life) <- Mana.announce manaActivations pid oid total_ (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -803,8 +808,13 @@ removalClaim pid oid component gs = case component of
 -- one mana payment (Pawl.Engine.Mana.payableResolutionsGiven), which is why it
 -- lives there rather than here.
 jointlyPayable :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
-jointlyPayable pid oid components gs =
-  Claim.satisfiable (Maybe.mapMaybe (\component -> removalClaim pid oid component gs) components)
+jointlyPayable pid oid components gs = Claim.satisfiable (claimsOf pid oid components gs)
+
+-- Everything these components will take out of a zone. What `jointlyPayable`
+-- asks Hall's condition of, and what the MANA side is handed so it can ask the
+-- same question of these claims and its sources' together (#1134).
+claimsOf :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> [Claim]
+claimsOf pid oid components gs = Maybe.mapMaybe (\component -> removalClaim pid oid component gs) components
 
 -- CR 118.3: a player can't pay a cost without the resources to pay it fully. The
 -- mana part AND every component, measured against the CURRENT state -- before any
@@ -832,6 +842,13 @@ jointlyPayable pid oid components gs =
 -- nothing about two parts of one. CR 601.2h's "partial payments are not allowed"
 -- is the other half of the reading.
 --
+-- The objects are handed ACROSS the two halves for the same reason the life is,
+-- and CR 601.2g is why they have to be: the mana window comes before CR 601.2h's
+-- payment, so a Phyrexian Tower tapped for {B} has already eaten the creature
+-- Village Rites' additional cost then wants. `jointlyPayable` above reads the
+-- components alone; the mana side reads them beside its sources' own claims and
+-- is the stricter of the two.
+--
 -- What is left counted twice over is a component that spends MANA, and no such
 -- component exists: the mana part spends nothing but mana and life, and both of
 -- those are already totalled across the two halves above.
@@ -839,7 +856,7 @@ canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
-    Mana.canPayCommitting manaActivations pid (lifeOwedBy (Cost.components cost)) manaCost gs
+    Mana.canPayCommitting manaActivations pid (lifeOwedBy (Cost.components cost)) (claimsOf pid oid (Cost.components cost) gs) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
 
@@ -964,17 +981,19 @@ canPaySomeCompletion pid oid total_ cost gs = canPaySomeCompletionGiven (Project
 -- Handing the board in changes no answer -- see Mana.payableResolutionsGiven and
 -- the snapshot argument at Projection.projectGiven.
 --
--- ONLY the mana half is threaded. The COMPONENTS are still asked through
--- canPayComponent, whose Sacrifice and TapForTotalPower arms make per-object
--- walks of their own (#1073); no activation cost in the pool carries one.
+-- ONLY the mana half gets the pre-walked board. The COMPONENTS are still
+-- asked through canPayComponent, whose Sacrifice and TapForTotalPower arms make
+-- per-object walks of their own (#1073); no activation cost in the pool carries
+-- one. Their CLAIMS do reach the mana side, for `canPay`'s reason (#1134).
 canPaySomeCompletionGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
+        claimed = claimsOf pid oid (Cost.components cost) gs
         payable (completed, life) =
           any
-            (\totalled -> Mana.canPayCommittingGiven manaActivations grants pcs pid (outside + life) totalled gs)
+            (\totalled -> Mana.canPayCommittingGiven manaActivations grants pcs pid (outside + life) claimed totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
