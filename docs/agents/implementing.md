@@ -15,7 +15,10 @@ says nothing about CI.
 
 ## Running the suite
 
-    cabal test --test-options '--timeout 1s --hide-successes'
+    cabal test --test-options '--timeout 2s --hide-successes'
+
+The timeout catches infinite loops. It is not an assertion about speed, so a
+case that sits near the budget is not a regression to chase.
 
 Never pipe `cabal test` or `cabal build` output --- it stalls a ~30s suite for
 minutes. One build at a time. No `cabal clean`; the incremental build under

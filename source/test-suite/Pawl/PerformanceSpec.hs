@@ -11,6 +11,15 @@
 -- case, GHC stopped sharing the repeated `project srcId gs`, and the suite went
 -- from 29s to 56s with nothing failing.
 --
+-- TWO FIXTURES, because CR 605.1a's mana-ability test cuts the enumeration's
+-- gate chain in half and one printing can only measure one side of it. Llanowar
+-- Elves stops at that test and holds the RATIO guard; Prodigal Sorcerer runs
+-- past it into the target and cost gates and holds an ABSOLUTE per-permanent
+-- ceiling. See boardOf and sorcererCeilingBytesPerPermanent for why the second
+-- one cannot be a ratio: after #716 that path takes a constant number of
+-- whole-board PROJECTIONS, but it still walks the battlefield per ability for
+-- other reasons and so is still quadratic overall (#1073).
+--
 -- Only the action enumeration is measured. The other paths the priority loop
 -- reaches every pass -- Combat.legalAttackers, Combat.legalBlockers,
 -- Mana.manaSources, Cast.castableSpells -- have no bound here (#717).
@@ -123,7 +132,7 @@ growthBound = 8
 -- every object costs without changing the shape of the loop keeps the ratio at
 -- 4x, and only an absolute figure catches it.
 --
--- Measured at 5,448 bytes per permanent on GHC 9.14.1, so this carries ~2.2x
+-- Measured at 7,515 bytes per permanent on GHC 9.14.1, so this carries ~1.6x
 -- headroom: enough to absorb a compiler bump, a change of architecture (this
 -- was measured on aarch64 and CI runs the suite on x86_64), or a feature
 -- landing in the enumeration -- and still tight enough to fail on a doubling.

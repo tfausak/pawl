@@ -841,8 +841,9 @@ hybridHalves :: ManaType -> ManaType -> [ManaType]
 hybridHalves a b = if a == b then [a] else [a, b]
 
 -- CR 118.3: can this MANA cost be paid at all, with nothing else claiming the
--- resources? Pure, because Action.legalActions reaches it (through
--- Pawl.Engine.Cost.canPay) while merely ENUMERATING actions, where prompting
+-- resources? Pure, because Action.legalActions reaches this family of predicates
+-- (through Pawl.Engine.Cost.canPaySomeCompletionGiven, which asks
+-- canPayCommittingGiven below) while merely ENUMERATING actions, where prompting
 -- would be absurd -- so it cannot simply walk tapForMana, which now asks a
 -- question.
 --
@@ -861,8 +862,9 @@ canPay pid = canPayCommitting pid 0
 -- floor must still admit alongside whatever the rest of this cost costs. Two
 -- callers commit life: `announce`, for CR 118.13a's choices -- both those already
 -- made and those a `completions` entry is standing in for -- and
--- Pawl.Engine.Cost.canPay, for the CR 119.4 payments the cost's COMPONENTS owe.
--- Zero everywhere else, which is what `canPay` is.
+-- Pawl.Engine.Cost's canPay and canPaySomeCompletion(Given), for the CR 119.4
+-- payments the cost's COMPONENTS owe. Zero everywhere else, which is what
+-- `canPay` is.
 canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
 canPayCommitting pid committed cost gs = canPayCommittingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
 

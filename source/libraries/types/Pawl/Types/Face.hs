@@ -191,6 +191,10 @@ data Face card = MkFace
     -- hand, which pawl's projection does not reach (#160). CR 118.8d: this does not
     -- change the card's mana cost, so 'manaCost' above and every reader of mana
     -- value is unaffected.
+    --
+    -- CR 118.8c is not implemented: a player instructed to cast a spell "if able"
+    -- is still required to cast one whose mandatory additional cost involves cards
+    -- of a stated quality in a hidden zone (#110).
     additionalCosts :: [CostComponent.CostComponent Keyword.Keyword],
     -- | CR 118.9: this face's printed alternative costs, which its controller MAY
     -- pay rather than the spell's mana cost (Fireblast). CR 118.9c: this does not
@@ -202,6 +206,11 @@ data Face card = MkFace
     -- caster picks from. Each carries its OWN mana part, which is how CR 118.6a's
     -- second sentence falls out of the shape -- Fireblast's is Just [], a real,
     -- taxable {0}, not Nothing.
+    --
+    -- That second sentence is UNEXERCISED, though: it speaks of an alternative
+    -- cost applied to an UNPAYABLE one, and Fireblast is the only card in the pool
+    -- with an alternative cost at all -- it has a printed mana cost, so no card
+    -- reaches the case (#109).
     --
     -- Printed-only: an effect that GRANTS an alternative cost has no carrier here
     -- (#103). CR 118.9 is about SPELLS, so this lives on a face and never on

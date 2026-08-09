@@ -290,9 +290,10 @@ targetable pcs perspective source sourceView gs recipient =
 -- Takes the controller rather than reading it, because targetable above needs the
 -- same answer for CR 702.11d's Context and reading it twice would rebuild the
 -- control-grant list twice. That list is Projection.controllerOf's own, not the
--- one admittedGiven hoists: it is built only for a candidate that already HAS a
--- hexproof ability, which is no candidate at all on almost every board. Threading
--- the hoisted list through is the fix if one ever makes the rebuild matter.
+-- `grants` legalRecipientsGiven and admittedGiven are handed: it is built only
+-- for a candidate that already HAS a hexproof ability, which is no candidate at
+-- all on almost every board. Threading `grants` down to here as well is the fix
+-- if one ever makes the rebuild matter.
 --
 -- Nothing either way is False, the vacuous posture every player-referencing
 -- question here already takes: a question with no "you" in it names no opponent,
