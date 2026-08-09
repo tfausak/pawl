@@ -516,6 +516,7 @@ effectCounts effect = case effect of
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration _ quantity -> durationCounts duration <> quantityCounts quantity
   Effect.PreventAllDamage duration _ -> durationCounts duration
+  Effect.RedirectDamage duration _ _ _ -> durationCounts duration
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
@@ -743,6 +744,7 @@ effectReplacements effect = case effect of
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage {} -> []
   Effect.PreventAllDamage {} -> []
+  Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
@@ -841,6 +843,8 @@ isShield rewrite = case rewrite of
   DamageRewrite.PreventAll -> False
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
+  -- CR 614.9's redirection is neither counted nor a prevention.
+  DamageRewrite.Redirect _ -> False
 
 -- The non-vacuity half of the same lint: is this the replacement that carries a
 -- PhasePattern at all? A wildcard is right here, where it is not above -- this
@@ -1210,6 +1214,7 @@ effectMintedFaces effect = case effect of
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage {} -> []
   Effect.PreventAllDamage {} -> []
+  Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
@@ -1907,6 +1912,9 @@ effectFilters effect = case effect of
   Effect.SkipNextPhase _ _ -> []
   Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
   Effect.PreventAllDamage duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
+  -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
+  Effect.RedirectDamage duration _ srcRef destRef ->
+    unframed (durationFilters duration <> objectRefFilters srcRef <> objectRefFilters destRef)
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []

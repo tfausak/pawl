@@ -5,6 +5,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.CastOffer as CastOffer
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.Daytime as Daytime
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.EntryRiders as EntryRiders
@@ -436,6 +437,23 @@ data Effect card
     -- write. Fog IS such a Replace precisely because it shields nobody in
     -- particular.
     PreventAllDamage Duration.Duration ObjectRef.ObjectRef
+  | -- | CR 614.9: install a floating REDIRECTION effect -- Turn the Tables' "all
+    -- combat damage that would be dealt to you this turn is dealt to target
+    -- attacking creature instead". The first ObjectRef is the damage's original
+    -- recipient, the second where it goes instead.
+    --
+    -- NOT a Replace carrying a DamageR, for PreventNextDamage's reason doubled:
+    -- BOTH sides are known only at resolution, and card data can name neither an
+    -- ObjectId nor a PlayerId. Resolve bakes the source side into
+    -- DamagePattern.whichRecipient and the destination into
+    -- DamageRewrite.Redirect.
+    --
+    -- The Maybe DamageKind is PRINTED, not assumed: Turn the Tables says "all
+    -- COMBAT damage", and an opcode without the field would redirect its
+    -- controller's noncombat damage away too -- weaker than printed, in the
+    -- controller's favour. Nothing means any kind, for a redirect that names
+    -- none.
+    RedirectDamage Duration.Duration (Maybe DamageKind.DamageKind) ObjectRef.ObjectRef ObjectRef.ObjectRef
   | -- | CR 701.6/701.6a: counter the slot's target via the Event.counter funnel.
     -- ONE opcode for both of that rule's subjects -- Cancel's slot is a
     -- Pool.Spells one and Stifle's a Pool.Abilities one -- because which ending

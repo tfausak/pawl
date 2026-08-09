@@ -77,6 +77,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.SkipNextPhase {} -> Nothing
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing
+  Effect.RedirectDamage {} -> Nothing
   Effect.Counter _ -> Nothing
   Effect.PutCounters {} -> Nothing
   Effect.RemoveCounters {} -> Nothing

@@ -198,6 +198,11 @@ slotsOf effect = case effect of
     Set.unions [durationSlots duration, objectRefSlots ref, Quantity.slots quantity]
   -- The same two reads, minus the shield size this opcode does not carry.
   Effect.PreventAllDamage duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
+  -- BOTH ObjectRefs. Turn the Tables reads its target slot through the
+  -- DESTINATION ref, so naming only the source side would leave a declared
+  -- target unread and pass the reads-equal-declares lint on a card that fizzles.
+  Effect.RedirectDamage duration _ srcRef destRef ->
+    Set.unions [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
   Effect.Counter slot -> Set.singleton slot
   Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.RemoveCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
@@ -329,6 +334,7 @@ slotsAreExhaustive effect = case effect of
   Effect.PreventNextDamage duration _ quantity ->
     durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity
   Effect.PreventAllDamage duration _ -> durationSlotsAreExhaustive duration
+  Effect.RedirectDamage duration _ _ _ -> durationSlotsAreExhaustive duration
   Effect.Counter _ -> True
   Effect.PutCounters _ quantity _ -> Quantity.slotsAreExhaustive quantity
   Effect.RemoveCounters _ quantity _ -> Quantity.slotsAreExhaustive quantity
@@ -428,6 +434,7 @@ readsX = any effectReadsX
       Effect.SkipNextPhase {} -> False
       Effect.PreventNextDamage _ _ quantity -> Quantity.readsX quantity
       Effect.PreventAllDamage {} -> False
+      Effect.RedirectDamage {} -> False
       Effect.Counter _ -> False
       Effect.PutCounters _ quantity _ -> Quantity.readsX quantity
       Effect.RemoveCounters _ quantity _ -> Quantity.readsX quantity
@@ -485,6 +492,7 @@ searchesLibrary effect = case effect of
   Effect.SkipNextPhase {} -> False
   Effect.PreventNextDamage {} -> False
   Effect.PreventAllDamage {} -> False
+  Effect.RedirectDamage {} -> False
   Effect.Counter _ -> False
   Effect.PutCounters {} -> False
   Effect.RemoveCounters {} -> False
@@ -602,6 +610,7 @@ boundSlots effect = case effect of
   Effect.SkipNextPhase {} -> Set.empty
   Effect.PreventNextDamage {} -> Set.empty
   Effect.PreventAllDamage {} -> Set.empty
+  Effect.RedirectDamage {} -> Set.empty
   Effect.Counter _ -> Set.empty
   Effect.PutCounters {} -> Set.empty
   Effect.RemoveCounters {} -> Set.empty
@@ -1465,10 +1474,11 @@ offerCast resolving controller slot offer = do
         OptionalDecision.Declines -> pure ()
         OptionalDecision.Exercises -> Cast.castSpellWith applied controller oid name Facing.FaceUp
 
--- CR 615.3: install one floating prevention shield over `recipient`, for a
--- duration. The shared body of Effect.PreventNextDamage's and
--- Effect.PreventAllDamage's arms, which differ only in the DamageRewrite they
--- hand it -- CR 615.7's countdown or CR 615.1's unbounded one.
+-- CR 615.3: install one floating damage row over `recipient`, for a duration.
+-- The shared body of Effect.PreventNextDamage's, Effect.PreventAllDamage's and
+-- Effect.RedirectDamage's arms, which differ only in the DamageRewrite they hand
+-- it -- CR 615.7's countdown, CR 615.1's unbounded shield, or CR 614.9's
+-- redirection.
 --
 -- The row's other fields are Replace's: CR 113.7's source, CR 109.5's controller
 -- baked at installation, and a fresh timestamp for its CR 614.5 identity.
@@ -1483,8 +1493,8 @@ offerCast resolving controller slot offer = do
 -- ReplacementEffect and no payload, so a prevention that also does something --
 -- Test of Faith's "for each 1 damage prevented this way, put a +1/+1 counter on
 -- that creature" -- cannot be written (#689).
-installShield :: PlayerId -> ObjectId -> Duration.Duration -> DamageRewrite.DamageRewrite -> GameState -> Recipient -> GameState
-installShield controller source duration rewrite g recipient = case Expiry.arm controller source duration g of
+installDamageRow :: PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> GameState -> Recipient -> GameState
+installDamageRow controller source duration kind rewrite g recipient = case Expiry.arm controller source duration g of
   -- CR 611.2b: the duration never started, so no shield is installed.
   Nothing -> g
   Just expiry ->
@@ -1494,9 +1504,12 @@ installShield controller source duration rewrite g recipient = case Expiry.arm c
             { ActiveReplacement.effect =
                 ReplacementEffect.DamageR
                   DamagePattern.MkDamagePattern
-                    { -- Both producers say "damage that would be dealt", naming
-                      -- no kind, so the shield takes combat and noncombat alike.
-                      DamagePattern.whichKind = Nothing,
+                    { -- PRINTED, not assumed. Both prevention producers say
+                      -- "damage that would be dealt", naming no kind, and pass
+                      -- Nothing so the shield takes combat and noncombat alike;
+                      -- Turn the Tables says "all COMBAT damage" and passes
+                      -- Just Combat.
+                      DamagePattern.whichKind = kind,
                       -- Nor does either name a source, which is CR 615.7's own
                       -- "the number of events or sources dealing it doesn't
                       -- matter". CR 615.9's shields against a source of a chosen
@@ -1507,20 +1520,21 @@ installShield controller source duration rewrite g recipient = case Expiry.arm c
                     }
                   rewrite,
               ActiveReplacement.source = source,
-              -- CR 109.5, baked as Replace's is: nothing reads it on a shield
-              -- today (the pattern names its recipient outright and has no
-              -- ControllerRelation to resolve), but the row cannot be built
-              -- without one.
+              -- CR 109.5, baked as Replace's is: nothing reads it on one of
+              -- these rows today (the pattern names its recipient outright and
+              -- has no ControllerRelation to resolve), but the row cannot be
+              -- built without one.
               ActiveReplacement.controller = controller,
               ActiveReplacement.timestamp = ts,
               ActiveReplacement.expiry = expiry,
               -- CR 615.7's shield is spent in DAMAGE, not in applications, so
               -- the use count is not what ends it (see Pawl.Types.Uses); a
-              -- PreventAll shield has nothing to spend at all.
+              -- PreventAll shield and a CR 614.9 redirection have nothing to
+              -- spend at all.
               ActiveReplacement.uses = Uses.Unlimited,
-              -- CR 614.15: a prevention shield replaces damage from any source,
-              -- including one this resolution is not itself dealing, so it is
-              -- not a self-replacement.
+              -- CR 614.15: these rows replace damage from any source, including
+              -- one this resolution is not itself dealing, so none of them is a
+              -- self-replacement.
               ActiveReplacement.origin = ReplacementOrigin.Other
             }
      in g1 {GameState.replacements = active : GameState.replacements g1}
@@ -2591,19 +2605,39 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- the same state `setShield` leaves a spent one in.
         Monad.when (n > 0) . State.modify' $ \g0 ->
           let amount = Integer.toNaturalSaturating n
-           in List.foldl' (installShield controller source duration (DamageRewrite.PreventNext amount)) g0 recipients
+           in List.foldl' (installDamageRow controller source duration Nothing (DamageRewrite.PreventNext amount)) g0 recipients
   Effect.PreventAllDamage duration ref -> do
     -- CR 615.1 / 615.3: install one floating prevention shield per recipient the
     -- ref names, with no amount to count down -- "prevent all damage that would
     -- be dealt to you this turn" (Selfless Squire). The row is
     -- PreventNextDamage's above in every respect but its rewrite, which is why
-    -- both go through `installShield`; what differs is that CR 615.7's "reduced
+    -- both go through `installDamageRow`; what differs is that CR 615.7's "reduced
     -- to 0" terminator does not exist here, so only the duration ends it.
     --
     -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
     gs <- State.get
     let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
-    State.modify' $ \g0 -> List.foldl' (installShield controller source duration DamageRewrite.PreventAll) g0 recipients
+    State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration Nothing DamageRewrite.PreventAll) g0 recipients
+  Effect.RedirectDamage duration kind srcRef destRef -> do
+    -- CR 614.9: install a floating redirection effect -- Turn the Tables' "all
+    -- combat damage that would be dealt to you this turn is dealt to target
+    -- attacking creature instead". BOTH sides are baked here, because both are
+    -- known only at resolution and card data can name neither: the source side
+    -- into DamagePattern.whichRecipient, the destination into the rewrite.
+    --
+    -- Both through Damage.damageRecipient for PreventNextDamage's reason (CR
+    -- 120.1a). The rule's own guard is re-asked at redirect time, in
+    -- Event.apply, because the destination may leave between now and then.
+    gs <- State.get
+    let recipientsOf ref = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
+    -- EXACTLY ONE destination: CR 614.9 replaces damage to one thing with the
+    -- same damage to ANOTHER one thing, and no printed redirect names more than
+    -- one. None means CR 608.2b's target is already gone, so the effect does
+    -- nothing and no row is installed.
+    case recipientsOf destRef of
+      [dest] ->
+        State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration kind (DamageRewrite.Redirect dest)) g0 (recipientsOf srcRef)
+      _ -> pure ()
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
     -- this installs one -- floating, because a sorcery's skip outlives the

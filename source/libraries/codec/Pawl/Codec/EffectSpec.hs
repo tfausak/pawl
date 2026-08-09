@@ -18,6 +18,7 @@ import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Daytime as Daytime
@@ -448,6 +449,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.PreventAllDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))))
       """ {"type":"PreventAllDamage","value":[{"type":"UntilEndOfTurn"},"you"]} """
+  -- CR 614.9: Turn the Tables, whose kind field is PRINTED ("all combat
+  -- damage") and whose two refs are the source side then the destination.
+  Spec.it s "RedirectDamage" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RedirectDamage Duration.UntilEndOfTurn (Just DamageKind.Combat) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "you"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"RedirectDamage","value":[{"type":"UntilEndOfTurn"},{"type":"Combat"},"you","target"]} """
   -- CR 113.9: this opcode counters an ability as well as a spell, with the type
   -- unchanged, so the wire shape is too.
   Spec.it s "Counter" $
