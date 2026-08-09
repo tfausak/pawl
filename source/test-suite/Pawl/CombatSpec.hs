@@ -3879,17 +3879,21 @@ trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalk
     Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "Jace dies either way"
   -- CR 702.19f, the negative control: a plain trampler attacking a planeswalker
   -- can assign the defending player nothing, "even if ... the damage the attacking
-  -- creature could assign is greater than the planeswalker's loyalty". War Mammoth
-  -- is a 3/3 with trample and nothing else.
+  -- creature could assign is greater than the planeswalker's loyalty".
+  --
+  -- Panglacial Wurm and not War Mammoth, and that is the whole point of the case:
+  -- a 3/3 into 3 loyalty is forced whether or not the keyword is there, so it
+  -- could not tell the two apart. The Wurm is 9/5 with plain trample, so 6 would
+  -- spill past Jace if CR 702.19f were not enforced.
   Spec.it s "CR 702.19f plain trample offers the defending player nothing" $ do
-    warMammoth <- S.printingOf s registry "War Mammoth"
+    wurm <- S.printingOf s registry "Panglacial Wurm"
     jace <- S.printingOf s registry "Jace Beleren"
-    let (gs, _, jaceId) = jaceBoard jace [warMammoth]
-        answer = Map.fromList [(Recipient.ToPlaneswalker jaceId, 0), (Recipient.ToPlayer S.bob, 3)]
+    let (gs, _, jaceId) = jaceBoard jace [wurm]
+        answer = Map.fromList [(Recipient.ToPlaneswalker jaceId, 3), (Recipient.ToPlayer S.bob, 6)]
         (after, offered) = runCombatLogging (assignmentLog answer) gs
     Spec.assertEqWith s "no division was ever asked for, so no map held the player" offered []
     Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
-    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "all 3 went to Jace (CR 704.5i)"
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "all 9 went to Jace (CR 704.5i)"
   -- CR 702.19e, the exception to CR 506.4c: two 2/1 first strikers bury Jace in the
   -- FIRST combat damage step (CR 510.4), and Thrasta -- still recorded as attacking
   -- it -- assigns to the defending player in the second. The control is the same
