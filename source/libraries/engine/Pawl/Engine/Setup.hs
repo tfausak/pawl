@@ -177,7 +177,8 @@ createCard pid printing = do
 
 -- Build each player's library from their deck's multiset, shuffle, draw.
 -- CR 103.1: build this player's library from their deck -- and, for a Commander
--- deck, CR 903.6's "the commander begins the game in the command zone".
+-- deck, CR 903.6's "the commander begins the game in the command zone" and CR
+-- 903.7's forty life.
 --
 -- The commander is created exactly like any other card and then placed in a
 -- different zone, so it is an ordinary Source.OfCard object throughout: CR 903.3
