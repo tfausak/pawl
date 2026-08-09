@@ -976,6 +976,21 @@ runCombat answer gs0 =
           else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
    in go 24 gs0
 
+-- Run whole steps until `step` is the current phase, WITHOUT running it, so a
+-- test can play that one step itself under a different answerer. Bounded so a
+-- bug cannot loop forever. Stops early if combat is left, so a caller that names
+-- a step this combat never reaches gets the state at the exit rather than a
+-- hang.
+runToStep :: Phase.Phase -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+runToStep step answer gs0 =
+  let go n g =
+        if n <= (0 :: Int)
+          || GameState.phase g == step
+          || not (inCombatPhase (GameState.phase g))
+          then g
+          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
+   in go 8 gs0
+
 inCombatPhase :: Phase.Phase -> Bool
 inCombatPhase p = case p of
   Phase.Combat _ -> True

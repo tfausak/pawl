@@ -6,6 +6,8 @@ import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
+import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scaling as Scaling
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
@@ -43,3 +45,13 @@ spec s = Spec.describe s "Pawl.Codec.DamageRewrite" $ do
       DamageRewrite.fromJson
       (DamageRewrite.Scale (Scaling.Multiply 2))
       """ {"type":"Scale","value":{"type":"Multiply","value":2}} """
+  -- CR 614.9's redirection. Baked by Resolve's RedirectDamage arm and never
+  -- authored on a card -- card data cannot name an ObjectId -- so this codec is
+  -- the replay path's, not a card's.
+  Spec.it s "Redirect" $
+    Common.assertJsonCodec
+      s
+      DamageRewrite.toJson
+      DamageRewrite.fromJson
+      (DamageRewrite.Redirect (Recipient.ToCreature (ObjectId.MkObjectId 7)))
+      """ {"type":"Redirect","value":{"type":"ToCreature","value":7}} """
