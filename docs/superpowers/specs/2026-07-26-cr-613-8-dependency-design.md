@@ -154,15 +154,14 @@ is never a gathered candidate. `applyCharacteristicPT` folds an object's own CDA
 at layer 7a outside the candidate list, and devoid is seeded before layer 1. So no
 pair this loop can see is ever CDA-vs-non-CDA.
 
-**The analysis is per object.** The CR defines the dependency globally — "what it
-applies to" is a set over the whole board — while `projectWith` projects one
-object and asks "does `a` apply to *this* one". The two agree whenever a
-dependency that matters for object O is visible at O, which is every pair the
-pool can build: if `b` does not apply to O it cannot change O's characteristics,
-so it cannot change whether `a` applies to O. They diverge only when `b` changes
-`a`'s set at some *other* object P while both still apply to O and their order
-matters — which needs an effect whose filter reads something off P, and nothing
-in the vocabulary does. Filed as #236 rather than pretended away.
+**The analysis was per object, and that was wrong.** This section originally
+argued that deciding the dependency at the projected object agreed with the CR's
+whole-set definition for every pair the pool could build, since a divergence
+would need a filter reading some *other* object. It does not: a global dependency
+LOOP projects to opposite one-way edges at *different* objects, with both filters
+reading only their own candidate. Life and Limb + Blood Moon over a Bayou and a
+Saproling is the pair. Fixed in #236 — the scan ranges over the battlefield, so
+one object settles the relation for all of them.
 
 ## 5. The gate cards
 

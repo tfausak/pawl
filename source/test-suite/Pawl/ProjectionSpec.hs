@@ -278,6 +278,32 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
       (ashayaId, gs) = place g3
    in (forestId, pikerId, tokenId, ashayaId, gs)
 
+-- Life and Limb, Blood Moon, a Bayou and a Shroofus Sproutsire, all under alice.
+-- `limbFirst` controls the timestamp order (fresh timestamps ascend with
+-- placement).
+--
+-- CR 613.8b's dependency LOOP, and it takes both permanents to see it. Life and
+-- Limb depends on Blood Moon at the Bayou: CR 305.7's set deletes the Forest
+-- subtype, so the Bayou leaves "all Forests". Blood Moon depends on Life and Limb
+-- at Shroofus: the Saproling becomes a nonbasic land, so it enters "nonbasic
+-- lands". Neither edge is visible at the other permanent, so only a relation
+-- decided over the whole board sees the loop at all: asked one permanent at a
+-- time, each reports a different one-way dependency, and the pair of answers is
+-- one no single order of the two effects produces.
+--
+-- Shroofus is the pool's only printed nontoken Saproling, and is transcribed
+-- without its combat-damage token trigger (#1113).
+limbBloodMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+limbBloodMoon bayou shroofus limb bloodMoon limbFirst =
+  let base = Setup.emptyGame S.bothPlayers
+      (bayouId, g1) = S.addCreature bayou S.alice base
+      (shroofusId, g2) = S.addCreature shroofus S.alice g1
+      place g =
+        if limbFirst
+          then snd (S.addCreature bloodMoon S.alice (snd (S.addCreature limb S.alice g)))
+          else snd (S.addCreature limb S.alice (snd (S.addCreature bloodMoon S.alice g)))
+   in (bayouId, shroofusId, place g2)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   Spec.it s "layer classification matches CR 613.1" $ do
@@ -1251,6 +1277,33 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf forestId gs)) "and still a land"
 
+  -- CR 613.8b's loop clause reached by two PRINTED cards, and the proving pair
+  -- for deciding CR 613.8a over the whole board rather than per projected object.
+  -- Each permanent shows one edge only (see limbBloodMoon), so a per-object
+  -- relation finds a one-way dependency at each and answers Blood-Moon-first at
+  -- the Bayou while answering Life-and-Limb-first at Shroofus -- an answer no
+  -- single order produces, and the same answer in both timestamp orders. The loop
+  -- makes CR 613.8b hand the tie to CR 613.7, so the two orders must differ.
+  Spec.it s "CR 613.8b Life and Limb and Blood Moon form a loop: the older Life and Limb applies first" $ do
+    bayou <- S.printingOf s registry "Bayou"
+    shroofus <- S.printingOf s registry "Shroofus Sproutsire"
+    limb <- S.printingOf s registry "Life and Limb"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (bayouId, shroofusId, gs) = limbBloodMoon bayou shroofus limb bloodMoon True
+    Spec.assertEqWith s "the Bayou is a Saproling, then a Mountain" (Projection.subtypesOf bayouId gs) (Set.fromList [Subtype.Type.Mountain, Subtype.Type.Saproling])
+    Spec.assertBool s (Projection.isCreatureOf bayouId gs) "and a creature, which Blood-Moon-first never makes it"
+    Spec.assertEqWith s "Shroofus is a Saproling Mountain" (Projection.subtypesOf shroofusId gs) (Set.fromList [Subtype.Type.Mountain, Subtype.Type.Saproling])
+
+  Spec.it s "CR 613.8b the same loop with Blood Moon older gives the other answer" $ do
+    bayou <- S.printingOf s registry "Bayou"
+    shroofus <- S.printingOf s registry "Shroofus Sproutsire"
+    limb <- S.printingOf s registry "Life and Limb"
+    bloodMoon <- S.printingOf s registry "Blood Moon"
+    let (bayouId, shroofusId, gs) = limbBloodMoon bayou shroofus limb bloodMoon False
+    Spec.assertEqWith s "the Bayou is only a Mountain" (Projection.subtypesOf bayouId gs) (Set.singleton Subtype.Type.Mountain)
+    Spec.assertBool s (not (Projection.isCreatureOf bayouId gs)) "and not a creature: Blood Moon took the Forest type before Life and Limb was asked"
+    Spec.assertEqWith s "Shroofus is a Saproling Forest, never reached by Blood Moon" (Projection.subtypesOf shroofusId gs) (Set.fromList [Subtype.Type.Forest, Subtype.Type.Saproling])
+
   -- Conversion is the pool's first static ability whose AFFECTED set names a
   -- basic land type, which is what makes CR 612's word swap reach an affected set
   -- at all. The pair below differs only in whether the swap is installed.
@@ -1934,10 +1987,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Humility is erased; newer survives" above). Timestamp order alone would ask A
   -- first, get "it flies, skip it", and leave the Maiden with nothing.
   --
-  -- Asserted about the FLIER only. Goblin Piker beside it never flew, so applying
-  -- Humility does not change A's answer for the Piker, and pawl decides the
-  -- dependency per projected object rather than over the whole affected set
-  -- (#236) -- which is where the two would diverge.
+  -- Asserted about the FLIER only, which is the object the dependency is visible
+  -- at: a Goblin Piker beside it never flew, so applying Humility would not change
+  -- A's answer there. The relation is decided over the whole board, so one such
+  -- object settles it for every other.
   Spec.it s "CR 613.8b Humility reorders an effect whose set reads a keyword" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     humility <- S.printingOf s registry "Humility"
