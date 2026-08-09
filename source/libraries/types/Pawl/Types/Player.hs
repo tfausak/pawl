@@ -3,6 +3,7 @@ module Pawl.Types.Player where
 import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Status as Status
 
@@ -76,6 +77,18 @@ data Player = MkPlayer
     -- survives the round trip. Counts CASTS and not returns, which is the detail
     -- rule 903.8 turns on: a commander that dies and goes back to the command zone
     -- without being recast has not made its own next cast any dearer.
-    commanderCasts :: Natural.Natural
+    commanderCasts :: Natural.Natural,
+    -- | CR 903.10a: how much COMBAT damage this player has been dealt by each
+    -- commander, over the course of the game. Absent key means zero, the
+    -- convention `counters` above uses. Only ever climbs -- rule 903.10a counts
+    -- the whole game, so nothing takes damage back out.
+    --
+    -- Keyed by the commander's OWNER, not by an object and not by a printing.
+    -- CR 400.7 mints a fresh id on every zone change, so an id could not
+    -- survive the commander's first cast; and `commander` above is at most one
+    -- printing per player (CR 903.3 designates one card), so the owner names
+    -- exactly one commander today. Partner and background decks, which give a
+    -- player two, would need a finer key (#939).
+    commanderDamage :: Map.Map PlayerId.PlayerId Natural.Natural
   }
   deriving (Eq, Show)

@@ -48,9 +48,14 @@ import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Zone as Zone
 
--- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), and CR
--- 704.5c (ten or more poison counters). Two-Headed Giant's shared-poison variant
--- (CR 704.6b / 810) is out of scope (design.md §6).
+-- CR 704.5a (life <= 0), CR 704.5b (drawing from an empty library), CR 704.5c
+-- (ten or more poison counters), and CR 704.6c / CR 903.10a (twenty-one combat
+-- damage from one commander). Two-Headed Giant's shared-poison variant (CR
+-- 704.6b / 810) is out of scope (design.md §6).
+--
+-- Rule 704.6c's disjunct is delegated to Pawl.Engine.Commander, the way CR
+-- 704.5z's is to Pawl.Engine.Speed: this module owns WHEN a state-based action
+-- is checked, not what each one means.
 losesNow :: GameState -> PlayerId -> Bool
 losesNow gs pid = case Map.lookup pid (GameState.players gs) of
   Nothing -> False
@@ -59,6 +64,7 @@ losesNow gs pid = case Map.lookup pid (GameState.players gs) of
       && ( Player.life player <= 0
              || Set.member pid (GameState.drewFromEmpty gs)
              || Map.findWithDefault 0 PlayerCounterKind.Poison (Player.counters player) >= 10
+             || Commander.lethalDamage pid gs
          )
 
 -- CR 704.5h: a creature with toughness > 0 dealt damage by a deathtouch source

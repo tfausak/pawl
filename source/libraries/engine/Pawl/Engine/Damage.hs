@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -550,6 +551,41 @@ applyDamage events = do
         Just pid ->
           let gain player = player {Player.life = Player.life player + toInteger (DamageEvent.amount ev)}
            in g {GameState.players = Map.adjust gain pid (GameState.players g)}
+      -- CR 903.10a: the running tally of COMBAT damage each commander has dealt
+      -- each player, kept under the commander's OWNER (Player.commanderDamage).
+      --
+      -- A third pass rather than a line inside markOne, for `gainOne`'s reason:
+      -- the tally is not one of CR 120.3's results at all -- it is a record CR
+      -- 903.10a keeps beside them -- so no arm of markOne can turn it off.
+      --
+      -- Asked of `board`, the pre-batch state the rest of applyDamage classifies
+      -- against, so every event in one batch reads the same answer to "was the
+      -- source a commander" -- CR 510.2's simultaneity, which an earlier event in
+      -- the fold must not disturb.
+      --
+      -- Over `survivors`, so prevented and replaced damage never counts: rule
+      -- 903.10a counts damage DEALT.
+      --
+      -- COMBAT damage only, which is rule 903.10a's own word and why the kind is
+      -- tested rather than assumed: Pawl.Engine.Resolve's DealDamage arm builds
+      -- Noncombat events from the very same sources.
+      --
+      -- Players only, so this is a walk of its own rather than a row in
+      -- onPermanent's `results` list: that list is keyed by CardType and a player
+      -- has none (damagedCardTypes answers empty for one).
+      tallyOne board g ev = case DamageEvent.target ev of
+        Recipient.ToPlayer pid
+          | DamageEvent.kind ev == DamageKind.Combat ->
+              case Commander.commanderOwnerOf (DamageEvent.source ev) board of
+                Nothing -> g
+                Just owner ->
+                  let count player =
+                        player
+                          { Player.commanderDamage =
+                              Map.insertWith (+) owner (DamageEvent.amount ev) (Player.commanderDamage player)
+                          }
+                   in g {GameState.players = Map.adjust count pid (GameState.players g)}
+        _ -> g
       -- CR 119.2: damage dealt to a player CAUSES that player to lose that much
       -- life, so the loss is recorded here and never by Pawl.Engine.Resolve's
       -- LoseLife arm, which no damage runs through.
@@ -633,7 +669,8 @@ applyDamage events = do
     ( \gs ->
         let marked = List.foldl' (markOne gs) gs survivors
             gained = List.foldl' gainOne marked survivors
-            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) gained prevented
+            tallied = List.foldl' (tallyOne gs) gained survivors
+            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) tallied prevented
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
             -- the damage that caused them, which is the same reasoning the

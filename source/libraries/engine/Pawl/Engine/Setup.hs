@@ -37,8 +37,16 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Zone as Zone
 
-startingLife :: Integer
-startingLife = 20
+-- CR 103.4's twenty, and CR 903.7 / CR 103.4c's forty for a Commander game,
+-- taken off the deck's CR 903.3 designation.
+--
+-- "Has a commander designated" standing in for "is a Commander game" is exact
+-- today rather than an approximation, and it rests on a capability pawl lacks
+-- rather than on a claim about Magic: Deck.commander is set by nothing but a
+-- Commander deck, and pawl has no game options at all (#175), so there is no
+-- way for the two to come apart.
+startingLife :: Maybe Printing -> Integer
+startingLife commander = if Maybe.isJust commander then 40 else 20
 
 -- How many cards this deck holds, CR 903.5's commander included: rule 903.5
 -- counts the deck at exactly 100 cards "including its commander", so the card
@@ -58,7 +66,9 @@ emptyGame order =
       newPlayer pid =
         ( pid,
           Player.MkPlayer
-            { Player.life = startingLife,
+            { -- CR 903.7 sets the total once the decks are known, which is
+              -- createDeck below; no deck has been read yet here.
+              Player.life = startingLife Nothing,
               Player.status = Status.Playing,
               Player.counters = Map.empty,
               -- CR 701.54c: the Ring has tempted nobody in a game that has not
@@ -71,7 +81,11 @@ emptyGame order =
               -- happened before the game began.
               Player.speed = Nothing,
               Player.commander = Nothing,
-              Player.commanderCasts = 0
+              Player.commanderCasts = 0,
+              -- CR 903.10a counts "over the course of the game", and no
+              -- commander has dealt anybody anything in one that has not
+              -- started.
+              Player.commanderDamage = Map.empty
             }
         )
    in GameState.MkGameState
@@ -174,6 +188,13 @@ createCard pid printing = do
 -- zones constantly; an id or an object field could not survive that.
 createDeck :: PlayerId -> Deck.Deck -> Game ()
 createDeck pid deck = do
+  -- CR 903.7 / CR 103.4: the starting life total, which is the deck's business
+  -- and so cannot be settled by emptyGame above.
+  State.modify' $ \gs ->
+    gs
+      { GameState.players =
+          Map.adjust (\p -> p {Player.life = startingLife (Deck.commander deck)}) pid (GameState.players gs)
+      }
   Monad.forM_ (Map.toList (Deck.cards deck)) $ \(printing, n) ->
     Monad.replicateM_ (Natural.toIntSaturating n) (createCard pid printing)
   Monad.forM_ (Deck.commander deck) $ \printing -> do
@@ -263,7 +284,10 @@ resetPlayers players =
   let reset player = case Player.status player of
         Status.Playing ->
           player
-            { Player.life = startingLife,
+            { -- CR 903.7 again: Player.commander survives the rebuild (see
+              -- Player.commanderCasts below), so a restarted Commander game
+              -- starts back at forty rather than at twenty.
+              Player.life = startingLife (Player.commander player),
               Player.counters = Map.empty,
               -- CR 727.1 / 729.2: a NEW game, so the Ring has tempted nobody in
               -- it. The command zone this line's callers empty is where the
@@ -277,7 +301,11 @@ resetPlayers players =
               -- is deliberately NOT reset beside it: rule 903.3's designation is
               -- made from the deck before the game begins and the restart reuses
               -- the same decks, so the same card is still the commander.
-              Player.commanderCasts = 0
+              Player.commanderCasts = 0,
+              -- CR 903.10a counts "over the course of the game", and CR 727.1
+              -- makes the restarted one a new game, so the tally starts over
+              -- with the tax.
+              Player.commanderDamage = Map.empty
             }
         Status.Departed _ -> player
    in fmap reset players
