@@ -111,9 +111,27 @@ data TriggerCondition
     -- attacker (#1145). The rule's "even if" has no case in reach until it can.
     --
     -- The ATTACKER the event also carries is not compared here. CR 509.3b's
-    -- "blocks a creature", CR 509.3c's and CR 509.3d's "becomes blocked" are
-    -- separate conditions no card in the pool declares (#1146).
+    -- "blocks a creature" and CR 509.3d's "becomes blocked by a creature" are
+    -- separate conditions no card in the pool declares (#1146); CR 509.3c's is
+    -- SelfBecomesBlocked below.
     SelfBlocks
+  | -- | CR 509.3c: "whenever [a creature] becomes blocked" -- Sacred Prey's. The
+    -- ATTACKING side of SelfBlocks, and self-scoped the same way.
+    --
+    -- Matched against GameEvent.AttackerBlocked, which CR 509.1's declaration
+    -- produces one of per attacker that got at least one blocker. That grouping
+    -- is rule 509.3c's "only once each combat for that creature, even if it's
+    -- blocked by multiple creatures" -- and unlike SelfBlocks' once, it is a real
+    -- dedup rather than an arity pawl happens to be stuck with, since nothing
+    -- stops the defending player assigning two blockers to one attacker.
+    --
+    -- Only a DECLARATION makes the event, so rule 509.3c's other two producers --
+    -- an effect, and a creature put onto the battlefield as a blocker (CR 509.4)
+    -- -- do not reach it. Neither has a producer in the pool (#1146).
+    --
+    -- No blocker is bound: rule 509.3c's form names none. CR 509.3d's does, and
+    -- that is a separate condition (#1146).
+    SelfBecomesBlocked
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.
     --

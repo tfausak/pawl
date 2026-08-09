@@ -26,6 +26,7 @@ toJson c = case c of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> Common.nullary "OpponentLostLifeDuringYourTurn"
   TriggerCondition.SelfAttacks f -> Common.tagged "SelfAttacks" . Just $ TriggerFrequency.toJson f
   TriggerCondition.SelfBlocks -> Common.nullary "SelfBlocks"
+  TriggerCondition.SelfBecomesBlocked -> Common.nullary "SelfBecomesBlocked"
   TriggerCondition.SelfCycled -> Common.nullary "SelfCycled"
   TriggerCondition.PlayerDiscards r -> Common.tagged "PlayerDiscards" . Just $ PlayerRelation.toJson r
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> Common.nullary "SelfPutIntoGraveyardFromLibrary"
@@ -65,6 +66,7 @@ fromJson value = do
     ("OpponentLostLifeDuringYourTurn", _) -> Right TriggerCondition.OpponentLostLifeDuringYourTurn
     ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> TriggerFrequency.fromJson v
     ("SelfBlocks", _) -> Right TriggerCondition.SelfBlocks
+    ("SelfBecomesBlocked", _) -> Right TriggerCondition.SelfBecomesBlocked
     ("SelfCycled", _) -> Right TriggerCondition.SelfCycled
     ("PlayerDiscards", Just v) -> TriggerCondition.PlayerDiscards <$> PlayerRelation.fromJson v
     ("SelfPutIntoGraveyardFromLibrary", _) -> Right TriggerCondition.SelfPutIntoGraveyardFromLibrary

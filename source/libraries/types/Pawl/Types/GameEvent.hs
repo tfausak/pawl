@@ -176,6 +176,27 @@ data GameEvent
     -- and it cannot be derived later, since a blocker removed from combat (CR
     -- 506.4) leaves no record of what it was declared against.
     BlockerDeclared ObjectId.ObjectId ObjectId.ObjectId
+  | -- | CR 509.1h: an attacking creature BECAME a blocked creature -- one event
+    -- per attacker the CR 509.1 declaration gave at least one blocker, appended
+    -- by Pawl.Engine.Combat.declareBlockers alone.
+    --
+    -- Derived from the same declaration as BlockerDeclared and not folded into
+    -- it, because the two have different arities: an attacker can be blocked by
+    -- several creatures, so BlockerDeclared fires once per PAIR while CR 509.3c's
+    -- "becomes blocked" fires once per attacker. Grouping is what makes the
+    -- difference, and Pawl.Engine.Event.matchesTrigger sees one event at a time
+    -- and so cannot do it.
+    --
+    -- The BLOCKERS are not carried. CR 509.3d's "becomes blocked by a creature"
+    -- is the condition that names one, and it reads BlockerDeclared's pair
+    -- instead -- this event exists to be the once-per-combat one (#1146).
+    --
+    -- A DECLARATION is the only producer, which is STRICTER than rule 509.3c:
+    -- that rule also makes an attacker become blocked when an effect blocks it,
+    -- or when its only blocker is one put onto the battlefield (CR 509.4 denies
+    -- that creature having "blocked", but says nothing about the attacker).
+    -- Neither producer exists in the pool (#1146).
+    AttackerBlocked ObjectId.ObjectId
   | -- | CR 701.20a: a player revealed a card.
     --
     -- A reveal is the one game action whose entire content is INFORMATION, so

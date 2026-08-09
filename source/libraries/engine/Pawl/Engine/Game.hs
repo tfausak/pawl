@@ -628,6 +628,7 @@ castOf event = case event of
   GameEvent.Revealed _ _ -> Nothing
   GameEvent.AttackerDeclared _ _ -> Nothing
   GameEvent.BlockerDeclared _ _ -> Nothing
+  GameEvent.AttackerBlocked _ -> Nothing
   GameEvent.SpellCountered _ -> Nothing
   GameEvent.LoyaltyAbilityActivated _ -> Nothing
   GameEvent.LifeLost _ _ -> Nothing
