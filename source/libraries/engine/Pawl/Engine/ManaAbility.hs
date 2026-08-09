@@ -53,6 +53,10 @@ manaProduced effect = case effect of
   Effect.Create {} -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
+  -- CR 615.5's rider is not descended into, the same stop Effect.Create makes at
+  -- a minted token's abilities: this asks what the effect ITSELF adds, and a
+  -- prevention adds no mana. A rider that did would be a mana clause nothing in
+  -- the pool prints, and CR 605.1a would then want it seen here.
   Effect.PreventNextDamage {} -> Nothing
   Effect.PreventAllDamage {} -> Nothing
   Effect.RedirectDamage {} -> Nothing

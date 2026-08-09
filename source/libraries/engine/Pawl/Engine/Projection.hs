@@ -1327,7 +1327,11 @@ rewriteEffect pairs effect = case effect of
   Effect.Create quantity card riders slot -> Effect.Create quantity (rewriteCard pairs card) riders slot
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
-  Effect.PreventNextDamage {} -> effect
+  -- CR 612.1: a rider's text is as changeable as any other, so the recursion
+  -- reaches it. The shield's own three fields hold nothing a text change
+  -- touches, which is why the arm was a no-op before.
+  Effect.PreventNextDamage duration ref quantity rider ->
+    Effect.PreventNextDamage duration ref quantity (fmap (rewriteEffect pairs) rider)
   Effect.PreventAllDamage {} -> effect
   Effect.RedirectDamage {} -> effect
   Effect.Counter _ -> effect

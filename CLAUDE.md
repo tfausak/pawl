@@ -61,6 +61,13 @@ to agents as written. What it doesn't say:
   gitignored `cabal.project.local`. Copy it in from the primary checkout before
   the first build, or a locally green build says nothing about CI.
 
+- That file sets `semaphore: True`, so concurrent `cabal` runs in *different*
+  worktrees contend on one shared GHC job semaphore --- that is the mechanism
+  behind one-build-at-a-time. A killed or crashed run corrupts it; the symptom
+  is `semWait: invalid argument`, and `cabal test --no-semaphore -j1` gets
+  through. Never `pkill -f 'cabal test'` --- it reaches into other agents'
+  worktrees. Match your own worktree path, or wait.
+
 - Derive against `origin/main`, not the working checkout. The primary checkout
   drifts --- it sat 47 commits behind during one drain run --- so a grep there
   reports a type as absent that landed hours ago, and every line number in an

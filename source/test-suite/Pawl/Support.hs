@@ -1179,7 +1179,8 @@ addRegenShield oid gs =
             ActiveReplacement.timestamp = ts,
             ActiveReplacement.expiry = Expiry.AtCleanup,
             ActiveReplacement.uses = Uses.Once,
-            ActiveReplacement.origin = ReplacementOrigin.Other
+            ActiveReplacement.origin = ReplacementOrigin.Other,
+            ActiveReplacement.rider = Nothing
           }
    in addReplacement active gs1
 
@@ -1375,6 +1376,7 @@ oneMountainState mountain ph =
           GameState.delayedTriggers = Seq.empty,
           GameState.continuousEffects = [],
           GameState.replacements = [],
+          GameState.pendingPreventionRiders = Seq.empty,
           GameState.playerEffects = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,

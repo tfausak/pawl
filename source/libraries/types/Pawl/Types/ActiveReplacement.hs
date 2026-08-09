@@ -3,6 +3,7 @@ module Pawl.Types.ActiveReplacement where
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -63,6 +64,12 @@ data ActiveReplacement = MkActiveReplacement
     timestamp :: Timestamp.Timestamp,
     expiry :: Expiry.Expiry,
     uses :: Uses.Uses,
-    origin :: ReplacementOrigin.ReplacementOrigin
+    origin :: ReplacementOrigin.ReplacementOrigin,
+    -- | CR 615.5's additional effect, for the one carrier that can hold one:
+    -- Nothing on every row but a shield installed by an
+    -- Effect.PreventNextDamage whose rider is non-empty. Copied forward to
+    -- Pawl.Types.ReplacementCandidate and then to Pawl.Types.Prevention, since
+    -- the row may be spent and dropped in the very application that fires it.
+    rider :: Maybe PreventionRider.PreventionRider
   }
   deriving (Eq, Ord, Show)

@@ -1093,7 +1093,8 @@ armCastFromGraveyard caster face spellId =
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.Never,
                   ActiveReplacement.uses = Uses.Once,
-                  ActiveReplacement.origin = ReplacementOrigin.Other
+                  ActiveReplacement.origin = ReplacementOrigin.Other,
+                  ActiveReplacement.rider = Nothing
                 }
          in gs1 {GameState.replacements = active : GameState.replacements gs1}
    in Monad.mapM_ arm (Keyword.castFromGraveyardReplacementsOf (Face.keywords face))

@@ -556,8 +556,9 @@ loop asOf batch applied prevented event = do
           -- doubles unpreventable damage.
           --
           -- Not implemented: CR 615.12's middle clause, "any additional effects
-          -- they have will take place". No prevention row can carry one, so
-          -- there is nothing here to run (#689).
+          -- they have will take place". A row CAN carry one now (CR 615.5), but
+          -- this short-circuit runs before `apply`, so `preventionBy` below
+          -- reports nothing and the rider is never queued (#1106).
           outcome <-
             if Replacement.inertPrevention gs candidate event
               then pure (Just event)

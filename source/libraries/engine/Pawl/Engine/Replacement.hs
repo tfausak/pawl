@@ -138,7 +138,10 @@ collect sources floating =
             -- CR 614.15: a permanent's replacement ability is a STATIC ability,
             -- which puts it outside the self-replacement class -- so this
             -- segment is never CR 616.1a's, whatever it replaces.
-            ReplacementCandidate.origin = ReplacementOrigin.Other
+            ReplacementCandidate.origin = ReplacementOrigin.Other,
+            -- CR 615.5: a static replacement ability has no field to carry an
+            -- additional effect (#1105).
+            ReplacementCandidate.rider = Nothing
           }
       fromFloating active =
         ReplacementCandidate.MkReplacementCandidate
@@ -158,7 +161,11 @@ collect sources floating =
             -- CR 614.15: a floating row IS an effect of a resolving spell or
             -- ability, so this is the one segment that can carry a
             -- self-replacement, and the row itself says whether it does.
-            ReplacementCandidate.origin = ActiveReplacement.origin active
+            ReplacementCandidate.origin = ActiveReplacement.origin active,
+            -- CR 615.5, copied off the row rather than looked up later: the row
+            -- may be dropped by the very application that fires the rider
+            -- (`setShield` drops a shield reduced to 0).
+            ReplacementCandidate.rider = ActiveReplacement.rider active
           }
    in fmap fromPermanent (Projection.replacementsAffecting sources)
         <> fmap fromFloating floating
@@ -990,7 +997,11 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
                       -- prevents nothing (CR 615.1a) -- `prevents` refuses it
                       -- above, so no redirect ever reaches here.
                       Prevention.recipient = DamageEvent.target de,
-                      Prevention.amount = was - now
+                      Prevention.amount = was - now,
+                      -- CR 615.5's additional effect, carried out of the loop
+                      -- so a caller that CAN run effects finds it. Copied, not
+                      -- inspected: this module never asks what the rider is.
+                      Prevention.rider = ReplacementCandidate.rider candidate
                     }
               else Nothing
   _ -> Nothing
@@ -1009,10 +1020,18 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
 --
 -- Ascending by key, so the CR 608.2i record -- and therefore the CR 603.3b order
 -- these triggers are offered in -- is canonical rather than gather-dependent.
+--
+-- Only the AMOUNTS are summed. CR 615.5's rider is a property of the INSTANCE,
+-- and the key already fixes the instance, so every entry merged here carries the
+-- same rider and taking either side is taking the same value -- which is also
+-- the rule: one application of one prevention effect runs its additional effect
+-- once, with the total it prevented.
 groupPreventions :: [Prevention] -> [Prevention]
 groupPreventions ps =
-  let keyed = Map.fromListWith (+) [((Prevention.by p, Prevention.recipient p), Prevention.amount p) | p <- ps]
-      rebuild ((by, recipient), amount) = Prevention.MkPrevention {Prevention.by = by, Prevention.recipient = recipient, Prevention.amount = amount}
+  let merge (a1, r) (a2, _) = (a1 + a2, r)
+      keyed = Map.fromListWith merge [((Prevention.by p, Prevention.recipient p), (Prevention.amount p, Prevention.rider p)) | p <- ps]
+      rebuild ((by, recipient), (amount, rider)) =
+        Prevention.MkPrevention {Prevention.by = by, Prevention.recipient = recipient, Prevention.amount = amount, Prevention.rider = rider}
    in fmap rebuild (Map.toAscList keyed)
 
 -- CR 615.7: when two or more applicable sources would deal damage to a shielded
@@ -1275,7 +1294,8 @@ installTurnSkips entry gs =
                   ActiveReplacement.timestamp = ts,
                   ActiveReplacement.expiry = Expiry.AtCleanup,
                   ActiveReplacement.uses = Uses.Once,
-                  ActiveReplacement.origin = ReplacementOrigin.Other
+                  ActiveReplacement.origin = ReplacementOrigin.Other,
+                  ActiveReplacement.rider = Nothing
                 }
          in g1 {GameState.replacements = active : GameState.replacements g1}
    in List.foldl' install gs (Set.toAscList (ExtraTurn.skipped entry))

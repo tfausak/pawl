@@ -1,5 +1,6 @@
 module Pawl.Types.Effect where
 
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.CastOffer as CastOffer
@@ -419,7 +420,25 @@ data Effect card
     -- Hands' "this turn" the second, printed rather than assumed. No Uses field:
     -- CR 615.7's shield is spent in damage, not in applications, so Resolve
     -- installs it Unlimited.
-    PreventNextDamage Duration.Duration ObjectRef.ObjectRef Quantity.Quantity
+    --
+    -- The trailing Seq is CR 615.5's ADDITIONAL EFFECT -- Test of Faith's "for
+    -- each 1 damage prevented this way, put a +1/+1 counter on that creature".
+    -- It rides the shield rather than being a sibling effect of the same
+    -- resolution because it fires when the shield does, once per application and
+    -- possibly turns later, and it reads the amount that application prevented
+    -- (Pawl.Engine.Binding.eventAmount, stamped by
+    -- Pawl.Engine.Resolve.runPreventionRiders). Empty for a shield with no such
+    -- clause, which is every other prevention in the pool.
+    --
+    -- An Effect embedding a Seq of Effects is structural NESTING, not a
+    -- recursive call: Effect.Create already embeds a card whose faces embed
+    -- effects, and the analyses that walk this type descend into the rider the
+    -- same way they descend into a token.
+    --
+    -- PreventAllDamage below deliberately has no such field: no unbounded shield
+    -- in the pool carries a rider, and an unread one would be speculative
+    -- (#1107).
+    PreventNextDamage Duration.Duration ObjectRef.ObjectRef Quantity.Quantity (Seq.Seq (Effect card))
   | -- | CR 615.1 / 615.3: install an UNBOUNDED prevention shield over the recipients
     -- an ObjectRef names, for a duration -- Selfless Squire's "prevent all damage
     -- that would be dealt to you this turn".
