@@ -6169,8 +6169,9 @@ chaptersOnStackFrom oid gs =
 --
 -- Distinct power/toughness on every creature (Lich 4/2, Boggart Brute 3/2,
 -- Goblin Piker 2/1, Bird Maiden 1/2, Bog Wraith 3/3) so no assertion below can
--- pass on a numeric coincidence, and bob holds TWO creatures so CR 701.21a's
--- choice is a real prompt rather than a forced single candidate.
+-- pass on a numeric coincidence, and the edict's victim always holds TWO
+-- creatures so CR 701.21a's choice is a real prompt rather than a forced single
+-- candidate -- bob in most cases, carol in the CR 725.4 one, where bob leaves.
 monarchTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchTriggerSpec s registry =
   let -- Names `victim` for every target slot that offers them. S.identityAnswer
@@ -6316,6 +6317,38 @@ monarchTriggerSpec s registry =
           Spec.assertEqWith s "bob kept both of his" (S.creaturesInPlay S.bob after) 2
           Spec.assertEqWith s "carol kept hers" (S.creaturesInPlay S.carol after) 1
           Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+        -- CR 725.4's third route into the crown: no effect and no inherent
+        -- ability, just the monarch leaving the game. Three seats are mandatory
+        -- twice over -- Departure.continuesAfterDeparture skips all of CR 800.4a
+        -- at two (CR 800.1), and the edict's victim has to be somebody other
+        -- than the departed monarch and the Lich's controller.
+        --
+        -- The bystanders helper is not used: its two creatures sit with bob, who
+        -- is the one leaving here, so carol holds the pair instead (Goblin Piker
+        -- 2/1, Bird Maiden 1/2) and CR 701.21a's choice stays a real prompt.
+        Spec.it s "CR 725.4 a departure crowns alice, and that crowning fires her edict" $ do
+          custodiLich <- S.printingOf s registry "Custodi Lich"
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          let base = S.withMonarch S.bob (Setup.emptyGame S.threePlayers)
+              (lich, g1) = S.addCreature custodiLich S.alice base
+              (_, g2) = S.addCreature piker S.carol g1
+              (_, gs) = S.addCreature birdMaiden S.carol g2
+              -- CR 104.3a: bob concedes, so the crown is reassigned inside the
+              -- departure rather than by anything that resolves afterwards.
+              departed = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.bob)
+              after = resolveAll (targetsPlayer S.carol) departed
+          Spec.assertEqWith s "bob wore the crown going in" (GameState.monarch gs) (Just S.bob)
+          Spec.assertEqWith s "alice is the active player, so CR 725.4's first sentence crowns her" (GameState.activePlayer gs) S.alice
+          Spec.assertEqWith s "CR 725.4 alice is the monarch" (GameState.monarch after) (Just S.alice)
+          Spec.assertBool s (S.onBattlefield lich after) "alice's Lich watched from the battlefield"
+          -- Asserted BEFORE the event, so a run with the record deleted fails
+          -- here rather than on the event and the payload is what is pinned.
+          Spec.assertEqWith s "CR 701.21a the targeted carol lost exactly one of her two" (S.creaturesInPlay S.carol after) 1
+          Spec.assertEqWith s "and alice, untargeted, still has her Lich" (S.creaturesInPlay S.alice after) 1
+          Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the reassignment recorded its crowning"
+          Spec.assertEqWith s "CR 104.2a two survivors, so the game is still going" (GameState.result after) Nothing
+          Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
