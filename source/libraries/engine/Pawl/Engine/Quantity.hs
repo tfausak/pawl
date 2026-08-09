@@ -280,6 +280,10 @@ slots quantity = case quantity of
   -- Neither half of a ManaCount contributes an AMOUNT slot: a ManaFilter names
   -- no slot at all, and PlayerRef.InSlot names a TARGET slot, which is
   -- Resolve's half of the lint. Count's Scope is in the same position.
+  --
+  -- Resolve.slotsOf does NOT in fact recover such a nested ref, so no lint sees
+  -- it (#1079). slotsAreExhaustive below reports these arms so the CR 603.3b
+  -- elision cannot rest on the gap.
   Quantity.ManaCount _ -> Set.empty
   -- The same position a third time: this arm's PlayerRef.InSlot names a TARGET
   -- slot, not an amount one.
