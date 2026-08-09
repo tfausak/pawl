@@ -1,0 +1,35 @@
+{-# LANGUAGE MultilineStrings #-}
+
+module Pawl.Codec.SacrificeRestrictionSpec where
+
+import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Spec as Spec
+import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
+
+spec :: (Monad m) => Spec.Spec m n -> n ()
+spec s =
+  -- Garland, Royal Kidnapper's third clause (CR 701.21a / CR 101.2), which is
+  -- also the one Affected in the pool that conjoins CR 109.5's controller with
+  -- CR 108.3's owner -- so this round-trips the OwnedBy atom in the position a
+  -- card actually writes it, not only as a bare filter.
+  Spec.describe s "Pawl.Codec.SacrificeRestriction" . Spec.it s "MkSacrificeRestriction" $
+    Common.assertJsonCodec
+      s
+      SacrificeRestriction.toJson
+      SacrificeRestriction.fromJson
+      ( SacrificeRestriction.MkSacrificeRestriction
+          ( Affected.Matching
+              ( Filter.And
+                  [ Filter.HasCardType CardType.Creature,
+                    Filter.ControlledBy PlayerRelation.You,
+                    Filter.Not (Filter.OwnedBy PlayerRelation.You)
+                  ]
+              )
+          )
+      )
+      """ {"affected":{"type":"Matching","value":{"type":"And","value":[{"type":"HasCardType","value":{"type":"Creature"}},{"type":"ControlledBy","value":{"type":"You"}},{"type":"Not","value":{"type":"OwnedBy","value":{"type":"You"}}}]}}} """

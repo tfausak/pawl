@@ -17,6 +17,7 @@ import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Target as Target
@@ -551,7 +552,23 @@ performStateBasedActions = Event.simultaneously $ do
       -- where such an ability has triggered but is not yet ON the stack is real:
       -- Engine.performSettle runs this pass before placePendingTriggers. See
       -- Saga.awaitingChapter.
-      told = Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs
+      --
+      -- CR 101.2's prohibition is subtracted HERE and not left to the funnel's own
+      -- gate, and that is a TERMINATION argument rather than a tidiness one: a
+      -- finished Saga that can't be sacrificed would keep `acted` below True
+      -- forever while moving nothing, and CR 704.3's "repeat until no
+      -- state-based action is performed" would never come to rest. Nothing is
+      -- PERFORMED for such a Saga, so nothing is reported -- which is also what
+      -- the rule says, since CR 101.2 stops the sacrifice from happening at all.
+      --
+      -- No board in the pool reaches it, so this is argued rather than tested:
+      -- the pool's one prohibition (Garland, Royal Kidnapper) names CREATURES,
+      -- and no printing here is both a Saga and a creature. The guard stands
+      -- because the failure it prevents is a hang rather than a wrong answer.
+      told =
+        filter
+          (\(_, oid) -> not (SacrificeRestriction.prohibited oid gs))
+          (Saga.sacrificing (\oid -> Projection.controllerOf oid gs) pcs (Event.unscannedEvents gs) gs)
       -- CR 704.5v / 310.7, from the SAME pre-pass state as everything above, and
       -- living in Pawl.Engine.Battle with the rest of rule 310 the way CR 704.5s
       -- lives in Pawl.Engine.Saga.

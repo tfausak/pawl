@@ -44,6 +44,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Affected as Affected
@@ -2228,6 +2229,12 @@ protectedFromCountering oid gs =
 -- not destroying. Restricted to permanents on the battlefield, so anything else is
 -- a no-op.
 --
+-- TWO refusals live here, and the arms below cite each: CR 701.21a's "a permanent
+-- they don't control", and CR 101.2's "can't" beating a rule or effect's "can" --
+-- a permanent under a Pawl.Types.SacrificeRestriction. Both are asked at the
+-- funnel, so a caller that named a victim without consulting
+-- Pawl.Engine.Replacement.sacrificeCandidates cannot get past either.
+--
 -- CR 701.21a also forbids sacrificing a permanent you do not control, which is why
 -- this takes the sacrificing player. Enforced here at the one funnel rather than
 -- trusted from each caller: a cost payment, a triggered ability's own source and
@@ -2261,6 +2268,26 @@ sacrifice pid oid = do
       -- be wrong.
       Zone.Battlefield
         | Projection.controllerOf oid gs /= Just pid -> pure ()
+        -- CR 101.2: "if a rule or effect allows or directs something to happen,
+        -- and another effect states that it can't happen, the 'can't' effect
+        -- takes precedence" -- Garland, Royal Kidnapper's "can't be sacrificed".
+        -- CR 101.3 says what happens instead: "any part of an instruction that's
+        -- impossible to perform is ignored", so nothing moves, no event is
+        -- recorded, and no destruction is substituted.
+        --
+        -- The SECOND of the two gates, and it earns its place at the funnel:
+        -- Effect.Sacrifice names a target or a bound group and consults no
+        -- candidate list at all, which is how Lightning Skelemental's "at the
+        -- beginning of the end step, sacrifice this creature" reaches here.
+        -- Pawl.SacrificeRestrictionSpec proves that path goes through this arm
+        -- and no other -- gating only the candidate list leaves it green.
+        --
+        -- The other two callers that name a victim outright answer CR 101.2
+        -- before they get here as well, and for their own reasons:
+        -- Pawl.Engine.Cost refuses the SacrificeThis cost so CR 118.3 is not
+        -- broken, and Pawl.Engine.Sba drops a CR 704.5s Saga so CR 704.3's
+        -- repeat terminates. This arm is the backstop under both.
+        | SacrificeRestriction.prohibited oid gs -> pure ()
         | otherwise -> do
             State.modify' (recordEvent (GameEvent.PermanentSacrificed pid oid))
             changeZone oid Zone.Graveyard

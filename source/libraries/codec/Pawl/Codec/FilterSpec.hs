@@ -104,6 +104,16 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       (Filter.ControlledBy PlayerRelation.Opponent)
       """ {"type":"ControlledBy","value":{"type":"Opponent"}} """
+  -- CR 108.3, and the ONE arm this file must carry for: the decoder dispatches on
+  -- a Text tag, so a missing arm there compiles and fails only when a card file
+  -- is loaded.
+  Spec.it s "OwnedBy" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Filter.OwnedBy PlayerRelation.You)
+      """ {"type":"OwnedBy","value":{"type":"You"}} """
   Spec.it s "IsPlayer" $
     Common.assertJsonCodec
       s

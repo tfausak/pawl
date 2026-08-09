@@ -29,6 +29,7 @@ import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
+import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.Ring as Ring
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Target as Target
@@ -2133,14 +2134,19 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             | n > 0 -> do
                 -- Candidates are what the VICTIM controls, ascending, so both the
                 -- elision and a short transcript are deterministic. No perspective
-                -- on the filter context: an edict's filter names a quality, never
-                -- a player.
-                let candidates =
-                      List.sort
-                        ( filter
-                            (\oid -> Filter.matches (Filter.MkContext Nothing Nothing) (Projection.viewOfObject oid gs) filter_)
-                            (Projection.controls victim gs)
-                        )
+                -- and no source on the filter context: an edict's filter names a
+                -- quality, never a player, and CR 601.2c's "another" is not a word
+                -- an edict prints.
+                --
+                -- Through Replacement.sacrificeCandidates rather than an inline
+                -- match, which is what puts CR 101.2's "can't be sacrificed" on
+                -- this path too (Garland, Royal Kidnapper): a prohibited permanent
+                -- is not merely unsacrificeable but is never the pick that
+                -- satisfies the edict, so a victim controlling one prohibited and
+                -- one ordinary creature loses the ordinary one. One home for CR
+                -- 701.21a's candidate question is what that function's header
+                -- already asks for (#111).
+                let candidates = Replacement.sacrificeCandidates victim Nothing filter_ gs
                     decider = Decide.deciderFor victim gs
                     -- The quantity as the count it is. `n > 0` above, so the
                     -- clamp never decides anything here.

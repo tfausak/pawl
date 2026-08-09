@@ -108,6 +108,7 @@ theRingEmblem =
               Face.blockRequirements = [],
               Face.attackRequirements = [],
               Face.combatRestrictions = [],
+              Face.sacrificeRestrictions = [],
               Face.attackCosts = [],
               Face.mulliganActions = [],
               Face.openingHandActions = []
