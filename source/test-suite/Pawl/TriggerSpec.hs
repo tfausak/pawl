@@ -3173,7 +3173,7 @@ flankingSpec s registry =
                   traded = S.runCombat S.aggressiveAnswer gs
                   controlStruck = atDamage control
                   controlTraded = S.runCombat S.aggressiveAnswer control
-              Spec.assertBool s (not (S.onBattlefield piker struck)) "the 2/1 Piker went to 1/0 and CR 704.5a buried it"
+              Spec.assertBool s (not (S.onBattlefield piker struck)) "the 2/1 Piker went to 1/0 and CR 704.5f buried it"
               Spec.assertEqWith s "the Cavalry itself is untouched" (S.powerToughnessOf cavalry struck) (Just (2, 2))
               Spec.assertBool s (S.onBattlefield cavalry traded) "so nothing was left to deal it damage"
               Spec.assertEqWith s "control leg: a 2/2 without flanking leaves the Piker at 2/1" (S.powerToughnessOf otherPiker controlStruck) (Just (2, 1))
