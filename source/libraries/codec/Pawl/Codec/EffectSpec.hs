@@ -364,6 +364,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GainLife (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1))
       """ {"type":"GainLife","value":[{"type":"Relative","value":{"type":"You"}},{"type":"Literal","value":1}]} """
+  Spec.it s "ExchangeLifeTotals" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeLifeTotals (SlotName.MkSlotName (Text.pack "target")))
+      """ {"type":"ExchangeLifeTotals","value":"target"} """
   -- Create's EntryRiders and bound slot are each ELIDED when they are the
   -- default, exactly like MoveToZone above: four emitted forms, the middle two
   -- told apart at decode by JSON TYPE.

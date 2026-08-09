@@ -296,6 +296,19 @@ data Effect card
     -- action follows a gain (CR 704.5a is about a total of 0 or less), so this one
     -- can never kill anybody.
     GainLife PlayerRef.PlayerRef Quantity.Quantity
+  | -- | CR 701.12c: this effect's controller and the slot's target player
+    -- exchange life totals -- Mirror Universe's "exchange life totals with
+    -- target opponent". Each of the two gains or loses whatever it takes to
+    -- reach the other's PREVIOUS total, which is why a card cannot spell this
+    -- with a GainLife and a LoseLife of its own: the second would read a total
+    -- the first had already overwritten.
+    --
+    -- Not LoseLife's and GainLife's PlayerRef, and not two of them: an exchange
+    -- has exactly two sides, where a PlayerRef may name every player at once.
+    -- The controller is one side because the printed sentence's other side is an
+    -- unstated "you" (CR 109.5); a card exchanging the totals of two OTHER
+    -- players (Soul Conduit) needs a second slot here (#1141).
+    ExchangeLifeTotals SlotName.SlotName
   | -- | CR 702.179c: the players the PlayerRef names each have their speed
     -- increased by this much -- "if a player has no speed and they are instructed
     -- to increase their speed by a certain value, their speed becomes that value",
