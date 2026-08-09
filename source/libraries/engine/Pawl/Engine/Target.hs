@@ -76,11 +76,26 @@ import qualified Pawl.Types.Zone as Zone
 -- genuinely absent perspective, which leaves a player-referencing filter
 -- vacuously False.
 legalRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-legalRecipients perspective source spec gs =
-  -- The SAME thunk both halves read, so the whole-board projection is still
-  -- taken at most once per slot (admittedGiven's own note).
-  let pcs = Projection.projectAll gs
-      -- CR 115.5's gate, hoisted out of the fold: one scan of the stack per
+legalRecipients perspective source spec gs = legalRecipientsGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective source spec gs
+
+-- The same set given a board the CALLER has already walked. `pcs` and `grants`
+-- are one whole-board projection and one control-grant walk, and threading them
+-- in is what makes the whole ENUMERATION take one of each rather than one per
+-- slot per ability per permanent (#716): the wrapper above hoists per CALL, and
+-- Action.legalActions' mode-fillability gate calls it once per permanent.
+--
+-- It changes no answer, for the reason at Projection.projectGiven: the board is
+-- a snapshot of one GameState, and both this and its caller are pure functions
+-- of the same one.
+--
+-- Both stay THUNKS here. `pcs` the caller has usually already forced, but
+-- `sourceView` below must not become strict -- see its own note.
+legalRecipientsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
+legalRecipientsGiven pcs grants perspective source spec gs =
+  -- The SAME thunk both halves read, so the whole-board projection is taken at
+  -- most once per slot even when this is reached through the wrapper above, and
+  -- once per enumeration when it is not (admittedGiven's own note).
+  let -- CR 115.5's gate, hoisted out of the fold: one scan of the stack per
       -- slot rather than one per candidate.
       sourceOnStack = elem source (GameState.stack gs)
       -- CR 702.11d's "[quality] spells ... or abilities ... from [quality]
@@ -92,13 +107,16 @@ legalRecipients perspective source spec gs =
       -- Hoisted like `pcs`, so one slot takes one view rather than one per
       -- candidate; and a THUNK, so a slot with no "hexproof from" candidate on it
       -- -- which is every slot on almost every board -- pays for neither the view
-      -- nor the control-grant walk it would force. That is the same posture
-      -- opponentOf's controller read takes below.
-      sourceView = Projection.viewOfObjectGiven pcs (Projection.controlGrants gs) source gs
+      -- nor the control-grant walk it would force. `grants` arriving as a
+      -- parameter does not change that: the wrapper above passes an unforced
+      -- Projection.controlGrants, and the enumeration passes one it has already
+      -- paid for. That is the same posture opponentOf's controller read takes
+      -- below.
+      sourceView = Projection.viewOfObjectGiven pcs grants source gs
       keep recipient =
         not (sourceOnStack && Recipient.objectOf recipient == Just source)
           && targetable pcs perspective source sourceView gs recipient
-   in Set.filter keep (admittedGiven pcs perspective source spec gs)
+   in Set.filter keep (admittedGiven pcs grants perspective source spec gs)
 
 -- CR 115.1 / CR 303.4c / CR 701.3a: the recipients the SPEC itself admits -- its
 -- Pool's base candidate set (CR 115.4's "any target" is creatures, planeswalkers
@@ -117,10 +135,10 @@ legalRecipients perspective source spec gs =
 -- 701.3a). Both ask what the enchant SPEC admits; neither is a player choosing a
 -- target.
 admittedRecipients :: Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-admittedRecipients perspective source spec gs = admittedGiven (Projection.projectAll gs) perspective source spec gs
+admittedRecipients perspective source spec gs = admittedGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective source spec gs
 
-admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
-admittedGiven pcs perspective source spec gs =
+admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> TargetSpec -> GameState -> Set Recipient
+admittedGiven pcs grants perspective source spec gs =
   let pool = TargetSpec.pool spec
       narrowing = TargetSpec.filter spec
       context = Filter.MkContext perspective (Just source)
@@ -131,10 +149,11 @@ admittedGiven pcs perspective source spec gs =
       -- Projection.projectGiven, and holds here because this is a pure function of
       -- one GameState.
       --
-      -- `pcs` is the CALLER's thunk so that legalRecipients' restriction pass and
-      -- this admission pass share one projection rather than taking two. Thunks,
-      -- so a slot that asks neither question pays for neither.
-      grants = Projection.controlGrants gs
+      -- `pcs` and `grants` are both the CALLER's thunks so that
+      -- legalRecipientsGiven's restriction pass and this admission pass share one
+      -- projection and one grant walk rather than taking two of each -- and, one
+      -- level further out, so that a whole enumeration shares one of each (#716).
+      -- Thunks, so a slot that asks neither question pays for neither.
       keep recipient = case recipient of
         -- CR 115.1: a player candidate is narrowed too ("target opponent"), by a
         -- Filter that asks about the player rather than about an object -- the
@@ -271,9 +290,10 @@ targetable pcs perspective source sourceView gs recipient =
 -- Takes the controller rather than reading it, because targetable above needs the
 -- same answer for CR 702.11d's Context and reading it twice would rebuild the
 -- control-grant list twice. That list is Projection.controllerOf's own, not the
--- one admittedGiven hoists: it is built only for a candidate that already HAS a
--- hexproof ability, which is no candidate at all on almost every board. Threading
--- the hoisted list through is the fix if one ever makes the rebuild matter.
+-- `grants` legalRecipientsGiven and admittedGiven are handed: it is built only
+-- for a candidate that already HAS a hexproof ability, which is no candidate at
+-- all on almost every board. Threading `grants` down to here as well is the fix
+-- if one ever makes the rebuild matter.
 --
 -- Nothing either way is False, the vacuous posture every player-referencing
 -- question here already takes: a question with no "you" in it names no opponent,
@@ -532,7 +552,11 @@ stillAdmitted perspective source recipient spec gs = Set.member recipient (admit
 -- a DIFFERENT rule: unconditional, and firing only where its own words do, for a
 -- source that is itself on the stack -- see legalRecipients.
 legalSets :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
-legalSets perspective source specs gs = fmap (\spec -> legalRecipients perspective source spec gs) specs
+legalSets perspective source specs gs = legalSetsGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective source specs gs
+
+-- The same map on a board the caller already walked -- see legalRecipientsGiven.
+legalSetsGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> GameState -> Map SlotName (Set Recipient)
+legalSetsGiven pcs grants perspective source specs gs = fmap (\spec -> legalRecipientsGiven pcs grants perspective source spec gs) specs
 
 -- CR 700.2a: the mode indices all of whose target slots have a legal recipient
 -- (a mode with no slots is trivially fillable). Self-exclusion ("another") is
@@ -544,10 +568,17 @@ legalSets perspective source specs gs = fmap (\spec -> legalRecipients perspecti
 -- must see or an Aura with no legal creature would be castable and then countered
 -- on resolution (CR 601.2c). An ability has no enchant spec and passes Map.empty.
 fillableModes :: Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
-fillableModes perspective source extra modal gs =
+fillableModes perspective source extra modal gs = fillableModesGiven (Projection.projectAll gs) (Projection.controlGrants gs) perspective source extra modal gs
+
+-- The same set on a board the caller already walked -- see legalRecipientsGiven.
+-- This is the half Action.legalActions' activation gate wants: it asks this
+-- question once per permanent, and the wrapper above takes a whole-board sweep
+-- apiece to answer it (#716).
+fillableModesGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.ControlGrant] -> Maybe PlayerId -> ObjectId -> Map SlotName TargetSpec -> Modal.Modal Card -> GameState -> Set ModeIndex
+fillableModesGiven pcs grants perspective source extra modal gs =
   let ms = Foldable.toList (Modal.modes modal)
       fillable i m =
-        let sets = legalSets perspective source (Map.union extra (Mode.targetSpecs m)) gs
+        let sets = legalSetsGiven pcs grants perspective source (Map.union extra (Mode.targetSpecs m)) gs
          in if any Set.null (Map.elems sets)
               then Nothing
               else Just (ModeIndex.MkModeIndex i)
