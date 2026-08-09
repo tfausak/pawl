@@ -349,6 +349,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.BattleCry
       """ {"type":"BattleCry"} """
+  -- CR 702.108a's prowess takes no parameter either, and CR 702.108b makes the
+  -- COUNT multiple rather than the value.
+  Spec.it s "Prowess" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Prowess
+      """ {"type":"Prowess"} """
   Spec.it s "Menace" $
     Common.assertJsonCodec
       s
