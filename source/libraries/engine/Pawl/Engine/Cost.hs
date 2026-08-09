@@ -49,6 +49,7 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -1081,10 +1082,10 @@ pay pid oid cost = do
   case Cost.mana cost of
     -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
     Nothing -> pure Payment.Unpaid
-    -- CR 601.2g: Mana.payCost now PROMPTS for which sources to activate, so it is
-    -- monadic and restores the pre-payment state itself when it cannot be paid.
+    -- CR 601.2g: payMana PROMPTS for which sources to activate, so it is monadic
+    -- and restores the pre-payment state itself when it cannot be paid.
     Just manaCost -> do
-      paidMana <- Mana.payCost pid manaCost
+      paidMana <- payMana pid manaCost
       if not paidMana
         then pure Payment.Unpaid
         else do
@@ -1103,6 +1104,196 @@ payComponents pid oid components = case components of
     case outcome of
       Payment.Unpaid -> pure Payment.Unpaid
       Payment.Paid -> payComponents pid oid rest
+
+-- CR 601.2g: if the total cost includes a mana payment, the player then has a
+-- chance to activate mana abilities. Reached from an ability too, by CR 602.2b.
+--
+-- HERE rather than in Pawl.Engine.Mana, which keeps pools, production and
+-- spending, because CR 602.2b makes the mana window recursive: a mana ability is
+-- activated by paying ITS cost (tapForMana below), and that cost's non-mana
+-- components are paid by payComponents just above. Mana cannot reach this module
+-- -- Pawl.Engine.Cost imports it -- so the whole mutual recursion lives on this
+-- side of the edge.
+--
+-- Returns whether it was paid; on failure nothing is spent, which is CR 601.2h's
+-- bar on partial payments rather than mere tidiness. The prompts themselves are
+-- NOT rolled back -- they live in the Program, outside the state -- so a failed
+-- payment still asked its questions.
+--
+-- Failure is REACHABLE, and a source offering a colour choice is what makes it
+-- so. canPay asks whether SOME sequence of choices pays the cost; this asks the
+-- player to make them. A player who taps their only Birds of Paradise for green
+-- cannot then pay {B}, and the engine must let them: choosing badly is a choice,
+-- and second-guessing it here would be the engine playing the game.
+--
+-- One prompt per source tapped, against a shrinking candidate list, rather than
+-- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
+-- second is made knowing the first.
+--
+-- `refused` is what keeps that loop finite now that activating a mana ability can
+-- FAIL: a source whose own activation cost went unpaid is dropped from the
+-- candidates for the rest of this payment, since re-offering an untapped source
+-- that just refused to pay would ask the same question forever.
+--
+-- The life budget only ever binds a cost NOTHING ANNOUNCED for: a cast (CR
+-- 601.2b) and an activation (CR 602.2b) both run `announce` first, so the cost
+-- arriving here holds no Phyrexian symbol and the budget is 0. What is left
+-- under it is CR 118.13b/c, a cost paid during a resolution or for a special
+-- action, where pawl still chooses (#373).
+--
+-- It is recomputed on EVERY pass rather than fixed at entry, because a tap can
+-- change it: a Birds of Paradise tapped for blue takes the mana way to an
+-- unannounced {G/P} off the board, and the cost is then payable only by CR
+-- 107.4f's 2 life. Recomputing means pawl pays it, rather than failing the
+-- payment the way the paragraph above lets a mis-tapped {B} fail -- the same MORE
+-- PERMISSIVE posture, and reachable only where nothing announced (#373). Zero
+-- when the cost is unpayable outright.
+payMana :: PlayerId -> ManaCost.ManaCost -> Game Bool
+payMana pid cost = do
+  before <- State.get
+  paid <- tapUntilPaid Set.empty
+  Monad.unless paid (State.put before)
+  pure paid
+  where
+    tapUntilPaid refused = do
+      gs <- State.get
+      let budget = Maybe.fromMaybe 0 (Mana.lifeNeeded pid cost gs)
+      case Mana.spend budget cost (Game.poolOf pid gs) of
+        Just (left, life) -> do
+          State.put (Event.payLife pid life (Mana.setPool pid left gs))
+          pure True
+        Nothing -> case filter (`Set.notMember` refused) (Mana.manaSources pid gs) of
+          [] -> pure False
+          candidate : rest -> do
+            oid <- chooseSource pid (candidate NonEmpty.:| rest) gs
+            produced <- tapForMana oid
+            tapUntilPaid (if produced then refused else Set.insert oid refused)
+
+-- Which source to tap next.
+--
+-- Asked whenever there is more than one candidate, and elided ONLY when there is
+-- exactly one -- where no choice exists to make. A deliberately blunt reading of
+-- "eliding a prompt is legitimate only for indistinguishable options": it never
+-- has to be right about what indistinguishable MEANS.
+--
+-- The obvious cheaper rule -- elide when every candidate is a copy of the same
+-- card -- is unsound in this pool, and the counterexamples are ordinary. Two
+-- Llanowar Elves are one card, but one may be equipped or enchanted, one may
+-- carry +1/+1 counters, one may be borrowed until end of turn, and one may be
+-- blocking (CR 506.4 does not remove a creature from combat for tapping).
+-- `Game.cardOf` compares PRINTED identity and cannot see any of it, so that rule
+-- would suppress exactly the prompts the invariant exists to force (#217).
+--
+-- FILTERED, NOT TRUSTED, the posture Combat.declareAttackers and payComponents
+-- already take. Beyond hygiene, an answer outside the offered set is one payMana
+-- would spend a whole pass of its loop on for nothing: an unknown or mana-less
+-- id, or a source its `refused` set has already given up on.
+chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game ObjectId
+chooseSource pid candidates gs = case candidates of
+  only NonEmpty.:| [] -> pure only
+  _ -> do
+    answer <- Game.choose (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates)
+    pure $
+      if List.elem answer (NonEmpty.toList candidates)
+        then answer
+        else NonEmpty.head candidates
+
+-- CR 106.12's "tap [a permanent] for mana" -- activate one of its mana abilities,
+-- which by CR 602.2b means paying that ability's whole cost and then adding what
+-- it yields. CR 605.3b: a mana ability does not use the stack, so this is
+-- immediate -- which is also why the colour choice is made HERE and not by
+-- Pawl.Engine.Resolve.
+--
+-- Monadic because of that choice. A Mountain offers one yield and is never
+-- asked; Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR 305.6/305.7)
+-- offer several, and the engine never picks for the player. Which SOURCE to tap
+-- is a separate question, and payMana asks it.
+--
+-- The whole yield lands, so Sol Ring's "{T}: Add {C}{C}" adds two units from one
+-- activation. The TAP is no longer written here: it is the CR 107.5 component of
+-- the cost being paid (Mana.intrinsicManaCost for CR 305.6's ability), so a cost
+-- that also charges life charges it, and Mana Confluence pays 1.
+--
+-- Answers whether mana was actually added, which payMana's loop reads.
+--
+-- Not implemented: the ability's non-mana clauses -- Ancient Tomb's "deals 2
+-- damage to you". Running them needs the effect executor, which is
+-- Pawl.Engine.Resolve, above this module (#1118). Also not implemented: CR
+-- 118.3's question, asked BEFORE the payment, of whether that cost can be paid
+-- at all (#1119).
+tapForMana :: ObjectId -> Game Bool
+tapForMana oid = do
+  gs <- State.get
+  case (Game.lookupObject oid gs, Mana.manaOptionsOf oid gs) of
+    (Just obj, first : rest) -> do
+      -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
+      -- the permanent's controller (CR 106.4 only says it lands in "a player's
+      -- mana pool", not whose) -- and that same player makes the colour choice
+      -- and pays the cost. Falls back to owner in the impossible case
+      -- lookupObject just proved oid exists but controllerOf returns Nothing.
+      let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
+          options = first : rest
+      chosen <- chooseManaYield controller oid (fmap snd (first NonEmpty.:| rest)) gs
+      let (cost, yield) = Maybe.fromMaybe first (List.find ((==) chosen . snd) options)
+      outcome <- payActivation controller oid cost
+      case outcome of
+        Payment.Unpaid -> pure False
+        Payment.Paid -> do
+          State.modify' (Mana.addMana controller (Mana.unitsOf yield))
+          pure True
+    _ -> pure False
+
+-- CR 602.2b sends an activation cost through CR 601.2b-i, so a mana ability pays
+-- its whole cost. All or nothing, `pay`'s posture and for CR 601.2h's reason.
+--
+-- COMPONENTS FIRST, where `pay` opens the CR 601.2g mana window first. That
+-- inverts CR 601.2g/h, and the reason is termination: {T} is a component, so
+-- paying components first takes this source off its own mana window's candidate
+-- list before payMana goes looking (manaSourcesGiven keeps only untapped
+-- permanents). Left in rule order, a mana ability whose cost held mana would tap
+-- itself to pay itself, forever.
+--
+-- Unobservable in this pool, and the short-circuit below is why: every mana
+-- ability in `data/cards/` has an EMPTY mana part, so no window opens and there
+-- is no order to get wrong. The first mana ability charging mana -- Cabal
+-- Coffers' "{2}, {T}" -- is what would make the inversion visible, and wants CR
+-- 601.2g put back with a different guard (#1120).
+--
+-- That short-circuit is a performance call as well: payMana would answer True at
+-- once on {0}, but its first act is a whole-board payability walk, and this is on
+-- the path of every tap for mana (#200, #716).
+payActivation :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> Game Payment.Payment
+payActivation pid oid cost = do
+  before <- State.get
+  outcome <- payComponents pid oid (Cost.components cost)
+  paid <- case (outcome, Cost.mana cost) of
+    (Payment.Paid, Just (ManaCost.MkManaCost [])) -> pure True
+    (Payment.Paid, Just manaCost) -> payMana pid manaCost
+    -- CR 118.6: attempting to pay an unpayable cost is an illegal action.
+    _ -> pure False
+  Monad.unless paid (State.put before)
+  pure (if paid then Payment.Paid else Payment.Unpaid)
+
+-- Which mana this source produces -- which of its mana abilities, in which mode,
+-- and which colour each of that mode's AddMana effects makes, asked as ONE
+-- question because the answer is one yield.
+--
+-- Elided exactly when the source offers ONE yield, where no choice exists --
+-- Mana.manaOptionsOf has already collapsed routes producing identical mana for an
+-- identical cost, so a remaining list of two is two genuinely different options.
+--
+-- FILTERED, NOT TRUSTED, the posture chooseSource and payComponents take. Here
+-- that is not merely hygiene -- honouring a yield the source cannot make would
+-- mint mana out of nothing.
+chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty Mana.Type.Mana -> GameState -> Game Mana.Type.Mana
+chooseManaYield pid oid candidates gs = case NonEmpty.nub candidates of
+  only NonEmpty.:| [] -> pure only
+  distinct -> do
+    answer <- Game.choose (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid distinct)
+    pure $
+      if List.elem answer (NonEmpty.toList distinct)
+        then answer
+        else NonEmpty.head distinct
 
 payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent pid oid component = case component of

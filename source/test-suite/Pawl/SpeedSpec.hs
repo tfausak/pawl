@@ -31,9 +31,9 @@ import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Speed as Speed
@@ -115,7 +115,7 @@ castOnce pid spellId gs =
 -- How many mana ended up in Alice's pool after tapping this source, with every
 -- prompt answered by `answer`.
 pooledBy :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.GameState -> Int
-pooledBy answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Mana.tapForMana oid)) of
+pooledBy answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana oid)) of
   Mana.Type.MkMana units -> length units
 
 -- Answer Prompt.ChooseManaYield with the LAST candidate. The discriminator for

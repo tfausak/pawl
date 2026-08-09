@@ -90,7 +90,7 @@ data Effect card
     -- fixed type, or one colour its controller chooses (CR 105.4). ONE unit, so a
     -- mode adding more holds the opcode more than once: Sol Ring's "{T}: Add
     -- {C}{C}" is two of these, and Mana.manaRoutesOfGiven reads a mode's whole
-    -- list as one activation's yield. Executed by Mana.tapForMana at payment (CR
+    -- list as one activation's yield. Executed by Cost.tapForMana at payment (CR
     -- 605.3b: a mana ability never uses the stack), never by Resolve.applyEffect.
     AddMana ManaProduction.ManaProduction
   | -- | CR 701.23: search the controller's library for a card matching the Filter,

@@ -594,7 +594,7 @@ activateAbility pid srcId ability = do
               -- components. The gates above prove SOME sequence of choices pays for
               -- this ability -- but Unpaid is reachable all the same, because the
               -- mana window then asks the player to make those choices and a
-              -- mis-tapped colour is a choice the engine must honour (Mana.payCost).
+              -- mis-tapped colour is a choice the engine must honour (Cost.payMana).
               -- Reject-not-repair restores the whole activation, including the
               -- ability object this function put on the stack.
               payment <- Cost.pay pid srcId announcedCost

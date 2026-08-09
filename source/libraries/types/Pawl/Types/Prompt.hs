@@ -110,9 +110,12 @@ data Prompt r where
   --   * a mana ability with several MODES (CR 700.2). No card in the pool has one.
   --
   -- Collapsing them is sound because a source taps once and adds one yield, so all
-  -- three have the same answer set and consequences. It would stop being sound if
-  -- two abilities of one permanent differed in cost or in a rider, but
-  -- Mana.tapForMana reads neither today (#238).
+  -- three have the same answer set and consequences.
+  --
+  -- The answer is a yield ALONE, where Cost.tapForMana chooses among (cost, yield)
+  -- pairs. Not implemented: what to ask when two of one permanent's mana abilities
+  -- add the same mana for different costs, which this prompt cannot tell apart
+  -- (#1117). No permanent in the pool is in that position.
   --
   -- Candidates are deduplicated by the WHOLE yield, the one elision needing no
   -- judgement: two ways to produce black mana add the same mana.

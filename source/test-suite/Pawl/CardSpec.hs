@@ -1001,9 +1001,9 @@ triggeredAbilityOffends ability =
 -- SCOPE: the abilities that reach Activate. CR 605.3b's mana abilities do not --
 -- one "doesn't go on the stack, so it can't be targeted, countered, or otherwise
 -- responded to. Rather, it resolves immediately after it is activated" -- and
--- pawl's mana path lifts a route's AddMana effects out rather than activating
--- anything (#238), so NOTHING is bound for one and none of its other effects
--- runs either. No mana ability in the pool reads a slot, so applying the same
+-- pawl's mana path pays a route's cost and lifts its AddMana effects out, so
+-- NOTHING is bound for one and none of its other effects runs (#1118). No mana
+-- ability in the pool reads a slot, so applying the same
 -- available side to one is uniformity rather than a claim.
 activatedAbilityOffends :: ActivatedAbility.ActivatedAbility Card.Type.Card -> Bool
 activatedAbilityOffends ability =

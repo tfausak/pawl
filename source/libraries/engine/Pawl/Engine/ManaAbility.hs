@@ -24,7 +24,7 @@ import Pawl.Types.ManaProduction (ManaProduction)
 --
 -- Returns the ManaProduction rather than a settled ManaType because CR 605.1a
 -- asks whether the ability COULD add mana, which an unresolved colour choice
--- answers yes to; which colour is Mana.tapForMana's prompt, not a static fact.
+-- answers yes to; which colour is Cost.tapForMana's prompt, not a static fact.
 manaProduced :: Effect Card.Type.Card -> Maybe ManaProduction
 manaProduced effect = case effect of
   Effect.AddMana production -> Just production

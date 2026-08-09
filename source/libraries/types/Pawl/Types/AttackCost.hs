@@ -75,7 +75,7 @@ data AttackCost = MkAttackCost
     -- A ManaCost and not a Pawl.Types.Cost, so it carries no components. CR
     -- 508.1h's list is wider than mana, but a cost to attack that is not mana has
     -- no printing here (#599). Mana alone is also what makes CR 508.1i's window
-    -- plus CR 508.1j the whole payment, which Pawl.Engine.Mana.payCost is.
+    -- plus CR 508.1j the whole payment, which Pawl.Engine.Cost.payMana is.
     perAttacker :: ManaCost.ManaCost
   }
   deriving (Eq, Ord, Show)
