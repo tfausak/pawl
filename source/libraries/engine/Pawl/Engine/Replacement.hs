@@ -81,6 +81,8 @@ import Pawl.Types.ReplacementCandidate (ReplacementCandidate)
 import qualified Pawl.Types.ReplacementCandidate as ReplacementCandidate
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import Pawl.Types.ReplacementEntry (ReplacementEntry)
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.SourceRelation as SourceRelation
@@ -693,7 +695,7 @@ choose gs event candidates = case candidates of
         Nothing -> pure (Just first)
         Just pid -> do
           let decider = Decide.deciderFor pid gs
-          answer <- Game.choose (Prompt.ChooseReplacement decider pid (fmap ReplacementCandidate.source candidates))
+          answer <- Game.choose (Prompt.ChooseReplacement decider pid (fmap entryOf candidates))
           -- Reject-not-repair, as payment and Engine.permute already do: an
           -- out-of-range index leaves the canonical first standing rather than
           -- dropping the event or crashing.
@@ -707,6 +709,16 @@ choose gs event candidates = case candidates of
           then ReplacementCandidate.controller c
           else Nothing
       )
+
+-- What a candidate looks like to the player being asked (#74): its source and
+-- the effect that distinguishes it from another of the same source. A
+-- projection, not a computation -- the candidate already carries both.
+entryOf :: ReplacementCandidate -> ReplacementEntry
+entryOf c =
+  ReplacementEntry.MkReplacementEntry
+    { ReplacementEntry.source = ReplacementCandidate.source c,
+      ReplacementEntry.effect = ReplacementCandidate.effect c
+    }
 
 -- Total index into a list, with a fallback.
 at :: [a] -> Natural -> a -> a
