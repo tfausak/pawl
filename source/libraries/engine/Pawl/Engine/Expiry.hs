@@ -14,7 +14,6 @@ module Pawl.Engine.Expiry where
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Map.Strict as Map
-import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
@@ -147,7 +146,7 @@ sweepConditional = do
 -- board carries no permission at all, and sweepConditional runs at every settle.
 anyPermissionEnded :: (ExilePlayPermission.ExilePlayPermission -> Bool) -> GameState -> Bool
 anyPermissionEnded survives gs =
-  not (all survives (Maybe.mapMaybe Object.playableFromExile (Map.elems (GameState.objects gs))))
+  any (maybe False (not . survives) . Object.playableFromExile) (GameState.objects gs)
 
 -- CR 601.3's permission, ended. CLEARED rather than dropped, which is the one
 -- way this carrier differs from the other four: they are entries in a list that
