@@ -247,6 +247,7 @@ dirtied pid object =
       Object.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
       Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
       Object.turnedOverAt = Just (Timestamp.MkTimestamp 1),
+      Object.worldSince = Just (Timestamp.MkTimestamp 2),
       Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never),
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
