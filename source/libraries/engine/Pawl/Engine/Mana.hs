@@ -900,13 +900,14 @@ canPayCommittingGiven capacity grants pcs pid committed cost gs = not (null (pay
 -- creature: Add one mana of any color") chooses a colour on its own, so two
 -- creatures buy one red and one green, and the union repeated twice says exactly
 -- that where one option per yield said "two of one colour" (#1131). Exact because
--- the yields in a group are one route's colour choices: same activation, so the
--- same count and the same claims, and k of them claim Claim.scale k.
+-- the KEY is what an activation costs: every yield in a group is reachable by the
+-- same number of activations claiming the same objects, so k of them are k
+-- supplies of the union and claim Claim.scale k.
 --
--- Two GROUPS are still never mixed -- a source offers one option, so a yield
--- adding several mana cannot be taken on one activation and a one-mana yield on
--- the next. Not implemented: no card in the pool has a repeatable mana ability
--- with a multi-mana yield beside another yield (#1137).
+-- Two GROUPS are still never mixed, since a source offers one option: a
+-- multi-mana yield cannot be taken on one activation and a one-mana yield on the
+-- next, nor can two groups with different ceilings. Not implemented; no card in
+-- the pool has either shape (#1137).
 --
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
