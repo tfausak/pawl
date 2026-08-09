@@ -888,6 +888,52 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
+  -- CR 702.28's four cases, off a PRINTED keyword: Soltari Foot Soldier ({W}
+  -- Creature -- Soltari Soldier 1/1, shadow and nothing else) has no other text
+  -- for a case to pass on. Goblin Piker is the non-shadow creature throughout, so
+  -- the only thing that varies between the cases is which side has shadow.
+  Spec.it s "CR 702.28b a creature without shadow may not block a creature with shadow" $ do
+    footSoldier <- S.printingOf s registry "Soltari Foot Soldier"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [footSoldier] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.28b a creature WITH shadow may not block a creature without shadow" $ do
+    -- THE FALSIFIER, and the case no other evasion ability in the pool has:
+    -- 702.28b's second sentence restricts BLOCKING, so the board flying's
+    -- asymmetry makes legal (see "a flier may block a ground creature" above) is
+    -- illegal here. Fails against any implementation that reads shadow off the
+    -- attacker alone.
+    piker <- S.printingOf s registry "Goblin Piker"
+    footSoldier <- S.printingOf s registry "Soltari Foot Soldier"
+    let (gs, mine, theirs) = attacking [piker] [footSoldier]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.28b a creature with shadow may block a creature with shadow" $ do
+    -- Both halves of 702.28b are satisfied at once, which is what keeps the two
+    -- cases above from passing on a gate that simply forbids every block.
+    footSoldier <- S.printingOf s registry "Soltari Foot Soldier"
+    let (gs, mine, theirs) = attacking [footSoldier] [footSoldier]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.28b a shadow creature connects past an untapped ground creature, in a real combat" $ do
+    -- The gameplay-level case, flying's above with shadow in place of flying and
+    -- precise for its reasons: bob takes 1 rather than 0, and the 1/1 Foot
+    -- Soldier survives a 2/1 Piker that never got to block it.
+    footSoldier <- S.printingOf s registry "Soltari Foot Soldier"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = S.combatBoardOf [footSoldier] [piker]
+        after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
+    Spec.assertEqWith s "bob took 1" (S.lifeOf S.bob after) (Just 19)
+    Spec.assertEqWith s "the shadow creature lives" (S.creaturesInPlay S.alice after) 1
+    Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
+
   Spec.it s "CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp" $ do
     -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so
     -- this asks about the keyword and no other text.

@@ -721,6 +721,34 @@ intimidateAllowsGiven pcs blocker attacker gs =
           (Projection.colorsGiven pcs attacker gs)
       )
 
+-- CR 702.28b: a creature with shadow can't be blocked by creatures without
+-- shadow, and a creature without shadow can't be blocked by creatures with
+-- shadow.
+--
+-- The ONE evasion gate here that is not the asymmetry evasionAllows describes.
+-- 702.28b's second sentence restricts BLOCKING, so shadow is read off both
+-- creatures symmetrically and the two sentences together are exactly "the two
+-- agree": a shadow blocker is barred from a non-shadow attacker as firmly as a
+-- non-shadow blocker is from a shadow attacker. Written as the equality rather
+-- than as two implications because they are the same predicate, and the equality
+-- cannot drift into stating only one of them.
+--
+-- Not folded into evasionAllowsGiven beside flying: CR 509.1b checks EVERY
+-- restriction in force, so a creature with both flying and shadow needs a blocker
+-- that answers each -- which the separate conjunct in pairAllowedGiven gives for
+-- free.
+--
+-- Keyword MEMBERSHIP and never a count, because CR 702.28c makes multiple
+-- instances redundant -- landwalkAllowsGiven's posture, for CR 702.14e's matching
+-- reason.
+shadowAllows :: ObjectId -> ObjectId -> GameState -> Bool
+shadowAllows = shadowAllowsGiven Map.empty
+
+shadowAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+shadowAllowsGiven pcs blocker attacker gs =
+  Projection.hasKeywordGiven pcs Keyword.Shadow attacker gs
+    == Projection.hasKeywordGiven pcs Keyword.Shadow blocker gs
+
 -- CR 702.14c: a creature with landwalk can't be blocked as long as the defending
 -- player controls at least one land matching the specified criterion.
 --
@@ -731,8 +759,9 @@ intimidateAllowsGiven pcs blocker attacker gs =
 -- never a comparison between the two creatures -- unlike protection -- so a
 -- signature that could read the blocker could answer 702.14d wrong.
 --
--- The same asymmetry the other two evasion gates have (see evasionAllows):
+-- The same asymmetry as flying, fear and intimidate (see evasionAllows):
 -- landwalk restricts being BLOCKED, so the question is asked of the ATTACKER.
+-- Shadow is the pool's one gate where that does not hold.
 --
 -- Membership over the projection's keyword map, never its counts (CR 702.14e).
 -- The MAP rather than hasKeywordGiven, because CR 702.14a's [type] rides the
@@ -808,9 +837,10 @@ landwalkAllowsGiven grants pcs attacker gs =
 -- than over every attacker in combat. Declining to block is always legal under
 -- restrictions alone, which is the seed blockCeiling's fold relies on.
 --
--- The same asymmetry the other three evasion gates have (see evasionAllows): the
--- keyword is read off the ATTACKER. A creature with menace blocking alone is
--- legal, since 702.111b restricts being blocked and says nothing about blocking.
+-- The same asymmetry as flying, fear, intimidate and landwalk (see
+-- evasionAllows), and unlike shadow: the keyword is read off the ATTACKER. A
+-- creature with menace blocking alone is legal, since 702.111b restricts being
+-- blocked and says nothing about blocking.
 --
 -- Membership rather than the projection's per-keyword count, on
 -- landwalkAllowsGiven's terms: CR 702.111c makes multiple instances redundant, so
@@ -862,6 +892,7 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
     && evasionAllowsGiven pcs blocker attacker gs
     && fearAllowsGiven pcs blocker attacker gs
     && intimidateAllowsGiven pcs blocker attacker gs
+    && shadowAllowsGiven pcs blocker attacker gs
     && landwalkAllowsGiven grants pcs attacker gs
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
@@ -870,8 +901,8 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- The unit of legality is the whole declaration, not the pair, and that is not a
 -- stylistic choice: menace (CR 702.111b) constrains the SET blocking an attacker,
 -- which no per-pair predicate can express. Every other evasion ability the pool
--- has -- flying, reach, fear, intimidate, landwalk -- is pairwise or narrower;
--- designing to them would be designing to the case that misleads.
+-- has -- flying, reach, fear, intimidate, shadow, landwalk -- is pairwise or
+-- narrower; designing to them would be designing to the case that misleads.
 --
 -- So the three shapes of restriction are all asked here, one conjunct each:
 -- pairAllowed over the pairs, menaceAllows over the creatures blocking each

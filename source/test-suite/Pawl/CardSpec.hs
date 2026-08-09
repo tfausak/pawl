@@ -1432,6 +1432,9 @@ keywordFilters keyword = case keyword of
   -- player controls", written into the CR 502.1 turn-based action rather than
   -- into the keyword.
   Keyword.Phasing -> []
+  -- CR 702.28b names no quality: the only thing it asks about a blocker is
+  -- whether it has shadow too.
+  Keyword.Shadow -> []
   -- CR 702.127a names no quality: which zone an aftermath half may be cast from is
   -- written into the rule, not into the keyword.
   Keyword.Aftermath -> []
