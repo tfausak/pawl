@@ -41,7 +41,9 @@
 -- side of that same declaration, with Sacred Prey -- `selfBecomesBlockedSpec`.
 -- CR 702.45 bushido, the fifth keyword whose rule text IS a triggered ability
 -- and the only one to name both of those events, with Inner-Chamber Guard --
--- `bushidoSpec`.
+-- `bushidoSpec`. CR 509.3d's once-per-blocker form of the same declaration,
+-- which names the blocker, and CR 702.25 flanking, the sixth such keyword, with
+-- Benalish Cavalry -- `flankingSpec`.
 -- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
@@ -3139,6 +3141,90 @@ selfBecomesBlockedSpec s registry =
           (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]
           Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs)) (Just 20)
 
+-- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
+-- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
+-- block-trigger form that fires once per BLOCKER and names it.
+--
+-- Benalish Cavalry {1}{W} Creature -- Human Knight 2/2 is the card: flanking and
+-- nothing else, so every number below is the keyword's. Its blockers are drawn
+-- from the pool's vanilla creatures for the same reason.
+--
+-- Every reading is taken at the COMBAT DAMAGE step, before damage is dealt (CR
+-- 509.2a puts these triggers on the stack in the declare blockers step), so the
+-- -1/-1 is read directly rather than through what survives combat.
+flankingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+flankingSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer
+   in Spec.describe s "Flanking" $ do
+        -- The proving test, and its control: the same 2/2 attacker WITHOUT
+        -- flanking (Icehide Golem) against the same 2/1 blocker. The flanker's
+        -- Piker is 1/0 and already dead when damage would be dealt, so the
+        -- flanker survives; the Golem trades with it.
+        Spec.it s "CR 702.25a whole card: the blocking Piker is -1/-1 and dies before damage" $ do
+          (gs, mine, theirs) <- board ["Benalish Cavalry"] ["Goblin Piker"]
+          (control, controlMine, controlTheirs) <- board ["Icehide Golem"] ["Goblin Piker"]
+          case (mine, theirs, controlMine, controlTheirs) of
+            ([cavalry], [piker], [golem], [otherPiker]) -> do
+              let struck = atDamage gs
+                  traded = S.runCombat S.aggressiveAnswer gs
+                  controlStruck = atDamage control
+                  controlTraded = S.runCombat S.aggressiveAnswer control
+              Spec.assertBool s (not (S.onBattlefield piker struck)) "the 2/1 Piker went to 1/0 and CR 704.5f buried it"
+              Spec.assertEqWith s "the Cavalry itself is untouched" (S.powerToughnessOf cavalry struck) (Just (2, 2))
+              Spec.assertBool s (S.onBattlefield cavalry traded) "so nothing was left to deal it damage"
+              Spec.assertEqWith s "control leg: a 2/2 without flanking leaves the Piker at 2/1" (S.powerToughnessOf otherPiker controlStruck) (Just (2, 1))
+              Spec.assertBool s (not (S.onBattlefield golem controlTraded)) "and the Piker's 2 kills it"
+              Spec.assertBool s (not (S.onBattlefield otherPiker controlTraded)) "both die, where the flanker died alone"
+            _ -> Spec.assertFailure s "fixture should give each seat one creature"
+        -- CR 509.3d's arity, and the whole difference from CR 509.3c: "triggers
+        -- once for each creature that blocks the specified creature". Two
+        -- blockers, two triggers, and each -1/-1 lands on its OWN blocker.
+        --
+        -- The Hill Giant is the load-bearing reading: a condition matched against
+        -- the GROUPED GameEvent.AttackerBlocked fires once and leaves it 3/3,
+        -- and a binding that named the bearer instead moves the Cavalry's own
+        -- 2/2.
+        Spec.it s "CR 509.3d two blockers are two triggers, each on its own blocker" $ do
+          (gs, mine, theirs) <- board ["Benalish Cavalry"] ["Goblin Piker", "Hill Giant"]
+          case (mine, theirs) of
+            ([cavalry], [piker, giant]) -> do
+              let struck = atDamage gs
+              -- One assertion over all three readings, so a mutation cannot hide
+              -- behind whichever of them is checked first.
+              Spec.assertEqWith
+                s
+                "the 3/3 Giant is 2/2, the 2/1 Piker is gone, and the Cavalry took neither -1/-1"
+                (S.powerToughnessOf giant struck, S.onBattlefield piker struck, S.powerToughnessOf cavalry struck)
+                (Just (2, 2), False, Just (2, 2))
+            _ -> Spec.assertFailure s "fixture should give bob two blockers"
+        -- CR 702.25a's "without flanking", read as CR 509.3f asks -- the blocker's
+        -- characteristics as it becomes a blocking creature. A second Benalish
+        -- Cavalry blocking is 2/2 still; the Icehide Golem, the same 2/2 without
+        -- the keyword, is 1/1. The two boards differ in nothing else.
+        Spec.it s "CR 702.25a a blocker WITH flanking is spared and one without is not" $ do
+          (withIt, _, theirs) <- board ["Benalish Cavalry"] ["Benalish Cavalry"]
+          (without, _, others) <- board ["Benalish Cavalry"] ["Icehide Golem"]
+          case (theirs, others) of
+            ([blockingCavalry], [golem]) -> do
+              Spec.assertEqWith s "the flanking blocker is untouched" (S.powerToughnessOf blockingCavalry (atDamage withIt)) (Just (2, 2))
+              Spec.assertEqWith s "the one without takes -1/-1" (S.powerToughnessOf golem (atDamage without)) (Just (1, 1))
+            _ -> Spec.assertFailure s "fixture should give bob one blocker on each board"
+        -- CR 702.25b: each instance triggers separately, which is abilitiesFor's
+        -- replicate. No card in the pool prints flanking twice, so this is
+        -- asserted of the MINT rather than of a board -- as bushido's, prowess'
+        -- and battle cry's are.
+        Spec.it s "CR 702.25b two instances mint two abilities, both CR 509.3d" $ do
+          let abilities = Keyword.abilitiesFor Keyword.Type.Flanking 2
+              expected =
+                TriggerCondition.SelfBecomesBlockedBy
+                  (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not (Filter.Type.HasKeyword Keyword.Type.Flanking)])
+          Spec.assertEqWith s "two abilities" (length abilities) 2
+          Spec.assertEqWith s "each watching CR 509.3d, filtered on the blocker's own flanking" (fmap TriggeredAbility.condition abilities) [expected, expected]
+
 -- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
 -- blocked, it gets +N/+N until end of turn.'" The fifth keyword in this pool
 -- whose rule text IS a triggered ability, after CR 702.70a, CR 702.86a, CR
@@ -4622,6 +4708,10 @@ representativeEvents cond =
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
         TriggerCondition.SelfBlocks -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
         TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked departed)
+        -- The same declaration event SelfBlocks names, with the ids the other way
+        -- round: this condition's bearer is the ATTACKER, and the blocker is what
+        -- it binds.
+        TriggerCondition.SelfBecomesBlockedBy _ -> one (GameEvent.BlockerDeclared (ObjectId.MkObjectId 41) departed)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -4721,6 +4811,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBecomesBlocked,
+    TriggerCondition.SelfBecomesBlockedBy (Filter.Type.And []),
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
@@ -6845,6 +6936,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   selfBlocksSpec s registry
   selfBecomesBlockedSpec s registry
   bushidoSpec s registry
+  flankingSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   graveyardEffectZoneTriggerSpec s registry

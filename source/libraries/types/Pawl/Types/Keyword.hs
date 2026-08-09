@@ -175,6 +175,22 @@ data Keyword
     -- "[quality] creature with 'bands with other [quality]'" clause both rules
     -- also cover would need one, and is part of the unmodeled half.
     Banding -- 702.22
+  | -- | 702.25a: "whenever this creature becomes blocked by a creature without
+    -- flanking, the blocking creature gets -1/-1 until end of turn". A TRIGGERED
+    -- ability, like rule 702.70's poisonous and rule 702.45's bushido, so
+    -- Pawl.Engine.Keyword.flanking mints it and the ordinary CR 603 machinery
+    -- runs it.
+    --
+    -- Payload-free: rule 702.25a takes no parameter. Its own "without flanking"
+    -- is `Filter.Not (Filter.HasKeyword Flanking)` in the minted condition, which
+    -- needs no Pawl.Types.KeywordFamily constructor precisely because there is no
+    -- payload to abstract over -- a card asking for "a creature with flanking"
+    -- asks for this constructor exactly.
+    --
+    -- Multiple instances are NOT redundant (CR 702.25b: each triggers
+    -- separately), so its reader is the projection's per-keyword count rather
+    -- than membership.
+    Flanking -- 702.25
   | -- | 702.26a: a static ability that MODIFIES THE RULES OF THE UNTAP STEP.
     -- During each player's untap step, before that player untaps anything, every
     -- phased-in permanent with phasing they control phases out, and every

@@ -254,6 +254,29 @@ sacrificedCount = SlotName.MkSlotName (Text.pack "thatMany")
 castSpell :: SlotName
 castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 
+-- CR 509.3d: the reserved slot under which the CREATURE THAT BLOCKED the bearer
+-- is bound -- rule 702.25a's "the blocking creature". Stamped by
+-- Pawl.Engine.Event.eventBindings as the trigger is gathered, alongside
+-- `triggerPlayer`, `became` and `castSpell`, so flanking's payload is an
+-- ordinary slot read rather than a "the creature that blocked me" opcode.
+--
+-- Distinct from `triggerSource` (CR 113.7a) for the reason `castSpell` is: under
+-- this condition the bearer is the ATTACKING creature and the blocker is another
+-- object, controlled by the defending player. Distinct from `became` because no
+-- zone change happened at all -- CR 509.1g makes a creature a blocking creature
+-- where it stands.
+--
+-- One slot per blocker, never a group: CR 509.3d triggers once for each creature
+-- that blocks, so two blockers are two abilities each naming one object, and
+-- nothing here holds a set.
+--
+-- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
+-- "no card's targetSpecs may name it" sweep as `triggerPlayer` and `became`. A
+-- dead id is possible and is the payload's problem, as it is for those: the
+-- blocker can leave the battlefield before the trigger resolves.
+blockingCreature :: SlotName
+blockingCreature = SlotName.MkSlotName (Text.pack "thatBlocker")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -302,6 +325,10 @@ setBecame oid = Map.insert became (toObject oid)
 -- Bind an object under the reserved castSpell slot (CR 601.2i).
 setCastSpell :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setCastSpell oid = Map.insert castSpell (toObject oid)
+
+-- Bind an object under the reserved blockingCreature slot (CR 509.3d).
+setBlockingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setBlockingCreature oid = Map.insert blockingCreature (toObject oid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

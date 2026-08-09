@@ -41,6 +41,7 @@ toJson k = case k of
   Keyword.TrampleOverPlaneswalkers -> Common.nullary "TrampleOverPlaneswalkers"
   Keyword.Vigilance -> Common.nullary "Vigilance"
   Keyword.Banding -> Common.nullary "Banding"
+  Keyword.Flanking -> Common.nullary "Flanking"
   Keyword.Phasing -> Common.nullary "Phasing"
   Keyword.Shadow -> Common.nullary "Shadow"
   Keyword.Aftermath -> Common.nullary "Aftermath"
@@ -90,6 +91,7 @@ fromJson value = do
     ("TrampleOverPlaneswalkers", _) -> Right Keyword.TrampleOverPlaneswalkers
     ("Vigilance", _) -> Right Keyword.Vigilance
     ("Banding", _) -> Right Keyword.Banding
+    ("Flanking", _) -> Right Keyword.Flanking
     ("Phasing", _) -> Right Keyword.Phasing
     ("Shadow", _) -> Right Keyword.Shadow
     ("Aftermath", _) -> Right Keyword.Aftermath
