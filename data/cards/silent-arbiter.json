@@ -1,0 +1,50 @@
+{
+  "faces": [
+    {
+      "combatRestrictions": [
+        {
+          "type": "CantAttackMoreThan",
+          "value": {
+            "limit": 1
+          }
+        },
+        {
+          "type": "CantBlockMoreThan",
+          "value": {
+            "limit": 1
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 4
+        }
+      ],
+      "name": "Silent Arbiter",
+      "power": {
+        "type": "Literal",
+        "value": 1
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 5
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Construct"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

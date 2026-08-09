@@ -588,6 +588,8 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantAttack _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlock _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantAttackAlone _ condition -> foldMap conditionCounts condition
+  CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionCounts condition
+  CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionCounts condition
 
 -- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
@@ -1804,11 +1806,17 @@ replacementEffectFilters replacementEffect = case replacementEffect of
 -- Both the subject and CR 508.1c's "unless some condition is met": Blind-Spot
 -- Giant's gate carries `Not IsSource`, which is as much card data as the affected
 -- set beside it.
+--
+-- The SIZE-BOUNDING arms have no subject, so they contribute only their gate.
+-- Nothing stands in for the missing Affected on purpose: a `Matching Anything`
+-- there would report a filter Silent Arbiter does not print.
 combatRestrictionFilters :: CombatRestriction.CombatRestriction -> [Filter.Type.Filter Keyword.Keyword]
 combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttack affected condition -> affectedFilters affected <> foldMap conditionFilters condition
   CombatRestriction.CantBlock affected condition -> affectedFilters affected <> foldMap conditionFilters condition
   CombatRestriction.CantAttackAlone affected condition -> affectedFilters affected <> foldMap conditionFilters condition
+  CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionFilters condition
+  CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionFilters condition
 
 -- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,
 -- which is every position in the type except the one below.

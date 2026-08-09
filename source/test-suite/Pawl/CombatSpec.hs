@@ -2413,6 +2413,233 @@ attacksAloneSpec s registry = Spec.describe s "AttacksAlone" $ do
     Spec.assertEqWith s "and nothing was declared" (S.attackerDeclarationsOf refused) []
     Spec.assertEqWith s "while a lone PIKER connects for two" (S.lifeOf S.bob control) (Just 18)
 
+-- CR 508.1c and CR 509.1b, proved by Silent Arbiter ("{4} Artifact Creature --
+-- Construct 1/5, No more than one creature can attack each combat. No more than
+-- one creature can block each combat.") -- the restriction that forbids a
+-- declaration for its SIZE, and the third shape of combat restriction after
+-- Pacifism's per-creature one and Bonded Construct's set-shaped one.
+--
+-- What makes it a different kind again from Bonded Construct's: that one NAMES
+-- creatures and asks what the declaration holds, so a board of two of them
+-- allows a two-creature attack (CR 508.1c's Example). This one names no creature
+-- at all, so no Affected could carry it and no candidate list can hide it -- and
+-- it is not scoped to its controller either, which the cases below prove by
+-- putting the Arbiter on the DEFENDING player's battlefield and holding the
+-- attacking player to one attacker.
+--
+-- The first assertion of every case is that the creatures are still OFFERED, on
+-- attacksAloneSpec's terms: "the attack was refused" is also what a bug that
+-- subtracted them from CR 508.1a's or CR 509.1a's candidate list produces, and
+-- that bug would pass every negative assertion here.
+--
+-- The empty declaration is asserted LEGAL wherever no requirement is in force,
+-- because "no more than one" is a ceiling and not a quota: a reading of the bound
+-- as "exactly one" passes every other assertion in the first case.
+boundedDeclarationSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
+  Spec.it s "CR 508.1c a Silent Arbiter allows EITHER attacker but not both" $ do
+    -- Both single-creature declarations are legal on the SAME board the
+    -- two-creature one is refused on, which is what separates a size bound from
+    -- summoning sickness, a tap, a defender, or the Arbiter simply not being a
+    -- candidate: none of those changes its answer when a creature is dropped
+    -- from the declaration.
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [silentArbiter, piker] []
+        (control, theirs, _) = S.combatBoardOf [piker, piker] []
+    case (mine, theirs) of
+      ([arbiter, other], [first, second]) -> do
+        Spec.assertEqWith s "both are offered" (Combat.legalAttackers S.alice gs) [arbiter, other]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [arbiter] gs) "the Arbiter alone is legal"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [other] gs) "the Piker alone is legal"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [arbiter, other] gs)) "the two together are not"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [] gs) "and declining stays legal, so the bound is a ceiling and not a quota"
+        -- The control that makes the refusal the BOUND talking: two Goblin
+        -- Pikers and no Arbiter attack together happily.
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] control) "two creatures attack together without the Arbiter"
+      _ -> Spec.assertFailure s "fixture should have two creatures a side"
+  Spec.it s "CR 508.1c the bound is GLOBAL: bob's Arbiter holds ALICE to one attacker" $ do
+    -- Silent Arbiter's sentence says "no more than one creature", not "no more
+    -- than one creature you control". A reader that scoped the bound to its
+    -- source's controller passes every other attacking case in this group, since
+    -- the Arbiter sits on alice's side in all of them.
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker, piker] [silentArbiter]
+        (control, _, _) = S.combatBoardOf [piker, piker] [piker]
+    case mine of
+      [first, second] -> do
+        Spec.assertEqWith s "both of alice's are offered" (Combat.legalAttackers S.alice gs) [first, second]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first] gs) "one of them may attack"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first, second] gs)) "but not both"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] control) "and with a plain Piker there instead, both may"
+      _ -> Spec.assertFailure s "fixture should have two attackers"
+  Spec.it s "CR 509.1b the same Arbiter holds bob to one BLOCKER" $ do
+    -- The blocking half of the same card, and the same anti-vacuity shape: both
+    -- of bob's Pikers are offered, either may block alone, and the pair is
+    -- refused. Alice attacks with one creature because the Arbiter's first
+    -- sentence already holds her to one -- which is the attacking half's global
+    -- reach, observed again.
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker] [silentArbiter, piker, piker]
+        (control, plain, others) = attacking [piker] [piker, piker]
+    case (mine, theirs, plain, others) of
+      ([a], [arbiter, first, second], [b], [x, y]) -> do
+        Spec.assertEqWith s "all three of bob's are offered" (Combat.legalBlockers S.bob gs) [arbiter, first, second]
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first a) gs) "one blocker is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton second a) gs) "either one of them"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, a), (second, a)]) gs)) "two are not"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "and declining stays legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(x, b), (y, b)]) control) "two Pikers double block without the Arbiter"
+      _ -> Spec.assertFailure s "fixture should have one attacker and bob's blockers"
+  Spec.it s "CR 508.1d's own Example: the required creature attacks, and nothing else does" $ do
+    -- Verbatim: "A player controls two creatures: one that 'attacks if able' and
+    -- one with no abilities. An effect states 'No more than one creature can
+    -- attack each turn.' The only legal attack is for just the creature that
+    -- 'attacks if able' to attack. It's illegal to attack with the other
+    -- creature, attack with both, or attack with neither."
+    --
+    -- Built as: a Kormus Bell animating alice's Swamp into a 1/1, a Synthetic
+    -- Wetland Frenzy requiring Swamps to attack, and a Goblin Piker that is not a
+    -- Swamp -- so exactly ONE requirement instance is minted, which is what the
+    -- Example needs and what a Curse of the Nightly Hunt could not give. The
+    -- Arbiter is bob's, so "an effect states" is the global sentence the Example
+    -- describes rather than something alice's own board says.
+    --
+    -- The control on the same board WITHOUT the Arbiter is what proves the Frenzy
+    -- is live independently of the bound: there attacking with both is legal and
+    -- declining is not.
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    (gs, swampId, pikerId) <- exampleBoard s registry [silentArbiter]
+    (control, controlSwamp, controlPiker) <- exampleBoard s registry []
+    Spec.assertEqWith s "both of alice's creatures are offered" (Combat.legalAttackers S.alice gs) [swampId, pikerId]
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [swampId] gs) "the required Swamp alone is the only legal attack"
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [pikerId] gs)) "attacking with the other creature is illegal"
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [swampId, pikerId] gs)) "with both is illegal"
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "with neither is illegal"
+    Spec.assertBool s (Combat.legalAttackDeclaration S.alice [controlSwamp, controlPiker] control) "without the Arbiter both may attack"
+    Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] control)) "and the Frenzy still forbids declining, so it is live on its own"
+  Spec.it s "CR 508.1d two required creatures under a bound of one: the maximum is ONE, not two" $ do
+    -- The board attackCeiling's CLOSED FORM gets wrong, and the reason its guard
+    -- has to test the answer rather than the restriction. With a Curse of the
+    -- Nightly Hunt over two Goblin Pikers the instance set is both of them, and
+    -- the closed form hands back both -- a declaration the bound forbids, which
+    -- no player could attain, so every declaration would be illegal at once.
+    -- Enumerating instead finds a maximum of one, and either Piker attains it.
+    --
+    -- The case above does NOT prove this: there the closed form's answer is the
+    -- single required Swamp, which is within a bound of one, so the shortcut is
+    -- still exact. Two required creatures is the smallest board where the two
+    -- readings disagree.
+    curse <- S.printingOf s registry "Curse of the Nightly Hunt"
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = cursing curse S.alice [piker, piker] [silentArbiter]
+        (control, _, _) = cursing curse S.alice [piker, piker] []
+    case mine of
+      [first, second] -> do
+        Spec.assertEqWith s "both are still offered" (Combat.legalAttackers S.alice gs) [first, second]
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first] gs) "attacking with one attains the maximum"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [second] gs) "and so does the other one"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first, second] gs)) "both together is over the bound"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [] gs)) "and declining obeys neither requirement"
+        Spec.assertBool s (not (Combat.legalAttackDeclaration S.alice [first] control)) "without the Arbiter one Piker no longer attains it"
+        Spec.assertBool s (Combat.legalAttackDeclaration S.alice [first, second] control) "and both together do"
+      _ -> Spec.assertFailure s "fixture should have two creatures"
+  Spec.it s "CR 509.1c a Lure under a bound of one: the maximum is ONE blocker" $ do
+    -- The blocking twin of the case above, over blockCeiling's fold. Lure makes
+    -- every creature able to block the enchanted attacker do so, which is all
+    -- three of bob's; the bound allows one. So declining becomes illegal, exactly
+    -- one blocker is legal, and two remain forbidden -- the requirement and the
+    -- restriction each moving one of the three answers.
+    lure <- S.printingOf s registry "Lure"
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = luring lure [piker] [silentArbiter, piker, piker]
+        (control, plain, others) = luring lure [piker] [piker, piker]
+    case (mine, theirs, plain, others) of
+      ([a], [_, first, second], [b], [x, y]) -> do
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "declining is illegal under the Lure"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first a) gs) "one blocker attains the maximum"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, a), (second, a)]) gs)) "two are over the bound"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton x b) control)) "without the Arbiter one blocker no longer attains it"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(x, b), (y, b)]) control) "and both blocking does"
+      _ -> Spec.assertFailure s "fixture should have one attacker and bob's blockers"
+  Spec.it s "CR 508.1c whole cards: an over-large attack is refused in a real declare attackers step" $ do
+    -- The gameplay-level attacking case, through the priority loop and CR 703.4i's
+    -- turn-based action, with the interpreter that attacks with everything it is
+    -- offered.
+    --
+    -- THREE boards, on attacksAloneSpec's terms, and no two share an observable:
+    -- the Arbiter beside a Piker is refused outright and bob takes nothing; a lone
+    -- Piker connects for two, which rules out "a lone attacker never gets
+    -- through"; the Arbiter attacking by ITSELF connects for one, which rules out
+    -- "the Arbiter is never a legal attacker".
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (pair, _, _) = S.combatBoardOf [silentArbiter, piker] []
+        (lonePiker, _, _) = S.combatBoardOf [piker] []
+        (loneArbiter, _, _) = S.combatBoardOf [silentArbiter] []
+        refused = S.runCombat S.aggressiveAnswer pair
+        connects = S.runCombat S.aggressiveAnswer lonePiker
+        alone = S.runCombat S.aggressiveAnswer loneArbiter
+    Spec.assertEqWith s "two offered, none declared" (S.attackerDeclarationsOf refused) []
+    Spec.assertEqWith s "so bob takes nothing" (S.lifeOf S.bob refused) (Just 20)
+    Spec.assertEqWith s "a lone Piker connects for two" (S.lifeOf S.bob connects) (Just 18)
+    Spec.assertEqWith s "and the Arbiter by itself connects for one" (S.lifeOf S.bob alone) (Just 19)
+  Spec.it s "CR 509.1b whole cards: an over-large block is refused in a real declare blockers step" $ do
+    -- The gameplay-level blocking case, run through Combat.declareBlockers as
+    -- menaceSpec runs its own. S.aggressiveAnswer blocks with everything, which
+    -- on the first board is two creatures and therefore illegal, so
+    -- declareBlockers falls back to the forced declaration -- the empty one, not
+    -- a block repaired down to one creature.
+    --
+    -- THREE boards again: two candidate blockers under the Arbiter (nobody
+    -- blocks), ONE candidate blocker under the same Arbiter (it blocks, so the
+    -- Arbiter does not forbid blocking as such), and two candidates with no
+    -- Arbiter (both block, so two blockers are not refused as such).
+    silentArbiter <- S.printingOf s registry "Silent Arbiter"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (crowded, mine, theirs) = attacking [piker] [silentArbiter, piker]
+        (single, mineToo, theirsToo) = attacking [piker] [silentArbiter]
+        (plain, mineThree, theirsThree) = attacking [piker] [piker, piker]
+    case (mine, theirs, mineToo, theirsToo, mineThree, theirsThree) of
+      ([a], [arbiter, other], [b], [loneArbiter], [c], [x, y]) -> do
+        Spec.assertEqWith s "both of bob's are offered" (Combat.legalBlockers S.bob crowded) [arbiter, other]
+        let refused = S.runPure S.aggressiveAnswer crowded Combat.declareBlockers
+            blocked = S.runPure S.aggressiveAnswer single Combat.declareBlockers
+            doubled = S.runPure S.aggressiveAnswer plain Combat.declareBlockers
+        Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a refused) Set.empty
+        Spec.assertEqWith s "the lone Arbiter does block" (Combat.blockersOf b blocked) (Set.singleton loneArbiter)
+        Spec.assertEqWith s "and without one, two Pikers do" (Combat.blockersOf c doubled) (Set.fromList [x, y])
+      _ -> Spec.assertFailure s "fixture should have one attacker on each board"
+
+-- CR 508.1d's Example board: alice controls a Kormus Bell animating her Swamp
+-- into a 1/1, a Synthetic Wetland Frenzy requiring Swamps to attack, and a Goblin
+-- Piker that is not a Swamp -- so the Swamp is the Example's creature that
+-- "attacks if able" and the Piker is its creature with no abilities. `theirs` is
+-- bob's side, which is where the Example's "an effect states" goes.
+--
+-- Named rather than inlined because both the Example and its no-Arbiter control
+-- need it, and the two must differ in nothing else.
+exampleBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [Printing.Printing] ->
+  m (GameState.GameState, ObjectId.ObjectId, ObjectId.ObjectId)
+exampleBoard s registry theirs = do
+  bell <- S.printingOf s registry "Kormus Bell"
+  swamp <- S.printingOf s registry "Swamp"
+  piker <- S.printingOf s registry "Goblin Piker"
+  frenzy <- S.printingOf s registry "Synthetic Wetland Frenzy"
+  let (gs0, ours, _) = S.combatBoardOf [bell, swamp, piker] theirs
+      gs1 = snd (S.addCreature frenzy S.alice gs0)
+  case ours of
+    [_, swampId, pikerId] -> pure (gs1, swampId, pikerId)
+    _ -> Spec.assertFailure s "fixture should have the Bell, the Swamp and the Piker"
+
 vigilanceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 vigilanceSpec s registry = Spec.describe s "Vigilance" $ do
   Spec.it s "CR 702.20b attacking doesn't tap a creature with vigilance, but does tap its neighbor" $ do
@@ -3945,6 +4172,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   textChangedCombatRestrictionSpec s registry
   textChangedCombatAffectedSpec s registry
   attacksAloneSpec s registry
+  boundedDeclarationSpec s registry
   controlChangeSicknessSpec s registry
   controlChangeRemovalSpec s registry
   typeChangeRemovalSpec s registry
