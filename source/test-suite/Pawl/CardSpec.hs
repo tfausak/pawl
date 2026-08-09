@@ -1443,6 +1443,7 @@ keywordFilters keyword = case keyword of
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
   -- CR 702.13b names no quality either: the colours a blocker may have are the

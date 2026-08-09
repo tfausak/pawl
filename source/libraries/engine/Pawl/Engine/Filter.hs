@@ -480,6 +480,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Reach -> keyword
   Keyword.Type.Shroud -> keyword
   Keyword.Type.Trample -> keyword
+  Keyword.Type.TrampleOverPlaneswalkers -> keyword
   Keyword.Type.Vigilance -> keyword
   -- CR 702.34a, CR 702.37a and CR 702.42a: each states a cost as part of the
   -- keyword, so rewriteCost carries CR 612.1 into it.

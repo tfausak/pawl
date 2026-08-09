@@ -114,6 +114,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
@@ -172,6 +173,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
@@ -278,6 +280,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
@@ -449,6 +452,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
@@ -706,6 +710,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Reach -> []
   Keyword.Shroud -> []
   Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
   Keyword.Phasing -> []
@@ -806,6 +811,7 @@ familyOf keyword = case keyword of
   Keyword.Reach -> Nothing
   Keyword.Shroud -> Nothing
   Keyword.Trample -> Nothing
+  Keyword.TrampleOverPlaneswalkers -> Nothing
   Keyword.Vigilance -> Nothing
   Keyword.Banding -> Nothing
   Keyword.Phasing -> Nothing

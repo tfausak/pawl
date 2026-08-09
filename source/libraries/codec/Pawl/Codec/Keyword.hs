@@ -38,6 +38,7 @@ toJson k = case k of
   Keyword.Reach -> Common.nullary "Reach"
   Keyword.Shroud -> Common.nullary "Shroud"
   Keyword.Trample -> Common.nullary "Trample"
+  Keyword.TrampleOverPlaneswalkers -> Common.nullary "TrampleOverPlaneswalkers"
   Keyword.Vigilance -> Common.nullary "Vigilance"
   Keyword.Banding -> Common.nullary "Banding"
   Keyword.Phasing -> Common.nullary "Phasing"
@@ -83,6 +84,7 @@ fromJson value = do
     ("Reach", _) -> Right Keyword.Reach
     ("Shroud", _) -> Right Keyword.Shroud
     ("Trample", _) -> Right Keyword.Trample
+    ("TrampleOverPlaneswalkers", _) -> Right Keyword.TrampleOverPlaneswalkers
     ("Vigilance", _) -> Right Keyword.Vigilance
     ("Banding", _) -> Right Keyword.Banding
     ("Phasing", _) -> Right Keyword.Phasing

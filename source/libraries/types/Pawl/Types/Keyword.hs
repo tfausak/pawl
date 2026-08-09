@@ -143,6 +143,20 @@ data Keyword
     -- rather than another field on Hexproof above.
     Shroud
   | Trample -- 702.19
+  | -- | 702.19c: trample over planeswalkers, a VARIANT of trample that adds a
+    -- second tier to CR 702.19b's gate -- once the blockers have lethal and the
+    -- attacked planeswalker has damage at least equal to its loyalty, the rest
+    -- may go to that planeswalker's controller. CR 702.19e is its other half,
+    -- an exception to CR 506.4c.
+    --
+    -- A SIBLING of Trample rather than a payload on it, because CR 702.19d names
+    -- the two side by side ("with trample or trample over planeswalkers"): a
+    -- creature can have either without the other, and Pawl.Engine.Damage reads
+    -- them as two questions.
+    --
+    -- Payload-free: rule 702.19c takes no parameter and CR 702.19g makes
+    -- multiple instances redundant, so no KeywordFamily constructor is owed.
+    TrampleOverPlaneswalkers
   | Vigilance -- 702.20
   | -- | 702.22: banding. Only the two COMBAT-DAMAGE-DIVISION halves are modeled --
     -- CR 702.22j, where a banding blocker moves the choice of how the ATTACKING
