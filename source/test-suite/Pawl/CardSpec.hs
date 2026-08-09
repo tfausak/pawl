@@ -481,6 +481,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 601.2i's Filter is a predicate over the spell that was cast, and a Filter
   -- holds no Count, exactly as CR 603.6a's does above.
   TriggerCondition.SpellCast _ _ -> []
+  -- The same rule read off the spell itself carries nothing at all.
+  TriggerCondition.SelfCast -> []
 
 -- Every Count reachable from one effect: its own Quantity/Duration fields,
 -- and -- for Create/CreateEmblem -- every Count in the embedded token/emblem
@@ -1637,6 +1639,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 601.2i's "whenever you cast a [type] spell" carries one directly, over
   -- the spell rather than over a permanent.
   TriggerCondition.SpellCast f _ -> [f]
+  -- "This spell" names the bearer and needs no Filter to say so.
+  TriggerCondition.SelfCast -> []
 
 -- CR 613.11: which spells a player effect names -- a cost modifier's (CR
 -- 601.2f), a timing permission's (CR 601.3b) or a countering prohibition's (CR
