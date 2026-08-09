@@ -50,6 +50,7 @@ import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Action as Action.Type
 import qualified Pawl.Types.Asked as Asked
 import qualified Pawl.Types.BeginningStep as BeginningStep
+import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Concession as Concession
 import qualified Pawl.Types.CounterCause as CounterCause
@@ -66,6 +67,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Modal as Modal.Type
+import qualified Pawl.Types.Mode as Mode
+import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
@@ -815,12 +818,66 @@ orderPending pending = do
 orderFor :: GameState -> [PendingTrigger.PendingTrigger] -> PlayerId -> Game [PendingTrigger.PendingTrigger]
 orderFor gs pending pid = do
   let mine = filter (\pt -> PendingTrigger.controller pt == pid) pending
-  if length mine < 2
+      entries = fmap entryOf mine
+  if length mine < 2 || interchangeable entries
     then pure mine
     else do
       let decider = Decide.deciderFor pid gs
-      answer <- Game.choose (Prompt.OrderTriggers decider pid (fmap entryOf mine))
+      answer <- Game.choose (Prompt.OrderTriggers decider pid entries)
       pure (permute mine answer)
+
+-- CR 603.3b: is every permutation of this batch the same game, so that the
+-- prompt is a question with one answer? Two conditions, and both are needed.
+--
+-- The entries must be EQUAL -- one ability of one source, the discriminator
+-- Pawl.Types.TriggerEntry carries (#61). Equality alone is NOT enough, and that
+-- is the whole trap here: CR 603.6a fires one trigger per entrant, so Aether
+-- Flash watching two creatures enter contributes two EQUAL entries whose
+-- bindings name different creatures, and CR 117.3b hands priority back between
+-- the two resolutions -- so which of them was damaged first is on the board an
+-- opponent may respond to.
+--
+-- So the ability must also be order-inert: nothing about it may be decided as it
+-- is placed, and nothing it does may read what a sibling has already done.
+interchangeable :: [TriggerEntry.TriggerEntry] -> Bool
+interchangeable entries = case entries of
+  [] -> True
+  entry : rest -> all (== entry) rest && orderInert (TriggerEntry.ability entry)
+
+-- CR 603.3b: may a batch of EQUAL entries of this ability be put on the stack in
+-- the engine's canonical order without asking? Five conditions:
+--
+--   * no intervening "if" (CR 603.4), which is re-checked as the ability
+--     resolves and so can read a board an earlier sibling changed;
+--   * one mode and a ChooseExactly 1 selection, so CR 603.3c / 700.2b's mode
+--     announcement -- made as the ability is put on the stack, in the order
+--     chosen -- has nothing to announce;
+--   * no target specs, since CR 603.3d imports CR 601.2c and targets are chosen
+--     as each ability is placed, in the order chosen;
+--   * the mode reads NO slot at all (Resolve.modeSlots);
+--   * and that answer is complete (Resolve.slotsAreExhaustive), which is where
+--     an opcode carrying a nested payload has to be caught.
+--
+-- Reading no slot AT ALL rather than "no slot that varies across the batch" is
+-- deliberately conservative. Binding.you and Binding.triggerSource really are
+-- constant across a batch of equal entries -- one controller, one source -- so
+-- admitting them would be sound too; the conservative form needs no argument
+-- about which slots vary, and Soul Warden reads none. Do not widen it without a
+-- card that needs the width.
+--
+-- Not a case on any effect's IDENTITY: this asks two classifications and never
+-- which opcode it is looking at.
+orderInert :: TriggeredAbility.TriggeredAbility Card.Card -> Bool
+orderInert ability =
+  let modal = TriggeredAbility.modal ability
+   in Maybe.isNothing (TriggeredAbility.intervening ability)
+        && Modal.Type.selection modal == ModeSelection.ChooseExactly 1
+        && case Foldable.toList (Modal.Type.modes modal) of
+          [mode] ->
+            Map.null (Mode.targetSpecs mode)
+              && Set.null (Resolve.modeSlots mode)
+              && all Resolve.slotsAreExhaustive (Mode.allEffects mode)
+          _ -> False
 
 -- What one pending trigger looks like to the player being asked for CR 603.3b's
 -- order: its source and WHICH ABILITY it is (#61) -- see

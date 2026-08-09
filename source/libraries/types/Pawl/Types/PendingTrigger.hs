@@ -18,10 +18,13 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- states (CR 725.2, CR 702.179d). Both kinds
 -- share this type so that CR 603.3b can order them as one batch;
 -- `controller` is who controls the ability (CR 603.3a / CR 725.2). `bindings` is
--- the environment CAPTURED when a CR 603.7 delayed ability was armed -- how "it"
--- and "that card" (CR 603.7c) are remembered, and how CR 725.2's crown steal
--- remembers the damaging creature. Empty for an event- or state-matched
--- trigger, whose source binding Engine.placeOne stamps at placement instead.
+-- the environment the trigger arrives with: what CR 603.7 captured when a
+-- delayed ability was armed -- how "it" and "that card" (CR 603.7c) are
+-- remembered, and how CR 725.2's crown steal remembers the damaging creature --
+-- or, for an event-matched one, what Event.eventBindings read off the event
+-- itself (CR 603.6a's entrant, under Binding.became). Empty for a state trigger
+-- (CR 603.8), which has no event to read; the SOURCE binding is stamped later
+-- either way, by Engine.placeOne at placement.
 data PendingTrigger = MkPendingTrigger
   { source :: TriggerSource.TriggerSource,
     controller :: PlayerId.PlayerId,
