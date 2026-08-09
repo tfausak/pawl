@@ -17,8 +17,8 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 --     replacement and baked at install for a floating row, so two candidates
 --     alike in `source` and `effect` yet differing here would need ONE object
 --     installing two floating rows of one effect with different durations. Brine
---     Elemental beside Savor the Moment -- the pair `distinguishing` names -- is
---     two different sources, so `source` already separates it.
+--     Elemental beside Savor the Moment -- the CR 614.10a pair `choose`'s comment
+--     names -- is two different sources, so `source` already separates it.
 --   * `controller` (CR 109.5) is `source`'s current controller for a permanent's
 --     static ability and baked at install for a floating row, so it would take
 --     one source installing two rows across a control change.

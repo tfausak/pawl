@@ -3142,9 +3142,8 @@ castColdsteel mountain coldsteel pick =
         [] -> Nothing
    in (payloads, after, entered)
 
--- Take the candidate carrying `rewrite`, or the canonical first if it is absent
--- -- which is what makes an entry payload that has lost the effect show up as a
--- test failure rather than as a crash.
+-- Take the candidate carrying `rewrite`. Total, falling back on the canonical
+-- first the way the engine's own out-of-range handling does.
 pickRewrite :: EntryRewrite.EntryRewrite -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
 pickRewrite rewrite entries =
   let wanted e = ReplacementEntry.effect e == ReplacementEffect.EntryR Filter.Type.IsSource rewrite
