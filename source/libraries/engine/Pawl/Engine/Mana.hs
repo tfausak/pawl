@@ -868,10 +868,10 @@ canPayCommittingGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map Object
 canPayCommittingGiven capacity grants pcs pid committed cost gs = not (null (payableResolutionsGiven capacity grants pcs pid committed cost gs))
 
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
--- option per yield, and each option is that yield -- read as one supply per mana
--- it adds -- repeated as many times as it is taken, paired with the CLAIMS those
--- activations make on a zone (manaSuppliesGiven). payableResolutions picks
--- exactly ONE option per source.
+-- option per group of yields (see the collapse below), and each option is that
+-- group -- read as one supply per mana it adds -- repeated as many times as it is
+-- taken, paired with the CLAIMS those activations make on a zone
+-- (manaSuppliesGiven). payableResolutions picks exactly ONE option per source.
 --
 -- How many times is enumerated, 0 up to the ceiling, for an option that CLAIMS
 -- something, and fixed at the ceiling for one that does not. That asymmetry is
@@ -882,30 +882,31 @@ canPayCommittingGiven capacity grants pcs pid committed cost gs = not (null (pay
 -- one creature buy one sacrifice between them, and whose is the player's to
 -- choose.
 --
--- Mixing yields ACROSS a repeatable source's activations -- an Ashnod's Altar
--- that some effect had also given two different yields, one taken each time --
--- is what one option per yield gives up. Not implemented: no card in the pool
--- has a repeatable mana ability with more than one yield (#1131).
---
--- The COLLAPSE is the one place several yields become one option, and it is
--- exact rather than a shortcut. Where every yield adds at most one mana, each
--- option is at most one supply, and one supply is already "one mana that could be
--- any of these types": the union over the yields is precisely what an Urborg'd
--- Mountain or a Birds of Paradise puts on the table. A yield adding NO mana is
--- dropped by the same union, which changes no answer, since both of
--- payableResolutions' board clauses only ever grow as supplies are added.
+-- The COLLAPSE is where several yields become one option, and it is exact rather
+-- than a shortcut. Where a yield adds at most one mana, its option is at most one
+-- supply, and one supply is already "one mana that could be any of these types":
+-- the union over such yields is precisely what an Urborg'd Mountain or a Birds of
+-- Paradise puts on the table. A yield adding NO mana is dropped by the same
+-- union, which changes no answer, since both of payableResolutions' board clauses
+-- only ever grow as supplies are added.
 --
 -- It is also what keeps the search below small: Birds of Paradise's five yields
--- collapse to one option, so five Birds are one board rather than 5^5. A source
--- with ONE yield needs no collapse, so Sol Ring takes the other branch.
+-- collapse to one option, so five Birds are one board rather than 5^5. A yield
+-- adding SEVERAL mana cannot join a union -- "one mana of any of these types"
+-- cannot speak for Sol Ring's {C}{C} -- so it stays its own option.
 --
--- A yield that can be taken more than once is NOT collapsed with its siblings
--- either, and that is the collapse's own exactness talking: the union says "one
--- mana of any of these types" once, so repeating it would claim a second mana of
--- a type only the once-payable yield makes. Neither is a yield whose activation
--- CLAIMS something, for the different reason that a collapsed option has to speak
--- for its siblings' claims as well as their mana, and the union of two costs is
--- not a cost.
+-- Collapsed PER (count, claims), which is what lets a repeatable source MIX its
+-- yields across activations: each activation of Phyrexian Altar ("Sacrifice a
+-- creature: Add one mana of any color") chooses a colour on its own, so two
+-- creatures buy one red and one green, and the union repeated twice says exactly
+-- that where one option per yield said "two of one colour" (#1131). Exact because
+-- the yields in a group are one route's colour choices: same activation, so the
+-- same count and the same claims, and k of them claim Claim.scale k.
+--
+-- Two GROUPS are still never mixed -- a source offers one option, so a yield
+-- adding several mana cannot be taken on one activation and a one-mana yield on
+-- the next. Not implemented: no card in the pool has a repeatable mana ability
+-- with a multi-mana yield beside another yield (#1137).
 --
 -- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
@@ -913,13 +914,17 @@ canPayCommittingGiven capacity grants pcs pid committed cost gs = not (null (pay
 sourceOptions :: [(Natural, [Claim], Mana)] -> [([Supply], [Claim])]
 sourceOptions supplies =
   let unitLists = fmap (\(times, claims, yield) -> (times, claims, unitsOf yield)) supplies
-   in if all (\(times, claims, units) -> times <= 1 && null claims && length units <= 1) unitLists
-        then [(collapsed (concatMap (\(_, _, units) -> units) unitLists), [])]
-        else List.nub (concatMap optionsFor unitLists)
+      (narrow, wide) = List.partition (\(_, _, units) -> length units <= 1) unitLists
+      grouped =
+        fmap
+          (\((times, claims), units) -> (times, claims, collapsed units))
+          (Map.toList (Map.fromListWith (<>) (fmap (\(times, claims, units) -> ((times, claims), units)) narrow)))
+      apart = fmap (\(times, claims, units) -> (times, claims, fmap supplyOf units)) wide
+   in List.nub (concatMap optionsFor (grouped <> apart))
   where
-    optionsFor (times, claims, units) =
+    optionsFor (times, claims, offered) =
       fmap
-        (\k -> (concat (List.genericReplicate k (fmap supplyOf units)), Claim.scale k claims))
+        (\k -> (concat (List.genericReplicate k offered), Claim.scale k claims))
         (if null claims then [times] else [0 .. times])
     collapsed units =
       if null units
@@ -980,11 +985,13 @@ sourceOptions supplies =
 -- The SEARCH over boards is the product of the sources' options, exponential in
 -- the number of sources offering more than one -- the reason sourceOptions'
 -- collapse matters. After it, a source offers more than one option only if it has
--- several yields AND one of them adds more than one mana, which in this pool
--- takes a multi-mana ability on a permanent some effect has ALSO given a basic
--- land type (Palladium Myr under Ashaya), or if its activation CLAIMS something,
--- which costs one option per number of times it could be taken. So the ordinary
--- board -- lands, and a mana creature -- is still one board.
+-- yields the collapse keeps apart -- one adding more than one mana, which in this
+-- pool takes a multi-mana ability on a permanent some effect has ALSO given a
+-- basic land type (Palladium Myr under Ashaya) -- or if its activation CLAIMS
+-- something, which costs one option per number of times it could be taken. So the
+-- ordinary board -- lands, and a mana creature -- is still one board, and a
+-- repeatable source's colour choices cost options in its repeat count and not in
+-- the number of colours.
 -- `any` short-circuits, so a payable cost stops at the first board that pays it;
 -- an unpayable one walks every board, and neither a domination prune nor a cheap
 -- necessary-condition prefilter is implemented (#595).
