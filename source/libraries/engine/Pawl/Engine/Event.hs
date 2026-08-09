@@ -2421,11 +2421,11 @@ discard cause pid oid = do
 -- effect -- the rule, not a shortcut.
 --
 -- The snapshot is Projection.project, deliberately not the printed-card view a
--- search filter matches a library card through. The two can disagree: CR 604.3
--- makes a CDA function in all zones, so a Tarmogoyf in a library has a power that
--- viewOfCard reports as Nothing. A search may ignore that; a reveal may not,
--- having to show what a player at the table would see. No card in the pool makes
--- them differ today.
+-- search filter matches a library card through. The two can disagree on any axis
+-- a continuous effect reaches off the battlefield (#160, #623), where a reveal
+-- has to show what a player at the table would see. They now AGREE on CR 208.2a's
+-- characteristic-defining power, which Projection.viewOfCardIn evaluates in every
+-- zone as CR 604.3 requires. No card in the pool makes them differ today.
 reveal :: PlayerId -> ObjectId -> Game ()
 reveal pid oid = do
   gs <- State.get

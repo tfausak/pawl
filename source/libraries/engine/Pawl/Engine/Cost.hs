@@ -603,8 +603,10 @@ discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid g
 -- so Game.zoneMembers Zone.Graveyard pid is the whole of "your graveyard".
 --
 -- Matched against the PRINTED card and never a projection: nothing off the
--- battlefield is projected (#160), so Projection.viewOfCard is the view, and a
--- candidate whose card cannot be found matches nothing. The context carries the
+-- battlefield is projected (#160), so Projection.viewOfCardIn is the view --
+-- printed on every axis but CR 208.2a's characteristic-defining power, which
+-- functions in a graveyard too -- and a candidate whose card cannot be found
+-- matches nothing. The context carries the
 -- payer as its perspective and no source -- the criterion narrows a card by its
 -- own qualities, and CR 601.2a has already moved the spell being cast to the
 -- stack, so IsSource would have nothing in this pool to compare against anyway.
@@ -623,7 +625,7 @@ exileCandidates pid criterion gs =
   let context = Filter.MkContext (Just pid) Nothing
       matches candidate = case Game.faceOf candidate gs of
         Nothing -> False
-        Just face -> Filter.matches context (Projection.viewOfCard face) criterion
+        Just face -> Filter.matches context (Projection.viewOfCardIn gs candidate face) criterion
    in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
 
 -- The permanents this player may tap to pay a TapForTotalPower component on
