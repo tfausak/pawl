@@ -1313,6 +1313,171 @@ selflessSquireSpec s registry = Spec.describe s "Selfless Squire (CR 615.13)" $ 
     Spec.assertEqWith s "and THAT fired the Squire" (length (GameState.stack playerDealt)) 1
     Spec.assertEqWith s "for 3 counters, off a prevention its own ability had nothing to do with" (S.powerToughnessOf squire playerAfter) (Just (4, 4))
 
+-- alice is mid-combat attacking with `mine`; bob defends holding `spells` and
+-- `lands` untapped Plains that pay for them. Sits at the declare attackers step
+-- like every combatBoardOf board, so the ENGINE declares the attack and the
+-- combat damage this group observes is CR 510.2's own, never hand-written.
+-- CombatSpec.killShotBoard is the same shape one seat over.
+tablesBoard :: Printing.Printing -> Int -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId])
+tablesBoard plains lands mine spells =
+  let (gs0, ours, _) = S.combatBoardOf mine []
+      withLands = List.foldl' (\g _ -> snd (S.addCreature plains S.bob g)) gs0 [1 .. lands]
+      withCards = List.foldl' (\g p -> snd (S.addHandCard p S.bob g)) withLands spells
+   in (withCards, ours)
+
+-- Cast the named cards in the ORDER GIVEN, aiming every target at `victim`, and
+-- attack with everything.
+--
+-- Order matters in the Kill Shot case, and one answerer cannot express it: both
+-- spells declare the same Pool.Creatures/IsAttacking spec, and casting both in
+-- one priority round puts Kill Shot on TOP of the stack, so it resolves first
+-- and Turn the Tables fizzles under CR 608.2b with no row installed. That case
+-- therefore runs one step per spell, naming one card each time.
+castInOrder :: [String] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+castInOrder names victim p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
+  Prompt.ChooseAction _ _ actions ->
+    let isNamed n a = case a of
+          Action.Cast _ cardName _ -> cardName == CardName.MkCardName (Text.pack n)
+          _ -> False
+     in case Maybe.mapMaybe (\n -> List.find (isNamed n) actions) names of
+          h : _ -> h
+          [] -> Action.Pass
+  -- Blocks are DECLINED, so a case that gives bob a creature of his own still
+  -- has the attacker's damage aimed at bob for the redirect to move.
+  Prompt.DeclareBlockers {} -> Map.empty
+  _ -> S.aggressiveAnswer p
+
+-- Every floating redirection row, as (kind, source side, destination). The three
+-- things Resolve bakes, read back off the store: a case that asserted only on
+-- where the damage landed could not tell a redirect aimed at the right creature
+-- from one that always aims at the first attacker.
+redirectRows :: GameState.GameState -> [(Maybe DamageKind.DamageKind, Maybe Recipient.Recipient, Recipient.Recipient)]
+redirectRows gs =
+  [ (DamagePattern.whichKind pat, DamagePattern.whichRecipient pat, dest)
+  | active <- GameState.replacements gs,
+    ReplacementEffect.DamageR pat (DamageRewrite.Redirect dest) <- [ActiveReplacement.effect active]
+  ]
+
+-- CR 614.9: "Some effects replace damage dealt to one battle, creature,
+-- planeswalker, or player with the same damage dealt to another ...; such
+-- effects are called redirection effects."
+--
+-- Turn the Tables ({3}{W}{W}, Instant, Darksteel): "All combat damage that would
+-- be dealt to you this turn is dealt to target attacking creature instead." bob
+-- is the caster, because "you" is the redirect's controller and only the
+-- DEFENDING player is being dealt combat damage worth moving.
+turnTheTablesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+turnTheTablesSpec s registry = Spec.describe s "Turn the Tables (CR 614.9)" $ do
+  let atCombatDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+      hit src recipient n = DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
+      amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
+      targets gs = fmap DamageEvent.target (S.damageEventsOf gs)
+  -- THE WHOLE CARD. alice attacks with a lone Jedit Ojanen (5/5); bob redirects
+  -- its combat damage onto Jedit itself, which is lethal to a 5/5 (CR 704.5g).
+  Spec.it s "CR 614.9 whole card: the attacker's combat damage is dealt to the attacker instead of to bob" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    tables <- S.printingOf s registry "Turn the Tables"
+    case tablesBoard plains 5 [jedit] [tables] of
+      (gs, [attacker]) -> do
+        let atDamage = atCombatDamage (castInOrder ["Turn the Tables"] attacker) gs
+            after = S.runCombat (castInOrder ["Turn the Tables"] attacker) atDamage
+        -- Combat-timing vacuity: a fixture that skipped combat would pass the
+        -- life assertions below without dealing anything.
+        Spec.assertEqWith s "setup: the spell resolved and combat damage has NOT been dealt yet" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
+        -- The "did the target stick" trap: all three baked fields, not merely
+        -- that some redirect exists.
+        Spec.assertEqWith s "setup: one row, keyed to COMBAT damage to bob, aimed at the creature bob targeted" (redirectRows atDamage) [(Just DamageKind.Combat, Just (Recipient.ToPlayer S.bob), Recipient.ToCreature attacker)]
+        Spec.assertEqWith s "the damage never reached bob" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "it landed on the attacker instead" (targets after) [Recipient.ToCreature attacker]
+        -- The assertion that separates a redirect from a prevention: CR 614.9
+        -- replaces the RECIPIENT and nothing else, so one event of the same size.
+        Spec.assertEqWith s "one event, of the same amount" (amounts after) [5]
+        Spec.assertEqWith s "5 marked on a 5/5 is lethal" (S.creaturesInPlay S.alice after) 0
+        Spec.assertEqWith s "and nothing splashed onto the attacker's controller" (S.lifeOf S.alice after) (Just 20)
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+  -- The BASELINE that makes the case above discriminate: the same board, the
+  -- spell never cast. Every assertion moves.
+  Spec.it s "CR 614.9 no redirect, no move: the same 5 lands on bob and the attacker survives" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    tables <- S.printingOf s registry "Turn the Tables"
+    case tablesBoard plains 5 [jedit] [tables] of
+      (gs, [attacker]) -> do
+        let after = S.runCombat S.aggressiveAnswer gs
+        Spec.assertEqWith s "setup: no row was installed" (redirectRows after) []
+        Spec.assertEqWith s "bob takes all 5" (S.lifeOf S.bob after) (Just 15)
+        Spec.assertEqWith s "addressed to bob" (targets after) [Recipient.ToPlayer S.bob]
+        Spec.assertEqWith s "and the attacker is unharmed" (S.damageOf attacker after) (Just 0)
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+  -- THE KIND NARROWING. "All COMBAT damage", so a noncombat event aimed at bob
+  -- is none of the card's business. Without this case the whichKind thread is
+  -- unproven, and dropping it would run WEAKER than printed in bob's favour.
+  Spec.it s "CR 614.9 the printed narrowing: NONCOMBAT damage to bob is not redirected" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    tables <- S.printingOf s registry "Turn the Tables"
+    case tablesBoard plains 5 [jedit] [tables] of
+      (gs, [attacker]) -> do
+        let atDamage = atCombatDamage (castInOrder ["Turn the Tables"] attacker) gs
+            after = settleDamage S.identityAnswer atDamage [hit attacker (Recipient.ToPlayer S.bob) 4]
+        Spec.assertEqWith s "setup: the redirect really is installed" (length (redirectRows atDamage)) 1
+        Spec.assertEqWith s "bob takes the noncombat 4" (S.lifeOf S.bob after) (Just 16)
+        Spec.assertEqWith s "addressed to bob, not moved" (targets after) [Recipient.ToPlayer S.bob]
+        Spec.assertEqWith s "and the attacker is untouched" (S.damageOf attacker after) (Just 0)
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+  -- CR 614.9's GUARD. "If one of those permanents is no longer on the
+  -- battlefield when the damage would be redirected ... the effect does
+  -- nothing." bob redirects onto the Hill Giant and then kills it with Kill
+  -- Shot, so the surviving attacker's damage lands on bob exactly as if the
+  -- redirect were not there.
+  --
+  -- "Does nothing" is not "prevents": the load-bearing assertion is that the
+  -- event still HAPPENED. Dropping it instead would run weaker than printed.
+  Spec.it s "CR 614.9 guard: a destination that left the battlefield makes the effect do nothing" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    tables <- S.printingOf s registry "Turn the Tables"
+    killShot <- S.printingOf s registry "Kill Shot"
+    case tablesBoard plains 8 [jedit, hillGiant] [tables, killShot] of
+      (gs, [big, doomed]) -> do
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (castInOrder ["Turn the Tables"] doomed) gs
+            atDamage = atCombatDamage (castInOrder ["Kill Shot"] doomed) atBlockers
+            after = S.runCombat S.aggressiveAnswer atDamage
+        -- The negative-cast trap: bob is at 15 either way if the spell was never
+        -- cast at all, so the row's existence is asserted outright.
+        Spec.assertEqWith s "setup: the redirect was installed, aimed at the doomed creature" (redirectRows atDamage) [(Just DamageKind.Combat, Just (Recipient.ToPlayer S.bob), Recipient.ToCreature doomed)]
+        Spec.assertEqWith s "setup: Kill Shot really destroyed it" (S.creaturesInPlay S.alice atDamage) 1
+        Spec.assertEqWith s "so the survivor's 5 lands on bob" (S.lifeOf S.bob after) (Just 15)
+        Spec.assertEqWith s "and the event still HAPPENED -- 'does nothing' is not 'prevents'" (amounts after) [5]
+        Spec.assertEqWith s "addressed to bob, its original recipient" (targets after) [Recipient.ToPlayer S.bob]
+        Spec.assertEqWith s "the big attacker took nothing" (S.damageOf big after) (Just 0)
+      _ -> Spec.assertFailure s "fixture should have two attackers"
+  -- CR 615.12 is about PREVENTION effects, and CR 614.9's redirection is not one
+  -- (CR 615.1a: it never says "prevent"). Spider-Punk's "damage can't be
+  -- prevented" therefore has nothing to say to it, and the damage still moves.
+  --
+  -- This is the case that gives Replacement.prevents' Redirect arm an observer:
+  -- classify a redirect as a prevention and `inertPrevention` makes it do
+  -- nothing here, though the CR 615.13 trigger route cannot tell the two apart
+  -- (a redirect shrinks no event, so preventionBy reports nothing either way).
+  Spec.it s "CR 615.12 a redirect is not a prevention: unpreventable damage is still moved" $ do
+    plains <- S.printingOf s registry "Plains"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    spiderPunk <- S.printingOf s registry "Spider-Punk"
+    tables <- S.printingOf s registry "Turn the Tables"
+    case tablesBoard plains 5 [jedit] [tables] of
+      (gs, [attacker]) -> do
+        let (punk, withPunk) = S.addCreature spiderPunk S.bob gs
+            after = S.runCombat (castInOrder ["Turn the Tables"] attacker) withPunk
+        Spec.assertBool s (Set.member punk (GameState.battlefield withPunk)) "setup: Spider-Punk is out, so no damage can be prevented"
+        Spec.assertEqWith s "the damage still left bob" (S.lifeOf S.bob after) (Just 20)
+        Spec.assertEqWith s "and landed on the attacker" (targets after) [Recipient.ToCreature attacker]
+        Spec.assertEqWith s "at its full size" (amounts after) [5]
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+
 -- Apply one damage batch under a given interpreter. Top-level rather than a
 -- `where` binding for castEach's reason: the answer is rank-2 and GHC will not
 -- infer it.
@@ -2079,6 +2244,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   apnapSpec s registry
   excruciatorSpec s registry
   selflessSquireSpec s registry
+  turnTheTablesSpec s registry
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
   riotSpec s registry

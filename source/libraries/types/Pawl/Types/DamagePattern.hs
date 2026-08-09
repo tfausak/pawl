@@ -23,8 +23,14 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 --
 -- That Recipient is BAKED by the engine, never authored, exactly as
 -- Pawl.Types.PhasePattern.whosePhase is: card data cannot name an ObjectId or a
--- PlayerId, so the only producers are Resolve's two prevention arms
--- (PreventNextDamage and PreventAllDamage), which share one `installShield`.
+-- PlayerId, so the only producers are Resolve's three arms that bake one
+-- (PreventNextDamage, PreventAllDamage and RedirectDamage), which share one
+-- `installDamageRow`. RedirectDamage is also the one that names a KIND -- Turn
+-- the Tables' "all combat damage" -- where the two prevention arms name none.
+--
+-- Not implemented: a CARD-PRINTED recipient condition, which is what a static
+-- redirection ability needs -- "all damage that would be dealt to you is dealt
+-- to this creature instead" (Palisade Giant, Pariah) (#1054).
 --
 -- Not implemented: CR 615.1's shields that name a SOURCE by characteristic
 -- ("a red source of your choice", Circle of Protection: Red) rather than by

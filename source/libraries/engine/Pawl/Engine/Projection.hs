@@ -1329,6 +1329,7 @@ rewriteEffect pairs effect = case effect of
   Effect.SkipNextPhase {} -> effect
   Effect.PreventNextDamage {} -> effect
   Effect.PreventAllDamage {} -> effect
+  Effect.RedirectDamage {} -> effect
   Effect.Counter _ -> effect
   Effect.PutCounters {} -> effect
   Effect.RemoveCounters {} -> effect

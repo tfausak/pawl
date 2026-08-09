@@ -1,6 +1,7 @@
 module Pawl.Types.DamageRewrite where
 
 import qualified Numeric.Natural as Natural
+import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Scaling as Scaling
 
 -- | CR 614.1a / 615.1: how a replacement or prevention effect rewrites a damage
@@ -33,9 +34,21 @@ import qualified Pawl.Types.Scaling as Scaling
 -- Scale is Furnace of Rath's "double that damage ... instead", reusing
 -- Pawl.Types.Scaling rather than a Double arm -- the difference between doubling
 -- and tripling is a number, and CounterR and TokenR speak the same vocabulary.
+--
+-- Redirect is CR 614.9's redirection effect (Turn the Tables): the event's
+-- RECIPIENT is replaced and nothing else is. A rule-614 replacement, not a rule
+-- 615 prevention -- it never says "prevent" (CR 615.1a) -- so `prevents` refuses
+-- it and CR 615.13's trigger never sees it. Its Recipient is engine-baked and
+-- never authored, exactly as DamagePattern.whichRecipient is: card data cannot
+-- name an ObjectId, so Resolve's RedirectDamage arm is the one producer.
+--
+-- Not implemented: a redirect with a remaining AMOUNT, PreventNext's counted
+-- twin -- Harm's Way's "the next 2 damage ... is dealt to any target instead"
+-- (#1098).
 data DamageRewrite
   = PreventAll
   | PreventNext Natural.Natural
   | SetAmount Natural.Natural
   | Scale Scaling.Scaling
+  | Redirect Recipient.Recipient
   deriving (Eq, Ord, Show)

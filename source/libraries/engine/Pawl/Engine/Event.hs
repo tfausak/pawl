@@ -544,7 +544,7 @@ loop asOf batch applied prevented event = do
           -- reason this does not spin.
           --
           -- CR 615.3's use count is skipped too, which no card notices: every
-          -- prevention row pawl installs is Uses.Unlimited (Resolve.installShield
+          -- prevention row pawl installs is Uses.Unlimited (Resolve.installDamageRow
           -- says why, and Fog's authored row says Unlimited as well), so the
           -- `consume` this bypasses would have been a no-op anyway.
           --
@@ -1062,6 +1062,24 @@ apply batch candidate event =
       DamageRewrite.Scale scaling -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
         pure (Just (ProposedEvent.WouldDealDamage de {DamageEvent.amount = Replacement.scale scaling (DamageEvent.amount de)}))
+      -- CR 614.9: a redirection effect replaces the damage's RECIPIENT with
+      -- another and nothing else -- "the same damage dealt to another battle,
+      -- creature, planeswalker, or player". Every other field rides along for
+      -- SetAmount's reason: a replaced damage event keeps its source, its amount
+      -- and every deal-time rider it was proposed with.
+      --
+      -- The rule's guard says the effect DOES NOTHING, not that it is
+      -- inapplicable -- the CR 615.12 distinction `inertPrevention` already
+      -- draws -- so a dead destination consumes the candidate, is marked applied
+      -- by the loop, and hands the event straight back. Returning Nothing here
+      -- would DROP the damage, which is weaker than printed: the rule leaves it
+      -- on its original recipient.
+      DamageRewrite.Redirect dest -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        pure . Just $ case Replacement.redirectDestination gs dest of
+          Nothing -> event
+          Just live -> ProposedEvent.WouldDealDamage de {DamageEvent.target = live}
     -- Unreachable: `applies` admits DamageR only against WouldDealDamage.
     (ReplacementEffect.DamageR _ _, _) -> pure (Just event)
     -- CR 701.19a: regeneration removes marked damage, taps the permanent and

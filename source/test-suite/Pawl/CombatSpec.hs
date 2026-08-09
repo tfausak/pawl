@@ -2971,26 +2971,11 @@ killShotBoard plains piker killShot =
    in -- handOne parks its state in a precombat main phase; this board is mid-combat.
       withCard {GameState.phase = GameState.phase gs0, GameState.priority = GameState.priority gs0}
 
--- Run whole steps until `step` is the current phase, WITHOUT running it, so a
--- test can play that one step itself under a different answerer. Bounded so a
--- bug cannot loop forever. Stops early if combat is left, so a caller that names
--- a step this combat never reaches gets the state at the exit rather than a
--- hang.
-runToStep :: Phase.Phase -> (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-runToStep step answer gs0 =
-  let go n g =
-        if n <= (0 :: Int)
-          || GameState.phase g == step
-          || not (S.inCombatPhase (GameState.phase g))
-          then g
-          else go (n - 1) (snd (Engine.runGamePure answer g Engine.runStep))
-   in go 8 gs0
-
 -- Run whole steps until the end of combat step is the current phase, WITHOUT
 -- running it, so a test can play that one step itself under a different
 -- answerer.
 runToEndOfCombat :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
-runToEndOfCombat = runToStep (Phase.Combat CombatStep.EndOfCombat)
+runToEndOfCombat = S.runToStep (Phase.Combat CombatStep.EndOfCombat)
 
 -- CR 511.3: creatures are removed from combat as the end of combat step ENDS, so
 -- they are still attacking for the whole of that step -- including its priority
@@ -3160,7 +3145,7 @@ controlChangeRemovalSpec s registry = Spec.describe s "ControlChangeRemoval" $ d
         gs = snd (S.addHandCard rayOfCommand S.alice (addLands 4 gs0))
     case (mine, theirs) of
       (attacker : _, blocker : _) -> do
-        let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
             atEnd = runToEndOfCombat (snatch blocker) atBlockers
             -- The control leg: the same board and the same blocks, with alice
             -- never casting. Two 2/1 Pikers then trade and both die.
@@ -3327,7 +3312,7 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
     labyrinth <- S.printingOf s registry "Labyrinth of Skophos"
     case (removalAbility labyrinth, skophosBoard labyrinth island S.alice [piker] [piker]) of
       (Just ability, (gs, [attacker], [blocker], mazeId)) -> do
-        let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
             atEnd = runToEndOfCombatWith (mazeAnswer mazeId ability blocker) atBlockers
             -- The control leg: the same board and the same blocks, with the
             -- ability never activated. Two 2/1 Pikers then trade.
@@ -3351,7 +3336,7 @@ effectRemovalSpec s registry = Spec.describe s "EffectRemoval" $ do
       (Just ability, (gs, [attacker, homebody], [blocker], _)) -> do
         -- The combat damage step is the vantage point: blockers have been
         -- declared and nothing has died yet.
-        let atDamage = runToStep (Phase.Combat CombatStep.CombatDamage) (stayHomeAnswer homebody) gs
+        let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) (stayHomeAnswer homebody) gs
             legal = fmap (\theSpec -> Target.legalRecipients Nothing S.noSource theSpec atDamage) (removalSpec ability)
             admits oid = fmap (Set.member (Recipient.ToCreature oid)) legal
         Spec.assertEqWith s "the fixture reached the combat damage step with blocks declared" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
@@ -3545,7 +3530,7 @@ typeChangeRemovalSpec s registry = Spec.describe s "TypeChangeRemoval" $ do
     doomBlade <- S.printingOf s registry "Doom Blade"
     case unblockBoard opalescence livingPlane piker forest swamp doomBlade of
       (gs, [attacker], [_, plane], land) -> do
-        let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackOnly attacker) gs
+        let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) (attackOnly attacker) gs
             atEnd = runToEndOfCombat (unblock land plane) atBlockers
             -- The control leg: the same board and the same block, with alice
             -- never casting. The 2/1 Piker and the 1/1 Forest then trade.
@@ -3580,7 +3565,7 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
         -- at the declaration (CR 508.2b) and resolved in the declare
         -- attackers step's priority round, and CR 511.3 has not yet cleared
         -- the record.
-        atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
         tokens = S.tokensOf atBlockers
         attackers = Combat.Type.attackers (GameState.combat atBlockers)
         sicknessOf oid = fmap Object.sickness (Game.lookupObject oid atBlockers)
@@ -3611,7 +3596,7 @@ putOntoBattlefieldAttackingSpec s registry = Spec.describe s "PutOntoBattlefield
     -- the shape of the log.
     garrison <- S.printingOf s registry "Hanweir Garrison"
     let (gs, mine, _) = S.combatBoardOf [garrison, garrison] []
-        atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
         tokens = S.tokensOf atBlockers
         attackers = Combat.Type.attackers (GameState.combat atBlockers)
     Spec.assertEqWith s "each Garrison's trigger fired once: four tokens" (length tokens) 4
@@ -3689,7 +3674,7 @@ planeswalkerAttackSpec s registry = Spec.describe s "AttackingAPlaneswalker" $ d
     piker <- S.printingOf s registry "Goblin Piker"
     jace <- S.printingOf s registry "Jace Beleren"
     let (gs, mine, jaceId) = jaceBoard jace [piker]
-        atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker gs
+        atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) attackThePlaneswalker gs
     case mine of
       [attacker] ->
         Spec.assertEqWith
@@ -3776,7 +3761,7 @@ planeswalkerAttackSpec s registry = Spec.describe s "AttackingAPlaneswalker" $ d
     tiger <- S.printingOf s registry "Sabretooth Tiger"
     jace <- S.printingOf s registry "Jace Beleren"
     let (gs, mine, jaceId) = jaceBoard jace [tiger, tiger, piker]
-        atFirstStrike = runToStep (Phase.Combat CombatStep.CombatDamage) attackThePlaneswalker gs
+        atFirstStrike = S.runToStep (Phase.Combat CombatStep.CombatDamage) attackThePlaneswalker gs
         atSecond = snd (Engine.runGamePure attackThePlaneswalker atFirstStrike Engine.runStep)
         after = S.runCombat attackThePlaneswalker gs
         control = S.runCombat S.aggressiveAnswer gs
@@ -3940,7 +3925,7 @@ towershellSpec s registry = Spec.describe s "MeanderingTowershell" $ do
       towershellName = CardName.MkCardName $ Text.pack "Meandering Towershell"
   Spec.it s "CR 508.3a whole card: attacking exiles it, so CR 506.4 leaves it dealing no damage" $ do
     (gs, ours) <- boardOf
-    let atBlockers = runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
+    let atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers) S.aggressiveAnswer gs
     Spec.assertEqWith s "it was declared as an attacker" (S.attackerDeclarationsOf atBlockers) [ours]
     Spec.assertEqWith s "and its own trigger exiled it" (S.countOnBattlefieldByName towershellName S.alice atBlockers) 0
     Spec.assertEqWith s "it is the one card in exile" (Set.size (GameState.exile atBlockers)) 1
