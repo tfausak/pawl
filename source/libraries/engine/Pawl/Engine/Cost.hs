@@ -906,9 +906,9 @@ manaActivations pcs pid oid cost gs =
 -- lets Pawl.Engine.Mana take this count as a source's ceiling and then re-ask the
 -- joint question across sources without the two disagreeing about one source.
 --
--- The pool is read ONCE, off the untouched board. Exact for every criterion in
--- the pool, since taking one creature out of it leaves the rest creatures; a
--- criterion whose matches an earlier payment could change would want re-reading.
+-- The pool is read ONCE, off the untouched board, which is exact for every
+-- criterion in the pool: taking one creature out of it leaves the rest
+-- creatures.
 repeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
 repeatsOf pid oid cost gs = case (Cost.mana cost, traverse (\c -> removalClaim pid oid c gs) (Cost.components cost)) of
   (Just (ManaCost.MkManaCost []), Just claims) -> Claim.repeats claims

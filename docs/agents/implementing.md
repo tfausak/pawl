@@ -105,6 +105,11 @@ producer or stop. Stricter is admissible with an issue and an inline `(#N)`.
 ## Git and the PR
 
 - Branch off latest `origin/main`, named `issue-slug`. Never commit to `main`.
+- Immediately before the self-review and the push, `git fetch` and merge
+  `origin/main` again --- even if you merged earlier, and even if you merged
+  minutes ago. A PR armed just before you were dispatched typically lands
+  mid-run; three units in a row hit conflicts this way. Then re-run the suite
+  and the load-bearing mutations against the merged state.
 - Open the PR as a draft; mark it ready once the self-review findings are
   pushed and the suite is green.
 - **Never force-push after opening.** `origin/main` moves; `git merge

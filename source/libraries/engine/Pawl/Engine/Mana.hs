@@ -878,8 +878,9 @@ canPayCommittingGiven capacity grants pcs pid committed cost gs = not (null (pay
 -- the whole of #1126: the clauses payableResolutions asks of a board only ever
 -- grow as supplies are added, so a claimless source is never worth taking fewer
 -- times -- but a claiming one is, since the objects it leaves alone are what
--- another source's cost can then have. Two Phyrexian Towers beside one creature
--- pay for one activation between them, and which one is the player's to choose.
+-- another source's cost can then have. Ashnod's Altar and Phyrexian Tower beside
+-- one creature buy one sacrifice between them, and whose is the player's to
+-- choose.
 --
 -- Mixing yields ACROSS a repeatable source's activations -- an Ashnod's Altar
 -- that some effect had also given two different yields, one taken each time --
@@ -914,9 +915,9 @@ sourceOptions supplies =
   let unitLists = fmap (\(times, claims, yield) -> (times, claims, unitsOf yield)) supplies
    in if all (\(times, claims, units) -> times <= 1 && null claims && length units <= 1) unitLists
         then [(collapsed (concatMap (\(_, _, units) -> units) unitLists), [])]
-        else List.nub (concatMap taken unitLists)
+        else List.nub (concatMap optionsFor unitLists)
   where
-    taken (times, claims, units) =
+    optionsFor (times, claims, units) =
       fmap
         (\k -> (concat (List.genericReplicate k (fmap supplyOf units)), Claim.scale k claims))
         (if null claims then [times] else [0 .. times])

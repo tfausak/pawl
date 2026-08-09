@@ -1658,15 +1658,15 @@ sharedVictimSpec s registry = Spec.describe s "Two mana sources over one creatur
   -- Tower's free {C} beside the Altar's {C}{C}. Four wants both sacrifices.
   Spec.it s "CR 118.3 one creature cannot pay for both sacrifices" $ do
     board <- sharedVictimBoard s registry 1
-    Spec.assertBool s (generic 3 board) "the Tower's {C} and one Altar activation pay {3}"
-    Spec.assertBool s (not (generic 4 board)) "and nothing pays {4}"
+    Spec.assertBool s (paysGeneric 3 board) "the Tower's {C} and one Altar activation pay {3}"
+    Spec.assertBool s (not (paysGeneric 4 board)) "and nothing pays {4}"
 
   -- The same board with a second Piker, which is what says the refusal above is
   -- about the creature and not about the two sources.
   Spec.it s "CR 118.3 a second creature pays for the second sacrifice" $ do
     board <- sharedVictimBoard s registry 2
-    Spec.assertBool s (generic 5 board) "the Tower's {C} and two Altar activations pay {5}"
-    Spec.assertBool s (not (generic 6 board)) "and there is no third creature, so not {6}"
+    Spec.assertBool s (paysGeneric 5 board) "the Tower's {C} and two Altar activations pay {5}"
+    Spec.assertBool s (not (paysGeneric 6 board)) "and there is no third creature, so not {6}"
 
   -- The colours say WHICH activations a board is made of, where a generic count
   -- only says how many: {B}{B} is the Tower's sacrifice and {C} the Altar's, so
@@ -1712,8 +1712,8 @@ sharedVictimBoard s registry victims = do
   pure (foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : tower : replicate victims piker))
 
 -- Whether alice could pay {n} off this board.
-generic :: Natural -> GameState.GameState -> Bool
-generic n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n])
+paysGeneric :: Natural -> GameState.GameState -> Bool
+paysGeneric n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n])
 
 -- S.identityAnswer, recording the candidates of every Prompt.ChooseManaSource --
 -- the offers CR 601.2g's window made while the cost was still uncovered. A
