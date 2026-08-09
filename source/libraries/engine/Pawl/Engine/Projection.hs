@@ -2262,6 +2262,26 @@ modificationWrites m = case m of
   Modification.SetController _ -> Set.singleton Controller
   Modification.SetControllerToSource -> Set.singleton Controller
 
+-- What could move `c`'s affected set, as the aspects its filter reads -- Nothing
+-- when nothing can move it. Two ways to be immovable, each CR 613.8a's own
+-- precondition made cheap to test: a TheseObjects set names ids (CR 611.2c) and an
+-- Attached one reads its source's attachment (CR 303.4m), neither of which a
+-- modification writes; and a filter reading no projected aspect has nothing to
+-- change. CR 613.6's memo is a third, and stays in the fold because it is per
+-- object.
+movableAspects :: Gathered -> Maybe (Set Aspect)
+movableAspects c =
+  let readsOf f = if Set.null (filterReads f) then Nothing else Just (filterReads f)
+   in case gAffected c of
+        Affected.TheseObjects _ -> Nothing
+        Affected.Attached -> Nothing
+        Affected.Matching f -> readsOf f
+        Affected.MatchingAnywhere f -> readsOf f
+        -- Always movable, whatever the filter reads: the set is narrowed by WHO
+        -- CONTROLS each candidate, and Controller is an aspect layer 2 writes
+        -- (CR 613.1b).
+        Affected.AttachedPlayerControls f -> Just (Set.insert Controller (filterReads f))
+
 -- Could another effect move this one's affected set at all? The structural half
 -- of projectWith's movableReads: a set is movable when something a modification
 -- writes selects it -- a Matching or MatchingAnywhere set's predicate over
@@ -2373,10 +2393,19 @@ projectWith admits cands =
 -- or CR 613.7/613.8. abilitiesRemoved is the one caller that wants it, through
 -- decisionsUpTo; everything else goes through projectWith just above.
 projectDeciding :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
+projectDeciding admits cands =
+  let forObject = projectRaw admits cands
+   in \oid gs -> let (pc, ds) = forObject oid gs in (noncreaturePT oid gs pc, ds)
+
+-- projectDeciding without CR 208.3's noncreature gate, which is the state the
+-- layer fold itself works in rather than one any reader sees. Split out for the
+-- dependency scan below: it reads OTHER objects through this, so each snapshot is
+-- exactly the partial that object's own fold holds at the same layer.
+projectRaw :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (ProjectedCharacteristics, Map (ObjectId, Natural) Bool)
 -- Candidates-in, then a worker taking the object: everything derived from the
 -- candidate list alone is bound before `oid`, so projectAll shares it across the
 -- board instead of rebuilding it per object.
-projectDeciding admits cands = forObject
+projectRaw admits cands = forObject
   where
     -- Layers 5 and 7a are always visited, even with no gathered effect there: an
     -- object's own CDAs are not gathered candidates. For an object with neither,
@@ -2392,13 +2421,15 @@ projectDeciding admits cands = forObject
     movableLayers = Set.fromList (fmap gLayer (filter staticallyMovable cands))
     forObject oid gs =
       let applyLayer (partial, decided) lyr =
-            let seeded = case lyr of
-                  -- CR 613.3: characteristic-defining abilities first, within
-                  -- the layer they define. Colour is layer 5 (CR 613.1e), P/T is
-                  -- layer 7a (CR 613.4a).
-                  Layer.Color -> applyColorDefining partial
-                  Layer.CharacteristicPT -> applyCharacteristicPT lyr cands gs oid partial
-                  _ -> partial
+            let -- CR 613.3: characteristic-defining abilities first, within the
+                -- layer they define. Colour is layer 5 (CR 613.1e), P/T is layer 7a
+                -- (CR 613.4a). Taken per OBJECT, since the dependency scan seeds
+                -- every other object's snapshot the same way.
+                seedFor o p = case lyr of
+                  Layer.Color -> applyColorDefining p
+                  Layer.CharacteristicPT -> applyCharacteristicPT lyr cands gs o p
+                  _ -> p
+                seeded = seedFor oid partial
                 -- CR 613.6: the affected set is asked ONCE per effect, at the
                 -- lowest layer that effect reaches, and remembered in `decided` for
                 -- its other layers. It remembers "no" as faithfully as "yes": an
@@ -2407,46 +2438,46 @@ projectDeciding admits cands = forObject
                 --
                 -- Only an effect with parts in more than one layer carries a key;
                 -- everything else is Nothing and never touches the Map.
-                appliesTo ds pc c = case gEffect c of
+                --
+                -- Object-parameterised, like applyUnit and applyOne below: the
+                -- dependency scan asks all three about every object on the board,
+                -- not only the one being projected.
+                appliesTo o ds pc c = case gEffect c of
                   Just k | Just answer <- Map.lookup k ds -> answer
-                  _ -> affects (gSource c) oid (gAffected c) pc gs
+                  _ -> affects (gSource c) o (gAffected c) pc gs
                 -- Fold every part of ONE effect landing in this layer, in the order
                 -- the card lists them (CR 613.6). The parts share a source and an
                 -- affected set, so the caller asks applicability once.
-                applyUnit pc cs = List.foldl' (\p c -> applyModification lyr (gSource c) cands gs oid (gModification c) p) pc (NonEmpty.toList cs)
+                applyUnit o pc cs = List.foldl' (\p c -> applyModification lyr (gSource c) cands gs o (gModification c) p) pc (NonEmpty.toList cs)
                 -- Apply one effect, recording its decision the first time.
                 -- Re-inserting an existing key rewrites the value just read, so this
                 -- is idempotent rather than a second determination.
-                applyOne (pc, ds) cs =
+                applyOne o (pc, ds) cs =
                   let c = NonEmpty.head cs
-                      answer = appliesTo ds pc c
+                      answer = appliesTo o ds pc c
                       ds' = case gEffect c of
                         Nothing -> ds
                         Just k -> Map.insert k answer ds
-                   in (if answer then applyUnit pc cs else pc, ds')
-                -- What could move `c`'s affected set, as the aspects its filter
-                -- reads -- Nothing when nothing can move it. Three ways to be
-                -- immovable, each CR 613.8a's own precondition made cheap to test: a
-                -- TheseObjects set names ids (CR 611.2c) and an Attached one reads
-                -- its source's attachment (CR 303.4m), neither of which a
-                -- modification writes; an effect CR 613.6 already decided answers
-                -- from the memo; and a filter reading no projected aspect has nothing
-                -- to change.
-                movableReads ds c = case gEffect c of
-                  Just k | Map.member k ds -> Nothing
-                  _ -> case gAffected c of
-                    Affected.TheseObjects _ -> Nothing
-                    Affected.Attached -> Nothing
-                    Affected.Matching f ->
-                      let aspects = filterReads f
-                       in if Set.null aspects then Nothing else Just aspects
-                    Affected.MatchingAnywhere f ->
-                      let aspects = filterReads f
-                       in if Set.null aspects then Nothing else Just aspects
-                    -- Always movable, whatever the filter reads: the set is
-                    -- narrowed by WHO CONTROLS each candidate, and Controller is
-                    -- an aspect layer 2 writes (CR 613.1b).
-                    Affected.AttachedPlayerControls f -> Just (Set.insert Controller (filterReads f))
+                   in (if answer then applyUnit o pc cs else pc, ds')
+                -- CR 613.6's other half of movableAspects, and the half that is per
+                -- object: an effect whose set this object already settled cannot be
+                -- moved at it, whatever its filter reads.
+                decidedAt ds c = case gEffect c of
+                  Just k -> Map.member k ds
+                  Nothing -> False
+                -- Every OTHER battlefield object's state as this layer begins --
+                -- characteristics and CR 613.6 memo alike -- which is exactly the
+                -- partial that object's own fold holds here, so all of them derive
+                -- the same order. Lazy, and scanned after the projected object, so
+                -- a dependency visible right here never builds one.
+                --
+                -- Terminates for projectUpTo's reason: a snapshot admits strictly
+                -- fewer layers, so a movable layer below `lyr` recurses on a
+                -- strictly shorter Layer.
+                snapshot o =
+                  let (p, d) = projectRaw (\l -> admits l && l < lyr) cands o gs
+                   in (seedFor o p, d)
+                otherBoards = fmap (\o -> (o, snapshot o)) (Set.toList (Set.delete oid (GameState.battlefield gs)))
                 -- CR 613.8b: an effect that depends on another waits for it, and CR
                 -- 613.7 timestamp order picks the next among those waiting on
                 -- nothing. Re-deriving `ready` each round IS CR 613.8c, and removing
@@ -2464,46 +2495,52 @@ projectDeciding admits cands = forObject
                 --
                 -- `pending` holds EFFECTS, not modifications, that being CR 613.8's
                 -- unit.
-                resolve (pc, ds) pending = case pending of
+                resolve (pc, ds) others pending = case pending of
                   [] -> (pc, ds)
                   _ ->
-                    let -- One applicability answer per effect per round, shared by
-                        -- the dependency scan rather than recomputed per pair. An
-                        -- effect that does not apply changes nothing, so it cannot
-                        -- be the `b` of a dependency either. CR 613.6 gives every
-                        -- part of an effect the same affected set, so the head part
-                        -- answers for the unit.
-                        answered = fmap (\(i, cs) -> (i, cs, appliesTo ds pc (NonEmpty.head cs))) pending
-                        -- CR 613.8a clause (b), the "what it applies to" half: `a`
-                        -- depends on `b` when applying `b` would change whether `a`
-                        -- applies. The tentative application is thrown away and only
-                        -- the answer kept, and it is reached only for a pair that
-                        -- could interact -- `b` writing an aspect `a` reads.
-                        --
-                        -- Clause (c)'s CDA exclusion needs no test: a CDA is never a
-                        -- candidate, both in-place folds sitting outside this list.
-                        -- Clause (b)'s "text" and "what it does to" halves have no
-                        -- producer; "existence" is handled by liveGiven. The
-                        -- CR decides this over an effect's whole affected set and this
-                        -- decides it per projected object, which agrees for everything
-                        -- the Filter vocabulary can express (#236).
+                    let -- Every object CR 613.8a's question ranges over, the
+                        -- projected one first.
+                        boards = (oid, (pc, ds)) : others
+                        -- CR 613.8a clause (b)'s "what it applies to", at ONE
+                        -- object: applying `b` there changes whether `a` applies.
+                        -- The tentative application is thrown away and only the
+                        -- answer kept. An effect that does not apply at `o` changes
+                        -- nothing there, so it cannot be the `b` of a dependency
+                        -- seen at `o`. CR 613.6 gives every part of an effect the
+                        -- same affected set, so the head part answers for the unit.
                         --
                         -- `b` is applied WHOLE, every part landing in this layer:
                         -- half an effect is not a state CR 613 describes.
-                        dependsOnOne (i, as, answer) (j, bs, bApplies) =
+                        changesAt bs a (o, (p, d)) =
+                          not (decidedAt d a)
+                            && appliesTo o d p (NonEmpty.head bs)
+                            && appliesTo o d (applyUnit o p bs) a /= appliesTo o d p a
+                        -- `a` depends on `b` when that holds ANYWHERE: CR 613.8a
+                        -- asks about the effect's whole affected SET, so one object
+                        -- deciding it for the board is the rule rather than an
+                        -- approximation of it, and CR 613.8b's loop -- which shows
+                        -- as opposite one-way edges at different objects -- becomes
+                        -- visible at all.
+                        --
+                        -- Reached only for a pair that could interact, `b` writing
+                        -- an aspect `a`'s filter reads. Clause (c)'s CDA exclusion
+                        -- needs no test: a CDA is never a candidate, both in-place
+                        -- folds sitting outside this list. Clause (b)'s "text" and
+                        -- "what it does to" halves have no producer; "existence" is
+                        -- handled by liveGiven.
+                        dependsOnOne (i, as) (j, bs) =
                           let a = NonEmpty.head as
-                           in case movableReads ds a of
+                           in case movableAspects a of
                                 Nothing -> False
                                 Just aspects ->
                                   j /= i
-                                    && bApplies
                                     && not (Set.disjoint aspects (foldMap (modificationWrites . gModification) bs))
-                                    && appliesTo ds (applyUnit pc bs) a /= answer
-                        ready = filter (\a -> not (any (dependsOnOne a) answered)) answered
+                                    && any (changesAt bs a) boards
+                        ready = filter (\a -> not (any (dependsOnOne a) pending)) pending
                         -- The dependency edges, built only when the whole round is
                         -- blocked -- which is the one case that needs to know the
                         -- SHAPE of the tangle rather than merely that there is one.
-                        edges = Map.fromList (fmap (\a@(i, _, _) -> (i, fmap (\(j, _, _) -> j) (filter (dependsOnOne a) answered))) answered)
+                        edges = Map.fromList (fmap (\a@(i, _) -> (i, fmap fst (filter (dependsOnOne a) pending))) pending)
                         -- Everything reachable from `start` by following edges.
                         reach seen queue = case queue of
                           [] -> seen
@@ -2512,22 +2549,22 @@ projectDeciding admits cands = forObject
                               then reach seen xs
                               else reach (Set.insert x seen) (Map.findWithDefault [] x edges <> xs)
                         -- On a cycle iff it can reach itself in one step or more.
-                        onCycle (i, _, _) = Set.member i (reach Set.empty (Map.findWithDefault [] i edges))
+                        onCycle (i, _) = Set.member i (reach Set.empty (Map.findWithDefault [] i edges))
                         batch = case ready of
                           _ : _ -> ready
                           -- `ready` empty means every remaining effect has an
                           -- outgoing edge, and a finite graph where every node has
                           -- one contains a cycle -- so `cyclic` is never empty and
-                          -- the fallback to `answered` is unreachable. Written out
+                          -- the fallback to `pending` is unreachable. Written out
                           -- because `minimumBy` is partial and this keeps it total.
-                          [] -> case filter onCycle answered of
-                            [] -> answered
+                          [] -> case filter onCycle pending of
+                            [] -> pending
                             cyclic -> cyclic
                         -- CR 613.7a gives every part of one ability the source
                         -- permanent's timestamp, so the head part's stamp is the
                         -- unit's.
-                        (chosen, next, _) = List.minimumBy (Ord.comparing (\(_, cs, _) -> gTimestamp (NonEmpty.head cs))) batch
-                     in resolve (applyOne (pc, ds) next) (filter ((/= chosen) . fst) pending)
+                        (chosen, next) = List.minimumBy (Ord.comparing (\(_, cs) -> gTimestamp (NonEmpty.head cs))) batch
+                     in resolve (applyOne oid (pc, ds) next) (fmap (\(o, st) -> (o, applyOne o st next)) others) (filter ((/= chosen) . fst) pending)
                 -- Is there anything at this layer CR 613.8 could reorder? One Set
                 -- lookup, almost always in an empty Set.
                 movableHere = Set.member lyr movableLayers
@@ -2540,7 +2577,7 @@ projectDeciding admits cands = forObject
                     | gLayer c /= lyr || Map.member k ds -> ds
                     | otherwise -> Map.insert k (affects (gSource c) oid (gAffected c) seeded gs) ds
              in if movableHere
-                  then resolve (seeded, decided) (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
+                  then resolve (seeded, decided) otherBoards (zip [0 :: Int ..] (effectUnits (filter (\c -> gLayer c == lyr) cands)))
                   else
                     -- Nothing here can be moved, so no candidate depends on any other
                     -- and none's answer can change as the layer is applied. CR 613.8
@@ -2557,7 +2594,7 @@ projectDeciding admits cands = forObject
                         step pc c = applyModification lyr (gSource c) cands gs oid (gModification c) pc
                      in (List.foldl' step seeded ordered, decided')
           (folded, decisions) = List.foldl' applyLayer (copiableCharacteristics oid gs, Map.empty) layers
-       in (noncreaturePT oid gs folded, decisions)
+       in (folded, decisions)
 
 -- CR 208.3: "A noncreature permanent has no power or toughness, even if it's a
 -- card with a power and toughness printed on it (such as a Vehicle)." Applied to
