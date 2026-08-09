@@ -44,6 +44,7 @@ toJson k = case k of
   Keyword.Phasing -> Common.nullary "Phasing"
   Keyword.Shadow -> Common.nullary "Shadow"
   Keyword.Aftermath -> Common.nullary "Aftermath"
+  Keyword.Afflict n -> Common.tagged "Afflict" . Just $ Common.encodeNatural n
   Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
   Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Cost.toJson toJson cost
   Keyword.Fear -> Common.nullary "Fear"
@@ -93,6 +94,7 @@ fromJson value = do
     ("Phasing", _) -> Right Keyword.Phasing
     ("Shadow", _) -> Right Keyword.Shadow
     ("Aftermath", _) -> Right Keyword.Aftermath
+    ("Afflict", Just v) -> Keyword.Afflict <$> Common.decodeNatural v
     ("Cycling", Just (Value.Array (Array.MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson fromJson c <*> Filter.optional fromJson f
     ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson fromJson v
     ("Fear", _) -> Right Keyword.Fear

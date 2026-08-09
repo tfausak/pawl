@@ -57,10 +57,10 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.45, 702.70, 702.86, 702.91 and 702.108 do not: they spell bushido,
--- poisonous, annihilator, battle cry and prowess out as TRIGGERED abilities, so
--- those have to be MINTED and handed to the ordinary CR 603 machinery rather
--- than merely consulted.
+-- Rules 702.45, 702.70, 702.86, 702.91, 702.108 and 702.130 do not: they spell
+-- bushido, poisonous, annihilator, battle cry, prowess and afflict out as
+-- TRIGGERED abilities, so those have to be MINTED and handed to the ordinary CR
+-- 603 machinery rather than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -87,8 +87,9 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
 -- 702.45b says the same of bushido, CR 702.86b of annihilator, CR 702.91b of
--- battle cry and CR 702.108b of prowess, so the five minting arms below are the
--- same shape -- bushido's `concat` aside, since its instance is two abilities.
+-- battle cry, CR 702.108b of prowess and CR 702.130b of afflict, so the six
+-- minting arms below are the same shape -- bushido's `concat` aside, since its
+-- instance is two abilities.
 --
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
 -- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
@@ -104,6 +105,7 @@ abilitiesFor keyword count = case keyword of
   -- watches two events, and a TriggeredAbility carries one condition.
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
+  Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Crew _ -> []
@@ -166,6 +168,7 @@ handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
 handAbilitiesFor keyword = case keyword of
   Keyword.Cycling cost searchFor -> [cycling cost searchFor]
+  Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -297,6 +300,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Phasing -> []
   Keyword.Shadow -> []
   Keyword.Aftermath -> []
+  Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
   -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
@@ -480,6 +484,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- graveyard", is not a permission and is not here: a prohibition is
   -- Pawl.Engine.Cast's to apply, at its Zone.Hand arm.
   Keyword.Aftermath -> [CastingPermission.CastFromGraveyard]
+  Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
@@ -731,6 +736,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Phasing -> []
   Keyword.Shadow -> []
   Keyword.Aftermath -> []
+  Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
   -- CR 702.37a's plain morph mints nothing: rule 702.37a is one alternative cost
@@ -817,6 +823,7 @@ familyOf keyword = case keyword of
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
+  Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Deathtouch -> Nothing
   Keyword.Defender -> Nothing
@@ -1059,3 +1066,35 @@ bushidoHalf condition n =
         Duration.UntilEndOfTurn
         (Modification.ModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n)))
         (ObjectRef.EachMatching Filter.IsSource)
+
+-- CR 702.130a: whenever this creature becomes blocked, defending player loses N
+-- life. The SIXTH keyword in this pool whose rule text IS a triggered ability,
+-- and the one that adds nothing new -- its condition is bushido's CR 509.3c half
+-- and its player is annihilator's CR 508.5 one.
+--
+-- "DEFENDING PLAYER" is read off GameEvent.AttackerBlocked through the reserved
+-- Binding.triggerPlayer slot, exactly as annihilator reads it off
+-- GameEvent.AttackerDeclared. NOT the ability's controller: CR 603.3a makes that
+-- the ATTACKING creature's controller, and the life leaves whom they attacked.
+--
+-- Effect.LoseLife and not damage: rule 702.130a says "loses N life", so this is CR
+-- 119.3's life loss and none of CR 120's damage machinery sees it.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- rule 702.130a leaves nothing to choose, and has no "if" clause, so
+-- intervening = Nothing.
+afflict :: Natural -> TriggeredAbility Card
+afflict n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.LoseLife
+        (PlayerRef.InSlot Binding.triggerPlayer)
+        (Quantity.Literal (toInteger n))

@@ -130,7 +130,8 @@ data TriggerCondition
     -- -- do not reach it. Neither has a producer in the pool (#1146).
     --
     -- No blocker is bound: rule 509.3c's form names none. CR 509.3d's does, and
-    -- that is a separate condition (#1146).
+    -- that is a separate condition (#1146). CR 508.5's defending player IS bound,
+    -- the event carrying it -- rule 702.130a's afflict is what reads it.
     SelfBecomesBlocked
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.

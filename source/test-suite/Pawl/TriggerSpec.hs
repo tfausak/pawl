@@ -41,7 +41,9 @@
 -- side of that same declaration, with Sacred Prey -- `selfBecomesBlockedSpec`.
 -- CR 702.45 bushido, the fifth keyword whose rule text IS a triggered ability
 -- and the only one to name both of those events, with Inner-Chamber Guard --
--- `bushidoSpec`.
+-- `bushidoSpec`. CR 702.130 afflict, the sixth, which puts that event and CR
+-- 508.5's defending player in one sentence, with Khenra Eternal at three seats --
+-- `afflictSpec`.
 -- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
@@ -3228,6 +3230,91 @@ bushidoSpec s registry =
           Spec.assertEqWith s "bushido 2 held once is its two halves" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Bushido 2) 1)) (Keyword.bushido 2)
           Spec.assertEqWith s "and held twice is four abilities" (length (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Bushido 2) 2))) 4
 
+-- CR 702.130a: "'Afflict N' means 'Whenever this creature becomes blocked,
+-- defending player loses N life.'" The sixth keyword in this pool whose rule text
+-- IS a triggered ability, and the first to put CR 509.3c's event and CR 508.5's
+-- defending player in one sentence.
+--
+-- Khenra Eternal {1}{B} Creature -- Zombie Jackal Warrior 2/2 with afflict 1 and
+-- nothing else printed on it, so every number below is the keyword's.
+--
+-- THREE SEATS, for annihilatorSpec's reason: at two players "the defending
+-- player" and "the attacker's one opponent" are the same seat.
+--
+-- Afflict 1 is the only N a card in this pool puts on a board, so no case below
+-- can tell the keyword's N from a hardcoded 1. The mint inequality in the last
+-- case is what does, and it is there for that and no other reason.
+afflictSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+afflictSpec s registry =
+  let -- Attacks `who` with everything and lets them block with everything.
+      attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      attacking who p = case p of
+        Prompt.ChooseDefender {} -> who
+        _ -> S.aggressiveAnswer p
+      -- The same, with CR 509.1's declaration switched off -- the control leg, and
+      -- the only difference between the two answerers.
+      unblocked :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      unblocked who p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> attacking who p
+      -- alice fields the Khenra; bob and carol each field a Goblin Piker, so
+      -- either can block and neither is the only possible defender.
+      board = do
+        khenra <- S.printingOf s registry "Khenra Eternal"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (S.threePlayerCombat [khenra] [piker] [piker])
+      -- All three life totals as one reading, so no mutation can hide behind the
+      -- order the assertions happen to be written in.
+      lives gs = (S.lifeOf S.alice gs, S.lifeOf S.bob gs, S.lifeOf S.carol gs)
+   in Spec.describe s "Afflict" $ do
+        -- The proving test. alice attacks bob, bob blocks, and CR 508.5 makes bob
+        -- the defending player, so bob alone loses 1. No combat damage reaches a
+        -- player: the Khenra is blocked, and its 2 and the Piker's 2 trade.
+        Spec.it s "CR 702.130a whole card: a blocked Khenra Eternal costs the defending player 1 life" $ do
+          (gs, ours, yours, _) <- board
+          case (ours, yours) of
+            ([khenra], [piker]) -> do
+              let after = S.runCombat (attacking S.bob) gs
+              Spec.assertEqWith s "bob, and nobody else, is down 1" (lives after) (Just 20, Just 19, Just 20)
+              Spec.assertBool s (not (S.onBattlefield khenra after)) "the 2/2 Khenra died to the Piker's 2"
+              Spec.assertBool s (not (S.onBattlefield piker after)) "and the 2/1 Piker to the Khenra's"
+            _ -> Spec.assertFailure s "fixture should give alice a Khenra and bob a Piker"
+        -- CR 508.5a: the defending player is one SPECIFIC player, determined per
+        -- attacking creature. The only difference from the case above is the
+        -- answer to Prompt.ChooseDefender, so an implementation that bound the
+        -- attacker's controller, or "an opponent", or a fixed seat cannot pass
+        -- both.
+        Spec.it s "CR 508.5 the life follows whichever opponent was attacked" $ do
+          (gs, _, _, _) <- board
+          Spec.assertEqWith s "carol, attacked this time, is the one down 1" (lives (S.runCombat (attacking S.carol) gs)) (Just 20, Just 20, Just 19)
+        -- The control leg, on the same board: no block, so CR 509.3c's event never
+        -- happens and no life is lost to afflict. bob is down TWO instead of one,
+        -- the Khenra's combat damage -- distinct from 1, so the two legs cannot be
+        -- read as each other.
+        Spec.it s "CR 509.3c an unblocked Khenra Eternal afflicts nobody" $ do
+          (gs, _, _, _) <- board
+          Spec.assertEqWith s "bob took 2 combat damage and no afflict" (lives (S.runCombat (unblocked S.bob) gs)) (Just 20, Just 18, Just 20)
+        -- CR 603.2 through CR 508.5: the becomes-blocked event carries the
+        -- defending player, and the scan stamps them under the reserved slot rule
+        -- 702.130a's "defending player" reads. The falsifier is an arm that binds
+        -- the attacking side, or none at all.
+        Spec.it s "CR 603.2 the defending player rides the becomes-blocked event in the reserved slot" $ do
+          let bindings = Event.eventBindings TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (ObjectId.MkObjectId 9) S.carol)
+          Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.carol))
+        -- CR 702.130b: "If a creature has multiple instances of afflict, each
+        -- triggers separately." Asked of the mint rather than of a board, as
+        -- bushido's and prowess' are: no card in this pool prints afflict twice
+        -- and nothing here grants it.
+        --
+        -- The inequality is the second half of the case and a separate claim: N
+        -- reaches the minted ability at all. Afflict 1 is the only N a board in
+        -- this pool can show, so nothing above would go red if the mint hardcoded
+        -- its 1.
+        Spec.it s "CR 702.130b each instance of afflict is its own ability, and N reaches it" $ do
+          Spec.assertEqWith s "afflict 1 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afflict 1) 2)) [Keyword.afflict 1, Keyword.afflict 1]
+          Spec.assertEqWith s "and afflict 3 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afflict 3) 1)) [Keyword.afflict 3]
+          Spec.assertBool s (Keyword.afflict 1 /= Keyword.afflict 3) "and the two differ, so N is in the ability"
+
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
 -- enters, you gain 1 life", the card that proves it. Its effect names nothing
@@ -4621,7 +4708,9 @@ representativeEvents cond =
         -- eventBindingSlots here if the two coincided.
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
         TriggerCondition.SelfBlocks -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
-        TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked departed)
+        -- CR 508.5's defending player again, and carol for SelfAttacks' reason
+        -- above: eventBindings binds this field under `thatPlayer`.
+        TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked departed S.carol)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -6845,6 +6934,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   selfBlocksSpec s registry
   selfBecomesBlockedSpec s registry
   bushidoSpec s registry
+  afflictSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   graveyardEffectZoneTriggerSpec s registry

@@ -389,6 +389,15 @@ data Keyword
     -- proposed half at a time, so an aftermath half restricts itself and leaves its
     -- sibling alone.
     Aftermath
+  | -- | 702.130a: whenever this creature becomes blocked, defending player loses
+    -- N life. N rides the constructor, as Poisonous' does, and for the same
+    -- reason: CR 702.130b says each instance triggers separately.
+    --
+    -- The SIXTH keyword rule 702 states as a triggered ability. Its event is CR
+    -- 509.3c's, which Bushido above already watches, and its PLAYER is CR 508.5's,
+    -- which Annihilator above already reads -- so Pawl.Engine.Keyword.afflict is
+    -- the two put together and adds nothing of its own.
+    Afflict Natural.Natural
   | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
     -- enter with an additional +1/+1 counter on it. If you don't, it gains
     -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,
