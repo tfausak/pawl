@@ -2769,7 +2769,7 @@ matchesTrigger gs bearer you cond event = case cond of
   -- event here.
   --
   -- The attacking creature the event also carries is not compared: this condition
-  -- is CR 509.3a's, which names none (#1144).
+  -- is CR 509.3a's, which names none (#1146).
   TriggerCondition.SelfBlocks -> case event of
     GameEvent.BlockerDeclared blocker _ -> blocker == bearer
     GameEvent.AttackerDeclared _ _ -> False
@@ -3895,7 +3895,7 @@ eventBindingSlots cond = case cond of
   TriggerCondition.SelfAttacks _ -> Set.singleton Binding.triggerPlayer
   -- Nothing, unlike SelfAttacks above: the blocker is the bearer, already bound
   -- as CR 113.7a's source, and the attacker the event also carries is what CR
-  -- 509.3b's condition would name rather than this one (#1144). CR 509.1a makes
+  -- 509.3b's condition would name rather than this one (#1146). CR 509.1a makes
   -- the blocker's controller the defending player, whom CR 109.5's `you` already
   -- names.
   TriggerCondition.SelfBlocks -> Set.empty

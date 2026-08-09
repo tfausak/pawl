@@ -112,7 +112,7 @@ data TriggerCondition
     --
     -- The ATTACKER the event also carries is not compared here. CR 509.3b's
     -- "blocks a creature", CR 509.3c's and CR 509.3d's "becomes blocked" are
-    -- separate conditions no card in the pool declares (#1144).
+    -- separate conditions no card in the pool declares (#1146).
     SelfBlocks
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.
