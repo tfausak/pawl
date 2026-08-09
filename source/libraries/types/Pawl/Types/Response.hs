@@ -15,6 +15,7 @@ import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -198,4 +199,9 @@ data Response
     AnnouncedEntwine EntwineDecision.EntwineDecision
   | -- | CR 903.9a's answer: whether the commander goes to the command zone.
     ReturnedCommander CommandZoneDecision.CommandZoneDecision
+  | -- | CR 401.2's answer: the end of their library an owner picked for one card.
+    ChoseLibraryEnd LibraryPosition.LibraryPosition
+  | -- | CR 401.4's answer: the order an owner chose for the cards arriving at one
+    -- end of their library, as a permutation of the offered indices.
+    ArrangedLibraryArrivals [Natural.Natural]
   deriving (Eq, Show)

@@ -9,9 +9,10 @@ module Pawl.Types.LibraryPosition where
 -- 400.1), and only a library has ends -- a `Zone.LibraryTop` would make every
 -- exhaustive case over the seven zones answer a question about libraries twice.
 --
--- Two-valued. Not implemented: an inhabitant meaning "the object's owner
--- chooses which end", which Aetherspouts needs and which owes a Prompt, a
--- Response arm and a Replay arm that a stated position does not (#1035).
+-- Two-valued, and STAYS two-valued: "the object's owner chooses which end"
+-- (Aetherspouts) is Pawl.Types.LibraryPlacement's job, so that every consumer of
+-- this type -- Pawl.Engine.Game.insertIntoZone above all -- gets an end that is
+-- already settled.
 --
 -- Not a Bool, for the reason Regenerability and TapState are not: at a call site
 -- `insertIntoZone Zone.Library Top` says which end without a comment.

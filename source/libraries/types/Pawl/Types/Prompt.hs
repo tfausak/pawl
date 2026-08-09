@@ -23,6 +23,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -325,6 +326,41 @@ data Prompt r where
   -- owner may put it into the command zone", and a commander that died under a
   -- thief's control is still its owner's to reclaim.
   ReturnCommander :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt CommandZoneDecision.CommandZoneDecision
+  -- | CR 401.2: which END of a library a card an effect is putting there arrives
+  -- at, when the effect leaves the choice open -- Aetherspouts' "its owner puts
+  -- it on their choice of the top or bottom of their library". The ObjectId is
+  -- the card being placed, read PRE-MOVE, so two creatures put two
+  -- distinguishable questions on the wire (#61's requirement, met at birth).
+  --
+  -- The OWNER is the player asked, as ReturnCommander's is and for the same kind
+  -- of reason: the card says "its owner", and CR 400.3 sends it to that owner's
+  -- library whoever controlled it. NOT CR 608.2f's resolving controller.
+  --
+  -- Never elided: the two ends are plainly different boards. The case not asked
+  -- is a STATED end (Pawl.Types.LibraryPlacement.Stated), where the rules leave
+  -- nothing to ask. Asked in the sweep's APNAP order (CR 101.4, CR 608.2f's
+  -- primary determination), which is what WotC's Aetherspouts ruling spells out.
+  ChooseLibraryEnd :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt LibraryPosition.LibraryPosition
+  -- | CR 401.4: "If an effect puts two or more cards in a specific position in a
+  -- library at the same time, the owner of those cards may arrange them in any
+  -- order." The PlayerId is that owner -- which for a library destination is also
+  -- the library's owner (CR 400.3) -- the LibraryPosition is the end they are
+  -- arriving at, and the [ObjectId] is the batch in the engine's canonical (sweep)
+  -- order. The answer is a permutation of the entry INDICES, read as the order
+  -- the cards END UP in from that end inward.
+  --
+  -- The end is on the wire because the answer's meaning depends on it: a player
+  -- asked to order two cards has to know which end they are being stacked from.
+  --
+  -- A DIFFERENT decider from CR 608.2f's secondary sentence, which hands the
+  -- relative order of same-controller actions to the resolving spell's
+  -- controller. For a library destination CR 401.4 takes that back and gives it
+  -- to the cards' owner; Aetherspouts' own ruling quotes it.
+  --
+  -- Asked only for a batch of two or more, which is CR 401.4's own wording rather
+  -- than an elision this engine invented. Still asked when the cards are copies
+  -- of one printing, OrderTriggers' posture: they are distinct objects.
+  ArrangeLibraryArrivals :: Decider.Decider -> PlayerId.PlayerId -> LibraryPosition.LibraryPosition -> [ObjectId.ObjectId] -> Prompt [Natural.Natural]
   -- | CR 601.2b / 700.2a: choose the mode(s) while casting (the ObjectId is the
   -- spell). The Set ModeIndex is the LEGAL modes -- the engine pre-filters to modes
   -- whose targets are all fillable (CR 700.2a). The ModeSelection is the printed

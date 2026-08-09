@@ -8,6 +8,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Types.Asked as Asked
 import Pawl.Types.Card (Card)
@@ -83,6 +84,26 @@ freshTimestamp :: GameState -> (Timestamp.Timestamp, GameState)
 freshTimestamp gs =
   let Timestamp.MkTimestamp n = GameState.nextTimestamp gs
    in (Timestamp.MkTimestamp n, gs {GameState.nextTimestamp = Timestamp.MkTimestamp (n + 1)})
+
+-- Reject-not-repair, as payment already does: only a genuine permutation of the
+-- offered indices is honoured. Anything else -- a short answer, a duplicate, an
+-- out-of-range index -- leaves the canonical order standing rather than dropping
+-- or duplicating an entry.
+--
+-- Beside 'choose' because it is what an ORDERING prompt's answer is applied
+-- through, and both such prompts want it from modules that cannot see each
+-- other: CR 603.3b's trigger order (Pawl.Engine.Engine) and CR 401.4's library
+-- arrangement (Pawl.Engine.Resolve).
+permute :: [a] -> [Natural] -> [a]
+permute xs order =
+  let canonical :: [Natural]
+      canonical = zipWith const [0 ..] xs
+      at i = case List.genericDrop i xs of
+        h : _ -> Just h
+        [] -> Nothing
+   in if List.sort order == canonical
+        then Maybe.mapMaybe at order
+        else xs
 
 -- Ask a player something they could have answered more than one way, and record
 -- that they were asked (GameState.lastChoice). CR 104.4b's second sentence --

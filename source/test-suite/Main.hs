@@ -63,6 +63,7 @@ import qualified Pawl.Codec.GameEventSpec
 import qualified Pawl.Codec.KeywordFamilySpec
 import qualified Pawl.Codec.KeywordSpec
 import qualified Pawl.Codec.LayoutSpec
+import qualified Pawl.Codec.LibraryPlacementSpec
 import qualified Pawl.Codec.LibraryPositionSpec
 import qualified Pawl.Codec.LoyaltySpec
 import qualified Pawl.Codec.ManaCostSpec
@@ -312,6 +313,7 @@ spec s registry = do
   Pawl.Codec.KeywordFamilySpec.spec s
   Pawl.Codec.KeywordSpec.spec s
   Pawl.Codec.LayoutSpec.spec s
+  Pawl.Codec.LibraryPlacementSpec.spec s
   Pawl.Codec.LibraryPositionSpec.spec s
   Pawl.Codec.LoyaltySpec.spec s
   Pawl.Codec.ManaCostSpec.spec s
