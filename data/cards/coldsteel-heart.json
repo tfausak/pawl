@@ -1,0 +1,79 @@
+{
+  "faces": [
+    {
+      "activatedAbilities": [
+        {
+          "cost": {
+            "components": [
+              {
+                "type": "TapThis"
+              }
+            ],
+            "mana": []
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "AddMana",
+                        "value": {
+                          "type": "Chosen"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        }
+      ],
+      "name": "Coldsteel Heart",
+      "replacementEffects": [
+        {
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "Tapped"
+            }
+          ]
+        },
+        {
+          "type": "EntryR",
+          "value": [
+            {
+              "type": "IsSource"
+            },
+            {
+              "type": "ChooseColor"
+            }
+          ]
+        }
+      ],
+      "typeLine": {
+        "supertypes": [
+          {
+            "type": "Snow"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          }
+        ]
+      }
+    }
+  ]
+}

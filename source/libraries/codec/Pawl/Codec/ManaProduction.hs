@@ -10,6 +10,7 @@ toJson :: ManaProduction.ManaProduction -> Value.Value
 toJson mp = case mp of
   ManaProduction.OfType mt -> Common.tagged "OfType" . Just $ ManaType.toJson mt
   ManaProduction.AnyColor -> Common.nullary "AnyColor"
+  ManaProduction.Chosen -> Common.nullary "Chosen"
   ManaProduction.SnowSymbol -> Common.nullary "SnowSymbol"
 
 fromJson :: Value.Value -> Either Text.Text ManaProduction.ManaProduction
@@ -18,5 +19,6 @@ fromJson value = do
   case (t, mv) of
     ("OfType", Just v) -> ManaProduction.OfType <$> ManaType.fromJson v
     ("AnyColor", _) -> Right ManaProduction.AnyColor
+    ("Chosen", _) -> Right ManaProduction.Chosen
     ("SnowSymbol", _) -> Right ManaProduction.SnowSymbol
     _ -> Left . Text.pack $ "unknown ManaProduction: " <> t

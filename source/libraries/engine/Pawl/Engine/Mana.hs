@@ -73,13 +73,22 @@ subtypeMana subtype = case subtype of
 -- symbol. ONE option and not a choice, so nothing here prompts -- and no snow
 -- tag, because CR 107.4h reads the SOURCE (productionTagsGiven) and never the
 -- symbol the effect was written with.
-producedTypes :: ManaProduction -> [ManaType]
-producedTypes production = case production of
+--
+-- CR 607.2d's linked pair is resolved by reading Object.chosenColor off the
+-- SOURCE, which is why this takes one: an ability referring to "the chosen
+-- color" means the colour its own object was told to choose. One option, so it
+-- offers no choice; none at all when nothing has been chosen, which for
+-- Coldsteel Heart cannot happen on a permanent that entered (CR 614.1c) and is
+-- not a colour for the engine to invent when it does.
+producedTypes :: ObjectId -> GameState -> ManaProduction -> [ManaType]
+producedTypes oid gs production = case production of
   ManaProduction.OfType manaType -> [manaType]
   ManaProduction.AnyColor ->
     fmap
       ManaType.Colored
       [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green]
+  ManaProduction.Chosen ->
+    fmap ManaType.Colored (Maybe.maybeToList (Game.lookupObject oid gs >>= Object.chosenColor))
   ManaProduction.SnowSymbol -> [ManaType.Colorless]
 
 -- Every ROUTE by which this object could be activated for mana, as the mana ONE
@@ -152,7 +161,7 @@ manaYieldsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       asMana manaTypes =
         Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags}) manaTypes)
-   in List.nub (fmap asMana (concatMap (traverse producedTypes) (manaRoutesOfGiven pcs oid gs)))
+   in List.nub (fmap asMana (concatMap (traverse (producedTypes oid gs)) (manaRoutesOfGiven pcs oid gs)))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
 -- adds will carry. THE one place they are decided; manaYieldsOfGiven just above
