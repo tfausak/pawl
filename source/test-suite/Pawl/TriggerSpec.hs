@@ -1635,13 +1635,13 @@ orderingSpec s registry =
         -- means the input list comes back verbatim: nothing dropped, nothing
         -- duplicated.
         Spec.it s "permute applies a genuine permutation" $ do
-          Spec.assertEqWith s "reordered" (Engine.permute "abc" [2, 1, 0]) "cba"
+          Spec.assertEqWith s "reordered" (Game.permute "abc" [2, 1, 0]) "cba"
         Spec.it s "permute rejects a short answer, keeping the canonical order" $ do
-          Spec.assertEqWith s "unchanged" (Engine.permute "abc" [1, 0]) "abc"
+          Spec.assertEqWith s "unchanged" (Game.permute "abc" [1, 0]) "abc"
         Spec.it s "permute rejects a duplicate index, keeping the canonical order" $ do
-          Spec.assertEqWith s "unchanged" (Engine.permute "abc" [0, 0, 1]) "abc"
+          Spec.assertEqWith s "unchanged" (Game.permute "abc" [0, 0, 1]) "abc"
         Spec.it s "permute rejects an out-of-range index, keeping the canonical order" $ do
-          Spec.assertEqWith s "unchanged" (Engine.permute "abc" [0, 1, 5]) "abc"
+          Spec.assertEqWith s "unchanged" (Game.permute "abc" [0, 1, 5]) "abc"
         -- M-2 (review): apnapPlayers rotates the turn order to start at the active
         -- player and filters to controllers with a pending trigger -- genuinely new
         -- behaviour versus M3f's apnapOrder, which never consulted turn order at

@@ -11,7 +11,7 @@ import qualified Pawl.Types.EntryRiders as EntryRiders
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
-import qualified Pawl.Types.LibraryPosition as LibraryPosition
+import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Modification as Modification
@@ -227,19 +227,22 @@ data Effect card
     -- That reading asks about "the object it's on", which only an InSlot naming
     -- the reserved source slot can be; a swept set is never one object, so
     -- EffectZone answers Nothing for EachMatching whatever origin is stated.
-    -- The LibraryPosition is the END a LIBRARY destination arrives at (CR
-    -- 401.2's order): Griptide's "on top of its owner's library" against
-    -- Unsummon's silence. Inert for every other destination -- the battlefield,
-    -- exile and the command zone are unordered and the hand, graveyard and stack
-    -- have their own arrival rules -- so a card that states one on a non-library
-    -- move states something nothing reads, which is the same inert card-data
-    -- error the origin zone above describes.
+    -- The LibraryPlacement is the END a LIBRARY destination arrives at (CR
+    -- 401.2's order), either stated -- Griptide's "on top of its owner's
+    -- library", against Unsummon's silence -- or left to each moved object's
+    -- OWNER, which is Aetherspouts. Inert for every other destination -- the
+    -- battlefield, exile and the command zone are unordered and the hand,
+    -- graveyard and stack have their own arrival rules -- so a card that states
+    -- one on a non-library move states something nothing reads, which is the
+    -- same inert card-data error the origin zone above describes; a CardSpec
+    -- lint additionally forbids OwnerChooses there, since that one would ask a
+    -- player a question with no board behind it.
     --
     -- A field on the OPCODE rather than a seventh Zone constructor, for
-    -- EntryRiders' reason one zone over: the position is what the EFFECT says,
+    -- EntryRiders' reason one zone over: the placement is what the EFFECT says,
     -- and a Zone that carried it would make every case over the zones ask about
     -- libraries twice.
-    MoveToZone ObjectRef.ObjectRef Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName) (Maybe Zone.Zone) LibraryPosition.LibraryPosition
+    MoveToZone ObjectRef.ObjectRef Zone.Zone EntryRiders.EntryRiders (Maybe SlotName.SlotName) (Maybe Zone.Zone) LibraryPlacement.LibraryPlacement
   | -- | CR 121.1: the players the PlayerRef names each draw this many cards, one at
     -- a time (CR 121.2). Divination is `Relative You`; Ancestral Recall is
     -- `InSlot`, reading a slot TARGETING filled (CR 601.2c). Empty-library draw is

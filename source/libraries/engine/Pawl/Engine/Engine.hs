@@ -515,7 +515,7 @@ advanceSagas pid = do
 -- player who has left the game is not put onto the stack. No separate filter is
 -- needed: `orderPending` groups `pending` by `apnapPlayers`, which already
 -- restricts every group to a still-playing controller, and nothing in the
--- `apnapPlayers` -> `orderFor` -> `permute` pipeline can INTRODUCE an entry. Two
+-- `apnapPlayers` -> `orderFor` -> `Game.permute` pipeline can INTRODUCE an entry. Two
 -- carriers can reach this with a departed controller -- a DELAYED ability, whose
 -- controller CR 603.7d fixed as the arming spell resolved, and an OBJECT-BORNE
 -- ability reading CR 603.3a's controller from GameState.controlWhenTriggered
@@ -820,7 +820,7 @@ orderFor gs pending pid = do
     else do
       let decider = Decide.deciderFor pid gs
       answer <- Game.choose (Prompt.OrderTriggers decider pid (fmap entryOf mine))
-      pure (permute mine answer)
+      pure (Game.permute mine answer)
 
 -- What one pending trigger looks like to the player being asked for CR 603.3b's
 -- order: its source and WHICH ABILITY it is (#61) -- see
@@ -835,21 +835,6 @@ entryOf pending =
     { TriggerEntry.source = PendingTrigger.source pending,
       TriggerEntry.ability = PendingTrigger.ability pending
     }
-
--- Reject-not-repair, as payment already does: only a genuine permutation of the
--- offered indices is honoured. Anything else -- a short answer, a duplicate, an
--- out-of-range index -- leaves the canonical order standing rather than dropping
--- or duplicating a trigger.
-permute :: [a] -> [Natural] -> [a]
-permute xs order =
-  let canonical :: [Natural]
-      canonical = zipWith const [0 ..] xs
-      at i = case List.genericDrop i xs of
-        h : _ -> Just h
-        [] -> Nothing
-   in if List.sort order == canonical
-        then Maybe.mapMaybe at order
-        else xs
 
 -- CR 117.5's settle, discarding the report. The name all but one caller uses;
 -- `performSettle` below is the same act, and carries the whole account of it.

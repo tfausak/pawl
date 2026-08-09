@@ -178,6 +178,8 @@ library codec
     Pawl.Codec.KeywordSpec
     Pawl.Codec.Layout
     Pawl.Codec.LayoutSpec
+    Pawl.Codec.LibraryPlacement
+    Pawl.Codec.LibraryPlacementSpec
     Pawl.Codec.LibraryPosition
     Pawl.Codec.LibraryPositionSpec
     Pawl.Codec.Loyalty
@@ -604,6 +606,7 @@ library types
     Pawl.Types.LastKnown
     Pawl.Types.Layer
     Pawl.Types.Layout
+    Pawl.Types.LibraryPlacement
     Pawl.Types.LibraryPosition
     Pawl.Types.Loyalty
     Pawl.Types.Mana

@@ -69,6 +69,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
+import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.MillTally as MillTally
 import qualified Pawl.Types.Mode as Mode
 import Pawl.Types.ModeIndex (ModeIndex)
@@ -1150,6 +1152,74 @@ objectRefObjects legality chosen resolving controller source gs ref = case ref o
           Just pid -> Maybe.fromMaybe last_ (List.elemIndex pid order)
      in List.sortOn (\oid -> (seat oid, oid)) matching
 
+-- CR 401.2 and CR 401.4: turn the effect's LibraryPlacement into the END each
+-- moving object arrives at, and hand back the batch in the order the moves must
+-- then be PERFORMED in.
+--
+-- Two questions, both asked before anything moves, so every answer is given
+-- against the board the effect swept (CR 608.2f, "processed simultaneously"):
+--
+--   * CR 401.2, once per object: Aetherspouts' "its owner puts it on their
+--     choice of the top or bottom of their library". Asked of the OWNER, read
+--     off the PRE-MOVE object, in the sweep's own order -- which
+--     objectRefObjects already delivers in APNAP order (CR 101.4), the order
+--     WotC's Aetherspouts ruling spells out.
+--   * CR 401.4, once per (owner, end) group of two or more: "the owner of those
+--     cards may arrange them in any order". A DIFFERENT decider from CR 608.2f's
+--     secondary sentence, which hands the relative order of same-controller
+--     actions to the resolving spell's controller; for a library destination CR
+--     401.4 takes it back and gives it to the cards' owner.
+--
+-- The arrangement answer names the cards from the chosen end INWARD, which is
+-- how a player reads "arrange them". Game.insertIntoZone puts every arrival AT
+-- that end -- prepending for Top, appending for Bottom -- so whichever end it
+-- is, the card moved LAST finishes outermost. The batch is therefore performed
+-- in REVERSE of the arranged order, one rule for both ends rather than two,
+-- precisely because the sequence grows from opposite ends for them.
+--
+-- A move the CR 616.1 loop cancels (CR 614.6) simply does not arrive, and the
+-- rest keep the relative order their owner chose. That is CR 401.4 as written --
+-- it arranges the cards an effect PUTS into a library -- where re-asking after a
+-- cancellation would ask a question the rule does not.
+--
+-- Nothing here discharges #379. That issue is CR 608.2f's resolving-controller
+-- ordering for an action the CR gives no rule of its own; this is CR 401.4's
+-- library case, and it SCREENS the sweep order off rather than exposing it.
+settleArrivals :: Zone.Zone -> LibraryPlacement.LibraryPlacement -> [ObjectId] -> Game [(ObjectId, LibraryPosition.LibraryPosition)]
+settleArrivals zone placement targets = case zone of
+  Zone.Library -> do
+    settled <- Monad.mapM settleEnd targets
+    fmap concat (Monad.mapM (arrange settled) (List.nub (fmap fst settled)))
+  -- No other destination has ends: the battlefield, exile and the command zone
+  -- are unordered, and the hand, graveyard and stack have arrival rules of their
+  -- own. Nothing to settle and nothing to arrange, and the funnel ignores the
+  -- position it is handed.
+  _ -> pure (fmap (\oid -> (oid, LibraryPosition.defaultValue)) targets)
+  where
+    settleEnd oid = do
+      gs <- State.get
+      case fmap Object.owner (Game.lookupObject oid gs) of
+        -- Already gone (CR 603.7c's "no longer in the zone it's expected to be
+        -- in"). moveOne is a no-op for it, so there is nobody to ask.
+        Nothing -> pure ((Nothing, LibraryPosition.defaultValue), oid)
+        Just owner -> do
+          position <- case placement of
+            LibraryPlacement.Stated stated -> pure stated
+            LibraryPlacement.OwnerChooses ->
+              Game.choose (Prompt.ChooseLibraryEnd (Decide.deciderFor owner gs) owner oid)
+          pure ((Just owner, position), oid)
+    arrange settled key = do
+      let batch = [oid | (k, oid) <- settled, k == key]
+          (mOwner, position) = key
+      case (mOwner, batch) of
+        (Just owner, _ : _ : _) -> do
+          gs <- State.get
+          answer <- Game.choose (Prompt.ArrangeLibraryArrivals (Decide.deciderFor owner gs) owner position batch)
+          pure (fmap (\oid -> (oid, position)) (reverse (Game.permute batch answer)))
+        -- One card is one order, which is CR 401.4's own "two or more" rather
+        -- than an elision this engine invented.
+        _ -> pure (fmap (\oid -> (oid, position)) batch)
+
 -- The same sweep as objectRefObjects, one step earlier: what an ObjectRef names as
 -- RECIPIENTS, before the objects are picked out of them.
 --
@@ -1759,7 +1829,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- creature that is not in the record is what Game.removeFromCombat
         -- already does to it, which is nothing.
         _ -> gs
-  Effect.MoveToZone ref zone entry mSlot _ position ->
+  Effect.MoveToZone ref zone entry mSlot _ placement ->
     -- ONE object through CR 400.7's funnel, shared by the two arms below so that
     -- what a move DOES is written once and only WHICH objects move differs.
     let -- CR 400.7: the funnel mints a new incarnation in `zone`, owner-relative
@@ -1774,7 +1844,9 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- reason -- Griptide's "on top of its owner's library" is where the card
         -- ARRIVES, so it has to be settled by the move rather than by a second
         -- write afterward, which would leave the incarnation on the bottom while
-        -- the Moved event and any CR 616.1 watcher looked at it.
+        -- the Moved event and any CR 616.1 watcher looked at it. `settleArrivals`
+        -- below is what turns the effect's LibraryPlacement into the per-object
+        -- end each mover is handed here.
         --
         -- CR 110.2a: "If an effect instructs a player to put an object onto the
         -- battlefield, that object enters the battlefield under THAT PLAYER's
@@ -1799,7 +1871,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- player controls neither -- CR 800.4d keeps their triggered ability off
         -- the stack and Departure.nonCardStackObjectsCease removes one already
         -- on it, while clause 1 of CR 800.4a took their spells out of the game.
-        moveOne target = do
+        moveOne (target, position) = do
           mNew <- Event.changeZoneEntering target zone position entry (Just controller)
           case mNew of
             -- CR 614.6: the CR 616.1 loop cancelled the move, or the id was
@@ -1834,56 +1906,61 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               -- CardSpec lint rejects the combination rather than letting a card
               -- ask for it (#972).
               Monad.mapM_ (\bindTo -> State.modify' (bindSlot resolving bindTo newId)) mSlot
-     in case ref of
-          -- NOT routed through objectRefObjects, and that is the whole reason
-          -- this arm branches by hand rather than sweeping both cases. That
-          -- function reads `slotGroup` and then `chosen`, never `slotOne` -- and
-          -- slotOne is what lets a slot an EARLIER EFFECT OF THIS SAME RESOLUTION
-          -- bound name its object here. Befriending the Moths' chapter III is the
-          -- producer: "Exile this Saga, then return IT to the battlefield
-          -- transformed", two moves in one resolution where the second names what
-          -- the first minted. Sending InSlot through the shared sweep would find
-          -- nothing for it.
-          --
-          -- The slot therefore names EITHER a target this ability declared or an
-          -- incarnation such an earlier effect bound (the mSlot above, CR 400.7).
-          -- A declared target is read out of `chosen` behind CR 608.2b's
-          -- re-validation, which is what a target is owed; a slot `chosen` does
-          -- not mention was never targeted and owes it nothing, so it is read LIVE
-          -- off the resolving object (slotOne, whose own note explains why
-          -- `chosen` cannot see it). Testing membership rather than preferring one
-          -- answer is what keeps the two apart: a slot cannot be both, and a
-          -- target never loses its re-validation to a binding that happens to
-          -- share its name. No card observes the difference -- the CardSpec lint
-          -- "no delayed ability declares a target spec under a slot its card
-          -- defines" is what rules the collision out -- so the membership test
-          -- buys the ordering rather than a passing test.
-          ObjectRef.InSlot slot -> do
-            bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
-            let mTarget = case bound of
-                  Just oid -> Just oid
-                  Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-                    (Just recipient, True) -> Recipient.objectOf recipient
-                    -- Illegal slot (CR 608.2b), a non-object recipient, or a slot
-                    -- nothing ever bound.
-                    _ -> Nothing
-            Monad.mapM_ moveOne mTarget
-          -- Evacuation's "return all creatures to their owners' hands". Swept
-          -- ONCE from the PRE-MOVE state, which is CR 608.2c's "in the order
-          -- written" read together with CR 608.2f's "each such action is
-          -- processed simultaneously": nothing an earlier move does can add to or
-          -- remove from the list, so a creature that stops being one because
-          -- another creature left still moves. objectRefObjects already answers in
-          -- APNAP order.
-          --
-          -- Each mover then goes through the same funnel one at a time, so every
-          -- arrival gets its own CR 616.1 opportunity. CR 400.3 files each hand
-          -- arrival under Object.owner, which is what makes "their OWNERS' hands"
-          -- need nothing here: the funnel is handed `Just controller`, and CR
-          -- 110.2a's control question is asked only of a battlefield destination.
-          ObjectRef.EachMatching _ -> do
-            gs <- State.get
-            Monad.mapM_ moveOne (objectRefObjects legality chosen resolving controller source gs ref)
+     in do
+          -- WHICH objects move, gathered first and moved second, so that the CR
+          -- 401.2 and CR 401.4 questions between the two steps are asked of the
+          -- whole batch. BOTH branches go through it: a stated placement is
+          -- settled the same way, and an InSlot move is a batch of at most one.
+          targets <- case ref of
+            -- NOT routed through objectRefObjects, and that is the whole reason
+            -- this arm branches by hand rather than sweeping both cases. That
+            -- function reads `slotGroup` and then `chosen`, never `slotOne` -- and
+            -- slotOne is what lets a slot an EARLIER EFFECT OF THIS SAME RESOLUTION
+            -- bound name its object here. Befriending the Moths' chapter III is the
+            -- producer: "Exile this Saga, then return IT to the battlefield
+            -- transformed", two moves in one resolution where the second names what
+            -- the first minted. Sending InSlot through the shared sweep would find
+            -- nothing for it.
+            --
+            -- The slot therefore names EITHER a target this ability declared or an
+            -- incarnation such an earlier effect bound (the mSlot above, CR 400.7).
+            -- A declared target is read out of `chosen` behind CR 608.2b's
+            -- re-validation, which is what a target is owed; a slot `chosen` does
+            -- not mention was never targeted and owes it nothing, so it is read LIVE
+            -- off the resolving object (slotOne, whose own note explains why
+            -- `chosen` cannot see it). Testing membership rather than preferring one
+            -- answer is what keeps the two apart: a slot cannot be both, and a
+            -- target never loses its re-validation to a binding that happens to
+            -- share its name. No card observes the difference -- the CardSpec lint
+            -- "no delayed ability declares a target spec under a slot its card
+            -- defines" is what rules the collision out -- so the membership test
+            -- buys the ordering rather than a passing test.
+            ObjectRef.InSlot slot -> do
+              bound <- if Map.member slot chosen then pure Nothing else State.gets (slotOne slot resolving)
+              pure $ case bound of
+                Just oid -> [oid]
+                Nothing -> case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+                  (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
+                  -- Illegal slot (CR 608.2b), a non-object recipient, or a slot
+                  -- nothing ever bound.
+                  _ -> []
+            -- Evacuation's "return all creatures to their owners' hands". Swept
+            -- ONCE from the PRE-MOVE state, which is CR 608.2c's "in the order
+            -- written" read together with CR 608.2f's "each such action is
+            -- processed simultaneously": nothing an earlier move does can add to or
+            -- remove from the list, so a creature that stops being one because
+            -- another creature left still moves. objectRefObjects already answers in
+            -- APNAP order.
+            --
+            -- Each mover then goes through the same funnel one at a time, so every
+            -- arrival gets its own CR 616.1 opportunity. CR 400.3 files each hand
+            -- arrival under Object.owner, which is what makes "their OWNERS' hands"
+            -- need nothing here: the funnel is handed `Just controller`, and CR
+            -- 110.2a's control question is asked only of a battlefield destination.
+            ObjectRef.EachMatching _ -> do
+              gs <- State.get
+              pure (objectRefObjects legality chosen resolving controller source gs ref)
+          Monad.mapM_ moveOne =<< settleArrivals zone placement targets
   -- CR 701.24: shuffle the slot's target into its OWNER's library. Two steps, in
   -- this order and with the owner read before either:
   --
