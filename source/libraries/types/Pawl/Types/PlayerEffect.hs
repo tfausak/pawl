@@ -255,4 +255,20 @@ data PlayerEffect
     -- approximate. The narrowing rides in the pattern above instead, where CR
     -- 615.12's own subject is.
     DamageCantBePrevented DamagePattern.DamagePattern
+  | -- | CR 701.23 / 613.11 / Leonin Arbiter: this player can't search libraries.
+    --
+    -- CR 611.1's third clause again -- searching is something the RULES let a
+    -- player do while following an instruction, not a characteristic of any
+    -- object -- which is why it sits here rather than in
+    -- Pawl.Types.Modification.
+    --
+    -- WHICH library is not carried. Leonin Arbiter's sentence names none, and CR
+    -- 101.2 needs no help from a narrowing to stop the one search pawl can
+    -- perform: Effect.Search searches the RESOLVING CONTROLLER's own library and
+    -- no card in the pool searches another player's (#283). A card that
+    -- prohibited searching only some libraries would want a filter here.
+    --
+    -- WHOSE searching is the carrier's PlayerScope, as for every arm here:
+    -- Leonin Arbiter says "players" with no possessive, so EachPlayer.
+    CantSearchLibraries
   deriving (Eq, Ord, Show)

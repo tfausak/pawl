@@ -113,6 +113,7 @@ emptyGame order =
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.playerEffects = [],
+          GameState.ignoredAbilities = [],
           GameState.turnOrder = order_,
           GameState.activePlayer = NonEmpty.head order,
           GameState.phase = Turn.firstPhase,
@@ -343,6 +344,7 @@ restartGame perform starter = do
             GameState.replacements = [],
             GameState.pendingPreventionRiders = Seq.empty,
             GameState.playerEffects = [],
+            GameState.ignoredAbilities = [],
             GameState.turnOrder = order,
             -- CR 727.1a. Read back off the rebuilt order, exactly as
             -- subgameStateFrom does, so the two can never disagree and this
@@ -444,6 +446,7 @@ subgameStateFrom starter parent =
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.playerEffects = [],
+          GameState.ignoredAbilities = [],
           GameState.activePlayer = firstPlayer,
           GameState.phase = Turn.firstPhase,
           GameState.remaining = Turn.laterPhases,

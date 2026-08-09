@@ -115,6 +115,7 @@ import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.SourceRelation as SourceRelation
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -1492,6 +1493,14 @@ keywordFilters keyword = case keyword of
 costFilters :: Cost.Type.Cost Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 costFilters = concatMap costComponentFilters . Cost.Type.components
 
+-- CR 116.2: which spells a printed special action names -- only through the cost
+-- CR 116.2d's ignore carries.
+specialActionFilters :: SpecialAction.SpecialAction -> [Filter.Type.Filter Keyword.Keyword]
+specialActionFilters specialAction = case specialAction of
+  SpecialAction.IgnoreThisUntilEndOfTurn cost -> costFilters cost
+  -- CR 116.2e names one card and nothing about it.
+  SpecialAction.DiscardThisAnyTime -> []
+
 costComponentFilters :: CostComponent.CostComponent Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 costComponentFilters component = case component of
   -- CR 601.2f's "sacrificing permanents": Village Rites' "a creature".
@@ -1677,6 +1686,8 @@ playerEffectFilters playerEffect = case playerEffect of
   -- predicate over an object (Excruciator's "by this creature"). The pattern's
   -- authorability is linted by unpreventablePatternOffends below.
   PlayerEffect.DamageCantBePrevented _ -> []
+  -- CR 701.23 names no quality of the libraries it stops being searched.
+  PlayerEffect.CantSearchLibraries -> []
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -1702,6 +1713,7 @@ playerEffectFilters playerEffect = case playerEffect of
 unpreventableScopeOffends :: PlayerScope.PlayerScope -> PlayerEffect.PlayerEffect -> Bool
 unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented _ -> scope /= PlayerScope.EachPlayer
+  PlayerEffect.CantSearchLibraries -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
   -- written and any of the three is legitimate: Rule of Law and Thalia say
   -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
@@ -1737,6 +1749,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
 unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_)
+  PlayerEffect.CantSearchLibraries -> False
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
   PlayerEffect.CantCastSpells -> False
@@ -1991,7 +2004,7 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Twenty-one of Pawl.Types.Face's thirty-one fields can hold one, and
+-- frames it. Twenty-two of Pawl.Types.Face's thirty-one fields can hold one, and
 -- here is where each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
@@ -2002,6 +2015,7 @@ activatedAbilityFilters ability =
 --   * `replacementEffects` -- CR 614.1's counter-placement pattern.
 --   * `enchant` -- CR 303.4a's enchant ability, a TargetSpec.
 --   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
+--   * `specialActions` -- CR 116.2d's ignore cost, a Cost like the two above.
 --   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
 --     permission.
 --   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
@@ -2013,16 +2027,16 @@ activatedAbilityFilters ability =
 --   * `mulliganActions` (CR 103.5b) and `openingHandActions` (CR 103.6) -- the two
 --     pregame actions, which `cardResolutionEffects` above does not reach.
 --
--- The other ten fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
--- `defense`, `colorIndicator`, `counterability`, `castingPermissions`,
--- `castingRestrictions` and `specialActions`. That is checkable rather than
+-- The other nine fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
+-- `defense`, `colorIndicator`, `counterability`, `castingPermissions` and
+-- `castingRestrictions`. That is checkable rather than
 -- asserted: exactly sixteen modules under Pawl.Types import Pawl.Types.Filter --
 -- Affected, CostComponent, Count, CounterPattern, Effect, EntryRewrite, Keyword,
 -- MillTally, ObjectRef, PlayerEffect, Prompt, ReplacementEffect, TargetSpec,
--- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those ten
+-- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those nine
 -- fields reach is one of them.
 --
--- Twenty-one and ten is thirty-one, the whole record.
+-- Twenty-two and nine is thirty-one, the whole record.
 --
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
@@ -2041,6 +2055,7 @@ cardFilters card =
         <> concatMap targetSpecFilters (Face.enchant card)
         <> concatMap costComponentFilters (Face.additionalCosts card)
         <> concatMap costFilters (Face.alternativeCosts card)
+        <> concatMap specialActionFilters (Face.specialActions card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)

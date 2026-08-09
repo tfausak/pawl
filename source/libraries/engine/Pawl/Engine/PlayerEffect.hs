@@ -31,6 +31,7 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import Pawl.Types.Keyword (Keyword)
 import Pawl.Types.ManaCost (ManaCost)
 import Pawl.Types.ManaUnit (ManaUnit)
@@ -182,7 +183,21 @@ applying pid gs =
           ActivePlayerEffect.effect active
         )
       stored = fmap storedOne (GameState.playerEffects gs)
-      keep (_, controller, scope, _) = inScope pid controller scope
+      -- CR 116.2d: a player who has paid to ignore a permanent's static ability
+      -- sees none of that permanent's player abilities. Filtered HERE, at the
+      -- one gather every consumer reads through, so the ignore reaches all of
+      -- them at once and cannot be forgotten by a later gate.
+      --
+      -- Only the PRINTED carrier can be ignored, which is exact rather than a
+      -- shortcut: CR 116.2d's subject is "effects from static abilities", and a
+      -- stored effect came from a resolution instead (Silence). Those arrive
+      -- with source Nothing and so match nothing here.
+      keep (source, controller, scope, _) =
+        inScope pid controller scope
+          && not (any (ignores source) (GameState.ignoredAbilities gs))
+      ignores source ignored =
+        IgnoredAbility.player ignored == pid
+          && Just (IgnoredAbility.source ignored) == source
       effectOf (source, _, _, effect) = (source, effect)
    in fmap effectOf (filter keep (printed <> stored))
 
@@ -232,6 +247,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.DontLoseUnspentMana _ -> effect
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect
+  PlayerEffect.CantSearchLibraries -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -333,6 +349,7 @@ prohibitsCasting pid name gs =
         -- CR 615.12 edits what CR 615.1's shields do to a damage event. Nobody
         -- is more or less allowed to cast a spell for it.
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -377,7 +394,39 @@ prohibitsPlayingLand pid name gs =
         -- countering reaches a land play.
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
    in any prohibits (applying pid gs)
+
+-- CR 701.23: does any effect prohibit `pid` from searching a library?
+--
+-- Takes no library, unlike the two prohibitions above taking a name: no printed
+-- effect narrows WHICH library, and Effect.Search searches only the resolving
+-- controller's own (#1139). See Pawl.Types.PlayerEffect.CantSearchLibraries.
+--
+-- A DISJUNCTION for CR 101.2's reason.
+prohibitsSearching :: PlayerId -> GameState -> Bool
+prohibitsSearching pid gs =
+  let prohibits effect = case effect of
+        PlayerEffect.CantSearchLibraries -> True
+        -- Every other arm is about casting, playing, targeting, countering,
+        -- paying or keeping mana. CR 701.23's search is an action a player takes
+        -- while FOLLOWING an instruction that has already resolved, so none of
+        -- them reaches it -- Silence stops the spell, never the search a
+        -- resolved one performs.
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+   in any (prohibits . snd) (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
 -- (Object.chosenNames). Empty for an effect with no source -- a stored CR 611.2c
@@ -441,6 +490,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.CantSearchLibraries -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -455,6 +505,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.CantSearchLibraries -> Nothing
       effects = fmap snd (applying pid gs)
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 
@@ -506,6 +557,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.CantBeTargetedBy _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -555,6 +607,7 @@ protectedFromTargeting caster pid gs =
         -- protects still targets it legally and still resolves.
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -602,6 +655,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantBeTargetedBy _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.CantSearchLibraries -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -630,6 +684,7 @@ maximumHandSize pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
    in if any (removes . snd) (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
@@ -674,6 +729,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
+        PlayerEffect.CantSearchLibraries -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -727,6 +783,7 @@ cantBeCountered pid oid gs =
         -- is about a damage event and CR 701.6a about an object on the stack.
         -- The two travel together on one card and share nothing.
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
@@ -773,6 +830,7 @@ unpreventable :: GameState -> [(Maybe ObjectId, DamagePattern.DamagePattern)]
 unpreventable gs =
   let says (src, effect) = case effect of
         PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
+        PlayerEffect.CantSearchLibraries -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing
