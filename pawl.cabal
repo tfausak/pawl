@@ -268,6 +268,8 @@ library codec
     Pawl.Codec.SlotNameSpec
     Pawl.Codec.SourceRelation
     Pawl.Codec.SourceRelationSpec
+    Pawl.Codec.SpecialAction
+    Pawl.Codec.SpecialActionSpec
     Pawl.Codec.StaticAbility
     Pawl.Codec.StaticAbilitySpec
     Pawl.Codec.Subtype
@@ -673,6 +675,7 @@ library types
     Pawl.Types.SlotName
     Pawl.Types.Source
     Pawl.Types.SourceRelation
+    Pawl.Types.SpecialAction
     Pawl.Types.StaticAbility
     Pawl.Types.Status
     Pawl.Types.Subtype
@@ -778,6 +781,7 @@ test-suite pawl-test-suite
     Pawl.SacrificeRestrictionSpec
     Pawl.SagaSpec
     Pawl.SetupSpec
+    Pawl.SpecialActionSpec
     Pawl.SpeedSpec
     Pawl.Support
     Pawl.TargetSpec

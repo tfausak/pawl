@@ -108,6 +108,7 @@ import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
 import qualified Pawl.Codec.SlotNameSpec
 import qualified Pawl.Codec.SourceRelationSpec
+import qualified Pawl.Codec.SpecialActionSpec
 import qualified Pawl.Codec.StaticAbilitySpec
 import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
@@ -189,6 +190,7 @@ import qualified Pawl.SagaSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
+import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TransformSpec
@@ -346,6 +348,7 @@ spec s registry = do
   Pawl.Codec.SearchDestinationSpec.spec s
   Pawl.Codec.SlotNameSpec.spec s
   Pawl.Codec.SourceRelationSpec.spec s
+  Pawl.Codec.SpecialActionSpec.spec s
   Pawl.Codec.StaticAbilitySpec.spec s
   Pawl.Codec.SubtypeFamilySpec.spec s
   Pawl.Codec.SubtypeSpec.spec s
@@ -423,6 +426,7 @@ spec s registry = do
   Pawl.SlugSpec.spec s
   Pawl.SacrificeRestrictionSpec.spec s registry
   Pawl.SagaSpec.spec s registry
+  Pawl.SpecialActionSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TransformSpec.spec s registry

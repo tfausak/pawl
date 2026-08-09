@@ -48,6 +48,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -123,6 +124,7 @@ baseFace =
       Face.alternativeCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
+      Face.specialActions = [],
       Face.enchant = [],
       Face.counterability = Counterability.Counterable
     }
@@ -161,7 +163,8 @@ minimalFace =
       Face.sacrificeRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
-      Face.openingHandActions = []
+      Face.openingHandActions = [],
+      Face.specialActions = []
     }
 
 -- The same face the verbose literal below spells out: minimalFace's fields,
@@ -210,6 +213,7 @@ populatedFace =
       Face.counterability = Counterability.CantBeCountered,
       Face.mulliganActions = [[Effect.ExileHandThenDraw]],
       Face.openingHandActions = [[Effect.ExileHandThenDraw]],
+      Face.specialActions = [SpecialAction.DiscardThisAnyTime],
       Face.enchant = [TargetSpec.MkTargetSpec Pool.Creatures Nothing],
       Face.castingRestrictions = [CastingRestriction.AttackedThisStep]
     }
@@ -241,6 +245,7 @@ populatedFaceJson =
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
     <> "\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
     <> "\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
+    <> "\"specialActions\":[{\"type\":\"DiscardThisAnyTime\"}],"
     <> "\"enchant\":[{\"pool\":{\"type\":\"Creatures\"}}],"
     <> "\"castingRestrictions\":[{\"type\":\"AttackedThisStep\"}]}"
 
@@ -309,6 +314,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "openingHandActions (CR 103.6) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.openingHandActions <$> decodeFace v) (Right [])
+    Spec.it s "specialActions (CR 116.2) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.specialActions <$> decodeFace v) (Right [])
     Spec.it s "enchant (CR 702.5a) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.enchant <$> decodeFace v) (Right [])
@@ -440,6 +448,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.openingHandActions = [[Effect.ExileHandThenDraw]]}
         (init baseFaceJson <> ",\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]]}")
+    Spec.it s "specialActions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.specialActions = [SpecialAction.DiscardThisAnyTime]}
+        (init baseFaceJson <> ",\"specialActions\":[{\"type\":\"DiscardThisAnyTime\"}]}")
     Spec.it s "enchant" $
       Common.assertJsonCodec
         s
