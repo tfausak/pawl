@@ -35,8 +35,10 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
 import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -384,7 +386,7 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announce canPayActivation pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
+    (announced, life) <- Mana.announce canActivateManaAbility pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -490,6 +492,24 @@ reductionHalvesOf symbol = case symbol of
 requiresSicknessCheck :: Cost Keyword.Type.Keyword -> Bool
 requiresSicknessCheck cost =
   any (\c -> elem c (Cost.components cost)) [CostComponent.TapThis, CostComponent.UntapThis]
+
+-- CR 302.6 asked of one activation COST -- the whole of what the rule reads, so
+-- an ability charging anything else is not gated at all. The ONE reading, asked
+-- on both paths an activated ability takes: Pawl.Engine.Activate for an ability
+-- that uses the stack, and canActivateManaAbility below for one that does not
+-- (CR 605.3b). Two readings could disagree, and the mana one used to, by gating
+-- every source of a controller's whether its cost held {T} or not (#1116).
+--
+-- Reads PROJECTED creature-ness, so a plain land is never sick-gated and an
+-- animated one is. Keyed to `pid`, the player trying to activate: CR 302.6 asks
+-- about THEIR control since THEIR most recent turn began, so a settle recorded
+-- for anyone else does not answer it (#198). CR 702.10c's haste exemption comes
+-- with it, from Summoning.settledOrHastyGiven.
+sicknessOkGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+sicknessOkGiven pcs pid oid cost gs =
+  not (requiresSicknessCheck cost)
+    || not (Set.member CardType.Creature (Projection.cardTypesGiven pcs oid gs))
+    || Summoning.settledOrHastyGiven pcs pid oid gs
 
 -- CR 606.2: an activated ability with a loyalty symbol in its cost is a loyalty
 -- ability. The CLASSIFICATION Pawl.Engine.Activate reads for CR 606.3's window
@@ -829,25 +849,38 @@ canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
-    Mana.canPayCommitting canPayActivation pid (lifeOwedBy (Cost.components cost)) manaCost gs
+    Mana.canPayCommitting canActivateManaAbility pid (lifeOwedBy (Cost.components cost)) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
 
--- CR 118.3 asked of a MANA ability's own activation cost, which CR 602.2b makes
--- the activation pay. This is the gate (Mana.Gate) threaded through
--- Pawl.Engine.Mana's supply model and the CR 601.2g window, and the reason a
--- source that cannot pay is neither offered nor counted.
+-- May this player activate this mana ability, right now? The gate (Mana.Gate)
+-- threaded through Pawl.Engine.Mana's supply model and the CR 601.2g window, and
+-- the reason a source it refuses is neither offered nor counted. CR 605.3b keeps
+-- a mana ability off the stack, so nothing here comes from Activate.activatable
+-- and every restriction that window applies has to be applied here instead.
+--
+-- Two of them, both read off the ability's OWN activation cost, which CR 602.2b
+-- makes the activation pay: CR 118.3, can the cost be paid; and CR 302.6, is the
+-- creature settled enough to pay it. NEITHER is a fact about the permanent alone
+-- -- CR 107.5 bars a tapped permanent from paying {T} and says nothing about a
+-- cost without one, and CR 302.6 gates only a cost holding {T} or {Q} -- which is
+-- why both are asked per ROUTE here rather than of the source in
+-- Mana.manaSourcesGiven (#1116).
 --
 -- `canPay` above without its mana half, which is not an omission: the MANA part
 -- is asked about only for CR 118.6, since the supply walk is what asks this and
 -- asking it back would not terminate. Exact for the pool, where every mana
 -- ability's mana part is empty -- Cabal Coffers is the card that would make the
 -- difference visible, and `payActivation` defers to the same issue (#1120).
-canPayActivation :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPayActivation pid oid cost gs =
+--
+-- `pcs` is the pre-projected board CR 302.6's two reads want; Map.empty asks for
+-- a fresh projection, which is what a caller with no sweep in hand passes (#200).
+canActivateManaAbility :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canActivateManaAbility pcs pid oid cost gs =
   Maybe.isJust (Cost.mana cost)
     && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
     && jointlyPayable pid oid (Cost.components cost) gs
+    && sicknessOkGiven pcs pid oid cost gs
 
 -- CR 118.3 asked one step later than `canPay` asks it: is SOME nonhybrid
 -- equivalent of this cost (CR 601.2b) payable, measured at CR 601.2f's total?
@@ -909,7 +942,7 @@ canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cos
     let outside = lifeOwedBy (Cost.components cost)
         payable (completed, life) =
           any
-            (\totalled -> Mana.canPayCommittingGiven canPayActivation grants pcs pid (outside + life) totalled gs)
+            (\totalled -> Mana.canPayCommittingGiven canActivateManaAbility grants pcs pid (outside + life) totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
@@ -1165,7 +1198,7 @@ payComponents pid oid components = case components of
 -- candidates for the rest of this payment, since re-offering an untapped source
 -- that just refused to pay would ask the same question forever. What reaches it
 -- is a payment REFUSED and not one that was never payable: CR 118.3's gate
--- (canPayActivation) keeps an unpayable option off the offer to begin with.
+-- (canActivateManaAbility) keeps an unpayable option off the offer to begin with.
 --
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for: a cast (CR
 -- 601.2b) and an activation (CR 602.2b) both run `announce` first, so the cost
@@ -1188,11 +1221,11 @@ payMana pid cost = do
   pure paid
   where
     -- What the pool would leave if the cost were paid out of it right now.
-    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded canPayActivation pid cost gs)) cost (Game.poolOf pid gs)
+    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded canActivateManaAbility pid cost gs)) cost (Game.poolOf pid gs)
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)
-      case filter (`Set.notMember` refused) (Mana.manaSources canPayActivation pid gs) of
+      case filter (`Set.notMember` refused) (Mana.manaSources canActivateManaAbility pid gs) of
         [] -> settle
         candidate : rest -> do
           answer <- chooseSource covered pid (candidate NonEmpty.:| rest) gs
@@ -1289,7 +1322,7 @@ tapForMana oid = do
       -- and pays the cost. Falls back to owner in the impossible case
       -- lookupObject just proved oid exists but controllerOf returns Nothing.
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\option -> canPayActivation controller oid (ManaOption.cost option) gs) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> canActivateManaAbility Map.empty controller oid (ManaOption.cost option) gs) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
