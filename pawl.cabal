@@ -663,6 +663,7 @@ library types
     Pawl.Types.ReplacementBucket
     Pawl.Types.ReplacementCandidate
     Pawl.Types.ReplacementEffect
+    Pawl.Types.ReplacementEntry
     Pawl.Types.ReplacementOrigin
     Pawl.Types.Response
     Pawl.Types.RestartSignal

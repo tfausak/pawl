@@ -36,6 +36,7 @@ import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PhyrexianPayment as PhyrexianPayment
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -526,22 +527,26 @@ data Prompt r where
   -- the highest non-empty bucket, the affected object's controller (or its owner,
   -- or the affected player) chooses which to apply NEXT -- and then the process
   -- repeats over what is applicable now (616.1f), so this is asked once per
-  -- iteration, not once per event. The [ObjectId] is each candidate's SOURCE, in
-  -- the engine's canonical order (battlefield ascending, then the floating
-  -- store); the answer is an index into it.
+  -- iteration, not once per event. The [ReplacementEntry] is the candidates in the
+  -- engine's canonical order (battlefield ascending, then the floating store); the
+  -- answer is an index into it.
   --
-  -- Positional, and carrying the hole OrderTriggers no longer has: a source with
-  -- two DISTINCT applicable replacement abilities would put two different effects
-  -- on the wire as identical entries. No card in the pool has two in the same event
-  -- class, so it is unreachable; the fix is the shape the trigger side already took
-  -- -- an entry carrying the applicable effect alongside its source (#74).
+  -- A PICK and not a permutation, which is where this parts company with
+  -- OrderTriggers: CR 616.1 chooses one to apply and CR 616.1f re-collects, so the
+  -- rest of the order is never settled here.
+  --
+  -- Positional, but no longer positional BY NECESSITY: the entry carries the
+  -- effect alongside its source (#74), so two entries are equal exactly when they
+  -- are interchangeable. Coldsteel Heart's "enters tapped" beside its "as this
+  -- enters, choose a color" is one source with two applicable entry replacements
+  -- in one bucket, and the two entries differ.
   --
   -- Asked only when the bucket holds two or more candidates that are not all
   -- indistinguishable: among indistinguishable ones every order yields the same
   -- board, each still getting its own CR 614.5 opportunity. Indistinguishable is
   -- equal in the EFFECT, plus -- where application reads the applying candidate,
   -- which is Replacement.readsApplier's question -- equal in CR 109.5's "you".
-  ChooseReplacement :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> Prompt Natural.Natural
+  ChooseReplacement :: Decider.Decider -> PlayerId.PlayerId -> [ReplacementEntry.ReplacementEntry] -> Prompt Natural.Natural
   -- | CR 603.7c: which of several minted tokens a Create's slot binds -- the "it" a
   -- delayed triggered ability armed in the same resolution will name. The ObjectId
   -- is the effect's source; the NonEmpty is the tokens actually minted, in
@@ -753,9 +758,9 @@ data Prompt r where
   -- or the ability object on the stack -- not its source, since two triggers off
   -- one source resolve as two distinct stack objects); the ModeIndex is which of
   -- its chosen modes is asking, so a modal payload with two optional modes puts
-  -- two DISTINGUISHABLE questions on the wire -- the discriminator
-  -- ChooseReplacement (#74) still does without, and the one OrderTriggers gained
-  -- with its TriggerEntry (#61).
+  -- two DISTINGUISHABLE questions on the wire -- the discriminator OrderTriggers
+  -- gained with its TriggerEntry (#61) and ChooseReplacement with its
+  -- ReplacementEntry (#74).
   --
   -- CR 603.5 makes this a resolution-time prompt rather than a cast-time one: an
   -- optional ability goes on the stack regardless, and the choice is made when it
@@ -851,8 +856,8 @@ data Prompt r where
   -- cost increase or reduction. Two symbols of the SAME colour ask two identical
   -- questions, which is sound here because the answers are interchangeable: both
   -- demand the same mana and the same 2 life, so which prompt got which is not
-  -- observable -- a claim OrderTriggers could not make until its entry carried an
-  -- ability (#61) and ChooseReplacement still cannot (#74).
+  -- observable -- a claim neither OrderTriggers nor ChooseReplacement could make
+  -- until each entry carried the ability or effect itself (#61, #74).
   --
   -- Elided when only one route is payable -- no source of the symbol's colour, or a
   -- life total below CR 119.4's floor.
