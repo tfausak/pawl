@@ -1,0 +1,75 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 3
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        }
+      ],
+      "name": "Aetherspouts",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "MoveToZone",
+                    "value": [
+                      {
+                        "type": "And",
+                        "value": [
+                          {
+                            "type": "HasCardType",
+                            "value": {
+                              "type": "Creature"
+                            }
+                          },
+                          {
+                            "type": "IsAttacking"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "Library"
+                      },
+                      {
+                        "type": "OwnerChooses"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}

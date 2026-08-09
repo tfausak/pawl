@@ -26,6 +26,7 @@ import qualified Pawl.Types.Desync as Desync
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
+import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.MulliganDecision as MulliganDecision
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
@@ -64,6 +65,8 @@ encode p answer = case p of
   Prompt.ChooseX {} -> Response.ChoseX answer
   Prompt.ChooseEntwine {} -> Response.AnnouncedEntwine answer
   Prompt.ReturnCommander {} -> Response.ReturnedCommander answer
+  Prompt.ChooseLibraryEnd {} -> Response.ChoseLibraryEnd answer
+  Prompt.ArrangeLibraryArrivals {} -> Response.ArrangedLibraryArrivals answer
   Prompt.ChooseModes {} -> Response.ChoseModes answer
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
@@ -272,6 +275,12 @@ decode p response = case p of
   Prompt.ReturnCommander {} -> case response of
     Response.ReturnedCommander decision -> Just decision
     _ -> Nothing
+  Prompt.ChooseLibraryEnd {} -> case response of
+    Response.ChoseLibraryEnd position -> Just position
+    _ -> Nothing
+  Prompt.ArrangeLibraryArrivals {} -> case response of
+    Response.ArrangedLibraryArrivals order -> Just order
+    _ -> Nothing
 
 -- The answer used when the transcript is exhausted or does not match. Keeping
 -- this total is what lets 'replay' avoid a partial escape: an over-short log
@@ -473,6 +482,13 @@ defaultAnswer p = case p of
   -- CR 903.9a is a "may", so leaving the commander where it is is always legal
   -- and is the answer that changes nothing.
   Prompt.ReturnCommander {} -> CommandZoneDecision.Leaves
+  -- CR 401.2: both ends are legal. The BOTTOM, which is
+  -- LibraryPosition.defaultValue and so the end every library arrival in the tree
+  -- took before an effect could name one.
+  Prompt.ChooseLibraryEnd {} -> LibraryPosition.defaultValue
+  -- CR 401.4: the canonical order is always a legal answer, as OrderTriggers'
+  -- arm above says.
+  Prompt.ArrangeLibraryArrivals _ _ _ oids -> zipWith const [0 ..] oids
 
 -- Run a game under a base interpreter, keeping every answer in order.
 --
