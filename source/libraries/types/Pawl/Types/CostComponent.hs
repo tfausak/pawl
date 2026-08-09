@@ -179,4 +179,29 @@ data CostComponent keyword
     -- reason the zone is, so a cost reading somebody else's would be a second
     -- constructor rather than a field here.
     ExileCardsFromGraveyard Natural.Natural (Filter.Filter keyword)
+  | -- | CR 406.2 a third time, in its FIXED form: exile the topmost card of the
+    -- paying player's graveyard that matches the Filter. Circling Vultures'
+    -- "unless you exile the top creature card of your graveyard" is the
+    -- printing. A cost by CR 118.1's general reading, ExileCardsFromGraveyard's
+    -- argument unchanged.
+    --
+    -- ExileThisFromGraveyard's side of the axis rather than
+    -- ExileCardsFromGraveyard's, even though it names another card: CR 404.2
+    -- keeps a graveyard in a fixed order that a player "normally can't change",
+    -- so "the top creature card" identifies exactly one card and there is
+    -- nothing to prompt for. Offering a choice here would be MORE permissive
+    -- than the printing, which is why the general constructor cannot stand in.
+    --
+    -- No count. CR 404.1 gives a graveyard one top, and a card asking for two
+    -- fixed cards would be asking about an order this constructor does not
+    -- expose.
+    --
+    -- "The TOP" is the LAST member of Pawl.Engine.Game.zoneMembers' answer:
+    -- CR 404.1 puts an arrival "on top of its owner's graveyard" and
+    -- Pawl.Engine.Game.insertIntoZone appends it, so the most recent card is
+    -- last. That is the opposite end from a library, whose head is its top.
+    --
+    -- The zone, the owner and the printed-not-projected matching are all
+    -- ExileCardsFromGraveyard's, for its reasons.
+    ExileTopFromGraveyard (Filter.Filter keyword)
   deriving (Eq, Ord, Show)

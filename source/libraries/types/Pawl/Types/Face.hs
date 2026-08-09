@@ -40,6 +40,7 @@ import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
@@ -290,7 +291,17 @@ data Face card = MkFace
     --
     -- No card grants two of these, so the two-action offer is proved on the CR
     -- 103.5b window only (#803).
-    openingHandActions :: [[Effect.Effect card]]
+    openingHandActions :: [[Effect.Effect card]],
+    -- | CR 116.2: the special actions this face's printed text grants -- CR
+    -- 116.2e's "you may discard this card any time you could cast an instant"
+    -- (Circling Vultures). Read directly from the card, the castingPermissions
+    -- precedent: the ability functions in the HAND (CR 113.6), which pawl's
+    -- projection does not reach (#160).
+    --
+    -- A LIST rather than a flag, matching every neighbouring permission field:
+    -- nothing in CR 116.2 caps how many such lines a face may print, and
+    -- Pawl.Types.SpecialAction says which rows will land here.
+    specialActions :: [SpecialAction.SpecialAction]
   }
   deriving (Eq, Ord, Show)
 

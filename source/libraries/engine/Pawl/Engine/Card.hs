@@ -122,7 +122,8 @@ faceDownFace =
       Face.sacrificeRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
-      Face.openingHandActions = []
+      Face.openingHandActions = [],
+      Face.specialActions = []
     }
 
 -- The face a card shows where nothing has singled out one half for itself. WHICH
@@ -247,6 +248,12 @@ merge2 l r =
       Face.attackCosts = Face.attackCosts l <> Face.attackCosts r,
       Face.mulliganActions = Face.mulliganActions l <> Face.mulliganActions r,
       Face.openingHandActions = Face.openingHandActions l <> Face.openingHandActions r,
+      -- CR 709.4c: "each ability in the text box of each half", so a permission
+      -- printed on either half survives into the combined view. No printed split
+      -- card grants a CR 116.2 special action; the line is here for the reason
+      -- its neighbours are -- a record UPDATE would otherwise keep the left
+      -- half's silently.
+      Face.specialActions = Face.specialActions l <> Face.specialActions r,
       -- CR 709.4c again, and CR 702.5a: an enchant ability IS an ability in a
       -- half's text box, so both halves' survive here -- and CR 702.5c says what
       -- a combined view carrying two of them means, which is Card.enchantSpec's
@@ -800,7 +807,8 @@ subtractHalf face =
       Face.sacrificeRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
-      Face.openingHandActions = []
+      Face.openingHandActions = [],
+      Face.specialActions = []
     }
 
 -- The face of this card with the given name, if it has one. CR 709.4a: a card's

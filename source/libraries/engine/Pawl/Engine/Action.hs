@@ -1,5 +1,6 @@
 module Pawl.Engine.Action where
 
+import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
@@ -21,6 +22,7 @@ import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.SpecialAction as SpecialAction
 import qualified Pawl.Types.Zone as Zone
 
 -- The land plays this player may make right now: CR 305.1's land cards in their
@@ -65,6 +67,31 @@ playableLands pid gs =
             else fmap (\(mName, _) -> (oid, mName)) (Card.landFaces card)
    in concatMap playable (Game.zoneMembers Zone.Hand pid gs)
 
+-- The cards in this player's hand whose own text grants CR 116.2e's special
+-- action: Circling Vultures' "you may discard this card any time you could cast
+-- an instant".
+--
+-- Read off the CARD (Card.combined) and never a projection, the field's own rule
+-- in Pawl.Types.Face: the ability functions in the hand, which pawl's projection
+-- does not reach (#160). A hand member with no card behind it -- a token, an
+-- ability -- contributes nothing, playableLands' reading one function above.
+--
+-- The permission is a CLASSIFICATION and not an identity: this asks whether the
+-- card data grants the operation, never which card it is.
+discardableCards :: PlayerId -> GameState -> [ObjectId]
+discardableCards pid gs =
+  let grantsIt oid = case Game.lookupObject oid gs of
+        Nothing -> False
+        Just obj -> case Object.source obj of
+          Source.OfCard printing -> granted (Printing.card printing)
+          Source.OfToken card -> granted card
+          Source.OfAbility _ _ -> False
+          Source.OfTrigger _ _ -> False
+          Source.OfEmblem _ -> False
+          Source.OfInherentTrigger _ _ -> False
+      granted card = List.elem SpecialAction.DiscardThisAnyTime (Face.specialActions (Card.combined card))
+   in filter grantsIt (Game.zoneMembers Zone.Hand pid gs)
+
 legalActions :: PlayerId -> GameState -> [Action]
 legalActions pid gs =
   let -- CR 305.1 / 116.2a: the window is a main phase of this player's own turn
@@ -96,9 +123,9 @@ legalActions pid gs =
       -- CR 116.2b / 702.37e: turning a face-down permanent face up is a special
       -- action a player may take any time they have priority, so it joins the
       -- menu beside CR 116.2a's land play rather than going through the stack.
-      -- Ungated by phase or by an empty stack, and the ONLY one of the three
-      -- special actions pawl offers that is: CR 116.2a and CR 116.2m both state
-      -- those restrictions and CR 116.2b states neither.
+      -- Ungated by phase or by an empty stack, which it shares with CR 116.2e's
+      -- discard below: CR 116.2a and CR 116.2m both state those restrictions and
+      -- CR 116.2b and CR 116.2e state neither.
       turnUps = fmap Action.TurnFaceUp (FaceDown.turnableFaceUp pid gs)
       -- CR 116.2m / 709.5e: the third special action, and the one whose window is
       -- CR 116.2a's rather than CR 116.2b's -- "any time they have priority and
@@ -110,6 +137,17 @@ legalActions pid gs =
       -- which door to open is the player's choice, and offering each as its own
       -- legal action is how the engine avoids making it.
       unlocks = fmap (uncurry Action.Unlock) (Room.unlockable pid gs)
+      -- CR 116.2e: the fourth special action, and the SECOND one ungated by
+      -- phase and by an empty stack -- "a player can take such an action any
+      -- time they have priority", which is CR 116.2b's window rather than CR
+      -- 116.2a's.
+      --
+      -- The card's own wording is "any time you could cast an instant", and this
+      -- deliberately does not ask that: CR 116.2e's last sentence states the
+      -- timing the rules use, so no casting permission or restriction is
+      -- consulted. legalActions is only ever called for the player with
+      -- priority, so the rule's condition is already met by being here.
+      discards = fmap Action.DiscardFromHand (discardableCards pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -142,4 +180,4 @@ legalActions pid gs =
             forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> activations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations

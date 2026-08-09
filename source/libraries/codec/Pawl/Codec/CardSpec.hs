@@ -60,7 +60,8 @@ bareFace n =
       Face.sacrificeRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
-      Face.openingHandActions = []
+      Face.openingHandActions = [],
+      Face.specialActions = []
     }
 
 -- | A basic land, which is what every file in the corpus but @wax-wane.json@

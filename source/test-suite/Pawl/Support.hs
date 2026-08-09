@@ -293,6 +293,7 @@ playLandAnswer p = case p of
           A.TurnFaceUp _ -> False
           A.Unlock _ _ -> False
           A.Activate _ _ -> False
+          A.DiscardFromHand _ -> False
      in case filter isPlay actions of
           h : _ -> h
           [] -> A.Pass
@@ -578,7 +579,11 @@ addLibraryCard printing pid gs =
           }
       )
 
--- One card of a printing in pid's graveyard.
+-- One card of a printing in pid's graveyard, ON TOP of whatever is already
+-- there -- CR 404.1, and the end Pawl.Engine.Game.insertIntoZone puts a real
+-- arrival at, so a fixture built by repeated calls has the order a game would
+-- have produced. That is load-bearing for CR 404.2's "the top creature card"
+-- (Pawl.Engine.Cost.topExileCandidate), which reads the LAST member.
 addGraveyardCard :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 addGraveyardCard printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
@@ -610,7 +615,7 @@ addGraveyardCard printing pid gs =
    in ( oid,
         gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
-            GameState.graveyard = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.graveyard gs2)
+            GameState.graveyard = Map.insertWith (flip (Seq.><)) pid (Seq.singleton oid) (GameState.graveyard gs2)
           }
       )
 
@@ -1422,6 +1427,7 @@ isCastOf oid action = case action of
   A.Activate _ _ -> False
   A.TurnFaceUp _ -> False
   A.Unlock _ _ -> False
+  A.DiscardFromHand _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer
 -- (lookupMin prefers ToCreature over ToPlayer, and the Piker is the only

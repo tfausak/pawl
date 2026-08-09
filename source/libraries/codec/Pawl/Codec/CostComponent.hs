@@ -27,6 +27,7 @@ toJson encode c = case c of
   CostComponent.RemoveLoyaltyFromThis n -> Common.tagged "RemoveLoyaltyFromThis" . Just $ Common.encodeNatural n
   CostComponent.ExileThisFromGraveyard -> Common.nullary "ExileThisFromGraveyard"
   CostComponent.ExileCardsFromGraveyard n c_ -> Common.tagged "ExileCardsFromGraveyard" . Just . Common.array $ [Common.encodeNatural n, Filter.toJson encode c_]
+  CostComponent.ExileTopFromGraveyard c_ -> Common.tagged "ExileTopFromGraveyard" . Just $ Filter.toJson encode c_
 
 fromJson :: (Value.Value -> Either Text.Text keyword) -> Value.Value -> Either Text.Text (CostComponent.CostComponent keyword)
 fromJson decode value = do
@@ -54,4 +55,5 @@ fromJson decode value = do
       count <- Common.decodeNatural n
       filter_ <- Filter.fromJson decode c_
       pure $ CostComponent.ExileCardsFromGraveyard count filter_
+    ("ExileTopFromGraveyard", Just v) -> CostComponent.ExileTopFromGraveyard <$> Filter.fromJson decode v
     _ -> Left . Text.pack $ "unknown CostComponent: " <> t
