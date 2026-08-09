@@ -249,7 +249,9 @@ manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 -- Pawl.Engine.Cost.isLoyaltyCost answers; no loyalty ability in the pool adds
 -- mana, so the clause is inert rather than checked here). Read at two sites:
 -- manaRoutesOfGiven includes a mana ability as a source, and
--- Action.legalActions excludes it from the stack.
+-- Activate.activatableGiven refuses to put one on the stack (CR 605.3b). What
+-- Action.legalActions offers instead is Action.ActivateManaAbility, one per
+-- manaSourcesGiven, which is CR 605.3a's priority window.
 --
 -- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
 -- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even

@@ -1628,34 +1628,28 @@ lastChoiceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> 
 lastChoiceSpec s registry = Spec.describe s "lastChoice (CR 104.4b)" $ do
   Spec.it s "a priority round whose only action is Pass leaves it alone" $ do
     mountain <- S.printingOf s registry "Mountain"
-    let after = S.runPure S.identityAnswer (choicelessBoard mountain Nothing) Engine.priorityLoop
+    let after = S.runPure S.identityAnswer (choicelessBoard mountain True) Engine.priorityLoop
     Spec.assertEqWith s "no player was offered a choice" (GameState.lastChoice after) (Timestamp.MkTimestamp 0)
 
-  Spec.it s "a priority round offering a castable spell moves it" $ do
-    -- The board differs by ONE card: a Lightning Bolt in alice's hand, which her
-    -- untapped Mountain can pay for, so Action.legalActions offers her a Cast
-    -- beside the Pass. That is the optional action.
-    --
-    -- A spell rather than the Mountain's own mana ability, though CR 605.1a
-    -- makes that an activated ability alice could use: Action.legalActions
-    -- deliberately omits mana abilities (Activate.activatableGiven's
-    -- `not (Mana.isManaAbility ability)`, since CR 605.3b keeps them off the
-    -- stack), so a lone land leaves the menu at exactly [Pass].
+  Spec.it s "CR 605.3a an untapped land's own mana ability is that optional action" $ do
+    -- The board differs by ONE BIT from the one above: the same lone Mountain,
+    -- untapped. CR 605.3a lets alice activate its mana ability while she holds
+    -- priority, so Action.legalActions offers it beside the Pass and CR 104.4b's
+    -- loop is no longer made of mandatory actions alone.
     mountain <- S.printingOf s registry "Mountain"
-    bolt <- S.printingOf s registry "Lightning Bolt"
-    let after = S.runPure S.identityAnswer (choicelessBoard mountain (Just bolt)) Engine.priorityLoop
+    let board = choicelessBoard mountain False
+        after = S.runPure S.identityAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "the menu is Pass and the mana ability, nothing else" (length (Action.legalActions S.alice board)) 2
     Spec.assertBool s (GameState.lastChoice after > Timestamp.MkTimestamp 0) "alice was offered a choice"
 
 -- alice, active, in her precombat main phase with an empty stack, nothing
--- scheduled after it, and one untapped Mountain. Her menu is exactly [Pass]
--- unless `castable` puts something in her hand she can pay for.
-choicelessBoard :: Printing.Printing -> Maybe Printing.Printing -> GameState.GameState
-choicelessBoard mountain castable =
+-- scheduled after it, and one Mountain. Her hand is empty, so her menu is
+-- exactly [Pass] while that Mountain is tapped.
+choicelessBoard :: Printing.Printing -> Bool -> GameState.GameState
+choicelessBoard mountain tapped =
   let base = Setup.emptyGame S.bothPlayers
-      (_, gs1) = S.addCreature mountain S.alice base
-      gs2 = case castable of
-        Nothing -> gs1
-        Just printing -> snd (S.addHandCard printing S.alice gs1)
+      (mountainId, gs1) = S.addCreature mountain S.alice base
+      gs2 = if tapped then S.tapObject mountainId gs1 else gs1
    in gs2
         { GameState.phase = Phase.PrecombatMain,
           GameState.remaining = Seq.empty,

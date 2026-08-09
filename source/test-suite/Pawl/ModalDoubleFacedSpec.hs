@@ -135,6 +135,7 @@ landPlays actions =
         A.Unlock _ _ -> Nothing
         A.Activate _ _ -> Nothing
         A.DiscardFromHand _ -> Nothing
+        A.ActivateManaAbility _ -> Nothing
    in Maybe.mapMaybe playOf actions
 
 -- Every permanent on the battlefield that is not one of alice's Mountains --

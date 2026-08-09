@@ -1207,7 +1207,10 @@ chooseSource pid candidates gs = case candidates of
 -- Monadic because of that choice. A Mountain offers one yield and is never
 -- asked; Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR 305.6/305.7)
 -- offer several, and the engine never picks for the player. Which SOURCE to tap
--- is a separate question, and payMana asks it.
+-- is a separate question, answered differently in CR 605.3a's three windows:
+-- payMana asks it (Prompt.ChooseManaSource) because a payment has to keep
+-- tapping until the cost is met, while a player with priority has already
+-- answered it by choosing an Action.ActivateManaAbility off the menu.
 --
 -- The whole yield lands, so Sol Ring's "{T}: Add {C}{C}" adds two units from one
 -- activation. The TAP is no longer written here: it is the CR 107.5 component of

@@ -84,6 +84,7 @@ isPlay action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.ActivateManaAbility _ -> False
 
 isDiscarded :: GameEvent.GameEvent -> Bool
 isDiscarded event = case event of

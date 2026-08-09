@@ -7,6 +7,7 @@ import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Room as Room
@@ -174,10 +175,28 @@ legalActions pid gs =
       -- NON-mana ability runs the whole chain: that path is held by an absolute
       -- per-permanent ceiling instead, because what is left in it is still O(N)
       -- per permanent without being a projection (#1073).
+      grants = Projection.controlGrants gs
+      pcs = Projection.projectAll gs
       activations =
-        let grants = Projection.controlGrants gs
-            pcs = Projection.projectAll gs
-            forObject oid =
+        let forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations
+      -- CR 605.3a's first window -- "a player may activate an activated mana
+      -- ability whenever they have priority" -- which the activation list above
+      -- cannot serve: Activate.activatableGiven refuses a mana ability outright,
+      -- because CR 605.3b keeps it off the stack and that is the only thing an
+      -- Action.Activate does with one.
+      --
+      -- Mana.manaSourcesGiven is the whole gate, and it is the SAME list CR
+      -- 605.3a's other two windows are served from (Cost.payMana's candidates):
+      -- untapped, controlled, offering some mana route, and past CR 302.6's
+      -- sickness test. ONE sweep for the whole enumeration rather than one per
+      -- permanent, on the board this function already walked.
+      --
+      -- Not implemented: CR 118.3 asked of the ability's own activation cost
+      -- before it is offered, so a source whose cost cannot be paid is offered
+      -- here, fails when taken, and -- having tapped nothing -- is offered again
+      -- (#1119). The same gap the payment window has, where Cost.payMana's
+      -- `refused` set is what stops it looping.
+      manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven grants pcs pid gs)
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaActivations
