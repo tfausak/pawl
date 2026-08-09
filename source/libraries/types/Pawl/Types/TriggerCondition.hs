@@ -111,9 +111,9 @@ data TriggerCondition
     -- attacker (#1145). The rule's "even if" has no case in reach until it can.
     --
     -- The ATTACKER the event also carries is not compared here. CR 509.3b's
-    -- "blocks a creature" and CR 509.3d's "becomes blocked by a creature" are
-    -- separate conditions no card in the pool declares (#1146); CR 509.3c's is
-    -- SelfBecomesBlocked below.
+    -- "blocks a creature" is a separate condition no card in the pool declares
+    -- (#1146); CR 509.3c's is SelfBecomesBlocked below and CR 509.3d's is
+    -- SelfBecomesBlockedBy, which reads this same event from the attacker's side.
     SelfBlocks
   | -- | CR 509.3c: "whenever [a creature] becomes blocked" -- Sacred Prey's. The
     -- ATTACKING side of SelfBlocks, and self-scoped the same way.
@@ -130,8 +130,35 @@ data TriggerCondition
     -- -- do not reach it. Neither has a producer in the pool (#1146).
     --
     -- No blocker is bound: rule 509.3c's form names none. CR 509.3d's does, and
-    -- that is a separate condition (#1146).
+    -- that is SelfBecomesBlockedBy below.
     SelfBecomesBlocked
+  | -- | CR 509.3d: "whenever [a creature] becomes blocked by a creature" -- rule
+    -- 702.25a's flanking, whose Filter is "without flanking". Self-scoped on the
+    -- ATTACKING side like SelfBecomesBlocked, and matched against
+    -- GameEvent.BlockerDeclared's PAIR rather than GameEvent.AttackerBlocked:
+    -- rule 509.3d "triggers once for each creature that blocks the specified
+    -- creature", which is one declaration event per blocker.
+    --
+    -- That arity is the whole difference from SelfBecomesBlocked above, which
+    -- reads the grouped event and fires once however many blockers there are. Two
+    -- blockers is the board that tells them apart.
+    --
+    -- The Filter is a predicate over the BLOCKER, read at the scan -- which is
+    -- rule 509.3f's "at the point it becomes a blocking creature", since CR
+    -- 509.2a puts the triggers on the stack before any player gets priority and
+    -- nothing can change the blocker in between. The bearer frames the match
+    -- rather than being it, as PermanentEnters' does: it is the Filter context's
+    -- source and its controller the perspective CR 109.5 gives "you".
+    --
+    -- The blocker is bound under Pawl.Engine.Binding.blockingCreature for rule
+    -- 702.25a's "the blocking creature" to read: it is a different object from the
+    -- bearer, unlike SelfBecomesBlocked's, where the event names nobody but the
+    -- attacker.
+    --
+    -- Rule 509.3d's other two producers -- an effect that adds a blocker, and a
+    -- creature put onto the battlefield blocking, which this one form DOES
+    -- trigger for -- have no producer in the pool and record no event (#1146).
+    SelfBecomesBlockedBy (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.
     --

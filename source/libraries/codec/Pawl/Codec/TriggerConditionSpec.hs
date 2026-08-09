@@ -13,6 +13,7 @@ import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Filter as Filter
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Quantity as Quantity
@@ -138,6 +139,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfBecomesBlocked
       """ {"type":"SelfBecomesBlocked"} """
+  -- CR 509.3d, which carries a Filter over the BLOCKER where its once-each-combat
+  -- sibling above carries nothing -- rule 702.25a's "without flanking".
+  Spec.it s "SelfBecomesBlockedBy" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfBecomesBlockedBy (Filter.Not (Filter.HasKeyword Keyword.Flanking)))
+      """ {"type":"SelfBecomesBlockedBy","value":{"type":"Not","value":{"type":"HasKeyword","value":{"type":"Flanking"}}}} """
   -- CR 113.6k's condition, which names a zone pair rather than the battlefield.
   Spec.it s "SelfPutIntoGraveyardFromLibrary" $
     Common.assertJsonCodec

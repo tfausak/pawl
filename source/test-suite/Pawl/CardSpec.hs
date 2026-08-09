@@ -461,6 +461,9 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfBlocks -> []
   TriggerCondition.SelfBecomesBlocked -> []
+  -- CR 509.3d's Filter is a predicate over the blocker, and holds no Count for
+  -- PermanentEnters' reason.
+  TriggerCondition.SelfBecomesBlockedBy _ -> []
   TriggerCondition.SelfCycled -> []
   -- CR 701.9a's discard condition is a PlayerRelation, which holds no Count.
   TriggerCondition.PlayerDiscards _ -> []
@@ -1159,7 +1162,8 @@ reservedSlots =
       Binding.became,
       Binding.eventAmount,
       Binding.sacrificedCount,
-      Binding.castSpell
+      Binding.castSpell,
+      Binding.blockingCreature
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -1440,6 +1444,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.28b names no quality: the only thing it asks about a blocker is
   -- whether it has shadow too.
   Keyword.Shadow -> []
+  -- CR 702.25a is payload-free: the Filter its minted ability carries is the
+  -- ENGINE's, never a card's.
+  Keyword.Flanking -> []
   -- CR 702.127a names no quality: which zone an aftermath half may be cast from is
   -- written into the rule, not into the keyword.
   Keyword.Aftermath -> []
@@ -1639,6 +1646,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfBlocks -> []
   TriggerCondition.SelfBecomesBlocked -> []
+  -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
+  -- Filter -- rule 702.25a's "without flanking".
+  TriggerCondition.SelfBecomesBlockedBy f -> [f]
   TriggerCondition.SelfCycled -> []
   TriggerCondition.PlayerDiscards _ -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.

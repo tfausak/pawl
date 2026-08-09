@@ -57,10 +57,10 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.70, 702.86, 702.91 and 702.108 do not: they spell poisonous,
--- annihilator, battle cry and prowess out as TRIGGERED abilities, so those have
--- to be MINTED and handed to the ordinary CR 603 machinery rather than merely
--- consulted.
+-- Rules 702.25, 702.70, 702.86, 702.91 and 702.108 do not: they spell flanking,
+-- poisonous, annihilator, battle cry and prowess out as TRIGGERED abilities, so
+-- those have to be MINTED and handed to the ordinary CR 603 machinery rather than
+-- merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -86,8 +86,9 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and
 -- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
--- 702.86b says the same of annihilator, CR 702.91b of battle cry and CR 702.108b
--- of prowess, so the four minting arms below are the same shape.
+-- 702.86b says the same of annihilator, CR 702.91b of battle cry, CR 702.108b of
+-- prowess and CR 702.25b of flanking, so the five minting arms below are the same
+-- shape.
 --
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
 -- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
@@ -102,6 +103,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Prowess -> List.genericReplicate count prowess
+  Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -180,6 +182,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
+  Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
   Keyword.Aftermath -> []
@@ -289,6 +292,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
+  Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
   Keyword.Aftermath -> []
@@ -463,6 +467,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
+  Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
   -- CR 702.127a's FIRST static ability: "you may cast this half of this split card
@@ -721,6 +726,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.TrampleOverPlaneswalkers -> []
   Keyword.Vigilance -> []
   Keyword.Banding -> []
+  Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
   Keyword.Aftermath -> []
@@ -824,6 +830,7 @@ familyOf keyword = case keyword of
   Keyword.TrampleOverPlaneswalkers -> Nothing
   Keyword.Vigilance -> Nothing
   Keyword.Banding -> Nothing
+  Keyword.Flanking -> Nothing
   Keyword.Phasing -> Nothing
   Keyword.Shadow -> Nothing
   Keyword.Fear -> Nothing
@@ -1000,3 +1007,48 @@ prowess =
         Duration.UntilEndOfTurn
         (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
         (ObjectRef.EachMatching Filter.IsSource)
+
+-- CR 702.25a: whenever this creature becomes blocked by a creature without
+-- flanking, the blocking creature gets -1/-1 until end of turn. The fifth keyword
+-- rule 702 states as a triggered ability, minted here like the four above.
+--
+-- CR 509.3d is the event -- "becomes blocked by a creature", which triggers once
+-- for each creature that blocks -- and NOT CR 509.3c's "becomes blocked", which
+-- fires once however many blockers there are. Two blockers on one flanker is
+-- therefore two triggers and two -1/-1s, each landing on its own blocker.
+--
+-- "WITHOUT FLANKING" rides the condition rather than the payload, which is rule
+-- 509.3f: a blocker's characteristics are checked as it becomes a blocking
+-- creature, so a creature that gains flanking afterwards is still pumped down and
+-- one that loses it is still spared. The card type conjunct is the rule's printed
+-- "a creature"; CR 509.1a admits nothing else as a blocker, so it narrows
+-- nothing today.
+--
+-- "THE BLOCKING CREATURE" is the object the event named, bound under the reserved
+-- Binding.blockingCreature slot by Pawl.Engine.Event.eventBindings -- an ordinary
+-- slot read, exactly as poisonous' "that player" is, and NOT a set sweep over
+-- whoever is blocking at resolution: rule 702.25a names the one creature whose
+-- block fired this ability.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- rule 702.25a leaves nothing to choose, and has no "if" clause, so
+-- intervening = Nothing. CR 702.25b's separate instances are abilitiesFor's
+-- replicate, as for the four above.
+flanking :: TriggeredAbility Card
+flanking =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition =
+        TriggerCondition.SelfBecomesBlockedBy
+          (Filter.And [Filter.HasCardType CardType.Creature, Filter.Not (Filter.HasKeyword Keyword.Flanking)]),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness (Quantity.Literal (-1)) (Quantity.Literal (-1)))
+        (ObjectRef.InSlot Binding.blockingCreature)
