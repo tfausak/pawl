@@ -310,6 +310,7 @@ playLandAnswer p = case p of
           A.Unlock _ _ -> False
           A.Activate _ _ -> False
           A.DiscardFromHand _ -> False
+          A.Ignore _ -> False
           A.ActivateManaAbility _ -> False
      in case filter isPlay actions of
           h : _ -> h
@@ -1395,6 +1396,7 @@ oneMountainState mountain ph =
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.playerEffects = [],
+          GameState.ignoredAbilities = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,
           GameState.phase = ph,
@@ -1472,6 +1474,7 @@ isCastOf oid action = case action of
   A.TurnFaceUp _ -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
+  A.Ignore _ -> False
   A.ActivateManaAbility _ -> False
 
 -- bob's Piker on the battlefield; alice casts a Bolt at it under identityAnswer

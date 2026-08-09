@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
+import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
 import qualified Pawl.Engine.Replacement as Replacement
@@ -1793,32 +1794,47 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           Nothing -> False
           Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
      in do
-          -- CR 601.3 (Panglacial Wurm): the chance to cast a
-          -- castable-while-searching card is offered AT THE SEARCH, not when the
-          -- resolution began (#57). Two things follow, and both are the rule
-          -- rather than conveniences:
+          -- CR 101.2 / Leonin Arbiter: a player who can't search libraries does
+          -- not, and finds nothing. Asked BEFORE CR 601.3's offer below, because
+          -- that offer is made WHILE SEARCHING and this player never begins to.
           --
-          --   * everything this resolution sequences BEFORE the search has
-          --     already happened, so the offer is made in the game state the
-          --     player is actually searching from -- Scapeshift's sacrificed
-          --     lands are gone before the Wurm's affordability is judged;
-          --   * CR 601.3's subject is "a spell or ability", and this site is
-          --     reached by both. The old site was Stack's Source.OfAbility arm
-          --     alone, so a searching SPELL was never offered the cast at all.
-          Cast.castWhileSearching controller
-          gs <- State.get
-          let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
-              decider = Decide.deciderFor controller gs
-          answer <- Game.choose (Prompt.SearchLibrary decider controller matches)
-          -- CR 701.23a: the card found is one the search's own filter admits.
-          -- Filtered, not trusted (#222): naming a card the filter excluded, or one
-          -- that is not in the library at all, finds nothing rather than fetching
-          -- it. CR 701.23b makes that a legal outcome in its own right -- "that
-          -- player isn't required to find some or all of those cards even if
-          -- they're present" -- so rejecting needs no new branch downstream.
-          let found = case answer of
-                Just oid | List.elem oid matches -> Just oid
-                _ -> Nothing
+          -- The rest of the instruction still happens: CR 701.23 says only how
+          -- to look, so the shuffle at the end is the CARD's separate
+          -- instruction and a prohibition on searching is no reason to skip it.
+          prohibited <- State.gets (PlayerEffect.prohibitsSearching controller)
+          found <-
+            if prohibited
+              then pure Nothing
+              else do
+                -- CR 601.3 (Panglacial Wurm): the chance to cast a
+                -- castable-while-searching card is offered AT THE SEARCH, not
+                -- when the resolution began (#57). Two things follow, and both
+                -- are the rule rather than conveniences:
+                --
+                --   * everything this resolution sequences BEFORE the search has
+                --     already happened, so the offer is made in the game state
+                --     the player is actually searching from -- Scapeshift's
+                --     sacrificed lands are gone before the Wurm's affordability
+                --     is judged;
+                --   * CR 601.3's subject is "a spell or ability", and this site
+                --     is reached by both. The old site was Stack's
+                --     Source.OfAbility arm alone, so a searching SPELL was never
+                --     offered the cast at all.
+                Cast.castWhileSearching controller
+                gs <- State.get
+                let matches = filter (matches1 gs) (Game.zoneMembers Zone.Library controller gs)
+                    decider = Decide.deciderFor controller gs
+                answer <- Game.choose (Prompt.SearchLibrary decider controller matches)
+                -- CR 701.23a: the card found is one the search's own filter
+                -- admits. Filtered, not trusted (#222): naming a card the filter
+                -- excluded, or one that is not in the library at all, finds
+                -- nothing rather than fetching it. CR 701.23b makes that a legal
+                -- outcome in its own right -- "that player isn't required to
+                -- find some or all of those cards even if they're present" -- so
+                -- rejecting needs no new branch downstream.
+                pure $ case answer of
+                  Just oid | List.elem oid matches -> Just oid
+                  _ -> Nothing
           -- Where the card goes is the CARD's instruction, not rule 701.23's --
           -- that rule says only how to look, and CR 701.23e says the same of the
           -- reveal ("if the effect that contains the search instruction doesn't

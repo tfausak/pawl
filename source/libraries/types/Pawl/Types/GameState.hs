@@ -14,6 +14,7 @@ import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.GameEvent as GameEvent
+import qualified Pawl.Types.IgnoredAbility as IgnoredAbility
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Mana as Mana
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
@@ -205,6 +206,11 @@ data GameState = MkGameState
     -- sweeps consult. A permanent's printed player abilities are NOT here --
     -- Pawl.Engine.PlayerEffect re-derives those live.
     playerEffects :: [ActivePlayerEffect.ActivePlayerEffect],
+    -- | CR 116.2d: the ignores players have paid for, each with an expiry the
+    -- Pawl.Engine.Expiry sweeps consult. Read by Pawl.Engine.PlayerEffect.applying,
+    -- which drops an ignored permanent's abilities for the ignoring player alone
+    -- -- so this suppresses, where every neighbour above adds.
+    ignoredAbilities :: [IgnoredAbility.IgnoredAbility],
     -- | The seating order. CR 800.5 (or CR 806.3 for Grand Melee) only says
     -- players determine SOME seating order; CR 103.1's last sentence is what
     -- makes it the turn order, beginning with the starting player -- so this
