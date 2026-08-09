@@ -47,6 +47,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
@@ -57,6 +58,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -70,6 +72,7 @@ import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.Status as Status
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.Uses as Uses
@@ -1016,6 +1019,28 @@ worldPair s registry = do
   livingPlane <- S.printingOf s registry "Living Plane"
   pure (crossroads, livingPlane)
 
+-- One state-based-action pass with CR 704.5k's clock sampled first, which is what
+-- Engine.performSettle does on every pass (sampleWorldSince, then the SBA check).
+-- A test that called Sba directly would find every world permanent unstamped and
+-- the rule with no candidates -- so this, and not the bare pass, is what these
+-- single-pass tests run.
+worldPass :: Game.Type.Game Bool
+worldPass = Engine.sampleWorldSince >> Sba.performStateBasedActions
+
+-- What Object.worldSince holds for one object, or Nothing if there is no such
+-- object at all.
+worldSinceOf :: ObjectId.ObjectId -> GameState.GameState -> Maybe Timestamp.Timestamp
+worldSinceOf oid gs = Game.lookupObject oid gs >>= Object.worldSince
+
+-- S.addCreature, plus the CR 704.5k stamp that the settle following a permanent's
+-- entry would mint. A fixture that hand-places two world permanents with no settle
+-- between them has them becoming world in the SAME pass, which CR 704.5k's second
+-- sentence makes a TIE -- not the board these tests are about.
+addWorld :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
+addWorld printing pid gs =
+  let (oid, gs1) = S.addCreature printing pid gs
+   in (oid, S.runPure S.identityAnswer gs1 Engine.sampleWorldSince)
+
 worldRuleSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 worldRuleSpec s registry =
   Spec.describe s "WorldRule" $ do
@@ -1023,13 +1048,14 @@ worldRuleSpec s registry =
     -- except the one that has had the world supertype for the shortest amount
     -- of time are put into their owners' graveyards."
     --
-    -- Shortest amount of time is the NEWEST arrival, so the second one to
+    -- Shortest amount of time is the LAST one to become world, which for a
+    -- PRINTED world supertype is the last one to enter -- so the second one to
     -- enter is the one that lives.
     Spec.it s "CR 704.5k the newer of two world permanents survives" $ do
       (crossroads, livingPlane) <- worldPair s registry
-      let (older, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
-          (newer, gs) = S.addCreature livingPlane S.alice g0
-          after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+      let (older, g0) = addWorld crossroads S.alice (Setup.emptyGame S.bothPlayers)
+          (newer, gs) = addWorld livingPlane S.alice g0
+          after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (inPlay newer after) "the newcomer stays"
       Spec.assertBool s (not (inPlay older after)) "the incumbent is gone"
       Spec.assertEqWith s "exactly one was buried" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
@@ -1040,9 +1066,9 @@ worldRuleSpec s registry =
     -- to enumerate the battlefield in.
     Spec.it s "CR 704.5k which one survives is the entry order, not the card" $ do
       (crossroads, livingPlane) <- worldPair s registry
-      let (older, g0) = S.addCreature livingPlane S.alice (Setup.emptyGame S.bothPlayers)
-          (newer, gs) = S.addCreature crossroads S.alice g0
-          after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+      let (older, g0) = addWorld livingPlane S.alice (Setup.emptyGame S.bothPlayers)
+          (newer, gs) = addWorld crossroads S.alice g0
+          after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (inPlay newer after) "the newcomer stays"
       Spec.assertBool s (not (inPlay older after)) "the incumbent is gone"
 
@@ -1051,9 +1077,9 @@ worldRuleSpec s registry =
     -- world permanent is exactly the board the legend rule leaves alone.
     Spec.it s "CR 704.5k two players may NOT each keep a world permanent" $ do
       (crossroads, livingPlane) <- worldPair s registry
-      let (hers, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
-          (his, gs) = S.addCreature livingPlane S.bob g0
-          after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+      let (hers, g0) = addWorld crossroads S.alice (Setup.emptyGame S.bothPlayers)
+          (his, gs) = addWorld livingPlane S.bob g0
+          after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (inPlay his after) "bob's newer one stays"
       Spec.assertBool s (not (inPlay hers after)) "alice's older one is gone"
 
@@ -1061,10 +1087,10 @@ worldRuleSpec s registry =
     -- same pass, rather than peeling one off per pass.
     Spec.it s "CR 704.5k a third world permanent buries both incumbents at once" $ do
       (crossroads, livingPlane) <- worldPair s registry
-      let (first, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
-          (second, g1) = S.addCreature livingPlane S.alice g0
-          (third, gs) = S.addCreature crossroads S.alice g1
-          after = S.runPure S.identityAnswer gs Sba.performStateBasedActions
+      let (first, g0) = addWorld crossroads S.alice (Setup.emptyGame S.bothPlayers)
+          (second, g1) = addWorld livingPlane S.alice g0
+          (third, gs) = addWorld crossroads S.alice g1
+          after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (inPlay third after) "only the newest stays"
       Spec.assertBool s (not (inPlay first after)) "the first is gone"
       Spec.assertBool s (not (inPlay second after)) "the second is gone too"
@@ -1073,8 +1099,8 @@ worldRuleSpec s registry =
     -- "Two or more": one world permanent is nobody's business.
     Spec.it s "CR 704.5k a lone world permanent survives" $ do
       (crossroads, _) <- worldPair s registry
-      let (only, gs) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
-          after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+      let (only, gs) = addWorld crossroads S.alice (Setup.emptyGame S.bothPlayers)
+          after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (inPlay only after) "it stays"
 
     -- The other half of the condition: an ordinary enchantment alongside a
@@ -1083,9 +1109,9 @@ worldRuleSpec s registry =
     Spec.it s "CR 704.5k a world permanent and an ordinary enchantment coexist" $ do
       (crossroads, _) <- worldPair s registry
       badMoon <- S.printingOf s registry "Bad Moon"
-      let (world, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+      let (world, g0) = addWorld crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (ordinary, gs) = S.addCreature badMoon S.alice g0
-          after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+          after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (inPlay world after) "the world enchantment stays"
       Spec.assertBool s (inPlay ordinary after) "so does Bad Moon"
 
@@ -1095,10 +1121,10 @@ worldRuleSpec s registry =
     -- one.)
     Spec.it s "CR 704.5k the loser goes to its OWNER's graveyard" $ do
       (crossroads, livingPlane) <- worldPair s registry
-      let (his, g0) = S.addCreature crossroads S.bob (Setup.emptyGame S.bothPlayers)
+      let (his, g0) = addWorld crossroads S.bob (Setup.emptyGame S.bothPlayers)
           stolen = S.giveControl his S.alice g0
-          (hers, gs) = S.addCreature livingPlane S.alice stolen
-          after = S.runPure S.identityAnswer gs Sba.checkStateBasedActions
+          (hers, gs) = addWorld livingPlane S.alice stolen
+          after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (inPlay hers after) "alice's newer one stays"
       Spec.assertBool s (not (inPlay his after)) "the stolen one left the battlefield"
       Spec.assertEqWith s "one card in bob's graveyard" (length (Game.zoneMembers Zone.Graveyard S.bob after)) 1
@@ -1116,11 +1142,11 @@ worldRuleSpec s registry =
     Spec.it s "CR 704.3 the world rule and the legend rule share one pass" $ do
       (crossroads, _) <- worldPair s registry
       night <- S.printingOf s registry "Night of Souls' Betrayal"
-      let (oldWorld, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+      let (oldWorld, g0) = addWorld crossroads S.alice (Setup.emptyGame S.bothPlayers)
           (firstNight, g1) = S.addCreature night S.alice g0
           (secondNight, g2) = S.addCreature night S.alice g1
-          (newWorld, gs) = S.addCreature crossroads S.alice g2
-          after = S.runPure (keepsLegend firstNight) gs Sba.performStateBasedActions
+          (newWorld, gs) = addWorld crossroads S.alice g2
+          after = S.runPure (keepsLegend firstNight) gs worldPass
       Spec.assertBool s (inPlay newWorld after) "the newest world permanent stays"
       Spec.assertBool s (not (inPlay oldWorld after)) "the older world permanent is gone"
       Spec.assertBool s (inPlay firstNight after) "the chosen legend stays"
@@ -1141,10 +1167,10 @@ worldRuleSpec s registry =
       night <- S.printingOf s registry "Night of Souls' Betrayal"
       let (_, g0) = S.addCreature opalescence S.alice (Setup.emptyGame S.bothPlayers)
           (_, g1) = S.addCreature night S.alice g0
-          (doomed, g2) = S.addCreature crossroads S.alice g1
-          (newer, gs) = S.addCreature livingPlane S.alice g2
+          (doomed, g2) = addWorld crossroads S.alice g1
+          (newer, gs) = addWorld livingPlane S.alice g2
       Spec.assertEqWith s "the animated Crossroads really is a 0/0" (Projection.toughnessOf doomed gs) (Just 0)
-      let after = S.runPure S.identityAnswer gs Sba.performStateBasedActions
+      let after = S.runPure S.identityAnswer gs worldPass
       Spec.assertBool s (not (inPlay doomed after)) "it is gone"
       Spec.assertBool s (inPlay newer after) "the newer world permanent stays"
       Spec.assertEqWith s "and exactly one card was buried" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
@@ -1157,7 +1183,7 @@ worldRuleSpec s registry =
       (crossroads, livingPlane) <- worldPair s registry
       forest <- S.printingOf s registry "Forest"
       let base = S.landsInPlay forest 4 -- {2}{G}{G}
-          (incumbent, withCrossroads) = S.addCreature crossroads S.alice base
+          (incumbent, withCrossroads) = addWorld crossroads S.alice base
           (withSpell, spellId) = S.handOne livingPlane withCrossroads
           cast = snd (Engine.runGamePure S.identityAnswer withSpell (S.cast S.alice spellId))
           after = snd (Engine.runGamePure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority))
@@ -1167,6 +1193,90 @@ worldRuleSpec s registry =
       -- made every Forest a creature, which is how this test knows the world
       -- rule buried the OLD one rather than the new arrival.
       Spec.assertEqWith s "and the four Forests are creatures now" (length (filter (\oid -> Projection.isCreatureOf oid after) (Set.toList (GameState.battlefield after)))) 4
+
+    -- THE discriminating board for CR 704.5k's clock: a permanent that entered
+    -- EARLIER but became world LATER. The Forest was on the battlefield first and
+    -- the Living Plane second, so the entry timestamp says the Living Plane has
+    -- been world for the shortest time -- and the rule says the Forest has, since
+    -- it only became world when the Charter resolved. The two readings pick
+    -- opposite survivors, so both assertions flip if the clock goes back to
+    -- Object.timestamp.
+    --
+    -- Synthetic World Charter ("Target permanent becomes world until end of turn",
+    -- CR 205.4a, CR 613.1d) is the producer: no printing grants or removes the
+    -- world supertype.
+    Spec.it s "CR 704.5k the clock is when it became world, not when it entered" $ do
+      (_, livingPlane) <- worldPair s registry
+      forest <- S.printingOf s registry "Forest"
+      charter <- S.printingOf s registry "Synthetic World Charter"
+      let (old, g0) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+          -- Two more Forests, which is the Charter's {1}{G}.
+          (_, g1) = S.addCreature forest S.alice g0
+          (_, g2) = S.addCreature forest S.alice g1
+          (plane, g3) = S.addCreature livingPlane S.alice g2
+          (g4, spell) = S.handOne charter g3
+          -- The Living Plane is stamped on this settle; the Forest is not world
+          -- yet, so nothing is buried.
+          settled = S.runPure S.identityAnswer g4 Engine.settleForPriority
+          resolved = S.runPure (aimedAt old) settled (S.cast S.alice spell >> Stack.resolveTop)
+          after = S.runPure S.identityAnswer resolved Engine.settleForPriority
+      -- Without this the whole group could pass on a Charter that grants nothing:
+      -- one world permanent is no rule at all.
+      Spec.assertBool s (Set.member Supertype.World (PC.supertypes (Projection.project old resolved))) "the Charter really did make the Forest world"
+      Spec.assertBool s (inPlay old after) "the Forest became world last, so it survives"
+      Spec.assertBool s (not (inPlay plane after)) "the Living Plane has been world longer, so it is buried"
+
+    -- CR 704.5k's second sentence: "in the event of a tie for the shortest amount
+    -- of time, all are put into their owners' graveyards." Two permanents that
+    -- become world in the SAME settle pass share one stamp and so tie.
+    --
+    -- Built from a continuous effect on each rather than two Charter resolutions:
+    -- two spells resolve one after another and each resolution is followed by its
+    -- own settle, so that route cannot produce a genuine same-pass tie.
+    Spec.it s "CR 704.5k two permanents that become world in one pass tie, and both are buried" $ do
+      forest <- S.printingOf s registry "Forest"
+      let (a, g0) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+          (b, g1) = S.addCreature forest S.alice g0
+          gs = S.withEffect b (Modification.AddSupertype Supertype.World) (S.withEffect a (Modification.AddSupertype Supertype.World) g1)
+          sampled = S.runPure S.identityAnswer gs Engine.sampleWorldSince
+          after = S.runPure S.identityAnswer gs Engine.settleForPriority
+      Spec.assertBool s (Maybe.isJust (worldSinceOf a sampled)) "both were stamped at all"
+      Spec.assertEqWith s "one stamp for the whole pass, so the two tie" (worldSinceOf a sampled) (worldSinceOf b sampled)
+      Spec.assertBool s (not (inPlay a after) && not (inPlay b after)) "a tie buries every world permanent"
+
+    -- CR 400.7: the returning permanent is a new object, so its clock starts when
+    -- it returned. The Crossroads was world first, went to hand while the Living
+    -- Plane took the stamp, and came back last -- so it is the survivor. A clock
+    -- carried across the move would make it the older world permanent and bury it.
+    Spec.it s "CR 400.7 a world permanent that leaves and returns is world only since it returned" $ do
+      (crossroads, livingPlane) <- worldPair s registry
+      let (first, g0) = S.addCreature crossroads S.alice (Setup.emptyGame S.bothPlayers)
+          (inHand, g1) = S.runPureWith S.identityAnswer g0 (Engine.settleForPriority >> Event.changeZoneReturning first Zone.Hand)
+          (plane, g2) = S.addCreature livingPlane S.alice g1
+      case inHand of
+        Nothing -> Spec.assertFailure s "the Crossroads should have reached alice's hand"
+        Just held -> do
+          -- The Living Plane is stamped on this settle, before the Crossroads is
+          -- back on the battlefield to be stamped after it.
+          let (back, g3) = S.runPureWith S.identityAnswer g2 (Engine.settleForPriority >> Event.changeZoneReturning held Zone.Battlefield)
+              after = S.runPure S.identityAnswer g3 Engine.settleForPriority
+          case back of
+            Nothing -> Spec.assertFailure s "the Crossroads should have returned to the battlefield"
+            Just again -> do
+              Spec.assertBool s (inPlay again after) "the returned Crossroads became world last, so it survives"
+              Spec.assertBool s (not (inPlay plane after)) "the Living Plane is buried"
+
+    -- The stamp is not a latch: when the permanent stops being world the next
+    -- settle clears it, so becoming world again starts a new clock. CR 514.2's
+    -- sweep (Expiry.dropAtCleanup) is what ends the "until end of turn" grant.
+    Spec.it s "CR 704.5k the clock is cleared when the permanent stops being world" $ do
+      forest <- S.printingOf s registry "Forest"
+      let (land, g0) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+          gs = S.withEffect land (Modification.AddSupertype Supertype.World) g0
+          stamped = S.runPure S.identityAnswer gs Engine.settleForPriority
+          after = S.runPure S.identityAnswer (Expiry.dropAtCleanup stamped) Engine.settleForPriority
+      Spec.assertBool s (Maybe.isJust (worldSinceOf land stamped)) "world, and stamped"
+      Spec.assertBool s (Maybe.isNothing (worldSinceOf land after)) "no longer world, so no longer stamped"
 
 sbaSpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 sbaSpec s =
