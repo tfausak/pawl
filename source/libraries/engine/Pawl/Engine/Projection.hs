@@ -475,16 +475,23 @@ controllerWithLastKnown oid gs = case lastKnownOf oid gs of
 -- candidates have no projection at all (gather walks the battlefield only), so
 -- they fall back to the printed card -- a library/hand/graveyard candidate is
 -- matched against its PRINTED characteristics, never a projected view (#160).
+-- Its POWER is the one axis a rule reaches into off the battlefield: CR 208.2a
+-- makes a characteristic-defining one function everywhere, which is why the
+-- fallback is viewOfCardIn rather than viewOfCard.
 viewUpTo :: Layer -> [Gathered] -> GameState -> Count.ViewOf
 viewUpTo bound cands gs oid =
   if Set.member oid (GameState.battlefield gs)
     then Just (viewOfCharacteristics oid (projectUpTo bound cands oid gs) (controllerOf oid gs) (countersOf oid gs) gs)
-    else fmap viewOfCard (Game.faceOf oid gs)
+    else fmap (viewOfCardIn gs oid) (Game.faceOf oid gs)
 
--- The characteristics view of a printed card off the battlefield, e.g. one being
--- matched by a search. No projection exists there, so every axis is read from the
--- printed face; the axes that only an OBJECT can have -- a controller, counters,
--- an attacking flag -- are Nothing or empty, and each says so at its field.
+-- The characteristics view of a printed card off the battlefield, from the FACE
+-- alone. No projection exists there, so every axis is read from the printed
+-- face; the axes that only an OBJECT can have -- a controller, counters, an
+-- attacking flag -- are Nothing or empty, and each says so at its field.
+--
+-- A reader holding a game state wants viewOfCardIn below instead, which is this
+-- with CR 208.2a's characteristic-defining power filled in. This one survives
+-- for the callers that hold no object id, and as that one's inner view.
 viewOfCard :: Face.Face Card.Type.Card -> Filter.View
 viewOfCard face =
   let typeLine = Face.typeLine face
@@ -553,9 +560,53 @@ viewOfCard face =
           Filter.ringBearerFor = Nothing
         }
 
--- CR 208.1's power for a card OFF the battlefield, where there is no projection
--- to read one from -- what Imperial Recruiter's "creature card with power 2 or
--- less" is asking each card in a library. Nothing for a face with no power box:
+-- viewOfCard for a card that IS an object in some zone, so a
+-- characteristic-defining power can be evaluated: CR 604.3 and CR 208.2a make a
+-- CDA function in all zones, so Tarmogoyf in a library has the power its count
+-- says, which is what Imperial Recruiter's "creature card with power 2 or less"
+-- must read. The view every off-battlefield reader gets; viewOfCard survives for
+-- the FACE-only callers, and as the blind inner view below.
+--
+-- Only Filter.power differs. Filter.View has no toughness axis at all, so CR
+-- 208.2a's other half has nothing here to land on.
+viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
+viewOfCardIn gs oid face = (viewOfCard face) {Filter.power = characteristicPowerIn gs oid face}
+
+-- CR 208.2a's power for a face whose CDA sets it, and printedPower's answer for
+-- every other face -- including a face with a characteristicPT but no printed
+-- power box, which seedCharacteristicPT rejects as malformed.
+--
+-- Quantity.determine rather than Quantity.evaluate, so CR 208.2a's last sentence
+-- ("if the ability needs to use a number that can't be determined ... use 0")
+-- applies here exactly as it does on the battlefield in applyCharacteristicPT.
+--
+-- The context is the CDA's OWN and never the reading effect's: CR 604.3a(3) says
+-- a CDA affects no other object, and CR 109.5 resolves its "you" to the object's
+-- controller or, having none in a library or a graveyard, its owner -- which is
+-- what controllerOf answers there (see defaultControllerOf and CR 108.4a). A
+-- searching player's perspective would be a different player's "you".
+--
+-- The injected ViewOf is the CDA-BLIND viewOfCard, which is what bounds the
+-- descent: Tarmogoyf's count sweeps every graveyard, so a Tarmogoyf in a
+-- graveyard is one of its own candidates, and injecting this function would make
+-- a CDA that read a candidate's POWER recur without end. Nothing in the pool
+-- does -- swapping the injection leaves the suite green, since DistinctCardTypes
+-- forces only Filter.cardTypes -- so the bound is unobserved today and is here
+-- for the CDA that would observe it. Blind is also the posture viewUpTo already
+-- takes for an off-battlefield candidate (#160).
+--
+-- Not implemented: a BATTLEFIELD candidate that a CDA evaluated here sweeps is
+-- read as a printed card rather than through its CR 613 projection (#1080).
+characteristicPowerIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
+characteristicPowerIn gs oid face = case seedCharacteristicPT face of
+  Nothing -> printedPower face
+  Just (power, _) ->
+    let context = Filter.MkContext (controllerOf oid gs) (Just oid)
+        viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
+     in Just (Quantity.determine viewOf context gs oid power)
+
+-- CR 208.1's PRINTED power box, for a card off the battlefield where there is no
+-- projection to read one from. Nothing for a face with no power box:
 -- CR 208.1 gives power only to creature cards, so a land or an instant has none
 -- to report, and Filter.PowerAtMost/PowerAtLeast answer False for it either way.
 --
@@ -567,9 +618,9 @@ viewOfCard face =
 -- arm answers for the projection seed, where a star that survived
 -- baseCharacteristics is a hole rather than a zero.
 --
--- Not implemented: the value of a CHARACTERISTIC-DEFINING power off the
--- battlefield (CR 208.2a) -- a face with a characteristicPT reports Nothing,
--- where Tarmogoyf in a graveyard has a real power (#1023).
+-- A face with a characteristicPT answers Nothing HERE because a face alone
+-- cannot evaluate one -- CR 208.2a's number is characteristicPowerIn's above,
+-- which every reader that holds a game state goes through.
 printedPower :: Face.Face Card.Type.Card -> Maybe Integer
 printedPower face = case Face.characteristicPT face of
   Just _ -> Nothing

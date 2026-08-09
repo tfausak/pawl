@@ -47,7 +47,7 @@ data Filter keyword
     --
     -- Read through the PROJECTION wherever one exists, so a creature that gains
     -- flying at CR 613.1f layer 6 matches and a Humility'd one stops matching;
-    -- Projection.viewOfCard is the printed-card fallback off the battlefield.
+    -- Projection.viewOfCardIn is the printed-card fallback off the battlefield.
     HasKeyword keyword
   | -- | The object has SOME keyword ability of this family (CR 702.1), whatever
     -- its payload -- Flensing Raptor's "another target creature you control with
@@ -78,9 +78,10 @@ data Filter keyword
     -- reachable from the other, and Pawl.FilterSpec pins that pair apart.
     --
     -- Answered off the PROJECTION on the battlefield and off the printed power
-    -- box everywhere else (Projection.printedPower), which is what Imperial
-    -- Recruiter's "creature card with power 2 or less" reads as it searches a
-    -- library.
+    -- box everywhere else, except that CR 208.2a's characteristic-defining power
+    -- is evaluated in every zone (Projection.characteristicPowerIn) -- which is
+    -- what Imperial Recruiter's "creature card with power 2 or less" reads as it
+    -- searches a library, Tarmogoyf included.
     PowerAtMost Integer
   | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
     -- Command's "creature card with mana value 2 or less".
