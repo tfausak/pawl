@@ -129,6 +129,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
+  Keyword.Wither -> []
   Keyword.Devoid -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
@@ -189,6 +190,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
+  Keyword.Wither -> []
   Keyword.Devoid -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
@@ -298,6 +300,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.BattleCry -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
+  Keyword.Wither -> []
   Keyword.Devoid -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
@@ -475,6 +478,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.BattleCry -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
+  Keyword.Wither -> []
   Keyword.Devoid -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
@@ -747,6 +751,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.BattleCry -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
+  Keyword.Wither -> []
   Keyword.Devoid -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -814,6 +819,7 @@ familyOf keyword = case keyword of
   Keyword.Fear -> Nothing
   Keyword.Intimidate -> Nothing
   Keyword.Infect -> Nothing
+  Keyword.Wither -> Nothing
   Keyword.BattleCry -> Nothing
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing

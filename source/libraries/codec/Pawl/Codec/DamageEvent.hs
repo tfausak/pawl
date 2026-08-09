@@ -17,6 +17,7 @@ toJson ev =
         <> Common.requiredPair "amount" Common.encodeNatural (DamageEvent.amount ev)
         <> Common.optionalPair "dealtByDeathtouch" False Common.boolean (DamageEvent.dealtByDeathtouch ev)
         <> Common.optionalPair "dealtByInfect" False Common.boolean (DamageEvent.dealtByInfect ev)
+        <> Common.optionalPair "dealtByWither" False Common.boolean (DamageEvent.dealtByWither ev)
         <> Common.optionalPair "dealtByToxic" 0 Common.encodeNatural (DamageEvent.dealtByToxic ev)
         -- CR 702.15b's answer is a player or nobody, so Nothing (no lifelink at
         -- deal time) is what an absent key means.
@@ -32,6 +33,7 @@ fromJson value = do
   a <- Common.field "amount" ps >>= Common.decodeNatural
   d <- Common.defaultedField "dealtByDeathtouch" False Common.asBoolean ps
   i <- Common.defaultedField "dealtByInfect" False Common.asBoolean ps
+  w <- Common.defaultedField "dealtByWither" False Common.asBoolean ps
   x <- Common.defaultedField "dealtByToxic" 0 Common.decodeNatural ps
   l <- Common.defaultedField "dealtByLifelink" Nothing (Common.decodeMaybe PlayerId.fromJson) ps
   k <- Common.field "kind" ps >>= DamageKind.fromJson
@@ -42,6 +44,7 @@ fromJson value = do
         DamageEvent.amount = a,
         DamageEvent.dealtByDeathtouch = d,
         DamageEvent.dealtByInfect = i,
+        DamageEvent.dealtByWither = w,
         DamageEvent.dealtByToxic = x,
         DamageEvent.dealtByLifelink = l,
         DamageEvent.kind = k

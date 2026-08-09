@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers Pawl.Engine.Damage and Pawl.Engine.Sba: the damage funnel, its deal-time riders
--- (deathtouch, infect, toxic, lifelink), trample, and state-based actions.
+-- (deathtouch, infect, wither, toxic, lifelink), trample, and state-based actions.
 module Pawl.DamageSpec where
 
 import qualified Control.Monad as Monad
@@ -254,7 +254,7 @@ creatureSbaSpec s registry =
           -- A real 2/1 Piker (bob's) is the damage source; alice's 1/1 token takes 2.
           (srcId, gs1) = S.addCreature piker S.bob base
           (tokId, gs2) = S.addToken goblinCard S.alice gs1
-          damaged = S.runPure S.identityAnswer gs2 (Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False False 0 Nothing DamageKind.Combat])
+          damaged = S.runPure S.identityAnswer gs2 (Damage.applyDamage [DamageEvent.MkDamageEvent srcId (Recipient.ToCreature tokId) 2 False False False 0 Nothing DamageKind.Combat])
           settled = S.settleSba damaged
       Spec.assertEqWith s "the token is gone from the battlefield" (S.creaturesInPlay S.alice settled) 0
       Spec.assertEqWith s "and NOT sitting in a graveyard (the falsifier)" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 0
@@ -265,7 +265,7 @@ creatureSbaSpec s registry =
           (victim, gs0) = S.addCreature piker S.alice base -- 2/1
           shielded = S.addRegenShield victim gs0
           -- 2 combat damage is lethal to a 2/1; the shield replaces the CR 704.5g destruction.
-          damaged = S.runPure S.identityAnswer shielded (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Combat])
+          damaged = S.runPure S.identityAnswer shielded (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Combat])
           settled = S.settleSba damaged
       Spec.assertEqWith s "survived (regenerated)" (Set.member victim (GameState.battlefield settled)) True
       case Game.lookupObject victim settled of
@@ -318,8 +318,8 @@ damageSpec s registry =
                 ActiveReplacement.origin = ReplacementOrigin.Other
               }
           withShield = S.addReplacement shield gs0
-          combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Combat])
-          spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Noncombat])
+          combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Combat])
+          spell = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Noncombat])
       Spec.assertEqWith s "combat damage prevented -- none marked" (S.damageOf victim combat) (Just 0)
       Spec.assertEqWith s "combat damage prevented -- no event recorded" (S.damageEventsOf combat) []
       Spec.assertEqWith s "noncombat damage still dealt" (S.damageOf victim spell) (Just 2)
@@ -345,7 +345,7 @@ infectSpec s registry =
     Spec.it s "CR 120.3b infect damage to a player becomes poison, not life loss" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True 0 Nothing DamageKind.Combat
+          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True False 0 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
       Spec.assertEqWith s "bob has three poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 3
       Spec.assertEqWith s "bob's life unchanged" (S.lifeOf S.bob after) (Just 20)
@@ -355,7 +355,7 @@ infectSpec s registry =
       piker <- S.printingOf s registry "Goblin Piker"
       let (src, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
           (victim, gs1) = S.addCreature piker S.bob gs0
-          ev = DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False True 0 Nothing DamageKind.Combat
+          ev = DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False True False 0 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer gs1 (Damage.applyDamage [ev])
       Spec.assertEqWith s "two -1/-1 counters" (fmap (Map.findWithDefault 0 CounterKind.MinusOneMinusOne . Object.counters) (Game.lookupObject victim after)) (Just 2)
       Spec.assertEqWith s "no marked damage" (S.damageOf victim after) (Just 0)
@@ -381,13 +381,61 @@ infectSpec s registry =
           Spec.assertEqWith s "no marked damage on the blocker" (S.damageOf blocker fought) (Just 0)
           Spec.assertEqWith s "blocker buried by 704.5f" (length (Game.zoneMembers Zone.Graveyard S.bob settled)) 1
 
+-- CR 702.80. Wither is infect's CREATURE half alone, so the pair below is the
+-- whole unit: CR 120.3d's counters against a creature, CR 120.3a's ordinary life
+-- loss against a player. Sickle Ripper ({1}{B} Creature -- Elemental Warrior
+-- 2/1, "Wither") prints nothing else.
+--
+-- CR 702.80d's redundancy is not tested: the rider is a Bool read by Map.member,
+-- so a second instance cannot change it, and there is nothing to mutate away.
+witherSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+witherSpec s registry =
+  Spec.describe s "Wither" $ do
+    -- Deliberately mismatched numbers: 2 damage into 4 toughness, so "two -1/-1
+    -- counters" and "two marked damage" leave DIFFERENT boards. A 2/2 blocker
+    -- would die either way and prove nothing.
+    Spec.it s "CR 702.80a Sickle Ripper shrinks its blocker with -1/-1 counters and takes ordinary damage back" $ do
+      sickleRipper <- S.printingOf s registry "Sickle Ripper"
+      giantSpider <- S.printingOf s registry "Giant Spider"
+      let (gs, attackers, blockers) = S.combatBoardOf [sickleRipper] [giantSpider]
+          fought = S.fightWith S.aggressiveAnswer gs
+          settled = S.settleSba fought
+      case (attackers, blockers) of
+        (attacker : _, blocker : _) -> do
+          Spec.assertEqWith s "two -1/-1 counters on the blocker" (S.counterOf CounterKind.MinusOneMinusOne blocker fought) 2
+          Spec.assertEqWith s "no marked damage on the blocker" (S.damageOf blocker fought) (Just 0)
+          Spec.assertEqWith s "the 0/2 blocker survives" (S.onBattlefield blocker settled) True
+          -- CR 120.3e: the Spider has no wither, so ITS damage is marked as
+          -- usual. Without this the change could be "damage is counters now".
+          Spec.assertEqWith s "two damage marked on the Ripper" (S.damageOf attacker fought) (Just 2)
+          Spec.assertEqWith s "no -1/-1 counters on the Ripper" (S.counterOf CounterKind.MinusOneMinusOne attacker fought) 0
+          Spec.assertEqWith s "CR 704.5g buries the 2/1 Ripper in its owner's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice settled)) 1
+        _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
+    -- CR 120.3a's exception names infect and NOT wither, which is the one place
+    -- wither differs from the keyword it otherwise copies.
+    Spec.it s "CR 120.3a Sickle Ripper drains an unblocked player's life, gives no poison" $ do
+      sickleRipper <- S.printingOf s registry "Sickle Ripper"
+      let (gs, _, _) = S.combatBoardOf [sickleRipper] []
+          after = S.fightWith S.aggressiveAnswer gs
+      Spec.assertEqWith s "bob lost the two life" (S.lifeOf S.bob after) (Just 18)
+      -- CR 119.2's EVENT and not only the total: lifeLostBy skips infect's
+      -- diverted damage, and this is what keeps wither out of that skip.
+      Spec.assertEqWith s "a life-loss event was recorded" (elem (GameEvent.LifeLost S.bob 2) (S.eventsOf after)) True
+      Spec.assertEqWith s "bob has no poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 0
+      Spec.assertEqWith
+        s
+        "nothing on the board gained a -1/-1 counter"
+        (any (\obj -> Map.findWithDefault 0 CounterKind.MinusOneMinusOne (Object.counters obj) > (0 :: Natural.Natural)) (GameState.objects after))
+        False
+
 toxicSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 toxicSpec s registry =
   Spec.describe s "Toxic" $ do
     Spec.it s "CR 120.3g toxic poison is IN ADDITION to the damage, not instead of it" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 Nothing DamageKind.Combat
+          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False False 2 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
       Spec.assertEqWith s "bob has two poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 2
       Spec.assertEqWith s "bob still lost the three life" (S.lifeOf S.bob after) (Just 17)
@@ -396,7 +444,7 @@ toxicSpec s registry =
     Spec.it s "CR 120.3g toxic gives no poison on NONCOMBAT damage" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 Nothing DamageKind.Noncombat
+          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False False 2 Nothing DamageKind.Noncombat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
       Spec.assertEqWith s "bob has no poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 0
       Spec.assertEqWith s "bob lost the three life" (S.lifeOf S.bob after) (Just 17)
@@ -408,7 +456,7 @@ toxicSpec s registry =
     Spec.it s "CR 120.3b/120.3g infect and toxic stack: poison is amount plus N, and no life is lost" $ do
       piker <- S.printingOf s registry "Goblin Piker"
       let (oid, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True 2 Nothing DamageKind.Combat
+          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False True False 2 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer gs0 (Damage.applyDamage [ev])
       Spec.assertEqWith s "bob has five poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 5
       Spec.assertEqWith s "bob's life unchanged" (S.lifeOf S.bob after) (Just 20)
@@ -499,7 +547,7 @@ toxicSpec s registry =
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other
               }
-          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False 2 Nothing DamageKind.Combat
+          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False False 2 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])
       Spec.assertEqWith s "no poison" (S.playerCounterOf PlayerCounterKind.Poison S.bob after) 0
       Spec.assertEqWith s "no life lost" (S.lifeOf S.bob after) (Just 20)
@@ -630,7 +678,7 @@ lifelinkSpec s registry =
                 ActiveReplacement.uses = Uses.Unlimited,
                 ActiveReplacement.origin = ReplacementOrigin.Other
               }
-          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 2 False False 0 (Just S.alice) DamageKind.Combat
+          ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 2 False False False 0 (Just S.alice) DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])
       Spec.assertEqWith s "alice gained nothing" (S.lifeOf S.alice after) (Just 20)
       Spec.assertEqWith s "and bob lost nothing" (S.lifeOf S.bob after) (Just 20)
@@ -1162,11 +1210,11 @@ damageEventSpec s registry =
           Spec.assertEqWith s "two events" (length events) 2
           Spec.assertBool
             s
-            (elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False False 0 Nothing DamageKind.Combat) events)
+            (elem (DamageEvent.MkDamageEvent a (Recipient.ToCreature b) 2 False False False 0 Nothing DamageKind.Combat) events)
             "attacker hit blocker for 2"
           Spec.assertBool
             s
-            (elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False False 0 Nothing DamageKind.Combat) events)
+            (elem (DamageEvent.MkDamageEvent b (Recipient.ToCreature a) 2 False False False 0 Nothing DamageKind.Combat) events)
             "blocker hit attacker for 2"
         _ -> Spec.assertFailure s "fixture should have one creature per side"
 
@@ -1180,7 +1228,7 @@ damageEventSpec s registry =
             s
             "one player event"
             (S.damageEventsOf after)
-            [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat]
+            [DamageEvent.MkDamageEvent a (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat]
         _ -> Spec.assertFailure s "fixture should have an attacker"
 
 deathtouchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -2047,6 +2095,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Damage" $ do
   sbaSpec s
   creatureSbaSpec s registry
   infectSpec s registry
+  witherSpec s registry
   toxicSpec s registry
   lifelinkSpec s registry
   lastKnownRiderSpec s registry

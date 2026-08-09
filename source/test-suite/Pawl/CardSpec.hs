@@ -1462,6 +1462,8 @@ keywordFilters keyword = case keyword of
   -- the keyword.
   Keyword.Prowess -> []
   Keyword.Infect -> []
+  -- CR 702.80a names no quality either: what it changes is where damage goes.
+  Keyword.Wither -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
