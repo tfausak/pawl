@@ -864,7 +864,12 @@ canPay pid = canPayCommitting pid 0
 -- Pawl.Engine.Cost.canPay, for the CR 119.4 payments the cost's COMPONENTS owe.
 -- Zero everywhere else, which is what `canPay` is.
 canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
-canPayCommitting pid committed cost gs = not (null (payableResolutions pid committed cost gs))
+canPayCommitting pid committed cost gs = canPayCommittingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
+
+-- The same question given a board already walked -- see payableResolutionsGiven
+-- for what `grants` and `pcs` are and why handing them in changes no answer.
+canPayCommittingGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> Bool
+canPayCommittingGiven grants pcs pid committed cost gs = not (null (payableResolutionsGiven grants pcs pid committed cost gs))
 
 -- One untapped source's contribution to the supply side, as the OPTIONS it
 -- offers: one option per yield, and each option is that yield read as one supply
@@ -982,13 +987,22 @@ sourceOptions yields =
 -- enumeration: its life way is a resolution with one fewer demand, so neither
 -- has to learn about a symbol that consumes no supply at all.
 payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutions pid committed cost gs =
+payableResolutions pid committed cost gs = payableResolutionsGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
+
+-- The same list given a board the CALLER has already walked, which is the half
+-- Action.legalActions' enumeration wants: the wrapper above takes one
+-- control-grant walk and one whole-board projection per CALL, and the caller
+-- there is a loop over the battlefield, so an activation cost measured through
+-- the wrapper costs a whole-board sweep per permanent (#716).
+--
+-- The SAME board manaSources is judged against serves the per-source yields
+-- too, rather than a fresh projection per source on top of the sweep (#200);
+-- see manaSources above for the hoist and its snapshot argument. That argument
+-- is what makes handing the board in from outside change no answer: it is a
+-- snapshot of one GameState, and this is a pure function of the same one.
+payableResolutionsGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutionsGiven grants pcs pid committed cost gs =
   let Mana.MkMana units = Game.poolOf pid gs
-      -- The SAME board manaSources is judged against serves the per-source
-      -- yields too, rather than a fresh projection per source on top of the sweep
-      -- (#200); see manaSources above for the hoist and its snapshot argument.
-      grants = Projection.controlGrants gs
-      pcs = Projection.projectAll gs
       pooled = fmap supplyOf units
       options = fmap (\oid -> sourceOptions (manaYieldsOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
       -- One option taken from each source, appended to the pool: `sequenceA` over

@@ -58,6 +58,7 @@ import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.TapState as TapState
@@ -785,12 +786,25 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- The COMPONENTS are asked exactly as `canPay` asks them, and no completion
 -- touches them: `completions` rewrites mana symbols only.
 canPaySomeCompletion :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canPaySomeCompletion pid oid total_ cost gs = case Cost.mana cost of
+canPaySomeCompletion pid oid total_ cost gs = canPaySomeCompletionGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid oid total_ cost gs
+
+-- The same question given a board the CALLER has already walked. The wrapper
+-- above reaches Mana.canPayCommitting, which takes one control-grant walk and
+-- one whole-board projection per call; Action.legalActions' activation gate asks
+-- it once per permanent, so that is a whole-board sweep per permanent (#716).
+-- Handing the board in changes no answer -- see Mana.payableResolutionsGiven and
+-- the snapshot argument at Projection.projectGiven.
+--
+-- ONLY the mana half is threaded. The COMPONENTS are still asked through
+-- canPayComponent, whose Sacrifice and TapForTotalPower arms make per-object
+-- walks of their own (#1073); no activation cost in the pool carries one.
+canPaySomeCompletionGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
         payable (completed, life) =
-          Mana.canPayCommitting pid (outside + life) (total_ (ManaCost.MkManaCost completed)) gs
+          Mana.canPayCommittingGiven grants pcs pid (outside + life) (total_ (ManaCost.MkManaCost completed)) gs
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
           && jointlyPayable pid oid (Cost.components cost) gs

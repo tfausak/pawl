@@ -324,6 +324,11 @@ loyaltyActivatedThisTurn srcId gs = elem (GameEvent.LoyaltyAbilityActivated srcI
 payableCost :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCost = payableCostAt 0
 
+-- The same predicate on a board the caller already walked -- see
+-- Cost.canPaySomeCompletionGiven.
+payableCostGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostGiven grants pcs = payableCostAtGiven grants pcs 0
+
 -- The same question asked at some OTHER value of X -- `payableCost` is this at
 -- the floor and `affordableX` is this climbed.
 --
@@ -343,6 +348,11 @@ payableCost = payableCostAt 0
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x pid srcId gs cost = Cost.canPaySomeCompletion pid srcId id (Cost.substituteX x cost) gs
 
+-- The same predicate on a board the caller already walked -- see
+-- Cost.canPaySomeCompletionGiven.
+payableCostAtGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
+payableCostAtGiven grants pcs x pid srcId gs cost = Cost.canPaySomeCompletionGiven grants pcs pid srcId id (Cost.substituteX x cost) gs
+
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
 -- shared with Cast.affordableX; only the predicate differs, and only by CR
@@ -359,14 +369,22 @@ affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid
 --
 -- activatableGiven is the half Action.legalActions wants: `grants` is one
 -- control-grant walk and `pcs` one whole-board projection, taken once for the
--- enumeration instead of once per permanent per ability (#200, #316). Two of the
--- conjuncts are deliberately NOT given that board: Target.fillableModes and
--- Cost.canPay ask about OTHER objects (the target pool, the mana sources), so
--- each hoists its own board for its own sweep (#316).
+-- enumeration instead of once per permanent per ability (#200, #316). EVERY
+-- conjunct is given that board, the last two included. They ask about OTHER
+-- objects -- the target pool, the mana sources -- but the board is a whole-board
+-- snapshot rather than this object's own, so it answers those questions too, and
+-- the plain wrappers they used to call (Target.fillableModes,
+-- Cost.canPaySomeCompletion) build exactly this from exactly this `gs`.
 --
--- Those two hoists are per CALL, and the caller is a loop over the battlefield,
--- so an ability that reaches them costs one whole-board sweep per permanent
--- (#716).
+-- Threading them buys the SHAPE of the loop: those wrappers hoist per CALL, and
+-- the caller is a loop over the battlefield, so an ability that reached them
+-- cost a whole-board sweep per permanent. Pawl.PerformanceSpec's Prodigal
+-- Sorcerer ceiling is what holds that line.
+--
+-- `activatable` keeps Map.empty deliberately. It has no engine caller -- only
+-- tests -- so the slower per-object Projection.projectGiven fallback costs
+-- nothing, and it makes the plain path a genuinely independent computation that
+-- PerformanceSpec's differential test can hold the threaded one against.
 activatable :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 activatable pid srcId ability gs = activatableGiven (Projection.controlGrants gs) Map.empty pid srcId ability gs
 
@@ -379,9 +397,9 @@ activatableGiven grants pcs pid srcId ability gs =
     && restrictionsOk pid ability gs
     && loyaltyOk pid srcId ability gs
     && Modal.selectionPossible
-      (Target.fillableModes (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
+      (Target.fillableModesGiven pcs grants (Just pid) srcId Map.empty (ActivatedAbility.modal ability) gs)
       (Modal.Type.selection (ActivatedAbility.modal ability))
-    && payableCost pid srcId gs (ActivatedAbility.cost ability)
+    && payableCostGiven grants pcs pid srcId gs (ActivatedAbility.cost ability)
 
 -- CR 602.2a: an ability activated from a hidden zone reveals the card that has
 -- it (CR 701.20a). Note what the rule does NOT say: there is no qualifier about
