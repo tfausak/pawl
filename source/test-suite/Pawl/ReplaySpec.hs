@@ -13,6 +13,7 @@ import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Engine as Engine
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Monarch as Monarch
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
@@ -39,8 +40,9 @@ import qualified Pawl.Types.Game as Game.Type
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
-import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ManaUnit as ManaUnit
@@ -63,11 +65,16 @@ import qualified Pawl.Types.TriggerEntry as TriggerEntry
 import qualified Pawl.Types.TriggerSource as TriggerSource
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 
--- The one-unit yield of a single-colour mana ability, which is what a
--- ChooseManaYield candidate looks like for every source but Sol Ring. No
--- production tag: every source these replays tap is a nonsnow one (CR 205.4g).
-oneMana :: Color.Color -> Mana.Mana
-oneMana color = Mana.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}]
+-- One way of tapping a single-colour source: CR 305.6's intrinsic "{T}" cost and
+-- a one-unit yield, which is what a ChooseManaYield candidate looks like for
+-- every source but Sol Ring. No production tag: every source these replays tap
+-- is a nonsnow one (CR 205.4g).
+oneMana :: Color.Color -> ManaOption.ManaOption
+oneMana color =
+  ManaOption.MkManaOption
+    { ManaOption.cost = Mana.intrinsicManaCost,
+      ManaOption.yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}]
+    }
 
 combatReplaySpec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 combatReplaySpec s =

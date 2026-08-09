@@ -31,6 +31,8 @@ import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import Pawl.Types.ManaCost (ManaCost)
 import qualified Pawl.Types.ManaCost as ManaCost
+import Pawl.Types.ManaOption (ManaOption)
+import qualified Pawl.Types.ManaOption as ManaOption
 import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import Pawl.Types.ManaSymbol (ManaSymbol)
@@ -193,7 +195,7 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 -- The same yields against a pre-projected board, which is manaRoutesOfGiven's
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
-manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs))
+manaYieldsOfGiven pcs oid gs = List.nub (fmap ManaOption.yield (manaOptionsOfGiven pcs oid gs))
 
 -- The same yields narrowed to the ones this player could actually get, each with
 -- HOW MANY TIMES they could get it: an activation answered 0 -- CR 118.3's
@@ -214,7 +216,7 @@ manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs
 -- on answering the ungated question.
 manaYieldsAvailableGiven :: Capacity -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [(Natural, Mana)]
 manaYieldsAvailableGiven capacity pcs pid oid gs =
-  let counted = [(capacity pcs pid oid cost gs, yield) | (cost, yield) <- manaOptionsOfGiven pcs oid gs]
+  let counted = fmap (\option -> (capacity pcs pid oid (ManaOption.cost option) gs, ManaOption.yield option)) (manaOptionsOfGiven pcs oid gs)
       available = filter ((> 0) . fst) counted
    in fmap
         (\yield -> (maximum (fmap fst (filter ((==) yield . snd) available)), yield))
@@ -225,25 +227,24 @@ manaYieldsAvailableGiven capacity pcs pid oid gs =
 -- colour choice) pair. `traverse` over the list applicative is that product:
 -- Birds of Paradise's one route becomes CR 105.4's five one-mana options.
 --
--- Deduplicated by the PAIR. Two routes producing identical mana for an identical
--- cost (an Urborg'd Swamp is a Swamp twice over) are indistinguishable options,
--- so collapsing them elides a prompt with no content; two that charge differently
--- are not, and survive as two.
---
--- Not implemented: what a player is asked when two surviving options share a
--- yield and differ only in cost. Prompt.ChooseManaYield carries the yield alone,
--- so the answer would name both and Pawl.Engine.Cost.tapForMana would take the
--- first (#1117).
-manaOptionsOf :: ObjectId -> GameState -> [(Cost Keyword.Keyword, Mana)]
+-- Deduplicated by the WHOLE option. Two routes producing identical mana for an
+-- identical cost (an Urborg'd Swamp is a Swamp twice over) are indistinguishable
+-- options, so collapsing them elides a prompt with no content; two that charge
+-- differently are not, and survive as two -- which is why what survives here is
+-- what Pawl.Engine.Cost.chooseManaYield offers whole.
+manaOptionsOf :: ObjectId -> GameState -> [ManaOption]
 manaOptionsOf = manaOptionsOfGiven Map.empty
 
 -- The same options against a pre-projected board (#200).
-manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, Mana)]
+manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaOption]
 manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       asMana manaTypes =
         Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags}) manaTypes)
-      expand (cost, productions) = fmap (\manaTypes -> (cost, asMana manaTypes)) (traverse (producedTypes oid gs) productions)
+      expand (cost, productions) =
+        fmap
+          (\manaTypes -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.yield = asMana manaTypes})
+          (traverse (producedTypes oid gs) productions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object

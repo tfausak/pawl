@@ -16,7 +16,7 @@ import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
-import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -53,9 +53,10 @@ data Response
     -- the player chose to tap for the sake of floating what it makes, or Nothing
     -- to close the window.
     ChoseExtraManaSource (Maybe ObjectId.ObjectId)
-  | -- | CR 605.3b / 105.4: the mana the source's controller chose it to produce
-    -- -- the whole yield of one activation, so a Sol Ring's is two units.
-    ChoseManaYield Mana.Mana
+  | -- | CR 605.3b / 105.4: the way the source's controller chose to tap it --
+    -- the whole yield of one activation, so a Sol Ring's is two units, beside
+    -- what CR 602.2b charged for it.
+    ChoseManaYield ManaOption.ManaOption
   | -- | CR 701.34a: the permanents and players a proliferating player chose. A
     -- pair rather than two constructors, because one prompt asks one question.
     ChoseProliferation (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)

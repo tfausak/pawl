@@ -55,6 +55,7 @@ import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
@@ -503,10 +504,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 prefersColor :: Color.Color -> Prompt.Prompt r -> r
 prefersColor wanted p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
-    let yield = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty}]
-     in if elem yield (NonEmpty.toList candidates)
-          then yield
-          else NonEmpty.head candidates
+    S.optionYielding (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored wanted, ManaUnit.tags = Set.empty}]) candidates
   _ -> S.identityAnswer p
 
 -- Alice controls `permanents` and holds `spell`; she casts it and resolves it,
@@ -1052,7 +1050,7 @@ prefersLongYieldFrom :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 prefersLongYieldFrom wanted p = case p of
   Prompt.ChooseManaYield _ _ oid candidates
     | oid == wanted ->
-        let size yield = case yield of
+        let size option = case ManaOption.yield option of
               Mana.Type.MkMana units -> length units
          in List.maximumBy (\a b -> compare (size a) (size b)) (NonEmpty.toList candidates)
   _ -> S.identityAnswer p
@@ -1393,6 +1391,39 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     Spec.assertEqWith s "accepting: the land is tapped" (tapOf accepted) (Just TapState.Tapped)
     Spec.assertEqWith s "accepting: and CR 704.5a takes the game" (fmap Player.status (Map.lookup S.alice (GameState.players accepted))) (Just (Status.Departed Departure.Type.Lost))
 
+  -- Two of ONE permanent's mana abilities adding the SAME mana for different
+  -- costs, which the pool reaches by putting Urborg beside Mana Confluence: the
+  -- land is a Swamp, so CR 305.6's intrinsic "{T}: Add {B}" sits beside the
+  -- printed "{T}, Pay 1 life: Add {B}". The yield cannot tell those two apart,
+  -- and an engine that offers the yield alone answers "which cost" itself (#1117).
+  --
+  -- Asked at the PROMPT and answered at the board, since neither is the whole
+  -- fact: the payload is where the two candidates are visible, and the life total
+  -- is what proves the answer decides which of them is paid for.
+  Spec.it s "CR 305.6/602.2b an Urborg'd Mana Confluence's black is free or costs a life" $ do
+    manaConfluence <- S.printingOf s registry "Mana Confluence"
+    urborg <- S.printingOf s registry "Urborg, Tomb of Yawgmoth"
+    let (confluenceId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+        (_, gs) = S.addCreature urborg S.alice g1
+        black = Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty}]
+        -- The offered black option that is CR 305.6's free one, or the printed
+        -- one that charges the life -- `printed` picks which.
+        buysBlack :: Bool -> Prompt.Prompt r -> r
+        buysBlack printed p = case p of
+          Prompt.ChooseManaYield _ _ _ candidates ->
+            let wanted option = ManaOption.yield option == black && (ManaOption.cost option /= Mana.intrinsicManaCost) == printed
+             in Maybe.fromMaybe (NonEmpty.head candidates) (List.find wanted (NonEmpty.toList candidates))
+          _ -> S.identityAnswer p
+        blacks = filter ((==) black . ManaOption.yield) (optionsOffered confluenceId gs)
+        free = S.runPure (buysBlack False) gs (Cost.tapForMana confluenceId)
+        bought = S.runPure (buysBlack True) gs (Cost.tapForMana confluenceId)
+    Spec.assertEqWith s "both ways of adding black are offered" (length blacks) 2
+    Spec.assertEqWith s "charging two different costs" (length (List.nub (fmap ManaOption.cost blacks))) 2
+    Spec.assertEqWith s "the free one: black in the pool" (poolTypes S.alice free) [ManaType.Colored Color.Black]
+    Spec.assertEqWith s "the free one: and all 20 life" (S.lifeOf S.alice free) (Just 20)
+    Spec.assertEqWith s "the bought one: the same black" (poolTypes S.alice bought) [ManaType.Colored Color.Black]
+    Spec.assertEqWith s "the bought one: for 1 life" (S.lifeOf S.alice bought) (Just 19)
+
 -- Answers Prompt.ChooseManaYield with a yield of two black mana whenever it is
 -- on offer, and defers everything else to S.identityAnswer. prefersColor's
 -- two-unit sibling, which Phyrexian Tower's "Add {B}{B}" is the pool's only card
@@ -1401,24 +1432,27 @@ prefersDoubleBlack :: Prompt.Prompt r -> r
 prefersDoubleBlack p = case p of
   Prompt.ChooseManaYield _ _ _ candidates ->
     let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty}
-        yield = Mana.Type.MkMana [unit, unit]
-     in if elem yield (NonEmpty.toList candidates)
-          then yield
-          else NonEmpty.head candidates
+     in S.optionYielding (Mana.Type.MkMana [unit, unit]) candidates
   _ -> S.identityAnswer p
 
--- The colour question as ASKED, rather than as read off the pool afterwards: one
--- entry per candidate Prompt.ChooseManaYield offered, and none at all where the
--- prompt was elided.
-yieldsOffered :: ObjectId.ObjectId -> GameState.GameState -> [[ManaType.ManaType]]
-yieldsOffered oid gs =
-  let step :: Prompt.Prompt r -> State.State [[ManaType.ManaType]] r
+-- The question as ASKED, rather than as read off the pool afterwards: one entry
+-- per candidate Prompt.ChooseManaYield offered, and none at all where the prompt
+-- was elided. Prompt-level because that is the only level some of it is visible
+-- at: two candidates a player can tell apart can still reach the same board.
+optionsOffered :: ObjectId.ObjectId -> GameState.GameState -> [ManaOption.ManaOption]
+optionsOffered oid gs =
+  let step :: Prompt.Prompt r -> State.State [ManaOption.ManaOption] r
       step p = case p of
         Prompt.ChooseManaYield _ _ _ candidates -> do
-          State.modify' (<> fmap (fmap ManaUnit.manaType . Mana.unitsOf) (NonEmpty.toList candidates))
+          State.modify' (<> NonEmpty.toList candidates)
           pure (NonEmpty.head candidates)
         _ -> pure (S.identityAnswer p)
    in State.execState (Engine.runGame step gs (Cost.tapForMana oid)) []
+
+-- The colours of those candidates alone, for a caller that is asking what the
+-- source could produce rather than what it charges.
+yieldsOffered :: ObjectId.ObjectId -> GameState.GameState -> [[ManaType.ManaType]]
+yieldsOffered oid gs = fmap (fmap ManaUnit.manaType . Mana.unitsOf . ManaOption.yield) (optionsOffered oid gs)
 
 -- CR 118.3: "A player can't pay a cost without having the necessary resources to
 -- pay it fully", and CR 602.2b makes a mana ability's activation cost one of
