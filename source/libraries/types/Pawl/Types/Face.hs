@@ -298,9 +298,9 @@ data Face card = MkFace
     -- precedent: the ability functions in the HAND (CR 113.6), which pawl's
     -- projection does not reach (#160).
     --
-    -- A LIST rather than a flag, matching every neighbouring permission field: a
-    -- face may in principle print more than one such line, and the rows of CR
-    -- 116.2 that a card grants are more than one kind.
+    -- A LIST rather than a flag, matching every neighbouring permission field:
+    -- nothing in CR 116.2 caps how many such lines a face may print, and
+    -- Pawl.Types.SpecialAction says which rows will land here.
     specialActions :: [SpecialAction.SpecialAction]
   }
   deriving (Eq, Ord, Show)

@@ -1813,18 +1813,19 @@ namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zo
 -- Circling Vultures on alice's battlefield with the given cards already in her
 -- graveyard, IN THE ORDER GIVEN so the last one is the top (CR 404.1), her
 -- upkeep begun and the trigger settled onto the stack -- zombieUpkeep's shape
--- one card over. Returns the Vultures, the graveyard ids and that state.
-vulturesUpkeep :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+-- one card over. Returns the Vultures and that state; the buried cards are
+-- asserted on by NAME, since CR 400.7 renames them on the way out.
+vulturesUpkeep :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
 vulturesUpkeep vultures buried =
   let (vulturesId, g1) = S.addCreature vultures S.alice (Setup.emptyGame S.bothPlayers)
-      bury (ids, g) printing = let (oid, g') = S.addGraveyardCard printing S.alice g in (ids <> [oid], g')
-      (buriedIds, g2) = List.foldl' bury ([], g1) buried
+      bury g printing = snd (S.addGraveyardCard printing S.alice g)
+      g2 = List.foldl' bury g1 buried
       upkeep = Phase.Beginning BeginningStep.Upkeep
       begun =
         Event.recordEvent
           (GameEvent.StepBegan upkeep S.alice)
           (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
-   in (vulturesId, buriedIds, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
+   in (vulturesId, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
 
 -- CR 118.12a's gate again, over the cost component that has no choice in it:
 -- Circling Vultures' "At the beginning of your upkeep, sacrifice this creature
@@ -1841,7 +1842,7 @@ circlingVulturesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry
 circlingVulturesSpec s registry = Spec.describe s "CirclingVultures" $ do
   Spec.it s "CR 118.3 an empty graveyard cannot pay, so the Vultures are sacrificed" $ do
     vultures <- S.printingOf s registry "Circling Vultures"
-    let (vulturesId, _, onStack) = vulturesUpkeep vultures []
+    let (vulturesId, onStack) = vulturesUpkeep vultures []
         ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
     Spec.assertBool s (S.onBattlefield vulturesId onStack) "the Vultures are on the battlefield before the trigger resolves"
     Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
@@ -1858,14 +1859,21 @@ circlingVulturesSpec s registry = Spec.describe s "CirclingVultures" $ do
   Spec.it s "CR 601.2f a noncreature card in the graveyard cannot pay it either" $ do
     vultures <- S.printingOf s registry "Circling Vultures"
     bolt <- S.printingOf s registry "Lightning Bolt"
-    let (vulturesId, _, onStack) = vulturesUpkeep vultures [bolt]
+    let (vulturesId, onStack) = vulturesUpkeep vultures [bolt]
         ((_, after), _) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
     Spec.assertBool s (not (S.onBattlefield vulturesId after)) "the Vultures were sacrificed"
-    Spec.assertEqWith s "and the Bolt is still in the graveyard" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    Spec.assertEqWith s "nothing was exiled" (namesIn Zone.Exile S.alice after) []
+    -- CR 404.1 again, from the other side: the sacrificed Vultures arrive on top
+    -- of the Bolt that could not pay for them.
+    Spec.assertEqWith
+      s
+      "and the Bolt is still in the graveyard, under them"
+      (namesIn Zone.Graveyard S.alice after)
+      [Just (S.printingName bolt), Just (S.printingName vultures)]
   Spec.it s "CR 118.12a a creature card in the graveyard pays it and the Vultures survive" $ do
     vultures <- S.printingOf s registry "Circling Vultures"
     piker <- S.printingOf s registry "Goblin Piker"
-    let (vulturesId, _, onStack) = vulturesUpkeep vultures [piker]
+    let (vulturesId, onStack) = vulturesUpkeep vultures [piker]
         ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
     Spec.assertBool s (S.onBattlefield vulturesId after) "the Vultures are still on the battlefield"
     Spec.assertEqWith s "CR 406.2 the Piker was exiled" (namesIn Zone.Exile S.alice after) [Just (S.printingName piker)]
@@ -1881,7 +1889,7 @@ circlingVulturesSpec s registry = Spec.describe s "CirclingVultures" $ do
     vultures <- S.printingOf s registry "Circling Vultures"
     piker <- S.printingOf s registry "Goblin Piker"
     birdMaiden <- S.printingOf s registry "Bird Maiden"
-    let (vulturesId, _, onStack) = vulturesUpkeep vultures [piker, birdMaiden]
+    let (vulturesId, onStack) = vulturesUpkeep vultures [piker, birdMaiden]
         ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
     Spec.assertBool s (S.onBattlefield vulturesId after) "the Vultures are still on the battlefield"
     Spec.assertEqWith s "the Bird Maiden, buried last, was exiled" (namesIn Zone.Exile S.alice after) [Just (S.printingName birdMaiden)]
