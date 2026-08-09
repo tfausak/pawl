@@ -46,8 +46,13 @@ data Response
   | ChoseDiscard [ObjectId.ObjectId]
   | -- | CR 507.1: the opponent the active player chose to attack.
     ChoseDefender PlayerId.PlayerId
-  | -- | CR 601.2g: the mana source the player chose to tap.
-    ChoseManaSource ObjectId.ObjectId
+  | -- | CR 601.2g: the mana source the player chose to tap, or Nothing for CR
+    -- 118.3c's refusal to activate any.
+    ChoseManaSource (Maybe ObjectId.ObjectId)
+  | -- | CR 605.3a, past the point the cost is covered: the further source
+    -- the player chose to tap for the sake of floating what it makes, or Nothing
+    -- to close the window.
+    ChoseExtraManaSource (Maybe ObjectId.ObjectId)
   | -- | CR 605.3b / 105.4: the mana the source's controller chose it to produce
     -- -- the whole yield of one activation, so a Sol Ring's is two units.
     ChoseManaYield Mana.Mana

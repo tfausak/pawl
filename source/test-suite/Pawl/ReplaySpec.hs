@@ -465,11 +465,30 @@ combatReplaySpec s =
           let a = ObjectId.MkObjectId 7
               b = ObjectId.MkObjectId 9
               p = Prompt.ChooseManaSource decider S.alice (a NonEmpty.:| [b])
-          Spec.assertEqWith s "the second source round trips" (Replay.decode p (Replay.encode p b)) (Just b)
+          Spec.assertEqWith s "the second source round trips" (Replay.decode p (Replay.encode p (Just b))) (Just (Just b))
           -- Discriminating for the same reason ChooseDefender's pair is: a
           -- decode that ignored the response and returned the head would
           -- pass one leg by accident.
-          Spec.assertEqWith s "the first source round trips" (Replay.decode p (Replay.encode p a)) (Just a)
+          Spec.assertEqWith s "the first source round trips" (Replay.decode p (Replay.encode p (Just a))) (Just (Just a))
+          -- CR 118.3c: the refusal has to survive too, or a replayed transcript
+          -- taps a source the player declined to.
+          Spec.assertEqWith s "and so does declining" (Replay.decode p (Replay.encode p Nothing)) (Just Nothing)
+        -- CR 605.3a: floating past what the cost needs is its own decision, and
+        -- its own response constructor.
+        Spec.it s "ChooseExtraManaSource round-trips, and does not decode as ChooseManaSource" $ do
+          let a = ObjectId.MkObjectId 7
+              p = Prompt.ChooseExtraManaSource decider S.alice (a NonEmpty.:| [ObjectId.MkObjectId 9])
+          Spec.assertEqWith s "the extra source round trips" (Replay.decode p (Replay.encode p (Just a))) (Just (Just a))
+          -- Discriminating: this fails if the two mana-source prompts share one
+          -- response constructor, which would let a transcript answer the wrong
+          -- window.
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseManaSource (Just a))) Nothing
+        Spec.it s "a short transcript floats nothing once the cost is covered" $
+          Spec.assertEqWith
+            s
+            "declines"
+            (Replay.defaultAnswer (Prompt.ChooseExtraManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
+            Nothing
         Spec.it s "a discard choice does not decode as a mana-source choice" $ do
           -- Discriminating: this fails if ChooseManaSource reuses another
           -- ObjectId-shaped response instead of getting its own constructor.
@@ -480,7 +499,7 @@ combatReplaySpec s =
             s
             "the head"
             (Replay.defaultAnswer (Prompt.ChooseManaSource decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])))
-            (ObjectId.MkObjectId 7)
+            (Just (ObjectId.MkObjectId 7))
         -- CR 605.3b / 105.4: the mana an any-colour source was tapped for is a
         -- decision, so it has to survive a transcript like any other.
         Spec.it s "ChooseManaYield round-trips through the transcript" $ do
@@ -495,7 +514,7 @@ combatReplaySpec s =
           -- Discriminating: this fails if ChooseManaYield reuses ChoseManaSource
           -- rather than getting its own constructor.
           let p = Prompt.ChooseManaYield decider S.alice (ObjectId.MkObjectId 7) (oneMana Color.Black NonEmpty.:| [oneMana Color.Red])
-          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))) Nothing
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseManaSource (Just (ObjectId.MkObjectId 7)))) Nothing
         -- CR 701.34a: who was proliferated onto is a decision, so it has to
         -- survive a transcript like any other.
         Spec.it s "ChooseProliferate round-trips through the transcript" $ do
@@ -523,11 +542,13 @@ combatReplaySpec s =
           -- Discriminating: a decode that ignored the response and returned
           -- the head would pass one leg by accident.
           Spec.assertEqWith s "keeping the first round trips" (Replay.decode p (Replay.encode p a)) (Just a)
-        Spec.it s "a legend choice does not decode as a mana-source choice" $ do
-          -- Discriminating: fails if ChooseLegend reuses ChoseManaSource rather
-          -- than getting its own ObjectId-shaped constructor.
+        Spec.it s "a legend choice does not decode as a Ring-bearer choice" $ do
+          -- Discriminating: fails if ChooseLegend reuses ChoseRingBearer rather
+          -- than getting its own ObjectId-shaped constructor. The mana-source
+          -- response no longer carries a bare ObjectId, so it can no longer be
+          -- the foil here.
           let p = Prompt.ChooseLegend decider S.alice (ObjectId.MkObjectId 7 NonEmpty.:| [ObjectId.MkObjectId 9])
-          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseManaSource (ObjectId.MkObjectId 7))) Nothing
+          Spec.assertEqWith s "mismatch" (Replay.decode p (Response.ChoseRingBearer (ObjectId.MkObjectId 7))) Nothing
         -- CR 603.7c: which of several minted tokens "it" names is a decision, so
         -- it has to survive a transcript like any other.
         Spec.it s "ChooseBoundToken round-trips through the transcript" $ do

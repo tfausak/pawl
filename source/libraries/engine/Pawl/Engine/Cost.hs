@@ -1120,15 +1120,29 @@ payComponents pid oid components = case components of
 -- NOT rolled back -- they live in the Program, outside the state -- so a failed
 -- payment still asked its questions.
 --
--- Failure is REACHABLE, and a source offering a colour choice is what makes it
--- so. canPay asks whether SOME sequence of choices pays the cost; this asks the
--- player to make them. A player who taps their only Birds of Paradise for green
--- cannot then pay {B}, and the engine must let them: choosing badly is a choice,
--- and second-guessing it here would be the engine playing the game.
+-- Failure is REACHABLE two ways. canPay asks whether SOME sequence of choices
+-- pays the cost; this asks the player to make them, and they may tap their only
+-- Birds of Paradise for green and then be unable to pay {B}, or decline to tap
+-- anything at all (CR 118.3c). The engine must let them do either: choosing
+-- badly is a choice, and second-guessing it here would be the engine playing the
+-- game.
 --
 -- One prompt per source tapped, against a shrinking candidate list, rather than
 -- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
 -- second is made knowing the first.
+--
+-- The window CLOSES when the player says so, not when the cost is covered. CR
+-- 605.3a's permission to activate a mana ability while casting is not rationed
+-- by what the cost needs, so the loop keeps asking once the pool covers it --
+-- Omnath, Locus of Mana is the pool's reason to say yes -- and CR 118.3c's "not
+-- mandatory" lets the answer be none at all, which fails the payment. Which of
+-- those two questions is asked is exactly whether the pool covers the cost yet,
+-- since that is what the player's silence would mean.
+--
+-- Ordering the window as "cover the cost, then float" restricts nothing: a
+-- player may still tap any source at either point, so every subset of their
+-- sources is still reachable. What the split buys is a sane default for a
+-- caller with no player attached (Pawl.Engine.Replay.defaultAnswer).
 --
 -- `refused` is what keeps that loop finite now that activating a mana ability can
 -- FAIL: a source whose own activation cost went unpaid is dropped from the
@@ -1151,52 +1165,68 @@ payComponents pid oid components = case components of
 payMana :: PlayerId -> ManaCost.ManaCost -> Game Bool
 payMana pid cost = do
   before <- State.get
-  paid <- tapUntilPaid Set.empty
+  paid <- window Set.empty
   Monad.unless paid (State.put before)
   pure paid
   where
-    tapUntilPaid refused = do
+    -- What the pool would leave if the cost were paid out of it right now.
+    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded pid cost gs)) cost (Game.poolOf pid gs)
+    window refused = do
       gs <- State.get
-      let budget = Maybe.fromMaybe 0 (Mana.lifeNeeded pid cost gs)
-      case Mana.spend budget cost (Game.poolOf pid gs) of
+      let covered = Maybe.isJust (settlement gs)
+      case filter (`Set.notMember` refused) (Mana.manaSources pid gs) of
+        [] -> settle
+        candidate : rest -> do
+          answer <- chooseSource covered pid (candidate NonEmpty.:| rest) gs
+          case answer of
+            Nothing -> settle
+            Just oid -> do
+              produced <- tapForMana oid
+              window (if produced then refused else Set.insert oid refused)
+    -- CR 601.2h: the window is closed, so the cost is paid out of what is there
+    -- -- and simply is not paid when the player floated too little.
+    settle :: Game Bool
+    settle = do
+      gs <- State.get
+      case settlement gs of
+        Nothing -> pure False
         Just (left, life) -> do
           State.put (Event.payLife pid life (Mana.setPool pid left gs))
           pure True
-        Nothing -> case filter (`Set.notMember` refused) (Mana.manaSources pid gs) of
-          [] -> pure False
-          candidate : rest -> do
-            oid <- chooseSource pid (candidate NonEmpty.:| rest) gs
-            produced <- tapForMana oid
-            tapUntilPaid (if produced then refused else Set.insert oid refused)
 
--- Which source to tap next.
+-- Which source to tap next, or none. `covered` says whether the pool already
+-- pays the cost, which picks between CR 118.3c's question and CR 601.2g's.
 --
--- Asked whenever there is more than one candidate, and elided ONLY when there is
--- exactly one -- where no choice exists to make. A deliberately blunt reading of
--- "eliding a prompt is legitimate only for indistinguishable options": it never
--- has to be right about what indistinguishable MEANS.
+-- Asked on every pass, and NEVER elided, not even for a single candidate:
+-- declining is an answer on every board, so there is always a choice to make.
+-- What makes a lone candidate worth asking about is Mana Confluence -- "{T}, Pay
+-- 1 life" is a cost a player at 1 life would rather not pay, and it is often
+-- their only source, so eliding here would tap it for them.
 --
--- The obvious cheaper rule -- elide when every candidate is a copy of the same
--- card -- is unsound in this pool, and the counterexamples are ordinary. Two
--- Llanowar Elves are one card, but one may be equipped or enchanted, one may
--- carry +1/+1 counters, one may be borrowed until end of turn, and one may be
--- blocking (CR 506.4 does not remove a creature from combat for tapping).
--- `Game.cardOf` compares PRINTED identity and cannot see any of it, so that rule
--- would suppress exactly the prompts the invariant exists to force (#217).
+-- Same-card candidates are not collapsed either. Two Llanowar Elves are one
+-- card, but one may be equipped or enchanted, one may carry +1/+1 counters, one
+-- may be borrowed until end of turn, and one may be blocking (CR 506.4 does not
+-- remove a creature from combat for tapping). `Game.cardOf` compares PRINTED
+-- identity and cannot see any of it, so collapsing them would suppress exactly
+-- the prompts the invariant exists to force (#217).
 --
 -- FILTERED, NOT TRUSTED, the posture Combat.declareAttackers and payComponents
 -- already take. Beyond hygiene, an answer outside the offered set is one payMana
 -- would spend a whole pass of its loop on for nothing: an unknown or mana-less
--- id, or a source its `refused` set has already given up on.
-chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game ObjectId
-chooseSource pid candidates gs = case candidates of
-  only NonEmpty.:| [] -> pure only
-  _ -> do
-    answer <- Game.choose (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates)
-    pure $
-      if List.elem answer (NonEmpty.toList candidates)
-        then answer
-        else NonEmpty.head candidates
+-- id, or a source its `refused` set has already given up on. An unrecognised id
+-- reads as declining rather than as the head candidate, since the fallback must
+-- not tap something on the player's behalf.
+chooseSource :: Bool -> PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game (Maybe ObjectId)
+chooseSource covered pid candidates gs = do
+  let decider = Decide.deciderFor pid gs
+  answer <-
+    Game.choose $
+      if covered
+        then Prompt.ChooseExtraManaSource decider pid candidates
+        else Prompt.ChooseManaSource decider pid candidates
+  pure $ case answer of
+    Just oid | List.elem oid (NonEmpty.toList candidates) -> Just oid
+    _ -> Nothing
 
 -- CR 106.12's "tap [a permanent] for mana" -- activate one of its mana abilities,
 -- which by CR 602.2b means paying that ability's whole cost and then adding what

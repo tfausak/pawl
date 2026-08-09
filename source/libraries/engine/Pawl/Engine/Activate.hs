@@ -362,7 +362,9 @@ affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
 -- (abilitiesFor), it is not a mana ability (those are handled at payment, not
--- the stack), the whole activation cost is payable at CR 601.2b's X=0 floor (CR
+-- the stack; CR 605.3a's other window, activating one with priority and no cost
+-- to pay, is not implemented -- #1123), the whole activation cost is payable at
+-- CR 601.2b's X=0 floor (CR
 -- 118.3), the {T} sickness gate holds, the ability's timing rider permits it now
 -- (CR 307.5), and enough modes are fillable to satisfy the selection (CR
 -- 700.2a/602.2b). The cost is the PRINTED one (#90).

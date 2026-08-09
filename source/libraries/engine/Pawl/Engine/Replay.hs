@@ -49,6 +49,7 @@ encode p answer = case p of
   Prompt.ChooseDiscard {} -> Response.ChoseDiscard answer
   Prompt.ChooseDefender {} -> Response.ChoseDefender answer
   Prompt.ChooseManaSource {} -> Response.ChoseManaSource answer
+  Prompt.ChooseExtraManaSource {} -> Response.ChoseExtraManaSource answer
   Prompt.ChooseManaYield {} -> Response.ChoseManaYield answer
   Prompt.ChooseProliferate {} -> Response.ChoseProliferation answer
   Prompt.ChooseRingBearer {} -> Response.ChoseRingBearer answer
@@ -130,6 +131,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseManaSource {} -> case response of
     Response.ChoseManaSource oid -> Just oid
+    _ -> Nothing
+  Prompt.ChooseExtraManaSource {} -> case response of
+    Response.ChoseExtraManaSource oid -> Just oid
     _ -> Nothing
   Prompt.ChooseManaYield {} -> case response of
     Response.ChoseManaYield mana -> Just mana
@@ -308,8 +312,13 @@ defaultAnswer p = case p of
   Prompt.ChooseDiscard _ _ ids n -> List.genericTake n ids
   -- CR 507.1: the prompt is only asked with candidates, so the head is legal.
   Prompt.ChooseDefender _ _ candidates -> NonEmpty.head candidates
-  -- Any candidate pays.
-  Prompt.ChooseManaSource _ _ candidates -> NonEmpty.head candidates
+  -- Any candidate pays, and the cost is still short, so taking one is the least
+  -- eventful answer that can still pay: CR 118.3c's refusal would fail the
+  -- payment and reverse whatever proposed it.
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  -- The cost is already covered, so floating more is the eventful answer and
+  -- closing the window is the quiet one.
+  Prompt.ChooseExtraManaSource {} -> Nothing
   -- Every offered yield is producible: tapForMana only offers what the source
   -- can make.
   Prompt.ChooseManaYield _ _ _ candidates -> NonEmpty.head candidates
