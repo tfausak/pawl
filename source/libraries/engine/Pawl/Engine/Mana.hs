@@ -15,11 +15,9 @@ import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
@@ -51,17 +49,21 @@ import qualified Pawl.Types.Prompt as Prompt
 import Pawl.Types.Subtype (Subtype)
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
-import qualified Pawl.Types.TapState as TapState
 
--- | CR 118.3 asked of a mana ability's OWN activation cost: can this player pay
--- it, for the ability on this object? CR 602.2b is why the supply model has to
--- ask -- activating a mana ability means paying its cost -- so a source whose
--- cost cannot be paid is neither an offer nor a supply.
+-- | Asked of a mana ability's OWN activation cost: may this player activate it,
+-- for the ability on this object? CR 602.2b is why the supply model has to ask
+-- -- activating a mana ability means paying its cost -- so a route the gate
+-- refuses is neither an offer nor a supply.
 --
--- A CALLBACK rather than a call, for Pawl.Engine.Count.ViewOf's reason: cost
--- payability is Pawl.Engine.Cost's question, and that module imports this one.
--- Pawl.Engine.Cost.canPayActivation is the only answer the engine passes.
-type Gate = PlayerId -> ObjectId -> Cost Keyword.Keyword -> GameState -> Bool
+-- EVERY restriction on the activation rides here, not just CR 118.3's
+-- payability: CR 605.3b keeps a mana ability off the stack, so there is no other
+-- window to apply one in. It takes the pre-projected board because CR 302.6's
+-- reads want it (#200).
+--
+-- A CALLBACK rather than a call, for Pawl.Engine.Count.ViewOf's reason: those
+-- are Pawl.Engine.Cost's questions, and that module imports this one.
+-- Pawl.Engine.Cost.canActivateManaAbility is the only answer the engine passes.
+type Gate = Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Keyword -> GameState -> Bool
 
 -- | CR 305.6
 subtypeMana :: Subtype -> Maybe ManaType
@@ -112,11 +114,10 @@ producedTypes oid gs production = case production of
 -- payment and never on the stack (CR 605.3b).
 --
 -- CR 106.12 narrows "tap for mana" to a mana ability that includes {T} in its
--- activation cost, and this function does not FILTER on that -- it only carries
--- the cost, so a mana ability without {T} would be enumerated here as though it
--- tapped. Every mana ability in the pool costs {T} and nothing else does the
--- narrowing (manaSourcesGiven leans on the same fact for CR 302.6, and
--- isManaAbility reads no cost at all) (#1116).
+-- activation cost, and this function does not filter on that, deliberately: a
+-- route is every way the object could be activated for mana, {T} or not. The
+-- narrowing is applied where the tap rules are, by the Gate reading each route's
+-- own cost (manaSourcesGiven).
 --
 -- The nesting is the whole point. The OUTER list is the options -- which ability
 -- of this permanent, and which of its modes -- and each carries the COST CR
@@ -189,9 +190,10 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
 manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs))
 
--- The same yields narrowed to the ones this player could actually get: CR 118.3
--- refuses an activation whose cost cannot be paid, so its yield is no supply
--- (payableResolutionsGiven) and no offer (Pawl.Engine.Cost.tapForMana).
+-- The same yields narrowed to the ones this player could actually get: an
+-- activation the gate refuses -- CR 118.3's unpayable cost, CR 302.6's sick
+-- creature -- yields nothing, so it is no supply (payableResolutionsGiven) and
+-- no offer (Pawl.Engine.Cost.tapForMana).
 --
 -- Separate from manaYieldsOf above rather than replacing it, and CR 106.7 is why
 -- rather than tidiness: "the type of mana a permanent could produce" is defined
@@ -199,7 +201,7 @@ manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs
 -- on answering the ungated question.
 manaYieldsAvailableGiven :: Gate -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [Mana]
 manaYieldsAvailableGiven gate pcs pid oid gs =
-  List.nub (fmap snd (filter (\(cost, _) -> gate pid oid cost gs) (manaOptionsOfGiven pcs oid gs)))
+  List.nub (fmap snd (filter (\(cost, _) -> gate pcs pid oid cost gs) (manaOptionsOfGiven pcs oid gs)))
 
 -- Every way this object could be tapped for mana, as the COST CR 602.2b makes
 -- that activation pay paired with the mana it adds -- one entry per (route,
@@ -323,9 +325,10 @@ emptyManaPools gs =
         kept -> Just (Mana.MkMana kept)
    in gs {GameState.manaPool = Map.mapMaybeWithKey retain (GameState.manaPool gs)}
 
--- Untapped permanents this player controls that can produce mana (CR 109.4a:
--- a mana ability's controller is determined as though it were on the stack --
--- i.e. the permanent's controller, CR 110.2 -- not the object's owner).
+-- Permanents this player controls with a mana ability they could activate right
+-- now (CR 109.4a: a mana ability's controller is determined as though it were on
+-- the stack -- i.e. the permanent's controller, CR 110.2 -- not the object's
+-- owner).
 --
 -- ONE control-grant walk and ONE whole-board projection for the whole sweep,
 -- threaded into every question asked of every permanent -- the hoist
@@ -344,22 +347,19 @@ manaSources gate pid gs = manaSourcesGiven gate (Projection.controlGrants gs) (P
 
 manaSourcesGiven :: Gate -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
 manaSourcesGiven gate grants pcs pid gs =
-  let -- CR 302.6: a sick creature can't use a {T} mana ability, and every mana
-      -- ability in the pool costs {T}; a land is never sick-gated. Keyed to
-      -- `pid`: the creature must have settled under the player reaching for the
-      -- mana, not under whoever held it before (#198) -- and CR 702.10c's haste
-      -- exemption applies as it does to any other {T} ability.
-      notSickCreature oid =
-        not (Set.member CardType.Creature (Projection.cardTypesGiven pcs oid gs))
-          || Summoning.settledOrHastyGiven pcs pid oid gs
-      -- CR 118.3: a route whose activation cost this player cannot pay is no
-      -- route at all, so a permanent whose every route is unpayable is not a
-      -- source (Phyrexian Tower's "{T}, Sacrifice a creature" with no creature
-      -- to give). Asked of the ROUTES rather than the options, since a colour
-      -- choice cannot change what the activation charges.
-      isSource oid = case Game.lookupObject oid gs of
-        Nothing -> False
-        Just obj -> Object.tapped obj == TapState.Untapped && any (\(cost, _) -> gate pid oid cost gs) (manaRoutesOfGiven pcs oid gs) && notSickCreature oid
+  let -- A route the gate refuses is no route at all, so a permanent whose every
+      -- route is refused is not a source -- Phyrexian Tower's "{T}, Sacrifice a
+      -- creature" with no creature to give (CR 118.3), a tapped Forest's "{T}"
+      -- (CR 107.5), a sick Llanowar Elves' (CR 302.6). Asked of the ROUTES
+      -- rather than the options, since a colour choice cannot change what the
+      -- activation charges.
+      --
+      -- PER ROUTE and not once for the permanent, which is CR 106.12's
+      -- narrowing: "tap for mana" is an activation whose cost includes {T}, and
+      -- the tap and sickness rules reach only such a cost. A Blood Pet is a
+      -- black source while tapped and on the turn it arrives, because
+      -- "Sacrifice this creature: Add {B}" is neither (#1116).
+      isSource oid = any (\(cost, _) -> gate pcs pid oid cost gs) (manaRoutesOfGiven pcs oid gs)
    in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
@@ -829,17 +829,20 @@ canPayCommitting gate pid committed cost gs = canPayCommittingGiven gate (Projec
 canPayCommittingGiven :: Gate -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> Bool
 canPayCommittingGiven gate grants pcs pid committed cost gs = not (null (payableResolutionsGiven gate grants pcs pid committed cost gs))
 
--- One untapped source's contribution to the supply side, as the OPTIONS it
--- offers: one option per yield, and each option is that yield read as one supply
--- per mana it adds. payableResolutions picks exactly ONE option per source.
+-- One source's contribution to the supply side, as the OPTIONS it offers: one
+-- option per yield, and each option is that yield read as one supply per mana it
+-- adds. payableResolutions picks exactly ONE option per source.
 --
--- One and not several, because CR 106.12 makes "tap for mana" an activation of a
--- mana ability including {T} in its activation cost, and CR 107.5 bars tapping an
--- already-tapped permanent to pay that cost. Every mana ability in this pool
--- includes {T} (manaSourcesGiven leans on the same fact for CR 302.6), so an
--- untapped source is tapped for mana at most once and adds what exactly one
--- activation adds. Mixing its yields -- the first mana from one, the second from
--- another -- describes a board no sequence of activations reaches.
+-- One and not several, because every mana ability in this pool can be activated
+-- at most once from a given board. CR 106.12's "tap for mana" holds {T} in its
+-- cost, and CR 107.5 bars tapping an already-tapped permanent to pay it; Blood
+-- Pet's "Sacrifice this creature" spends the source itself. So a source adds
+-- what exactly one activation adds, and mixing its yields -- the first mana from
+-- one, the second from another -- describes a board no sequence of activations
+-- reaches.
+--
+-- Not implemented: a source a payment could activate SEVERAL times, which this
+-- would still count once (#1128).
 --
 -- The COLLAPSE is the one place several yields become one option, and it is
 -- exact rather than a shortcut. Where every yield adds at most one mana, each

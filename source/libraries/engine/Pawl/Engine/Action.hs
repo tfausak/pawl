@@ -190,24 +190,17 @@ legalActions pid gs =
       --
       -- Mana.manaSourcesGiven is the whole gate, and it is the SAME list CR
       -- 605.3a's other two windows are served from (Cost.payMana's candidates):
-      -- untapped, controlled, offering some mana route, past CR 302.6's sickness
-      -- test, and -- through Cost.canPayActivation, CR 118.3 asked of the mana
-      -- ability's own cost (CR 602.2b) -- able to pay for itself. ONE sweep for
-      -- the whole enumeration rather than one per permanent, on the board this
-      -- function already walked.
+      -- controlled, and offering some route Cost.canActivateManaAbility admits
+      -- -- CR 118.3's payability of the ability's own cost (CR 602.2b), which
+      -- carries CR 107.5's tapped permanent and CR 302.6's sick creature with
+      -- it. ONE sweep for the whole enumeration rather than one per permanent,
+      -- on the board this function already walked.
       --
-      -- That last conjunct is also what keeps the offer from being one a player
-      -- could take forever: an activation whose cost goes unpaid taps nothing,
-      -- so an ungated menu would offer it again unchanged. Cost.tapForMana picks
-      -- among exactly the options this gate admitted -- one predicate, asked at
-      -- the offer and at the payment, so the two cannot disagree.
-      --
-      -- UNOBSERVABLE on this menu today, and deliberately kept anyway: the gate
-      -- drops a permanent only when EVERY route of it is unpayable, and the one
-      -- card whose activation cost can fail keeps a route that cannot (Phyrexian
-      -- Tower's "{T}: Add {C}" beside its sacrifice). Removing it leaves the
-      -- suite green. What IS observable is the same predicate one level down, on
-      -- the yields -- Pawl.ManaSpec's "what the activation may yield is gated by
-      -- its own cost".
-      manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.canPayActivation grants pcs pid gs)
+      -- That gate is also what keeps the offer from being one a player could
+      -- take forever: a source already tapped cannot pay its {T} again, so it
+      -- leaves the menu the moment it is taken. Cost.tapForMana picks among
+      -- exactly the options this gate admitted -- one predicate, asked at the
+      -- offer and at the payment, so the two cannot disagree. Pawl.ManaSpec's
+      -- "the menu carries one activation per untapped source" is the proof.
+      manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.canActivateManaAbility grants pcs pid gs)
    in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaActivations

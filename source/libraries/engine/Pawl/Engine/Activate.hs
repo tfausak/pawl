@@ -20,13 +20,11 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
-import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.Card as Card
-import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -48,25 +46,15 @@ import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Zone as Zone
 
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
--- sick. Asks Pawl.Engine.Cost for the CLASSIFICATION rather than matching a
--- component constructor here, and covers both of CR 302.6's symbols -- the tap
--- symbol (CR 107.5) and the untap symbol (CR 107.6) alike.
---
--- Keyed to `pid`, the player trying to activate: CR 302.6 asks about THEIR
--- control since THEIR most recent turn began, so a settle recorded for anyone
--- else does not answer it (#198). CR 702.10c's haste exemption comes with it,
--- from the shared predicate.
---
--- Reads PROJECTED creature-ness, so a plain land is never sick-gated and an
--- animated one is.
+-- sick. The whole reading lives in Pawl.Engine.Cost, because the mana window
+-- needs the same one and CR 605.3b keeps a mana ability from ever reaching this
+-- module; all that is left here is handing over the ability's cost.
 sicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 sicknessOk = sicknessOkGiven Map.empty
 
 sicknessOkGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
-sicknessOkGiven pcs pid srcId ability gs =
-  let needsCheck = Cost.requiresSicknessCheck (ActivatedAbility.cost ability)
-      isCreature = Set.member CardType.Creature (Projection.cardTypesGiven pcs srcId gs)
-   in not (needsCheck && isCreature && not (Summoning.settledOrHastyGiven pcs pid srcId gs))
+sicknessOkGiven pcs pid srcId ability =
+  Cost.sicknessOkGiven pcs pid srcId (ActivatedAbility.cost ability)
 
 -- The abilities to consider activating, which depends on WHERE the object is --
 -- the one place that zone question is asked, so no caller repeats it.
