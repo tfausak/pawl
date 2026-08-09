@@ -125,9 +125,17 @@ legalActions pid gs =
       -- sharing them rested on GHC's CSE before and is now stated (#200, #315,
       -- #316). The board is a snapshot of this one `gs` and this is a pure
       -- function of it, so nothing can move between the projection and its
-      -- uses. Pawl.PerformanceSpec is what holds the line now: it measures this
-      -- enumeration over 64 and 256 permanents and fails if quadrupling the
-      -- board costs more than 8x, which one projection per object does.
+      -- uses. Threaded into the cost and target gates too, which used to hoist
+      -- a board apiece per call and so per permanent (#716).
+      --
+      -- Pawl.PerformanceSpec is what holds the line now, with a fixture per
+      -- depth of the gate chain. A MANA ability stops at CR 605.1a and never
+      -- reaches those two gates: that path is linear, and the ratio guard
+      -- measures it over 64 and 256 permanents and fails if quadrupling the
+      -- board costs more than 8x, which one projection per object does. A
+      -- NON-mana ability runs the whole chain: that path is held by an absolute
+      -- per-permanent ceiling instead, because what is left in it is still O(N)
+      -- per permanent without being a projection (#1073).
       activations =
         let grants = Projection.controlGrants gs
             pcs = Projection.projectAll gs

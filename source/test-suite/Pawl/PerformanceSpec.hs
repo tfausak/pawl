@@ -11,6 +11,15 @@
 -- case, GHC stopped sharing the repeated `project srcId gs`, and the suite went
 -- from 29s to 56s with nothing failing.
 --
+-- TWO FIXTURES, because CR 605.1a's mana-ability test cuts the enumeration's
+-- gate chain in half and one printing can only measure one side of it. Llanowar
+-- Elves stops at that test and holds the RATIO guard; Prodigal Sorcerer runs
+-- past it into the target and cost gates and holds an ABSOLUTE per-permanent
+-- ceiling. See boardOf and sorcererCeilingBytesPerPermanent for why the second
+-- one cannot be a ratio: after #716 that path takes a constant number of
+-- whole-board PROJECTIONS, but it still walks the battlefield per ability for
+-- other reasons and so is still quadratic overall (#1073).
+--
 -- Only the action enumeration is measured. The other paths the priority loop
 -- reaches every pass -- Combat.legalAttackers, Combat.legalBlockers,
 -- Mana.manaSources, Cast.castableSpells -- have no bound here (#717).
@@ -29,6 +38,7 @@ import qualified Data.Set as Set
 import qualified GHC.Conc as Conc
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
+import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
@@ -47,23 +57,22 @@ smallBoard, largeBoard :: Int
 smallBoard = 64
 largeBoard = 256
 
--- `n` Llanowar Elves on the battlefield under alice, in her precombat main
--- phase.
+-- `n` copies of a printing on the battlefield under alice, in her precombat
+-- main phase.
 --
--- Llanowar Elves and not a vanilla creature because its printed "{T}: Add {G}"
--- makes the enumeration do the work under guard: the loop reads every
--- permanent's PROJECTED activated abilities (Activate.abilitiesForGiven, the
--- reader #315 made expensive) and classifies each one. A vanilla body would
--- leave that list empty and the per-object gates would never run at all.
+-- Never a vanilla creature: the printing has to carry an activated ability, or
+-- the loop reads an empty list of PROJECTED activated abilities
+-- (Activate.abilitiesForGiven, the reader #315 made expensive) and the
+-- per-object gates never run at all. The two printings this module uses stop at
+-- two different depths of that gate chain, which is why it takes both:
 --
--- It stops where CR 605.1a's mana-ability test does, which is before
--- Cost.canPay and Target.fillableModes. That is deliberate: those two ask about
--- OTHER objects and take a whole-board sweep apiece, so a board whose abilities
--- reach them is quadratic today and NOT guarded here -- swapping this fixture
--- for Prodigal Sorcerer reads 15.6x rather than 3.8x (#716). This module
--- measures the projection loop the enumeration itself runs, so the fixture
--- keeps those two sweeps out of the reading rather than widening the bound to
--- admit them.
+--   * LLANOWAR ELVES stops where CR 605.1a's mana-ability test does, before
+--     Cost.canPaySomeCompletion and Target.fillableModes. That short path is
+--     the one the ratio guard below reads, and it is linear.
+--   * PRODIGAL SORCERER's "{T}: deals 1 damage to any target" is not a mana
+--     ability (CR 605.1a: it requires a target), so its enumeration runs every
+--     remaining conjunct, including the two that ask about OTHER objects. That
+--     path is the one the absolute Sorcerer ceiling below reads.
 --
 -- The hand is empty, so Cast.castableSpells and playableLands are constant work
 -- here and the battlefield loop is the only thing that varies with `n`.
@@ -123,7 +132,7 @@ growthBound = 8
 -- every object costs without changing the shape of the loop keeps the ratio at
 -- 4x, and only an absolute figure catches it.
 --
--- Measured at 5,448 bytes per permanent on GHC 9.14.1, so this carries ~2.2x
+-- Measured at 7,515 bytes per permanent on GHC 9.14.1, so this carries ~1.6x
 -- headroom: enough to absorb a compiler bump, a change of architecture (this
 -- was measured on aarch64 and CI runs the suite on x86_64), or a feature
 -- landing in the enumeration -- and still tight enough to fail on a doubling.
@@ -132,6 +141,47 @@ growthBound = 8
 -- constant in the commit that causes it.
 ceilingBytesPerPermanent :: Integer
 ceilingBytesPerPermanent = 12000
+
+-- The same committed ceiling for the OTHER fixture -- the one whose ability is
+-- not a mana ability, so the enumeration runs the two conjuncts that ask about
+-- other objects (CR 700.2a's fillable-mode test and CR 118.3's payability
+-- test). Those two are the ones #716 threaded the enumeration's own board into,
+-- and this is what holds that threading in place.
+--
+-- AN ABSOLUTE CEILING AND DELIBERATELY NOT A RATIO, because this board is STILL
+-- QUADRATIC and the ratio would say so without saying anything about the
+-- threading. Neither conjunct takes a whole-board PROJECTION per permanent any
+-- more, but each still does O(N) non-projection work per permanent:
+-- Target.basePoolGiven builds a fresh recipient Set over the battlefield for
+-- every slot of every ability, Mana.manaSourcesGiven filters
+-- Projection.controlsGiven for every ability, and PlayerEffect.applying walks
+-- the battlefield once per player candidate (#1073). Measured at 16.5x for a 4x
+-- board after the threading, against ~16x before it -- so a growth bound here
+-- would fail at 8x and assert nothing at 20x.
+--
+-- THE BRACKET this number sits in, all at largeBoard on GHC 9.14.1 / aarch64,
+-- and the reason the headroom is thinner than ceilingBytesPerPermanent's:
+--
+--   * 766,459 as it stands.
+--   * 1,453,467 with the target gate's board taken away again (pass
+--     Target.fillableModesGiven a fresh Projection.projectAll rather than
+--     Activate.activatableGiven's own).
+--   * 1,556,019 with the cost gate's board taken away again, the same way.
+--   * 2,242,971 with both -- which is the pre-#716 tree.
+--
+-- So this is the geometric middle of the reading and the SMALLEST of the three
+-- regressions it has to catch, exactly as growthBound above is the geometric
+-- middle of its two: ~1.37x headroom over the reading, ~1.38x under the
+-- cheapest regression. There is no more room than that, and that is a fact
+-- about the size of the win rather than a choice -- the threading is a 2.9x
+-- constant, not an order of magnitude, because #1073's residual dominates what
+-- is left.
+--
+-- REGENERATED exactly as ceilingBytesPerPermanent above is: run this test and
+-- read the observed figure out of the failure message. If #1073 lands, the
+-- reading drops a long way and this should be retightened with it.
+sorcererCeilingBytesPerPermanent :: Integer
+sorcererCeilingBytesPerPermanent = 1050000
 
 spec :: (Monad n) => Spec.Spec IO n -> Registry.Registry IO -> n ()
 spec s registry = Spec.describe s "performance" $ do
@@ -170,3 +220,49 @@ spec s registry = Spec.describe s "performance" $ do
     large <- allocationsOf (enumerationOver elves) largeBoard
     let perPermanent = large `div` toInteger largeBoard
     Spec.assertLeWith s ("observed " <> show perPermanent <> " bytes per permanent (" <> show large <> " bytes over " <> show largeBoard <> " permanents)") perPermanent ceilingBytesPerPermanent
+
+  -- The discriminating fixture check for the Sorcerer board, and the one the
+  -- measurement below is worthless without.
+  Spec.it s "the Prodigal Sorcerer fixture reaches every conjunct of the enumeration" $ do
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let board = boardOf sorcerer smallBoard
+        oids = Set.toList (GameState.battlefield board)
+    Spec.assertEqWith s "the board holds one permanent per requested size" (length oids) smallBoard
+    Spec.assertEqWith s "each one offers exactly one activated ability to enumerate" (fmap (\oid -> length (Activate.abilitiesFor oid board)) oids) (replicate smallBoard 1)
+    -- CR 602.2: one Activate action per permanent, plus Pass. THE load-bearing
+    -- assertion here: an offered activation means CR 605.1a's mana-ability
+    -- test, the CR 302.6 sickness gate, CR 700.2a's fillable-mode test AND CR
+    -- 118.3's payability test all ran and all said yes. If any conjunct
+    -- refused, this reads 1 -- exactly what the Llanowar Elves fixture reads --
+    -- and every allocation figure taken over this board is vacuous.
+    Spec.assertEqWith s "and the enumeration answers one activation per permanent at both sizes" (fmap (enumerationOver sorcerer) [smallBoard, largeBoard]) [smallBoard + 1, largeBoard + 1]
+
+  -- Threading the enumeration's board into those last two conjuncts (#716) must
+  -- change no ANSWER, only what the answer costs. This is the direct check that
+  -- it did not.
+  --
+  -- A genuine differential rather than one expression under two names:
+  -- Activate.activatable passes Map.empty for the projected board, so the plain
+  -- side really does project each object for itself through
+  -- Projection.projectGiven's per-object fallback while the threaded side reads
+  -- the pre-projected board. It is still a REGRESSION FENCE and not a proof,
+  -- since both sides read the same GameState -- the proof is the snapshot
+  -- argument at Projection.projectGiven.
+  Spec.it s "the threaded board answers what the unthreaded one answers" $ do
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    let board = boardOf sorcerer 8
+        oids = Set.toList (GameState.battlefield board)
+        viaPlain oid = filter (\ab -> Activate.activatable S.alice oid ab board) (Activate.abilitiesFor oid board)
+        viaThreaded oid =
+          filter
+            (\ab -> Activate.activatableGiven (Projection.controlGrants board) (Projection.projectAll board) S.alice oid ab board)
+            (Activate.abilitiesFor oid board)
+    Spec.assertEqWith s "the plain gate offers something to differ about" (fmap (length . viaPlain) oids) (replicate 8 1)
+    Spec.assertEqWith s "and the threaded gate agrees with it object for object" (fmap viaThreaded oids) (fmap viaPlain oids)
+
+  Spec.it s "enumerating a board of non-mana abilities stays within its committed allocation ceiling" $ do
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    _ <- allocationsOf (enumerationOver sorcerer) 4
+    large <- allocationsOf (enumerationOver sorcerer) largeBoard
+    let perPermanent = large `div` toInteger largeBoard
+    Spec.assertLeWith s ("observed " <> show perPermanent <> " bytes per permanent (" <> show large <> " bytes over " <> show largeBoard <> " permanents)") perPermanent sorcererCeilingBytesPerPermanent
