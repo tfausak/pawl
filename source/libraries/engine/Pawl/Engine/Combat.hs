@@ -1540,3 +1540,18 @@ declareBlockers = do
               -- entries are already in this map.
               joined = Map.union (Map.fromList (fmap (\b -> (b, pid)) (Map.keys declaration))) (Combat.joinedUnder (GameState.combat gs1))
           State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}
+          -- CR 509.1i: the declaration is a trigger event, and CR 509.2a puts
+          -- what it fires onto the stack before the active player gets priority
+          -- -- which the ordinary settle does, this being the last thing the
+          -- turn-based action of CR 509.1 does.
+          --
+          -- Recorded AFTER the state is written, unlike the sacrifice funnel's
+          -- CR 603.10a look-back: nothing here leaves the battlefield, so the
+          -- blocker a trigger names is the object standing on the board.
+          --
+          -- Over `declaration` and not `merged`, which is declareAttackers'
+          -- argument on the blocking side: CR 509.4 makes a creature that is
+          -- blocking without having been declared -- one put onto the battlefield
+          -- blocking -- never "blocked", and `merged` cannot tell it from one
+          -- that was.
+          State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared blocker attacker) h) g (Map.toList declaration)

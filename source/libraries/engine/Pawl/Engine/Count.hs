@@ -242,6 +242,7 @@ snapshotView gs shape event = case event of
   -- The same reason, with no snapshot to offer either: no EventShape names an
   -- attacker being declared (CR 508.2b).
   GameEvent.AttackerDeclared _ _ -> Nothing
+  GameEvent.BlockerDeclared _ _ -> Nothing
   -- A countering (CR 701.6a) does move the spell, but this event is not that
   -- move: Event.counter records a Moved event alongside this one, and matching
   -- both would count one countering twice. It carries no snapshot either.
