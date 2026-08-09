@@ -1499,7 +1499,7 @@ aimCreature oid p = case p of
 -- opportunity); this timeout is the safety net for the TERMINATION half -- it
 -- asserts nothing on a green run. Five seconds, not two: this guards a hang,
 -- not a slowdown. Measured 2026-08-09 on GHC 9.14.1 / aarch64-darwin: the
--- slowest case in this group runs 0.02s and all 100 run in 0.07s, so five
+-- slowest case in this group runs 0.02s and all 105 run in 0.08s, so five
 -- seconds is 250x the worst case -- more than a loaded shared runner can eat.
 -- It is also the ONLY timeout this group has under CI, which passes no
 -- --timeout at all (flake.nix's check phase is a bare `Setup test`), so
