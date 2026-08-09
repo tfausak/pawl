@@ -222,6 +222,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Phasing
       """ {"type":"Phasing"} """
+  -- CR 702.28b: nullary, because the rule takes no parameter -- both of its
+  -- sentences ask only whether the other creature has the same keyword.
+  Spec.it s "Shadow" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Shadow
+      """ {"type":"Shadow"} """
   -- CR 702.127a: nullary, because what an aftermath half costs is its own printed
   -- mana cost -- unlike flashback, whose alternative cost rides the constructor.
   Spec.it s "Aftermath" $
