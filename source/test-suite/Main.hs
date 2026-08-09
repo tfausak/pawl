@@ -218,21 +218,30 @@ testTree registry =
   Tasty.testGroup
     "pawl"
     ( [Tasty.testGroup "spec" . Writer.execWriter $ spec tasty registry]
-        -- Pawl.ReplacementSpec is wired separately because its timeout is a
-        -- tasty option and Pawl.Spec cannot express one. The rationale for the
-        -- timeout is at that module's `spec`; it guards CR 616.1's termination,
-        -- where a regression hangs rather than fails.
+        -- These two subtrees are wired separately because their timeouts are
+        -- tasty options and Pawl.Spec cannot express one. They are also the
+        -- only timeouts the suite has under CI, which passes no --timeout: the
+        -- `nix build` check phase runs a bare `Setup test`, so tasty defaults
+        -- to NoTimeout and deleting either would turn a non-terminating
+        -- regression into a job that runs to the platform's limit. Each budget
+        -- is at least 100x its group's slowest case measured 2026-08-09,
+        -- rounded up to a round number: headroom for a loaded shared runner,
+        -- not a speed assertion. The option is deliberately NOT hoisted onto the whole
+        -- "pawl" group, because localOption beats the command line and would
+        -- silently make an agent's --timeout 2s ineffective suite-wide.
+        --
+        -- Pawl.ReplacementSpec guards CR 616.1's termination, where a
+        -- regression hangs rather than fails; the fuller rationale is at that
+        -- module's `spec`. Slowest case 0.02s, so five seconds.
         <> fmap
           (Tasty.localOption (Tasty.mkTimeout 5000000))
           (Writer.execWriter (Pawl.ReplacementSpec.spec tasty registry))
-        -- Pawl.EngineSpec is wired separately for the same reason, and guards
-        -- the same failure mode one level up: it asserts that a whole game
-        -- terminates, which without a timeout hangs rather than fails. Its
-        -- budget is the looser one because each of its cases plays out one or
-        -- two complete games (the longest runs 161 turns) rather than resolving
-        -- a single event.
+        -- Pawl.EngineSpec guards the same failure mode one level up: it
+        -- asserts that a whole game terminates. Its budget is the looser one
+        -- because each case plays out one or two complete games rather than
+        -- resolving a single event -- slowest case 2.13s, so 300 seconds.
         <> fmap
-          (Tasty.localOption (Tasty.mkTimeout 30000000))
+          (Tasty.localOption (Tasty.mkTimeout 300000000))
           (Writer.execWriter (Pawl.EngineSpec.spec tasty registry))
     )
 
