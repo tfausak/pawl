@@ -49,6 +49,7 @@ import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -85,6 +86,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.SlotName as SlotName
@@ -147,7 +149,7 @@ counterBoard forest battlegrowth mine theirs =
 -- depend on the engine's canonical candidate order.
 raceAnswer :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 raceAnswer preferred victim p = case p of
-  Prompt.ChooseReplacement _ _ sources -> maybe 0 Int.toNaturalSaturating (List.elemIndex preferred sources)
+  Prompt.ChooseReplacement _ _ entries -> maybe 0 Int.toNaturalSaturating (List.findIndex ((== preferred) . ReplacementEntry.source) entries)
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
   _ -> S.identityAnswer p
 
@@ -973,8 +975,8 @@ allocateShield furnace src p = case p of
   Prompt.OrderDamage _ _ events ->
     let key e = (DamageEvent.source e /= src, DamageEvent.source e)
      in fmap fst (List.sortOn (key . snd) (zip [0 ..] events))
-  Prompt.ChooseReplacement _ _ sources ->
-    maybe 0 Int.toNaturalSaturating (List.findIndex (/= furnace) sources)
+  Prompt.ChooseReplacement _ _ entries ->
+    maybe 0 Int.toNaturalSaturating (List.findIndex ((/= furnace) . ReplacementEntry.source) entries)
   _ -> S.identityAnswer p
 
 -- CR 616.1's last sentence: "If two or more players have to make these choices
@@ -2077,6 +2079,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   shimatsuSpec s registry
   riotSpec s registry
   brineElementalSpec s registry
+  coldsteelHeartSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -2303,9 +2306,9 @@ rowSourceOf who gs =
 -- one board instead of disagreeing.
 replaceIfAskedOf :: PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 replaceIfAskedOf who preferred p = case p of
-  Prompt.ChooseReplacement _ asked sources
+  Prompt.ChooseReplacement _ asked entries
     | asked == who ->
-        maybe 0 Int.toNaturalSaturating (List.elemIndex preferred sources)
+        maybe 0 Int.toNaturalSaturating (List.findIndex ((== preferred) . ReplacementEntry.source) entries)
   _ -> S.identityAnswer p
 
 -- Copy `wanted` if and only if the copy choice is offered to `who`, and decline
@@ -2883,9 +2886,9 @@ turnStarts answer n gs =
 -- hand card's.
 skipAnswer :: Bool -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 skipAnswer wantBrine brine p = case p of
-  Prompt.ChooseReplacement _ _ sources ->
+  Prompt.ChooseReplacement _ _ entries ->
     let wanted = if wantBrine then (== brine) else (/= brine)
-     in maybe 0 Int.toNaturalSaturating (List.findIndex wanted sources)
+     in maybe 0 Int.toNaturalSaturating (List.findIndex (wanted . ReplacementEntry.source) entries)
   _ -> S.identityAnswer p
 
 -- Three seats (CR 800.1), alice active in her precombat main phase:
@@ -3107,3 +3110,87 @@ brineElementalSpec s registry = Spec.describe s "BrineElemental" $ do
       Nothing -> Spec.assertFailure s "the face-down cast did not reach the battlefield"
       Just (gs, brine) ->
         assertBrineRun s (skipAnswer True brine) gs alicePiker carolPiker (Just TapState.Untapped) 1
+
+-- alice casts a Coldsteel Heart off two Mountains and resolves it, answering CR
+-- 616.1's race with `pick` and CR 614.1c's colour with blue. Returns every
+-- ChooseReplacement payload raised, the finished board, and the permanent that
+-- entered.
+--
+-- BLUE and not the default: Replay.defaultAnswer falls back to white, so a
+-- colour assertion against white would pass on a game that asked nothing.
+--
+-- The payloads are recorded through State the way choosersAsked records player
+-- ids -- mid-game, because the discriminating observable here is what reached
+-- the wire, not what the board settled on (see the group below).
+castColdsteel ::
+  Printing.Printing ->
+  Printing.Printing ->
+  ([ReplacementEntry.ReplacementEntry] -> Natural.Natural) ->
+  ([[ReplacementEntry.ReplacementEntry]], GameState.GameState, Maybe ObjectId.ObjectId)
+castColdsteel mountain coldsteel pick =
+  let (withCard, oid) = S.handOne coldsteel (S.landsInPlay mountain 2)
+      step :: Prompt.Prompt r -> State.State [[ReplacementEntry.ReplacementEntry]] r
+      step p = case p of
+        Prompt.ChooseReplacement _ _ entries -> do
+          State.modify' (<> [entries])
+          pure (pick entries)
+        Prompt.ChooseColor {} -> pure Color.Blue
+        _ -> pure (S.identityAnswer p)
+      ((_, after), payloads) = State.runState (Engine.runGame step withCard (S.cast S.alice oid >> Stack.resolveTop)) []
+      entered = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield withCard)) of
+        o : _ -> Just o
+        [] -> Nothing
+   in (payloads, after, entered)
+
+-- Take the candidate carrying `rewrite`, or the canonical first if it is absent
+-- -- which is what makes an entry payload that has lost the effect show up as a
+-- test failure rather than as a crash.
+pickRewrite :: EntryRewrite.EntryRewrite -> [ReplacementEntry.ReplacementEntry] -> Natural.Natural
+pickRewrite rewrite entries =
+  let wanted e = ReplacementEntry.effect e == ReplacementEffect.EntryR Filter.Type.IsSource rewrite
+   in maybe 0 Int.toNaturalSaturating (List.findIndex wanted entries)
+
+-- CR 616.1 with CR 614.1c and CR 614.1d. Coldsteel Heart ({2} Snow Artifact,
+-- "This artifact enters tapped." / "As this artifact enters, choose a color." /
+-- "{T}: Add one mana of the chosen color.") is one source with TWO applicable
+-- replacement effects for one entry event -- both ReplacementBucket.Other, both
+-- ReplacementOrigin.Other -- so both reach `choose` in a single iteration and
+-- the payload must say which is which (#74).
+coldsteelHeartSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+coldsteelHeartSpec s registry = Spec.describe s "Coldsteel Heart (CR 616.1)" $ do
+  -- THE PROVING CASE. Asserted on the PROMPT PAYLOAD and not on the board, and
+  -- that is not a shortcut: CR 616.1f re-collects and CR 614.5 gives each effect
+  -- one opportunity, so the artifact ends up tapped with the chosen colour
+  -- whichever candidate is picked. A board-level assertion here would be
+  -- over-determined and would pass under the [ObjectId] payload this replaces.
+  --
+  -- The payload LIST is asserted to have exactly one element before anything is
+  -- said about its contents: a card file that lost one of the two replacements
+  -- would leave one candidate, elide the prompt, and make a "every payload had
+  -- two distinct entries" assertion pass over zero payloads.
+  Spec.it s "CR 616.1 two entry replacements of ONE source are distinct entries" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    coldsteel <- S.printingOf s registry "Coldsteel Heart"
+    case castColdsteel mountain coldsteel (const 0) of
+      ([entries], _, _) -> do
+        Spec.assertEqWith s "CR 616.1e offered both candidates" (length entries) 2
+        Spec.assertEqWith s "and the player can tell them apart" (length (List.nub entries)) 2
+        Spec.assertEqWith s "though both come from the same permanent" (length (List.nub (fmap ReplacementEntry.source entries))) 1
+      (payloads, _, _) -> Spec.assertFailure s ("expected exactly one ChooseReplacement, got " <> show (length payloads))
+  -- The card-data control: independent of any payload assertion, so a JSON typo
+  -- cannot hide behind a green one. Both rewrites ran.
+  Spec.it s "CR 614.1c/614.1d both replacements applied, whichever was chosen" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    coldsteel <- S.printingOf s registry "Coldsteel Heart"
+    let assertBoth label pick = case castColdsteel mountain coldsteel pick of
+          (_, after, Just oid) -> case Game.lookupObject oid after of
+            Nothing -> Spec.assertFailure s (label <> ": the artifact left the battlefield")
+            Just obj -> do
+              Spec.assertEqWith s (label <> ": CR 614.1d it entered tapped") (Object.tapped obj) TapState.Tapped
+              Spec.assertEqWith s (label <> ": CR 614.1c it chose blue") (Object.chosenColor obj) (Just Color.Blue)
+          _ -> Spec.assertFailure s (label <> ": the artifact did not reach the battlefield")
+    -- OVER-DETERMINED BY DESIGN, and named as such: this passes under the broken
+    -- payload too. Its job is to catch a mis-indexing regression in the answerers
+    -- migrated to ReplacementEntry, not to prove anything about #74.
+    assertBoth "tapped first" (pickRewrite EntryRewrite.Tapped)
+    assertBoth "colour first" (pickRewrite EntryRewrite.ChooseColor)

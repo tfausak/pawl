@@ -1059,11 +1059,84 @@ wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
     Spec.assertEqWith s "the Wellspring is tapped" (S.tappedCount S.alice resolved) 1
     Spec.assertEqWith s "and both mana were spent" (poolSize S.alice resolved) 0
 
+-- alice casts a Coldsteel Heart off two Mountains and resolves it, naming BLUE
+-- at CR 614.1c's colour choice. Returns the board and the permanent that
+-- entered.
+--
+-- Blue and not white: white is Replay.defaultAnswer's fallback, so an assertion
+-- against it would pass on a game that never asked.
+resolvedColdsteel :: Printing.Printing -> Printing.Printing -> (GameState.GameState, Maybe ObjectId.ObjectId)
+resolvedColdsteel mountain coldsteel =
+  let board = S.landsInPlay mountain 2
+      (withCard, oid) = S.handOne coldsteel board
+      answer :: Prompt.Prompt r -> r
+      answer p = case p of
+        Prompt.ChooseColor {} -> Color.Blue
+        _ -> S.identityAnswer p
+      after = S.runPure answer (S.runPure answer withCard (S.cast S.alice oid)) Stack.resolveTop
+      entered = case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield board)) of
+        o : _ -> Just o
+        [] -> Nothing
+   in (after, entered)
+
+-- CR 607.2d: "If an object has an ability printed on it that causes a player to
+-- 'choose a [value]' and an ability printed on it that refers to 'the chosen
+-- [value]' . . . those abilities are linked." Coldsteel Heart ({2} Snow
+-- Artifact, "As this artifact enters, choose a color." / "{T}: Add one mana of
+-- the chosen color.") is the pool's producer, and ManaProduction.Chosen is how
+-- the second ability reads what the first wrote.
+chosenColorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2d)" $ do
+  -- ONE option and not five, which is what separates Chosen from AnyColor: the
+  -- colour is already settled, so nothing is asked when the ability is used.
+  Spec.it s "CR 607.2d a Coldsteel Heart that chose blue offers blue and nothing else" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    coldsteel <- S.printingOf s registry "Coldsteel Heart"
+    case resolvedColdsteel mountain coldsteel of
+      (after, Just oid) -> do
+        Spec.assertEqWith s "exactly the chosen colour" (Mana.manaTypesOf oid after) [ManaType.Colored Color.Blue]
+        -- tapForMana runs no activation cost (#238), so the artifact's own {T}
+        -- and CR 614.1d's entered-tapped status gate nothing here; what is under
+        -- test is WHICH mana the ability adds.
+        Spec.assertEqWith s "and that is what reaches the pool" (tappedFor S.identityAnswer oid after) [ManaType.Colored Color.Blue]
+      _ -> Spec.assertFailure s "the Coldsteel Heart did not reach the battlefield"
+
+  -- The discriminating half: same card, different answer, different mana. An
+  -- engine picking the colour itself would give one of these the other's mana.
+  Spec.it s "CR 607.2d the colour is the player's, not the engine's" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    coldsteel <- S.printingOf s registry "Coldsteel Heart"
+    let board = S.landsInPlay mountain 2
+        (withCard, cardId) = S.handOne coldsteel board
+        naming wanted p = case p of
+          Prompt.ChooseColor {} -> wanted
+          _ -> S.identityAnswer p
+        run wanted =
+          let after = S.runPure (naming wanted) (S.runPure (naming wanted) withCard (S.cast S.alice cardId)) Stack.resolveTop
+           in case Set.toList (Set.difference (GameState.battlefield after) (GameState.battlefield board)) of
+                o : _ -> Mana.manaTypesOf o after
+                [] -> []
+    Spec.assertEqWith s "naming red" (run Color.Red) [ManaType.Colored Color.Red]
+    Spec.assertEqWith s "naming green" (run Color.Green) [ManaType.Colored Color.Green]
+
+  -- No colour chosen yields NO mana rather than a fallback colour. Unreachable
+  -- through play -- CR 614.1c settles the choice as the permanent enters -- so a
+  -- fixture write is what puts a Coldsteel Heart in that state, and the point is
+  -- that the engine invents nothing when it finds one.
+  Spec.it s "CR 607.2d a Coldsteel Heart placed with no colour chosen produces nothing" $ do
+    coldsteel <- S.printingOf s registry "Coldsteel Heart"
+    let (oid, gs) = S.addCreature coldsteel S.alice (Setup.emptyGame S.bothPlayers)
+    Spec.assertEqWith s "chosenColor is unset" (fmap Object.chosenColor (Game.lookupObject oid gs)) (Just Nothing)
+    Spec.assertEqWith s "so it offers no mana" (Mana.manaTypesOf oid gs) []
+    Spec.assertEqWith s "and tapping it adds none" (tappedFor S.identityAnswer oid gs) []
+    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]) gs)) "and it pays for nothing"
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
   castabilitySpec s registry
   anyColorSpec s registry
+  chosenColorSpec s registry
   solRingSpec s registry
   palladiumMyrSpec s registry
   hybridSpec s registry
