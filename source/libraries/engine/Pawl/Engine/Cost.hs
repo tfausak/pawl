@@ -384,7 +384,7 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announce pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
+    (announced, life) <- Mana.announce canPayActivation pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -829,9 +829,25 @@ canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
-    Mana.canPayCommitting pid (lifeOwedBy (Cost.components cost)) manaCost gs
+    Mana.canPayCommitting canPayActivation pid (lifeOwedBy (Cost.components cost)) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
+
+-- CR 118.3 asked of a MANA ability's own activation cost, which CR 602.2b makes
+-- the activation pay. This is the gate (Mana.Gate) threaded through
+-- Pawl.Engine.Mana's supply model and the CR 601.2g window, and the reason a
+-- source that cannot pay is neither offered nor counted.
+--
+-- `canPay` above without its mana half, which is not an omission: the MANA part
+-- is asked about only for CR 118.6, since the supply walk is what asks this and
+-- asking it back would not terminate. Exact for the pool, where every mana
+-- ability's mana part is empty -- Cabal Coffers is the card that would make the
+-- difference visible, and `payActivation` defers to the same issue (#1120).
+canPayActivation :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPayActivation pid oid cost gs =
+  Maybe.isJust (Cost.mana cost)
+    && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
+    && jointlyPayable pid oid (Cost.components cost) gs
 
 -- CR 118.3 asked one step later than `canPay` asks it: is SOME nonhybrid
 -- equivalent of this cost (CR 601.2b) payable, measured at CR 601.2f's total?
@@ -893,7 +909,7 @@ canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cos
     let outside = lifeOwedBy (Cost.components cost)
         payable (completed, life) =
           any
-            (\totalled -> Mana.canPayCommittingGiven grants pcs pid (outside + life) totalled gs)
+            (\totalled -> Mana.canPayCommittingGiven canPayActivation grants pcs pid (outside + life) totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
@@ -1147,7 +1163,9 @@ payComponents pid oid components = case components of
 -- `refused` is what keeps that loop finite now that activating a mana ability can
 -- FAIL: a source whose own activation cost went unpaid is dropped from the
 -- candidates for the rest of this payment, since re-offering an untapped source
--- that just refused to pay would ask the same question forever.
+-- that just refused to pay would ask the same question forever. What reaches it
+-- is a payment REFUSED and not one that was never payable: CR 118.3's gate
+-- (canPayActivation) keeps an unpayable option off the offer to begin with.
 --
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for: a cast (CR
 -- 601.2b) and an activation (CR 602.2b) both run `announce` first, so the cost
@@ -1170,11 +1188,11 @@ payMana pid cost = do
   pure paid
   where
     -- What the pool would leave if the cost were paid out of it right now.
-    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded pid cost gs)) cost (Game.poolOf pid gs)
+    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded canPayActivation pid cost gs)) cost (Game.poolOf pid gs)
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)
-      case filter (`Set.notMember` refused) (Mana.manaSources pid gs) of
+      case filter (`Set.notMember` refused) (Mana.manaSources canPayActivation pid gs) of
         [] -> settle
         candidate : rest -> do
           answer <- chooseSource covered pid (candidate NonEmpty.:| rest) gs
@@ -1246,32 +1264,39 @@ chooseSource covered pid candidates gs = do
 --
 -- Answers whether mana was actually added, which payMana's loop reads.
 --
+-- CR 118.3 GATES the options before any of this: an option whose activation cost
+-- the controller cannot pay is not offered and not paid, so a tapped permanent
+-- adds nothing (CR 107.5) and Phyrexian Tower with no creature offers only its
+-- {C}. Asked here as well as at the offer (Mana.manaSourcesGiven) because this
+-- is where the payment happens, and the two questions differ: a source is
+-- offered on having SOME payable option, and this picks among exactly those.
+--
 -- Not implemented: the ability's non-mana clauses -- Ancient Tomb's "deals 2
 -- damage to you". Running them needs the effect executor, which is
--- Pawl.Engine.Resolve, above this module (#1118). Also not implemented: CR
--- 118.3's question, asked BEFORE the payment, of whether that cost can be paid
--- at all (#1119).
+-- Pawl.Engine.Resolve, above this module (#1118).
 tapForMana :: ObjectId -> Game Bool
 tapForMana oid = do
   gs <- State.get
-  case (Game.lookupObject oid gs, Mana.manaOptionsOf oid gs) of
-    (Just obj, first : rest) -> do
+  case Game.lookupObject oid gs of
+    Nothing -> pure False
+    Just obj -> do
       -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
       -- the permanent's controller (CR 106.4 only says it lands in "a player's
       -- mana pool", not whose) -- and that same player makes the colour choice
       -- and pays the cost. Falls back to owner in the impossible case
       -- lookupObject just proved oid exists but controllerOf returns Nothing.
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-          options = first : rest
-      chosen <- chooseManaYield controller oid (fmap snd (first NonEmpty.:| rest)) gs
-      let (cost, yield) = Maybe.fromMaybe first (List.find ((==) chosen . snd) options)
-      outcome <- payActivation controller oid cost
-      case outcome of
-        Payment.Unpaid -> pure False
-        Payment.Paid -> do
-          State.modify' (Mana.addMana controller (Mana.unitsOf yield))
-          pure True
-    _ -> pure False
+      case filter (\(cost, _) -> canPayActivation controller oid cost gs) (Mana.manaOptionsOf oid gs) of
+        [] -> pure False
+        options@(first : rest) -> do
+          chosen <- chooseManaYield controller oid (fmap snd (first NonEmpty.:| rest)) gs
+          let (cost, yield) = Maybe.fromMaybe first (List.find ((==) chosen . snd) options)
+          outcome <- payActivation controller oid cost
+          case outcome of
+            Payment.Unpaid -> pure False
+            Payment.Paid -> do
+              State.modify' (Mana.addMana controller (Mana.unitsOf yield))
+              pure True
 
 -- CR 602.2b sends an activation cost through CR 601.2b-i, so a mana ability pays
 -- its whole cost. All or nothing, `pay`'s posture and for CR 601.2h's reason.

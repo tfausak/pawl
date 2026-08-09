@@ -205,15 +205,15 @@ manaSpec s registry = Spec.describe s "Mana" $ do
 
   Spec.it s "two Mountains can pay {1}{R}" $ do
     mountain <- S.printingOf s registry "Mountain"
-    Spec.assertBool s (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 2)) "affordable"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice pikerCost (S.landsInPlay mountain 2)) "affordable"
 
   Spec.it s "one Mountain cannot pay {1}{R}" $ do
     mountain <- S.printingOf s registry "Mountain"
-    Spec.assertBool s (not (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 1))) "unaffordable"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice pikerCost (S.landsInPlay mountain 1))) "unaffordable"
 
   Spec.it s "no Mountains cannot pay {1}{R}" $ do
     mountain <- S.printingOf s registry "Mountain"
-    Spec.assertBool s (not (Mana.canPay S.alice pikerCost (S.landsInPlay mountain 0))) "unaffordable"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice pikerCost (S.landsInPlay mountain 0))) "unaffordable"
 
   -- Three identical Mountains: every candidate is a copy of the same card, so
   -- the choice is genuinely indistinguishable and payCost must NOT ask (#12).
@@ -306,7 +306,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         (pikerId, g1) = S.addCreature piker S.alice base
         (_, gs) = S.addCreature ashaya S.alice g1
     Spec.assertBool s (ManaType.Colored Color.Green `elem` Mana.manaTypesOf pikerId gs) "green available"
-    Spec.assertBool s (pikerId `elem` Mana.manaSources S.alice gs) "and it is a mana source"
+    Spec.assertBool s (pikerId `elem` Mana.manaSources Cost.canPayActivation S.alice gs) "and it is a mana source"
 
   Spec.it s "CR 305.7 Blood Moon turns that same creature-land red" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -334,7 +334,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         sick = g2 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) pikerId (GameState.objects g2)}
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf pikerId sick)) "it is a land now"
     Spec.assertBool s (Projection.isCreatureOf pikerId sick) "and still a creature"
-    Spec.assertBool s (pikerId `notElem` Mana.manaSources S.alice sick) "so the sick creature is no mana source"
+    Spec.assertBool s (pikerId `notElem` Mana.manaSources Cost.canPayActivation S.alice sick) "so the sick creature is no mana source"
 
   Spec.it s "CR 605.1a a {T}: Add {G} ability is a mana ability" $
     let ab =
@@ -376,13 +376,13 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (elfId, gs) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
     Spec.assertBool s (elem (ManaType.Colored Color.Green) (Mana.manaTypesOf elfId gs)) "taps green"
-    Spec.assertBool s (elem elfId (Mana.manaSources S.alice gs)) "is a mana source"
+    Spec.assertBool s (elem elfId (Mana.manaSources Cost.canPayActivation S.alice gs)) "is a mana source"
 
   Spec.it s "CR 302.6 a summoning-sick Llanowar Elves is NOT a mana source" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
     let (elfId, g0) = S.addCreature llanowarElves S.alice (Setup.emptyGame S.bothPlayers)
         sick = g0 {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) elfId (GameState.objects g0)}
-    Spec.assertBool s (notElem elfId (Mana.manaSources S.alice sick)) "sick elf excluded"
+    Spec.assertBool s (notElem elfId (Mana.manaSources Cost.canPayActivation S.alice sick)) "sick elf excluded"
 
   -- CR 302.6's other half, and the same trap #198 sprang on attacking: bob's
   -- Elves settled under BOB, so the settle it carries says nothing about
@@ -394,9 +394,9 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         settled = S.runPure S.identityAnswer g0 (Engine.settleAll S.bob)
         (aura, withAura) = S.addCreature controlMagic S.alice settled
         stolen = S.attach aura elfId withAura
-    Spec.assertBool s (elem elfId (Mana.manaSources S.bob settled)) "bob could tap it"
+    Spec.assertBool s (elem elfId (Mana.manaSources Cost.canPayActivation S.bob settled)) "bob could tap it"
     Spec.assertBool s (elem elfId (Projection.controls S.alice stolen)) "alice controls it now"
-    Spec.assertBool s (notElem elfId (Mana.manaSources S.alice stolen)) "but it is sick for her, so it is not her mana source"
+    Spec.assertBool s (notElem elfId (Mana.manaSources Cost.canPayActivation S.alice stolen)) "but it is sick for her, so it is not her mana source"
 
   -- CR 702.10c is the exemption that makes the steal above pay off when the
   -- thief also grants haste: "If a creature has haste, its controller can
@@ -420,7 +420,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
         resolved = snd (Engine.runGamePure S.identityAnswer cast Stack.resolveTop)
     Spec.assertEqWith s "alice controls the Elves" (Projection.controllerOf elfId resolved) (Just S.alice)
     Spec.assertBool s (Projection.hasKeyword Keyword.Haste elfId resolved) "it has haste"
-    Spec.assertBool s (elem elfId (Mana.manaSources S.alice resolved)) "so she may tap it for mana this turn"
+    Spec.assertBool s (elem elfId (Mana.manaSources Cost.canPayActivation S.alice resolved)) "so she may tap it for mana this turn"
 
   -- CR 601.2g / 602.1: WHICH sources to activate is the player's choice, and
   -- pawl's second invariant is that the engine never makes one. A Forest and a
@@ -523,6 +523,15 @@ tappedFor :: (forall r. Prompt.Prompt r -> r) -> ObjectId.ObjectId -> GameState.
 tappedFor answer oid gs = case Game.poolOf S.alice (S.runPure answer gs (Cost.tapForMana oid)) of
   Mana.Type.MkMana units -> fmap ManaUnit.manaType units
 
+-- A fixture write that untaps one permanent, so a card that entered tapped can
+-- be asked what it produces once CR 107.5 no longer refuses its cost. Not the
+-- untap step: the turn structure is not what is under test here.
+untapObject :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+untapObject oid gs =
+  gs
+    { GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Untapped}) oid (GameState.objects gs)
+    }
+
 anyColorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
   -- CR 105.4: "If a player is asked to choose a color, they must choose one of
@@ -536,7 +545,7 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
       "exactly the five colors"
       (Mana.manaTypesOf birdsId gs)
       (fmap ManaType.Colored [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])
-    Spec.assertBool s (elem birdsId (Mana.manaSources S.alice gs)) "it is a mana source"
+    Spec.assertBool s (elem birdsId (Mana.manaSources Cost.canPayActivation S.alice gs)) "it is a mana source"
 
   -- The gameplay-level proof (design.md section 4): a real card, cast end to
   -- end off a source that produces no black mana until its controller says so.
@@ -569,7 +578,7 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
     let (_, g1) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs) = S.addCreature birds S.alice g1
         cost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green), ManaSymbol.OfType (ManaType.Colored Color.Black)]
-    Spec.assertBool s (Mana.canPay S.alice cost gs) "affordable"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost gs) "affordable"
 
   Spec.it s "CR 118.3 two Birds of Paradise can pay {B}{B}, one cannot" $ do
     birds <- S.printingOf s registry "Birds of Paradise"
@@ -577,8 +586,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
         (_, two) = S.addCreature birds S.alice one
         black = ManaSymbol.OfType (ManaType.Colored Color.Black)
         cost = ManaCost.MkManaCost [black, black]
-    Spec.assertBool s (Mana.canPay S.alice cost two) "two suffice"
-    Spec.assertBool s (not (Mana.canPay S.alice cost one)) "one does not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost two) "two suffice"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice cost one)) "one does not"
 
   -- The OTHER way to get this wrong, which Hall's condition also rules out:
   -- checking each symbol independently ("is there a source that could make
@@ -593,8 +602,8 @@ anyColorSpec s registry = Spec.describe s "Mana of any color" $ do
         (_, g2) = S.addCreature forest S.alice g1
         (_, gs) = S.addCreature forest S.alice g2
         white = ManaSymbol.OfType (ManaType.Colored Color.White)
-    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [white, white]) gs)) "only one white source"
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [white, ManaSymbol.Generic 2]) gs) "but one {W} plus {2} is fine"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [white, white]) gs)) "only one white source"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [white, ManaSymbol.Generic 2]) gs) "but one {W} plus {2} is fine"
 
   -- Not only "any color": a source with two BASIC LAND TYPES has been a real
   -- choice in this pool since Urborg landed, and tapForMana was silently
@@ -858,8 +867,8 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
   Spec.it s "CR 118.3 a lone Sol Ring pays {2} by itself" $ do
     solRing <- S.printingOf s registry "Sol Ring"
     let (_, gs) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
-    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
 
   -- Both supplies a Sol Ring contributes are COLORLESS, so they swell the
   -- generic count and serve no typed demand. Discriminating against a supply
@@ -871,8 +880,8 @@ solRingSpec s registry = Spec.describe s "Sol Ring" $ do
     let (_, g1) = S.addCreature solRing S.alice (Setup.emptyGame S.bothPlayers)
         (_, gs) = S.addCreature mountain S.alice g1
         red = ManaSymbol.OfType (ManaType.Colored Color.Red)
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]) gs) "{2}{R} is affordable"
-    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2, red]) gs) "{2}{R} is affordable"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
 
   -- The gameplay-level proof (design.md section 4): a real spell cast end to
   -- end off a single permanent, which no one-mana-per-source engine can do.
@@ -967,7 +976,7 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
     Spec.assertBool
       s
-      (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3, green, green]) gs))
+      (not (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3, green, green]) gs))
       "five mana with two green is out of reach"
 
   -- The control legs, on the SAME board: everything the board really can pay is
@@ -979,7 +988,7 @@ palladiumMyrSpec s registry = Spec.describe s "Palladium Myr" $ do
         (_, g2) = S.addCreature palladiumMyr S.alice g1
         (_, gs) = S.addCreature palladiumMyr S.alice g2
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-        pays cost = Mana.canPay S.alice (ManaCost.MkManaCost cost) gs
+        pays cost = Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost cost) gs
     -- One Myr on its Forest, one on its {C}{C}: {G}{G}{C}{C}.
     Spec.assertBool s (pays [ManaSymbol.Generic 2, green, green]) "{2}{G}{G}"
     -- Both Myrs on {C}{C}: {G}{C}{C}{C}{C}, the board's largest payment.
@@ -1065,8 +1074,8 @@ wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
     wellspring <- S.printingOf s registry "Synthetic Prismatic Wellspring"
     let gs = S.landsInPlay wellspring 1
     Spec.assertEqWith s "nothing is floating" (poolSize S.alice gs) 0
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
-    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) gs) "{2} is affordable"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 3]) gs)) "{3} is not"
 
   -- CR 700.2d: "If a player is allowed to choose more than one mode ... that
   -- player normally can't choose the same mode more than once." So the
@@ -1078,8 +1087,8 @@ wellspringSpec s registry = Spec.describe s "SyntheticPrismaticWellspring" $ do
     let gs = S.landsInPlay wellspring 1
         red = ManaSymbol.OfType (ManaType.Colored Color.Red)
         green = ManaSymbol.OfType (ManaType.Colored Color.Green)
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [red, green]) gs) "{R}{G} is affordable"
-    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [red, green]) gs) "{R}{G} is affordable"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [red, red]) gs)) "{R}{R} is not"
 
   -- What one activation actually PUTS in the pool, which is the same
   -- enumeration read through the other door: CR 106.12's tap-for-mana adds a
@@ -1144,11 +1153,11 @@ chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2
     case resolvedColdsteel Color.Blue mountain coldsteel of
       (after, Just oid) -> do
         Spec.assertEqWith s "exactly the chosen colour" (Mana.manaTypesOf oid after) [ManaType.Colored Color.Blue]
-        -- Cost.tapForMana pays the ability's cost but does not first ask
-        -- whether it CAN be paid (#1119), so CR 107.5 and CR 614.1d's
-        -- entered-tapped status gate nothing here; what is under test is WHICH
-        -- mana the ability adds.
-        Spec.assertEqWith s "and that is what reaches the pool" (tappedFor S.identityAnswer oid after) [ManaType.Colored Color.Blue]
+        -- CR 107.5: the Heart entered tapped, so its {T} cannot be paid and the
+        -- ability adds nothing at all -- the proof that Cost.tapForMana asks CR
+        -- 118.3 before paying. Untapped, the same board shows WHICH mana it adds.
+        Spec.assertEqWith s "tapped, it adds nothing" (tappedFor S.identityAnswer oid after) []
+        Spec.assertEqWith s "untapped, that is what reaches the pool" (tappedFor S.identityAnswer oid (untapObject oid after)) [ManaType.Colored Color.Blue]
       _ -> Spec.assertFailure s "the Coldsteel Heart did not reach the battlefield"
 
   -- The discriminating half: same card, different answer, different mana. An
@@ -1172,7 +1181,7 @@ chosenColorSpec s registry = Spec.describe s "Mana of the chosen color (CR 607.2
     Spec.assertEqWith s "chosenColor is unset" (fmap Object.chosenColor (Game.lookupObject oid gs)) (Just Nothing)
     Spec.assertEqWith s "so it offers no mana" (Mana.manaTypesOf oid gs) []
     Spec.assertEqWith s "and tapping it adds none" (tappedFor S.identityAnswer oid gs) []
-    Spec.assertBool s (not (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]) gs)) "and it pays for nothing"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Blue)]) gs)) "and it pays for nothing"
 
 -- CR 602.2b sends an activation through CR 601.2b-i, so tapping for mana pays the
 -- ability's whole cost -- which is not always just {T}. Mana Confluence (Land,
@@ -1251,6 +1260,90 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     Spec.assertEqWith s "accepting: the land is tapped" (tapOf accepted) (Just TapState.Tapped)
     Spec.assertEqWith s "accepting: and CR 704.5a takes the game" (fmap Player.status (Map.lookup S.alice (GameState.players accepted))) (Just (Status.Departed Departure.Type.Lost))
 
+-- Answers Prompt.ChooseManaYield with a yield of two black mana whenever it is
+-- on offer, and defers everything else to S.identityAnswer. prefersColor's
+-- two-unit sibling, which Phyrexian Tower's "Add {B}{B}" is the pool's only card
+-- to need.
+prefersDoubleBlack :: Prompt.Prompt r -> r
+prefersDoubleBlack p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates ->
+    let unit = ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored Color.Black, ManaUnit.tags = Set.empty}
+        yield = Mana.Type.MkMana [unit, unit]
+     in if elem yield (NonEmpty.toList candidates)
+          then yield
+          else NonEmpty.head candidates
+  _ -> S.identityAnswer p
+
+-- CR 118.3: "A player can't pay a cost without having the necessary resources to
+-- pay it fully", and CR 602.2b makes a mana ability's activation cost one of
+-- those costs. Phyrexian Tower (Legendary Land, "{T}: Add {C}." / "{T}, Sacrifice
+-- a creature: Add {B}{B}.") is the pool's first mana ability whose cost can fail
+-- on a board a player can reach: the tap is always payable and the sacrifice is
+-- not. Mana Confluence's "Pay 1 life" fails only at 0 life, which CR 704.5a has
+-- already ended the game at.
+--
+-- Goblin Piker is the creature throughout, and it produces no mana, so the only
+-- thing it changes is whether the second ability has a cost to pay.
+phyrexianTowerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
+  -- The unit fact, in both directions on one board. The permanent PRODUCES black
+  -- either way (CR 106.7, manaTypesOf reads the card), so an engine that skipped
+  -- CR 118.3 would hand out {B}{B} with nothing to sacrifice.
+  Spec.it s "CR 118.3 the sacrifice option is offered only with a creature to give" $ do
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (towerId, alone) = S.addCreature tower S.alice (Setup.emptyGame S.bothPlayers)
+        withPiker = snd (S.addCreature piker S.alice alone)
+    Spec.assertEqWith s "CR 106.7: it produces {C} and {B} with nothing to sacrifice" (Mana.manaTypesOf towerId alone) [ManaType.Colorless, ManaType.Colored Color.Black]
+    Spec.assertEqWith s "with no creature, only the {C} can be paid for" (tappedFor prefersDoubleBlack towerId alone) [ManaType.Colorless]
+    Spec.assertEqWith
+      s
+      "with one, the sacrifice option adds {B}{B}"
+      (tappedFor prefersDoubleBlack towerId withPiker)
+      [ManaType.Colored Color.Black, ManaType.Colored Color.Black]
+
+  -- CR 601.2h: the cost is paid in full or not at all, so the creature goes when
+  -- the mana arrives -- and stays when the other option is taken.
+  Spec.it s "CR 602.2b taking that option pays the sacrifice" $ do
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (towerId, board) = S.addCreature tower S.alice (snd (S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)))
+        tapWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        tapWith answer = S.runPure answer board (Cost.tapForMana towerId)
+    Spec.assertEqWith s "the Piker is gone" (S.creaturesInPlay S.alice (tapWith prefersDoubleBlack)) 0
+    Spec.assertEqWith s "choosing {C} instead leaves it alive" (S.creaturesInPlay S.alice (tapWith S.identityAnswer)) 1
+
+  -- CR 118.3 on the SUPPLY side: Mana.canPay counts an untapped source as the
+  -- mana it could make, and an activation nobody can pay makes none. Without
+  -- this the Tower alone reads as a {B}{B} source and the cast below would be
+  -- offered and then fail.
+  Spec.it s "CR 118.3 an unpayable activation is no supply either" $ do
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let alone = snd (S.addCreature tower S.alice (Setup.emptyGame S.bothPlayers))
+        withPiker = snd (S.addCreature piker S.alice alone)
+        black = ManaSymbol.OfType (ManaType.Colored Color.Black)
+        doubleBlack = ManaCost.MkManaCost [black, black]
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice doubleBlack withPiker) "{B}{B} with a creature to sacrifice"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice doubleBlack alone)) "and not without one"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 1]) alone) "though the Tower alone still pays {1}"
+
+  -- The gameplay-level proof (design.md section 4): a real spell whose whole cost
+  -- is the mana only that activation can make, cast end to end. Withered Wretch
+  -- is {B}{B} and targets nothing as it is cast.
+  Spec.it s "CR 601.2g Withered Wretch is cast off a Tower that eats a Piker" $ do
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    witheredWretch <- S.printingOf s registry "Withered Wretch"
+    let resolved = castOffBoard prefersDoubleBlack [tower, piker] witheredWretch
+        without = castOffBoard prefersDoubleBlack [tower] witheredWretch
+        countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
+    Spec.assertEqWith s "the Wretch resolved" (countOf "Withered Wretch" resolved) 1
+    Spec.assertEqWith s "the Piker paid for it" (countOf "Goblin Piker" resolved) 0
+    -- CR 601.2h reverses the whole cast, so the Tower is left untapped too.
+    Spec.assertEqWith s "with no Piker there is no {B}{B} and the cast fails" (countOf "Withered Wretch" without) 0
+    Spec.assertEqWith s "and nothing was spent trying" (S.tappedCount S.alice without) 0
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   manaSpec s registry
@@ -1272,6 +1365,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   snowSymbolSpec s registry
   wellspringSpec s registry
   manaConfluenceSpec s registry
+  phyrexianTowerSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against
@@ -1327,9 +1421,9 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     icehideGolem <- S.printingOf s registry "Icehide Golem"
     let board = S.landsInPlay mountain 1
         (g, spellId) = S.handOne icehideGolem board
-    Spec.assertBool s (not (null (Mana.manaSources S.alice board))) "the Mountain IS a mana source"
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [redSymbol]) board) "and it pays {R}"
-    Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "but it does not pay {S}"
+    Spec.assertBool s (not (null (Mana.manaSources Cost.canPayActivation S.alice board))) "the Mountain IS a mana source"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [redSymbol]) board) "and it pays {R}"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice snowCost board)) "but it does not pay {S}"
     Spec.assertBool s (not (S.castable S.alice spellId g)) "so the Golem cannot be cast"
 
   -- CR 107.4h's second sentence, from the other end: "Effects that reduce the
@@ -1339,8 +1433,8 @@ snowSpec s registry = Spec.describe s "Snow" $ do
   Spec.it s "CR 107.4h {S} is not generic: no number of nonsnow Mountains pays it" $ do
     mountain <- S.printingOf s registry "Mountain"
     let board = S.landsInPlay mountain 6
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 6]) board) "six Mountains pay {6}"
-    Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "and none of them pays {S}"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 6]) board) "six Mountains pay {6}"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice snowCost board)) "and none of them pays {S}"
 
   -- The tag narrows nothing ELSE. CR 107.4h's last sentence -- "Snow is neither
   -- a color nor a type of mana" -- cuts both ways: a Snow-Covered Mountain's
@@ -1349,7 +1443,7 @@ snowSpec s registry = Spec.describe s "Snow" $ do
     snowMountain <- S.printingOf s registry "Snow-Covered Mountain"
     Spec.assertBool
       s
-      (Mana.canPay S.alice (ManaCost.MkManaCost [redSymbol]) (S.landsInPlay snowMountain 1))
+      (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [redSymbol]) (S.landsInPlay snowMountain 1))
       "a Snow-Covered Mountain pays {R}"
 
   -- CR 106.3: "If mana is produced by an ability, the source of that mana is the
@@ -1441,8 +1535,8 @@ snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
         (g, spellId) = S.handOne icehideGolem board
         control = S.landsInPlay snowMountain 1
         (cg, controlSpellId) = S.handOne icehideGolem control
-    Spec.assertBool s (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) board) "it pays {2}"
-    Spec.assertBool s (not (Mana.canPay S.alice snowCost board)) "but it does not pay {S}"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.Generic 2]) board) "it pays {2}"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice snowCost board)) "but it does not pay {S}"
     Spec.assertBool s (not (S.castable S.alice spellId g)) "so the Golem cannot be cast off it"
     Spec.assertBool s (S.castable S.alice controlSpellId cg) "though it can off a Snow-Covered Mountain"
 
@@ -1451,11 +1545,11 @@ snowSymbolSpec s registry = Spec.describe s "SyntheticSnowSymbol" $ do
   Spec.it s "CR 106.11 the mana is colorless, so it pays no coloured symbol" $ do
     snowSymbol <- S.printingOf s registry "Synthetic Snow Symbol"
     let board = S.landsInPlay snowSymbol 1
-        pays color = Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored color)]) board
+        pays color = Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored color)]) board
     Spec.assertBool s (not (any pays [Color.White, Color.Blue, Color.Black, Color.Red, Color.Green])) "no colour is payable"
     Spec.assertBool
       s
-      (Mana.canPay S.alice (ManaCost.MkManaCost [ManaSymbol.OfType ManaType.Colorless]) board)
+      (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [ManaSymbol.OfType ManaType.Colorless]) board)
       "but {C} is"
 
   -- The gameplay-level proof (design.md section 4): a real spell cast end to end
@@ -1493,10 +1587,10 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     forest <- S.printingOf s registry "Forest"
     island <- S.printingOf s registry "Island"
     let cost = ManaCost.MkManaCost [redGreen]
-    Spec.assertBool s (Mana.canPay S.alice cost (S.landsInPlay mountain 1)) "a Mountain pays it"
-    Spec.assertBool s (Mana.canPay S.alice cost (mixedLands mountain forest 0 1)) "a Forest pays it"
-    Spec.assertBool s (not (Mana.canPay S.alice cost (S.landsInPlay island 1))) "an Island does not"
-    Spec.assertBool s (not (Mana.canPay S.alice cost (S.landsInPlay mountain 0))) "and nothing does not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost (S.landsInPlay mountain 1)) "a Mountain pays it"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost (mixedLands mountain forest 0 1)) "a Forest pays it"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice cost (S.landsInPlay island 1))) "an Island does not"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice cost (S.landsInPlay mountain 0))) "and nothing does not"
 
   -- THE case a greedy left-to-right match gets wrong, and the reason
   -- Mana.spendDemands searches instead of folding. One Mountain and one
@@ -1507,7 +1601,7 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     forest <- S.printingOf s registry "Forest"
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 1 1
-    Spec.assertBool s (Mana.canPay S.alice cost gs) "canPay says yes"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost gs) "canPay says yes"
     let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana S.alice cost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "both lands tapped" (S.tappedCount S.alice after) 2
@@ -1520,9 +1614,9 @@ hybridSpec s registry = Spec.describe s "Hybrid" $ do
     forest <- S.printingOf s registry "Forest"
     let cost = ManaCost.MkManaCost [redGreen, redSymbol]
         gs = mixedLands mountain forest 0 2
-    Spec.assertBool s (not (Mana.canPay S.alice cost gs)) "canPay says no"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice cost gs)) "canPay says no"
     Spec.assertBool s (not (fst (S.runPureWith S.identityAnswer gs (Cost.payMana S.alice cost)))) "and paying fails"
-    Spec.assertEqWith s "two {R/G} alone WOULD be payable from them" (Mana.canPay S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs) True
+    Spec.assertEqWith s "two {R/G} alone WOULD be payable from them" (Mana.canPay Cost.canPayActivation S.alice (ManaCost.MkManaCost [redGreen, redGreen]) gs) True
 
   Spec.it s "CR 107.4e whole card: Burning-Tree Emissary casts off RR, GG, or RG" $ do
     mountain <- S.printingOf s registry "Mountain"
@@ -1637,10 +1731,10 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     mountain <- S.printingOf s registry "Mountain"
     island <- S.printingOf s registry "Island"
     let cost = ManaCost.MkManaCost [twoOrRed]
-    Spec.assertBool s (Mana.canPay S.alice cost (S.landsInPlay mountain 1)) "one Mountain pays it"
-    Spec.assertBool s (Mana.canPay S.alice cost (S.landsInPlay island 2)) "two Islands pay it"
-    Spec.assertBool s (not (Mana.canPay S.alice cost (S.landsInPlay island 1))) "one Island does not"
-    Spec.assertBool s (not (Mana.canPay S.alice cost (S.landsInPlay island 0))) "and nothing does not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost (S.landsInPlay mountain 1)) "one Mountain pays it"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost (S.landsInPlay island 2)) "two Islands pay it"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice cost (S.landsInPlay island 1))) "one Island does not"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice cost (S.landsInPlay island 0))) "and nothing does not"
 
   -- The coloured route, end to end. Three lands for three symbols is the
   -- reading a payment path that charged every symbol one mana would also
@@ -1652,7 +1746,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     mountain <- S.printingOf s registry "Mountain"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     let gs = S.landsInPlay mountain 3
-    Spec.assertBool s (Mana.canPay S.alice javelinCost gs) "canPay says yes"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice javelinCost gs) "canPay says yes"
     Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
     let (paid, after) = S.runPureWith S.identityAnswer (S.landsInPlay mountain 6) (Cost.payMana S.alice javelinCost)
     Spec.assertBool s paid "six Mountains pay it too"
@@ -1664,7 +1758,7 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     island <- S.printingOf s registry "Island"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     let gs = S.landsInPlay island 6
-    Spec.assertBool s (Mana.canPay S.alice javelinCost gs) "canPay says yes"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice javelinCost gs) "canPay says yes"
     Spec.assertEqWith s "and it casts" (castsOff flameJavelin gs) 1
 
   -- THE discriminating negative. Five Islands is one short of the {6} the
@@ -1674,9 +1768,9 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     island <- S.printingOf s registry "Island"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     let gs = S.landsInPlay island 5
-    Spec.assertBool s (not (Mana.canPay S.alice javelinCost gs)) "canPay says no"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice javelinCost gs)) "canPay says no"
     Spec.assertEqWith s "and it does not cast" (castsOff flameJavelin gs) 0
-    Spec.assertBool s (not (Mana.canPay S.alice javelinCost (S.landsInPlay island 3))) "three Islands are nowhere near"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice javelinCost (S.landsInPlay island 3))) "three Islands are nowhere near"
 
   -- CR 107.4e symbol by symbol, which the card's own ruling spells out:
   -- "you can pay for Flame Javelin by spending {R}{R}{R}, {2}{R}{R},
@@ -1687,12 +1781,12 @@ monocoloredHybridSpec s registry = Spec.describe s "MonocoloredHybrid" $ do
     island <- S.printingOf s registry "Island"
     flameJavelin <- S.printingOf s registry "Flame Javelin"
     let cost = javelinCost
-    Spec.assertBool s (Mana.canPay S.alice cost (mixedLands mountain island 2 2)) "two Mountains and two Islands: {R}{R}{2}"
-    Spec.assertBool s (Mana.canPay S.alice cost (mixedLands mountain island 1 4)) "one Mountain and four Islands: {R}{4}"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost (mixedLands mountain island 2 2)) "two Mountains and two Islands: {R}{R}{2}"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost (mixedLands mountain island 1 4)) "one Mountain and four Islands: {R}{4}"
     Spec.assertEqWith s "and that one really casts" (castsOff flameJavelin (mixedLands mountain island 1 4)) 1
     -- One short of {R}{4} and one red short of {R}{R}{2}: four mana with
     -- only one red pays no route at all.
-    Spec.assertBool s (not (Mana.canPay S.alice cost (mixedLands mountain island 1 3))) "one Mountain and three Islands: no route"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice cost (mixedLands mountain island 1 3))) "one Mountain and three Islands: no route"
 
   -- The gameplay-level proof (design.md section 4): the whole card, cast
   -- and resolved off the all-generic route, doing what it says.
@@ -1963,7 +2057,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   Spec.it s "CR 107.4f one {G/P} is paid with one green mana and no life" $ do
     forest <- S.printingOf s registry "Forest"
     let gs = S.landsInPlay forest 1
-    Spec.assertBool s (Mana.canPay S.alice phyrexianCost gs) "canPay says yes"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice phyrexianCost gs) "canPay says yes"
     let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana S.alice phyrexianCost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "the Forest is tapped" (S.tappedCount S.alice after) 1
@@ -1976,7 +2070,7 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   Spec.it s "CR 107.4f one {G/P} is paid by 2 life when no green mana can be made" $ do
     mountain <- S.printingOf s registry "Mountain"
     let gs = S.landsInPlay mountain 1
-    Spec.assertBool s (Mana.canPay S.alice phyrexianCost gs) "canPay says yes"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice phyrexianCost gs) "canPay says yes"
     let (paid, after) = S.runPureWith S.identityAnswer gs (Cost.payMana S.alice phyrexianCost)
     Spec.assertBool s paid "and it really is paid"
     Spec.assertEqWith s "exactly 2 life" (S.lifeOf S.alice after) (Just 18)
@@ -1988,9 +2082,9 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
   -- payment that takes alice to exactly 0 is legal -- CR 704.5a's loss is a
   -- state-based action afterwards, not a bar on the payment.
   Spec.it s "CR 119.4 a {G/P} is payable at 2 life and unpayable at 1" $ do
-    Spec.assertBool s (Mana.canPay S.alice phyrexianCost (aliceAt 2)) "2 life is enough"
-    Spec.assertBool s (not (Mana.canPay S.alice phyrexianCost (aliceAt 1))) "1 life is not"
-    Spec.assertBool s (not (Mana.canPay S.alice phyrexianCost (aliceAt 0))) "0 life is not"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice phyrexianCost (aliceAt 2)) "2 life is enough"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice phyrexianCost (aliceAt 1))) "1 life is not"
+    Spec.assertBool s (not (Mana.canPay Cost.canPayActivation S.alice phyrexianCost (aliceAt 0))) "0 life is not"
     let (paid, after) = S.runPureWith S.identityAnswer (aliceAt 2) (Cost.payMana S.alice phyrexianCost)
     Spec.assertBool s paid "paying at 2 really works"
     Spec.assertEqWith s "and takes her to 0" (S.lifeOf S.alice after) (Just 0)
@@ -2091,26 +2185,26 @@ phyrexianSpec s registry = Spec.describe s "Phyrexian" $ do
     Spec.assertEqWith
       s
       "the {G} plus {2} route, costing no life"
-      (Mana.lifeNeeded S.alice cost (mixedLands island birds 2 1))
+      (Mana.lifeNeeded Cost.canPayActivation S.alice cost (mixedLands island birds 2 1))
       (Just 0)
-    Spec.assertBool s (Mana.canPay S.alice cost (mixedLands island birds 2 1)) "and it is payable"
+    Spec.assertBool s (Mana.canPay Cost.canPayActivation S.alice cost (mixedLands island birds 2 1)) "and it is payable"
     -- The discriminator: the same cost and the same three permanents, but a
     -- Mountain in the Birds' place makes no green, so every surviving route
     -- costs 2 life and the answer really does depend on the board.
     Spec.assertEqWith
       s
       "with a Mountain instead, 2 life is the cheapest there is"
-      (Mana.lifeNeeded S.alice cost (mixedLands island mountain 2 1))
+      (Mana.lifeNeeded Cost.canPayActivation S.alice cost (mixedLands island mountain 2 1))
       (Just 2)
     Spec.assertEqWith
       s
       "and a lone {G/P} off nothing at all is 2 as well"
-      (Mana.lifeNeeded S.alice phyrexianCost (Setup.emptyGame S.bothPlayers))
+      (Mana.lifeNeeded Cost.canPayActivation S.alice phyrexianCost (Setup.emptyGame S.bothPlayers))
       (Just 2)
     Spec.assertEqWith
       s
       "while a lone {G/P} with a Forest is 0"
-      (Mana.lifeNeeded S.alice phyrexianCost (S.landsInPlay forest 1))
+      (Mana.lifeNeeded Cost.canPayActivation S.alice phyrexianCost (S.landsInPlay forest 1))
       (Just 0)
 
   -- The budget is recomputed as sources are tapped, not fixed when the
