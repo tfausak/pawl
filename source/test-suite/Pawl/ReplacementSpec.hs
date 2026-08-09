@@ -662,7 +662,7 @@ mendingHandsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -
 mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
   let -- One noncombat damage event, from `src`, at `n`.
       hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       -- Order a contested batch by preferring the event from `src`, by SOURCE id
       -- rather than by position, so the assertion does not depend on the order
@@ -810,7 +810,7 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
 spiderPunkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spiderPunkSpec s registry = Spec.describe s "Spider-Punk (CR 615.12)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       -- What each COUNTDOWN shield on the board has left (CR 615.7), read off
       -- the rows themselves. An empty list is a shield spent to 0 and dropped,
@@ -1000,7 +1000,7 @@ allocateShield furnace src p = case p of
 apnapSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 apnapSpec s registry = Spec.describe s "APNAP (CR 616.1)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
   -- Both batch orders, because only the PAIR discriminates: settling the batch
   -- in gather order already answers [alice, bob] when alice's event happens to
   -- come first, and would answer [bob, alice] when it does not.
@@ -1129,7 +1129,7 @@ apnapSpec s registry = Spec.describe s "APNAP (CR 616.1)" $ do
 excruciatorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
       withBoard act = do
@@ -1201,7 +1201,7 @@ excruciatorSpec s registry = Spec.describe s "Excruciator (CR 615.12)" $ do
 selflessSquireSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 selflessSquireSpec s registry = Spec.describe s "Selfless Squire (CR 615.13)" $ do
   let hit src recipient n =
-        DamageEvent.MkDamageEvent src recipient n False False 0 Nothing DamageKind.Noncombat
+        DamageEvent.MkDamageEvent src recipient n False False False 0 Nothing DamageKind.Noncombat
       amounts gs = fmap DamageEvent.amount (S.damageEventsOf gs)
       -- Cast the Squire, let its CR 603.6a enters trigger go on the stack, and
       -- resolve it -- which is what installs the CR 615.1 shield.
@@ -1531,8 +1531,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         -- this assertion (Fog prevents a whole batch, not just one event) does
         -- not need.
         batch =
-          [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False False 0 Nothing DamageKind.Combat,
-            DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False False 0 Nothing DamageKind.Combat
+          [ DamageEvent.MkDamageEvent victimA (Recipient.ToCreature victimA) 2 False False False 0 Nothing DamageKind.Combat,
+            DamageEvent.MkDamageEvent victimB (Recipient.ToCreature victimB) 2 False False False 0 Nothing DamageKind.Combat
           ]
         after = S.runPure S.identityAnswer resolved (Damage.applyDamage batch)
     Spec.assertEqWith s "the first attacker's damage was prevented" (S.damageOf victimA after) (Just 0)
@@ -1611,7 +1611,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
         (troll, g1) = S.addCreature uthdenTroll S.alice base
         armed = S.runPure S.identityAnswer g1 (Activate.activateAbility S.alice troll (theAbility uthdenTroll) >> Stack.resolveTop)
         -- 2 damage is lethal to a 2/2.
-        hurt = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent troll (Recipient.ToCreature troll) 2 False False 0 Nothing DamageKind.Combat])
+        hurt = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent troll (Recipient.ToCreature troll) 2 False False False 0 Nothing DamageKind.Combat])
         settled = S.settleSba hurt
     Spec.assertBool s (Set.member troll (GameState.battlefield settled)) "the shield saved it"
   Spec.it s "CR 614.8 regeneration replaces the destruction, so Rest in Peace never sees it" $ do
@@ -2225,7 +2225,7 @@ galvanicBlastSpec s registry =
           (victim, g3) = S.addCreature pikerPrinting S.bob g2
           (ts, g4) = Game.freshTimestamp g3
           armed = S.addReplacement (blastShape mine ts) g4
-          hit src = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False False 0 Nothing DamageKind.Noncombat])
+          hit src = S.runPure S.identityAnswer armed (Damage.applyDamage [DamageEvent.MkDamageEvent src (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Noncombat])
       Spec.assertEqWith s "its own source's 2 becomes 4" (S.damageOf victim (hit mine)) (Just 4)
       Spec.assertEqWith s "another source's 2 stays 2" (S.damageOf victim (hit theirs)) (Just 2)
 

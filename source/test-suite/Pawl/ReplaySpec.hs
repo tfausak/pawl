@@ -87,8 +87,8 @@ combatReplaySpec s =
       -- CR 615.7: two simultaneous combat damage events one shield could cover
       -- part of, which is the batch that prompt is asked over.
       orderDamageEvents =
-        [ DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.alice) 5 False False 0 Nothing DamageKind.Combat,
-          DamageEvent.MkDamageEvent (ObjectId.MkObjectId 8) (Recipient.ToPlayer S.alice) 3 False False 0 Nothing DamageKind.Combat
+        [ DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.alice) 5 False False False 0 Nothing DamageKind.Combat,
+          DamageEvent.MkDamageEvent (ObjectId.MkObjectId 8) (Recipient.ToPlayer S.alice) 3 False False False 0 Nothing DamageKind.Combat
         ]
    in Spec.describe s "CombatReplay" $ do
         Spec.it s "attackers round-trip through the transcript" $

@@ -1928,7 +1928,7 @@ poisonousSpec s registry =
         -- falsifier is an implementation that hands the poison to the ability's
         -- controller (Binding.you) instead.
         Spec.it s "CR 603.2 the damaged player rides the trigger in the reserved slot" $ do
-          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
+          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
               bindings = Event.eventBindings TriggerCondition.SelfDealsCombatDamageToPlayer ev
           Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.bob))
         -- The proving test. CR 702.70a: "Whenever this creature deals combat
@@ -4135,7 +4135,7 @@ representativeEvents cond =
       moved from to = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics
       combatDamage =
         GameEvent.DamageDealt
-          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
+          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
       one e = e NonEmpty.:| []
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
@@ -5416,7 +5416,7 @@ lifeGainTriggerSpec s registry =
         Spec.it s "CR 119.9 a 0-damage lifelink event records no life gain at all" $ do
           childOfNight <- S.printingOf s registry "Child of Night"
           let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
-              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False 0 (Just S.alice) DamageKind.Combat
+              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False False 0 (Just S.alice) DamageKind.Combat
               gainsIn gs = [p | GameEvent.LifeGained p _ <- S.eventsOf gs]
               after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
@@ -6197,7 +6197,7 @@ monarchTriggerSpec s registry =
       -- combat: Monarch.inherentMatch reads the recorded DamageEvent, and
       -- ExpirySpec's monarch group drives the same rule the same way.
       combatDamageTo monarch damager =
-        S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False 0 Nothing DamageKind.Combat)]
+        S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing DamageKind.Combat)]
    in Spec.describe s "MonarchTrigger" $ do
         -- The whole chain off one entry: CR 603.6a's entry trigger crowns alice,
         -- Effect.BecomeMonarch records CR 725.1's event, and the second ability

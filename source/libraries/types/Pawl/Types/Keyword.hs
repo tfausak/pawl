@@ -253,6 +253,15 @@ data Keyword
     -- triggers -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds
     -- from the projection's per-keyword count.
     Poisonous Natural.Natural
+  | -- | 702.80a: damage this source deals to a creature isn't marked on it;
+    -- instead its controller puts that many -1/-1 counters on that creature.
+    -- Nullary, because CR 702.80d makes multiple instances redundant -- so unlike
+    -- poisonous and battle cry, no reader here takes a count.
+    --
+    -- Infect's (702.90) CREATURE half and nothing more: CR 120.3d names both
+    -- keywords together, while CR 120.3a's life-loss exception names infect
+    -- alone, so wither damage to a player is ordinary life loss.
+    Wither
   | -- | 702.86a: whenever this creature attacks, defending player sacrifices N
     -- permanents. N rides the constructor, as Poisonous' does, and for the same
     -- reason: CR 702.86b says each instance triggers separately, so
