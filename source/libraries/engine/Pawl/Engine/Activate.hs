@@ -47,8 +47,9 @@ import qualified Pawl.Types.Zone as Zone
 
 -- CR 302.6: a creature's {T}-cost ability can't be activated while summoning
 -- sick. The whole reading lives in Pawl.Engine.Cost, because the mana window
--- needs the same one and CR 605.3b keeps a mana ability from ever reaching this
--- module; all that is left here is handing over the ability's cost.
+-- needs the same one and cannot come through here -- CR 605.3b is why
+-- activatableGiven refuses a mana ability outright. All that is left on this
+-- side is handing over the ability's cost.
 sicknessOk :: PlayerId -> ObjectId -> ActivatedAbility.ActivatedAbility Card.Card -> GameState -> Bool
 sicknessOk = sicknessOkGiven Map.empty
 

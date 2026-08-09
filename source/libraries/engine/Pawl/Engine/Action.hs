@@ -197,10 +197,12 @@ legalActions pid gs =
       -- on the board this function already walked.
       --
       -- That gate is also what keeps the offer from being one a player could
-      -- take forever: a source already tapped cannot pay its {T} again, so it
-      -- leaves the menu the moment it is taken. Cost.tapForMana picks among
-      -- exactly the options this gate admitted -- one predicate, asked at the
-      -- offer and at the payment, so the two cannot disagree. Pawl.ManaSpec's
-      -- "the menu carries one activation per untapped source" is the proof.
+      -- take forever: taking it spends what the cost charged, and the gate
+      -- refuses the source once it cannot charge it again -- a tapped permanent
+      -- cannot pay {T} (CR 107.5), a sacrificed Blood Pet is gone. Cost.tapForMana
+      -- picks among exactly the options this gate admitted -- one predicate,
+      -- asked at the offer and at the payment, so the two cannot disagree.
+      -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
+      -- the proof.
       manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.canActivateManaAbility grants pcs pid gs)
    in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaActivations
