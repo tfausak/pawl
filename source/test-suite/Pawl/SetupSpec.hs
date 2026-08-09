@@ -185,6 +185,19 @@ setupSpec s registry = Spec.describe s "Setup" $ do
   Spec.it s "CR 800.1 a three-player game has three players still in it at the start" $
     Spec.assertEqWith s "all three playing" (Game.stillPlaying S.threePlayerGame) [S.alice, S.bob, S.carol]
 
+  -- CR 903.7 / CR 103.4c against CR 103.4, on two decks identical but for
+  -- Deck.commander -- so the designation is the sole cause of the difference.
+  -- The positive control for Pawl.CommanderSpec's CR 903.10a group, whose victim
+  -- has to be alive at 19 after twenty-one damage.
+  Spec.it s "CR 903.7 a Commander deck starts its player at 40 life" $ do
+    shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+    let build commander =
+          S.runPure S.identityAnswer (Setup.emptyGame S.bothPlayers) $
+            Setup.createDeck S.alice Deck.MkDeck {Deck.cards = Map.empty, Deck.commander = commander}
+    Spec.assertEqWith s "forty with a commander" (S.lifeOf S.alice (build (Just shimatsu))) (Just 40)
+    Spec.assertEqWith s "twenty without" (S.lifeOf S.alice (build Nothing)) (Just 20)
+    Spec.assertEqWith s "and bob, whose deck was never built, keeps CR 103.4's twenty" (S.lifeOf S.bob (build (Just shimatsu))) (Just 20)
+
 greenBlackSetup :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m GameState.GameState
 greenBlackSetup s registry = do
   matchup <- S.greenBlack (S.printingOf s registry)

@@ -372,6 +372,16 @@ conditionCounts condition =
   quantityCounts (Condition.Type.measured condition)
     <> quantityCounts (Condition.Type.threshold condition)
 
+-- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
+-- boundaries by design, so every lint that reaches a card through them needs
+-- this beside it, or the gate's Counts -- and through them its Filters -- go
+-- unswept.
+modeClauseConditions :: Mode.Mode Card.Type.Card -> [Condition.Type.Condition]
+modeClauseConditions = Maybe.mapMaybe Clause.condition . Foldable.toList . Mode.clauses
+
+modalClauseConditions :: Modal.Modal Card.Type.Card -> [Condition.Type.Condition]
+modalClauseConditions = concatMap modeClauseConditions . Modal.modes
+
 -- Every Count reachable from a Duration: only ForAsLongAs (CR 611.2b) carries
 -- a Condition.
 durationCounts :: Duration.Duration -> [Count.Type.Count Quantity.Type.Quantity]
@@ -544,19 +554,21 @@ activatedAbilityCounts :: ActivatedAbility.ActivatedAbility Card.Type.Card -> [C
 activatedAbilityCounts ability =
   foldMap conditionCounts (ActivatedAbility.condition ability)
     <> concatMap effectCounts (Modal.allEffects (ActivatedAbility.modal ability))
+    <> concatMap conditionCounts (modalClauseConditions (ActivatedAbility.modal ability))
 
 triggeredAbilityCounts :: TriggeredAbility.TriggeredAbility Card.Type.Card -> [Count.Type.Count Quantity.Type.Quantity]
 triggeredAbilityCounts ability =
   triggerConditionCounts (TriggeredAbility.condition ability)
     <> foldMap conditionCounts (TriggeredAbility.intervening ability)
     <> concatMap effectCounts (Modal.allEffects (TriggeredAbility.modal ability))
+    <> concatMap conditionCounts (modalClauseConditions (TriggeredAbility.modal ability))
 
 -- Every Count reachable from a card: every site a Pawl.Types.Count can be
 -- authored -- Quantity (characteristic-defining P/T, printed P/T, and every
 -- effect/modification quantity), Condition (a trigger's own condition, a
 -- triggered ability's intervening clause, an activated ability's CR 702.178a
--- gate, a ForAsLongAs duration, and CR 508.1c's / CR 509.1b's "unless some
--- condition is met"), and every effect
+-- gate, a ForAsLongAs duration, CR 701.46a's per-clause gate, and CR 508.1c's /
+-- CR 509.1b's "unless some condition is met"), and every effect
 -- (spell, activated, triggered, delayed), recursing into a minted token or
 -- emblem.
 --
@@ -609,6 +621,7 @@ cardCounts card =
     <> concatMap (\(Toughness.MkToughness quantity) -> quantityCounts quantity) (Maybe.maybeToList (Face.toughness card))
     <> concatMap staticAbilityCounts (Face.staticAbilities card)
     <> concatMap effectCounts (Card.allEffects card)
+    <> concatMap conditionCounts (modalClauseConditions (Face.spell card))
     <> concatMap activatedAbilityCounts (Face.activatedAbilities card)
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
@@ -1033,7 +1046,7 @@ oneEffectTrigger condition effect =
     { TriggeredAbility.condition = condition,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -1056,7 +1069,7 @@ oneEffectActivated mana effect =
     { ActivatedAbility.cost = Cost.Type.MkCost {Cost.Type.mana = mana, Cost.Type.components = []},
       ActivatedAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       ActivatedAbility.restrictions = [],
       ActivatedAbility.condition = Nothing
@@ -1067,7 +1080,7 @@ oneEffectActivated mana effect =
 lintMode :: [Effect.Effect Card.Type.Card] -> [SlotName.SlotName] -> Mode.Mode Card.Type.Card
 lintMode effects slots =
   Mode.MkMode
-    (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList effects)))
+    (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects)))
     (Map.fromList (fmap (\slot -> (slot, TargetSpec.MkTargetSpec Pool.AnyTarget Nothing)) slots))
 
 -- oneEffectActivated widened to SEVERAL modes, free, under CR 700.2's
@@ -1444,7 +1457,13 @@ keywordFilters keyword = case keyword of
   -- creature" set is written into the ability Pawl.Engine.Keyword mints, not
   -- into the keyword.
   Keyword.BattleCry -> []
+  -- CR 702.108a names no quality either: the "+1/+1" and the noncreature-spell
+  -- condition are written into the ability Pawl.Engine.Keyword mints, not into
+  -- the keyword.
+  Keyword.Prowess -> []
   Keyword.Infect -> []
+  -- CR 702.80a names no quality either: what it changes is where damage goes.
+  Keyword.Wither -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
@@ -1923,6 +1942,7 @@ modalFilters modal =
   concatMap
     ( \mode ->
         concatMap effectFilters (Mode.allEffects mode)
+          <> unframed (concatMap conditionFilters (modeClauseConditions mode))
           <> unframed (concatMap targetSpecFilters (Map.elems (Mode.targetSpecs mode)))
     )
     (Modal.modes modal)
@@ -2423,7 +2443,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                 Modal.MkModal
                   ( Seq.singleton
                       ( Mode.MkMode
-                          (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))))
+                          (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton (Effect.Destroy (ObjectRef.InSlot Binding.you) Regenerability.Regenerable (Just Binding.eventAmount)))))
                           (Map.singleton Binding.you (TargetSpec.MkTargetSpec Pool.AnyTarget Nothing))
                       )
                   )
@@ -3411,7 +3431,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         -- clauses and its targetSpecs at once.
         spellOf effects specs =
           Modal.MkModal
-            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.fromList effects))) specs))
+            (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList effects))) specs))
             (ModeSelection.ChooseExactly 1)
         boostedBy quantity =
           StaticAbility.MkStaticAbility

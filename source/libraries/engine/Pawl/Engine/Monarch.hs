@@ -65,7 +65,7 @@ oneEffect cond eff =
     { TriggeredAbility.condition = cond,
       TriggeredAbility.modal =
         Modal.MkModal
-          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Optionality.Mandatory Nothing (Seq.singleton eff))) Map.empty))
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton eff))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening = Nothing
     }
@@ -266,6 +266,14 @@ returnExiledForMonarch = do
 --
 -- "Who can become the monarch" is read as "is still in the game": no card in
 -- the pool prevents a player from becoming the monarch (#178).
+--
+-- The write and the CR 725.1 event record are ONE step, for the reason
+-- Departure.depart gives for keeping this call inside itself: a crowning that
+-- records nothing is a crowning CR 603.2 cannot see, and separating the two
+-- lets a later caller move the crown silently. A rule rather than an effect
+-- moves it here, which changes nothing -- CR 725.2's stolen crown is a rule too
+-- and records the same event. Nothing is recorded for CR 725.4's third
+-- sentence: no player became the monarch.
 reassignOnDeparture :: PlayerId -> [PlayerId] -> GameState -> GameState
 reassignOnDeparture leaving playing gs =
   if GameState.monarch gs /= Just leaving
@@ -276,9 +284,11 @@ reassignOnDeparture leaving playing gs =
             (before, _ : after) -> after <> before
             (before, []) -> before
           next = List.find (\pid -> List.elem pid playing) walk
-       in gs
-            { GameState.monarch =
-                if List.elem active playing
-                  then Just active
-                  else next
-            }
+          crowned =
+            if List.elem active playing
+              then Just active
+              else next
+          moved = gs {GameState.monarch = crowned}
+       in case crowned of
+            Nothing -> moved
+            Just pid -> Event.recordEvent (GameEvent.BecameMonarch pid) moved

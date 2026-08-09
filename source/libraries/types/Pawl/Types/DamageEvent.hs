@@ -25,8 +25,14 @@ data DamageEvent = MkDamageEvent
     -- | CR 702.90d: whether the source had infect WHEN THIS DAMAGE WAS DEALT
     -- (last known information), captured exactly as dealtByDeathtouch is.
     dealtByInfect :: Bool,
+    -- | CR 702.80b: whether the source had wither WHEN THIS DAMAGE WAS DEALT
+    -- (last known information), captured exactly as dealtByInfect is. Read only
+    -- for damage to a CREATURE -- CR 120.3d pairs wither with infect there, and
+    -- CR 120.3a's life-loss exception names infect alone, so a wither source's
+    -- damage to a player is ordinary life loss.
+    dealtByWither :: Bool,
     -- | The source's TOTAL TOXIC VALUE (CR 702.164b: the sum of its toxic
-    -- abilities' Ns) when this damage was dealt. Captured the way the two bits
+    -- abilities' Ns) when this damage was dealt. Captured the way the three bits
     -- above are, but NOT for their reason: rule 702.164 has no last-known-
     -- information clause of its own, so this one is uniformity, not citation.
     -- Zero for a source without toxic. Read only for COMBAT damage dealt to a

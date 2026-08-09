@@ -253,6 +253,15 @@ data Keyword
     -- triggers -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds
     -- from the projection's per-keyword count.
     Poisonous Natural.Natural
+  | -- | 702.80a: damage this source deals to a creature isn't marked on it;
+    -- instead its controller puts that many -1/-1 counters on that creature.
+    -- Nullary, because CR 702.80d makes multiple instances redundant -- so unlike
+    -- poisonous and battle cry, no reader here takes a count.
+    --
+    -- Infect's (702.90) CREATURE half and nothing more: CR 120.3d names both
+    -- keywords together, while CR 120.3a's life-loss exception names infect
+    -- alone, so wither damage to a player is ordinary life loss.
+    Wither
   | -- | 702.86a: whenever this creature attacks, defending player sacrifices N
     -- permanents. N rides the constructor, as Poisonous' does, and for the same
     -- reason: CR 702.86b says each instance triggers separately, so
@@ -271,12 +280,25 @@ data Keyword
   | Infect -- 702.90
   | -- | 702.91a: whenever this creature attacks, each other attacking creature gets
     -- +1/+0 until end of turn. The THIRD keyword rule 702 states as a triggered
-    -- ability, after poisonous (702.70a) and annihilator (702.86a), and so the third one
+    -- ability, after poisonous (702.70a) and annihilator (702.86a) and before
+    -- prowess (702.108a), and so the third one
     -- Pawl.Engine.Keyword MINTS rather than merely consults. Nullary, because rule
     -- 702.91a takes no parameter -- and unlike flying's or lifelink's nullary
     -- siblings, its reader takes the per-keyword count rather than membership,
     -- since CR 702.91b gives it the multiplicity CR 702.70b gives poisonous.
     BattleCry
+  | -- | 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
+    -- until end of turn. The FOURTH keyword rule 702 states as a triggered
+    -- ability, after poisonous (702.70a), annihilator (702.86a) and battle cry
+    -- (702.91a), and minted the same way. What it adds to those three is the
+    -- WATCHED EVENT: the first of them to trigger on something other than its
+    -- own bearer's combat, so the minted condition is CR 601.2i's
+    -- TriggerCondition.SpellCast rather than a self-scoped one.
+    --
+    -- Nullary, because rule 702.108a takes no parameter, and its reader takes
+    -- the per-keyword count rather than membership: CR 702.108b gives it the
+    -- multiplicity CR 702.91b gives battle cry.
+    Prowess
   | -- | 702.111b: a creature with menace can't be blocked except by two or more
     -- creatures. Nullary like fear (702.36) and unlike landwalk -- the number two
     -- is written into the rule.

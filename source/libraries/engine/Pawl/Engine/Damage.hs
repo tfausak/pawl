@@ -9,6 +9,7 @@ import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -109,11 +110,11 @@ blockerThreshold gs attacker blocker =
 -- One damage event, with its deal-time riders read off the projection HERE
 -- rather than re-derived when they are consumed: each is a fact about the source
 -- AS THE DAMAGE IS DEALT, and the source may be gone by the time the CR 704.5h
--- SBA or a later reader asks. CR 702.2e, CR 702.90d and CR 702.15c say so
--- outright for deathtouch, infect and lifelink. Rule 702.164 has NO such clause,
--- so toxic's total value (CR 702.164b) is captured by analogy rather than by
--- citation -- observably the same today, since applyDamage runs in the same
--- instant, and it keeps the CR 608.2i record self-contained.
+-- SBA or a later reader asks. CR 702.2e, CR 702.90d, CR 702.15c and CR 702.80b
+-- say so outright for deathtouch, infect, lifelink and wither. Rule 702.164 has
+-- NO such clause, so toxic's total value (CR 702.164b) is captured by analogy
+-- rather than by citation -- observably the same today, since applyDamage runs
+-- in the same instant, and it keeps the CR 608.2i record self-contained.
 --
 -- Lifelink's rider carries WHO rather than WHETHER, because CR 702.15b's answer
 -- is a player. Projection.controllerWithLastKnown delegates to controllerOf,
@@ -125,9 +126,9 @@ blockerThreshold gs attacker blocker =
 -- Fire-Eater sacrifices itself to pay for the ability that then deals its
 -- damage. The plain readers answer False, 0 and Nothing for an id that names
 -- nothing, which would silently report every rider absent rather than as it last
--- was, against CR 702.2e, CR 702.15c, CR 702.90d and CR 608.2h.
+-- was, against CR 702.2e, CR 702.15c, CR 702.90d, CR 702.80b and CR 608.2h.
 --
--- One fallback for all four riders, not four: they are read here at a single
+-- One fallback for all five riders, not five: they are read here at a single
 -- site off two readers that share one liveness test (Projection.lastKnownOf), so
 -- deathtouch and lifelink cannot come to disagree about whether the source is
 -- still there. Every damage the engine deals is built here, so no assignment
@@ -146,6 +147,7 @@ damageEvent gs kind source target amount =
           DamageEvent.amount = amount,
           DamageEvent.dealtByDeathtouch = has Keyword.Deathtouch,
           DamageEvent.dealtByInfect = has Keyword.Infect,
+          DamageEvent.dealtByWither = has Keyword.Wither,
           DamageEvent.dealtByToxic = toxic,
           DamageEvent.dealtByLifelink =
             if has Keyword.Lifelink
@@ -440,12 +442,17 @@ damagedCardTypes gs recipient =
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
-  let -- CR 120.3d / 702.90c and CR 120.3e: the creature result. Counters are added
-      -- directly (not via Event.putCounters) because this is a consequence of a
-      -- damage event that already ran the CR 616 replacement loop, so a "would put
-      -- -1/-1 from infect" CR 614 sub-replacement is out of scope (#122).
+  let -- CR 120.3d / 702.90c / 702.80a and CR 120.3e: the creature result. Counters
+      -- are added directly (not via Event.putCounters) because this is a
+      -- consequence of a damage event that already ran the CR 616 replacement
+      -- loop, so a "would put -1/-1 from infect" CR 614 sub-replacement is out of
+      -- scope (#122).
+      --
+      -- The disjunction is CR 120.3d's "wither and/or infect" verbatim, and its
+      -- scope is this creature arm ALONE: CR 120.3a's life-loss exception names
+      -- infect and not wither, so markOne's ToPlayer arm below stays infect-only.
       markCreature ev oid g =
-        if DamageEvent.dealtByInfect ev
+        if DamageEvent.dealtByInfect ev || DamageEvent.dealtByWither ev
           then
             let addMinus obj = obj {Object.counters = Map.insertWith (+) CounterKind.MinusOneMinusOne (DamageEvent.amount ev) (Object.counters obj)}
              in g {GameState.objects = Map.adjust addMinus oid (GameState.objects g)}
@@ -516,6 +523,10 @@ applyDamage events = do
           -- The damaged PLAYER gets the counters, not the source's controller,
           -- who merely performs it (CR 120.3b/120.3g). And toxic is scoped to
           -- COMBAT damage, so a noncombat event's captured value is ignored.
+          --
+          -- WITHER IS ABSENT ON PURPOSE. CR 120.3d pairs it with infect for a
+          -- creature recipient only; CR 120.3a's exception names infect alone, so
+          -- a wither source drains a player's life like any other.
           let toxic = case DamageEvent.kind ev of
                 DamageKind.Combat -> DamageEvent.dealtByToxic ev
                 DamageKind.Noncombat -> 0
@@ -550,6 +561,41 @@ applyDamage events = do
         Just pid ->
           let gain player = player {Player.life = Player.life player + toInteger (DamageEvent.amount ev)}
            in g {GameState.players = Map.adjust gain pid (GameState.players g)}
+      -- CR 903.10a: the running tally of COMBAT damage each commander has dealt
+      -- each player, kept under the commander's OWNER (Player.commanderDamage).
+      --
+      -- A third pass rather than a line inside markOne, for `gainOne`'s reason:
+      -- the tally is not one of CR 120.3's results at all -- it is a record CR
+      -- 903.10a keeps beside them -- so no arm of markOne can turn it off.
+      --
+      -- Asked of `board`, the pre-batch state the rest of applyDamage classifies
+      -- against, so every event in one batch reads the same answer to "was the
+      -- source a commander" -- CR 510.2's simultaneity, which an earlier event in
+      -- the fold must not disturb.
+      --
+      -- Over `survivors`, so prevented and replaced damage never counts: rule
+      -- 903.10a counts damage DEALT.
+      --
+      -- COMBAT damage only, which is rule 903.10a's own word and why the kind is
+      -- tested rather than assumed: Pawl.Engine.Resolve's DealDamage arm builds
+      -- Noncombat events from the very same sources.
+      --
+      -- Players only, so this is a walk of its own rather than a row in
+      -- onPermanent's `results` list: that list is keyed by CardType and a player
+      -- has none (damagedCardTypes answers empty for one).
+      tallyOne board g ev = case DamageEvent.target ev of
+        Recipient.ToPlayer pid
+          | DamageEvent.kind ev == DamageKind.Combat ->
+              case Commander.commanderOwnerOf (DamageEvent.source ev) board of
+                Nothing -> g
+                Just owner ->
+                  let count player =
+                        player
+                          { Player.commanderDamage =
+                              Map.insertWith (+) owner (DamageEvent.amount ev) (Player.commanderDamage player)
+                          }
+                   in g {GameState.players = Map.adjust count pid (GameState.players g)}
+        _ -> g
       -- CR 119.2: damage dealt to a player CAUSES that player to lose that much
       -- life, so the loss is recorded here and never by Pawl.Engine.Resolve's
       -- LoseLife arm, which no damage runs through.
@@ -564,6 +610,10 @@ applyDamage events = do
       -- the life loss with poison counters, and a 0-damage event loses nothing --
       -- neither is a life loss event for CR 702.179d to see. Only players: CR
       -- 120.3c and CR 120.3d take a permanent's damage somewhere else entirely.
+      --
+      -- Infect and NOT wither, which is CR 120.3a's own wording. Pinned by
+      -- DamageSpec's Wither group, which asserts the recorded LifeLost event and
+      -- not merely the total.
       lifeLostBy ev = case DamageEvent.target ev of
         Recipient.ToPlayer pid
           | not (DamageEvent.dealtByInfect ev),
@@ -633,7 +683,8 @@ applyDamage events = do
     ( \gs ->
         let marked = List.foldl' (markOne gs) gs survivors
             gained = List.foldl' gainOne marked survivors
-            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) gained prevented
+            tallied = List.foldl' (tallyOne gs) gained survivors
+            noted = List.foldl' (\g p -> Event.recordEvent (GameEvent.DamagePrevented (Prevention.recipient p) (Prevention.amount p)) g) tallied prevented
             dealt = List.foldl' (\g ev -> Event.recordEvent (GameEvent.DamageDealt ev) g) noted survivors
          in -- CR 119.2's life loss and CR 120.3f's life gain are recorded AFTER
             -- the damage that caused them, which is the same reasoning the

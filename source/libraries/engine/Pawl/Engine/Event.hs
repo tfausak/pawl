@@ -2666,8 +2666,9 @@ matchesTrigger gs bearer you cond event = case cond of
   -- this event whichever MonarchTarget named the player, which covers an entry
   -- trigger's crown, a targeted crown and CR 725.2's stolen crown.
   --
-  -- CR 725.4's departure reassignment is NOT matched: Monarch.reassignOnDeparture
-  -- moves the crown without recording an event (#1052).
+  -- CR 725.4's departure reassignment records the same event, so the crown
+  -- moving because the monarch left is matched alike. TriggerSpec's "CR 725.4 a
+  -- departure crowns alice, and that crowning fires her edict" proves it.
   --
   -- The event carries exactly one player, which is CR 725.3 ("Only one player can
   -- be the monarch at a time") rather than a simplification -- so the relation is

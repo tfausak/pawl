@@ -22,6 +22,7 @@ import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.MonarchWatch as MonarchWatch
 import qualified Pawl.Types.Object as Object
@@ -37,6 +38,16 @@ import qualified Pawl.Types.Zone as Zone
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
+
+-- The players CR 725.1's event says were crowned, in order -- so a CR 725.4 case
+-- can assert both who took the crown and that nothing else was recorded.
+crownings :: GameState.GameState -> [PlayerId.PlayerId]
+crownings gs = Maybe.mapMaybe crownedIn (S.eventsOf gs)
+
+crownedIn :: GameEvent.GameEvent -> Maybe PlayerId.PlayerId
+crownedIn event = case event of
+  GameEvent.BecameMonarch pid -> Just pid
+  _ -> Nothing
 
 -- bob's Meandering Towershell, stolen by alice's Control Magic, on a board that
 -- has not started its first turn -- so alice's own untap step is what writes CR
@@ -139,6 +150,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         gone = Departure.depart Departure.Type.Conceded S.bob board
     Spec.assertEqWith s "alice is the active player on this board" (GameState.activePlayer board) S.alice
     Spec.assertEqWith s "so alice is the monarch" (GameState.monarch gone) (Just S.alice)
+    -- CR 603.2: that is a player BECOMING the monarch, so the reassignment
+    -- records the event a "whenever you become the monarch" ability matches --
+    -- naming the NEW monarch, not the departing one. TriggerSpec's Custodi Lich
+    -- case is the gameplay-level proof.
+    Spec.assertEqWith s "and exactly one crowning was recorded, naming her" (crownings gone) [S.alice]
 
   -- CR 725.4: "If the active player is leaving the game or if there is no
   -- active player, the next player in turn order who can become the monarch
@@ -147,6 +163,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
     let board = S.withMonarch S.alice S.threePlayerGame
         gone = Departure.depart Departure.Type.Conceded S.alice board
     Spec.assertEqWith s "bob, the seat after alice's" (GameState.monarch gone) (Just S.bob)
+    Spec.assertEqWith s "and the crowning names him, so the walk's branch records too" (crownings gone) [S.bob]
 
   Spec.it s "CR 725.4 the walk past the active player's seat skips a seat that has already departed" $ do
     -- alice is the active player and has already left, so there is no active
@@ -192,6 +209,11 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         gone = Departure.depart Departure.Type.Conceded S.carol board
     Spec.assertEqWith s "nobody is left to become the monarch" (GameState.monarch gone) Nothing
     Spec.assertEqWith s "and the roster is untouched" (GameState.turnOrder gone) [S.alice, S.bob, S.carol]
+    -- The third sentence records NOTHING: a crown that went nowhere is not a
+    -- player becoming the monarch. The two earlier departures record none
+    -- either -- there was no monarch to reassign yet -- so this list is exactly
+    -- what the departure under test added.
+    Spec.assertEqWith s "and no crowning was recorded" (crownings gone) []
 
   Spec.it s "CR 800.4a a departing player's objects leave the game, from every zone that can hold one" $ do
     piker <- S.printingOf s registry "Goblin Piker"

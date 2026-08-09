@@ -69,7 +69,12 @@ instances able candidates attackers gs =
             -- have started on its behalf -- a requirement is its OWN carrier,
             -- never part of a StaticAbility, so CR 613.6 has nothing here to
             -- hold together. The cut is unconditional.
-            if (null setEffs || Projection.liveGiven setEffs source gs)
+            --
+            -- CR 613.11's placement is also why the CR 305.7 gate is
+            -- liveAfterLayers: the projection is finished here, so the setter's
+            -- affected set is read against it, exactly as `named` below reads it
+            -- for the subject set.
+            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
               && not (removed source)
               then
                 -- CR 612.1's word swap over the source's own text, computed HERE

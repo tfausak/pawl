@@ -330,6 +330,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Infect
       """ {"type":"Infect"} """
+  -- CR 702.80d makes multiple instances redundant, so wither is a bare tag with
+  -- nothing to count.
+  Spec.it s "Wither" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Wither
+      """ {"type":"Wither"} """
   -- CR 702.91a's battle cry takes no parameter, so it encodes as a bare tag.
   -- What CR 702.91b makes multiple is the COUNT the projection keeps, never the
   -- value.
@@ -340,6 +349,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.BattleCry
       """ {"type":"BattleCry"} """
+  -- CR 702.108a's prowess takes no parameter either, and CR 702.108b makes the
+  -- COUNT multiple rather than the value.
+  Spec.it s "Prowess" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Prowess
+      """ {"type":"Prowess"} """
   Spec.it s "Menace" $
     Common.assertJsonCodec
       s

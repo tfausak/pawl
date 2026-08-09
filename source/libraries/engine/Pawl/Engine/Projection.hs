@@ -263,14 +263,13 @@ applyModification lyr src cands gs oid m pc =
 -- creature type on an animated permanent survives. Taking exactly one type is
 -- not a narrowing: no printed card sets a land's subtype to more than one.
 --
--- The ability clause strips keywords and the four fields below. A permanent's
--- static abilities, player abilities and block requirements are decided before
--- the fold instead, by the CR 305.7 gates in gather,
--- Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement, because an
--- ability landing on OTHER objects must be kept out of the candidate list rather
--- than erased from its own projection. Those gates read base characteristics and
--- this reads the projection, so the halves disagree on an object that became a
--- land at layer 4 (#391).
+-- The ability clause strips keywords and the four fields below. An ability
+-- landing on OTHER objects is decided by a gate instead, because it must be kept
+-- out of the candidate list rather than erased from its own projection: gather
+-- and controlGrants use liveGiven, and every reader after the layers uses
+-- liveAfterLayers. Only the liveGiven pair still reads base where this reads the
+-- projection, so the halves disagree on an object that became a land at layer 4
+-- (#391).
 --
 -- CR 305.7 spares abilities GRANTED to the land, which needs no guard: every
 -- field cleared here is seeded from the card, and GainKeyword is layer 6, after
@@ -1074,37 +1073,50 @@ setLandSubtypeEffects gs =
         <> concatMap fromPerm (Set.toList (GameState.battlefield gs))
 
 -- CR 305.7: a land whose subtype is set to a basic type loses its rules-text
--- abilities. This is the GATE half of that rule, shared by the three readers
--- whose ability lands on objects other than the bearer -- gather here,
--- Pawl.Engine.PlayerEffect.applying and Pawl.Engine.BlockRequirement.instances --
--- since such an ability must be kept out of the candidate list rather than erased
--- from the bearer's projection afterwards. Every other rules-text ability is
--- stripped inside the fold by setLandSubtypeTo.
+-- abilities. This is the GATE half of that rule, for the readers whose ability
+-- lands on objects other than the bearer, since such an ability must be kept out
+-- of the candidate list rather than erased from the bearer's projection
+-- afterwards. Every other rules-text ability is stripped inside the fold by
+-- setLandSubtypeTo.
 --
--- "Applies to" reads BASE characteristics, so nothing recurses into the
--- projection and the question each effect asks of each other is a fixed one. The
--- ORDER the effects apply in is CR 613.8's, computed by `appliedSetEffects` below
--- -- dependency order, falling back to timestamp order inside a dependency loop
--- (CR 613.8b).
+-- The effect list is hoisted so a caller computes it once rather than once per
+-- permanent, which made project O(permanents^3) per SBA sweep. `oid`'s rules-text
+-- abilities survive iff no effect that ACTUALLY APPLIES reaches it. Which ones
+-- apply is rule 613.8's question, answered once by `appliedSetEffects` below --
+-- dependency order, falling back to timestamp order inside a dependency loop (CR
+-- 613.8b). This function only asks the applied ones whether they name `oid`.
 --
--- The base read is a restriction rather than a shortcut, so the two halves of CR
--- 305.7 disagree about their affected set: a permanent that becomes a land only
--- through a layer-4 type change is invisible here while the fold's arm reaches it
--- (#391).
-staticAbilitiesLive :: ObjectId -> GameState -> Bool
-staticAbilitiesLive oid gs = liveGiven (setLandSubtypeEffects gs) oid gs
-
--- The liveness answer, given the game's subtype-setting effects precomputed. The
--- list is hoisted so gather computes it once per projection rather than once per
--- permanent, which made project O(permanents^3) per SBA sweep.
---
--- `oid`'s rules-text abilities survive iff no effect that ACTUALLY APPLIES reaches
--- it. Which ones apply is rule 613.8's question, answered once by
--- appliedSetEffects; this function only asks the applied ones whether they name
--- `oid`.
+-- This is the INSIDE-THE-FOLD gate, and its two callers are gather (via
+-- permanentParts) and controlGrants. "Applies to" reads BASE characteristics so
+-- nothing recurses into the projection being built. That restriction costs a real
+-- case: a permanent that becomes a land only through a layer-4 type change
+-- (Ashaya on Thalia) is invisible here while the fold's own arm reaches it, so the
+-- two halves of CR 305.7 still disagree for those two callers (#391). Every reader
+-- OUTSIDE the fold uses liveAfterLayers below, which has no such disagreement.
 liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveGiven setEffs oid gs =
   not (any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs))
+
+-- The same CR 305.7 gate for a reader OUTSIDE the layer fold. CR 613.10 applies a
+-- player effect "after the determination of objects' characteristics" and CR
+-- 613.11 a rules-modifying effect "after all other continuous effects have been
+-- applied", so by the time such a reader runs the projection is finished and there
+-- is nothing to be circular about -- which is why this may read the projection
+-- where liveGiven, called from inside the fold, must read base.
+--
+-- Not a fixpoint: the readers below call project, project's fold calls liveGiven,
+-- and liveGiven bottoms out at baseCharacteristics, which folds nothing. Nothing
+-- lower on that ladder calls anything higher.
+--
+-- WHICH effects apply is still liveGiven's layer-4 question, answered by
+-- appliedSetEffects against base characteristics. Only the final membership test
+-- -- does an applied setter's affected set name THIS object? -- moves to the
+-- finished projection, which is what keeps CR 613.8's intra-layer ordering out of
+-- here.
+liveAfterLayers :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
+liveAfterLayers setEffs oid gs =
+  let view = project oid gs
+   in not (any (\(src, aff) -> affects src oid aff view gs) (appliedSetEffects setEffs gs))
 
 -- CR 613.8: which of the CR 305.7 subtype-setting effects actually apply, in the
 -- order the rule applies them.
@@ -1468,7 +1480,13 @@ rewriteTriggeredAbility pairs ability =
 -- correct way" finds nothing in it to swap.
 rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card -> Modal.Modal Card.Type.Card
 rewriteModal pairs modal =
-  let rewriteClause c = c {Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c)}
+  let rewriteClause c =
+        c
+          { Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c),
+            -- CR 701.46a's clause gate is a Condition, so its Filters are
+            -- printed words a text change must reach too.
+            Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
+          }
       rewriteTargetSpec ts = ts {TargetSpec.filter = fmap (Filter.rewrite pairs) (TargetSpec.filter ts)}
       rewriteMode m =
         m
@@ -2216,7 +2234,7 @@ filterReads f = case f of
 -- counters need no arm, arriving here as synthetic GainKeywords.
 --
 -- An ability change can also matter to CR 613.8 by changing an effect's EXISTENCE,
--- a different clause that lives in staticAbilitiesLive.
+-- a different clause that lives in liveGiven.
 modificationWrites :: Modification -> Set Aspect
 modificationWrites m = case m of
   Modification.GainKeyword _ -> Set.singleton Keywords
@@ -2460,7 +2478,7 @@ projectDeciding admits cands = forObject
                         -- Clause (c)'s CDA exclusion needs no test: a CDA is never a
                         -- candidate, both in-place folds sitting outside this list.
                         -- Clause (b)'s "text" and "what it does to" halves have no
-                        -- producer; "existence" is handled by staticAbilitiesLive. The
+                        -- producer; "existence" is handled by liveGiven. The
                         -- CR decides this over an effect's whole affected set and this
                         -- decides it per projected object, which agrees for everything
                         -- the Filter vocabulary can express (#236).
@@ -3019,6 +3037,11 @@ data ControlGrant = MkControlGrant
 -- 613.8a scopes dependency within a layer and CR 613.6 keeps a started effect
 -- applying, so no reordering reaches across. Nothing is added at layer 6 either:
 -- its vocabulary cannot put a static ability on an object.
+--
+-- That is also why this keeps liveGiven's BASE read rather than taking
+-- liveAfterLayers: control is decided at layer 2, before any layer-4 setter
+-- applies, so CR 613.6 keeps the grant applying "even if the ability generating
+-- the effect is removed during this process".
 --
 -- INVARIANT this liveness gate depends on (#197): the `liveGiven` call below must
 -- never FORCE a control-dependent Filter, since liveGiven -> affectsBase ->

@@ -33,6 +33,10 @@
 -- ordering payload's ability discriminator -- two DISTINCT abilities of one
 -- source, ordered both ways with different boards, and two triggers of the SAME
 -- ability staying indistinguishable, with Hero of Bladehold -- `battleCrySpec`.
+-- CR 702.108 prowess, the fourth such keyword and the first whose event is not
+-- its bearer's combat -- CR 601.2i's cast, watched through the same
+-- TriggerCondition.SpellCast a card writes -- with Monastery Swiftspear --
+-- `prowessSpec`.
 -- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
@@ -1980,7 +1984,7 @@ poisonousSpec s registry =
         -- falsifier is an implementation that hands the poison to the ability's
         -- controller (Binding.you) instead.
         Spec.it s "CR 603.2 the damaged player rides the trigger in the reserved slot" $ do
-          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
+          let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
               bindings = Event.eventBindings TriggerCondition.SelfDealsCombatDamageToPlayer ev
           Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.bob))
         -- The proving test. CR 702.70a: "Whenever this creature deals combat
@@ -2340,6 +2344,110 @@ battleCrySpec s registry =
               after = S.runCombat (resolvingFirst True) gs
           Spec.assertEqWith s "two 1/1 Soldiers" (powersOf (S.tokensOf after) after) [Just 1, Just 1]
           Spec.assertEqWith s "so bob takes 3 + 1 + 1" (S.lifeOf S.bob after) (Just 15)
+
+-- CR 702.108a: "Prowess is a triggered ability. 'Prowess' means 'Whenever you
+-- cast a noncreature spell, this creature gets +1/+1 until end of turn.'" The
+-- fourth keyword in this pool whose rule text IS a triggered ability, after CR
+-- 702.70a, CR 702.86a and CR 702.91a, and the first of the four to watch
+-- something other than its bearer's combat: the event is CR 601.2i's, so
+-- Pawl.Engine.Keyword.prowess mints TriggerCondition.SpellCast.
+--
+-- Monastery Swiftspear, {R} Creature -- Human Monk 1/2 with haste and prowess.
+-- 1/2 rather than a square body on purpose: prowess is +1/+1 and battle cry is
+-- +1/+0, so every assertion below reads BOTH power and toughness -- a power-only
+-- one cannot tell the two payloads apart -- and an asymmetric base also catches
+-- a swapped pair of arguments to Modification.ModifyPowerToughness.
+--
+-- Boil, {3}{R} Instant "Destroy all Islands", is the noncreature spell, for
+-- youngPyromancerSpec's reasons: it targets nothing, so no answerer choice
+-- enters the fixture, and nobody here controls an Island, so its resolution
+-- moves nothing an assertion reads. Goblin Piker, {2}{R}, is the creature spell.
+--
+-- The printed sentence narrows two things at once -- who cast it and what it was
+-- -- so each case below moves exactly one, and the negatives carry the positive
+-- control that the cast really happened. THREE seats, carol being the one that
+-- is neither the caster nor the ability's controller: at two players "the caster
+-- is not you" and "the caster is that one opponent" are the same sentence.
+prowessSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+prowessSpec s registry =
+  let -- alice bears the Swiftspear and has four Mountains, bob four as well, so
+      -- a negative never fails for want of mana; carol is the third seat.
+      board mountain swiftspear =
+        let addLands pid n g = List.foldl' (\g' _ -> snd (S.addCreature mountain pid g')) g [1 .. (n :: Int)]
+            withLands = addLands S.bob 4 (addLands S.alice 4 S.threePlayerGame)
+            (spearId, withSpear) = S.addCreature swiftspear S.alice withLands
+         in ( spearId,
+              withSpear
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+      sizeOf oid gs = (Projection.powerOf oid gs, Projection.toughnessOf oid gs)
+   in Spec.describe s "Prowess" $ do
+        -- THE case: the trigger fires, and the pump is the one rule 702.108a
+        -- names rather than merely some pump.
+        Spec.it s "CR 702.108a whole card: casting an instant makes Monastery Swiftspear 2/3" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
+          boil <- S.printingOf s registry "Boil"
+          let (spearId, base) = board mountain swiftspear
+              (boilId, gs) = S.addHandCard boil S.alice base
+              after = castAndResolve S.alice boilId gs
+          Spec.assertEqWith s "1/2 before the cast" (sizeOf spearId gs) (Just 1, Just 2)
+          Spec.assertEqWith s "and 2/3 once the trigger resolves" (sizeOf spearId after) (Just 2, Just 3)
+        -- "Noncreature", moved on its own: alice still casts, and only what she
+        -- casts changes. Without this a filter that admitted every spell and one
+        -- that read the card type are indistinguishable.
+        Spec.it s "CR 702.108a a CREATURE spell pumps nothing" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (spearId, base) = board mountain swiftspear
+              (pikerId, gs) = S.addHandCard piker S.alice base
+              after = castAndResolve S.alice pikerId gs
+          -- Positive control: the cast really happened and really resolved, so
+          -- the silence below is the Filter's answer and not a fixture that
+          -- never cast anything.
+          Spec.assertEqWith s "the Piker resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+          Spec.assertEqWith s "and the Swiftspear is still 1/2" (sizeOf spearId after) (Just 1, Just 2)
+        -- "You", moved on its own: the same instant from the seat to alice's
+        -- left. The paired assertion on the same board is what proves the seat
+        -- is the only thing the silence turns on.
+        Spec.it s "CR 109.5 'you cast': an OPPONENT's instant pumps nothing" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
+          boil <- S.printingOf s registry "Boil"
+          let (spearId, base) = board mountain swiftspear
+              (bobsBoil, withBobs) = S.addHandCard boil S.bob base
+              (alicesBoil, gs) = S.addHandCard boil S.alice withBobs
+              byBob = castAndResolve S.bob bobsBoil gs
+              byAlice = castAndResolve S.alice alicesBoil gs
+          Spec.assertEqWith s "bob's cast really resolved" (length (Game.zoneMembers Zone.Graveyard S.bob byBob)) 1
+          Spec.assertEqWith s "and left the Swiftspear at 1/2" (sizeOf spearId byBob) (Just 1, Just 2)
+          Spec.assertEqWith s "the same board pumps for alice's own cast" (sizeOf spearId byAlice) (Just 2, Just 3)
+        -- CR 514.2: "until end of turn" is armed to the cleanup step, and CR
+        -- 611.2c's frozen set is a single creature, so the whole effect goes.
+        -- Run as the turn-based action rather than by advancing turns, which
+        -- would deck a fixture player (CR 104.3c).
+        Spec.it s "CR 514.2 the pump is gone at the cleanup step" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          swiftspear <- S.printingOf s registry "Monastery Swiftspear"
+          boil <- S.printingOf s registry "Boil"
+          let (spearId, base) = board mountain swiftspear
+              (boilId, gs) = S.addHandCard boil S.alice base
+              after = castAndResolve S.alice boilId gs
+              cleaned = S.runPure S.identityAnswer after (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
+          Spec.assertEqWith s "2/3 while the effect lasts" (sizeOf spearId after) (Just 2, Just 3)
+          Spec.assertEqWith s "and 1/2 again afterwards" (sizeOf spearId cleaned) (Just 1, Just 2)
+        -- CR 702.108b: "If a creature has multiple instances of prowess, each
+        -- triggers separately." Asked of the mint rather than of a board, as
+        -- battle cry's is: no card in this pool prints prowess twice and nothing
+        -- here grants it, so a second instance is unreachable through play.
+        Spec.it s "CR 702.108b each instance of prowess is its own ability" $ do
+          Spec.assertEqWith s "prowess held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Prowess 2)) [Keyword.prowess, Keyword.prowess]
+          Spec.assertEqWith s "and held once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Prowess 1)) [Keyword.prowess]
 
 -- CR 702.29c: "'When you cycle this card' means 'When you discard this card to
 -- pay an activation cost of a cycling ability.' These abilities trigger from
@@ -4192,7 +4300,7 @@ representativeEvents cond =
       moved from to = GameEvent.Moved (ZoneChange.MkZoneChange departed arrived from to) S.emptyCharacteristics
       combatDamage =
         GameEvent.DamageDealt
-          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False 0 Nothing DamageKind.Combat)
+          (DamageEvent.MkDamageEvent departed (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
       one e = e NonEmpty.:| []
    in case cond of
         TriggerCondition.SelfEnters -> one (moved Zone.Stack Zone.Battlefield)
@@ -5473,7 +5581,7 @@ lifeGainTriggerSpec s registry =
         Spec.it s "CR 119.9 a 0-damage lifelink event records no life gain at all" $ do
           childOfNight <- S.printingOf s registry "Child of Night"
           let (oid, gs0) = S.addCreature childOfNight S.alice (Setup.emptyGame S.bothPlayers)
-              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False 0 (Just S.alice) DamageKind.Combat
+              evOf n = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) n False False False 0 (Just S.alice) DamageKind.Combat
               gainsIn gs = [p | GameEvent.LifeGained p _ <- S.eventsOf gs]
               after n = S.runPure S.identityAnswer gs0 (Damage.applyDamage [evOf n])
           Spec.assertEqWith s "two damage records the gain" (gainsIn (after 2)) [S.alice]
@@ -6226,8 +6334,9 @@ chaptersOnStackFrom oid gs =
 --
 -- Distinct power/toughness on every creature (Lich 4/2, Boggart Brute 3/2,
 -- Goblin Piker 2/1, Bird Maiden 1/2, Bog Wraith 3/3) so no assertion below can
--- pass on a numeric coincidence, and bob holds TWO creatures so CR 701.21a's
--- choice is a real prompt rather than a forced single candidate.
+-- pass on a numeric coincidence, and the edict's victim always holds TWO
+-- creatures so CR 701.21a's choice is a real prompt rather than a forced single
+-- candidate -- bob in most cases, carol in the CR 725.4 one, where bob leaves.
 monarchTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 monarchTriggerSpec s registry =
   let -- Names `victim` for every target slot that offers them. S.identityAnswer
@@ -6253,7 +6362,7 @@ monarchTriggerSpec s registry =
       -- combat: Monarch.inherentMatch reads the recorded DamageEvent, and
       -- ExpirySpec's monarch group drives the same rule the same way.
       combatDamageTo monarch damager =
-        S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False 0 Nothing DamageKind.Combat)]
+        S.withEvents [GameEvent.DamageDealt (DamageEvent.MkDamageEvent damager (Recipient.ToPlayer monarch) 2 False False False 0 Nothing DamageKind.Combat)]
    in Spec.describe s "MonarchTrigger" $ do
         -- The whole chain off one entry: CR 603.6a's entry trigger crowns alice,
         -- Effect.BecomeMonarch records CR 725.1's event, and the second ability
@@ -6373,6 +6482,38 @@ monarchTriggerSpec s registry =
           Spec.assertEqWith s "bob kept both of his" (S.creaturesInPlay S.bob after) 2
           Spec.assertEqWith s "carol kept hers" (S.creaturesInPlay S.carol after) 1
           Spec.assertEqWith s "the stack is empty" (GameState.stack after) []
+        -- CR 725.4's third route into the crown: no effect and no inherent
+        -- ability, just the monarch leaving the game. Three seats are mandatory
+        -- twice over -- Departure.continuesAfterDeparture skips all of CR 800.4a
+        -- at two (CR 800.1), and the edict's victim has to be somebody other
+        -- than the departed monarch and the Lich's controller.
+        --
+        -- The bystanders helper is not used: its two creatures sit with bob, who
+        -- is the one leaving here, so carol holds the pair instead (Goblin Piker
+        -- 2/1, Bird Maiden 1/2) and CR 701.21a's choice stays a real prompt.
+        Spec.it s "CR 725.4 a departure crowns alice, and that crowning fires her edict" $ do
+          custodiLich <- S.printingOf s registry "Custodi Lich"
+          piker <- S.printingOf s registry "Goblin Piker"
+          birdMaiden <- S.printingOf s registry "Bird Maiden"
+          let base = S.withMonarch S.bob (Setup.emptyGame S.threePlayers)
+              (lich, g1) = S.addCreature custodiLich S.alice base
+              (_, g2) = S.addCreature piker S.carol g1
+              (_, gs) = S.addCreature birdMaiden S.carol g2
+              -- CR 104.3a: bob concedes, so the crown is reassigned inside the
+              -- departure rather than by anything that resolves afterwards.
+              departed = S.runPure S.identityAnswer gs (Departure.leaveGame Departure.Type.Conceded S.bob)
+              after = resolveAll (targetsPlayer S.carol) departed
+          Spec.assertEqWith s "bob wore the crown going in" (GameState.monarch gs) (Just S.bob)
+          Spec.assertEqWith s "alice is the active player, so CR 725.4's first sentence crowns her" (GameState.activePlayer gs) S.alice
+          Spec.assertEqWith s "CR 725.4 alice is the monarch" (GameState.monarch after) (Just S.alice)
+          Spec.assertBool s (S.onBattlefield lich after) "alice's Lich watched from the battlefield"
+          -- Asserted BEFORE the event, so a run with the record deleted fails
+          -- here rather than on the event and the payload is what is pinned.
+          Spec.assertEqWith s "CR 701.21a the targeted carol lost exactly one of her two" (S.creaturesInPlay S.carol after) 1
+          Spec.assertEqWith s "and alice, untargeted, still has her Lich" (S.creaturesInPlay S.alice after) 1
+          Spec.assertBool s (elem (GameEvent.BecameMonarch S.alice) (S.eventsOf after)) "and the reassignment recorded its crowning"
+          Spec.assertEqWith s "CR 104.2a two survivors, so the game is still going" (GameState.result after) Nothing
+          Spec.assertEqWith s "the stack is empty, so nothing is still pending" (GameState.stack after) []
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
@@ -6397,6 +6538,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   poisonousSpec s registry
   annihilatorSpec s registry
   battleCrySpec s registry
+  prowessSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   graveyardEffectZoneTriggerSpec s registry
