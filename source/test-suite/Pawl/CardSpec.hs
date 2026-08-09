@@ -1457,6 +1457,10 @@ keywordFilters keyword = case keyword of
   -- creature" set is written into the ability Pawl.Engine.Keyword mints, not
   -- into the keyword.
   Keyword.BattleCry -> []
+  -- CR 702.108a names no quality either: the "+1/+1" and the noncreature-spell
+  -- condition are written into the ability Pawl.Engine.Keyword mints, not into
+  -- the keyword.
+  Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []

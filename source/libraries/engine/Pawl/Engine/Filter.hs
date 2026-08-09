@@ -493,6 +493,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Annihilator _ -> keyword
   Keyword.Type.Infect -> keyword
   Keyword.Type.BattleCry -> keyword
+  Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword
   Keyword.Type.Devoid -> keyword
   -- CR 702.122a's N is a number and not a word, so CR 612.2 has nothing to swap.

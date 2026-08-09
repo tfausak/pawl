@@ -54,6 +54,7 @@ toJson k = case k of
   Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
   Keyword.Infect -> Common.nullary "Infect"
   Keyword.BattleCry -> Common.nullary "BattleCry"
+  Keyword.Prowess -> Common.nullary "Prowess"
   Keyword.Menace -> Common.nullary "Menace"
   Keyword.Devoid -> Common.nullary "Devoid"
   Keyword.Crew n -> Common.tagged "Crew" . Just $ Common.encodeNatural n
@@ -96,6 +97,7 @@ fromJson value = do
     ("Annihilator", Just v) -> Keyword.Annihilator <$> Common.decodeNatural v
     ("Infect", _) -> Right Keyword.Infect
     ("BattleCry", _) -> Right Keyword.BattleCry
+    ("Prowess", _) -> Right Keyword.Prowess
     ("Menace", _) -> Right Keyword.Menace
     ("Devoid", _) -> Right Keyword.Devoid
     ("Crew", Just v) -> Keyword.Crew <$> Common.decodeNatural v

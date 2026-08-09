@@ -48,6 +48,7 @@ import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
+import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
@@ -56,16 +57,17 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.70, 702.86 and 702.91 do not: they spell poisonous, annihilator and
--- battle cry out as TRIGGERED abilities, so those have to be MINTED and handed
--- to the ordinary CR 603 machinery rather than merely consulted.
+-- Rules 702.70, 702.86, 702.91 and 702.108 do not: they spell poisonous,
+-- annihilator, battle cry and prowess out as TRIGGERED abilities, so those have
+-- to be MINTED and handed to the ordinary CR 603 machinery rather than merely
+-- consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
 -- this module must never do is grow an arm for a CARD.
 --
 -- triggeredAbilitiesOf derives its abilities from a projection's POST-LAYER
--- keyword counts, so Humility takes all three of those abilities away for free
+-- keyword counts, so Humility takes all four of those abilities away for free
 -- and an Aura's layer-6 grant adds them. Its one caller is
 -- Pawl.Engine.Event's EVENT scan; rule 702 has no state-triggered (CR 603.8) or
 -- delayed (CR 603.7) keyword ability, so the first keyword that needs one must
@@ -84,8 +86,8 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and
 -- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
--- 702.86b says the same of annihilator and CR 702.91b of battle cry, so the
--- three minting arms below are the same shape.
+-- 702.86b says the same of annihilator, CR 702.91b of battle cry and CR 702.108b
+-- of prowess, so the four minting arms below are the same shape.
 --
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
 -- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
@@ -99,6 +101,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
+  Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -184,6 +187,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Riot -> []
@@ -292,6 +296,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Riot -> []
@@ -468,6 +473,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Riot -> []
@@ -739,6 +745,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Devoid -> []
   Keyword.Daybound -> []
@@ -808,6 +815,7 @@ familyOf keyword = case keyword of
   Keyword.Intimidate -> Nothing
   Keyword.Infect -> Nothing
   Keyword.BattleCry -> Nothing
+  Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
   Keyword.Devoid -> Nothing
   Keyword.Aftermath -> Nothing
@@ -935,3 +943,44 @@ battleCry =
         ( ObjectRef.EachMatching
             (Filter.And [Filter.HasCardType CardType.Creature, Filter.IsAttacking, Filter.Not Filter.IsSource])
         )
+
+-- CR 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
+-- until end of turn. The fourth keyword rule 702 states as a triggered ability,
+-- minted here like the three above and handed to the same CR 603 machinery.
+--
+-- The first of the four whose event is NOT its bearer's combat: CR 601.2i's
+-- "any abilities that trigger when a spell is cast trigger at this time" is the
+-- event, so the condition is TriggerCondition.SpellCast -- the constructor Young
+-- Pyromancer already writes, read the same way. "You cast" is
+-- Filter.ControlledBy You against CR 109.5's "you", the ability's controller (CR
+-- 603.3a); "a noncreature spell" is Filter.Not of the card type, which is the
+-- printed word and not a disjunction of the other types. TurnScope.EachTurn
+-- because rule 702.108a names no turn (Brineborn Cutthroat's OpponentsTurn is
+-- the arm that would).
+--
+-- "THIS CREATURE" is the bearer, so the payload is battle cry's with
+-- Filter.IsSource rather than its negation -- and unlike battle cry's set this
+-- one is a singleton, which CR 611.2c fixes as the effect begins all the same.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
+-- is placed -- rule 702.108a leaves nothing to choose, and has no "if" clause,
+-- so intervening = Nothing.
+prowess :: TriggeredAbility Card
+prowess =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition =
+        TriggerCondition.SpellCast
+          (Filter.And [Filter.ControlledBy PlayerRelation.You, Filter.Not (Filter.HasCardType CardType.Creature)])
+          TurnScope.EachTurn,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+        (ObjectRef.EachMatching Filter.IsSource)
