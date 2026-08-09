@@ -62,8 +62,9 @@ cantBeSacrificed candidates gs =
             -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
             -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
             -- restriction that has started to apply is argued in
-            -- BlockRequirement.instances.
-            if (null setEffs || Projection.liveGiven setEffs source gs)
+            -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
+            -- 305.7 gate be liveAfterLayers rather than liveGiven.
+            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
               && not (removed source)
               then
                 -- CR 612.1's word swap over the SOURCE's own text, computed here

@@ -62,8 +62,10 @@ instances candidates gs =
             -- The same two ability losses BlockRequirement.instances asks
             -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
             -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
-            -- requirement that has started to apply is argued there.
-            if (null setEffs || Projection.liveGiven setEffs source gs)
+            -- requirement that has started to apply is argued there. Why CR
+            -- 613.11 also lets the CR 305.7 gate be liveAfterLayers rather than
+            -- liveGiven is argued there too.
+            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
               && not (removed source)
               then
                 -- CR 612.1's word swap over the source's own text, computed HERE
