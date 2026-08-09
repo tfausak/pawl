@@ -3997,6 +3997,61 @@ youngPyromancerSpec s registry =
           -- proves the seat is the only thing the silence above turns on.
           Spec.assertEqWith s "the same board fires for alice's own cast" (elementalsOf S.alice byAlice) 1
 
+-- CR 113.6k: the first ability in the pool that functions from the STACK. The
+-- same rule that put Narcomoeba's in a graveyard, one zone over.
+--
+-- Desolation Twin, {10} Creature -- Eldrazi 10/10: "When you cast this spell,
+-- create a 10/10 colorless Eldrazi creature token." Chosen from the cast-trigger
+-- family because it is the one member whose WHOLE printed text pawl can write:
+-- every other printing in that family wants CR 707.10's copy-a-spell or CR
+-- 118.12's positive half (#701). Nothing of this card is omitted.
+--
+-- The bearer is the SPELL, which is what makes this a zone test rather than
+-- another SpellCast case: at CR 601.2i the Twin is on nobody's battlefield and in
+-- nobody's graveyard, so every candidate source but Event.eventTriggers'
+-- `spellCast` misses it entirely, and the token below never appears.
+desolationTwinSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+desolationTwinSpec s registry =
+  let eldrazi = CardName.MkCardName (Text.pack "Eldrazi Token")
+      eldraziOf = S.countOnBattlefieldByName eldrazi
+      -- Ten Mountains, which is the Twin's {10} exactly and Goblin Piker's
+      -- {1}{R} with plenty to spare -- the negative case below casts on the same
+      -- board, so mana can never be what separates the two.
+      board mountain =
+        let withLands = List.foldl' (\g _ -> snd (S.addCreature mountain S.alice g)) (Setup.emptyGame S.bothPlayers) [1 .. (10 :: Int)]
+         in withLands
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      castAndResolve caster oid gs = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs (S.cast caster oid)) Engine.priorityLoop
+   in Spec.describe s "SelfCast" $ do
+        -- THE case: an ability borne by an object on the stack fires at all.
+        Spec.it s "CR 113.6k Desolation Twin's cast trigger fires from the stack" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          twin <- S.printingOf s registry "Desolation Twin"
+          let (twinId, gs) = S.addHandCard twin S.alice (board mountain)
+              after = castAndResolve S.alice twinId gs
+          Spec.assertEqWith s "no Eldrazi token before the cast" (eldraziOf S.alice gs) 0
+          -- Positive control: the spell really resolved, so the token below is
+          -- the trigger's and not a fixture that never cast anything.
+          Spec.assertEqWith s "the Twin itself resolved onto the battlefield" (S.countOnBattlefieldByName (S.printingName twin) S.alice after) 1
+          Spec.assertEqWith s "and its cast trigger made exactly one token" (eldraziOf S.alice after) 1
+        -- The same board and the same caster, one spell apart. A fence on the
+        -- candidate source's SCOPE rather than on the condition: `spellCast`
+        -- offers the cast spell alone, so a source that reached into the hand or
+        -- swept the whole stack would make a token here. No mutation of the code
+        -- as it stands turns this red.
+        Spec.it s "CR 601.2i a different card's cast fires nothing" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          twin <- S.printingOf s registry "Desolation Twin"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (_, withTwin) = S.addHandCard twin S.alice (board mountain)
+              (pikerId, gs) = S.addHandCard piker S.alice withTwin
+              after = castAndResolve S.alice pikerId gs
+          Spec.assertEqWith s "the Piker resolved" (S.countOnBattlefieldByName (S.printingName piker) S.alice after) 1
+          Spec.assertEqWith s "and the Twin in hand made no token" (eldraziOf S.alice after) 0
+
 -- CR 601.2i's trigger reading back the spell it watched: the reserved slot
 -- Event.eventBindings stamps for that condition (Binding.castSpell), and the
 -- first payload that acts on the WATCHED OBJECT rather than merely counting the
@@ -4362,6 +4417,9 @@ representativeEvents cond =
         -- `thatSpell`, the caster under `thatPlayer` -- so the two sides agree
         -- on the pair.
         TriggerCondition.SpellCast _ _ -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
+        -- The same event, and the only one this condition admits either. It binds
+        -- nothing whichever ids the event names, since the spell IS the bearer.
+        TriggerCondition.SelfCast -> one (GameEvent.SpellCast S.alice arrived S.emptyCharacteristics)
         -- CR 709.5h's own event, on the BEARER and naming the same door the
         -- condition does, so the pair really matches -- the door below is the one
         -- everyTriggerCondition names.
@@ -4436,6 +4494,7 @@ everyTriggerCondition =
     -- were listed.
     TriggerCondition.SpellCast Filter.Type.IsSource TurnScope.EachTurn,
     TriggerCondition.SpellCast Filter.Type.IsSource TurnScope.OpponentsTurn,
+    TriggerCondition.SelfCast,
     TriggerCondition.SelfHalfUnlocked (CardName.MkCardName (Text.pack "Steaming Sauna")),
     TriggerCondition.RoomFullyUnlocked PlayerRelation.You,
     -- Balemurk Leech's own pair, and not an arbitrary one: PermanentEnters binds
@@ -6565,6 +6624,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   anafenzaAttackSpec s registry
   ezuriExperienceSpec s registry
   youngPyromancerSpec s registry
+  desolationTwinSpec s registry
   presenceOfTheMasterSpec s registry
   kambalSpec s registry
   brinebornCutthroatSpec s registry

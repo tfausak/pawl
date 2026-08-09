@@ -260,6 +260,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SpellCast (Filter.ControlledBy PlayerRelation.You) TurnScope.OpponentsTurn)
       """ {"type":"SpellCast","value":[{"type":"ControlledBy","value":{"type":"You"}},{"type":"OpponentsTurn"}]} """
+  -- CR 601.2i read off the spell itself, Desolation Twin's "when you cast this
+  -- spell": nullary, since "this spell" needs neither Filter nor TurnScope.
+  Spec.it s "SelfCast" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfCast
+      """ {"type":"SelfCast"} """
   -- CR 709.5h. The payload is the DOOR's own name (CR 709.4a), which is what
   -- separates two unlock triggers printed on one Room.
   Spec.it s "SelfHalfUnlocked round-trips its door" $

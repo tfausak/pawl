@@ -405,8 +405,10 @@ data TriggerCondition
     -- reason the relation is not a separate payload.
     --
     -- NOT self-scoped: the bearer is a creature watching the stack, and is the
-    -- Filter.Context's source, so "another" and "this spell" are expressible as
-    -- Filter.Not Filter.IsSource and Filter.IsSource if a card ever wants them.
+    -- Filter.Context's source, so "another" is expressible as
+    -- Filter.Not Filter.IsSource if a card ever wants it. "This spell" is
+    -- SelfCast below rather than Filter.IsSource here, for the zone reason that
+    -- constructor gives.
     --
     -- The spell is read AS IT IS ON THE STACK. CR 608.2h is not involved -- CR
     -- 601.2a leaves the spell there "until it resolves, it's countered, or a rule
@@ -437,6 +439,25 @@ data TriggerCondition
     -- The same type StepBegins carries above, read against the same player: CR
     -- 109.5's "you", the ability's controller when it triggered (CR 603.3a).
     SpellCast (Filter.Filter Keyword.Keyword) TurnScope.TurnScope
+  | -- | CR 601.2i again, read off the spell BEING cast rather than off a bystander
+    -- -- "when you cast this spell", Desolation Twin's. Self-scoped like
+    -- SelfEnters, and a sibling of SpellCast above rather than
+    -- @SpellCast Filter.IsSource@ for SelfEnters' and SelfDies' reason: the match
+    -- is a bare comparison of ids, needing no projection of the spell at all.
+    --
+    -- The ZONE is the second reason, and the one this constructor exists for.
+    -- CR 113.6k puts a trigger condition that can't trigger from the battlefield
+    -- in the zones it can trigger from, and this one cannot: CR 601.2a moves the
+    -- object to the stack to cast it and leaves it there, so it is on the stack
+    -- and not on the battlefield at the moment CR 601.2i fires this.
+    -- Pawl.Engine.Event.zoneTriggeredFrom answers that with a total case over
+    -- this type; asking the same of a Filter's shape would be a partial analysis
+    -- of an open language, silently answering "battlefield" for every shape it
+    -- had not anticipated.
+    --
+    -- No TurnScope and no Filter: "this spell" is the whole subject, and no
+    -- printing narrows its own cast by whose turn it is.
+    SelfCast
   | -- | CR 709.5h: "when you unlock this door" -- fires when the permanent bearing
     -- the ability is given the unlocked designation for the NAMED half. "Some
     -- abilities trigger when a player unlocks a particular half of a permanent.
