@@ -66,8 +66,11 @@ costsOn attacker target gs =
           costs ->
             -- The same two ability losses CombatRestriction.restricted asks
             -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
-            -- CR 613.1f layer-6 removal.
-            if (null setEffs || Projection.liveGiven setEffs source gs)
+            -- CR 613.1f layer-6 removal. CR 613.11 / 601.2f put this after every
+            -- layer, which is why the CR 305.7 gate is liveAfterLayers rather
+            -- than liveGiven -- the same reason `view` above is the full
+            -- projection.
+            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
               && not (removed source)
               then concatMap (fromCost source) costs
               else []

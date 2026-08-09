@@ -140,7 +140,13 @@ applying pid gs =
               -- already STARTED to apply cannot reach it: CR 613.10/613.11 apply
               -- a player effect AFTER the seven layers have run, so it never
               -- started to apply before layer 6 and the cut is unconditional.
-              if (null setEffs || Projection.liveGiven setEffs oid gs)
+              --
+              -- That same "after the layers" placement is why the CR 305.7 gate
+              -- is liveAfterLayers: the projection is finished here, so the
+              -- setter's affected set is read against it rather than against base
+              -- characteristics, and a permanent animated into a land at layer 4
+              -- is reached (Ashaya on Thalia, under Blood Moon).
+              if (null setEffs || Projection.liveAfterLayers setEffs oid gs)
                 && not (removed oid)
                 then
                   -- CR 612.1's word swap over the permanent's own text, computed
