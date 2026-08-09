@@ -5,8 +5,10 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Room as Room
@@ -174,10 +176,38 @@ legalActions pid gs =
       -- NON-mana ability runs the whole chain: that path is held by an absolute
       -- per-permanent ceiling instead, because what is left in it is still O(N)
       -- per permanent without being a projection (#1073).
+      grants = Projection.controlGrants gs
+      pcs = Projection.projectAll gs
       activations =
-        let grants = Projection.controlGrants gs
-            pcs = Projection.projectAll gs
-            forObject oid =
+        let forObject oid =
               fmap (Action.Activate oid) (filter (\ab -> Activate.activatableGiven grants pcs pid oid ab gs) (Activate.abilitiesForGiven pcs oid gs))
          in concatMap forObject (Projection.controlsGiven grants pid gs <> Game.zoneMembers Zone.Hand pid gs <> Game.zoneMembers Zone.Graveyard pid gs)
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations
+      -- CR 605.3a's first window -- "a player may activate an activated mana
+      -- ability whenever they have priority" -- which the activation list above
+      -- cannot serve: Activate.activatableGiven refuses a mana ability outright,
+      -- because CR 605.3b keeps it off the stack and that is the only thing an
+      -- Action.Activate does with one.
+      --
+      -- Mana.manaSourcesGiven is the whole gate, and it is the SAME list CR
+      -- 605.3a's other two windows are served from (Cost.payMana's candidates):
+      -- untapped, controlled, offering some mana route, past CR 302.6's sickness
+      -- test, and -- through Cost.canPayActivation, CR 118.3 asked of the mana
+      -- ability's own cost (CR 602.2b) -- able to pay for itself. ONE sweep for
+      -- the whole enumeration rather than one per permanent, on the board this
+      -- function already walked.
+      --
+      -- That last conjunct is also what keeps the offer from being one a player
+      -- could take forever: an activation whose cost goes unpaid taps nothing,
+      -- so an ungated menu would offer it again unchanged. Cost.tapForMana picks
+      -- among exactly the options this gate admitted -- one predicate, asked at
+      -- the offer and at the payment, so the two cannot disagree.
+      --
+      -- UNOBSERVABLE on this menu today, and deliberately kept anyway: the gate
+      -- drops a permanent only when EVERY route of it is unpayable, and the one
+      -- card whose activation cost can fail keeps a route that cannot (Phyrexian
+      -- Tower's "{T}: Add {C}" beside its sacrifice). Removing it leaves the
+      -- suite green. What IS observable is the same predicate one level down, on
+      -- the yields -- Pawl.ManaSpec's "what the activation may yield is gated by
+      -- its own cost".
+      manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.canPayActivation grants pcs pid gs)
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaActivations

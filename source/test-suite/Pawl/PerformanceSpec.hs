@@ -68,7 +68,10 @@ largeBoard = 256
 --
 --   * LLANOWAR ELVES stops where CR 605.1a's mana-ability test does, before
 --     Cost.canPaySomeCompletion and Target.fillableModes. That short path is
---     the one the ratio guard below reads, and it is linear.
+--     the one the ratio guard below reads, and it is linear. CR 605.3a's
+--     priority window offers the Elf's ability anyway (#1123), through
+--     Mana.manaSourcesGiven -- ONE sweep for the whole enumeration rather than
+--     a per-object gate, so the path this fixture measures is unchanged.
 --   * PRODIGAL SORCERER's "{T}: deals 1 damage to any target" is not a mana
 --     ability (CR 605.1a: it requires a target), so its enumeration runs every
 --     remaining conjunct, including the two that ask about OTHER objects. That
@@ -132,10 +135,12 @@ growthBound = 8
 -- every object costs without changing the shape of the loop keeps the ratio at
 -- 4x, and only an absolute figure catches it.
 --
--- Measured at 7,515 bytes per permanent on GHC 9.14.1, so this carries ~1.6x
+-- Measured at 9,188 bytes per permanent on GHC 9.14.1, so this carries ~1.3x
 -- headroom: enough to absorb a compiler bump, a change of architecture (this
 -- was measured on aarch64 and CI runs the suite on x86_64), or a feature
 -- landing in the enumeration -- and still tight enough to fail on a doubling.
+-- It read 7,515 before CR 605.3a's priority window (#1123) added an action per
+-- source to the list this walk builds.
 -- To REGENERATE it, run this test and read the observed figure out of the
 -- failure message; if the increase is understood and wanted, raise this
 -- constant in the commit that causes it.
@@ -194,11 +199,11 @@ spec s registry = Spec.describe s "performance" $ do
         oids = Set.toList (GameState.battlefield board)
     Spec.assertEqWith s "the board holds one permanent per requested size" (length oids) smallBoard
     Spec.assertEqWith s "each one offers exactly one activated ability to enumerate" (fmap (\oid -> length (Activate.abilitiesFor oid board)) oids) (replicate smallBoard 1)
-    -- CR 605.3b: an activated mana ability doesn't go on the stack, so it is
-    -- not an offered action and alice may only pass. That the ANSWER does not
-    -- grow with the board is what makes the readings below a measure of the
-    -- walk rather than of the list it builds.
-    Spec.assertEqWith s "and the enumeration answers Pass alone at both sizes" (fmap (enumerationOver elves) [smallBoard, largeBoard]) [1, 1]
+    -- CR 605.3a: one ActivateManaAbility per Elf, plus Pass. No Activate
+    -- rides beside it -- CR 605.3b keeps a mana ability off the stack, so
+    -- Activate.activatableGiven still refuses it at CR 605.1a and the gate
+    -- chain the ratio guard measures is still the SHORT one.
+    Spec.assertEqWith s "and the enumeration answers one mana activation per permanent at both sizes" (fmap (enumerationOver elves) [smallBoard, largeBoard]) [smallBoard + 1, largeBoard + 1]
 
   Spec.it s "enumerating legal actions costs one board projection, not one per object" $ do
     elves <- S.printingOf s registry "Llanowar Elves"

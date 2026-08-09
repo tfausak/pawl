@@ -18,6 +18,7 @@ import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Daytime as Daytime
 import qualified Pawl.Engine.Decide as Decide
@@ -1217,6 +1218,26 @@ priorityLoop = do
                               -- neither a cost nor a cycle.
                               Action.Type.DiscardFromHand oid -> do
                                 Event.discard DiscardCause.Ordinary p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 605.3a's first window, and CR 605.3b's
+                              -- immediacy: the ability does not go on the stack,
+                              -- so activating it is over by the time this
+                              -- returns and the mana is already in the pool.
+                              -- CR 117.3c keeps priority with the activator and
+                              -- restarts the pass count, the shape every arm
+                              -- above shares.
+                              --
+                              -- Cost.tapForMana is the same activation CR
+                              -- 605.3a's other two windows take (Cost.payMana
+                              -- calls it), which is why nothing here is about
+                              -- mana: this arm decides only WHEN it may happen.
+                              -- Its answer is discarded because a mana ability
+                              -- whose cost went unpaid changed nothing and the
+                              -- player simply has priority again (CR 601.2h).
+                              Action.Type.ActivateManaAbility oid -> do
+                                Monad.void (Cost.tapForMana oid)
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

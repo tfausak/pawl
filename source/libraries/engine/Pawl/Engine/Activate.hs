@@ -361,13 +361,17 @@ affordableX :: PlayerId -> ObjectId -> GameState -> Cost Keyword -> Natural
 affordableX pid srcId gs cost = Cost.greatestPayableX (\x -> payableCostAt x pid srcId gs cost) cost
 
 -- CR 602.2/602.5: the ability is a member of the source's abilities
--- (abilitiesFor), it is not a mana ability (those are handled at payment, not
--- the stack; CR 605.3a's other window, activating one with priority and no cost
--- to pay, is not implemented -- #1123), the whole activation cost is payable at
--- CR 601.2b's X=0 floor (CR
--- 118.3), the {T} sickness gate holds, the ability's timing rider permits it now
--- (CR 307.5), and enough modes are fillable to satisfy the selection (CR
--- 700.2a/602.2b). The cost is the PRINTED one (#90).
+-- (abilitiesFor), it is not a mana ability, the whole activation cost is payable
+-- at CR 601.2b's X=0 floor (CR 118.3), the {T} sickness gate holds, the
+-- ability's timing rider permits it now (CR 307.5), and enough modes are
+-- fillable to satisfy the selection (CR 700.2a/602.2b). The cost is the PRINTED
+-- one (#90).
+--
+-- The mana-ability conjunct is about the STACK and not about permission: CR
+-- 605.3b keeps such an ability off it, so an Action.Activate has nothing to do
+-- with one. CR 605.3a's windows are served elsewhere -- by
+-- Action.ActivateManaAbility with priority, and by Cost.payMana inside a
+-- payment -- and both of them go through Cost.tapForMana.
 --
 -- activatableGiven is the half Action.legalActions wants: `grants` is one
 -- control-grant walk and `pcs` one whole-board projection, taken once for the

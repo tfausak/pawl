@@ -5,7 +5,9 @@
 -- 601.2g mana window itself, which lives in Pawl.Engine.Cost (payMana,
 -- chooseSource, tapForMana) because CR 602.2b makes activating a mana ability a
 -- cost payment. The window is tested here rather than in CostSpec: the subsystem
--- is mana, and CostSpec covers what a cost IS.
+-- is mana, and CostSpec covers what a cost IS. CR 605.3a's OTHER window -- a mana
+-- ability activated with priority and no payment in flight -- is here too, and
+-- is reached through Pawl.Engine.Action and Pawl.Engine.Engine.
 --
 -- CR 118.13a's announcement lives
 -- here too (Mana.announce), so the cases that reach it through
@@ -844,6 +846,137 @@ floatsEverything p = case p of
   Prompt.ChooseExtraManaSource _ _ candidates -> Just (NonEmpty.head candidates)
   _ -> S.identityAnswer p
 
+-- CR 605.3a's FIRST window: "a player may activate an activated mana ability
+-- whenever they have priority", with no cost in flight at all. Its other two
+-- windows -- casting or activating something that needs a mana payment, and a
+-- rule or effect asking for one -- are Cost.payMana's and are covered above; the
+-- difference is only whether a payment is waiting on the mana.
+--
+-- Offered as Action.ActivateManaAbility and taken in Engine.playGame's priority
+-- loop, so the whole proof here is at gameplay level. Omnath, Locus of Mana is
+-- what makes the pool VISIBLE on a board: its layer-7c pump counts the unspent
+-- green mana its controller has, so three Forests tapped for nothing at all read
+-- off the creature as 4/4.
+priorityWindowSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+priorityWindowSpec s registry = Spec.describe s "CR 605.3a the priority window" $ do
+  Spec.it s "CR 605.3a a player with priority may fill their pool with nothing to pay for" $ do
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (omnathId, board) = priorityWindowBoard omnath forest
+        after = S.runPure tapEverything board Engine.priorityLoop
+        -- The paired control: the same board, the same loop, and the one
+        -- difference is that alice declines the action. Every assertion below
+        -- reads the other way on it, so none of them can be passing on
+        -- something the fixture would have done anyway.
+        passed = S.runPure S.identityAnswer board Engine.priorityLoop
+    Spec.assertEqWith s "three green floating, and nothing asked for them" (poolSize S.alice after) 3
+    Spec.assertEqWith s "all three Forests are tapped" (S.tappedCount S.alice after) 3
+    Spec.assertEqWith s "CR 605.3b nothing went on the stack" (length (GameState.stack after)) 0
+    Spec.assertEqWith s "CR 613.4c Omnath counts all three" (Projection.powerOf omnathId after) (Just 4)
+    Spec.assertEqWith s "and its toughness with them" (Projection.toughnessOf omnathId after) (Just 4)
+    Spec.assertEqWith s "the control: passing floats nothing" (poolSize S.alice passed) 0
+    Spec.assertEqWith s "and leaves Omnath its printed 1/1" (Projection.powerOf omnathId passed) (Just 1)
+
+  -- The offer itself, and its one gate. Mana.manaSources is what
+  -- Action.legalActions filters on, so a source already tapped for the turn
+  -- drops off the menu -- which is also what stops the loop above from being
+  -- infinite.
+  Spec.it s "CR 605.3a the menu carries one activation per untapped source" $ do
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    let (_, board) = priorityWindowBoard omnath forest
+        tappedOne = case Mana.manaSources Cost.canPayActivation S.alice board of
+          oid : _ -> S.tapObject oid board
+          [] -> board
+        offers gs = filter isManaActivation (Action.legalActions S.alice gs)
+    Spec.assertEqWith s "one per Forest, and none for the Omnath" (length (offers board)) 3
+    Spec.assertEqWith s "tapping one takes it off the menu" (length (offers tappedOne)) 2
+
+  -- CR 118.3 reaches this window too: the options are gated by whether the
+  -- ability's own activation cost can be paid (CR 602.2b), the same predicate
+  -- the payment window is gated by. Phyrexian Tower is the pool's one mana
+  -- ability whose cost can fail -- "{T}, Sacrifice a creature: Add {B}{B}"
+  -- beside an always-payable "{T}: Add {C}" -- so the permanent is on the menu
+  -- either way and what changes is what taking it can yield.
+  Spec.it s "CR 118.3 what the activation may yield is gated by its own cost" $ do
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let alone = towerBoard tower Nothing
+        withPiker = towerBoard tower (Just piker)
+        run gs = S.runPure tapEverythingForBlack gs Engine.priorityLoop
+    Spec.assertEqWith s "with a creature to give, the priority window floats {B}{B}" (poolTypes S.alice (run withPiker)) [ManaType.Colored Color.Black, ManaType.Colored Color.Black]
+    Spec.assertEqWith s "CR 601.2h and the creature paid for it" (S.creaturesInPlay S.alice (run withPiker)) 0
+    Spec.assertEqWith s "with none, the same window can only take the {C}" (poolTypes S.alice (run alone)) [ManaType.Colorless]
+
+  -- CR 117.3c: "if a player has priority when they ... activate an ability ...
+  -- that player receives priority afterward." Who is asked next is the only
+  -- thing a game observes about who holds it, so the sequence is the assertion --
+  -- SpecialActionSpec's shape for CR 116.3, and both halves of the arm ride on
+  -- it. It is BOB's turn, so his pass is already standing when alice taps:
+  -- retaining priority puts her second prompt before his second, and restarting
+  -- CR 117.4's pass count is what makes him asked a second time at all.
+  Spec.it s "CR 117.3c the activator receives priority again afterward" $ do
+    forest <- S.printingOf s registry "Forest"
+    let (_, withForest) = S.addCreature forest S.alice (Setup.emptyGame S.bothPlayers)
+        board = withForest {GameState.activePlayer = S.bob, GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+        asked = State.execState (Engine.runGame tapOnceThenPass board Engine.priorityLoop) []
+    Spec.assertEqWith s "bob passes, alice taps, alice is asked again, and only then is bob asked again" asked [S.bob, S.alice, S.alice, S.bob]
+
+-- alice, active, in her precombat main phase with an empty hand and an empty
+-- stack: one Omnath and three Forests, so the only mana that can ever reach her
+-- pool is mana she activated a mana ability for while holding priority.
+priorityWindowBoard :: Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, GameState.GameState)
+priorityWindowBoard omnath forest =
+  let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+      board = foldr (\_ gs -> snd (S.addCreature forest S.alice gs)) g1 [1 :: Int, 2, 3]
+   in (omnathId, board {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty})
+
+-- alice, active, in her precombat main phase: one Phyrexian Tower, and a
+-- creature to sacrifice or not.
+towerBoard :: Printing.Printing -> Maybe Printing.Printing -> GameState.GameState
+towerBoard tower victim =
+  let g1 = snd (S.addCreature tower S.alice (Setup.emptyGame S.bothPlayers))
+      g2 = case victim of
+        Nothing -> g1
+        Just printing -> snd (S.addCreature printing S.alice g1)
+   in g2 {GameState.phase = Phase.PrecombatMain, GameState.remaining = Seq.empty}
+
+isManaActivation :: Action.Type.Action -> Bool
+isManaActivation action = case action of
+  Action.Type.ActivateManaAbility _ -> True
+  Action.Type.Activate _ _ -> False
+  Action.Type.Cast {} -> False
+  Action.Type.Play {} -> False
+  Action.Type.TurnFaceUp _ -> False
+  Action.Type.Unlock _ _ -> False
+  Action.Type.DiscardFromHand _ -> False
+  Action.Type.Pass -> False
+
+-- Activates a mana ability whenever one is offered, and passes once none is.
+tapEverything :: Prompt.Prompt r -> r
+tapEverything p = case p of
+  Prompt.ChooseAction _ _ actions -> case filter isManaActivation actions of
+    h : _ -> h
+    [] -> Action.Type.Pass
+  _ -> S.identityAnswer p
+
+-- tapEverything's actions with prefersDoubleBlack's colour answer, so the one
+-- thing separating the two Phyrexian Tower boards is whether {B}{B} was on offer.
+tapEverythingForBlack :: Prompt.Prompt r -> r
+tapEverythingForBlack p = case p of
+  Prompt.ChooseAction {} -> tapEverything p
+  _ -> prefersDoubleBlack p
+
+-- tapEverything again, recording which player each priority prompt went to:
+-- the record CR 117.3c is asserted on. Its board holds one source, so the
+-- activation happens once and every later prompt passes.
+tapOnceThenPass :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+tapOnceThenPass p = case p of
+  Prompt.ChooseAction _ pid _ -> do
+    State.modify' (<> [pid])
+    pure (tapEverything p)
+  _ -> pure (S.identityAnswer p)
+
 -- CR 605.3b: one activation of one mana ability, adding TWO mana. Sol Ring ({1}
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
 -- unit, and it is what separates "the types this source could produce" from "the
@@ -1380,6 +1513,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   moltensteelSpec s registry
   upwellingSpec s registry
   omnathSpec s registry
+  priorityWindowSpec s registry
   snowSpec s registry
   snowSymbolSpec s registry
   wellspringSpec s registry

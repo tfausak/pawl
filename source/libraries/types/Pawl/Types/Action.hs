@@ -55,6 +55,20 @@ data Action
     -- VALUE (validated by membership in Projection.abilitiesOf), never an
     -- index.
     Activate ObjectId.ObjectId (ActivatedAbility.ActivatedAbility Card.Card)
+  | -- | CR 605.3a's FIRST window: activate one of this permanent's mana
+    -- abilities while holding priority, with no payment in flight. Separate from
+    -- Activate above because CR 605.3b keeps a mana ability off the stack, so
+    -- the two arms do different things with the ability they name.
+    --
+    -- Carries the SOURCE alone, where Activate carries an ability value. CR
+    -- 305.6's intrinsic "{T}: Add [type]" is printed on no card and is no member
+    -- of the permanent's activated abilities, so an ability value cannot name
+    -- the very thing a basic land is tapped for. WHICH mana ability, in which
+    -- mode, and in which color is one question about the yield, and it is the
+    -- one Prompt.ChooseManaYield already asks inside a payment (CR 605.3a's
+    -- other two windows) -- so both windows reach the pool through one
+    -- mechanism rather than two.
+    ActivateManaAbility ObjectId.ObjectId
   | -- | CR 116.2b / 702.37e: turn a face-down permanent you control face up.
     -- "A player can take this action any time they have priority", and it does
     -- not use the stack -- so it is an Action rather than anything that goes
