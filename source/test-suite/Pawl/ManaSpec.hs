@@ -1274,6 +1274,19 @@ prefersDoubleBlack p = case p of
           else NonEmpty.head candidates
   _ -> S.identityAnswer p
 
+-- The colour question as ASKED, rather than as read off the pool afterwards: one
+-- entry per candidate Prompt.ChooseManaYield offered, and none at all where the
+-- prompt was elided.
+yieldsOffered :: ObjectId.ObjectId -> GameState.GameState -> [[ManaType.ManaType]]
+yieldsOffered oid gs =
+  let step :: Prompt.Prompt r -> State.State [[ManaType.ManaType]] r
+      step p = case p of
+        Prompt.ChooseManaYield _ _ _ candidates -> do
+          State.modify' (<> fmap (fmap ManaUnit.manaType . Mana.unitsOf) (NonEmpty.toList candidates))
+          pure (NonEmpty.head candidates)
+        _ -> pure (S.identityAnswer p)
+   in State.execState (Engine.runGame step gs (Cost.tapForMana oid)) []
+
 -- CR 118.3: "A player can't pay a cost without having the necessary resources to
 -- pay it fully", and CR 602.2b makes a mana ability's activation cost one of
 -- those costs. Phyrexian Tower (Legendary Land, "{T}: Add {C}." / "{T}, Sacrifice
@@ -1296,6 +1309,12 @@ phyrexianTowerSpec s registry = Spec.describe s "Phyrexian Tower" $ do
         withPiker = snd (S.addCreature piker S.alice alone)
     Spec.assertEqWith s "CR 106.7: it produces {C} and {B} with nothing to sacrifice" (Mana.manaTypesOf towerId alone) [ManaType.Colorless, ManaType.Colored Color.Black]
     Spec.assertEqWith s "with no creature, only the {C} can be paid for" (tappedFor prefersDoubleBlack towerId alone) [ManaType.Colorless]
+    Spec.assertEqWith s "so there is no colour question to ask" (yieldsOffered towerId alone) []
+    Spec.assertEqWith
+      s
+      "with one, both options are on offer"
+      (yieldsOffered towerId withPiker)
+      [[ManaType.Colorless], [ManaType.Colored Color.Black, ManaType.Colored Color.Black]]
     Spec.assertEqWith
       s
       "with one, the sacrifice option adds {B}{B}"
