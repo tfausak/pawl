@@ -24,6 +24,12 @@ import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 --     one source installing two rows across a control change.
 --   * `origin` is constant across the bucket highestBucket already partitioned
 --     on, and `identity` is CR 614.5 bookkeeping no player chooses by.
+--   * `rider` (CR 615.5) is Nothing for every candidate but a floating
+--     prevention shield's, so differing here would take one source installing
+--     two shields alike in pattern AND in remaining amount -- `effect` carries
+--     both -- yet carrying different additional effects. That is one card
+--     printing two prevention clauses of the same size with different riders,
+--     which no printing does.
 --
 -- `effect` is the DISCRIMINATOR (#74): Coldsteel Heart's "This artifact enters
 -- tapped" and "As this artifact enters, choose a color" are two applicable

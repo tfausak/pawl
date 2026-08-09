@@ -514,7 +514,9 @@ effectCounts effect = case effect of
   Effect.Replace duration _ _ condition _ -> durationCounts duration <> foldMap conditionCounts condition
   -- CR 614.10a's "next" is a use count, not a Duration and not a Quantity.
   Effect.SkipNextPhase _ _ -> []
-  Effect.PreventNextDamage duration _ quantity -> durationCounts duration <> quantityCounts quantity
+  -- CR 615.5's rider is an effect list a card authors, so its Counts are this
+  -- card's Counts -- the same recursion Create takes into a minted token.
+  Effect.PreventNextDamage duration _ quantity rider -> durationCounts duration <> quantityCounts quantity <> concatMap effectCounts rider
   Effect.PreventAllDamage duration _ -> durationCounts duration
   Effect.RedirectDamage duration _ _ _ -> durationCounts duration
   Effect.TurnFaceDown _ -> []
@@ -742,7 +744,8 @@ effectReplacements effect = case effect of
   Effect.GainLife _ _ -> []
   Effect.IncreaseSpeed _ _ -> []
   Effect.SkipNextPhase _ _ -> []
-  Effect.PreventNextDamage {} -> []
+  -- CR 615.5's rider can carry an Effect.Replace, so this descends.
+  Effect.PreventNextDamage _ _ _ rider -> concatMap effectReplacements rider
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
@@ -1212,7 +1215,8 @@ effectMintedFaces effect = case effect of
   Effect.GainLife _ _ -> []
   Effect.IncreaseSpeed _ _ -> []
   Effect.SkipNextPhase _ _ -> []
-  Effect.PreventNextDamage {} -> []
+  -- CR 615.5's rider can mint a token or emblem of its own, so this descends.
+  Effect.PreventNextDamage _ _ _ rider -> concatMap effectMintedFaces rider
   Effect.PreventAllDamage {} -> []
   Effect.RedirectDamage {} -> []
   Effect.TurnFaceDown _ -> []
@@ -1910,7 +1914,11 @@ effectFilters effect = case effect of
   Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> overFaces cardFilters card
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)
   Effect.SkipNextPhase _ _ -> []
-  Effect.PreventNextDamage duration ref quantity -> unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity)
+  -- The rider's Filters too, for CR 615.5. This is the traversal that dropped
+  -- landwalk's payload once, so a nested effect list is exactly what it must not
+  -- stop at.
+  Effect.PreventNextDamage duration ref quantity rider ->
+    unframed (durationFilters duration <> objectRefFilters ref <> quantityFilters quantity) <> concatMap effectFilters rider
   Effect.PreventAllDamage duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
   -- BOTH refs, or a Filter inside a redirect's destination escapes this lint.
   Effect.RedirectDamage duration _ srcRef destRef ->

@@ -2,6 +2,7 @@ module Pawl.Types.Prevention where
 
 import Numeric.Natural (Natural)
 import qualified Pawl.Types.CandidateId as CandidateId
+import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.Recipient as Recipient
 
 -- | CR 615.13: one prevention effect, applied, having prevented `amount` damage
@@ -22,9 +23,17 @@ import qualified Pawl.Types.Recipient as Recipient
 -- type: the CR 616.1 loop's own answer is the SURVIVING event, and a caller
 -- holding only that cannot tell a prevented 3 from an event that was never
 -- proposed.
+--
+-- `rider` is CR 615.5's additional effect, carried off the applying row so it
+-- outlives it -- a CR 615.7 shield spent to 0 is dropped in the very application
+-- that fires the rider. Nothing for every prevention but one a card wrote a
+-- rider onto. Opaque here and everywhere below: Pawl.Engine.Damage queues it
+-- without looking inside, and Pawl.Engine.Resolve is the one module that runs
+-- it.
 data Prevention = MkPrevention
   { by :: CandidateId.CandidateId,
     recipient :: Recipient.Recipient,
-    amount :: Natural
+    amount :: Natural,
+    rider :: Maybe PreventionRider.PreventionRider
   }
   deriving (Eq, Ord, Show)

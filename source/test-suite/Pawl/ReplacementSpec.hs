@@ -10,6 +10,7 @@
 -- than here.
 module Pawl.ReplacementSpec where
 
+import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -225,7 +226,8 @@ leylineShape src ts =
       ActiveReplacement.timestamp = ts,
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,
-      ActiveReplacement.origin = ReplacementOrigin.Other
+      ActiveReplacement.origin = ReplacementOrigin.Other,
+      ActiveReplacement.rider = Nothing
     }
 
 -- Eon Hub {5} Artifact: "Players skip their upkeep steps."
@@ -786,6 +788,102 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
     Spec.assertEqWith s "bob's life is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "and 3 of the shield's 4 were spent, so 1 remains" (length (GameState.replacements after)) 1
 
+-- CR 615.5's ADDITIONAL EFFECT, whose producer is Test of Faith ({1}{W} Instant:
+-- "Prevent the next 3 damage that would be dealt to target creature this turn.
+-- For each 1 damage prevented this way, put a +1/+1 counter on that creature").
+--
+-- Not a triggered ability, and that is the whole of what these cases
+-- discriminate. Test of Faith's 2004-12-01 ruling: "The +1/+1 counters are put
+-- onto the creature at the same time the damage is prevented. If a 1/1 creature
+-- would be dealt 6 damage, 3 damage is prevented and three +1/+1 counters are
+-- put on the creature." Under a triggered reading the counters would wait for
+-- the stack and CR 704.5g would have destroyed the creature first.
+--
+-- Two seats is enough: no relational text is under test -- the rider names the
+-- shielded creature, never "an opponent" or "the defending player" -- so the
+-- three-seat trap does not apply.
+--
+-- The COMBAT case really runs the combat steps through Pawl.Engine.Engine, which
+-- the other groups in this file avoid: the ordering under test is the one
+-- between the rider and the step's state-based action check, and only the engine
+-- has both.
+testOfFaithSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
+  let shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
+      -- alice is active with a Goblin Piker (2/1) and two Plains; bob defends
+      -- with a Jedit Ojanen (5/5). Positioned at declare attackers, so
+      -- S.runCombat drives the rest.
+      atCombat gs =
+        gs
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.Combat CombatStep.DeclareAttackers,
+            -- CR 703.4h has already happened on this board, so the defending
+            -- player is stated rather than derived (S.combatBoardOf's posture).
+            GameState.combat = Combat.emptyCombat {Combat.Type.defender = Just S.bob},
+            GameState.remaining =
+              Seq.fromList
+                [ Phase.Combat CombatStep.DeclareBlockers,
+                  Phase.Combat CombatStep.CombatDamage,
+                  Phase.Combat CombatStep.EndOfCombat,
+                  Phase.PostcombatMain
+                ]
+          }
+  -- The ruling's own arithmetic, at combat scale. 5 damage meets a shield of 3:
+  -- 3 is prevented and becomes 3 counters, 2 is marked, and the 2/1 that would
+  -- have died is a 5/4 with 2 damage on it. Every number distinct -- shield 3,
+  -- incoming 5, marked 2, final toughness 4 -- so no two readings of the rule
+  -- land on the same board.
+  Spec.it s "CR 615.5 the counters are on before CR 704.5g asks whether the attacker died" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    jedit <- S.printingOf s registry "Jedit Ojanen"
+    testOfFaith <- S.printingOf s registry "Test of Faith"
+    let base = S.landsInPlay plains 2
+        (attacker, g1) = S.addCreature pikerPrinting S.alice base
+        (blocker, g2) = S.addCreature jedit S.bob g1
+        (g3, spellId) = S.handOne testOfFaith g2
+        shielded = castAndResolve (aimCreature attacker) g3 spellId
+        after = S.runCombat S.aggressiveAnswer (atCombat shielded)
+        -- The CONTROL is the same board, same two Plains, same card in hand,
+        -- with the spell never cast -- so the only difference is the shield.
+        control = S.runCombat S.aggressiveAnswer (atCombat g3)
+    Spec.assertEqWith s "setup: the shield is a floating replacement holding 3" (shieldsLeft shielded) [3]
+    Spec.assertBool s (S.onBattlefield attacker after) "the shielded 2/1 survived a 5-power blocker"
+    Spec.assertEqWith s "with 3 +1/+1 counters, one per damage prevented" (countersOn CounterKind.PlusOnePlusOne attacker after) 3
+    Spec.assertEqWith s "so it is a 5/4" (S.powerToughnessOf attacker after) (Just (5, 4))
+    -- CR 615.6 / 120.3e: the prevented 3 never happened, and the other 2 are
+    -- marked.
+    Spec.assertEqWith s "and 2 of the 5 were marked on it" (S.damageOf attacker after) (Just 2)
+    -- The anti-vacuity fence: the block really happened and the shield really
+    -- ran out, so nothing above passes because no damage was dealt or because
+    -- the row is still sitting there unspent.
+    Spec.assertEqWith s "the blocker took the attacker's 2" (S.damageOf blocker after) (Just 2)
+    Spec.assertEqWith s "and the shield is spent to 0 and dropped (CR 615.7)" (shieldsLeft after) []
+    Spec.assertBool s (not (S.onBattlefield attacker control)) "without the shield that same 2/1 dies"
+  -- The other funnel: damage dealt by a RESOLVING ability rather than by combat,
+  -- which drains the rider inside Pawl.Engine.Resolve instead of inside the
+  -- combat damage step. One ping against a shield of 3 -- so the counter count
+  -- is 1, the amount THIS application prevented, and not the shield's printed 3.
+  Spec.it s "CR 615.5 a shield spent by a resolving ability runs its rider too" $ do
+    plains <- S.printingOf s registry "Plains"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    sorcerer <- S.printingOf s registry "Prodigal Sorcerer"
+    testOfFaith <- S.printingOf s registry "Test of Faith"
+    let base = S.landsInPlay plains 2
+        (victim, g1) = S.addCreature pikerPrinting S.alice base
+        (pinger, g2) = S.addCreature sorcerer S.alice g1
+        (g3, spellId) = S.handOne testOfFaith g2
+        shielded = castAndResolve (aimCreature victim) g3 spellId
+        ping g = S.runPure (aimCreature victim) g (Activate.activateAbility S.alice pinger (theAbility sorcerer) Monad.>> Stack.resolveTop)
+        after = ping shielded
+        control = ping g3
+    Spec.assertEqWith s "setup: the shield holds 3" (shieldsLeft shielded) [3]
+    Spec.assertEqWith s "the ping's 1 damage is prevented, so nothing is marked" (S.damageOf victim after) (Just 0)
+    Spec.assertEqWith s "and exactly one counter goes on -- the amount prevented, not the shield" (countersOn CounterKind.PlusOnePlusOne victim after) 1
+    Spec.assertEqWith s "so the 2/1 is a 3/2" (S.powerToughnessOf victim after) (Just (3, 2))
+    Spec.assertEqWith s "with 2 of the shield left (CR 615.7)" (shieldsLeft after) [2]
+    Spec.assertEqWith s "and unshielded the same ping marks 1 and puts no counter on" (S.damageOf victim control, countersOn CounterKind.PlusOnePlusOne victim control) (Just 1, 0)
+
 -- CR 615.12's damage that "can't be prevented", whose one producer in the pool
 -- is Spider-Punk ({1}{R} Legendary Creature -- Spider Human Hero 2/1, Marvel's
 -- Spider-Man 92), set against the pool's one COUNTDOWN shield, Mending Hands
@@ -797,7 +895,8 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
 -- damage is dealt in full though an applicable shield is there, and "existing
 -- damage prevention shields won't be reduced by damage that can't be prevented".
 -- The middle clause -- the applied effect's additional effect still happening --
--- has no producer, since no prevention row can carry one (#689).
+-- is not implemented: a row can carry one (CR 615.5, testOfFaithSpec below), but
+-- `inertPrevention` short-circuits before it could fire (#1106).
 --
 -- EVERY case here has a CONTROL on a board that differs in Spider-Punk and in
 -- nothing else, so no assertion can pass because the damage would have got
@@ -2161,7 +2260,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
               ActiveReplacement.timestamp = ts,
               ActiveReplacement.expiry = Expiry.AtCleanup,
               ActiveReplacement.uses = Uses.Once,
-              ActiveReplacement.origin = ReplacementOrigin.Other
+              ActiveReplacement.origin = ReplacementOrigin.Other,
+              ActiveReplacement.rider = Nothing
             }
         g3 = S.addReplacement active g2
         asked = answersFor S.identityAnswer g3 (Event.runEntry Set.empty piker)
@@ -2236,6 +2336,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   stonehornSpec s registry
   galvanicBlastSpec s registry
   mendingHandsSpec s registry
+  testOfFaithSpec s registry
   spiderPunkSpec s registry
   apnapSpec s registry
   excruciatorSpec s registry
@@ -2719,7 +2820,8 @@ blastShape src ts =
       ActiveReplacement.timestamp = ts,
       ActiveReplacement.expiry = Expiry.Never,
       ActiveReplacement.uses = Uses.Unlimited,
-      ActiveReplacement.origin = ReplacementOrigin.SelfReplacement
+      ActiveReplacement.origin = ReplacementOrigin.SelfReplacement,
+      ActiveReplacement.rider = Nothing
     }
 
 -- alice controls `n` Mountains and `extra` further permanents, and holds a

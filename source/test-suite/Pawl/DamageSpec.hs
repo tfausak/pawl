@@ -318,7 +318,8 @@ damageSpec s registry =
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
-                ActiveReplacement.origin = ReplacementOrigin.Other
+                ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.rider = Nothing
               }
           withShield = S.addReplacement shield gs0
           combat = S.runPure S.identityAnswer withShield (Damage.applyDamage [DamageEvent.MkDamageEvent victim (Recipient.ToCreature victim) 2 False False False 0 Nothing DamageKind.Combat])
@@ -337,7 +338,8 @@ damageSpec s registry =
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
-                ActiveReplacement.origin = ReplacementOrigin.Other
+                ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.rider = Nothing
               }
           dropped = Expiry.dropAtCleanup (S.addReplacement shield base)
        in Spec.assertEqWith s "no replacements remain" (GameState.replacements dropped) []
@@ -548,7 +550,8 @@ toxicSpec s registry =
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
-                ActiveReplacement.origin = ReplacementOrigin.Other
+                ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.rider = Nothing
               }
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 3 False False False 2 Nothing DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])
@@ -679,7 +682,8 @@ lifelinkSpec s registry =
                 ActiveReplacement.timestamp = Timestamp.MkTimestamp 900,
                 ActiveReplacement.expiry = Expiry.Type.AtCleanup,
                 ActiveReplacement.uses = Uses.Unlimited,
-                ActiveReplacement.origin = ReplacementOrigin.Other
+                ActiveReplacement.origin = ReplacementOrigin.Other,
+                ActiveReplacement.rider = Nothing
               }
           ev = DamageEvent.MkDamageEvent oid (Recipient.ToPlayer S.bob) 2 False False False 0 (Just S.alice) DamageKind.Combat
           after = S.runPure S.identityAnswer (S.addReplacement shield gs0) (Damage.applyDamage [ev])

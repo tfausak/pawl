@@ -2,6 +2,7 @@
 
 module Pawl.Codec.EffectSpec where
 
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
@@ -439,8 +440,23 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4))
+      (Effect.PreventNextDamage Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (Quantity.Literal 4) Seq.empty)
       """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":4}]} """
+  -- CR 615.5's additional effect, the fourth element (Test of Faith). Elided
+  -- above, where it is empty; nested here, so the recursion into an effect
+  -- inside an effect is round-tripped.
+  Spec.it s "PreventNextDamage with a CR 615.5 rider" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      ( Effect.PreventNextDamage
+          Duration.UntilEndOfTurn
+          (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
+          (Quantity.Literal 3)
+          (Seq.singleton (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (SlotName.MkSlotName (Text.pack "target"))))
+      )
+      """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":3},[{"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"InSlot","value":"thatMuch"},"target"]}]]} """
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
   Spec.it s "PreventAllDamage" $
     Common.assertJsonCodec

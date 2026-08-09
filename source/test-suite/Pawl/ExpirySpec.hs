@@ -240,7 +240,8 @@ whileReplacement src you gs =
             ActiveReplacement.timestamp = ts,
             ActiveReplacement.expiry = Expiry.Type.While you S.youControlSource,
             ActiveReplacement.uses = Uses.Unlimited,
-            ActiveReplacement.origin = ReplacementOrigin.Other
+            ActiveReplacement.origin = ReplacementOrigin.Other,
+            ActiveReplacement.rider = Nothing
           }
    in S.addReplacement active gs1
 

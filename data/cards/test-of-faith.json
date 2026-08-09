@@ -1,0 +1,79 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "White"
+            }
+          }
+        }
+      ],
+      "name": "Test of Faith",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "PreventNextDamage",
+                    "value": [
+                      {
+                        "type": "UntilEndOfTurn"
+                      },
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 3
+                      },
+                      [
+                        {
+                          "type": "PutCounters",
+                          "value": [
+                            {
+                              "type": "PlusOnePlusOne"
+                            },
+                            {
+                              "type": "InSlot",
+                              "value": "thatMuch"
+                            },
+                            "target"
+                          ]
+                        }
+                      ]
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "Creatures"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Instant"
+          }
+        ]
+      }
+    }
+  ]
+}
