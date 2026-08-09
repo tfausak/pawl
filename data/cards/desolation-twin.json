@@ -1,0 +1,88 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 10
+        }
+      ],
+      "name": "Desolation Twin",
+      "power": {
+        "type": "Literal",
+        "value": 10
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 10
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "SelfCast"
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
+                              {
+                                "name": "Eldrazi Token",
+                                "power": {
+                                  "type": "Literal",
+                                  "value": 10
+                                },
+                                "toughness": {
+                                  "type": "Literal",
+                                  "value": 10
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Eldrazi"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Eldrazi"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
