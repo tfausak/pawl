@@ -18,7 +18,9 @@ says nothing about CI.
     cabal test --test-options '--timeout 2s --hide-successes'
 
 The timeout catches infinite loops. It is not an assertion about speed, so a
-case that sits near the budget is not a regression to chase.
+case that sits near the budget is not a regression to chase. Two subtrees carry
+their own, looser budgets via `Tasty.localOption` in `Main.hs`, which beats the
+command line; that is what keeps the small global figure safe.
 
 Never pipe `cabal test` or `cabal build` output --- it stalls a ~30s suite for
 minutes. One build at a time. No `cabal clean`; the incremental build under
