@@ -1293,15 +1293,16 @@ takesHalf half p = case p of
     if elem half offers then half else NonEmpty.head offers
   _ -> S.identityAnswer p
 
--- alice controls `copies` reducers and `n` untapped Swamps; her hand holds one
--- `spell` and one Sol Ring ({1} colourless Artifact). Shared by the two
--- hybrid-reduction groups below, which differ in which hybrid symbol their
--- reducer is written with and in which black spell that symbol is aimed at.
--- Loaded fresh inside each case that needs it -- equivalent because loading is
--- deterministic and cached (batch-recipe.md).
+-- alice controls `copies` reducers and `n` untapped lands of one printing; her
+-- hand holds one `spell` and one Sol Ring ({1} colourless Artifact). Shared by
+-- the two hybrid-reduction groups below, which differ in which hybrid symbol
+-- their reducer is written with and in which black spell that symbol is aimed
+-- at. The land is a Swamp everywhere but the one gate case that needs a board
+-- producing no black mana. Loaded fresh inside each case that needs it --
+-- equivalent because loading is deterministic and cached (batch-recipe.md).
 hybridDiscountBoard :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Int -> Int -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
-hybridDiscountBoard swamp discount spell solRing copies n =
-  let base = S.landsInPlay swamp n
+hybridDiscountBoard land discount spell solRing copies n =
+  let base = S.landsInPlay land n
       put g _ = snd (S.addCreature discount S.alice g)
       withCopies = List.foldl' put base [1 .. copies]
       (spellId, gs1) = S.addHandCard spell S.alice withCopies
@@ -1391,6 +1392,76 @@ monocoloredHybridDiscountSpec s registry =
       let (_, ringId, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 3
           paid = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ringId)
       Spec.assertEqWith s "one Swamp tapped, not none" (S.tappedCount S.alice paid) 1
+
+    -- CR 118.7e AT THE GATE. Two Swamps cannot pay Khabál Ghoul's printed
+    -- {2}{B}, and either half of the reduction brings it into range: the {B}
+    -- half leaves {2} and the {2} half leaves {B}. The control differs in ONE
+    -- thing, the reducer's presence.
+    Spec.it s "CR 118.7e a hybrid reduction makes a spell castable that full price does not" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (discounted, _, withDiscount) = hybridDiscountBoard swamp discount ghoul solRing 1 2
+          (undiscounted, _, bare) = hybridDiscountBoard swamp discount ghoul solRing 0 2
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "two Swamps cannot pay a printed {2}{B}"
+      Spec.assertBool s (S.castable S.alice discounted withDiscount) "but they can pay it reduced"
+
+    -- WHICH half the gate has to reach for. One Swamp pays only the {2} half's
+    -- {B}: the {B} half leaves {2}, which one Swamp cannot pay. So a gate that
+    -- resolved the symbol one fixed way -- or took the first resolution -- would
+    -- answer False here, where CR 118.7e gives the choice to the payer and makes
+    -- the honest question whether SOME resolution pays.
+    Spec.it s "CR 118.7e the gate reaches the half that pays and not merely the first" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (discounted, _, withDiscount) = hybridDiscountBoard swamp discount ghoul solRing 1 1
+          (undiscounted, _, bare) = hybridDiscountBoard swamp discount ghoul solRing 0 1
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "one Swamp cannot pay a printed {2}{B}"
+      Spec.assertBool s (S.castable S.alice discounted withDiscount) "but it can pay the {2} half's {B}"
+
+    -- THE OTHER DIRECTION, and the reason the gate cannot pick a half either:
+    -- two Radiant Fountains make {C}{C}, which pays the {B} half's leftover {2}
+    -- and cannot pay the {2} half's leftover {B}. With the case above, no fixed
+    -- half answers both.
+    Spec.it s "CR 118.7e the gate reaches the coloured half too" $ do
+      fountain <- S.printingOf s registry "Radiant Fountain"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (discounted, _, withDiscount) = hybridDiscountBoard fountain discount ghoul solRing 1 2
+          (undiscounted, _, bare) = hybridDiscountBoard fountain discount ghoul solRing 0 2
+      Spec.assertBool s (not (S.castable S.alice undiscounted bare)) "colourless mana cannot pay a printed {2}{B}"
+      Spec.assertBool s (S.castable S.alice discounted withDiscount) "but it can pay the {B} half's {2}"
+
+    -- The negative the two cases above need, and it differs from them in the
+    -- mana alone: with no Swamps at all neither half is payable, so a gate that
+    -- answered True whenever a resolution EXISTS fails here.
+    Spec.it s "CR 118.7e the gate offers no cast that no half can pay" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 0
+      Spec.assertBool s (not (S.castable S.alice ghoulId gs)) "no mana pays either half"
+
+    -- THE GATE AND THE PAYMENT AGREE, which is the pair that matters: on the
+    -- board the gate now says yes to, both of CR 118.7e's answers complete, and
+    -- they tap different numbers of Swamps. A gate more permissive than the
+    -- payment would leave one of these two casts unpaid.
+    Spec.it s "CR 118.7e a cast the gate allows is one both halves can pay" $ do
+      swamp <- S.printingOf s registry "Swamp"
+      discount <- S.printingOf s registry "Synthetic Monocolored Hybrid Discount"
+      ghoul <- S.printingOf s registry "Khabál Ghoul"
+      solRing <- S.printingOf s registry "Sol Ring"
+      let (ghoulId, _, gs) = hybridDiscountBoard swamp discount ghoul solRing 1 2
+          takenAsGeneric = S.runPure (takesHalf (ManaSymbol.Generic 2)) gs (S.cast S.alice ghoulId)
+          takenAsBlack = S.runPure (takesHalf black) gs (S.cast S.alice ghoulId)
+      Spec.assertBool s (S.castable S.alice ghoulId gs) "the gate allows the cast"
+      Spec.assertEqWith s "the {2} half taps one Swamp" (S.tappedCount S.alice takenAsGeneric) 1
+      Spec.assertEqWith s "the {B} half taps both" (S.tappedCount S.alice takenAsBlack) 2
 
 -- Synthetic Hybrid Discount {2} Artifact: "Black spells you cast cost {W/B}
 -- less to cast."

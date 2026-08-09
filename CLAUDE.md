@@ -82,6 +82,11 @@ to agents as written. What it doesn't say:
     explicit "no" is cheap
   - what was deferred
 
+- Keep the prose terse --- PR bodies, issue comments and code comments alike.
+  Say what needs saying and stop: a line each for the points above rather than a
+  section each, and a citation in place of a quoted rule. Do the verification
+  work in full; just don't write it up at length.
+
 - Mark the PR ready for review once the self-review's findings are pushed and
   the suite is green, then report it and stop. Don't wait for CI. Don't start
   the next unit either: one unit at a time per checkout, since two branches
