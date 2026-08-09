@@ -690,6 +690,14 @@ monocoloredHybridGeneric = 2
 -- tail's symbols unannounced would silently withhold reductions a later answer is
 -- entitled to.
 --
+-- `total` answers a LIST, and a route counts as payable when ANY of its totals
+-- pays: CR 118.7e's choice of which half a hybrid REDUCTION takes is made at CR
+-- 601.2f, one step after this, so withholding the resolution that pays would
+-- hide a route here for a choice the player has not made yet. That keeps this
+-- offer exactly as permissive as Pawl.Engine.Cost.canPaySomeCompletion, which
+-- quantifies over the same two enumerations. What no test observes is the
+-- difference, since it is only whether this function ASKS (#1076).
+--
 -- Measured against the BOARD and not the pool: canPayCommitting counts an
 -- untapped source as the mana it could make (payableResolutions), so a Forest
 -- still in play offers the mana route before anything is tapped. A player who
@@ -705,7 +713,7 @@ monocoloredHybridGeneric = 2
 -- one did.
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: PlayerId -> ObjectId -> (ManaCost -> ManaCost) -> Natural -> ManaCost -> Game (ManaCost, Natural)
+announce :: PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> ManaCost -> Game (ManaCost, Natural)
 announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
     -- "Payable" here means SOME completion of the remaining announcements pays
@@ -719,7 +727,9 @@ announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
     -- on every one of them, for the reason the haddock gives.
     stillPayable done rest gs extra ways =
       let candidate (tail_, life) =
-            canPayCommitting pid (outside + extra + life) (total (ManaCost.MkManaCost (reverse done <> ways <> tail_))) gs
+            any
+              (\totalled -> canPayCommitting pid (outside + extra + life) totalled gs)
+              (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
        in any candidate (completions rest)
     -- One symbol's announcement. Asked only where two routes are payable, and
     -- FILTERED, NOT TRUSTED where it is asked.
