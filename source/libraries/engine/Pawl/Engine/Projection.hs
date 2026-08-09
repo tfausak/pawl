@@ -2282,8 +2282,9 @@ movableAspects c =
         -- (CR 613.1b).
         Affected.AttachedPlayerControls f -> Just (Set.insert Controller (filterReads f))
 
--- Could another effect move this one's affected set at all? The structural half
--- of projectWith's movableReads: a set is movable when something a modification
+-- Could another effect move this one's affected set at all? movableAspects above
+-- with the aspects thrown away and an empty filter still counted movable: a set
+-- is movable when something a modification
 -- writes selects it -- a Matching or MatchingAnywhere set's predicate over
 -- characteristics, or an AttachedPlayerControls set's controller (CR 613.1b). A
 -- TheseObjects set names ids (CR 611.2c) and an Attached one reads its source's
@@ -2406,8 +2407,8 @@ projectDeciding admits cands = forObject
     -- affected set another can move (staticallyMovable). Bound before the object,
     -- so a whole-board sweep pays once rather than per object per layer.
     --
-    -- Deliberately coarser than movableReads inside the fold, skipping the CR 613.6
-    -- memo test and the filter's own aspects. Both only turn True into False, so
+    -- Deliberately coarser than the fold's own test, skipping the CR 613.6 memo
+    -- (decidedAt) and the filter's own aspects. Both only turn True into False, so
     -- this over-admits -- costing the general path, never a different answer.
     movableLayers = Set.fromList (fmap gLayer (filter staticallyMovable cands))
     forObject oid gs =
