@@ -294,12 +294,25 @@ data Keyword
   | Infect -- 702.90
   | -- | 702.91a: whenever this creature attacks, each other attacking creature gets
     -- +1/+0 until end of turn. The THIRD keyword rule 702 states as a triggered
-    -- ability, after poisonous (702.70a) and annihilator (702.86a), and so the third one
+    -- ability, after poisonous (702.70a) and annihilator (702.86a) and before
+    -- prowess (702.108a), and so the third one
     -- Pawl.Engine.Keyword MINTS rather than merely consults. Nullary, because rule
     -- 702.91a takes no parameter -- and unlike flying's or lifelink's nullary
     -- siblings, its reader takes the per-keyword count rather than membership,
     -- since CR 702.91b gives it the multiplicity CR 702.70b gives poisonous.
     BattleCry
+  | -- | 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
+    -- until end of turn. The FOURTH keyword rule 702 states as a triggered
+    -- ability, after poisonous (702.70a), annihilator (702.86a) and battle cry
+    -- (702.91a), and minted the same way. What it adds to those three is the
+    -- WATCHED EVENT: the first of them to trigger on something other than its
+    -- own bearer's combat, so the minted condition is CR 601.2i's
+    -- TriggerCondition.SpellCast rather than a self-scoped one.
+    --
+    -- Nullary, because rule 702.108a takes no parameter, and its reader takes
+    -- the per-keyword count rather than membership: CR 702.108b gives it the
+    -- multiplicity CR 702.91b gives battle cry.
+    Prowess
   | -- | 702.111b: a creature with menace can't be blocked except by two or more
     -- creatures. Nullary like fear (702.36) and unlike landwalk -- the number two
     -- is written into the rule.
