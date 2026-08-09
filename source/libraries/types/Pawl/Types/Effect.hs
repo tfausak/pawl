@@ -93,10 +93,11 @@ data Effect card
     AddMana ManaProduction.ManaProduction
   | -- | CR 701.23: search the controller's library for a card matching the Filter,
     -- put it where the SearchDestination says, then shuffle. The Filter is
-    -- evaluated over the PRINTED-card view (Projection.viewOfCard) -- a card in a
-    -- library has no projection. Evolving Wilds' "basic land card" (CR 701.23a /
-    -- 205.4c) is `And [HasCardType Land, HasSupertype Basic]`, and CR 702.29e's
-    -- basic landcycling is the same filter with the other destination.
+    -- evaluated over the PRINTED-card view (Projection.viewOfCardIn) -- a card in
+    -- a library has no projection, only CR 208.2a's characteristic-defining
+    -- power. Evolving Wilds' "basic land card" (CR 701.23a / 205.4c) is
+    -- `And [HasCardType Land, HasSupertype Basic]`, and CR 702.29e's basic
+    -- landcycling is the same filter with the other destination.
     --
     -- Finds at most one card, always: no card in the pool searches for two
     -- (#283).
