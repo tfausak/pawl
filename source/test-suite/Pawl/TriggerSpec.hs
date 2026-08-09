@@ -1590,6 +1590,18 @@ orderingSpec s registry =
           State.modify' (+ 1)
           pure (zipWith const [0 ..] entries)
         _ -> pure (S.identityAnswer p)
+      -- alice has a permanent that watches creatures enter, plus lands and a
+      -- token-maker in hand. Casting and resolving the maker is one event, so CR
+      -- 603.6a fires the watcher once per entrant.
+      watcherBoard watcher land n maker =
+        let (gs0, makerId) = S.handOne maker (S.landsInPlay land n)
+            (_, gs1) = S.addCreature watcher S.alice gs0
+         in (gs1, makerId)
+      -- Cast it, run priority out, and report how many times CR 603.3b's order
+      -- was asked for along the way.
+      castCounting gs makerId =
+        let ((_, after), asked) = State.runState (Engine.runGame countingAnswer gs (S.cast S.alice makerId >> Engine.priorityLoop)) 0
+         in (after, asked)
    in Spec.describe s "TriggerOrdering" $ do
         Spec.it s "CR 603.3b two triggers under one controller ask for an order, exactly once" $ do
           tidalWave <- S.printingOf s registry "Tidal Wave"
@@ -1598,6 +1610,46 @@ orderingSpec s registry =
           let (_, gs) = boardOf tidalWave khabalGhoul island
               (_, asked) = State.runState (Engine.runGame countingAnswer gs Engine.settleForPriority) 0
           Spec.assertEqWith s "asked once" asked 1
+        -- THE ELISION, and its negative, one permanent apart. Dragon Fodder's
+        -- single Create of two tokens is one event (CR 603.6a), so each board's
+        -- watcher contributes two EQUAL entries under one controller.
+        --
+        -- Soul Warden's payload reads no slot, so both orders gain the same 2
+        -- life and there is nothing to decide. The life assertion is what stops
+        -- `asked == 0` passing because the triggers never fired.
+        Spec.it s "CR 603.3b a batch of interchangeable triggers is not asked about (Soul Warden)" $ do
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          mountain <- S.printingOf s registry "Mountain"
+          dragonFodder <- S.printingOf s registry "Dragon Fodder"
+          let (gs, fodderId) = watcherBoard soulWarden mountain 2 dragonFodder
+              (after, asked) = castCounting gs fodderId
+          Spec.assertEqWith s "not asked" asked 0
+          Spec.assertEqWith s "and both triggers resolved: 1 life each" (S.lifeOf S.alice after) (fmap (+ 2) (S.lifeOf S.alice gs))
+          Spec.assertEqWith s "with both goblins still standing" (length (S.tokensOf after)) 2
+        -- Aether Flash is Warstorm Surge's shape and the reason entry equality
+        -- alone is not the test: the two entries are equal, their bindings name
+        -- different creatures, and CR 117.3b hands priority back between the two
+        -- resolutions -- so which goblin was shot first is observable.
+        Spec.it s "CR 117.3b the same-shaped batch IS asked about when the payload reads the entrant (Aether Flash)" $ do
+          aetherFlash <- S.printingOf s registry "Aether Flash"
+          mountain <- S.printingOf s registry "Mountain"
+          dragonFodder <- S.printingOf s registry "Dragon Fodder"
+          let (gs, fodderId) = watcherBoard aetherFlash mountain 2 dragonFodder
+              (after, asked) = castCounting gs fodderId
+          Spec.assertEqWith s "asked once" asked 1
+          Spec.assertEqWith s "and both triggers resolved: 2 damage kills a 1/1 (CR 704.5g)" (S.tokensOf after) []
+        -- The control: one entrant, so one trigger, which the older `length mine
+        -- < 2` guard already elided. Without it, "Soul Warden asks nothing"
+        -- cannot be told apart from "the batch was never two".
+        Spec.it s "CR 603.3b one trigger is elided by count alone (Soul Warden, one token)" $ do
+          soulWarden <- S.printingOf s registry "Soul Warden"
+          island <- S.printingOf s registry "Island"
+          tidalWave <- S.printingOf s registry "Tidal Wave"
+          let (gs, waveId) = watcherBoard soulWarden island 3 tidalWave
+              (after, asked) = castCounting gs waveId
+          Spec.assertEqWith s "not asked" asked 0
+          Spec.assertEqWith s "and the one trigger resolved" (S.lifeOf S.alice after) (fmap (+ 1) (S.lifeOf S.alice gs))
+          Spec.assertEqWith s "off one token" (length (S.tokensOf after)) 1
         -- Sacrifice resolves FIRST: the Wall token dies, and CR 608.2h has the
         -- Ghoul count it when its own effect is applied. The token has NO printed
         -- card (CR 111.1) and its death happened at a boundary the scan already
@@ -2227,22 +2279,27 @@ battleCrySpec s registry =
             other -> Spec.assertFailure s ("expected one ordering payload of two entries, got " <> show (fmap length other))
         -- The other half of #61: two triggers of the SAME ability must stay
         -- INDISTINGUISHABLE, or the engine would be asking a question with no
-        -- answer. CR 603.6a fires Soul Warden's ability once per entering
+        -- answer. CR 603.6a fires the watcher's ability once per entering
         -- creature, and Hero of Bladehold's token-maker puts two Soldiers onto
         -- the battlefield at once, so the second ordering choice of the same
         -- combat is a pair of entries differing only in which token each
         -- remembers -- a difference the entry deliberately does not carry.
+        --
+        -- The watcher is Aether Flash rather than Soul Warden BECAUSE its payload
+        -- reads the entrant: Engine.orderInert now elides the prompt outright for
+        -- a watcher that reads nothing, so a batch that still reaches the wire is
+        -- the only place two equal entries can be observed at all.
         Spec.it s "CR 603.6a two triggers of the SAME ability stay indistinguishable" $ do
           hero <- S.printingOf s registry "Hero of Bladehold"
-          soulWarden <- S.printingOf s registry "Soul Warden"
-          case S.combatBoardOf [hero, soulWarden] [] of
-            (gs, [_, wardenId], _) -> case snd (State.runState (Engine.runGame recordEntries gs Engine.runStep) []) of
+          aetherFlash <- S.printingOf s registry "Aether Flash"
+          case S.combatBoardOf [hero, aetherFlash] [] of
+            (gs, [_, flashId], _) -> case snd (State.runState (Engine.runGame recordEntries gs Engine.runStep) []) of
               [[a, b], [w1, w2]] -> do
                 Spec.assertBool s (a /= b) "the Hero's two abilities are still distinguishable"
-                Spec.assertEqWith s "the second choice is the Warden's" (TriggerEntry.source w1) (TriggerSource.OfObject wardenId)
+                Spec.assertEqWith s "the second choice is the Flash's" (TriggerEntry.source w1) (TriggerSource.OfObject flashId)
                 Spec.assertEqWith s "and its two triggers are the same ability from the same source" w1 w2
               other -> Spec.assertFailure s ("expected two ordering payloads of two entries each, got " <> show (fmap length other))
-            _ -> Spec.assertFailure s "fixture should give alice a Hero and a Soul Warden"
+            _ -> Spec.assertFailure s "fixture should give alice a Hero and an Aether Flash"
         -- CR 702.91a's "each OTHER attacking creature", read one word at a time.
         -- The Piker is another attacking creature and gets +1/+0; the Hero is
         -- attacking but is not OTHER; the Wall is neither pumped nor an attacker

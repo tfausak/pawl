@@ -11,16 +11,20 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaCount as ManaCount
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaCount as ManaCount.Type
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerRef as PlayerRef
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
+import qualified Pawl.Types.Scope as Scope
 import Pawl.Types.SlotName (SlotName)
 
 -- Nothing when the value cannot be determined.
@@ -289,6 +293,50 @@ slots quantity = case quantity of
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
   Quantity.ObjectCounters _ -> Set.empty
+
+-- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
+-- off the resolving object's bindings? It is not wherever a PlayerRef is nested
+-- inside one: that names a TARGET slot, which `slots` leaves to
+-- Resolve.slotsOf -- and slotsOf cannot see a reference buried in a quantity.
+-- Resolve.slotsAreExhaustive is the sole caller and carries the whole account.
+--
+-- One arm per constructor, no wildcard, for that function's reason: a new
+-- quantity arm carrying a reference must answer here rather than default to True
+-- and license an unsound elision.
+slotsAreExhaustive :: Quantity -> Bool
+slotsAreExhaustive quantity = case quantity of
+  Quantity.Literal _ -> True
+  Quantity.ManaValue -> True
+  Quantity.Power -> True
+  Quantity.InSlot _ -> True
+  Quantity.Star -> True
+  Quantity.Plus a b -> slotsAreExhaustive a && slotsAreExhaustive b
+  -- Both halves `slots` skips: the Scope's PlayerRef, and the per-member
+  -- quantity of a Greatest, which may hide one of its own.
+  Quantity.Count c ->
+    scopeIsSlotless (Count.Type.scope c)
+      && not (Count.anyQuantity (not . slotsAreExhaustive) c)
+  Quantity.ManaCount c -> playerRefIsSlotless (ManaCount.Type.player c)
+  Quantity.LifeTotal ref -> playerRefIsSlotless ref
+  Quantity.Speed ref -> playerRefIsSlotless ref
+  Quantity.IsMonarch ref -> playerRefIsSlotless ref
+  Quantity.PlayerCounters ref _ -> playerRefIsSlotless ref
+  Quantity.ObjectCounters _ -> True
+
+-- Only InSlot names a slot; the other two are answered from the evaluation
+-- context alone (Resolve.playerRefSlots says the same thing as a set).
+playerRefIsSlotless :: PlayerRef.PlayerRef -> Bool
+playerRefIsSlotless ref = case ref of
+  PlayerRef.EachPlayer -> True
+  PlayerRef.Relative _ -> True
+  PlayerRef.InSlot _ -> False
+
+-- CR 608.2i's look-back names no player and no slot; a zone scope names whose
+-- zone it is.
+scopeIsSlotless :: Scope.Scope -> Bool
+scopeIsSlotless scope = case scope of
+  Scope.InZone _ ref -> playerRefIsSlotless ref
+  Scope.InHistory _ -> True
 
 -- Does this quantity read CR 601.2b's announced X? Since #14 retired X's
 -- dedicated constructor, that read is a Quantity.InSlot naming

@@ -487,14 +487,19 @@ data Prompt r where
   -- batch with no id to put on the wire.
   --
   -- Positional, but no longer positional BY NECESSITY: the entry carries the
-  -- ability alongside the source (#61), so two entries are equal exactly when they
-  -- are interchangeable. A source with two DISTINCT abilities triggered by one
+  -- ability alongside the source (#61), so two entries DIFFER exactly when they
+  -- are distinguishable. A source with two DISTINCT abilities triggered by one
   -- event is real and in the pool, and the two entries differ; two triggers of the
-  -- SAME ability stay equal, which is the other half of the requirement.
+  -- SAME ability stay equal, which is the other half of the requirement. The
+  -- converse does not hold -- equal entries can still be distinguishable -- which
+  -- is what the next paragraph is about.
   --
-  -- Asked only when the player controls two or more. Still asked when those two or
-  -- more are all EQUAL, which ChooseReplacement elides (#590): the equality holds
-  -- up to their bindings, and nothing here has read those to check.
+  -- Asked ONLY when the player controls two or more AND the order is observable.
+  -- Equal entries are not on their own enough to elide: they are equal up to
+  -- their bindings, and CR 117.3b makes which of two same-ability triggers
+  -- resolved first visible whenever the payload reads one (Aether Flash on two
+  -- entrants). Pawl.Engine.Engine.orderInert is the other half, and carries the
+  -- account.
   --
   -- Asked ONCE PER PASS of CR 603.3b's two-part process, not once per batch: the
   -- rule gives the own-order choice inside each pass, so a player controlling one
