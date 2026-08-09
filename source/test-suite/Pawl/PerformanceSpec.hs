@@ -135,7 +135,7 @@ growthBound = 8
 -- every object costs without changing the shape of the loop keeps the ratio at
 -- 4x, and only an absolute figure catches it.
 --
--- Measured at 9,172 bytes per permanent on GHC 9.14.1, so this carries ~1.3x
+-- Measured at 9,188 bytes per permanent on GHC 9.14.1, so this carries ~1.3x
 -- headroom: enough to absorb a compiler bump, a change of architecture (this
 -- was measured on aarch64 and CI runs the suite on x86_64), or a feature
 -- landing in the enumeration -- and still tight enough to fail on a doubling.

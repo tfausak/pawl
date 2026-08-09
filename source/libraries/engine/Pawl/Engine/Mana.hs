@@ -53,6 +53,16 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 
+-- | CR 118.3 asked of a mana ability's OWN activation cost: can this player pay
+-- it, for the ability on this object? CR 602.2b is why the supply model has to
+-- ask -- activating a mana ability means paying its cost -- so a source whose
+-- cost cannot be paid is neither an offer nor a supply.
+--
+-- A CALLBACK rather than a call, for Pawl.Engine.Count.ViewOf's reason: cost
+-- payability is Pawl.Engine.Cost's question, and that module imports this one.
+-- Pawl.Engine.Cost.canPayActivation is the only answer the engine passes.
+type Gate = PlayerId -> ObjectId -> Cost Keyword.Keyword -> GameState -> Bool
+
 -- | CR 305.6
 subtypeMana :: Subtype -> Maybe ManaType
 subtypeMana subtype = case subtype of
@@ -178,6 +188,18 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
 manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs))
+
+-- The same yields narrowed to the ones this player could actually get: CR 118.3
+-- refuses an activation whose cost cannot be paid, so its yield is no supply
+-- (payableResolutionsGiven) and no offer (Pawl.Engine.Cost.tapForMana).
+--
+-- Separate from manaYieldsOf above rather than replacing it, and CR 106.7 is why
+-- rather than tidiness: "the type of mana a permanent could produce" is defined
+-- to IGNORE whether the ability's costs could be paid, so manaTypesOf has to go
+-- on answering the ungated question.
+manaYieldsAvailableGiven :: Gate -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [Mana]
+manaYieldsAvailableGiven gate pcs pid oid gs =
+  List.nub (fmap snd (filter (\(cost, _) -> gate pid oid cost gs) (manaOptionsOfGiven pcs oid gs)))
 
 -- Every way this object could be tapped for mana, as the COST CR 602.2b makes
 -- that activation pay paired with the mana it adds -- one entry per (route,
@@ -317,11 +339,11 @@ emptyManaPools gs =
 -- this is a pure function of one GameState: nothing can move between the
 -- projection and its uses, and payCost's loop -- the one caller that DOES change
 -- the state, by tapping -- takes a fresh State.get on every pass.
-manaSources :: PlayerId -> GameState -> [ObjectId]
-manaSources pid gs = manaSourcesGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
+manaSources :: Gate -> PlayerId -> GameState -> [ObjectId]
+manaSources gate pid gs = manaSourcesGiven gate (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
-manaSourcesGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
-manaSourcesGiven grants pcs pid gs =
+manaSourcesGiven :: Gate -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> [ObjectId]
+manaSourcesGiven gate grants pcs pid gs =
   let -- CR 302.6: a sick creature can't use a {T} mana ability, and every mana
       -- ability in the pool costs {T}; a land is never sick-gated. Keyed to
       -- `pid`: the creature must have settled under the player reaching for the
@@ -330,9 +352,14 @@ manaSourcesGiven grants pcs pid gs =
       notSickCreature oid =
         not (Set.member CardType.Creature (Projection.cardTypesGiven pcs oid gs))
           || Summoning.settledOrHastyGiven pcs pid oid gs
+      -- CR 118.3: a route whose activation cost this player cannot pay is no
+      -- route at all, so a permanent whose every route is unpayable is not a
+      -- source (Phyrexian Tower's "{T}, Sacrifice a creature" with no creature
+      -- to give). Asked of the ROUTES rather than the options, since a colour
+      -- choice cannot change what the activation charges.
       isSource oid = case Game.lookupObject oid gs of
         Nothing -> False
-        Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaRoutesOfGiven pcs oid gs)) && notSickCreature oid
+        Just obj -> Object.tapped obj == TapState.Untapped && any (\(cost, _) -> gate pid oid cost gs) (manaRoutesOfGiven pcs oid gs) && notSickCreature oid
    in filter isSource (Projection.controlsGiven grants pid gs)
 
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
@@ -632,8 +659,8 @@ monocoloredHybridGeneric = 2
 -- one did.
 --
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> ManaCost -> Game (ManaCost, Natural)
-announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
+announce :: Gate -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> ManaCost -> Game (ManaCost, Natural)
+announce gate pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
     -- "Payable" here means SOME completion of the remaining announcements pays
     -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
@@ -647,7 +674,7 @@ announce pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
     stillPayable done rest gs extra ways =
       let candidate (tail_, life) =
             any
-              (\totalled -> canPayCommitting pid (outside + extra + life) totalled gs)
+              (\totalled -> canPayCommitting gate pid (outside + extra + life) totalled gs)
               (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
        in any candidate (completions rest)
     -- One symbol's announcement. Asked only where two routes are payable, and
@@ -784,8 +811,8 @@ hybridHalves a b = if a == b then [a] else [a, b]
 -- A mana cost that is part of a whole COST goes through canPayCommitting below
 -- instead, because its components may want life too (CR 118.3 again). What is
 -- left here is the mana cost asked about on its own.
-canPay :: PlayerId -> ManaCost -> GameState -> Bool
-canPay pid = canPayCommitting pid 0
+canPay :: Gate -> PlayerId -> ManaCost -> GameState -> Bool
+canPay gate pid = canPayCommitting gate pid 0
 
 -- The same question with `committed` life already spoken for, which CR 119.4's
 -- floor must still admit alongside whatever the rest of this cost costs. Two
@@ -794,13 +821,13 @@ canPay pid = canPayCommitting pid 0
 -- Pawl.Engine.Cost's canPay and canPaySomeCompletion(Given), for the CR 119.4
 -- payments the cost's COMPONENTS owe. Zero everywhere else, which is what
 -- `canPay` is.
-canPayCommitting :: PlayerId -> Natural -> ManaCost -> GameState -> Bool
-canPayCommitting pid committed cost gs = canPayCommittingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
+canPayCommitting :: Gate -> PlayerId -> Natural -> ManaCost -> GameState -> Bool
+canPayCommitting gate pid committed cost gs = canPayCommittingGiven gate (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
 -- for what `grants` and `pcs` are and why handing them in changes no answer.
-canPayCommittingGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> Bool
-canPayCommittingGiven grants pcs pid committed cost gs = not (null (payableResolutionsGiven grants pcs pid committed cost gs))
+canPayCommittingGiven :: Gate -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> Bool
+canPayCommittingGiven gate grants pcs pid committed cost gs = not (null (payableResolutionsGiven gate grants pcs pid committed cost gs))
 
 -- One untapped source's contribution to the supply side, as the OPTIONS it
 -- offers: one option per yield, and each option is that yield read as one supply
@@ -809,7 +836,7 @@ canPayCommittingGiven grants pcs pid committed cost gs = not (null (payableResol
 -- One and not several, because CR 106.12 makes "tap for mana" an activation of a
 -- mana ability including {T} in its activation cost, and CR 107.5 bars tapping an
 -- already-tapped permanent to pay that cost. Every mana ability in this pool
--- costs exactly {T} (manaSourcesGiven leans on the same fact for CR 302.6), so an
+-- includes {T} (manaSourcesGiven leans on the same fact for CR 302.6), so an
 -- untapped source is tapped for mana at most once and adds what exactly one
 -- activation adds. Mixing its yields -- the first mana from one, the second from
 -- another -- describes a board no sequence of activations reaches.
@@ -917,8 +944,8 @@ sourceOptions yields =
 -- into charging {2/B} a single mana. CR 107.4f's {G/P} rides on the same
 -- enumeration: its life way is a resolution with one fewer demand, so neither
 -- has to learn about a symbol that consumes no supply at all.
-payableResolutions :: PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutions pid committed cost gs = payableResolutionsGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
+payableResolutions :: Gate -> PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutions gate pid committed cost gs = payableResolutionsGiven gate (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
@@ -931,11 +958,15 @@ payableResolutions pid committed cost gs = payableResolutionsGiven (Projection.c
 -- see manaSources above for the hoist and its snapshot argument. That argument
 -- is what makes handing the board in from outside change no answer: it is a
 -- snapshot of one GameState, and this is a pure function of the same one.
-payableResolutionsGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutionsGiven grants pcs pid committed cost gs =
+--
+-- Not implemented: the gate asked of two sources TOGETHER. Each is judged
+-- against the untouched board, so two activations claiming one creature both
+-- count (#1126).
+payableResolutionsGiven :: Gate -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutionsGiven gate grants pcs pid committed cost gs =
   let Mana.MkMana units = Game.poolOf pid gs
       pooled = fmap supplyOf units
-      options = fmap (\oid -> sourceOptions (manaYieldsOfGiven pcs oid gs)) (manaSourcesGiven grants pcs pid gs)
+      options = fmap (\oid -> sourceOptions (manaYieldsAvailableGiven gate pcs pid oid gs)) (manaSourcesGiven gate grants pcs pid gs)
       -- One option taken from each source, appended to the pool: `sequenceA` over
       -- the list applicative is that product, and it is [[]] -- one board, the
       -- pool alone -- when the player controls no source at all.
@@ -961,7 +992,7 @@ payableResolutionsGiven grants pcs pid committed cost gs =
 -- This is the budget payCost pays under. A cast or an activation has already
 -- announced its Phyrexian symbols away (`announce`, CR 118.13a), so this answers
 -- 0 for them; it decides anything only where nothing announced (#373).
-lifeNeeded :: PlayerId -> ManaCost -> GameState -> Maybe Natural
-lifeNeeded pid cost gs = case payableResolutions pid 0 cost gs of
+lifeNeeded :: Gate -> PlayerId -> ManaCost -> GameState -> Maybe Natural
+lifeNeeded gate pid cost gs = case payableResolutions gate pid 0 cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing

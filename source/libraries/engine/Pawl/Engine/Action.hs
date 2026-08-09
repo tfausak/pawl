@@ -5,6 +5,7 @@ import qualified Data.Map.Strict as Map
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Cast as Cast
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
@@ -189,14 +190,24 @@ legalActions pid gs =
       --
       -- Mana.manaSourcesGiven is the whole gate, and it is the SAME list CR
       -- 605.3a's other two windows are served from (Cost.payMana's candidates):
-      -- untapped, controlled, offering some mana route, and past CR 302.6's
-      -- sickness test. ONE sweep for the whole enumeration rather than one per
-      -- permanent, on the board this function already walked.
+      -- untapped, controlled, offering some mana route, past CR 302.6's sickness
+      -- test, and -- through Cost.canPayActivation, CR 118.3 asked of the mana
+      -- ability's own cost (CR 602.2b) -- able to pay for itself. ONE sweep for
+      -- the whole enumeration rather than one per permanent, on the board this
+      -- function already walked.
       --
-      -- Not implemented: CR 118.3 asked of the ability's own activation cost
-      -- before it is offered, so a source whose cost cannot be paid is offered
-      -- here, fails when taken, and -- having tapped nothing -- is offered again
-      -- (#1119). The same gap the payment window has, where Cost.payMana's
-      -- `refused` set is what stops it looping.
-      manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven grants pcs pid gs)
+      -- That last conjunct is also what keeps the offer from being one a player
+      -- could take forever: an activation whose cost goes unpaid taps nothing,
+      -- so an ungated menu would offer it again unchanged. Cost.tapForMana picks
+      -- among exactly the options this gate admitted -- one predicate, asked at
+      -- the offer and at the payment, so the two cannot disagree.
+      --
+      -- UNOBSERVABLE on this menu today, and deliberately kept anyway: the gate
+      -- drops a permanent only when EVERY route of it is unpayable, and the one
+      -- card whose activation cost can fail keeps a route that cannot (Phyrexian
+      -- Tower's "{T}: Add {C}" beside its sacrifice). Removing it leaves the
+      -- suite green. What IS observable is the same predicate one level down, on
+      -- the yields -- Pawl.ManaSpec's "what the activation may yield is gated by
+      -- its own cost".
+      manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.canPayActivation grants pcs pid gs)
    in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaActivations

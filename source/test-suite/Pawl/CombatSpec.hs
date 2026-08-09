@@ -2176,7 +2176,7 @@ castHackPaying island hackId target from to gs =
       answer p = case p of
         Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject target)) sets
         Prompt.ChooseLandTypeSwap {} -> (from, to)
-        Prompt.ChooseManaSource {} -> island
+        Prompt.ChooseManaSource {} -> Just island
         _ -> S.identityAnswer p
    in S.runPure answer (gs {GameState.priority = Just S.alice}) (do S.cast S.alice hackId; Stack.resolveTop)
 
@@ -3233,7 +3233,7 @@ mazeAnswer mazeId ability victim p = case p of
         pure (A.Activate mazeId ability)
   Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToCreature victim)) sets)
   Prompt.ChooseManaSource _ _ candidates ->
-    pure (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (/= mazeId) (NonEmpty.toList candidates)))
+    pure (Just (Maybe.fromMaybe (NonEmpty.head candidates) (List.find (/= mazeId) (NonEmpty.toList candidates))))
   _ -> pure (S.aggressiveAnswer p)
 
 -- runToEndOfCombat's stateful twin, for the answerer above: the same bounded

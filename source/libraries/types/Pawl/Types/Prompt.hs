@@ -87,17 +87,40 @@ data Prompt r where
   -- defending player from CR 506.2.
   ChooseDefender :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty PlayerId.PlayerId -> Prompt PlayerId.PlayerId
   -- | CR 601.2g (and CR 602.2b for an ability): which mana source to activate next
-  -- while paying a cost.
+  -- while paying a cost the pool does NOT yet cover.
   --
   -- Asked once per source TAPPED, against a shrinking candidate list, which is
   -- not once per mana the cost demands: a Sol Ring pays {2} in one activation and
   -- so raises this once.
   --
-  -- Elided only when there is exactly ONE candidate, where no choice exists.
-  -- Same-card candidates are NOT treated as interchangeable: two Llanowar Elves
-  -- can differ by an Equipment, an Aura, counters or borrowed control, and none of
-  -- that is visible in the printed card (#12, #217).
-  ChooseManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt ObjectId.ObjectId
+  -- Nothing DECLINES, which is CR 118.3c: activating mana abilities is not
+  -- mandatory even when paying is. The payment then comes up short and fails, and
+  -- CR 601.2h reverses whatever proposed it.
+  --
+  -- Never elided, not even for a single candidate, because declining is a real
+  -- answer on every board -- ChooseProliferate's posture. Same-card candidates
+  -- are NOT treated as interchangeable either: two Llanowar Elves can differ by
+  -- an Equipment, an Aura, counters or borrowed control, and none of that is
+  -- visible in the printed card (#12, #217).
+  ChooseManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
+  -- | CR 605.3a, asked once the pool ALREADY covers the cost: which further mana
+  -- source to activate, or Nothing to close CR 601.2g's window and pay. That
+  -- permission is not rationed by what the cost needs, so a player may keep
+  -- going.
+  --
+  -- A sibling of ChooseManaSource rather than the same constructor because the
+  -- two windows differ in what silence means -- there, declining fails the
+  -- payment; here, it pays. That is what lets a caller with no player attached
+  -- (Pawl.Engine.Replay.defaultAnswer) answer each one sensibly: take the first
+  -- source while short, float nothing once covered.
+  --
+  -- Floating is a real decision because unspent mana can be read: Omnath, Locus
+  -- of Mana gets +1/+1 for each green mana its controller has, so a player who
+  -- taps only what the cost needs has made their creature smaller.
+  --
+  -- Never elided: finishing is always an answer, so even one candidate is a real
+  -- question.
+  ChooseExtraManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 605.3b: which mana the source produces, asked as the mana ability
   -- resolves -- immediately, a mana ability never using the stack. The answer is a
   -- YIELD, the whole mana one activation adds, so "{T}: Add {C}{C}" is one
@@ -129,8 +152,8 @@ data Prompt r where
   -- offered whoever's it is, and nothing is re-checked at resolution (CR 608.2b).
   --
   -- Asked whenever either list is non-empty, elided only when both are empty.
-  -- Deliberately not elided for a single candidate, unlike ChooseManaSource: "any
-  -- number" includes none, so even one candidate is a real yes or no.
+  -- Deliberately not elided for a single candidate, ChooseManaSource's posture:
+  -- "any number" includes none, so even one candidate is a real yes or no.
   ChooseProliferate :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [PlayerId.PlayerId] -> Prompt (Set.Set ObjectId.ObjectId, Set.Set PlayerId.PlayerId)
   -- | CR 701.54a: which creature a tempted player controls becomes their
   -- Ring-bearer. The NonEmpty is the creatures they control; the answer is the ONE
@@ -704,8 +727,9 @@ data Prompt r where
   -- says would answer that rule on the player's behalf; "another permanent it can
   -- enchant" gets only the legal ones (Filter.CanHostSubject).
   --
-  -- Elided at exactly one candidate, the ChooseManaSource posture: the effect is
-  -- mandatory, so a single destination leaves nothing to decide. The current host
+  -- Elided at exactly one candidate: the effect is mandatory, so a single
+  -- destination leaves nothing to decide -- unlike ChooseManaSource, where
+  -- declining is always an answer. The current host
   -- is never among the candidates (CR 701.3b), so it is not being withheld.
   --
   -- NonEmpty rather than []: the caller does not raise this when no destination
