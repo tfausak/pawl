@@ -1,0 +1,274 @@
+{
+  "faces": [
+    {
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 2
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Blue"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Rootha, Mastering the Moment",
+      "power": {
+        "type": "Literal",
+        "value": 3
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 4
+      },
+      "triggeredAbilities": [
+        {
+          "condition": {
+            "type": "StepBegins",
+            "value": [
+              {
+                "type": "Combat",
+                "value": {
+                  "type": "BeginningOfCombat"
+                }
+              },
+              {
+                "type": "ControllersTurn"
+              }
+            ]
+          },
+          "intervening": {
+            "comparison": {
+              "type": "AtLeast"
+            },
+            "measured": {
+              "type": "Count",
+              "value": {
+                "aggregation": {
+                  "type": "Objects"
+                },
+                "filter": {
+                  "type": "And",
+                  "value": [
+                    {
+                      "type": "ControlledBy",
+                      "value": {
+                        "type": "You"
+                      }
+                    },
+                    {
+                      "type": "Or",
+                      "value": [
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Instant"
+                          }
+                        },
+                        {
+                          "type": "HasCardType",
+                          "value": {
+                            "type": "Sorcery"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "scope": {
+                  "type": "InHistory",
+                  "value": {
+                    "type": "SpellCast"
+                  }
+                }
+              }
+            },
+            "threshold": {
+              "type": "Literal",
+              "value": 1
+            }
+          },
+          "modal": {
+            "modes": [
+              {
+                "clauses": [
+                  {
+                    "effects": [
+                      {
+                        "type": "Create",
+                        "value": [
+                          {
+                            "type": "Literal",
+                            "value": 1
+                          },
+                          {
+                            "faces": [
+                              {
+                                "colorIndicator": [
+                                  {
+                                    "type": "Blue"
+                                  },
+                                  {
+                                    "type": "Red"
+                                  }
+                                ],
+                                "keywords": [
+                                  {
+                                    "type": "Flying"
+                                  },
+                                  {
+                                    "type": "Haste"
+                                  }
+                                ],
+                                "name": "Elemental Token",
+                                "power": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Greatest",
+                                      "value": {
+                                        "type": "ManaValue"
+                                      }
+                                    },
+                                    "filter": {
+                                      "type": "And",
+                                      "value": [
+                                        {
+                                          "type": "ControlledBy",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        },
+                                        {
+                                          "type": "Or",
+                                          "value": [
+                                            {
+                                              "type": "HasCardType",
+                                              "value": {
+                                                "type": "Instant"
+                                              }
+                                            },
+                                            {
+                                              "type": "HasCardType",
+                                              "value": {
+                                                "type": "Sorcery"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "scope": {
+                                      "type": "InHistory",
+                                      "value": {
+                                        "type": "SpellCast"
+                                      }
+                                    }
+                                  }
+                                },
+                                "toughness": {
+                                  "type": "Count",
+                                  "value": {
+                                    "aggregation": {
+                                      "type": "Greatest",
+                                      "value": {
+                                        "type": "ManaValue"
+                                      }
+                                    },
+                                    "filter": {
+                                      "type": "And",
+                                      "value": [
+                                        {
+                                          "type": "ControlledBy",
+                                          "value": {
+                                            "type": "You"
+                                          }
+                                        },
+                                        {
+                                          "type": "Or",
+                                          "value": [
+                                            {
+                                              "type": "HasCardType",
+                                              "value": {
+                                                "type": "Instant"
+                                              }
+                                            },
+                                            {
+                                              "type": "HasCardType",
+                                              "value": {
+                                                "type": "Sorcery"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "scope": {
+                                      "type": "InHistory",
+                                      "value": {
+                                        "type": "SpellCast"
+                                      }
+                                    }
+                                  }
+                                },
+                                "typeLine": {
+                                  "subtypes": [
+                                    {
+                                      "type": "Elemental"
+                                    }
+                                  ],
+                                  "types": [
+                                    {
+                                      "type": "Creature"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Orc"
+          },
+          {
+            "type": "Sorcerer"
+          }
+        ],
+        "supertypes": [
+          {
+            "type": "Legendary"
+          }
+        ],
+        "types": [
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}

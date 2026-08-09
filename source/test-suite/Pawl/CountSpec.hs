@@ -26,6 +26,7 @@ import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
@@ -320,6 +321,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
 
   aetherfluxReservoirSpec s registry
   tobiasSpec s registry
+  roothaSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -521,3 +523,123 @@ tobiasSpec s registry =
               stolen = S.giveControl b1 S.alice gs1
               after = kill tid (kill b1 stolen)
           Spec.assertEqWith s "bob's Giant and Tobias" (zombies after) 2
+
+-- CR 608.2i's look-back with a GREATEST over it: the first card whose fold reads
+-- a per-member quantity off an event's CR 608.2h snapshot rather than off a live
+-- object. GAMEPLAY LEVEL for the Aetherflux group's reason.
+--
+-- Rootha, Mastering the Moment, {2}{U}{R} Legendary Creature -- Orc Sorcerer 3/4:
+-- "At the beginning of combat on your turn, if you've cast an instant or sorcery
+-- spell this turn, create an X/X blue and red Elemental creature token with
+-- flying and haste, where X is the greatest mana value among instant and sorcery
+-- spells you've cast this turn."
+--
+-- alice casts Fog ({G}, 1) and Trumpet Blast ({2}{R}, 3), both instants or
+-- sorceries and both targetless; Panglacial Wurm ({5}{G}{G}, 7), a CREATURE
+-- spell; and bob casts Aetherspouts ({3}{U}{U}, 5). Six readings of the fold,
+-- six different numbers: greatest 3, least 1, count 2, sum 4, card-type-blind 7,
+-- controller-blind 5.
+--
+-- THREE seats, so "you cast it" and "bob cast it" are different sentences.
+roothaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+roothaSpec s registry =
+  let board rootha forest mountain island =
+        let addLands printing pid n g = List.foldl' (\g' _ -> snd (S.addCreature printing pid g')) g [1 .. (n :: Int)]
+            withLands = addLands island S.bob 8 (addLands mountain S.alice 6 (addLands forest S.alice 10 S.threePlayerGame))
+            (_, withRootha) = S.addCreature rootha S.alice withLands
+         in withRootha
+              { GameState.phase = Phase.PrecombatMain,
+                GameState.activePlayer = S.alice,
+                GameState.priority = Just S.alice
+              }
+      -- One spell into `caster`'s hand, cast, and the stack run down.
+      castOne printing caster gs =
+        let (oid, gs1) = S.addHandCard printing caster gs
+            cast = S.runPure S.identityAnswer gs1 (S.cast caster oid)
+         in S.runPure S.identityAnswer cast Engine.priorityLoop
+      -- Rule 507's beginning of combat step, staged and then RUN: Engine.runStep
+      -- is what writes the CR 603.2b StepBegan record the trigger matches, and
+      -- the priority loop resolves what it put on the stack.
+      intoBeginningOfCombat gs =
+        S.runPure
+          S.identityAnswer
+          gs
+            { GameState.phase = Phase.Combat CombatStep.BeginningOfCombat,
+              GameState.priority = Just S.alice
+            }
+          Engine.runStep
+      throughBeginningOfCombat gs = S.runPure S.identityAnswer (intoBeginningOfCombat gs) Engine.priorityLoop
+      spellsCast rootha forest mountain island fog blast wurm spouts =
+        let base = board rootha forest mountain island
+            withFog = castOne fog S.alice base
+            withBlast = castOne blast S.alice withFog
+            withWurm = castOne wurm S.alice withBlast
+         in castOne spouts S.bob withWurm
+   in Spec.describe s "Rootha, Mastering the Moment" $ do
+        Spec.it s "CR 202.3 X is the GREATEST mana value among the instants and sorceries ALICE cast" $ do
+          rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          island <- S.printingOf s registry "Island"
+          fog <- S.printingOf s registry "Fog"
+          blast <- S.printingOf s registry "Trumpet Blast"
+          wurm <- S.printingOf s registry "Panglacial Wurm"
+          spouts <- S.printingOf s registry "Aetherspouts"
+          let cast = spellsCast rootha forest mountain island fog blast wurm spouts
+              after = throughBeginningOfCombat cast
+          -- The four casts are what everything below folds, so a board where one
+          -- went unpaid would otherwise report a smaller maximum and look right.
+          Spec.assertEqWith s "four spells were cast" (length (filter isSpellCast (S.eventsOf cast))) 4
+          Spec.assertEqWith s "no token before combat" (S.tokensOf cast) []
+          Spec.assertEqWith s "CR 603.4 the intervening if holds, so the ability triggers" (length (filter isAbilityTriggered (S.eventsOf after))) 1
+          Spec.assertEqWith s "exactly one token" (length (S.tokensOf after)) 1
+          mapM_ (\oid -> Spec.assertEqWith s "3/3, not 1, 2, 4, 5 or 7" (S.powerToughnessOf oid after) (Just (3, 3))) (S.tokensOf after)
+          mapM_ (\oid -> Spec.assertEqWith s "blue and red" (Projection.colorsOf oid after) (Set.fromList [Color.Blue, Color.Red])) (S.tokensOf after)
+        -- CR 111.3: the creating ability defines the token's characteristics, and
+        -- it defines them as it resolves. GameState.events is cleared at the
+        -- handoff, so a token that kept the fold in its power box would have no
+        -- power at all on the next turn.
+        Spec.it s "CR 111.3 the 3/3 is fixed at creation: it survives the turn handoff that clears the log" $ do
+          rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          island <- S.printingOf s registry "Island"
+          fog <- S.printingOf s registry "Fog"
+          blast <- S.printingOf s registry "Trumpet Blast"
+          wurm <- S.printingOf s registry "Panglacial Wurm"
+          spouts <- S.printingOf s registry "Aetherspouts"
+          let after = throughBeginningOfCombat (spellsCast rootha forest mountain island fog blast wurm spouts)
+              handed = S.runPure S.identityAnswer after Engine.handoffTurn
+          Spec.assertEqWith s "the log is empty on the next turn" (S.eventsOf handed) []
+          Spec.assertEqWith s "one token still" (length (S.tokensOf handed)) 1
+          mapM_ (\oid -> Spec.assertEqWith s "still 3/3" (S.powerToughnessOf oid (S.settleSba handed)) (Just (3, 3))) (S.tokensOf handed)
+        -- CR 603.4's intervening "if", on the same board minus the two spells
+        -- that satisfy it. The Wurm alone is a cast this turn, so an ability
+        -- reading "if you've cast a spell" would still trigger here.
+        --
+        -- The assertion is that the ability never TRIGGERS, not merely that no
+        -- token appears: an ability that triggered anyway would fold an empty
+        -- set, and the token that mints has no power at all and dies to a
+        -- state-based action, so "no token" holds for a second reason and cannot
+        -- tell the two apart.
+        Spec.it s "CR 603.4 a CREATURE spell alone does not satisfy the intervening if" $ do
+          rootha <- S.printingOf s registry "Rootha, Mastering the Moment"
+          forest <- S.printingOf s registry "Forest"
+          mountain <- S.printingOf s registry "Mountain"
+          island <- S.printingOf s registry "Island"
+          wurm <- S.printingOf s registry "Panglacial Wurm"
+          let cast = castOne wurm S.alice (board rootha forest mountain island)
+              after = throughBeginningOfCombat cast
+          Spec.assertEqWith s "the Wurm was cast" (length (filter isSpellCast (S.eventsOf cast))) 1
+          Spec.assertEqWith s "the ability never triggered" (filter isAbilityTriggered (S.eventsOf after)) []
+          Spec.assertEqWith s "and no token was created" (S.tokensOf after) []
+
+isAbilityTriggered :: GameEvent.GameEvent -> Bool
+isAbilityTriggered event = case event of
+  GameEvent.AbilityTriggered {} -> True
+  _ -> False
+
+isSpellCast :: GameEvent.GameEvent -> Bool
+isSpellCast event = case event of
+  GameEvent.SpellCast {} -> True
+  _ -> False

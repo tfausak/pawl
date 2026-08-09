@@ -2,7 +2,7 @@
 -- fold -- enumerate the scope, keep by the Filter, aggregate -- that never
 -- learns which effect or card produced the count.
 --
--- Parameterized by the view builder AND by the per-object quantity reader
+-- Parameterized by the view builder AND by the per-member quantity reader
 -- rather than importing Pawl.Engine.Projection or Pawl.Engine.Quantity, both of
 -- which sit above this module and call into the layer fold. The caller supplies
 -- characteristics as of whatever layers it has already applied, which is what
@@ -41,11 +41,16 @@ import qualified Pawl.Types.ZoneChange as ZoneChange
 -- object the caller's bound projection cannot describe.
 type ViewOf = ObjectId -> Maybe Filter.View
 
--- Reads a per-object quantity off one candidate. INJECTED for the same
+-- Reads a per-member quantity off one candidate. INJECTED for the same
 -- module-cycle reason ViewOf is: Pawl.Engine.Quantity imports this module and
 -- ties the knot at its own Count arm. Every aggregation but
 -- Aggregation.Greatest ignores it.
-type QuantityOf quantity = ObjectId -> quantity -> Maybe Integer
+--
+-- BOTH the candidate's object and its view, because an InHistory candidate has
+-- only the second: its view is a CR 608.2h snapshot of a past event, so a
+-- reader demanding an object could never answer one. For an InZone
+-- candidate the view IS `viewOf` of the id beside it, so the two agree.
+type QuantityOf quantity = Maybe ObjectId -> Filter.View -> quantity -> Maybe Integer
 
 -- Nothing when the count cannot be determined -- an unresolvable PlayerRef, or
 -- (Aggregation.Greatest only) a maximum over a set that is empty or holds a
@@ -100,11 +105,10 @@ keep predicate context mv = case mv of
 -- CR 208.2a: Tarmogoyf counts card TYPES, so DistinctCardTypes is the size of
 -- the union, not the length of the list.
 --
--- Each member carries the object it came from when there is one. An InHistory
--- member has none: its view is a CR 608.2h snapshot of a past event rather than
--- of anything on the battlefield now, so there is no object to read a
--- per-object quantity against and Greatest over that scope is undeterminable
--- (#299).
+-- Each member carries the object it came from when there is one, and its view
+-- either way. An InHistory member has no object -- its view is a CR 608.2h
+-- snapshot of a past event rather than of anything on the battlefield now --
+-- so Greatest hands the reader both and lets it answer from whichever it can.
 aggregate :: QuantityOf quantity -> Aggregation.Aggregation quantity -> [(Maybe ObjectId, Filter.View)] -> Maybe Integer
 aggregate quantityOf aggregation members = case aggregation of
   Aggregation.Objects -> Just (toInteger (length members))
@@ -117,8 +121,10 @@ aggregate quantityOf aggregation members = case aggregation of
   -- legislates it case by case (CR 714.2d). CR 208.2a is one such case, applied
   -- where it is scoped -- at the characteristic-defining ability that consumes
   -- this count, never here.
+  -- Pawl.CountSpec's Rootha, Mastering the Moment group is what proves the
+  -- objectless member really is read off its snapshot.
   Aggregation.Greatest quantity -> do
-    values <- traverse (\(identity, _) -> identity >>= \oid -> quantityOf oid quantity) members
+    values <- traverse (\(identity, view) -> quantityOf identity view quantity) members
     case values of
       [] -> Nothing
       value : rest -> Just (Foldable.foldl' max value rest)

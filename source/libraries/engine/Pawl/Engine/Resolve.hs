@@ -94,6 +94,7 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
@@ -113,6 +114,7 @@ import qualified Pawl.Types.SourceRelation as SourceRelation
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
+import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Uses as Uses
 import qualified Pawl.Types.Zone as Zone
@@ -681,6 +683,39 @@ boundSlots effect = case effect of
 -- is known.
 namesEveryToken :: Quantity.Type.Quantity -> Bool
 namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
+
+-- CR 111.3: the values the creating spell or ability defines "become the token's
+-- text", and they are functionally equivalent to values PRINTED on a card. So a
+-- power or toughness a card wrote as a computed quantity -- Rootha, Mastering the
+-- Moment's "an X/X ... where X is the greatest mana value among instant and
+-- sorcery spells you've cast this turn" -- is settled here, as the effect
+-- resolves, and stamped as a literal. Left as a quantity it would be a rule the
+-- token carries rather than a number the effect defined, re-read on every
+-- projection: GameState.events is cleared at the turn handoff, so that token
+-- would have no power or toughness at all on the next turn, and a creature with
+-- none is destroyed as a state-based action.
+--
+-- An UNDETERMINABLE quantity is left exactly as it stands, which is what keeps CR
+-- 208.2's star working: a face with a characteristic-defining P/T prints Star in
+-- its power box, evaluate answers Nothing for it, and
+-- Projection.seedCharacteristicPT still finds the star where it expects it.
+--
+-- Power and toughness are the whole of it because they are the only printed
+-- characteristics a Face holds as a Quantity -- loyalty and defense are plain
+-- numbers.
+--
+-- Only the faces of the token being created, never the cards embedded in its own
+-- effects: a Create the token itself carries is a different effect and settles
+-- its own quantities when it resolves.
+bakeTokenCharacteristics :: (Quantity.Type.Quantity -> Maybe Integer) -> Card.Type.Card -> Card.Type.Card
+bakeTokenCharacteristics eval card = card {Card.Type.faces = fmap bakeFace (Card.Type.faces card)}
+  where
+    bake quantity = Maybe.maybe quantity Quantity.Type.Literal (eval quantity)
+    bakeFace face =
+      face
+        { Face.power = fmap (Power.MkPower . bake . Power.unwrap) (Face.power face),
+          Face.toughness = fmap (Toughness.MkToughness . bake . Toughness.unwrap) (Face.toughness face)
+        }
 
 -- A resolving spell's PROJECTED modes: only its chosen ones (CR 608.2c/700.2),
 -- with every text change affecting it applied to each effect (CR 612), so the
@@ -2470,7 +2505,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- 614's token replacements (Doubling Season) get their opportunity.
             -- CR 110.5b: the funnel is handed the entry's tap state, so a token
             -- the effect says is tapped is never untapped for an instant.
-            minted <- Event.createTokens controller card (Integer.toNaturalSaturating n) (EntryRiders.tapped entry)
+            minted <- Event.createTokens controller (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry)
             -- CR 508.4: "if a creature is put onto the battlefield attacking, its
             -- controller chooses which defending player ... it's attacking". The
             -- rules for that live in Pawl.Engine.Combat, which is also what keeps this

@@ -65,7 +65,21 @@ evaluate viewOf context gs oid = evaluateFor viewOf context gs oid oid
 -- ability, where the two ids differ), while Event.eventBindings writes to the
 -- stack object as a trigger is gathered. See the arm itself.
 evaluateFor :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> ObjectId -> Quantity -> Maybe Integer
-evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
+evaluateFor viewOf context gs announcedOn oid = evaluateAgainst viewOf context gs announcedOn (Just oid) (viewOf oid)
+
+-- The same fold aimed at a candidate that MAY NOT BE AN OBJECT. `mOid` is the
+-- object the evaluation is aimed at and `mView` its characteristics; every
+-- caller but one supplies both, through evaluateFor above.
+--
+-- The exception is a member of an Aggregation.Greatest over Scope.InHistory,
+-- which has a view and no object: CR 608.2h's snapshot describes a past event
+-- rather than anything on the battlefield now. So the view is passed
+-- alongside rather than looked up from `mOid`, and the arms that read
+-- characteristics read it; Quantity.InSlot, which reads BINDINGS rather than
+-- characteristics, has only `announcedOn` to fall back on there, and that is
+-- the object the fold's own resolution owns.
+evaluateAgainst :: Count.ViewOf -> Filter.Context -> GameState -> ObjectId -> Maybe ObjectId -> Maybe Filter.View -> Quantity -> Maybe Integer
+evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantity of
   Quantity.Literal n -> Just n
   -- CR 202.3 read through the injected view, exactly as the Power arm below is
   -- and for the extra reason that CR 707.2 makes mana cost copiable: layer 1
@@ -76,13 +90,13 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- Nothing when the view cannot say: no object at all, or an object with no
   -- card behind it. Off the battlefield the view is the printed card's
   -- (Projection.viewOfCardIn), which answers CR 202.3 in every zone.
-  Quantity.ManaValue -> viewOf oid >>= Filter.manaValue
+  Quantity.ManaValue -> mView >>= Filter.manaValue
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller
   -- decides that by which ViewOf it supplies (Projection.fullView vs.
   -- Projection.viewWithLastKnown). Nothing when the object has no power: it is
   -- not a creature, or it is gone and no last known information was kept.
-  Quantity.Power -> viewOf oid >>= Filter.power
+  Quantity.Power -> mView >>= Filter.power
   -- A value bound into the slot, read off the effect's SOURCE and then off the
   -- object on the stack. Nothing when neither holds an amount there: the
   -- producing effect has not run, or bound nothing.
@@ -115,7 +129,7 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- permanent never carries the X its spell was cast for.
   Quantity.InSlot slot ->
     let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
-     in fmap toInteger (boundOn oid <|> boundOn announcedOn)
+     in fmap toInteger ((mOid >>= boundOn) <|> boundOn announcedOn)
   -- CR 208.2: a bare star has no value of its own. Both readers of a
   -- characteristic-defining P/T substitute the object's quantity for it first,
   -- through Projection.seedCharacteristicPT -- the projection at its seed
@@ -123,7 +137,7 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- the battlefield -- so reaching this arm means the star was never resolved,
   -- honestly Nothing rather than a hole.
   Quantity.Star -> Nothing
-  Quantity.Plus a b -> case (evaluateFor viewOf context gs announcedOn oid a, evaluateFor viewOf context gs announcedOn oid b) of
+  Quantity.Plus a b -> case (recur a, recur b) of
     (Just x, Just y) -> Just (x + y)
     _ -> Nothing
   -- CR 208.2a / 608.2h: delegate to the general Count fold (Pawl.Engine.Count),
@@ -134,7 +148,7 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- candidates: CR 601.2b's X belongs to the resolving object. Terminating
   -- despite the mutual recursion -- a Greatest's payload is a strictly smaller
   -- subterm.
-  Quantity.Count c -> Count.evaluate viewOf (evaluateFor viewOf context gs announcedOn) context gs c
+  Quantity.Count c -> Count.evaluate viewOf (\mOid' view -> evaluateAgainst viewOf context gs announcedOn mOid' (Just view)) context gs c
   -- CR 106.4: the mana-pool fold (Pawl.Engine.ManaCount). Takes neither
   -- injection the Count arm above does: a mana unit has no characteristics for
   -- the ViewOf to describe, and a ManaCount holds no inner Quantity for the
@@ -216,7 +230,9 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- Object.counters and the PlayerCounters arm above both keep. The outer Nothing
   -- means the VIEW could not describe the object -- it is gone and nothing was
   -- filed under its id.
-  Quantity.ObjectCounters kind -> fmap (toInteger . Map.findWithDefault 0 kind . Filter.counters) (viewOf oid)
+  Quantity.ObjectCounters kind -> fmap (toInteger . Map.findWithDefault 0 kind . Filter.counters) mView
+  where
+    recur = evaluateAgainst viewOf context gs announcedOn mOid mView
 
 -- CR 208.2a, last sentence: an undeterminable number is 0, including inside a
 -- calculation. TOTAL where evaluate is partial -- an Integer, never a Maybe.
