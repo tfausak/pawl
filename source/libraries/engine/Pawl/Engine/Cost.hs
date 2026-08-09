@@ -623,6 +623,99 @@ tapObject target =
   State.modify'
     (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.tapped = TapState.Tapped}) target (GameState.objects gs)})
 
+-- What this component takes OUT of a zone: which zone it draws from, which
+-- objects are in that pool for it, and how many of them it claims. Nothing for a
+-- component that removes nothing, which is what leaves `jointlyPayable` below
+-- asking only about the components that can actually contend for one object.
+--
+-- TAPPING IS NOT A REMOVAL, and that is a rules fact rather than a scope cut. CR
+-- 601.2h pays a cost's parts "in any order", so a payer facing a cost that both
+-- taps and sacrifices taps first and sacrifices second; both payments are
+-- performed, and CR 118.11 confirms a cost is paid by the actions it calls for.
+-- A tapped permanent is still on the battlefield, so tapping takes nothing out
+-- of anybody's pool -- counting it as a claim would REFUSE costs the rules
+-- allow. TapForTotalPower is out for that reason and one more: its Natural is a
+-- THRESHOLD on an aggregate rather than a count of objects, so it has no claim
+-- of this shape to state at all.
+--
+-- The ZONE alone is a sound key even though a hand and a graveyard are
+-- per-player (CR 400.3, CR 108.4): every claim below is on `pid`'s own copy --
+-- discardCandidates and exileCandidates read `pid`'s zone, and each `*This` arm
+-- demands that `pid` control or own the object -- so two claims on one zone are
+-- always two claims on one pool.
+--
+-- A `*This` arm whose own guard fails answers an EMPTY pool rather than Nothing,
+-- which keeps the two readings in agreement: canPayComponent refuses such a
+-- component and so does Hall's condition below, instead of the joint check
+-- quietly dropping the claim.
+--
+-- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
+-- match: a new constructor that removes objects from a zone has to answer here,
+-- and -Werror is what makes it.
+removalClaim :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe (Zone.Zone, Set.Set ObjectId, Natural)
+removalClaim pid oid component gs = case component of
+  -- CR 701.21a: the permanents this player controls that match the criterion.
+  CostComponent.Sacrifice n criterion ->
+    Just (Zone.Battlefield, Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs), n)
+  CostComponent.SacrificeThis ->
+    Just (Zone.Battlefield, itself (Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid), 1)
+  CostComponent.DiscardCards n ->
+    Just (Zone.Hand, Set.fromList (discardCandidates pid oid gs), n)
+  CostComponent.DiscardThis -> Just (Zone.Hand, itself (isOwnedIn Zone.Hand), 1)
+  CostComponent.ExileCardsFromGraveyard n criterion ->
+    Just (Zone.Graveyard, Set.fromList (exileCandidates pid criterion gs), n)
+  CostComponent.ExileThisFromGraveyard -> Just (Zone.Graveyard, itself (isOwnedIn Zone.Graveyard), 1)
+  CostComponent.TapThis -> Nothing
+  CostComponent.UntapThis -> Nothing
+  CostComponent.TapForTotalPower _ _ -> Nothing
+  CostComponent.PayLife _ -> Nothing
+  CostComponent.PayEnergy _ -> Nothing
+  CostComponent.AddLoyaltyToThis _ -> Nothing
+  CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+  where
+    itself condition = if condition then Set.singleton oid else Set.empty
+    -- canPayComponent's own guard for the two `*This` arms that read a zone
+    -- rather than control, and asked here for its reason: CR 108.4 gives a card
+    -- outside the battlefield no controller, and CR 400.3 puts it in its OWNER's
+    -- zone.
+    isOwnedIn zone = case Game.lookupObject oid gs of
+      Nothing -> False
+      Just obj -> Object.zone obj == zone && Object.owner obj == pid
+
+-- CR 118.3's "fully", asked of a cost's components TOGETHER rather than one at a
+-- time. CR 601.2h pays them "in any order", so the question is whether there is
+-- SOME assignment of distinct objects to the components under which every one of
+-- them is paid in full -- not whether each, asked alone against the untouched
+-- board, could find enough.
+--
+-- Jarad, Golgari Lich Lord's "Sacrifice a Swamp and a Forest" is the printed
+-- case, and one Bayou (Land -- Forest Swamp) is the board that tells the two
+-- readings apart: each component alone finds a candidate, and there is only one
+-- land to give.
+--
+-- PER ZONE, because the zones are disjoint and a claim on one can never be paid
+-- out of another.
+--
+-- HALL'S CONDITION over the SUBSETS of one zone's claims, which is exactly
+-- necessary and sufficient here. Every object a component will take is
+-- interchangeable with every other object that component will take, so all the
+-- slots of one component share a neighbourhood, and the tightest subset of slots
+-- is always some whole number of components' worth. A greedy pass would not do:
+-- a component with the wider pool can eat the only object a narrower one could
+-- have used. Neither would a per-component check, which is the singleton subset
+-- of this one and is therefore subsumed rather than replaced.
+--
+-- The enumeration is EXPONENTIAL in the number of object-removing claims one
+-- cost makes on one zone. That number is 2 across the printed corpus, and no cap
+-- guards it -- an untriggerable cap is dead code. The mana side of the same
+-- gate already carries a subset enumeration of its own (#595).
+jointlyPayable :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
+jointlyPayable pid oid components gs =
+  let claimIn component = fmap (\(zone, pool, n) -> (zone, [(pool, n)])) (removalClaim pid oid component gs)
+      byZone = Map.fromListWith (<>) (Maybe.mapMaybe claimIn components)
+      satisfied subset = Natural.length (Set.unions (fmap fst subset)) >= sum (fmap snd subset)
+   in all (\claims -> all satisfied (List.subsequences claims)) (Map.elems byZone)
+
 -- CR 118.3: a player can't pay a cost without the resources to pay it fully. The
 -- mana part AND every component, measured against the CURRENT state -- before any
 -- part of the cost is paid. That is CR-correct rather than convenient: CR 601.2g
@@ -641,17 +734,24 @@ tapObject target =
 -- subsumes the per-component check the loop below still makes, and two PayLife
 -- components of one cost are added the same way.
 --
--- Every OTHER resource is still counted twice over, and no card in the pool makes
--- that observable: the mana part spends nothing but mana and life, so what would
--- have to exist is a component that spends mana -- which is not one of them --
--- or two components claiming one permanent, which is CR 118.10's own business
--- (#104).
+-- OBJECTS are the other resource measured across components rather than within
+-- each, and `jointlyPayable` is where: two components that each remove an object
+-- from a zone cannot both claim the one Bayou, which is again CR 118.3's "fully"
+-- read over the whole cost. CR 118.10 is NOT that rule and never was -- it
+-- governs two DIFFERENT spells or abilities each paying its own cost, and says
+-- nothing about two parts of one. CR 601.2h's "partial payments are not allowed"
+-- is the other half of the reading.
+--
+-- What is left counted twice over is a component that spends MANA, and no such
+-- component exists: the mana part spends nothing but mana and life, and both of
+-- those are already totalled across the two halves above.
 canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
     Mana.canPayCommitting pid (lifeOwedBy (Cost.components cost)) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
+      && jointlyPayable pid oid (Cost.components cost) gs
 
 -- CR 118.3 asked one step later than `canPay` asks it: is SOME nonhybrid
 -- equivalent of this cost (CR 601.2b) payable, measured at CR 601.2f's total?
@@ -693,6 +793,7 @@ canPaySomeCompletion pid oid total_ cost gs = case Cost.mana cost of
           Mana.canPayCommitting pid (outside + life) (total_ (ManaCost.MkManaCost completed)) gs
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
+          && jointlyPayable pid oid (Cost.components cost) gs
 
 -- CR 119.4's payments a cost owes OUTSIDE its mana part, added up -- what CR
 -- 118.3 makes the mana part's own life share a total with. A cost with no PayLife
@@ -747,8 +848,13 @@ canPayComponent pid oid component gs = case component of
   -- the two.
   CostComponent.PayLife n -> Event.canPayLife pid n gs
   -- CR 701.21a: this player must control at least `n` matching permanents.
-  -- CR 118.10's "each payment of a cost applies to only one spell, ability, or
-  -- effect" is not enforced across two components of ONE cost (#104).
+  --
+  -- This component ALONE, which is not the whole of CR 118.3's question, exactly
+  -- as the PayLife arm above is not: two Sacrifice components of one cost can
+  -- each find the same permanent here, and `jointlyPayable` is what asks them
+  -- together. Kept because a component is asked about on its own terms here, and
+  -- it can only ever be the weaker of the two -- it is the singleton subset of
+  -- Hall's condition, spelled out.
   CostComponent.Sacrifice n criterion ->
     Natural.length (Replacement.sacrificeCandidates pid (Just oid) criterion gs) >= n
   -- CR 702.122a: payable iff SOME subset of the candidates reaches the
@@ -804,9 +910,9 @@ canPayComponent pid oid component gs = case component of
   -- canPay as a conjunct, which is what puts the additional cost INSIDE the
   -- total cost the way CR 601.2f says rather than after announcement.
   --
-  -- Sacrifice's floor above, over a different pool. CR 118.10's "each payment of
-  -- a cost applies to only one spell, ability, or effect" is not enforced across
-  -- two components of ONE cost, exactly as it is not there (#104).
+  -- Sacrifice's floor above, over a different pool -- and this component ALONE
+  -- for Sacrifice's reason, with `jointlyPayable` asking the several
+  -- object-removing components of one cost together.
   CostComponent.ExileCardsFromGraveyard n criterion ->
     Natural.length (exileCandidates pid criterion gs) >= n
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
@@ -836,8 +942,14 @@ canPayComponent pid oid component gs = case component of
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
 -- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
--- elision here (#105) -- no component in this vocabulary changes another's
--- payability.
+-- elision here (#105).
+--
+-- That elision is OBSERVABLE, and this is where: paying one object-removing
+-- component takes an object the next one could have used, so a payer who would
+-- have ordered the two differently -- or answered the first prompt differently
+-- -- can lose a payment `canPay` correctly called payable. The board never goes
+-- illegal for it; the restore below makes an Unpaid payment a complete no-op, so
+-- what is lost is the activation rather than the game state.
 --
 -- All or nothing (CR 601.2h: partial payments are not allowed). The entry state
 -- is captured and restored on any rejection, so an Unpaid result is a complete

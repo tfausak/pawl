@@ -15,6 +15,7 @@ module Pawl.CostSpec where
 import qualified Control.Monad as Monad
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
@@ -308,11 +309,16 @@ answersFor :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> Game.Ty
 answersFor answer gs game = snd (Replay.record answer gs game)
 
 wasAskedToSacrifice :: [Response.Response] -> Bool
-wasAskedToSacrifice responses =
+wasAskedToSacrifice responses = sacrificePromptCount responses > 0
+
+-- How MANY times, which is what a cost with two Sacrifice components needs:
+-- "asked at all" cannot tell one prompt from two.
+sacrificePromptCount :: [Response.Response] -> Int
+sacrificePromptCount responses =
   let isSacrifice r = case r of
         Response.ChoseSacrifices _ -> True
         _ -> False
-   in any isSacrifice responses
+   in length (filter isSacrifice responses)
 
 wasAskedToChooseCost :: [Response.Response] -> Bool
 wasAskedToChooseCost responses =
@@ -754,9 +760,106 @@ longtuskCubSpec s registry =
           after = S.runCombat S.aggressiveAnswer gs
       Spec.assertEqWith s "alice gained two energy" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 2
 
+-- Jarad, Golgari Lich Lord {B}{B}{G}{G} Legendary Creature -- Zombie Elf 2/2,
+-- "Sacrifice a Swamp and a Forest: Return this card from your graveyard to your
+-- hand" (Oracle text checked against Scryfall). alice has Jarad in her
+-- graveyard, one untapped Bayou, and whatever `extras` adds beside it, with
+-- priority in her own precombat main phase.
+--
+-- Not implemented: Jarad's other activated ability, "{1}{B}{G}, Sacrifice
+-- another creature: Each opponent loses life equal to the sacrificed creature's
+-- power" -- no quantity can read the power of a permanent sacrificed to pay a
+-- COST, so the card file omits the ability (#1061).
+--
+-- THE card for CR 118.3 across two components, and a Bayou is why: `Land --
+-- Forest Swamp` is one permanent that answers BOTH halves of the cost, so a gate
+-- that asks each half on its own says yes and a gate that asks them together
+-- says no. The Bayou is added first, so it sorts ahead of every extra and is
+-- what Replay.defaultAnswer picks out of a ChooseSacrifices.
+jaradBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+jaradBoard jarad bayou extras =
+  let add gs printing = snd (S.addCreature printing S.alice gs)
+      withExtras = List.foldl' add (S.landsInPlay bayou 1) extras
+      (jaradId, withJarad) = S.addGraveyardCard jarad S.alice withExtras
+   in ( jaradId,
+        withJarad
+          { GameState.phase = Phase.PrecombatMain,
+            GameState.activePlayer = S.alice,
+            GameState.priority = Just S.alice
+          }
+      )
+
+-- The names of alice's objects in one zone, sorted. CR 400.7 mints a fresh id
+-- on every zone change, so a permanent that paid a cost has to be found in the
+-- graveyard by name rather than by the id it was sacrificed under.
+namesIn :: Zone.Zone -> GameState.GameState -> [CardName.CardName]
+namesIn zone gs =
+  List.sort (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers zone S.alice gs))
+
+jaradSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jaradSpec s registry =
+  Spec.describe s "Jarad, Golgari Lich Lord" $ do
+    -- CR 118.3: "A player can't pay a cost without having the necessary
+    -- resources to pay it FULLY", read over the whole cost -- with CR 601.2h's
+    -- "partial payments are not allowed" and its permission to pay the parts "in
+    -- any order". NOT CR 118.10, which is about two different abilities.
+    Spec.it s "CR 118.3 one Bayou does not pay for a Swamp and a Forest" $ do
+      jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+      bayou <- S.printingOf s registry "Bayou"
+      forest <- S.printingOf s registry "Forest"
+      let cost = ActivatedAbility.cost (theAbility jarad)
+          (loneId, lone) = jaradBoard jarad bayou []
+          (pairId, pair) = jaradBoard jarad bayou [forest]
+      -- Guards the two below against passing vacuously off a card file that
+      -- states one component, or none.
+      Spec.assertEqWith s "the cost really has two components" (length (Cost.Type.components cost)) 2
+      -- And the control on the control: each component ALONE is payable off the
+      -- lone Bayou, so what refuses the cost is the joint reading and nothing
+      -- else -- not the mana part, not a zone gate, not a missing candidate.
+      Spec.assertBool
+        s
+        (all (\c -> Cost.canPayComponent S.alice loneId c lone) (Cost.Type.components cost))
+        "each component on its own is payable off the one Bayou"
+      Spec.assertBool s (not (Cost.canPay S.alice loneId cost lone)) "but the cost as a whole is not"
+      Spec.assertBool s (Cost.canPay S.alice pairId cost pair) "and a Forest beside the Bayou pays it"
+    -- The prompt-side half (#112). It holds by CONSTRUCTION rather than by any
+    -- guard: Cost.payComponents folds the components in the Game state monad and
+    -- Cost.payComponent's Sacrifice arm reads the state afresh, so the second
+    -- component's candidates are computed after the first component's
+    -- Event.sacrifice has moved its permanent off the battlefield. It still
+    -- DISCRIMINATES: threading the pre-payment state down from Cost.pay and
+    -- computing the candidates off that snapshot instead makes this ask twice
+    -- and sacrifice the Bayou twice.
+    --
+    -- Bayou, Swamp and Forest is the board that shows it: the Swamp component is
+    -- asked (two candidates for one slot), the answer takes the Bayou, and the
+    -- Forest component is then down to one candidate and elided. A gate that
+    -- offered the Bayou twice would ask twice and sacrifice one land.
+    Spec.it s "CR 601.2h the second sacrifice cannot be paid with what the first consumed" $ do
+      jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+      bayou <- S.printingOf s registry "Bayou"
+      forest <- S.printingOf s registry "Forest"
+      swamp <- S.printingOf s registry "Swamp"
+      let (jaradId, gs) = jaradBoard jarad bayou [swamp, forest]
+          activating = Activate.activateAbility S.alice jaradId (theAbility jarad)
+          asked = answersFor S.identityAnswer gs activating
+          after = S.runPure S.identityAnswer gs activating
+      Spec.assertEqWith s "asked to sacrifice exactly once" (sacrificePromptCount asked) 1
+      Spec.assertEqWith
+        s
+        "the Swamp is still on the battlefield"
+        (namesIn Zone.Battlefield after)
+        [CardName.MkCardName (Text.pack "Swamp")]
+      Spec.assertEqWith
+        s
+        "and the Bayou and the Forest are the two lands that paid"
+        (namesIn Zone.Graveyard after)
+        (fmap (CardName.MkCardName . Text.pack) ["Bayou", "Forest", "Jarad, Golgari Lich Lord"])
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cost" $ do
   doorSpec s registry
+  jaradSpec s registry
   greedSpec s registry
   villageRitesSpec s registry
   headlessSkaabSpec s registry

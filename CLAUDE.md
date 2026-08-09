@@ -136,6 +136,14 @@ to agents as written. What it doesn't say:
   dies in the commit that closes the issue. A comment citing the test that
   *proves* a behavior is a different genre and outlives the issue.
 
+  A BLOCKED issue records its blocker as a comment, never in the body:
+  `Blocked by #N --- <capability>. Derived against origin/main @ <sha>, <date>.`
+  One line, one blocker, fixed wording so it greps. A body edited to say it
+  drifts silently; a dated comment does not, and it lands in #N's own timeline.
+  The PR that lands a capability reads that timeline
+  (`gh api repos/tfausak/pawl/issues/N/timeline`) and says in its body which
+  issues it unblocked --- without that step the line is bookkeeping.
+
 - A spec or plan is optional, not ceremony --- write one when the unit warrants
   it and commit it in the same PR. If you are following a plan, work its tasks
   strictly in order, and never edit the plan, weaken an assertion, or delete a
