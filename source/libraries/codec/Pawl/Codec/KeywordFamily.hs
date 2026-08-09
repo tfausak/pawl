@@ -18,6 +18,7 @@ toJson f = Common.nullary $ case f of
   KeywordFamily.Flashback -> "Flashback"
   KeywordFamily.Morph -> "Morph"
   KeywordFamily.Entwine -> "Entwine"
+  KeywordFamily.Bushido -> "Bushido"
   KeywordFamily.Poisonous -> "Poisonous"
   KeywordFamily.Annihilator -> "Annihilator"
   KeywordFamily.Crew -> "Crew"
@@ -33,6 +34,7 @@ fromJson =
       ("Flashback", KeywordFamily.Flashback),
       ("Morph", KeywordFamily.Morph),
       ("Entwine", KeywordFamily.Entwine),
+      ("Bushido", KeywordFamily.Bushido),
       ("Poisonous", KeywordFamily.Poisonous),
       ("Annihilator", KeywordFamily.Annihilator),
       ("Crew", KeywordFamily.Crew),
