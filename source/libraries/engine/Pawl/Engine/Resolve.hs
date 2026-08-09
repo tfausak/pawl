@@ -94,6 +94,8 @@ import Pawl.Types.PlayerId (PlayerId)
 import Pawl.Types.PlayerRef (PlayerRef)
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Prevention as Prevention
+import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
@@ -194,8 +196,21 @@ slotsOf effect = case effect of
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
-  Effect.PreventNextDamage duration ref quantity ->
-    Set.unions [durationSlots duration, objectRefSlots ref, Quantity.slots quantity]
+  -- CR 615.5's rider reads slots of its own -- Test of Faith's "that creature"
+  -- is the spell's own target slot -- so its reads join this effect's, LESS the
+  -- reserved amount slot. That one is not a dangling read: the prevention itself
+  -- binds it, exactly as a trigger condition binds one for its ability's effects
+  -- (Event.eventBindingSlots), and Resolve.runPreventionRiders is the writer.
+  -- Subtracted here rather than added to `boundSlots` below, because the
+  -- Pawl.CardSpec sweep that forbids a CARD binding a reserved name reads that
+  -- one.
+  Effect.PreventNextDamage duration ref quantity rider ->
+    Set.unions
+      [ durationSlots duration,
+        objectRefSlots ref,
+        Quantity.slots quantity,
+        Set.delete Binding.eventAmount (foldMap slotsOf rider)
+      ]
   -- The same two reads, minus the shield size this opcode does not carry.
   Effect.PreventAllDamage duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
   -- BOTH ObjectRefs. Turn the Tables reads its target slot through the
@@ -331,8 +346,8 @@ slotsAreExhaustive effect = case effect of
   Effect.Replace duration _ _ condition _ ->
     durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
   Effect.SkipNextPhase _ _ -> True
-  Effect.PreventNextDamage duration _ quantity ->
-    durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity
+  Effect.PreventNextDamage duration _ quantity rider ->
+    durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity && all slotsAreExhaustive rider
   Effect.PreventAllDamage duration _ -> durationSlotsAreExhaustive duration
   Effect.RedirectDamage duration _ _ _ -> durationSlotsAreExhaustive duration
   Effect.Counter _ -> True
@@ -432,7 +447,10 @@ readsX = any effectReadsX
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
-      Effect.PreventNextDamage _ _ quantity -> Quantity.readsX quantity
+      -- CR 601.2b's X reaches the rider too, an X-cost shield's rider being
+      -- free to name the same X. No card in the pool does, but this half of the
+      -- contract is a lint the rider must not slip past.
+      Effect.PreventNextDamage _ _ quantity rider -> Quantity.readsX quantity || readsX (Foldable.toList rider)
       Effect.PreventAllDamage {} -> False
       Effect.RedirectDamage {} -> False
       Effect.Counter _ -> False
@@ -490,6 +508,11 @@ searchesLibrary effect = case effect of
   Effect.Create {} -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
+  -- Not descended into for CR 615.5's rider, because this classification is
+  -- asked of the RESOLUTION that is about to run: the rider runs later, from
+  -- Resolve.runPreventionRiders and outside any resolution, so a Search there
+  -- would need its window opened where it runs rather than here. No rider in
+  -- the pool searches.
   Effect.PreventNextDamage {} -> False
   Effect.PreventAllDamage {} -> False
   Effect.RedirectDamage {} -> False
@@ -608,7 +631,10 @@ boundSlots effect = case effect of
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.Replace {} -> Set.empty
   Effect.SkipNextPhase {} -> Set.empty
-  Effect.PreventNextDamage {} -> Set.empty
+  -- The shield itself binds nothing; CR 615.5's rider is an effect list like any
+  -- other, so a name IT authors is a name this card authors -- which is what
+  -- keeps Pawl.CardSpec's reserved-name sweep over the rider.
+  Effect.PreventNextDamage _ _ _ rider -> foldMap boundSlots rider
   Effect.PreventAllDamage {} -> Set.empty
   Effect.RedirectDamage {} -> Set.empty
   Effect.Counter _ -> Set.empty
@@ -1489,12 +1515,11 @@ offerCast resolving controller slot offer = do
 -- creature when the spell or ability that generates that effect resolves". Every
 -- producer in the pool names exactly one, so the fold is over a singleton today.
 --
--- Not implemented: CR 615.5's additional effect. The row carries a
--- ReplacementEffect and no payload, so a prevention that also does something --
--- Test of Faith's "for each 1 damage prevented this way, put a +1/+1 counter on
--- that creature" -- cannot be written (#689).
-installDamageRow :: PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> GameState -> Recipient -> GameState
-installDamageRow controller source duration kind rewrite g recipient = case Expiry.arm controller source duration g of
+-- The `rider` is CR 615.5's additional effect, Nothing for a row that has none.
+-- Only Effect.PreventNextDamage's arm ever passes one: the unbounded shield has
+-- no producer that wants one (#1107) and a redirection is not a prevention.
+installDamageRow :: PlayerId -> ObjectId -> Duration.Duration -> Maybe DamageKind.DamageKind -> DamageRewrite.DamageRewrite -> Maybe PreventionRider.PreventionRider -> GameState -> Recipient -> GameState
+installDamageRow controller source duration kind rewrite rider g recipient = case Expiry.arm controller source duration g of
   -- CR 611.2b: the duration never started, so no shield is installed.
   Nothing -> g
   Just expiry ->
@@ -1535,7 +1560,8 @@ installDamageRow controller source duration kind rewrite g recipient = case Expi
               -- CR 614.15: these rows replace damage from any source, including
               -- one this resolution is not itself dealing, so none of them is a
               -- self-replacement.
-              ActiveReplacement.origin = ReplacementOrigin.Other
+              ActiveReplacement.origin = ReplacementOrigin.Other,
+              ActiveReplacement.rider = rider
             }
      in g1 {GameState.replacements = active : GameState.replacements g1}
 
@@ -1590,7 +1616,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- An unevaluable quantity is a no-op, the powerOf posture.
       Nothing -> pure ()
       Just n ->
-        Monad.when (n > 0) $
+        Monad.when (n > 0) $ do
           -- The applied effect IS the event (the M3a spec, section 4):
           -- constructing these DamageEvents and funneling them is the whole
           -- application. CR 120.3e / 120.3a live in applyDamage.
@@ -1600,6 +1626,10 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           -- with flying" needs, and applyDamage is the funnel that keeps it (its
           -- haddock carries the CR 615/616 reading of a batch).
           Damage.applyDamage (fmap (\recipient -> Damage.damageEvent gs DamageKind.Noncombat source recipient (Integer.toNaturalSaturating n)) recipients)
+          -- CR 615.5's "immediately afterward", for damage a resolution deals:
+          -- a shield this damage spent runs its additional effect here, inside
+          -- the same resolution, rather than waiting for the next SBA check.
+          runPreventionRiders
   Effect.ModifyTarget duration modification ref ->
     State.modify' $ \gs ->
       -- The affected objects are enumerated ONCE, here, by the same sweep every
@@ -2572,10 +2602,11 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                         ActiveReplacement.timestamp = ts,
                         ActiveReplacement.expiry = expiry,
                         ActiveReplacement.uses = uses,
-                        ActiveReplacement.origin = origin
+                        ActiveReplacement.origin = origin,
+                        ActiveReplacement.rider = Nothing
                       }
                in gs1 {GameState.replacements = active : GameState.replacements gs1}
-  Effect.PreventNextDamage duration ref quantity -> do
+  Effect.PreventNextDamage duration ref quantity riderEffects -> do
     -- CR 615.3 / 615.7: install one floating prevention shield per recipient the
     -- ref names -- "Prevent the next 4 damage that would be dealt to any target
     -- this turn" (Mending Hands). Pawl.Engine.Replacement consults it at the damage
@@ -2597,6 +2628,21 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     let viewOf = Projection.viewWithLastKnown source gs
         context = Filter.MkContext (Just controller) (Just source)
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
+        -- CR 615.5: the additional effect, BAKED onto the row with the
+        -- environment it will need -- this resolution's chosen targets, which is
+        -- what lets "that creature" still name something once CR 400.7 has
+        -- replaced the spell, and CR 109.5's "you". Nothing when the card wrote
+        -- no such clause, so an ordinary shield carries no payload at all.
+        rider =
+          if Seq.null riderEffects
+            then Nothing
+            else
+              Just
+                PreventionRider.MkPreventionRider
+                  { PreventionRider.effects = riderEffects,
+                    PreventionRider.targets = chosen,
+                    PreventionRider.controller = controller
+                  }
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       -- An unevaluable quantity is a no-op, the powerOf posture DealDamage takes.
       Nothing -> pure ()
@@ -2605,7 +2651,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- the same state `setShield` leaves a spent one in.
         Monad.when (n > 0) . State.modify' $ \g0 ->
           let amount = Integer.toNaturalSaturating n
-           in List.foldl' (installDamageRow controller source duration Nothing (DamageRewrite.PreventNext amount)) g0 recipients
+           in List.foldl' (installDamageRow controller source duration Nothing (DamageRewrite.PreventNext amount) rider) g0 recipients
   Effect.PreventAllDamage duration ref -> do
     -- CR 615.1 / 615.3: install one floating prevention shield per recipient the
     -- ref names, with no amount to count down -- "prevent all damage that would
@@ -2617,7 +2663,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- Through Damage.damageRecipient for PreventNextDamage's reason (CR 120.1a).
     gs <- State.get
     let recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
-    State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration Nothing DamageRewrite.PreventAll) g0 recipients
+    State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration Nothing DamageRewrite.PreventAll Nothing) g0 recipients
   Effect.RedirectDamage duration kind srcRef destRef -> do
     -- CR 614.9: install a floating redirection effect -- Turn the Tables' "all
     -- combat damage that would be dealt to you this turn is dealt to target
@@ -2636,7 +2682,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- nothing and no row is installed.
     case recipientsOf destRef of
       [dest] ->
-        State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration kind (DamageRewrite.Redirect dest)) g0 (recipientsOf srcRef)
+        State.modify' $ \g0 -> List.foldl' (installDamageRow controller source duration kind (DamageRewrite.Redirect dest) Nothing) g0 (recipientsOf srcRef)
       _ -> pure ()
   Effect.SkipNextPhase ref selector -> do
     -- CR 614.1b: "effects that use the word 'skip' are replacement effects", so
@@ -2683,7 +2729,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                     ActiveReplacement.timestamp = ts,
                     ActiveReplacement.expiry = Expiry.Type.Never,
                     ActiveReplacement.uses = Uses.Once,
-                    ActiveReplacement.origin = ReplacementOrigin.Other
+                    ActiveReplacement.origin = ReplacementOrigin.Other,
+                    ActiveReplacement.rider = Nothing
                   }
            in g1 {GameState.replacements = active : GameState.replacements g1}
     State.modify' (\g -> List.foldl' (flip install) g named)
@@ -3181,6 +3228,68 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
 -- PlaySubgame resolves as a draw here (see noSubgame).
 applyEffect :: ObjectId -> ObjectId -> PlayerId -> Map.Map SlotName Bool -> Map.Map SlotName Recipient -> Effect Card.Type.Card -> Game ()
 applyEffect = applyEffectWith noSubgame
+
+-- CR 615.5: run the additional effect of every prevention that has just been
+-- applied -- "the prevention takes place at the time the original event would
+-- have happened; the rest of the effect takes place immediately afterward".
+--
+-- Drains GameState.pendingPreventionRiders, which Pawl.Engine.Damage filled. The
+-- queue exists because that module is BELOW this one and cannot run a card's
+-- effects; this is the seam, and its two callers (this module's DealDamage arm
+-- and Pawl.Engine.Engine's combat damage step) both run it before the board can
+-- be observed and, decisively, before the next state-based action check. That
+-- ordering IS the rule: Test of Faith's 2004-12-01 ruling puts the counters on
+-- "at the same time the damage is prevented", so a 1/1 dealt 6 ends as a 4/4
+-- with 3 marked rather than dying to CR 704.5g first.
+--
+-- Emptied BEFORE the riders run, so a rider whose own damage is prevented by a
+-- second shield appends to a fresh queue instead of being re-run here.
+runPreventionRiders :: Game ()
+runPreventionRiders = do
+  queued <- State.gets GameState.pendingPreventionRiders
+  State.modify' (\gs -> gs {GameState.pendingPreventionRiders = Seq.empty})
+  Foldable.traverse_ runPreventionRider queued
+
+-- One queued prevention's additional effect. Nothing to run unless the
+-- prevention carries a rider AND its recipient is an object.
+--
+-- The recipient's OBJECT is where the prevented amount is stamped, and it is the
+-- only place it can be: CR 615.5's clause "may refer to the amount of damage
+-- that was prevented" is a Quantity.InSlot read of the reserved
+-- Binding.eventAmount slot, which Quantity.evaluateFor answers off a live
+-- object, and the spell that installed the shield went to its owner's graveyard
+-- as a new object long ago (CR 400.7). The shielded permanent is live by
+-- construction -- it is what the damage was addressed to. A shield over a PLAYER
+-- has no such object, so its rider does not run (#1104).
+--
+-- The stamp is UNDONE afterwards, restoring whatever was there. It is the one
+-- writer that puts Binding.eventAmount on a BATTLEFIELD permanent -- the other
+-- two write to a resolving object's own bindings -- and Quantity.evaluateFor
+-- asks an effect's SOURCE before the object on the stack, so a value left behind
+-- here would shadow the amount a later CR 615.13 trigger of that same permanent
+-- supplied. No board in the pool reaches that collision, so this is a fence
+-- rather than a fix: it has no test, and mutating it away leaves the suite
+-- green.
+--
+-- `resolving` and `source` are both the recipient: the rider is not resolving
+-- from the stack, and the recipient is the one object it can read anything off.
+-- Every slot the rider names is treated as a LEGAL target, because CR 608.2b was
+-- applied when the installing spell resolved -- a shield exists only because its
+-- target was legal then -- and the rider re-targets nothing.
+runPreventionRider :: Prevention.Prevention -> Game ()
+runPreventionRider prevention = case (Prevention.rider prevention, Recipient.objectOf (Prevention.recipient prevention)) of
+  (Just rider, Just oid) -> do
+    was <- State.gets (\gs -> Map.lookup Binding.eventAmount (maybe Map.empty Object.bindings (Game.lookupObject oid gs)))
+    State.modify' (bindAmountSlot oid Binding.eventAmount (Prevention.amount prevention))
+    let targets = PreventionRider.targets rider
+        legality = fmap (const True) targets
+    Foldable.traverse_
+      (applyEffect oid oid (PreventionRider.controller rider) legality targets)
+      (PreventionRider.effects rider)
+    State.modify' $ \gs ->
+      let restore obj = obj {Object.bindings = Map.alter (const was) Binding.eventAmount (Object.bindings obj)}
+       in gs {GameState.objects = Map.adjust restore oid (GameState.objects gs)}
+  _ -> pure ()
 
 -- CR 103.5b / CR 103.6: perform the effects of an action a card grants from a
 -- player's hand. Pawl.Engine.Mulligan's two window loops reach this through the

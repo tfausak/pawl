@@ -23,6 +23,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhasedOut as PhasedOut
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.RestartSignal as RestartSignal
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Timestamp as Timestamp
@@ -184,6 +185,21 @@ data GameState = MkGameState
     -- The event-pipeline analog of continuousEffects; a permanent's STATIC
     -- replacement abilities are not here -- the projection re-derives those live.
     replacements :: [ActiveReplacement.ActiveReplacement],
+    -- | CR 615.5: prevention applications whose additional effect has not run
+    -- yet, oldest first. A QUEUE rather than a return value, because the module
+    -- that applies a prevention (Pawl.Engine.Damage, below Pawl.Engine.Resolve)
+    -- cannot run a card's effects and the module that can is two funnels away --
+    -- widening the return type instead would reach every DamageSpec call site.
+    --
+    -- Filled by Damage.applyDamage with the preventions that carry a rider and
+    -- drained by Resolve.runPreventionRiders, which its two callers run
+    -- immediately after the damage and BEFORE the next state-based action check
+    -- (CR 704.3). That gap is where the rule lives: the counters Test of Faith
+    -- puts on are on before CR 704.5g asks whether the creature died.
+    --
+    -- Empty at every priority window the engine reaches, so nothing else has to
+    -- know it exists.
+    pendingPreventionRiders :: Seq.Seq Prevention.Prevention,
     -- | CR 611.1 / 613.11: stored PLAYER and RULES-modifying continuous effects
     -- from resolutions (Silence), each with an expiry the Pawl.Engine.Expiry
     -- sweeps consult. A permanent's printed player abilities are NOT here --

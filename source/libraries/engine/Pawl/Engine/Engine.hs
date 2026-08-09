@@ -426,6 +426,11 @@ runTurnBasedActions phase = do
       -- splice a second combat damage step in after it. The between-steps
       -- priority (CR 510.3) and SBA check come free from the step machinery.
       needSecond <- Damage.dealCombatDamage
+      -- CR 615.5's "immediately afterward": a shield this wave spent runs its
+      -- additional effect HERE, before the step's SBA check, so Test of Faith's
+      -- +1/+1 counters are on the blocker before CR 704.5g asks whether the
+      -- damage it did take was lethal.
+      Resolve.runPreventionRiders
       Monad.when needSecond $
         State.modify' (\gs -> gs {GameState.remaining = Turn.spliceSecondDamage (GameState.remaining gs)})
     -- CR 505.4 / 703.4f / 714.3c: "immediately after a player's precombat main

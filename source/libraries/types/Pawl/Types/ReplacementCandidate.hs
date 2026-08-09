@@ -4,6 +4,7 @@ import qualified Pawl.Types.CandidateId as CandidateId
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.PreventionRider as PreventionRider
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.ReplacementOrigin as ReplacementOrigin
 import qualified Pawl.Types.Uses as Uses
@@ -48,6 +49,11 @@ data ReplacementCandidate = MkReplacementCandidate
     -- one that applied and the other outlives it by a different rule (CR 614.10a's
     -- "the other will remain until another occurrence can be skipped").
     lifetime :: Maybe (Expiry.Expiry, Uses.Uses),
-    origin :: ReplacementOrigin.ReplacementOrigin
+    origin :: ReplacementOrigin.ReplacementOrigin,
+    -- | CR 615.5's additional effect, copied off a FLOATING row. Nothing for a
+    -- permanent's static replacement ability, which has no field to carry one
+    -- (#1105) -- not a missing value, since no such ability in the pool has an
+    -- additional effect the engine could run.
+    rider :: Maybe PreventionRider.PreventionRider
   }
   deriving (Eq, Ord, Show)

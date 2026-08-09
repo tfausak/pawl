@@ -5,6 +5,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
@@ -783,6 +784,19 @@ applyDamage events = do
               dealt
               (concatMap (\ev -> lifeLostBy ev <> lifeGainedBy ev) survivors <> removalsBetween gs marked)
     )
+  -- CR 615.5: "the rest of the effect takes place immediately afterward". This
+  -- module cannot run it -- Pawl.Engine.Resolve depends on this one -- so the
+  -- applications that carry an additional effect are QUEUED and Resolve drains
+  -- them, which both of this function's callers do before anything else can
+  -- observe the board. Only the ones with a rider, so the queue is empty on
+  -- every board but the handful this rule reaches.
+  --
+  -- Appended AFTER the records above, which is the order the two happened in:
+  -- the CR 608.2i record is of the prevention itself and the rider is the "rest
+  -- of the effect". Nothing is inspected here; the rider is an opaque payload
+  -- copied from Prevention to the queue.
+  State.modify' $ \gs ->
+    gs {GameState.pendingPreventionRiders = GameState.pendingPreventionRiders gs <> Seq.fromList (filter (Maybe.isJust . Prevention.rider) prevented)}
 
 -- Deal one combat damage step, returning True iff this was the FIRST of two --
 -- i.e. a second combat damage step must be spliced (CR 510.4).

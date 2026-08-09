@@ -1,6 +1,7 @@
 module Pawl.Codec.Effect where
 
 import qualified Data.Maybe as Maybe
+import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.CastOffer as CastOffer
@@ -116,7 +117,13 @@ toJson codec e = case e of
     Common.tagged "Replace" . Just . Common.array $
       [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
   Effect.SkipNextPhase r sel -> Common.tagged "SkipNextPhase" (Just (Common.array [PlayerRef.toJson r, PhaseSelector.toJson sel]))
-  Effect.PreventNextDamage d r q -> Common.tagged "PreventNextDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r, Quantity.toJson q]))
+  -- CR 615.5's additional effect is ELIDED when it is empty, which is Create's
+  -- posture above and every other prevention in the corpus: a shield with no
+  -- rider stays the three-element form it has always had.
+  Effect.PreventNextDamage d r q rider ->
+    Common.tagged "PreventNextDamage" . Just . Common.array $
+      [Duration.toJson d, ObjectRef.toJson r, Quantity.toJson q]
+        <> [Common.encodeSeq (toJson codec) rider | not (Seq.null rider)]
   Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   Effect.RedirectDamage d k f t -> Common.tagged "RedirectDamage" (Just (Common.array [Duration.toJson d, Common.encodeMaybe DamageKind.toJson k, ObjectRef.toJson f, ObjectRef.toJson t]))
   Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
@@ -300,8 +307,10 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [r, sel])) -> Effect.SkipNextPhase <$> PlayerRef.fromJson r <*> PhaseSelector.fromJson sel
       _ -> Left . Text.pack $ "SkipNextPhase expects [playerRef, phaseSelector]"
     "PreventNextDamage" -> case mv of
-      Just (Value.Array (Array.MkArray [d, r, q])) -> Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q
-      _ -> Left . Text.pack $ "PreventNextDamage expects [Duration, ObjectRef, Quantity]"
+      Just (Value.Array (Array.MkArray [d, r, q])) -> Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q <*> pure Seq.empty
+      Just (Value.Array (Array.MkArray [d, r, q, rider])) ->
+        Effect.PreventNextDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r <*> Quantity.fromJson q <*> Common.decodeSeq (fromJson decode) rider
+      _ -> Left . Text.pack $ "PreventNextDamage expects [Duration, ObjectRef, Quantity], optionally with a CR 615.5 rider"
     "PreventAllDamage" -> case mv of
       Just (Value.Array (Array.MkArray [d, r])) -> Effect.PreventAllDamage <$> Duration.fromJson d <*> ObjectRef.fromJson r
       _ -> Left . Text.pack $ "PreventAllDamage expects [Duration, ObjectRef]"
