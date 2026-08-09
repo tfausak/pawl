@@ -7,9 +7,9 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | What a player with priority may do. CR 116.2 lists twelve SPECIAL actions
--- and three of them are here -- CR 116.2a's land play, CR 116.2b's turning a
--- face-down permanent face up and CR 116.2m's unlock cost; the tracker for the
--- other nine is #875. Grows.
+-- and four of them are here -- CR 116.2a's land play, CR 116.2b's turning a
+-- face-down permanent face up, CR 116.2e's Circling Vultures discard and CR
+-- 116.2m's unlock cost; the tracker for the other eight is #875. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
@@ -84,4 +84,16 @@ data Action
     -- cost, so Pawl.Engine.Room reads it off the card rather than the player
     -- naming it.
     Unlock ObjectId.ObjectId CardName.CardName
+  | -- | CR 116.2e: discard a card in your hand whose own text grants the
+    -- permission. It does not use the stack (CR 116.1), so it is an Action
+    -- rather than anything that goes through Pawl.Engine.Stack, exactly as CR
+    -- 116.2a's land play is.
+    --
+    -- Carries only the object, TurnFaceUp's shape: CR 116.2e leaves nothing to
+    -- choose. Which card is discarded is the card whose ability it is, and there
+    -- is no cost.
+    --
+    -- CR 116.1 is also why this is only ever OFFERED: a special action is not
+    -- one the game generates, so the engine never takes it unasked.
+    DiscardFromHand ObjectId.ObjectId
   deriving (Eq, Ord, Show)

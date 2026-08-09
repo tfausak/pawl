@@ -122,3 +122,10 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       fromJson
       (CostComponent.ExileCardsFromGraveyard 1 (Filter.HasCardType CardType.Creature))
       """ {"type":"ExileCardsFromGraveyard","value":[1,{"type":"HasCardType","value":{"type":"Creature"}}]} """
+  Spec.it s "ExileTopFromGraveyard" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (CostComponent.ExileTopFromGraveyard (Filter.HasCardType CardType.Creature))
+      """ {"type":"ExileTopFromGraveyard","value":{"type":"HasCardType","value":{"type":"Creature"}}} """

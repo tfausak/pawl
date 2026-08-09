@@ -166,6 +166,7 @@ vanillaFace name typeLine =
       Face.attackCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
+      Face.specialActions = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
       Face.enchant = [],
@@ -1488,6 +1489,9 @@ costComponentFilters component = case component of
   CostComponent.TapForTotalPower _ f -> [f]
   -- CR 406.2 as a cost: Headless Skaab's "a creature card from your graveyard".
   CostComponent.ExileCardsFromGraveyard _ f -> [f]
+  -- CR 406.2 again: Circling Vultures' "the top creature card of your
+  -- graveyard".
+  CostComponent.ExileTopFromGraveyard f -> [f]
   CostComponent.TapThis -> []
   CostComponent.UntapThis -> []
   CostComponent.SacrificeThis -> []
@@ -1967,7 +1971,7 @@ activatedAbilityFilters ability =
     <> modalFilters (ActivatedAbility.modal ability)
 
 -- EVERY Filter position reachable from a card, each paired with whether an attach
--- frames it. Twenty of Pawl.Types.Face's twenty-eight fields can hold one, and
+-- frames it. Twenty-one of Pawl.Types.Face's thirty-one fields can hold one, and
 -- here is where each one's comes from:
 --
 --   * `keywords` -- CR 702.29e typecycling (Ash Barrens' landcycling).
@@ -1989,15 +1993,16 @@ activatedAbilityFilters ability =
 --   * `mulliganActions` (CR 103.5b) and `openingHandActions` (CR 103.6) -- the two
 --     pregame actions, which `cardResolutionEffects` above does not reach.
 --
--- The other eight fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
--- `colorIndicator`, `counterability`, `castingPermissions` and
--- `castingRestrictions`. That is checkable rather than asserted: exactly thirteen
--- modules under Pawl.Types import Pawl.Types.Filter -- Affected, CostComponent,
--- Count, CounterPattern, Effect, EntryRewrite, Keyword, ObjectRef, PlayerEffect,
--- Prompt, ReplacementEffect, TargetSpec and TriggerCondition -- and nothing those
--- eight fields reach is one of them.
+-- The other ten fields hold none: `name`, `manaCost`, `typeLine`, `loyalty`,
+-- `defense`, `colorIndicator`, `counterability`, `castingPermissions`,
+-- `castingRestrictions` and `specialActions`. That is checkable rather than
+-- asserted: exactly sixteen modules under Pawl.Types import Pawl.Types.Filter --
+-- Affected, CostComponent, Count, CounterPattern, Effect, EntryRewrite, Keyword,
+-- MillTally, ObjectRef, PlayerEffect, Prompt, ReplacementEffect, TargetSpec,
+-- TriggerCondition, TurnUpRewrite and ZoneChangePattern -- and nothing those ten
+-- fields reach is one of them.
 --
--- Twenty-one and eight is twenty-nine, the whole record.
+-- Twenty-one and ten is thirty-one, the whole record.
 --
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
