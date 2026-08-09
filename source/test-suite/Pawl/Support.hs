@@ -1520,7 +1520,17 @@ countOf ::
   GameState.GameState ->
   Count.Type.Count Quantity.Type.Quantity ->
   Maybe Integer
-countOf viewOf context gs = Count.evaluate viewOf (Quantity.evaluate viewOf context gs) context gs
+countOf viewOf context gs =
+  Count.evaluate
+    viewOf
+    -- The library reads each member against the RESOLVING object's announced X
+    -- (Pawl.Engine.Quantity's Count arm); a fixture has no resolving object, so
+    -- each member stands in for itself. A member with no object at all -- a
+    -- Scope.InHistory candidate, whose view is a CR 608.2h snapshot -- gets
+    -- noSource, which names nothing and so binds nothing.
+    (\mOid view -> Quantity.evaluateAgainst viewOf context gs (Maybe.fromMaybe noSource mOid) mOid (Just view))
+    context
+    gs
 
 -- Shared by Pawl.CountSpec and Pawl.ConditionSpec: a stub ViewOf, so a
 -- Pawl.Engine.Count.evaluate fold is exercised apart from any real projection. Every
