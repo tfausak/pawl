@@ -7,6 +7,7 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
@@ -241,11 +242,18 @@ data Object = MkObject
     -- because CR 400.7 makes the moved object a new one that has never
     -- transformed.
     turnedOverAt :: Maybe Timestamp.Timestamp,
-    -- | CR 715.3d: the player who may play this card while it remains exiled --
-    -- an Adventure spell's controller, written as the resolution that exiled it
-    -- finishes. Nothing for every object that did not get there that way, which
-    -- is what the rule's own "if an adventurer card ends up in exile for any
-    -- other reason" means.
+    -- | CR 601.3: the standing permission to play this card, as the player who
+    -- holds it and the duration it lasts. Nothing for every object nothing has
+    -- permitted, which is almost all of them -- and for an adventurer card that
+    -- reached exile some other way, which is what CR 715.3d's own ruling ("if an
+    -- adventurer card ends up in exile for any other reason") means.
+    --
+    -- TWO producers, one field. Pawl.Engine.Resolve.finishSpell writes CR
+    -- 715.3d's ("for as long as that card remains exiled, that player may play
+    -- it"), and Effect.GrantPlayFromExile writes the one a card states, with the
+    -- duration it states. The first takes Expiry.Never, because CR 715.3d states
+    -- no duration and CR 611.2a's default is the end of the game -- CR 400.7
+    -- ends that one, not a sweep.
     --
     -- STATE, where every other casting permission pawl has is a fact about a
     -- CARD: Face.castingPermissions and Pawl.Engine.Keyword.castingPermissionsOf
@@ -257,17 +265,20 @@ data Object = MkObject
     -- Per-incarnation, like damage and counters: cleared by newIncarnation, because
     -- CR 400.7 makes the moved object a new one. That IS CR 715.3d's "for as
     -- long as that card remains exiled" -- the permission ends when the card
-    -- leaves, with no sweep to run and nothing to unwind.
+    -- leaves, with no sweep to run and nothing to unwind. A STATED duration is
+    -- the part that does need a sweep, and Pawl.Engine.Expiry runs it over this
+    -- field as its fifth carrier.
     --
-    -- The player is the Adventure's CONTROLLER (CR 715.3d's "its controller
-    -- exiles it"), while Pawl.Engine.Game.zoneMembers filters exile by OWNER --
-    -- so a player who cast an opponent's adventurer card is named here and still
-    -- cannot find the card (#668).
+    -- The player is the granting effect's controller (CR 109.5, and CR 715.3d's
+    -- "its controller exiles it"), while Pawl.Engine.Game.zoneMembers filters
+    -- exile by OWNER -- so a player permitted to play someone else's exiled card
+    -- is named here and still cannot find it (#668).
     --
-    -- PLAYABLE and not castable, after the rule's own word. What reads it is
-    -- narrower than that: only Pawl.Engine.Cast does, so a land under this
-    -- permission would be permitted nothing (#670).
-    playableFromExileBy :: Maybe PlayerId.PlayerId,
+    -- PLAYABLE and not castable, after the rules' own word (CR 601.1a: "playing
+    -- a card means playing that card as a land or casting that card as a spell").
+    -- What reads it is narrower than that: only Pawl.Engine.Cast does, so a land
+    -- under this permission would be permitted nothing (#670).
+    playableFromExile :: Maybe ExilePlayPermission.ExilePlayPermission,
     -- | CR 701.54b: the Ring-bearer designation, as the player it was made for.
     -- Nothing for every permanent that is not anyone's Ring-bearer, which is
     -- almost all of them.
@@ -409,7 +420,7 @@ newIncarnation object =
       chosenNames = Set.empty,
       face = Nothing,
       turnedOverAt = Nothing,
-      playableFromExileBy = Nothing,
+      playableFromExile = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,
       unlockedHalves = Set.empty

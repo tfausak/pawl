@@ -592,6 +592,19 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.GainControl Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Enchantment)))
       """ {"type":"GainControl","value":[{"type":"Indefinite"},{"type":"HasCardType","value":{"type":"Enchantment"}}]} """
+  Spec.it s "GrantPlayFromExile round-trips both ObjectRef arms" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.GrantPlayFromExile Duration.UntilEndOfTurn (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))))
+      """ {"type":"GrantPlayFromExile","value":[{"type":"UntilEndOfTurn"},"exiled"]} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.GrantPlayFromExile Duration.Indefinite (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"GrantPlayFromExile","value":[{"type":"Indefinite"},{"type":"HasCardType","value":{"type":"Creature"}}]} """
   -- The shapes the encoder can emit, told apart by LENGTH: a bare ability name
   -- (CR 603.7a/b's defaults), a two-element form (a stated duration, onset
   -- still the default), and a three-element form (a stated onset, whose last

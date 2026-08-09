@@ -25,6 +25,8 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Deck as Deck
 import qualified Pawl.Types.Departure as Departure.Type
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
+import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.Player as Player
@@ -232,7 +234,7 @@ dirtied pid object =
       Object.chosenNames = Set.singleton (CardName.MkCardName (Text.pack "Mountain")),
       Object.face = Just (CardName.MkCardName (Text.pack "Mountain")),
       Object.turnedOverAt = Just (Timestamp.MkTimestamp 1),
-      Object.playableFromExileBy = Just pid,
+      Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never),
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
       Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna"))

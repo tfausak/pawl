@@ -527,6 +527,10 @@ effectCounts effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
   Effect.OfferCast {} -> []
+  -- The Duration's Condition, exactly as GainControl's: Victor Mancha, Runaway's
+  -- "for as long as you control this creature" is a Count, and dropping it here
+  -- would take its Filters out of the lint with it.
+  Effect.GrantPlayFromExile duration _ -> durationCounts duration
 
 -- Every Count reachable from one triggered ability (a card's own, or a
 -- delayed one -- both TriggeredAbility Card): its TriggerCondition, its
@@ -744,6 +748,7 @@ effectReplacements effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
   Effect.OfferCast {} -> []
+  Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
 
 -- #437: does this replacement carry a PhasePattern with a BAKED player in it?
@@ -1210,6 +1215,7 @@ effectMintedFaces effect = case effect of
   Effect.TakeExtraTurn {} -> []
   Effect.ShuffleIntoLibrary _ -> []
   Effect.OfferCast {} -> []
+  Effect.GrantPlayFromExile {} -> []
   Effect.ChangeText {} -> []
 
 -- Every slot ONE FACE declares as a target: its spell modes plus CR 303.4a's
@@ -1886,6 +1892,10 @@ effectFilters effect = case effect of
   Effect.TakeExtraTurn _ _ -> []
   Effect.ShuffleIntoLibrary _ -> []
   Effect.OfferCast {} -> []
+  -- Both, as GainControl's arm does: the Duration's Condition carries Victor
+  -- Mancha, Runaway's IsSource and ControlledBy, and an empty list here would
+  -- take them out of the lint without failing anything.
+  Effect.GrantPlayFromExile duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
 
 -- Per MODE rather than through Modal.allTargetSpecs, which is a Map.unions and so
 -- collapses two modes declaring the same slot name (#475) -- the cross-check

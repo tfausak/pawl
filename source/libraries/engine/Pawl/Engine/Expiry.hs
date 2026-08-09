@@ -2,14 +2,19 @@
 -- may case on Pawl.Types.Expiry -- the standing Pawl.Engine.Resolve has over
 -- Effect and Pawl.Engine.Projection over Modification. It owns the
 -- transformation from the PRINTED Duration to the STORED Expiry (`arm`) and
--- every sweep that ends one, over four carriers that share one expiry
--- vocabulary and so share one sweep. The delayed-trigger carrier differs only
--- in carrying MAYBE an expiry, because CR 603.7b lets a delayed ability have no
--- stated duration at all.
+-- every sweep that ends one, over five carriers that share one expiry
+-- vocabulary and so share one sweep. Two of the five carry MAYBE an expiry
+-- rather than one outright, for different reasons: a delayed trigger may state
+-- no duration at all (CR 603.7b), and an object's play permission (CR 601.3,
+-- Object.playableFromExile) is usually absent entirely -- so where the other
+-- three carriers are DROPPED from a list, the permission is CLEARED on an object
+-- that stays.
 module Pawl.Engine.Expiry where
 
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
+import qualified Data.Map.Strict as Map
+import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
@@ -20,11 +25,13 @@ import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import Pawl.Types.Duration (Duration)
 import qualified Pawl.Types.Duration as Duration
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import Pawl.Types.Expiry (Expiry)
 import qualified Pawl.Types.Expiry as Expiry
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
@@ -77,7 +84,8 @@ dropAtCleanup gs =
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
+          GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
         }
 
 -- CR 611.2b: drop every While whose condition has stopped holding. The effect
@@ -90,7 +98,9 @@ dropAtCleanup gs =
 -- checking here is indistinguishable from checking continuously.
 --
 -- `filter` only removes elements and preserves the survivors' order, so a
--- LENGTH compare is equivalent to a deep structural `/=` and cheaper.
+-- LENGTH compare is equivalent to a deep structural `/=` and cheaper. The
+-- permission carrier answers the same question with anyPermissionEnded, which is
+-- a scan and not a rebuild.
 -- `State.put` is skipped when nothing changed, so a no-op sweep does not
 -- rewrite the GameState.
 sweepConditional :: Game Bool
@@ -110,20 +120,49 @@ sweepConditional = do
       keptReplacements = filter keepReplacement (GameState.replacements gs)
       keptPlayerEffects = filter keepPlayerEffect (GameState.playerEffects gs)
       keptDelayed = Seq.filter keepDelayed (GameState.delayedTriggers gs)
+      keepPermission permission = survives (ExilePlayPermission.source permission) (ExilePlayPermission.expiry permission)
+      keptObjects = clearedPermissions keepPermission gs
       changed =
         length keptEffects /= length (GameState.continuousEffects gs)
           || length keptReplacements /= length (GameState.replacements gs)
           || length keptPlayerEffects /= length (GameState.playerEffects gs)
           || Seq.length keptDelayed /= Seq.length (GameState.delayedTriggers gs)
+          -- Omitting this term would be silent: settleForPriority would not run
+          -- again, and a permission whose loss changes what a player may do would
+          -- be observed one settle late.
+          || anyPermissionEnded keepPermission gs
   Monad.when changed $
     State.put
       gs
         { GameState.continuousEffects = keptEffects,
           GameState.replacements = keptReplacements,
           GameState.playerEffects = keptPlayerEffects,
-          GameState.delayedTriggers = keptDelayed
+          GameState.delayedTriggers = keptDelayed,
+          GameState.objects = keptObjects
         }
   pure changed
+
+-- Has any permission on the board ended under this test? The question the whole
+-- carrier is asked through, and it is a SCAN rather than a rebuild: almost every
+-- board carries no permission at all, and sweepConditional runs at every settle.
+anyPermissionEnded :: (ExilePlayPermission.ExilePlayPermission -> Bool) -> GameState -> Bool
+anyPermissionEnded survives gs =
+  not (all survives (Maybe.mapMaybe Object.playableFromExile (Map.elems (GameState.objects gs))))
+
+-- CR 601.3's permission, ended. CLEARED rather than dropped, which is the one
+-- way this carrier differs from the other four: they are entries in a list that
+-- goes away, and this is a field on an object that stays. Nothing else about the
+-- object is touched, an object with no permission is left exactly as it was, and
+-- the map is rebuilt only when something actually ended.
+clearedPermissions :: (ExilePlayPermission.ExilePlayPermission -> Bool) -> GameState -> Map.Map ObjectId Object.Object
+clearedPermissions survives gs =
+  let clear object =
+        if maybe True survives (Object.playableFromExile object)
+          then object
+          else object {Object.playableFromExile = Nothing}
+   in if anyPermissionEnded survives gs
+        then Map.map clear (GameState.objects gs)
+        else GameState.objects gs
 
 -- CR 611.2a: a duration a spell or ability states lasts as long as it says, so
 -- an until-your-next-turn duration ends as that player's turn begins.
@@ -152,7 +191,8 @@ dropAtTurnOf pid gs =
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
+          GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
         }
 
 -- CR 500.5's first clause: effects lasting until the end of a step or phase
@@ -182,5 +222,6 @@ dropAtEndOf ending gs =
         { GameState.continuousEffects = filter keepEffect (GameState.continuousEffects gs),
           GameState.replacements = filter keepReplacement (GameState.replacements gs),
           GameState.playerEffects = filter keepPlayerEffect (GameState.playerEffects gs),
-          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs)
+          GameState.delayedTriggers = Seq.filter keepDelayed (GameState.delayedTriggers gs),
+          GameState.objects = clearedPermissions (survives . ExilePlayPermission.expiry) gs
         }

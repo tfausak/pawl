@@ -1268,6 +1268,11 @@ rewriteEffect pairs effect = case effect of
   Effect.TakeExtraTurn {} -> effect
   Effect.ShuffleIntoLibrary _ -> effect
   Effect.OfferCast {} -> effect
+  -- The ObjectRef alone, exactly as GainControl above: the Duration is left
+  -- untouched, so a ForAsLongAs Condition's Filters are not rewritten. That
+  -- asymmetry is GainControl's and predates this opcode; matching it keeps the
+  -- two arms one behaviour rather than two.
+  Effect.GrantPlayFromExile duration ref -> Effect.GrantPlayFromExile duration (rewriteObjectRef pairs ref)
 
 -- CR 612.2 over one word whose family a card's text names rather than a
 -- constructor -- a ChangeText's forbidden-word set.

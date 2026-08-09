@@ -77,3 +77,4 @@ manaProduced effect = case effect of
   Effect.TakeExtraTurn {} -> Nothing
   Effect.ShuffleIntoLibrary _ -> Nothing
   Effect.OfferCast {} -> Nothing
+  Effect.GrantPlayFromExile {} -> Nothing
