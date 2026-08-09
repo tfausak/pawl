@@ -44,6 +44,7 @@ import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -76,6 +77,7 @@ import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
@@ -102,12 +104,12 @@ singleModeAbility effects specs =
 prefersSource :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 prefersSource wanted p = case p of
   Prompt.ChooseManaSource _ _ candidates ->
-    if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates
+    Just (if elem wanted (NonEmpty.toList candidates) then wanted else NonEmpty.head candidates)
   _ -> S.identityAnswer p
 
 avoidsSource :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 avoidsSource unwanted p = case p of
-  Prompt.ChooseManaSource _ _ candidates -> case filter (/= unwanted) (NonEmpty.toList candidates) of
+  Prompt.ChooseManaSource _ _ candidates -> Just $ case filter (/= unwanted) (NonEmpty.toList candidates) of
     h : _ -> h
     [] -> NonEmpty.head candidates
   _ -> S.identityAnswer p
@@ -437,40 +439,45 @@ manaSpec s registry = Spec.describe s "Mana" $ do
     Spec.assertEqWith s "asked to tap the Elf, it is tapped" (tappedElf (S.runPure (prefersSource elfId) gs (Cost.pay S.alice elfId cost))) (Just TapState.Tapped)
     Spec.assertEqWith s "asked to spare the Elf, it is untapped" (tappedElf (S.runPure (avoidsSource elfId) gs (Cost.pay S.alice elfId cost))) (Just TapState.Untapped)
 
-  -- The other half of the invariant: the elision is exactly "there is only one
-  -- candidate, so there is nothing to decide", and nothing broader. Counting
-  -- prompts is the direct assertion -- without it, an implementation that
-  -- never asks would still pass the test above's first half.
+  -- The other half of the invariant: WHEN the window asks, counted directly --
+  -- without which an implementation that never asks would still pass the test
+  -- above's first half. Nothing is elided any more, so a lone Forest is asked
+  -- about too: CR 118.3c makes declining an answer on every board (#218).
   --
-  -- Three Forests DO ask. They are one card, but sameness of card is not
-  -- sameness of object (#217), so the engine does not presume to skip it.
-  Spec.it s "CR 601.2g one candidate asks nothing; more than one always asks" $ do
+  -- The two counters separate CR 118.3c's question from CR 601.2g's. One Forest
+  -- pays {G} and then no source is left, so the second window has nothing to
+  -- offer; three Forests leave two, so it opens once and is declined.
+  Spec.it s "CR 118.3c/601.2g the window asks while short, then asks again once covered" $ do
     forest <- S.printingOf s registry "Forest"
     let green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
-        countingAnswer :: Prompt.Prompt r -> State.State Int r
+        countingAnswer :: Prompt.Prompt r -> State.State (Int, Int) r
         countingAnswer p = case p of
           Prompt.ChooseManaSource _ _ candidates -> do
-            State.modify' (+ 1)
-            pure (NonEmpty.head candidates)
+            State.modify' (\(short, extra) -> (short + 1, extra))
+            pure (Just (NonEmpty.head candidates))
+          Prompt.ChooseExtraManaSource {} -> do
+            State.modify' (\(short, extra) -> (short, extra + 1))
+            pure Nothing
           _ -> pure (S.identityAnswer p)
-        promptsFor g = State.execState (Engine.runGame countingAnswer g (Cost.payMana S.alice green)) 0
-    Spec.assertEqWith s "a lone Forest: nothing to ask" (promptsFor (S.landsInPlay forest 1)) 0
-    Spec.assertEqWith s "three Forests: one real decision" (promptsFor (S.landsInPlay forest 3)) 1
+        promptsFor g = State.execState (Engine.runGame countingAnswer g (Cost.payMana S.alice green)) (0, 0)
+    Spec.assertEqWith s "a lone Forest: asked once, and nothing left to float" (promptsFor (S.landsInPlay forest 1)) (1, 0)
+    Spec.assertEqWith s "three Forests: asked once short, then offered the float" (promptsFor (S.landsInPlay forest 3)) (1, 1)
 
   -- FILTERED, NOT TRUSTED: an interpreter naming a source that was not offered
-  -- must not be honoured. Beyond hygiene, tapForMana is a no-op on an unknown
-  -- id, so obeying the answer would leave the state unchanged and loop forever.
-  Spec.it s "CR 601.2g an answer outside the offered set is rejected, not obeyed" $ do
+  -- must not be honoured. The fallback is CR 118.3c's refusal rather than the
+  -- head candidate, because the alternative is the engine tapping a permanent
+  -- nobody named; the payment then fails and CR 601.2h reverses it.
+  Spec.it s "CR 601.2g an answer outside the offered set declines, it does not tap" $ do
     forest <- S.printingOf s registry "Forest"
     let green = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Green)]
         bogus = ObjectId.MkObjectId 9999
         liar p = case p of
-          Prompt.ChooseManaSource {} -> bogus
+          Prompt.ChooseManaSource {} -> Just bogus
           _ -> S.identityAnswer p
         gs = S.landsInPlay forest 3
         (paid, after) = S.runPureWith liar gs (Cost.payMana S.alice green)
-    Spec.assertBool s paid "the cost is still paid"
-    Spec.assertEqWith s "from a real Forest, not the invented id" (S.tappedCount S.alice after) 1
+    Spec.assertBool s (not paid) "the cost goes unpaid"
+    Spec.assertEqWith s "and no Forest was tapped in its name" (S.tappedCount S.alice after) 0
 
   Spec.it s "mana from a controlled permanent goes to its controller, not owner" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"
@@ -713,7 +720,7 @@ upwellingSpec s registry = Spec.describe s "Upwelling" $ do
         floatBlue :: Prompt.Prompt r -> r
         floatBlue p = case p of
           Prompt.ChooseManaSource _ _ candidates ->
-            if elem birdsId (NonEmpty.toList candidates) then birdsId else NonEmpty.head candidates
+            Just (if elem birdsId (NonEmpty.toList candidates) then birdsId else NonEmpty.head candidates)
           _ -> prefersColor Color.Blue p
         cast = S.runPure floatBlue board (S.cast S.alice elvesId)
         afterStep = S.runPure S.identityAnswer cast Engine.runStep
@@ -791,6 +798,42 @@ omnathSpec s registry = Spec.describe s "Omnath, Locus of Mana" $ do
     Spec.assertEqWith s "the blue is gone" (poolSize S.alice afterStep) 1
     Spec.assertEqWith s "the green survived the step boundary" (Projection.powerOf omnathId afterStep) (Just 2)
     Spec.assertEqWith s "and the toughness with it" (Projection.toughnessOf omnathId afterStep) (Just 2)
+
+  -- CR 605.3a's permission to activate a mana ability while casting is not
+  -- rationed by what the cost needs, so a player may tap past it. Omnath is why
+  -- they would: floating green is what makes it big, so an engine that stops the
+  -- moment the cost is covered has made the creature smaller on its controller's
+  -- behalf (#218).
+  --
+  -- Four Forests, a {1}{G} Blurred Mongoose, and the same board answered twice.
+  -- Every number differs from every other, so no two readings of the rule land
+  -- on the same one.
+  Spec.it s "CR 605.3a a player may tap more sources than the cost needs, and Omnath reads the float" $ do
+    forest <- S.printingOf s registry "Forest"
+    omnath <- S.printingOf s registry "Omnath, Locus of Mana"
+    mongoose <- S.printingOf s registry "Blurred Mongoose"
+    let (omnathId, g1) = S.addCreature omnath S.alice (Setup.emptyGame S.bothPlayers)
+        withForests = List.foldl' (\g _ -> snd (S.addCreature forest S.alice g)) g1 [1 .. 4 :: Int]
+        (board, mongooseId) = S.handOne mongoose withForests
+        castWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        castWith answer = S.runPure answer board (S.cast S.alice mongooseId)
+        floats = castWith floatsEverything
+        stops = castWith S.identityAnswer
+    Spec.assertEqWith s "floating: all four Forests tapped" (S.tappedCount S.alice floats) 4
+    Spec.assertEqWith s "floating: two green left over" (poolSize S.alice floats) 2
+    Spec.assertEqWith s "floating: and Omnath counts them" (Projection.powerOf omnathId floats) (Just 3)
+    Spec.assertEqWith s "declining the float: only what the cost needed" (S.tappedCount S.alice stops) 2
+    Spec.assertEqWith s "declining the float: nothing left over" (poolSize S.alice stops) 0
+    Spec.assertEqWith s "declining the float: so Omnath is its printed size" (Projection.powerOf omnathId stops) (Just 1)
+
+-- Says yes to the float window as long as anything is left to tap, and
+-- answers everything else as S.identityAnswer does -- so the only difference
+-- between a game run under this and one run under S.identityAnswer is how much
+-- mana was floated.
+floatsEverything :: Prompt.Prompt r -> r
+floatsEverything p = case p of
+  Prompt.ChooseExtraManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  _ -> S.identityAnswer p
 
 -- CR 605.3b: one activation of one mana ability, adding TWO mana. Sol Ring ({1}
 -- Artifact, "{T}: Add {C}{C}") is the pool's first source whose yield is not one
@@ -1172,6 +1215,41 @@ manaConfluenceSpec s registry = Spec.describe s "Mana Confluence" $ do
     let resolved = castOffBoard (prefersColor Color.Black) [manaConfluence] typhoidRats
     Spec.assertEqWith s "the Rats resolved" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Typhoid Rats") S.alice resolved) 1
     Spec.assertEqWith s "and the black mana cost her 1 life" (S.lifeOf S.alice resolved) (Just 19)
+
+  -- CR 118.3c: "Activating mana abilities is not mandatory, even if paying a cost
+  -- is." Mana Confluence is what makes that observable rather than a formality --
+  -- at 1 life, its "Pay 1 life" is a cost its controller does not survive, and CR
+  -- 704.5a then takes the game.
+  --
+  -- The same board answered twice. Declining leaves alice alive with the land
+  -- untapped and the Rats in hand, CR 601.2h having reversed the cast; taking the
+  -- offer kills her. An engine that taps whatever the cost needs can only do the
+  -- second, and it is not the player who decided (#218).
+  --
+  -- ONE candidate, deliberately: this is the case the old elision swallowed
+  -- whole, since "which source" has no answer to give when there is only one.
+  Spec.it s "CR 118.3c a player at 1 life may decline to tap their only Mana Confluence" $ do
+    manaConfluence <- S.printingOf s registry "Mana Confluence"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    let (confluenceId, g1) = S.addCreature manaConfluence S.alice (Setup.emptyGame S.bothPlayers)
+        (withRats, ratsId) = S.handOne typhoidRats g1
+        board = atLife 1 withRats
+        declines :: Prompt.Prompt r -> r
+        declines p = case p of
+          Prompt.ChooseManaSource {} -> Nothing
+          _ -> prefersColor Color.Black p
+        castWith :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+        castWith answer = S.settleSba (S.runPure answer board (S.cast S.alice ratsId))
+        refused = castWith declines
+        accepted = castWith (prefersColor Color.Black)
+        tapOf g = fmap Object.tapped (Game.lookupObject confluenceId g)
+    Spec.assertEqWith s "declining: alice keeps her last life" (S.lifeOf S.alice refused) (Just 1)
+    Spec.assertEqWith s "declining: the land is untapped" (tapOf refused) (Just TapState.Untapped)
+    Spec.assertEqWith s "declining: and the Rats are still in hand" (Game.zoneMembers Zone.Hand S.alice refused) [ratsId]
+    Spec.assertEqWith s "declining: so she is still playing" (fmap Player.status (Map.lookup S.alice (GameState.players refused))) (Just Status.Playing)
+    Spec.assertEqWith s "accepting: the life is gone" (S.lifeOf S.alice accepted) (Just 0)
+    Spec.assertEqWith s "accepting: the land is tapped" (tapOf accepted) (Just TapState.Tapped)
+    Spec.assertEqWith s "accepting: and CR 704.5a takes the game" (fmap Player.status (Map.lookup S.alice (GameState.players accepted))) (Just (Status.Departed Departure.Type.Lost))
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
