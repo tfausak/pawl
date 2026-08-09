@@ -1432,6 +1432,10 @@ keywordFilters keyword = case keyword of
   Keyword.Trample -> []
   Keyword.Vigilance -> []
   Keyword.Fear -> []
+  -- CR 702.13b names no quality either: the colours a blocker may have are the
+  -- ATTACKER's own, read off the projection at declare blockers rather than
+  -- written into the keyword.
+  Keyword.Intimidate -> []
   Keyword.Poisonous _ -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.

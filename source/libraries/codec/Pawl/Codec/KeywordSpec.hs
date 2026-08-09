@@ -254,6 +254,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Fear
       """ {"type":"Fear"} """
+  Spec.it s "Intimidate" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Intimidate
+      """ {"type":"Intimidate"} """
   -- CR 702.37a's payload is a whole Cost too -- the MORPH cost, which CR 702.37e
   -- pays to turn the permanent face up, never the {3} the cast pays.
   Spec.it s "Morph carries its cost, and is not Flashback" $ do

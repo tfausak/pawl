@@ -45,6 +45,7 @@ toJson k = case k of
   Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
   Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Cost.toJson toJson cost
   Keyword.Fear -> Common.nullary "Fear"
+  Keyword.Intimidate -> Common.nullary "Intimidate"
   -- An ARRAY, as Cycling's is, because CR 702.37b's megamorph is the same
   -- keyword with a second field rather than a tag of its own.
   Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Common.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
@@ -88,6 +89,7 @@ fromJson value = do
     ("Cycling", Just (Value.Array (Array.MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson fromJson c <*> Filter.optional fromJson f
     ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson fromJson v
     ("Fear", _) -> Right Keyword.Fear
+    ("Intimidate", _) -> Right Keyword.Intimidate
     ("Morph", Just (Value.Array (Array.MkArray [c, v]))) -> Keyword.Morph <$> Cost.fromJson fromJson c <*> MorphVariant.fromJson v
     ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v

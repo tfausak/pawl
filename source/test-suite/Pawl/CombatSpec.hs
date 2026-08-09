@@ -821,6 +821,73 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear b gs0)) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
+  -- CR 702.13's five cases. Unlike fear's above, these run off a PRINTED
+  -- keyword: Highborn Ghoul ({B}{B} Creature -- Zombie 2/1, intimidate and
+  -- nothing else) is the pool's first card to PRINT a colour-based evasion
+  -- ability, so there is no granted-keyword fixture between the card and the
+  -- gate, and no other text on the card for a case to pass on.
+  Spec.it s "CR 702.13b a green creature may not block a creature with intimidate" $ do
+    highbornGhoul <- S.printingOf s registry "Highborn Ghoul"
+    prowlingSerpopard <- S.printingOf s registry "Prowling Serpopard"
+    let (gs, mine, theirs) = attacking [highbornGhoul] [prowlingSerpopard]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.13b a black creature may block a creature with intimidate" $ do
+    -- The sibling of the case above, identical but for the blocker's colour:
+    -- Typhoid Rats is black, so it shares a colour with the black Ghoul. This
+    -- is the clause fear cannot be told apart from, which is why the
+    -- colourless-attacker case below has to sit beside it.
+    highbornGhoul <- S.printingOf s registry "Highborn Ghoul"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    let (gs, mine, theirs) = attacking [highbornGhoul] [typhoidRats]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.13b an ARTIFACT creature may block a creature with intimidate" $ do
+    -- THE FALSIFIER for reading 702.13b as a colour test alone: Darksteel Myr
+    -- is a colourless artifact creature, so it shares no colour with the Ghoul
+    -- and blocks on the artifact clause instead.
+    highbornGhoul <- S.printingOf s registry "Highborn Ghoul"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    let (gs, mine, theirs) = attacking [highbornGhoul] [darksteelMyr]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.13b a COLOURLESS creature with intimidate may be blocked only by artifact creatures" $ do
+    -- THE FALSIFIER that separates intimidate from fear, and the only assertion
+    -- here a hard-coded Color.Black fails. CR 105.3's "effects may also make a
+    -- colored object become colorless" is SetColor with no colours, so the
+    -- attacker is the printed Ghoul with its colour taken away at CR 613 layer
+    -- 5. CR 105.2c: it now has no colour, so it shares one with nobody -- the
+    -- black Typhoid Rats that blocked it legally in the case above may not, and
+    -- only the artifact creature may.
+    highbornGhoul <- S.printingOf s registry "Highborn Ghoul"
+    typhoidRats <- S.printingOf s registry "Typhoid Rats"
+    darksteelMyr <- S.printingOf s registry "Darksteel Myr"
+    let (gs0, mine, theirs) = attacking [highbornGhoul] [typhoidRats, darksteelMyr]
+    case (mine, theirs) of
+      (a : _, black : artifact : _) ->
+        let gs = S.withEffect a (Modification.SetColor Set.empty) gs0
+         in do
+              Spec.assertBool s (Set.null (Projection.colorsOf a gs)) "the attacker is colourless"
+              Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton black a) gs)) "the black creature may not block"
+              Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton artifact a) gs) "the artifact creature may"
+      _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
+  Spec.it s "CR 702.13b intimidate restricts being blocked, never blocking" $ do
+    -- The 702.9b asymmetry, restated for intimidate: the Ghoul blocking a red
+    -- attacker it shares no colour with is legal.
+    piker <- S.printingOf s registry "Goblin Piker"
+    highbornGhoul <- S.printingOf s registry "Highborn Ghoul"
+    let (gs, mine, theirs) = attacking [piker] [highbornGhoul]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+
   Spec.it s "CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp" $ do
     -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so
     -- this asks about the keyword and no other text.
