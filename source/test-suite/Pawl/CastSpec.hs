@@ -65,6 +65,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
+import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
@@ -654,7 +655,7 @@ handInPlay printing board =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
-            Object.playableFromExileBy = Nothing,
+            Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty
@@ -2024,6 +2025,136 @@ waxWaneSpec s registry = Spec.describe s "WaxWane" $ do
         Spec.assertEqWith s "and CR 709.4b's combined colours" (Projection.colorsOf exiled after) (Set.fromList [Color.Green, Color.White])
       _ -> Spec.assertFailure s "expected the redirected card in exile"
 
+-- Victor Mancha, Runaway {5} Legendary Artifact Creature -- Human Hero 4/4:
+-- "When Victor Mancha enters, exile target card from your graveyard. You may
+-- play it for as long as you control Victor Mancha." The pool's only
+-- Effect-granted permission to play a card from exile (CR 601.3), and the only
+-- one of either kind with a STATED duration -- CR 715.3d's states none, so
+-- Pawl.AdventureSpec cannot reach the sweep this group exercises.
+victorName, benalishHeroName :: CardName.CardName
+victorName = CardName.MkCardName (Text.pack "Victor Mancha, Runaway")
+benalishHeroName = CardName.MkCardName (Text.pack "Benalish Hero")
+
+-- The battlefield objects answering to a name -- how a test reaches the
+-- permanent a cast produced, whose id is neither the card's in hand nor the
+-- spell's on the stack (CR 400.7).
+namedOnBattlefield :: CardName.CardName -> GameState.GameState -> [ObjectId.ObjectId]
+namedOnBattlefield name gs = filter (\o -> Projection.nameOf o gs == name) (Set.toList (GameState.battlefield gs))
+
+-- Six Plains, a Benalish Hero ({W} 1/1) in alice's graveyard, and Victor Mancha
+-- cast out of her hand and resolved, with his ETB waiting on the stack.
+--
+-- FIVE Plains pay Victor's {5} and the SIXTH pays the Hero's {W}. That is the
+-- whole answer to the cast-gate vacuity trap: every assertion below about the
+-- Hero being castable or not is made on a board where the mana for it is
+-- untapped and the window is the same precombat main phase, so a missing offer
+-- is about the permission and can be about nothing else.
+--
+-- The Hero is the ONLY card in alice's graveyard, so CR 603.3d's target choice
+-- is forced and S.identityAnswer suffices. It is also a 1/1 whose only text is
+-- banding, so nothing it prints can be the reason a cast succeeds or fails.
+--
+-- Returns the Hero's graveyard id, the battlefield objects named Victor Mancha
+-- (a list, so a case that removes him can assert it emptied), and the state.
+victorTriggered :: Printing.Printing -> Printing.Printing -> Printing.Printing -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+victorTriggered plains victor hero =
+  let (heroId, board) = S.addGraveyardCard hero S.alice (S.landsInPlay plains 6)
+      (gs, victorCard) = S.handOne victor board
+      cast = S.runPure S.identityAnswer gs (Cast.castSpell S.alice victorCard victorName Facing.FaceUp)
+      entered = S.runPure S.identityAnswer cast Stack.resolveTop
+      -- CR 603.3b: the enters trigger goes onto the stack the next time a player
+      -- would receive priority.
+      placed = S.runPure S.identityAnswer entered Engine.settleForPriority
+   in (heroId, namedOnBattlefield victorName placed, placed)
+
+-- Whether alice is offered the cast of this object under this name.
+offeredCast :: ObjectId.ObjectId -> CardName.CardName -> GameState.GameState -> Bool
+offeredCast oid name gs = elem (A.Cast oid name Facing.FaceUp) (Action.legalActions S.alice gs)
+
+victorManchaSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+victorManchaSpec s registry = Spec.describe s "VictorMancha" $ do
+  -- CR 608.2c: two instructions in one clause, in written order -- the exile
+  -- happens and the permission is written over the incarnation CR 400.7 minted
+  -- at the destination, which is the slot the move bound.
+  Spec.it s "CR 601.3 the exiled card becomes castable from exile, and only by the permitted player" $ do
+    plains <- S.printingOf s registry "Plains"
+    victor <- S.printingOf s registry "Victor Mancha, Runaway"
+    hero <- S.printingOf s registry "Benalish Hero"
+    let (heroId, victors, placed) = victorTriggered plains victor hero
+        after = S.runPure S.identityAnswer placed Stack.resolveTop
+    Spec.assertEqWith s "Victor is on the battlefield" (length victors) 1
+    Spec.assertEqWith s "the graveyard is empty" (Game.zoneMembers Zone.Graveyard S.alice after) []
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiledId] -> do
+        Spec.assertBool s (exiledId /= heroId) "CR 400.7: exile holds a new incarnation"
+        -- The ACTION LIST, not the field: a field read would pass against an
+        -- engine where Pawl.Engine.Cast never consulted the permission at all.
+        Spec.assertBool s (offeredCast exiledId benalishHeroName after) "alice is offered the cast from exile"
+        -- Five Plains paid Victor's {5}; the sixth is still untapped, which is
+        -- what the negative cases below rest on.
+        Spec.assertEqWith s "one Plains is still untapped" (S.tappedCount S.alice after) 5
+        case Game.faceOf exiledId after of
+          Nothing -> Spec.assertFailure s "expected a face on the exiled card"
+          Just face -> do
+            -- CR 109.5: the permission names the ability's controller and no one
+            -- else. Asked of permitsCastFromExile directly, because bob's cast
+            -- would be refused for two further reasons on this board -- he has no
+            -- mana, and Game.zoneMembers files exile by OWNER so he cannot reach
+            -- alice's card at all (#668) -- so a gameplay-level negative here
+            -- would be over-determined and would discriminate nothing.
+            Spec.assertBool s (Cast.permitsCastFromExile S.alice exiledId face after) "alice is permitted"
+            Spec.assertBool s (not (Cast.permitsCastFromExile S.bob exiledId face after)) "bob is not"
+      other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
+  -- CR 611.2b's "for as long as": the duration ends when its condition stops
+  -- holding, and the permission goes with it. The SAME board and the SAME step as
+  -- the case above, differing only in whether Victor is on the battlefield.
+  Spec.it s "CR 611.2b the permission ends when its source leaves, and the card stays in exile" $ do
+    plains <- S.printingOf s registry "Plains"
+    victor <- S.printingOf s registry "Victor Mancha, Runaway"
+    hero <- S.printingOf s registry "Benalish Hero"
+    let (_, victors, placed) = victorTriggered plains victor hero
+        after = S.runPure S.identityAnswer placed Stack.resolveTop
+        dead = S.runPure S.identityAnswer after (Event.destroy Regenerability.Regenerable victors)
+        swept = S.runPure S.identityAnswer dead Engine.settleForPriority
+    case Game.zoneMembers Zone.Exile S.alice after of
+      [exiledId] -> do
+        Spec.assertBool s (offeredCast exiledId benalishHeroName after) "offered while Victor stands"
+        Spec.assertEqWith s "Victor is gone" (namedOnBattlefield victorName swept) []
+        -- Both halves matter. Still in exile says the offer's disappearance is
+        -- the permission ending and not the card moving, which CR 400.7 would
+        -- have ended for free.
+        Spec.assertBool s (elem exiledId (Game.zoneMembers Zone.Exile S.alice swept)) "the card is still in exile"
+        Spec.assertBool s (not (offeredCast exiledId benalishHeroName swept)) "and no longer offered"
+        -- The mana did not move either, so the absent offer is not about cost.
+        Spec.assertEqWith s "the same Plains is still untapped" (S.tappedCount S.alice swept) 5
+      other -> Spec.assertFailure s ("expected exactly one exiled card, got " <> show (length other))
+  -- CR 611.2b's first sentence: "if the 'for as long as' duration never starts,
+  -- the effect does nothing". Victor dies while his own trigger is on the stack,
+  -- so the trigger still resolves (its target is legal, CR 608.2b) and still
+  -- exiles the card -- but no permission is ever written.
+  --
+  -- The discriminator a sweep cannot launder: this state is reached without any
+  -- sweep running over a stored permission, so a green result here means nothing
+  -- was ever stored rather than that nothing survived.
+  Spec.it s "CR 611.2b a duration that never starts stores no permission, and the exile still happens" $ do
+    plains <- S.printingOf s registry "Plains"
+    victor <- S.printingOf s registry "Victor Mancha, Runaway"
+    hero <- S.printingOf s registry "Benalish Hero"
+    let (_, victors, placed) = victorTriggered plains victor hero
+        dead = S.runPure S.identityAnswer placed (Event.destroy Regenerability.Regenerable victors)
+        after = S.runPure S.identityAnswer dead Stack.resolveTop
+    Spec.assertBool s (not (null (GameState.stack placed))) "the trigger really was on the stack"
+    Spec.assertEqWith s "Victor died before it resolved" (namedOnBattlefield victorName after) []
+    case filter (\o -> Projection.nameOf o after == benalishHeroName) (Game.zoneMembers Zone.Exile S.alice after) of
+      [exiledId] -> do
+        Spec.assertEqWith
+          s
+          "the card was exiled with no permission on it"
+          (fmap Object.playableFromExile (Game.lookupObject exiledId after))
+          (Just Nothing)
+        Spec.assertBool s (not (offeredCast exiledId benalishHeroName after)) "and it is not castable from exile"
+      other -> Spec.assertFailure s ("expected exactly one exiled Hero, got " <> show (length other))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   castSpec s registry
@@ -2046,6 +2177,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry
   flashSpec s registry
+  victorManchaSpec s registry
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

@@ -767,8 +767,36 @@ data Effect card
     -- complete is reversed by CR 601.2, which puts the card back where it was.
     --
     -- NOT a permission written onto the card. CR 715.3d's exile permission lasts
-    -- "for as long as that card remains exiled" and is Object.playableFromExileBy;
+    -- "for as long as that card remains exiled" and is Object.playableFromExile;
     -- this one is a single opportunity taken during a resolution, and a Siege
     -- whose controller declines it stays in exile uncastable.
     OfferCast SlotName.SlotName CastOffer.CastOffer
+  | -- | CR 601.3: "a player can begin to cast a spell only if a rule or effect
+    -- allows that player to cast it" -- grant that permission over the objects
+    -- the ObjectRef names, for a duration. Victor Mancha, Runaway's "exile target
+    -- card from your graveyard. You may play it for as long as you control Victor
+    -- Mancha" is the producer: a MoveToZone binds the CR 400.7 incarnation the
+    -- exile minted, and this reads that slot.
+    --
+    -- The OPPOSITE of OfferCast, which is why it is a second opcode rather than a
+    -- rider on that one: an offer is one cast taken during this resolution and
+    -- declining it ends the matter, while this is a standing permission the
+    -- player exercises later, at their own timing, as often as the permission
+    -- lasts. OfferCast's own haddock draws the same line from the other side.
+    --
+    -- No PlayerRef. CR 109.5 makes the printed "you" the resolving controller,
+    -- and that is who the permission names. The owner-side grants (Release to the
+    -- Wind, Soul Partition) each carry a second clause pawl cannot yet spell, so
+    -- a beneficiary field would be a capability no card exercises.
+    --
+    -- PLAY and not cast, after CR 601.1a's "playing a card means playing that
+    -- card as a land or casting that card as a spell, whichever is appropriate".
+    -- Not implemented: the land half. Only Pawl.Engine.Cast reads the permission
+    -- this writes, so a land granted it is permitted nothing and CR 305.1's
+    -- special action is never offered (#670).
+    --
+    -- CR 611.2b: if the stated duration never starts, the effect does nothing --
+    -- Pawl.Engine.Expiry.arm answers Nothing and Resolve stores no permission at
+    -- all, rather than storing one that a later sweep would remove.
+    GrantPlayFromExile Duration.Duration ObjectRef.ObjectRef
   deriving (Eq, Ord, Show)

@@ -58,6 +58,7 @@ import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.ExtraTurn as ExtraTurn
 import qualified Pawl.Types.Face as Face
@@ -223,6 +224,10 @@ slotsOf effect = case effect of
   -- OfferCast's slot is a READ: it names the object being offered, bound by an
   -- earlier effect of the same list (CR 400.7).
   Effect.OfferCast slot _ -> Set.singleton slot
+  -- Both a READ: the ObjectRef names the object being permitted, normally bound
+  -- by a MoveToZone earlier in the same list (CR 400.7) exactly as OfferCast's
+  -- slot is, and the Duration's Condition may read a slot as a Quantity.
+  Effect.GrantPlayFromExile duration ref -> Set.union (durationSlots duration) (objectRefSlots ref)
 
 -- CR 611.2b: the only Duration carrying a Quantity is ForAsLongAs, through its
 -- Condition.
@@ -325,6 +330,7 @@ readsX = any effectReadsX
       Effect.TakeExtraTurn {} -> False
       Effect.ShuffleIntoLibrary _ -> False
       Effect.OfferCast {} -> False
+      Effect.GrantPlayFromExile {} -> False
 
 -- CR 601.3 (Panglacial): does this effect search a library? The classification
 -- Stack asks before resolving, to offer the cast-while-searching opportunity.
@@ -385,6 +391,7 @@ searchesLibrary effect = case effect of
   -- object the effect already has, so no library is looked at and the
   -- Panglacial window does not open on top of it.
   Effect.OfferCast {} -> False
+  Effect.GrantPlayFromExile {} -> False
   Effect.TakeExtraTurn {} -> False
 
 -- CR 603.7: the delayed abilities an effect list ARMS, by name. The read half of
@@ -496,6 +503,9 @@ boundSlots effect = case effect of
   Effect.TakeExtraTurn {} -> Set.empty
   Effect.ShuffleIntoLibrary _ -> Set.empty
   Effect.OfferCast {} -> Set.empty
+  -- Reads a slot, binds none: the object it permits already exists and already
+  -- has a name.
+  Effect.GrantPlayFromExile {} -> Set.empty
 
 -- Does a Create's slot name EVERY token it minted ("those tokens") rather than
 -- one particular one (CR 603.7c's "it")? Which of the two a card means is its own
@@ -691,8 +701,23 @@ finishSpell oid face controller =
         State.modify' $ \gs ->
           gs
             { GameState.objects =
-                Map.adjust (\o -> o {Object.playableFromExileBy = Just controller}) newId (GameState.objects gs)
+                Map.adjust (\o -> o {Object.playableFromExile = Just (permission newId)}) newId (GameState.objects gs)
             }
+  where
+    -- Expiry.Type.Never, and that is CR 611.2a read literally: CR 715.3d states
+    -- no duration, so the permission "lasts until the end of the game" and no
+    -- sweep ever ends it. What ends it is CR 400.7 -- the card leaving exile
+    -- mints a new incarnation, and newIncarnation clears the field.
+    --
+    -- The exiled card is its own `source`, which costs nothing and is honest:
+    -- Never never consults it, since only Expiry.Type.While evaluates a
+    -- Condition against a source.
+    permission newId =
+      ExilePlayPermission.MkExilePlayPermission
+        { ExilePlayPermission.player = controller,
+          ExilePlayPermission.source = newId,
+          ExilePlayPermission.expiry = Expiry.Type.Never
+        }
 
 -- The no-subgame spell resolver (Stack's default path and every direct caller).
 resolveSpell :: ObjectId -> Game ()
@@ -1849,6 +1874,33 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               Mulligan.shuffleLibrary (Object.owner obj)
       _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
   Effect.OfferCast slot offer -> offerCast resolving controller slot offer
+  -- CR 601.3: write the standing permission onto every object the ObjectRef
+  -- names, as CR 109.5's "you" and the stated duration.
+  --
+  -- NOT gated on the object being in exile. CR 601.3's permissions are not
+  -- zone-scoped, and Cast.castableZones consults this field only on its exile
+  -- arm, so a zone test here would be the rules core deciding what the effect
+  -- means rather than the effect saying it.
+  Effect.GrantPlayFromExile duration ref ->
+    State.modify' $ \gs ->
+      -- The same sweep every ObjectRef-taking opcode shares: a player recipient,
+      -- an illegal slot (CR 608.2b) and a set that matched nothing all arrive as
+      -- the empty list and change nothing.
+      case objectRefObjects legality chosen resolving controller source gs ref of
+        [] -> gs
+        targets -> case Expiry.arm controller source duration gs of
+          -- CR 611.2b: the duration never started, so the effect does nothing and
+          -- no permission is stored -- not one a later sweep would take away.
+          Nothing -> gs
+          Just expiry ->
+            let permission =
+                  ExilePlayPermission.MkExilePlayPermission
+                    { ExilePlayPermission.player = controller,
+                      ExilePlayPermission.source = source,
+                      ExilePlayPermission.expiry = expiry
+                    }
+                grant o = o {Object.playableFromExile = Just permission}
+             in gs {GameState.objects = foldr (Map.adjust grant) (GameState.objects gs) targets}
   Effect.Draw ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
