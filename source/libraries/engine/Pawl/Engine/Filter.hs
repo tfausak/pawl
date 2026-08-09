@@ -24,7 +24,9 @@ import qualified Pawl.Types.Supertype as Supertype
 -- player rather than an object. `power` and `controller` are Nothing off the
 -- battlefield -- a card in a library has neither under the rules that matter here
 -- -- so PowerAtLeast / ControlledBy are vacuously False there, which no search
--- filter uses.
+-- filter uses. `owner` and `manaValue` are the two axes that do NOT go vacuous
+-- with the zone, since CR 108.3 and CR 202.3 both name facts a card carries
+-- everywhere; each field says so.
 data View = MkView
   { cardTypes :: Set.Set CardType.CardType,
     supertypes :: Set.Set Supertype.Supertype,
@@ -49,6 +51,23 @@ data View = MkView
     -- no card behind it such as an ability on the stack.
     manaValue :: Maybe Integer,
     controller :: Maybe PlayerId.PlayerId,
+    -- CR 108.3 / 110.2: the candidate's OWNER -- the player who started the game
+    -- with the card in their deck, or (CR 111.2) the player who created the
+    -- token. Read straight off Object.owner, which setup writes once and no rule
+    -- ever rewrites: CR 613.1b's layer 2 changes CONTROL, and rule 108.3 has no
+    -- counterpart, so no projection is consulted.
+    --
+    -- Just in strictly MORE places than `controller` above, and deliberately: an
+    -- owner is a fact about a card IN THE GAME, so it is answerable in every
+    -- zone, where CR 108.4 gives a card outside the battlefield and the stack no
+    -- controller at all. That is manaValue's posture rather than power's, for
+    -- manaValue's reason.
+    --
+    -- Nothing only where there is no OBJECT to read it off: a player view, an
+    -- event snapshot, or a printed card being matched by a search, which CR
+    -- 109.1 makes an object of nothing. OwnedBy is vacuously False there, the
+    -- posture power and controller take.
+    owner :: Maybe PlayerId.PlayerId,
     -- Which object this view is OF. Nothing for a printed card off the
     -- battlefield, which is not an object -- so IsSource is vacuously False
     -- there, the same posture power and controller already take.
@@ -176,6 +195,8 @@ playerView pid =
       -- player has none.
       manaValue = Nothing,
       controller = Nothing,
+      -- CR 108.3 gives an owner to a CARD; a player owns cards and is not one.
+      owner = Nothing,
       identity = Nothing,
       playerIdentity = Just pid,
       -- CR 506.3: only a creature can attack, and a player is not one.
@@ -266,6 +287,17 @@ matches context view predicate = case predicate of
     (Just c, Just p) -> case relation of
       PlayerRelation.You -> c == p
       PlayerRelation.Opponent -> c /= p
+    _ -> False
+  -- CR 108.3 / 110.2: the same comparison ControlledBy makes, against the other
+  -- player -- so Garland's "creatures you control but don't own" is the two atoms
+  -- conjoined. Every other player is an Opponent by construction, for the reason
+  -- the arm above gives, and CR 102.3's teams are the one reading it is wrong for
+  -- (#175). Vacuously False where no object backs the view, or where no
+  -- perspective frames the match.
+  Filter.OwnedBy relation -> case (owner view, perspective context) of
+    (Just o, Just p) -> case relation of
+      PlayerRelation.You -> o == p
+      PlayerRelation.Opponent -> o /= p
     _ -> False
   Filter.IsSource -> case (identity view, source context) of
     (Just oid, Just src) -> oid == src
@@ -369,6 +401,9 @@ rewrite pairs predicate = case predicate of
   Filter.PowerAtMost _ -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
+  -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
+  -- this atom names a player relation rather than a subtype.
+  Filter.OwnedBy _ -> predicate
   Filter.IsSource -> predicate
   Filter.IsPlayer _ -> predicate
   Filter.IsAttacking -> predicate

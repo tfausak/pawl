@@ -256,6 +256,8 @@ library codec
     Pawl.Codec.ReplacementEffectSpec
     Pawl.Codec.ReplacementOrigin
     Pawl.Codec.ReplacementOriginSpec
+    Pawl.Codec.SacrificeRestriction
+    Pawl.Codec.SacrificeRestrictionSpec
     Pawl.Codec.Scaling
     Pawl.Codec.ScalingSpec
     Pawl.Codec.Scope
@@ -378,6 +380,7 @@ library engine
     Pawl.Engine.Resolve
     Pawl.Engine.Ring
     Pawl.Engine.Room
+    Pawl.Engine.SacrificeRestriction
     Pawl.Engine.Saga
     Pawl.Engine.Sba
     Pawl.Engine.Script
@@ -662,6 +665,7 @@ library types
     Pawl.Types.Response
     Pawl.Types.RestartSignal
     Pawl.Types.Result
+    Pawl.Types.SacrificeRestriction
     Pawl.Types.Scaling
     Pawl.Types.Scope
     Pawl.Types.SearchDestination
@@ -771,6 +775,7 @@ test-suite pawl-test-suite
     Pawl.ResolveSpec
     Pawl.RingSpec
     Pawl.RoomSpec
+    Pawl.SacrificeRestrictionSpec
     Pawl.SagaSpec
     Pawl.SetupSpec
     Pawl.SpeedSpec

@@ -102,6 +102,7 @@ import qualified Pawl.Codec.RecipientSpec
 import qualified Pawl.Codec.RegenerabilitySpec
 import qualified Pawl.Codec.ReplacementEffectSpec
 import qualified Pawl.Codec.ReplacementOriginSpec
+import qualified Pawl.Codec.SacrificeRestrictionSpec
 import qualified Pawl.Codec.ScalingSpec
 import qualified Pawl.Codec.ScopeSpec
 import qualified Pawl.Codec.SearchDestinationSpec
@@ -183,6 +184,7 @@ import qualified Pawl.ReplaySpec
 import qualified Pawl.ResolveSpec
 import qualified Pawl.RingSpec
 import qualified Pawl.RoomSpec
+import qualified Pawl.SacrificeRestrictionSpec
 import qualified Pawl.SagaSpec
 import qualified Pawl.SetupSpec
 import qualified Pawl.SlugSpec
@@ -338,6 +340,7 @@ spec s registry = do
   Pawl.Codec.RegenerabilitySpec.spec s
   Pawl.Codec.ReplacementEffectSpec.spec s
   Pawl.Codec.ReplacementOriginSpec.spec s
+  Pawl.Codec.SacrificeRestrictionSpec.spec s
   Pawl.Codec.ScalingSpec.spec s
   Pawl.Codec.ScopeSpec.spec s
   Pawl.Codec.SearchDestinationSpec.spec s
@@ -418,6 +421,7 @@ spec s registry = do
   Pawl.RoomSpec.spec s registry
   Pawl.SetupSpec.spec s registry
   Pawl.SlugSpec.spec s
+  Pawl.SacrificeRestrictionSpec.spec s registry
   Pawl.SagaSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
   Pawl.TargetSpec.spec s registry

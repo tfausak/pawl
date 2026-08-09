@@ -32,6 +32,11 @@ blackCreature =
       Filter.power = Just 2,
       Filter.manaValue = Just 3,
       Filter.controller = Just (PlayerId.MkPlayerId 0),
+      -- CR 108.3: OWNED by player 1 while CONTROLLED by player 0, the one board
+      -- shape that tells OwnedBy and ControlledBy apart (Garland, Royal
+      -- Kidnapper's stolen creature). A view where the two agreed would satisfy
+      -- either reading of the atom.
+      Filter.owner = Just (PlayerId.MkPlayerId 1),
       Filter.identity = Just (ObjectId.MkObjectId 7),
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -58,6 +63,7 @@ devoidBigCreature =
       Filter.power = Just 5,
       Filter.manaValue = Just 5,
       Filter.controller = Nothing,
+      Filter.owner = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,
@@ -218,6 +224,28 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
   Spec.it s "ControlledBy is False when the context has no perspective" $ do
     Spec.assertBool s (not (Filter.matches noPerspective blackCreature (Filter.Type.ControlledBy PlayerRelation.You))) "no perspective"
+
+  -- CR 108.3 against CR 109.5's controller, on the ONE view where the two
+  -- disagree: blackCreature is controlled by player 0 and owned by player 1, so
+  -- each of these four answers the OPPOSITE of the ControlledBy case above it.
+  -- An implementation reading the controller for the owner flips all four.
+  Spec.describe s "OwnedBy" $ do
+    Spec.it s "CR 108.3 OwnedBy You fails for an object its controller does not own" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.OwnedBy PlayerRelation.You))) "controlled, not owned"
+
+    Spec.it s "CR 108.3 OwnedBy You holds from the OWNER's perspective" $ do
+      Spec.assertBool s (Filter.matches other blackCreature (Filter.Type.OwnedBy PlayerRelation.You)) "player 1 owns it"
+
+    Spec.it s "CR 108.3 OwnedBy Opponent holds from the controller's perspective" $ do
+      Spec.assertBool s (Filter.matches self blackCreature (Filter.Type.OwnedBy PlayerRelation.Opponent)) "someone else owns it"
+
+    -- The two vacuity postures, matching ControlledBy's: no object behind the
+    -- view, and no "you" for the relation to be about.
+    Spec.it s "CR 108.3 OwnedBy is False when the view has no owner" $ do
+      Spec.assertBool s (not (Filter.matches self devoidBigCreature (Filter.Type.OwnedBy PlayerRelation.Opponent))) "no owner"
+
+    Spec.it s "CR 108.3 OwnedBy is False when the context has no perspective" $ do
+      Spec.assertBool s (not (Filter.matches noPerspective blackCreature (Filter.Type.OwnedBy PlayerRelation.Opponent))) "no perspective"
 
   Spec.describe s "IsSource" $ do
     Spec.it s "matches the context's source" $ do

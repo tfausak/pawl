@@ -47,6 +47,7 @@ import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
@@ -116,6 +117,7 @@ baseFace =
       Face.blockRequirements = [],
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
+      Face.sacrificeRestrictions = [],
       Face.attackCosts = [],
       Face.additionalCosts = [],
       Face.alternativeCosts = [],
@@ -156,6 +158,7 @@ minimalFace =
       Face.blockRequirements = [],
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
+      Face.sacrificeRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = []
@@ -200,6 +203,7 @@ populatedFace =
       Face.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached],
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
       Face.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing],
+      Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])],
       Face.additionalCosts = [CostComponent.TapThis],
       Face.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []],
@@ -230,6 +234,7 @@ populatedFaceJson =
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
+    <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
     <> "\"alternativeCosts\":[{\"mana\":[]}],"
@@ -281,6 +286,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "combatRestrictions (CR 508.1c/509.1b) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.combatRestrictions <$> decodeFace v) (Right [])
+    Spec.it s "sacrificeRestrictions (CR 701.21a/101.2) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.sacrificeRestrictions <$> decodeFace v) (Right [])
     Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attackCosts <$> decodeFace v) (Right [])
@@ -370,6 +378,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing]}
         (init baseFaceJson <> ",\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}]}")
+    Spec.it s "sacrificeRestrictions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached]}
+        (init baseFaceJson <> ",\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}]}")
     Spec.it s "attackCosts" $
       Common.assertJsonCodec
         s

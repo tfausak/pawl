@@ -97,6 +97,31 @@ data Filter keyword
     -- cost, so there is nothing projected to read instead.
     ManaValueAtMost Integer
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
+  | -- | CR 108.3 / 110.2: the candidate's OWNER relates thus to the perspective --
+    -- Garland, Royal Kidnapper's "creatures you control but don't own", which is
+    -- `And [ControlledBy You, Not (OwnedBy You)]`.
+    --
+    -- A SIBLING of ControlledBy above and never derivable from it: CR 110.2 makes
+    -- ownership and control independent, and the whole point of the atom is the
+    -- board where they disagree. Context-relative in ControlledBy's way -- the atom
+    -- carries no PlayerId, and who "you" is comes from the Context (CR 109.5) --
+    -- and reading the same PlayerRelation, since CR 108.3's owner is a player like
+    -- any other.
+    --
+    -- ANSWERABLE IN EVERY ZONE, where ControlledBy is not, and that difference is
+    -- CR 108.3's rather than an inconsistency: an owner is fixed when the game
+    -- starts and no rule changes it, while CR 108.4 gives a card outside the
+    -- battlefield and the stack no controller at all. That is manaValue's posture
+    -- rather than power's, and Pawl.Engine.Filter.View's `owner` field says so.
+    -- Nothing off an OBJECT, though -- a printed card being matched by a search is
+    -- not an object and has no owner, so the atom is vacuously False there.
+    --
+    -- Uncharacteristic, for IsAttacking's reason: CR 109.3's characteristic list
+    -- has no owner in it, and no CR 613 layer writes one -- CR 613.1b's layer 2
+    -- changes CONTROL and rule 108.3 has no counterpart. So
+    -- Pawl.Engine.Projection.filterReads declares it as reading nothing, alongside
+    -- IsToken.
+    OwnedBy PlayerRelation.PlayerRelation
   | -- | The candidate IS the evaluation's source object. Context-relative like
     -- ControlledBy: the Filter carries no object id, and the answer comes from the
     -- Context. `Not IsSource` is how CR 601.2c's "another" and a continuous

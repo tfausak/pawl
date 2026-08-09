@@ -39,6 +39,7 @@ import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import Pawl.Types.CandidateId (CandidateId)
 import qualified Pawl.Types.CandidateId as CandidateId
@@ -384,8 +385,9 @@ matchesZoneOwner gs src rel oid =
 -- way it was before this took a parameter.
 --
 -- sacrificeCandidates below is the one caller that narrows a whole battlefield
--- with it, and Pawl.Engine.Cost reaches it through that -- so there is no
--- duplicate matcher to keep in step (#111).
+-- with it, and Pawl.Engine.Cost, Pawl.Engine.Event and Pawl.Engine.Resolve's
+-- edict all reach it through that -- so there is no duplicate matcher to keep in
+-- step (#111).
 matchesPermanent :: GameState -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent gs source filter_ oid =
   Filter.matches (Filter.MkContext Nothing source) (Projection.viewOfObject oid gs) filter_
@@ -408,9 +410,19 @@ matchesPermanent gs source filter_ oid =
 -- creature itself, so without the frame it could pay by sacrificing itself.
 -- That is the same failure Pawl.Engine.Cost.tapCandidates records for CR
 -- 702.122a, where a Vehicle that had become a creature could crew itself.
+--
+-- CR 101.2 subtracts the permanents an effect in force says CAN'T be sacrificed
+-- (Garland, Royal Kidnapper), which is what makes such a permanent unofferable
+-- rather than merely unsacrificeable: this one function is what
+-- Pawl.Engine.Cost's CR 118.3 payability count, its Prompt.ChooseSacrifices
+-- offer, Pawl.Engine.Resolve's edict and Pawl.Engine.Event's as-enters offer all
+-- read. The other half of the gate is in Event.sacrifice, for the instructions
+-- that name a victim without consulting a candidate list.
 sacrificeCandidates :: PlayerId -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 sacrificeCandidates pid source filter_ gs =
-  List.sort (filter (matchesPermanent gs source filter_) (Projection.controls pid gs))
+  let matching = List.sort (filter (matchesPermanent gs source filter_) (Projection.controls pid gs))
+      forbidden = SacrificeRestriction.cantBeSacrificed matching gs
+   in filter (\oid -> not (Set.member oid forbidden)) matching
 
 -- CR 614.1a / 614.1c-d: does the event's subject satisfy this replacement's
 -- Filter? Both the ENTERING object of an entry replacement and the MOVING object

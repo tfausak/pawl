@@ -34,6 +34,7 @@ import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replacement as Replacement
+import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import Pawl.Types.Cost (Cost)
@@ -590,11 +591,11 @@ exileCandidates pid criterion gs =
 -- Replacement.sacrificeCandidates offers its own in.
 --
 -- NOT Replacement.sacrificeCandidates, and the difference is the CONTEXT. That
--- one matches against `Filter.MkContext Nothing Nothing`, which makes IsSource
--- and ControlledBy vacuous, and pre-narrows to `Projection.controls pid`
--- structurally. CR 702.122a's criterion needs both of the atoms that context
--- throws away -- "other" is `Not IsSource` and "you control" is `ControlledBy
--- You` -- so the perspective is the PAYER and the source is the permanent whose
+-- one matches with NO PERSPECTIVE, which makes ControlledBy vacuous, and
+-- pre-narrows to `Projection.controls pid` structurally instead. CR 702.122a's
+-- criterion needs the atom that context throws away -- "you control" is
+-- `ControlledBy You`, beside the `Not IsSource` both spell the same way -- so
+-- here the perspective is the PAYER and the source is the permanent whose
 -- ability is being paid for. Getting that wrong is not a subtlety here: without
 -- the source, a Vehicle that has already become a creature could crew itself.
 --
@@ -658,7 +659,18 @@ removalClaim pid oid component gs = case component of
   CostComponent.Sacrifice n criterion ->
     Just (Zone.Battlefield, Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs), n)
   CostComponent.SacrificeThis ->
-    Just (Zone.Battlefield, itself (Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid), 1)
+    Just
+      ( Zone.Battlefield,
+        -- CR 101.2's prohibition, exactly as canPayComponent reads it below --
+        -- the two answers have to agree, since this arm's empty pool is how the
+        -- joint check spells the same refusal.
+        itself
+          ( Set.member oid (GameState.battlefield gs)
+              && Projection.controllerOf oid gs == Just pid
+              && not (SacrificeRestriction.prohibited oid gs)
+          ),
+        1
+      )
   CostComponent.DiscardCards n ->
     Just (Zone.Hand, Set.fromList (discardCandidates pid oid gs), n)
   CostComponent.DiscardThis -> Just (Zone.Hand, itself (isOwnedIn Zone.Hand), 1)
@@ -834,9 +846,20 @@ canPayComponent pid oid component gs = case component of
   CostComponent.UntapThis -> case Game.lookupObject oid gs of
     Nothing -> False
     Just obj -> Set.member oid (GameState.battlefield gs) && Object.tapped obj == TapState.Tapped
-  -- CR 701.21a: only a permanent, and only one this player controls.
+  -- CR 701.21a: only a permanent, and only one this player controls -- and CR
+  -- 101.2, only one no effect in force says can't be sacrificed.
+  --
+  -- The prohibition is read in this module and not left to the funnel, because a
+  -- cost announced as payable and then unpayable would spend an activation and
+  -- leave the permanent alive; CR 118.3's "fully" is what forbids that. WHICH of
+  -- this module's two readings does it is not decided here: `removalClaim` above
+  -- asks the same question and `canPay` conjoins both answers, so either alone
+  -- refuses the cost. Stated twice for the Sacrifice arm's reason -- a component
+  -- is asked about on its own terms here -- and the two must not disagree.
   CostComponent.SacrificeThis ->
-    Set.member oid (GameState.battlefield gs) && Projection.controllerOf oid gs == Just pid
+    Set.member oid (GameState.battlefield gs)
+      && Projection.controllerOf oid gs == Just pid
+      && not (SacrificeRestriction.prohibited oid gs)
   -- CR 119.4: payable only if the life total is at least the amount. Shared with
   -- CR 107.4f's Phyrexian mana symbol, which pays life for a MANA symbol and so
   -- reads the same floor from inside Pawl.Engine.Mana.

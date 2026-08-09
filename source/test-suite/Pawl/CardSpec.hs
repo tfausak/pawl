@@ -109,6 +109,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.Scaling as Scaling
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
@@ -161,6 +162,7 @@ vanillaFace name typeLine =
       Face.blockRequirements = [],
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
+      Face.sacrificeRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],
@@ -1366,6 +1368,9 @@ canHostSubjects predicate = case predicate of
   Filter.Type.PowerAtMost _ -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ControlledBy _ -> 0
+  -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
+  -- PlayerRelation, which holds no Filter for a card author to reach.
+  Filter.Type.OwnedBy _ -> 0
   Filter.Type.IsSource -> 0
   Filter.Type.IsPlayer _ -> 0
   Filter.Type.IsAttacking -> 0
@@ -1954,9 +1959,9 @@ activatedAbilityFilters ability =
 --   * `additionalCosts`, `alternativeCosts` -- CR 601.2f's sacrifice component.
 --   * `playerAbilities` -- CR 613.11's cost modifiers and CR 601.3b's timing
 --     permission.
---   * `combatRestrictions` (CR 508.1c / 509.1b), `attackRequirements` (CR
---     508.1d), `blockRequirements` (CR 509.1c) and `attackCosts` (CR 508.1h) --
---     four more affected sets.
+--   * `combatRestrictions` (CR 508.1c / 509.1b), `sacrificeRestrictions` (CR
+--     701.21a / 101.2), `attackRequirements` (CR 508.1d), `blockRequirements`
+--     (CR 509.1c) and `attackCosts` (CR 508.1h) -- five more affected sets.
 --   * `spell`, `activatedAbilities`, `triggeredAbilities`, `delayedAbilities` --
 --     every mode's target specs and effects, plus an activation cost, a
 --     trigger's own condition and its intervening clause.
@@ -1971,7 +1976,7 @@ activatedAbilityFilters ability =
 -- Prompt, ReplacementEffect, TargetSpec and TriggerCondition -- and nothing those
 -- eight fields reach is one of them.
 --
--- Twenty and eight is twenty-eight, the whole record.
+-- Twenty-one and eight is twenty-nine, the whole record.
 --
 -- Every case BELOW this function is exhaustive with no catch-all, so a new
 -- constructor on any of those types fails to compile until it is classified. This
@@ -1995,6 +2000,7 @@ cardFilters card =
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)
+        <> concatMap (affectedFilters . SacrificeRestriction.affected) (Face.sacrificeRestrictions card)
     )
     <> modalFilters (Face.spell card)
     <> concatMap activatedAbilityFilters (Face.activatedAbilities card)
