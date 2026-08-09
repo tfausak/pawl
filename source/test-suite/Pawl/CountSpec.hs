@@ -23,7 +23,9 @@ import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Aggregation as Aggregation
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Departure as Departure.Type
@@ -317,6 +319,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     Spec.assertEqWith s "undeterminable" (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs count) Nothing
 
   aetherfluxReservoirSpec s registry
+  tobiasSpec s registry
 
 -- CR 608.2i read over CR 601.2i's event: "for each spell you've cast this
 -- turn", the first count whose scope is a shape of event that is NOT a zone
@@ -428,3 +431,93 @@ aetherfluxReservoirSpec s registry =
           Spec.assertEqWith s "six over alice's own turn" (gained three S.alice) (Just 6)
           Spec.assertEqWith s "the handoff itself gains nothing" (gained handed S.alice) (Just 6)
           Spec.assertEqWith s "and the next turn's first cast gains 1, not 4" (gained fourth S.alice) (Just 7)
+
+-- CR 608.2i read over CR 608.2h's record of a ZONE CHANGE: "for each nontoken
+-- creature you controlled that died this turn". GAMEPLAY LEVEL for the
+-- Aetherflux group's reason -- what it proves is that the count reads what the
+-- move funnel filed as each permanent ceased, so a stubbed ViewOf would prove
+-- nothing about the wiring.
+--
+-- Tobias, Doomed Conqueror, {2}{W}{U} Legendary Creature -- Human Soldier 3/2
+-- with Flash: "When Tobias dies, for each nontoken creature you controlled that
+-- died this turn, create a 2/2 black Zombie creature token."
+--
+-- BOTH halves of the filter are what this unit built: `ControlledBy You` needs
+-- the controller CR 109.3 keeps out of the characteristics, and `Not IsToken`
+-- needs the tokenhood CR 111.6 likewise does. Neither rides the snapshot; both
+-- come off the CR 608.2h record filed under the departing id.
+--
+-- TOBIAS COUNTS ITSELF. Its own death is recorded before the ability it
+-- triggers is put on the stack, let alone resolved, so "died this turn"
+-- includes it -- which is why every expected count below is one more than the
+-- deaths the case sets up.
+--
+-- THREE seats, so "you controlled" and "anyone controlled" are different
+-- sentences, and alice's deaths outnumber bob's so the two readings cannot
+-- coincide: 3 against 4 in the first case, 2 against 1 in the third.
+tobiasSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tobiasSpec s registry =
+  let zombie = CardName.MkCardName (Text.pack "Zombie Token")
+      board tobias =
+        let (tid, gs) = S.addCreature tobias S.alice S.threePlayerGame
+         in ( tid,
+              gs
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            )
+      -- Lethal damage and a run of the priority loop, which settles CR 704.5g
+      -- first and then resolves whatever the death triggered. One helper for
+      -- every death here, so the Zombie-making death takes the same route as
+      -- the deaths it counts.
+      kill oid gs = S.runPure S.identityAnswer (S.markDamage oid 9 gs) Engine.priorityLoop
+      zombies = S.countOnBattlefieldByName zombie S.alice
+   in Spec.describe s "Tobias, Doomed Conqueror" $ do
+        Spec.it s "CR 608.2h a look-back count reads who CONTROLLED each creature that died" $ do
+          tobias <- S.printingOf s registry "Tobias, Doomed Conqueror"
+          piker <- S.printingOf s registry "Goblin Piker"
+          giant <- S.printingOf s registry "Hill Giant"
+          let (tid, gs0) = board tobias
+              (a1, gs1) = S.addCreature piker S.alice gs0
+              (a2, gs2) = S.addCreature piker S.alice gs1
+              (b1, gs3) = S.addCreature giant S.bob gs2
+              dead = kill b1 (kill a2 (kill a1 gs3))
+              after = kill tid dead
+          Spec.assertEqWith s "no Zombie before Tobias dies" (zombies dead) 0
+          Spec.assertEqWith s "alice's two Pikers plus Tobias, and NOT bob's Giant" (zombies after) 3
+          Spec.assertEqWith s "and bob gets none" (S.countOnBattlefieldByName zombie S.bob after) 0
+          -- CR 111.4: the tokens are what the ability names, not just
+          -- permanents. The length assertion keeps the two traversals from
+          -- passing over an empty list.
+          Spec.assertEqWith s "three tokens and nothing else" (length (S.tokensOf after)) 3
+          mapM_ (\oid -> Spec.assertEqWith s "2/2" (S.powerToughnessOf oid after) (Just (2, 2))) (S.tokensOf after)
+          mapM_ (\oid -> Spec.assertEqWith s "black" (Projection.colorsOf oid after) (Set.singleton Color.Black)) (S.tokensOf after)
+        -- CR 111.6: "A token isn't a card." Doomed Traveler dies, its Spirit
+        -- token is created and dies too, so alice has three deaths of which
+        -- only two are nontoken -- 3 Zombies, not 4.
+        Spec.it s "CR 111.6 a TOKEN that died is not counted" $ do
+          tobias <- S.printingOf s registry "Tobias, Doomed Conqueror"
+          piker <- S.printingOf s registry "Goblin Piker"
+          traveler <- S.printingOf s registry "Doomed Traveler"
+          let (tid, gs0) = board tobias
+              (a1, gs1) = S.addCreature piker S.alice gs0
+              (a2, gs2) = S.addCreature traveler S.alice gs1
+              travelerDead = kill a2 (kill a1 gs2)
+              spirit = S.tokensOf travelerDead
+              dead = List.foldl' (flip kill) travelerDead spirit
+              after = kill tid dead
+          Spec.assertEqWith s "Doomed Traveler left exactly one Spirit token" (length spirit) 1
+          Spec.assertEqWith s "no Spirit survives" (S.tokensOf dead) []
+          Spec.assertEqWith s "Piker, Doomed Traveler and Tobias -- the Spirit is not counted" (zombies after) 3
+        -- CR 110.2 / 613.1b: the PROJECTED controller as the object left, which
+        -- is not its owner. bob's Giant dies under alice's control and counts
+        -- for her; reading the owner instead gives 1.
+        Spec.it s "CR 613.1b a creature STOLEN from bob counts for alice, who controlled it as it died" $ do
+          tobias <- S.printingOf s registry "Tobias, Doomed Conqueror"
+          giant <- S.printingOf s registry "Hill Giant"
+          let (tid, gs0) = board tobias
+              (b1, gs1) = S.addCreature giant S.bob gs0
+              stolen = S.giveControl b1 S.alice gs1
+              after = kill tid (kill b1 stolen)
+          Spec.assertEqWith s "bob's Giant and Tobias" (zombies after) 2
