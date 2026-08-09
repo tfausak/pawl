@@ -24,6 +24,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Action as Action
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Cost as Cost
@@ -1642,6 +1643,78 @@ altarBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameSta
 altarBoard altar piker victims =
   foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker)
 
+-- CR 118.3's "fully" across TWO mana sources. Ashnod's Altar ("Sacrifice a
+-- creature: Add {C}{C}") and Phyrexian Tower ("{T}: Add {C}", "{T}, Sacrifice a
+-- creature: Add {B}{B}") both buy their mana with a creature, and the supply
+-- model asked each of them alone against the untouched board -- so one Goblin
+-- Piker was counted as a victim twice and the pair read as four mana (#1126).
+--
+-- Goblin Piker makes no mana, so every mana on these boards comes through the
+-- Altar or the Tower and the counts below cannot be met any other way. What
+-- separates the two halves of each case is ONE Piker and nothing else.
+sharedVictimSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+sharedVictimSpec s registry = Spec.describe s "Two mana sources over one creature" $ do
+  -- With one Piker the sacrifices are exclusive, so the best board is the
+  -- Tower's free {C} beside the Altar's {C}{C}. Four wants both sacrifices.
+  Spec.it s "CR 118.3 one creature cannot pay for both sacrifices" $ do
+    board <- sharedVictimBoard s registry 1
+    Spec.assertBool s (paysGeneric 3 board) "the Tower's {C} and one Altar activation pay {3}"
+    Spec.assertBool s (not (paysGeneric 4 board)) "and nothing pays {4}"
+
+  -- The same board with a second Piker, which is what says the refusal above is
+  -- about the creature and not about the two sources.
+  Spec.it s "CR 118.3 a second creature pays for the second sacrifice" $ do
+    board <- sharedVictimBoard s registry 2
+    Spec.assertBool s (paysGeneric 5 board) "the Tower's {C} and two Altar activations pay {5}"
+    Spec.assertBool s (not (paysGeneric 6 board)) "and there is no third creature, so not {6}"
+
+  -- The colours say WHICH activations a board is made of, where a generic count
+  -- only says how many: {B}{B} is the Tower's sacrifice and {C} the Altar's, so
+  -- this cost is payable exactly when both sacrifices are.
+  Spec.it s "CR 118.3 {B}{B}{1} wants the Tower's sacrifice and the Altar's at once" $ do
+    one <- sharedVictimBoard s registry 1
+    two <- sharedVictimBoard s registry 2
+    let cost = ManaCost.MkManaCost [ManaSymbol.OfType (ManaType.Colored Color.Black), ManaSymbol.OfType (ManaType.Colored Color.Black), ManaSymbol.Generic 1]
+        pays = Mana.canPay Cost.manaActivations S.alice cost
+    Spec.assertBool s (not (pays one)) "one creature buys the {B}{B} or the {1}, not both"
+    Spec.assertBool s (pays two) "two creatures buy both"
+
+  -- The gameplay-level proof (design.md section 4), and it has to be the OFFER
+  -- rather than the outcome: an overstated supply and a correct one both leave
+  -- the Arbiter uncast, since the payment that follows a bad offer just fails
+  -- (CR 601.2h). What the bug really did was menu a cast that could not be paid.
+  Spec.it s "CR 601.2g a {4} spell is not offered off one creature" $ do
+    arbiter <- S.printingOf s registry "Silent Arbiter"
+    one <- sharedVictimBoard s registry 1
+    two <- sharedVictimBoard s registry 2
+    let offered board =
+          let (withSpell, oid) = S.handOne arbiter board
+           in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+    Spec.assertBool s (not (offered one)) "not offered"
+    Spec.assertBool s (offered two) "offered once a second creature can pay for the second sacrifice"
+
+  -- And the window itself, which no board can report: with one Piker the Altar
+  -- and the Tower are each still a source on their own (CR 118.3 refuses neither
+  -- alone), so both are offered -- and once one has taken the Piker the other is
+  -- gone from the next offer.
+  Spec.it s "CR 601.2g the window offers both sources, then neither" $ do
+    board <- sharedVictimBoard s registry 1
+    let cost = ManaCost.MkManaCost [ManaSymbol.Generic 4]
+        offers = State.execState (Engine.runGame recordingManaSources board (Cost.payMana S.alice cost)) []
+    Spec.assertEqWith s "two candidates, then the one the sacrifice did not spend" (fmap length offers) [2, 1]
+
+-- Alice's Ashnod's Altar, her Phyrexian Tower and `victims` Goblin Pikers.
+sharedVictimBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+sharedVictimBoard s registry victims = do
+  altar <- S.printingOf s registry "Ashnod's Altar"
+  tower <- S.printingOf s registry "Phyrexian Tower"
+  piker <- S.printingOf s registry "Goblin Piker"
+  pure (foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : tower : replicate victims piker))
+
+-- Whether alice could pay {n} off this board.
+paysGeneric :: Natural -> GameState.GameState -> Bool
+paysGeneric n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n])
+
 -- S.identityAnswer, recording the candidates of every Prompt.ChooseManaSource --
 -- the offers CR 601.2g's window made while the cost was still uncovered. A
 -- Prompt.ChooseExtraManaSource is a different question and is not recorded.
@@ -1685,6 +1758,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianTowerSpec s registry
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
+  sharedVictimSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against

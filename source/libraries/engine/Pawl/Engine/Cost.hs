@@ -24,6 +24,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Claim as Claim
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
@@ -39,6 +40,8 @@ import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
+import Pawl.Types.Claim (Claim)
+import qualified Pawl.Types.Claim as Claim.Type
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
@@ -736,35 +739,35 @@ tapObject target =
 -- EXHAUSTIVE with no wildcard, this module's posture for every CostComponent
 -- match: a new constructor that removes objects from a zone has to answer here,
 -- and -Werror is what makes it.
-removalClaim :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe (Zone.Zone, Set.Set ObjectId, Natural)
+removalClaim :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Maybe Claim
 removalClaim pid oid component gs = case component of
   -- CR 701.21a: the permanents this player controls that match the criterion.
   CostComponent.Sacrifice n criterion ->
-    Just (Zone.Battlefield, Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs), n)
+    claim Zone.Battlefield (Set.fromList (Replacement.sacrificeCandidates pid (Just oid) criterion gs)) n
   CostComponent.SacrificeThis ->
-    Just
-      ( Zone.Battlefield,
-        -- CR 101.2's prohibition, exactly as canPayComponent reads it below --
-        -- the two answers have to agree, since this arm's empty pool is how the
-        -- joint check spells the same refusal.
-        itself
+    claim
+      Zone.Battlefield
+      -- CR 101.2's prohibition, exactly as canPayComponent reads it below --
+      -- the two answers have to agree, since this arm's empty pool is how the
+      -- joint check spells the same refusal.
+      ( itself
           ( Set.member oid (GameState.battlefield gs)
               && Projection.controllerOf oid gs == Just pid
               && not (SacrificeRestriction.prohibited oid gs)
-          ),
-        1
+          )
       )
+      1
   CostComponent.DiscardCards n ->
-    Just (Zone.Hand, Set.fromList (discardCandidates pid oid gs), n)
-  CostComponent.DiscardThis -> Just (Zone.Hand, itself (isOwnedIn Zone.Hand), 1)
+    claim Zone.Hand (Set.fromList (discardCandidates pid oid gs)) n
+  CostComponent.DiscardThis -> claim Zone.Hand (itself (isOwnedIn Zone.Hand)) 1
   CostComponent.ExileCardsFromGraveyard n criterion ->
-    Just (Zone.Graveyard, Set.fromList (exileCandidates pid criterion gs), n)
+    claim Zone.Graveyard (Set.fromList (exileCandidates pid criterion gs)) n
   -- A pool of at most ONE, and the claim is on that one card rather than on a
   -- choice among several: CR 404.2's order picks it. An empty pool is how this
   -- arm spells the refusal canPayComponent gives below.
   CostComponent.ExileTopFromGraveyard criterion ->
-    Just (Zone.Graveyard, Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs)), 1)
-  CostComponent.ExileThisFromGraveyard -> Just (Zone.Graveyard, itself (isOwnedIn Zone.Graveyard), 1)
+    claim Zone.Graveyard (Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs))) 1
+  CostComponent.ExileThisFromGraveyard -> claim Zone.Graveyard (itself (isOwnedIn Zone.Graveyard)) 1
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
   CostComponent.TapForTotalPower _ _ -> Nothing
@@ -773,6 +776,7 @@ removalClaim pid oid component gs = case component of
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
   where
+    claim z p n = Just (Claim.Type.MkClaim {Claim.Type.zone = z, Claim.Type.pool = p, Claim.Type.count = n})
     itself condition = if condition then Set.singleton oid else Set.empty
     -- canPayComponent's own guard for the two `*This` arms that read a zone
     -- rather than control, and asked here for its reason: CR 108.4 gives a card
@@ -793,28 +797,14 @@ removalClaim pid oid component gs = case component of
 -- readings apart: each component alone finds a candidate, and there is only one
 -- land to give.
 --
--- PER ZONE, because the zones are disjoint and a claim on one can never be paid
--- out of another.
---
--- HALL'S CONDITION over the SUBSETS of one zone's claims, which is exactly
--- necessary and sufficient here. Every object a component will take is
--- interchangeable with every other object that component will take, so all the
--- slots of one component share a neighbourhood, and the tightest subset of slots
--- is always some whole number of components' worth. A greedy pass would not do:
--- a component with the wider pool can eat the only object a narrower one could
--- have used. Neither would a per-component check, which is the singleton subset
--- of this one and is therefore subsumed rather than replaced.
---
--- The enumeration is EXPONENTIAL in the number of object-removing claims one
--- cost makes on one zone. That number is 2 across the printed corpus, and no cap
--- guards it -- an untriggerable cap is dead code. The mana side of the same
--- gate already carries a subset enumeration of its own (#595).
+-- Pawl.Engine.Claim.satisfiable is the reading, and it carries the per-zone
+-- grouping and Hall's condition; what is this module's is which components make
+-- a claim at all (removalClaim). The same reading is asked across the SOURCES of
+-- one mana payment (Pawl.Engine.Mana.payableResolutionsGiven), which is why it
+-- lives there rather than here.
 jointlyPayable :: PlayerId -> ObjectId -> [CostComponent.CostComponent Keyword.Type.Keyword] -> GameState -> Bool
 jointlyPayable pid oid components gs =
-  let claimIn component = fmap (\(zone, pool, n) -> (zone, [(pool, n)])) (removalClaim pid oid component gs)
-      byZone = Map.fromListWith (<>) (Maybe.mapMaybe claimIn components)
-      satisfied subset = Natural.length (Set.unions (fmap fst subset)) >= sum (fmap snd subset)
-   in all (\claims -> all satisfied (List.subsequences claims)) (Map.elems byZone)
+  Claim.satisfiable (Maybe.mapMaybe (\component -> removalClaim pid oid component gs) components)
 
 -- CR 118.3: a player can't pay a cost without the resources to pay it fully. The
 -- mana part AND every component, measured against the CURRENT state -- before any
@@ -874,16 +864,22 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- ability's mana part is empty -- Cabal Coffers is the card that would make the
 -- difference visible, and `payActivation` defers to the same issue (#1120).
 --
+-- And WHAT ONE ACTIVATION TAKES, alongside the count, because the count alone is
+-- a fact about this source in isolation: two sources whose costs both sacrifice a
+-- creature each answer 1 beside one creature, and only the claims say they cannot
+-- both have it (#1126). The claims are one activation's, unscaled -- the reader
+-- multiplies by however many it takes.
+--
 -- `pcs` is the pre-projected board CR 302.6's two reads want; Map.empty asks for
 -- a fresh projection, which is what a caller with no sweep in hand passes (#200).
-manaActivations :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
+manaActivations :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> (Natural, [Claim])
 manaActivations pcs pid oid cost gs =
   if Maybe.isJust (Cost.mana cost)
     && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
     && jointlyPayable pid oid (Cost.components cost) gs
     && sicknessOkGiven pcs pid oid cost gs
-    then repeatsOf pid oid cost gs
-    else 0
+    then (repeatsOf pid oid cost gs, Maybe.mapMaybe (\c -> removalClaim pid oid c gs) (Cost.components cost))
+    else (0, [])
 
 -- How many times IN A ROW a cost already known to be payable once could be paid,
 -- which is what makes Ashnod's Altar beside two creatures two mana activations
@@ -904,23 +900,18 @@ manaActivations pcs pid oid cost gs =
 -- have paid, while a supply too large offers a cast that then cannot be paid --
 -- and an offer that changes nothing is offered again forever.
 --
--- Hall's condition again, exactly as `jointlyPayable` asks it, with the k-th
--- repetition asking for k times each claim: the pools are the same objects every
--- time, so the largest k is the smallest floor(pool / claimed) over the subsets
--- of one zone's claims.
+-- Pawl.Engine.Claim.repeats is the arithmetic, and it agrees with
+-- Claim.satisfiable by construction: k repetitions ask for k times each claim,
+-- and `repeats` is the largest k that Hall's condition still admits. That is what
+-- lets Pawl.Engine.Mana take this count as a source's ceiling and then re-ask the
+-- joint question across sources without the two disagreeing about one source.
 --
--- The pools are read off the UNTOUCHED board, so a sacrifice that changes what
--- the next activation's criterion matches is counted wrong -- the same reading
--- that counts one creature for two sources (#1126).
+-- The pool is read ONCE, off the untouched board, which is exact for every
+-- criterion in the pool: taking one creature out of it leaves the rest
+-- creatures.
 repeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
 repeatsOf pid oid cost gs = case (Cost.mana cost, traverse (\c -> removalClaim pid oid c gs) (Cost.components cost)) of
-  (Just (ManaCost.MkManaCost []), Just claims@(_ : _)) ->
-    let byZone = Map.fromListWith (<>) (fmap (\(zone, pool, n) -> (zone, [(pool, n)])) claims)
-        limit subset = case sum (fmap snd subset) of
-          0 -> Nothing
-          wanted -> Just (div (Natural.length (Set.unions (fmap fst subset))) wanted)
-        limits = concatMap (Maybe.mapMaybe limit . List.subsequences) (Map.elems byZone)
-     in if null limits then 1 else minimum limits
+  (Just (ManaCost.MkManaCost []), Just claims) -> Claim.repeats claims
   _ -> 1
 
 -- CR 118.3 asked one step later than `canPay` asks it: is SOME nonhybrid
@@ -1363,7 +1354,7 @@ tapForMana oid = do
       -- and pays the cost. Falls back to owner in the impossible case
       -- lookupObject just proved oid exists but controllerOf returns Nothing.
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\option -> manaActivations Map.empty controller oid (ManaOption.cost option) gs > 0) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> fst (manaActivations Map.empty controller oid (ManaOption.cost option) gs) > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         first : rest -> do
           chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
