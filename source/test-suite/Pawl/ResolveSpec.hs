@@ -3205,6 +3205,111 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
     Spec.assertEqWith s "bob is at 0" (S.lifeOf S.bob after) (Just 0)
     Spec.assertEqWith s "and alice wins" (GameState.result (S.settleSba after)) (Just (Result.Won S.alice))
 
+-- Mirror Universe (Legends) on alice's battlefield, in her own upkeep, with the
+-- three seats at three DIFFERENT life totals: "{T}, Sacrifice this artifact:
+-- Exchange life totals with target opponent. Activate only during your upkeep."
+--
+-- Three seats because a two-player board cannot tell the exchange's TARGET from
+-- "the other player". carol is a second legal target the interpreter can pick,
+-- and the totals are distinct so that no pair of them coincides.
+--
+-- The schedule loses its head for augurBoard's reason (ActivateSpec): emptyGame's
+-- `remaining` still begins with the upkeep step, so a runStep-driven test would
+-- otherwise advance out of the step the card names.
+mirrorBoard :: Printing.Printing -> Integer -> Integer -> Integer -> (ObjectId.ObjectId, GameState.GameState)
+mirrorBoard mirror hers his theirs =
+  let (mirrorId, gs1) = S.addCreature mirror S.alice S.threePlayerGame
+      at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+   in ( mirrorId,
+        gs1
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.drop 1 (GameState.remaining gs1),
+            GameState.players = at S.alice hers (at S.bob his (at S.carol theirs (GameState.players gs1)))
+          }
+      )
+
+-- Takes the first activation offered and aims every target slot at `who`.
+exchangeAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+exchangeAnswer who p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivation options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+  _ -> S.identityAnswer p
+
+isActivation :: A.Action -> Bool
+isActivation a = case a of
+  A.Activate {} -> True
+  A.Pass -> False
+  A.Play {} -> False
+  A.Cast {} -> False
+  A.TurnFaceUp _ -> False
+  A.Unlock _ _ -> False
+  A.DiscardFromHand _ -> False
+  A.ActivateManaAbility _ -> False
+
+-- The life events the whole step logged, by player and amount. CR 701.12c makes
+-- the exchange a GAIN and a LOSS rather than two assignments, so this is what a
+-- "whenever you gain life" trigger would have to read.
+lifeGains :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
+lifeGains gs = [(pid, n) | GameEvent.LifeGained pid n <- S.eventsOf gs]
+
+lifeLosses :: GameState.GameState -> [(PlayerId.PlayerId, Natural)]
+lifeLosses gs = [(pid, n) | GameEvent.LifeLost pid n <- S.eventsOf gs]
+
+exchangeLifeTotalsSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
+  -- The gameplay-level proof (design.md section 4), driven through
+  -- Engine.runStep and the priority loop: alice at 4 and bob at 27 swap, and
+  -- each reaches the other's PREVIOUS total -- an implementation that wrote one
+  -- side before reading the other would leave both on one number.
+  Spec.it s "CR 701.12c whole card: Mirror Universe swaps its controller's total with the target's" $ do
+    mirror <- S.printingOf s registry "Mirror Universe"
+    let (mirrorId, board) = mirrorBoard mirror 4 27 13
+        after = S.runPure (exchangeAnswer S.bob) board Engine.runStep
+    Spec.assertEqWith s "alice took bob's 27" (S.lifeOf S.alice after) (Just 27)
+    Spec.assertEqWith s "bob took alice's 4" (S.lifeOf S.bob after) (Just 4)
+    Spec.assertEqWith s "carol, untargeted, is untouched" (S.lifeOf S.carol after) (Just 13)
+    Spec.assertBool s (not (Set.member mirrorId (GameState.battlefield after))) "the Universe paid itself"
+    -- CR 701.12c's "gains or loses the amount of life necessary", as events:
+    -- 27 - 4 either way, and nothing else moved a life total this step.
+    Spec.assertEqWith s "alice gained 23" (lifeGains after) [(S.alice, 23)]
+    Spec.assertEqWith s "bob lost 23" (lifeLosses after) [(S.bob, 23)]
+    -- The printed "target opponent" is the card's own filter, read from the
+    -- perspective of the player activating it (CR 109.5), so alice is never a
+    -- candidate. Paired with the outcome above rather than asserted alone, since
+    -- a candidate list nothing consumed proves nothing.
+    let candidates = case Activate.abilitiesFor mirrorId board of
+          [ability] -> case Seq.lookup 0 (Modal.modes (ActivatedAbility.modal ability)) of
+            Just mode -> Map.elems (Target.legalSets (Just S.alice) mirrorId (Mode.targetSpecs mode) board)
+            Nothing -> []
+          _ -> []
+    Spec.assertEqWith s "both opponents are candidates, alice is not" candidates [Set.fromList [Recipient.ToPlayer S.bob, Recipient.ToPlayer S.carol]]
+
+  -- The same board and the same interpreter, aimed at carol: the slot is READ
+  -- rather than the exchange running against a fixed second seat.
+  Spec.it s "CR 601.2c the other side is the slot's target, not simply the opponent" $ do
+    mirror <- S.printingOf s registry "Mirror Universe"
+    let (_, board) = mirrorBoard mirror 4 27 13
+        after = S.runPure (exchangeAnswer S.carol) board Engine.runStep
+    Spec.assertEqWith s "alice took carol's 13" (S.lifeOf S.alice after) (Just 13)
+    Spec.assertEqWith s "carol took alice's 4" (S.lifeOf S.carol after) (Just 4)
+    Spec.assertEqWith s "bob, untargeted, is untouched" (S.lifeOf S.bob after) (Just 27)
+
+  -- CR 119.9: equal totals are an exchange that moves nobody, and a gain of 0 is
+  -- no life gain event at all -- so "whenever you gain life" must not fire on it.
+  Spec.it s "CR 119.9 an exchange between equal totals logs no life event" $ do
+    mirror <- S.printingOf s registry "Mirror Universe"
+    let (mirrorId, board) = mirrorBoard mirror 15 15 13
+        after = S.runPure (exchangeAnswer S.bob) board Engine.runStep
+    Spec.assertEqWith s "alice is still at 15" (S.lifeOf S.alice after) (Just 15)
+    Spec.assertEqWith s "bob is still at 15" (S.lifeOf S.bob after) (Just 15)
+    Spec.assertBool s (not (Set.member mirrorId (GameState.battlefield after))) "and the ability did resolve, its cost paid"
+    Spec.assertEqWith s "no gain" (lifeGains after) []
+    Spec.assertEqWith s "no loss" (lifeLosses after) []
+
 -- One with the Machine, the card that proves Aggregation.Greatest (#254):
 -- "Draw cards equal to the greatest mana value among artifacts you control."
 -- Nothing but the fold is new -- the effect is the existing Draw, the scope and
@@ -5454,6 +5559,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   aetherspoutsSpec s registry
   drawCardSpec s registry
   loseLifeSpec s registry
+  exchangeLifeTotalsSpec s registry
   greatestSpec s registry
   counterSpec s registry
   manaLeakSpec s registry

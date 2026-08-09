@@ -103,6 +103,7 @@ toJson codec e = case e of
   Effect.Discard s q -> Common.tagged "Discard" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
   Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.GainLife r q -> Common.tagged "GainLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
+  Effect.ExchangeLifeTotals s -> Common.tagged "ExchangeLifeTotals" (Just (SlotName.toJson s))
   Effect.IncreaseSpeed r q -> Common.tagged "IncreaseSpeed" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   -- Create's payload is positional, and the EntryRiders are ELIDED when they
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
@@ -275,6 +276,7 @@ fromJson decode value = do
     "GainLife" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.GainLife <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainLife expects [playerRef, quantity]"
+    "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . SlotName.fromJson)
     "IncreaseSpeed" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.IncreaseSpeed <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "IncreaseSpeed expects [playerRef, quantity]"

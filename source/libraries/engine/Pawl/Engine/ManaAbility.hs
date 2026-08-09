@@ -49,6 +49,7 @@ manaProduced effect = case effect of
   Effect.Discard {} -> Nothing
   Effect.LoseLife {} -> Nothing
   Effect.GainLife {} -> Nothing
+  Effect.ExchangeLifeTotals _ -> Nothing
   Effect.IncreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
   Effect.Replace {} -> Nothing

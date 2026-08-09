@@ -187,6 +187,7 @@ slotsOf effect = case effect of
   Effect.Discard slot quantity -> Set.insert slot (Quantity.slots quantity)
   Effect.LoseLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.GainLife ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
+  Effect.ExchangeLifeTotals slot -> Set.singleton slot
   Effect.IncreaseSpeed ref quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
@@ -339,6 +340,7 @@ slotsAreExhaustive effect = case effect of
   Effect.Discard _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.LoseLife _ quantity -> Quantity.slotsAreExhaustive quantity
   Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.ExchangeLifeTotals _ -> True
   Effect.IncreaseSpeed _ quantity -> Quantity.slotsAreExhaustive quantity
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
@@ -445,6 +447,7 @@ readsX = any effectReadsX
       Effect.Discard _ quantity -> Quantity.readsX quantity
       Effect.LoseLife _ quantity -> Quantity.readsX quantity
       Effect.GainLife _ quantity -> Quantity.readsX quantity
+      Effect.ExchangeLifeTotals _ -> False
       Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
       Effect.Replace {} -> False
@@ -506,6 +509,7 @@ searchesLibrary effect = case effect of
   Effect.Discard {} -> False
   Effect.LoseLife {} -> False
   Effect.GainLife {} -> False
+  Effect.ExchangeLifeTotals _ -> False
   Effect.IncreaseSpeed {} -> False
   Effect.Create {} -> False
   Effect.Replace {} -> False
@@ -630,6 +634,7 @@ boundSlots effect = case effect of
   Effect.Discard {} -> Set.empty
   Effect.LoseLife {} -> Set.empty
   Effect.GainLife {} -> Set.empty
+  Effect.ExchangeLifeTotals _ -> Set.empty
   Effect.IncreaseSpeed {} -> Set.empty
   Effect.Replace {} -> Set.empty
   Effect.SkipNextPhase {} -> Set.empty
@@ -2355,19 +2360,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- CostComponent.PayLife does for CR 119.4's cost side, and the CR
             -- 704.5a state-based action that may follow is the existing one in
             -- Pawl.Engine.Sba.
-            Monad.forM_ losers $ \pid ->
-              State.modify'
-                ( Event.recordEvent (GameEvent.LifeLost pid (Integer.toNaturalSaturating n))
-                    . ( \g ->
-                          g
-                            { GameState.players =
-                                Map.adjust
-                                  (\p -> p {Player.life = Player.life p - n})
-                                  pid
-                                  (GameState.players g)
-                            }
-                      )
-                )
+            Monad.forM_ losers (\pid -> changeLife pid (negate n))
       _ -> pure ()
   -- CR 119.3's other half, LoseLife's mirror in every respect but the sign. The
   -- comments above apply verbatim: same `viewWithLastKnown` reading, same
@@ -2388,19 +2381,34 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
-            Monad.forM_ gainers $ \pid ->
-              State.modify'
-                ( Event.recordEvent (GameEvent.LifeGained pid (Integer.toNaturalSaturating n))
-                    . ( \g ->
-                          g
-                            { GameState.players =
-                                Map.adjust
-                                  (\p -> p {Player.life = Player.life p + n})
-                                  pid
-                                  (GameState.players g)
-                            }
-                      )
-                )
+            Monad.forM_ gainers (\pid -> changeLife pid n)
+      _ -> pure ()
+  -- CR 701.12c: the two sides reach each other's PREVIOUS total, so both deltas
+  -- are read off the same game state before either is written -- a sequential
+  -- "set mine to theirs, then theirs to mine" would leave both on one total.
+  --
+  -- Written as a gain and a loss rather than as two assignments, which is the
+  -- rule's own wording ("each player gains or loses the amount of life
+  -- necessary"): that is what puts a LifeGained and a LifeLost in the log for a
+  -- "whenever you gain life" trigger to read. Equal totals move nobody, and
+  -- changeLife's zero case is what keeps the log silent then.
+  --
+  -- Not implemented: CR 701.12c's deferral to CR 119.7-8, under which an
+  -- exchange that would raise a player who can't gain life (or lower one who
+  -- can't lose life) doesn't happen. Vacuous rather than elided: no effect in
+  -- the pool stops a player gaining or losing life, Pawl.Types.PlayerEffect
+  -- having no such arm to consult.
+  Effect.ExchangeLifeTotals slot -> do
+    gs <- State.get
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just (Recipient.ToPlayer other), True) -> do
+        let lifeOf pid = maybe 0 Player.life (Map.lookup pid (GameState.players gs))
+            mine = lifeOf controller
+            theirs = lifeOf other
+        changeLife controller (theirs - mine)
+        changeLife other (mine - theirs)
+      -- Not a player recipient or an illegal slot (CR 608.2b): no-op, and CR
+      -- 701.12a agrees -- an exchange that cannot be completed does nothing.
       _ -> pure ()
   -- CR 702.179c: each named player's speed increases by this much. Pawl.Engine.
   -- Speed's inherent triggered ability (CR 702.179d) is one producer and card data
@@ -3258,6 +3266,27 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- rather than being a "next occurrence" replacement installed here).
     let entry pid = ExtraTurn.MkExtraTurn {ExtraTurn.taker = pid, ExtraTurn.source = source, ExtraTurn.skipped = skips}
     State.modify' (\g -> g {GameState.extraTurns = List.foldl' (\ts pid -> entry pid : ts) (GameState.extraTurns g) takers})
+
+-- CR 119.3: move one player's life total by this much, and record the CR 608.2i
+-- event of the matching sign. The write LoseLife, GainLife and ExchangeLifeTotals
+-- share, so a life total moves in exactly one place; a signed delta is the shape
+-- the exchange needs, and the sign is what picks the event, so the two kinds of
+-- event stay distinct for a trigger to read.
+--
+-- A zero delta writes nothing at all: CR 119.9 says so for the gain side ("if a
+-- player gains 0 life, no life gain event has occurred"), and the loss side takes
+-- the same posture, no rule making a 0 subtraction an event either. The opcodes
+-- above guard on their quantity as well; an exchange between equal totals reaches
+-- this guard alone.
+changeLife :: PlayerId -> Integer -> Game ()
+changeLife pid delta =
+  Monad.when (delta /= 0) . State.modify' $
+    Event.recordEvent
+      ( if delta > 0
+          then GameEvent.LifeGained pid (Integer.toNaturalSaturating delta)
+          else GameEvent.LifeLost pid (Integer.toNaturalSaturating (negate delta))
+      )
+      . (\g -> g {GameState.players = Map.adjust (\p -> p {Player.life = Player.life p + delta}) pid (GameState.players g)})
 
 -- The no-subgame executor (the ability path and every direct caller): a
 -- PlaySubgame resolves as a draw here (see noSubgame).
