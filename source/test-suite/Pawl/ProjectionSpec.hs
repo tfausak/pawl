@@ -286,10 +286,13 @@ ashayaBloodMoon forest piker ashaya bloodMoon ashayaFirst =
 -- Limb depends on Blood Moon at the Bayou: CR 305.7's set deletes the Forest
 -- subtype, so the Bayou leaves "all Forests". Blood Moon depends on Life and Limb
 -- at Shroofus: the Saproling becomes a nonbasic land, so it enters "nonbasic
--- lands". Neither edge is visible at the other permanent, which is why the
--- relation has to be decided over the whole board -- decided per object, each
--- permanent sees a different one-way edge and the two answers cannot come from
--- any one global order.
+-- lands". Neither edge is visible at the other permanent, so only a relation
+-- decided over the whole board sees the loop at all: asked one permanent at a
+-- time, each reports a different one-way dependency, and the pair of answers is
+-- one no single order of the two effects produces.
+--
+-- Shroofus is the pool's only printed nontoken Saproling, and is transcribed
+-- without its combat-damage token trigger (#1113).
 limbBloodMoon :: Printing.Printing -> Printing.Printing -> Printing.Printing -> Printing.Printing -> Bool -> (ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
 limbBloodMoon bayou shroofus limb bloodMoon limbFirst =
   let base = Setup.emptyGame S.bothPlayers
@@ -1984,10 +1987,10 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
   -- Humility is erased; newer survives" above). Timestamp order alone would ask A
   -- first, get "it flies, skip it", and leave the Maiden with nothing.
   --
-  -- Asserted about the FLIER only. Goblin Piker beside it never flew, so applying
-  -- Humility does not change A's answer for the Piker, and pawl decides the
-  -- dependency per projected object rather than over the whole affected set
-  -- (#236) -- which is where the two would diverge.
+  -- Asserted about the FLIER only, which is the object the dependency is visible
+  -- at: a Goblin Piker beside it never flew, so applying Humility would not change
+  -- A's answer there. The relation is decided over the whole board, so one such
+  -- object settles it for every other.
   Spec.it s "CR 613.8b Humility reorders an effect whose set reads a keyword" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     humility <- S.printingOf s registry "Humility"
