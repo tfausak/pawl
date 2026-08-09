@@ -386,7 +386,7 @@ announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
   Just manaCost -> do
-    (announced, life) <- Mana.announce canActivateManaAbility pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
+    (announced, life) <- Mana.announce manaActivations pid oid total_ (lifeOwedBy (Cost.components cost)) manaCost
     pure
       cost
         { Cost.mana = Just announced,
@@ -496,7 +496,7 @@ requiresSicknessCheck cost =
 -- CR 302.6 asked of one activation COST -- the whole of what the rule reads, so
 -- an ability charging anything else is not gated at all. The ONE reading, asked
 -- on both paths an activated ability takes: Pawl.Engine.Activate for an ability
--- that uses the stack, and canActivateManaAbility below for one that does not
+-- that uses the stack, and manaActivations below for one that does not
 -- (CR 605.3b). Two readings could disagree, and the mana one used to, by gating
 -- every source of a controller's whether its cost held {T} or not (#1116).
 --
@@ -849,15 +849,16 @@ canPay :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPay pid oid cost gs = case Cost.mana cost of
   Nothing -> False
   Just manaCost ->
-    Mana.canPayCommitting canActivateManaAbility pid (lifeOwedBy (Cost.components cost)) manaCost gs
+    Mana.canPayCommitting manaActivations pid (lifeOwedBy (Cost.components cost)) manaCost gs
       && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
       && jointlyPayable pid oid (Cost.components cost) gs
 
--- May this player activate this mana ability, right now? The gate (Mana.Gate)
--- threaded through Pawl.Engine.Mana's supply model and the CR 601.2g window, and
--- the reason a source it refuses is neither offered nor counted. CR 605.3b keeps
--- a mana ability off the stack, so nothing here comes from Activate.activatable
--- and every restriction that window applies has to be applied here instead.
+-- How many times may this player activate this mana ability, right now? The
+-- capacity (Mana.Capacity) threaded through Pawl.Engine.Mana's supply model and
+-- the CR 601.2g window, and the reason a source answered 0 is neither offered nor
+-- counted. CR 605.3b keeps a mana ability off the stack, so nothing here comes
+-- from Activate.activatable and every restriction that window applies has to be
+-- applied here instead.
 --
 -- Two of them, both read off the ability's OWN activation cost, which CR 602.2b
 -- makes the activation pay: CR 118.3, can the cost be paid; and CR 302.6, is the
@@ -875,12 +876,52 @@ canPay pid oid cost gs = case Cost.mana cost of
 --
 -- `pcs` is the pre-projected board CR 302.6's two reads want; Map.empty asks for
 -- a fresh projection, which is what a caller with no sweep in hand passes (#200).
-canActivateManaAbility :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Bool
-canActivateManaAbility pcs pid oid cost gs =
-  Maybe.isJust (Cost.mana cost)
+manaActivations :: Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
+manaActivations pcs pid oid cost gs =
+  if Maybe.isJust (Cost.mana cost)
     && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
     && jointlyPayable pid oid (Cost.components cost) gs
     && sicknessOkGiven pcs pid oid cost gs
+    then repeatsOf pid oid cost gs
+    else 0
+
+-- How many times IN A ROW a cost already known to be payable once could be paid,
+-- which is what makes Ashnod's Altar beside two creatures two mana activations
+-- rather than one (#1128).
+--
+-- Counted off `removalClaim` alone, and answered 1 for anything else. What CR
+-- 118.3's "fully" limits a repetition by is the resources it consumes, and the
+-- claims are the ones this module knows how to count: a cost every component of
+-- which takes objects out of a zone can be paid exactly as many times as those
+-- zones hold objects for it. A component that spends something else -- CR 107.5's
+-- tap, CR 119.4's life, CR 107.14's energy -- caps the answer at 1 instead of
+-- being counted, which is exact for {T} (a tapped permanent cannot pay it again)
+-- and an understatement for the rest (#1132). A MANA part does the same, since
+-- repeating it would spend mana this walk has not measured (#1120).
+--
+-- Understating is the safe direction and the reason the uncounted components cap
+-- rather than divide: a supply short by one refuses a cost the payment loop could
+-- have paid, while a supply too large offers a cast that then cannot be paid --
+-- and an offer that changes nothing is offered again forever.
+--
+-- Hall's condition again, exactly as `jointlyPayable` asks it, with the k-th
+-- repetition asking for k times each claim: the pools are the same objects every
+-- time, so the largest k is the smallest floor(pool / claimed) over the subsets
+-- of one zone's claims.
+--
+-- The pools are read off the UNTOUCHED board, so a sacrifice that changes what
+-- the next activation's criterion matches is counted wrong -- the same reading
+-- that counts one creature for two sources (#1126).
+repeatsOf :: PlayerId -> ObjectId -> Cost Keyword.Type.Keyword -> GameState -> Natural
+repeatsOf pid oid cost gs = case (Cost.mana cost, traverse (\c -> removalClaim pid oid c gs) (Cost.components cost)) of
+  (Just (ManaCost.MkManaCost []), Just claims@(_ : _)) ->
+    let byZone = Map.fromListWith (<>) (fmap (\(zone, pool, n) -> (zone, [(pool, n)])) claims)
+        limit subset = case sum (fmap snd subset) of
+          0 -> Nothing
+          wanted -> Just (div (Natural.length (Set.unions (fmap fst subset))) wanted)
+        limits = concatMap (Maybe.mapMaybe limit . List.subsequences) (Map.elems byZone)
+     in if null limits then 1 else minimum limits
+  _ -> 1
 
 -- CR 118.3 asked one step later than `canPay` asks it: is SOME nonhybrid
 -- equivalent of this cost (CR 601.2b) payable, measured at CR 601.2f's total?
@@ -942,7 +983,7 @@ canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cos
     let outside = lifeOwedBy (Cost.components cost)
         payable (completed, life) =
           any
-            (\totalled -> Mana.canPayCommittingGiven canActivateManaAbility grants pcs pid (outside + life) totalled gs)
+            (\totalled -> Mana.canPayCommittingGiven manaActivations grants pcs pid (outside + life) totalled gs)
             (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
@@ -1198,7 +1239,7 @@ payComponents pid oid components = case components of
 -- candidates for the rest of this payment, since re-offering an untapped source
 -- that just refused to pay would ask the same question forever. What reaches it
 -- is a payment REFUSED and not one that was never payable: CR 118.3's gate
--- (canActivateManaAbility) keeps an unpayable option off the offer to begin with.
+-- (manaActivations) keeps an unpayable option off the offer to begin with.
 --
 -- The life budget only ever binds a cost NOTHING ANNOUNCED for: a cast (CR
 -- 601.2b) and an activation (CR 602.2b) both run `announce` first, so the cost
@@ -1221,11 +1262,11 @@ payMana pid cost = do
   pure paid
   where
     -- What the pool would leave if the cost were paid out of it right now.
-    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded canActivateManaAbility pid cost gs)) cost (Game.poolOf pid gs)
+    settlement gs = Mana.spend (Maybe.fromMaybe 0 (Mana.lifeNeeded manaActivations pid cost gs)) cost (Game.poolOf pid gs)
     window refused = do
       gs <- State.get
       let covered = Maybe.isJust (settlement gs)
-      case filter (`Set.notMember` refused) (Mana.manaSources canActivateManaAbility pid gs) of
+      case filter (`Set.notMember` refused) (Mana.manaSources manaActivations pid gs) of
         [] -> settle
         candidate : rest -> do
           answer <- chooseSource covered pid (candidate NonEmpty.:| rest) gs
@@ -1322,7 +1363,7 @@ tapForMana oid = do
       -- and pays the cost. Falls back to owner in the impossible case
       -- lookupObject just proved oid exists but controllerOf returns Nothing.
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\(cost, _) -> canActivateManaAbility Map.empty controller oid cost gs) (Mana.manaOptionsOf oid gs) of
+      case filter (\(cost, _) -> manaActivations Map.empty controller oid cost gs > 0) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
         options@(first : rest) -> do
           chosen <- chooseManaYield controller oid (fmap snd (first NonEmpty.:| rest)) gs
