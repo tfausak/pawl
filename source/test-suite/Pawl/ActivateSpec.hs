@@ -113,6 +113,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   textChangedCostSpec s registry
   textChangedTargetSpec s registry
   graveyardEffectZoneSpec s registry
+  twoSacrificeComponentSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -1932,4 +1933,74 @@ graveyardEffectZoneSpec s registry = Spec.describe s "GraveyardEffectZone" $ do
         -- Swamps are tapped too, having paid the {1}{B}, which is why this asks
         -- about the Skeleton by name rather than about the battlefield at large.
         Spec.assertEqWith s "returned tapped (CR 110.5b)" (fmap (\oid -> fmap Object.tapped (Game.lookupObject oid after)) skeletons) [Just TapState.Tapped]
+      abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
+
+-- alice with Jarad, Golgari Lich Lord in her graveyard, one untapped Bayou, and
+-- one extra land per printing in `extras`, holding priority.
+--
+-- Two boards that differ ONLY by that extra land is the whole design of this
+-- group: the negative assertion below is "the ability is not offered", which
+-- passes for a dozen unrelated reasons, and only a positive control drawn from
+-- the same call on the same board plus one Forest discriminates.
+jaradBoard :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, GameState.GameState)
+jaradBoard jarad bayou extras =
+  let add gs printing = snd (S.addCreature printing S.alice gs)
+      withExtras = List.foldl' add (S.landsInPlay bayou 1) extras
+      (jaradId, withJarad) = S.addGraveyardCard jarad S.alice withExtras
+   in (jaradId, withJarad {GameState.priority = Just S.alice})
+
+-- Is this object Jarad? CR 400.7 mints a fresh id when the card leaves the
+-- graveyard, so the returned card has to be found by name -- namedSkeleton's
+-- reason, one card over.
+namedJarad :: GameState.GameState -> ObjectId.ObjectId -> Bool
+namedJarad gs oid = case Game.faceOf oid gs of
+  Nothing -> False
+  Just face -> Face.name face == CardName.MkCardName (Text.pack "Jarad, Golgari Lich Lord")
+
+-- CR 118.3 at the MENU, which is this unit's observable: an ability whose cost
+-- cannot be paid in full is never offered.
+--
+-- Jarad, Golgari Lich Lord {B}{B}{G}{G} Legendary Creature -- Zombie Elf 2/2,
+-- "Sacrifice a Swamp and a Forest: Return this card from your graveyard to your
+-- hand" (Oracle text checked against Scryfall). A Bayou is `Land -- Forest
+-- Swamp`, so one permanent matches both components and a per-component gate
+-- offers the activation off it alone. Pawl.CostSpec proves the same refusal at
+-- Cost.canPay; this is the same rule at gameplay level, through
+-- Action.legalActions.
+--
+-- Not implemented: Jarad's other activated ability, "{1}{B}{G}, Sacrifice
+-- another creature: Each opponent loses life equal to the sacrificed creature's
+-- power" -- no quantity can read the power of a permanent sacrificed to pay a
+-- COST, so the card file omits the ability (#1061).
+twoSacrificeComponentSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+twoSacrificeComponentSpec s registry = Spec.describe s "TwoSacrificeComponents" $ do
+  Spec.it s "CR 118.3 with one Bayou the activation is not offered, and a Forest offers it" $ do
+    jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+    bayou <- S.printingOf s registry "Bayou"
+    forest <- S.printingOf s registry "Forest"
+    let (loneId, lone) = jaradBoard jarad bayou []
+        (pairId, pair) = jaradBoard jarad bayou [forest]
+    -- The vacuity guard: on the lone-Bayou board CR 113.6m DID hand the ability
+    -- out from the graveyard, so what withholds the action is the cost gate and
+    -- not the zone gate. Without this, a typo in the card's origin zone would
+    -- make the negative below pass and prove nothing.
+    Spec.assertEqWith s "the ability is offered from the graveyard" (length (Activate.abilitiesFor loneId lone)) 1
+    Spec.assertBool s (not (any (isActivationOf loneId) (Action.legalActions S.alice lone))) "one Bayou offers no activation"
+    Spec.assertBool s (any (isActivationOf pairId) (Action.legalActions S.alice pair)) "a Forest beside it does"
+  -- End to end through the real engine: the activation is announced, both lands
+  -- pay the cost, and CR 400.7's funnel puts Jarad into alice's hand. The
+  -- falsifier for a gate that offered the action and could not carry it out.
+  Spec.it s "CR 118.3 whole card: activating it returns Jarad to hand and eats both lands" $ do
+    jarad <- S.printingOf s registry "Jarad, Golgari Lich Lord"
+    bayou <- S.printingOf s registry "Bayou"
+    forest <- S.printingOf s registry "Forest"
+    let (jaradId, gs) = jaradBoard jarad bayou [forest]
+    case Activate.abilitiesFor jaradId gs of
+      [ability] -> do
+        let after = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice jaradId ability >> Stack.resolveTop)
+            jarads = filter (namedJarad after) (Game.zoneMembers Zone.Hand S.alice after)
+        Spec.assertEqWith s "Jarad is in alice's hand" (length jarads) 1
+        Spec.assertBool s (not (any (namedJarad after) (Game.zoneMembers Zone.Graveyard S.alice after))) "and not still in the graveyard"
+        Spec.assertEqWith s "both lands paid the cost" (length (GameState.battlefield after)) 0
+        Spec.assertEqWith s "and both are in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
       abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
