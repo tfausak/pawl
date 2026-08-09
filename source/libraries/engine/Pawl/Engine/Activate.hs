@@ -335,23 +335,23 @@ payableCostGiven grants pcs = payableCostAtGiven grants pcs 0
 -- NO CR 601.2f TOTALLING, which is the one place this parts company with the
 -- spell's version: an activation cost is deliberately not routed through
 -- Cost.total anywhere (#90), so the printed cost is what is measured and what
--- will be paid. When #90 lands, the `id` below becomes Cost.totalMana and this
+-- will be paid. When #90 lands, the `pure` below becomes Cost.totalManas and this
 -- site is done.
 --
 -- Cost.canPaySomeCompletion and not Cost.canPay so that the two gates ask ONE
 -- predicate, in the same shape Cost.announce's `total` parameter already gives
--- the two offers. A NO-OP today rather than a behaviour change: with `id` for the
+-- the two offers. A NO-OP today rather than a behaviour change: with `pure` for the
 -- totalling, asking whether some completion of the cost is payable is the same
 -- question Mana.canPayCommitting already answers by expanding CR 107.4e's and CR
 -- 107.4f's ways itself. What it buys is that a reduction reaching an activation
 -- cost cannot arrive at a gate that still measures the printed {2/X}.
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAt x pid srcId gs cost = Cost.canPaySomeCompletion pid srcId id (Cost.substituteX x cost) gs
+payableCostAt x pid srcId gs cost = Cost.canPaySomeCompletion pid srcId pure (Cost.substituteX x cost) gs
 
 -- The same predicate on a board the caller already walked -- see
 -- Cost.canPaySomeCompletionGiven.
 payableCostAtGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
-payableCostAtGiven grants pcs x pid srcId gs cost = Cost.canPaySomeCompletionGiven grants pcs pid srcId id (Cost.substituteX x cost) gs
+payableCostAtGiven grants pcs x pid srcId gs cost = Cost.canPaySomeCompletionGiven grants pcs pid srcId pure (Cost.substituteX x cost) gs
 
 -- CR 601.2b via 602.2b: the greatest X this player could actually pay for, which
 -- is what Prompt.ChooseX carries. The climb itself is Cost.greatestPayableX,
@@ -549,7 +549,7 @@ activateAbility pid srcId ability = do
           -- clauses -- a cost paid during a resolution, or for a special action --
           -- are still unreached (#373).
           --
-          -- `id` rather than Cost.totalMana, and that is #90 rather than an
+          -- `pure` rather than Cost.totalManas, and that is #90 rather than an
           -- oversight: an activation cost is not routed through Cost.total
           -- anywhere, so measuring the announcement through anything else would
           -- offer routes against a total this engine never computes.
@@ -557,7 +557,7 @@ activateAbility pid srcId ability = do
           -- Run on the cost carrying the ANNOUNCED value, which is CR 601.2b's own
           -- order (the value of X precedes the hybrid and Phyrexian
           -- announcements).
-          announcedCost <- Cost.announce pid srcId id announcedAtX
+          announcedCost <- Cost.announce pid srcId pure announcedAtX
           let sets = Target.legalSets (Just pid) srcId (Modal.modesTargetSpecs chosenModes (ActivatedAbility.modal ability)) gs
           chosen <-
             if Map.null sets

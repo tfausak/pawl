@@ -211,12 +211,18 @@ payableCost = payableCostAt 0
 -- CR 601.2b's COMPLETION comes before CR 601.2f's totalling, which is why this is
 -- Cost.canPaySomeCompletion and not Cost.canPay over Cost.total: a {2/R} totalled
 -- while still spelled {2/R} hides the generic reduction the announcement would
--- expose. Cost.totalMana is the totalling, and it is the same function castSpell
+-- expose. Cost.totalManas is the totalling, and it is the same function castSpell
 -- hands Cost.announce, so the gate and the offer read the adjustments through one
 -- function.
+--
+-- CR 118.7e leaves the same choice inside a REDUCTION written with a hybrid
+-- symbol, which is why that totalling answers one cost per resolution and this
+-- gate asks whether some resolution pays: the choice is the payer's, made at CR
+-- 601.2f, and a gate that priced the symbol at nothing refused casts the payer
+-- was entitled to.
 payableCostAt :: Natural -> PlayerId -> ObjectId -> GameState -> Cost Keyword -> Bool
 payableCostAt x pid oid gs cost =
-  Cost.canPaySomeCompletion pid oid (Cost.totalMana pid oid gs) (Cost.substituteX x cost) gs
+  Cost.canPaySomeCompletion pid oid (Cost.totalManas pid oid gs) (Cost.substituteX x cost) gs
 
 -- CR 601.2b: the greatest value of X this player could actually pay for, which is
 -- what Prompt.ChooseX carries -- measured on the cost the cast is measuring, with
@@ -946,11 +952,11 @@ castProposed pid sid face castFrom candidates before = do
                   -- targets; CR 118.13a is what forbids deferring them to payment
                   -- time.
                   --
-                  -- Cost.totalMana is handed in so that the routes offered are the
+                  -- Cost.totalManas is handed in so that the routes offered are the
                   -- ones CR 601.2f's total can pay -- the same adjusted cost
                   -- payableCost gated this cast on, read from the same `gs` the
                   -- total below is.
-                  announcedCost <- Cost.announce pid sid (Cost.totalMana pid sid gs) announcedAtX
+                  announcedCost <- Cost.announce pid sid (Cost.totalManas pid sid gs) announcedAtX
                   -- CR 601.2c, and the spell is on the stack for it: `sets` above
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
@@ -977,8 +983,11 @@ castProposed pid sid face castFrom candidates before = do
                       -- reduction is applied", which is this step and not CR
                       -- 601.2b's announcement above. The answers arrive as the
                       -- adjustments themselves, so `totalWith` applies exactly
-                      -- what was chosen; `payableCost`'s own reading of them is
-                      -- the unannounced one, which is stricter (#813).
+                      -- what was chosen; `payableCost` gated the cast on some
+                      -- resolution paying, so the answer given here can be a
+                      -- worse one -- CR 118.7e attaches no condition to the
+                      -- choice, and CR 601.2h's failed payment is what `reject`
+                      -- below answers with.
                       adjustments <- Cost.announceReductions pid sid gs
                       let paidCost = Cost.totalWith adjustments announcedCost
                       payment <- Cost.pay pid sid paidCost

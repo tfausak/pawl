@@ -227,12 +227,34 @@ allAdjustments pid oid gs =
       commanderTax = Commander.tax pid oid gs
    in (if commanderTax == 0 then increases else commanderTax : increases, reductions)
 
+-- Every way CR 118.7e's choice could resolve the reductions that apply, one
+-- entry per combination -- `announceReductions` below with the prompt replaced
+-- by the list of halves, and reusing `reductionHalvesOf` so that the two cannot
+-- offer different halves. The GATE's shape: nobody has been asked yet, so the
+-- honest question is whether SOME resolution pays (CR 601.2f).
+--
+-- The INCREASES ride through untouched, and a symbol with no halves contributes
+-- itself exactly once, both for the reasons `announceReductions` gives.
+--
+-- One entry for adjustments with no hybrid symbol in them, so this is the
+-- identity case for every cost that never had a choice to make, and at most
+-- 2^(hybrid symbols across the reductions) otherwise.
+adjustmentResolutions :: PlayerId -> ObjectId -> GameState -> [([Natural], [ManaCost.ManaCost])]
+adjustmentResolutions pid oid gs =
+  let (increases, reductions) = allAdjustments pid oid gs
+      resolveOne symbol = case reductionHalvesOf symbol of
+        Nothing -> [symbol]
+        Just [] -> [symbol]
+        Just halves -> halves
+      resolveAll (ManaCost.MkManaCost symbols) = fmap ManaCost.MkManaCost (traverse resolveOne symbols)
+   in fmap ((,) increases) (traverse resolveAll reductions)
+
 -- The same totalling over adjustments the CALLER already has, which is what CR
 -- 118.7e's prompt needs: `announceReductions` asks the payer which half of each
 -- hybrid symbol in a reduction it takes, and the answers have to reach
 -- applyAdjustments rather than being read out of the game state a second time.
--- `total` above and `totalMana` below are this over the adjustments as they
--- stand unannounced, which is the CASTABILITY GATE's reading of them (#813).
+-- `total` above is this over the adjustments as they stand unannounced, which no
+-- caller in the engine asks for; `totalManas` below is it over every resolution.
 totalWith :: ([Natural], [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Cost Keyword.Type.Keyword
 totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustments) (Cost.mana cost)}
 
@@ -241,8 +263,19 @@ totalWith adjustments cost = cost {Cost.mana = fmap (applyAdjustments adjustment
 -- what wants it separately is `announce` and `canPaySomeCompletion`, which both
 -- have to ask "what will this cost once 601.2f has run?" of candidate costs that
 -- do not exist yet and never become a Cost of their own.
-totalMana :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> ManaCost.ManaCost
-totalMana pid oid gs = applyAdjustments (allAdjustments pid oid gs)
+--
+-- MANY answers rather than one, because CR 118.7e leaves a choice inside the
+-- reduction and this runs before anyone has made it: one total per resolution,
+-- and a caller asks `any` of them. A reduction with no hybrid symbol in it --
+-- every printed one -- gives exactly one, so this is the old single answer
+-- wherever the choice does not arise.
+--
+-- The resolutions are computed ONCE and shared across the candidate costs a
+-- caller measures, which is what the partial application buys.
+totalManas :: PlayerId -> ObjectId -> GameState -> ManaCost.ManaCost -> [ManaCost.ManaCost]
+totalManas pid oid gs =
+  let resolutions = adjustmentResolutions pid oid gs
+   in \manaCost -> fmap (`applyAdjustments` manaCost) resolutions
 
 -- CR 601.2f's ADDITIONAL-COSTS clause alone, bolted onto one candidate -- the
 -- shape CR 702.42a's entwine needs. Pawl.Engine.Cast applies it to whichever
@@ -331,17 +364,21 @@ greatestPayableX payableAt cost =
 -- the PayLife appended above is precisely the announcement being measured.
 --
 -- `total` is CR 601.2f's totalling, the CALLER's to supply because the two
--- callers genuinely differ. Pawl.Engine.Cast passes `totalMana`, so a spell's
+-- callers genuinely differ. Pawl.Engine.Cast passes `totalManas`, so a spell's
 -- announcement is measured against the same adjusted cost `Cast.payableCost`
 -- gated on -- against the printed cost instead, a reduction could hide a route
--- and this function elide the prompt. Pawl.Engine.Activate passes `id`, because
+-- and this function elide the prompt. Pawl.Engine.Activate passes `pure`, because
 -- an activation cost is deliberately not routed through `total` at all (#90).
 -- When #90 lands both sites change together, which is the point of the parameter.
+--
+-- It answers a LIST because CR 118.7e's choice of half is not made until CR
+-- 601.2f, one step after this: a route is offered where SOME resolution of the
+-- reductions pays it, which is exactly what the gate asks.
 --
 -- The COST that arrives already carries CR 601.2b's announced value of X, since
 -- that rule puts the value of the variable before this announcement. Named
 -- `total_` only because this module's own `total` is in scope.
-announce :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
+announce :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> Game (Cost Keyword.Type.Keyword)
 announce pid oid total_ cost = case Cost.mana cost of
   -- CR 118.6: an object with no mana cost has no mana symbols to announce.
   Nothing -> pure cost
@@ -370,14 +407,16 @@ announce pid oid total_ cost = case Cost.mana cost of
 -- reaches applyAdjustments is a reduction with no hybrid symbol left in it --
 -- the same posture Mana.announce takes toward a cost, leaving an OfType behind
 -- where a {2/R} stood. That is why applyAdjustments' own Hybrid arms still take
--- nothing: by the time a cost is PAID there is nothing there for them to read,
--- and what still arrives spelled {2/B} is the castability gate's reduction,
--- which no announcement precedes (#813).
+-- nothing: neither path that measures a cost leaves a hybrid symbol in a
+-- reduction for them to read -- this one answers it, and the gate enumerates it
+-- (`adjustmentResolutions`).
 --
--- NOT FILTERED BY PAYABILITY, unlike `announce`. CR 118.7e attaches no condition
--- to the choice -- a player may take the half that reduces nothing -- and none
--- is needed: a reduction only ever lowers a cost the gate already priced without
--- it, so no answer here can strand a payment.
+-- NOT FILTERED BY PAYABILITY, unlike `announce`: CR 118.7e attaches no condition
+-- to the choice, and a player may take the half that reduces nothing. What that
+-- costs is that an answer here can strand a payment the gate allowed on the
+-- strength of the OTHER half -- reject-not-repair, the posture Cast.castSpell
+-- takes toward an announced X the player cannot afford, and CR 601.2h's failed
+-- payment is what reverses it.
 --
 -- The INCREASES ride through untouched. CR 118.7e is a rule about reductions,
 -- and pawl's increases are amounts of generic mana with no symbol to choose
@@ -791,13 +830,22 @@ canPay pid oid cost gs = case Cost.mana cost of
 -- `lifeOwedBy` rides on every completion.
 --
 -- `total` is CR 601.2f's totalling of a mana cost, the CALLER's to supply for the
--- reason Pawl.Engine.Cost.announce's is: Pawl.Engine.Cast passes `totalMana` and
--- Pawl.Engine.Activate passes `id`, since an activation cost is deliberately not
+-- reason Pawl.Engine.Cost.announce's is: Pawl.Engine.Cast passes `totalManas` and
+-- Pawl.Engine.Activate passes `pure`, since an activation cost is deliberately not
 -- routed through `total` at all (#90).
+--
+-- It answers MANY totals, one per CR 118.7e resolution of the reductions
+-- (`totalManas`), and this asks `any` of them: the choice of half belongs to the
+-- player paying and is not made until CR 601.2f, so a cost this gate refuses has
+-- to be one NO half of the reduction could have paid. That makes the answer a
+-- product of two enumerations -- the cost's completions and the reductions'
+-- resolutions -- each of which is 1 where no hybrid symbol appears on that side,
+-- so no cost in the pool pays for the second one. The gate's cost is #595's
+-- subject.
 --
 -- The COMPONENTS are asked exactly as `canPay` asks them, and no completion
 -- touches them: `completions` rewrites mana symbols only.
-canPaySomeCompletion :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletion :: PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletion pid oid total_ cost gs = canPaySomeCompletionGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid oid total_ cost gs
 
 -- The same question given a board the CALLER has already walked. The wrapper
@@ -810,13 +858,15 @@ canPaySomeCompletion pid oid total_ cost gs = canPaySomeCompletionGiven (Project
 -- ONLY the mana half is threaded. The COMPONENTS are still asked through
 -- canPayComponent, whose Sacrifice and TapForTotalPower arms make per-object
 -- walks of their own (#1073); no activation cost in the pool carries one.
-canPaySomeCompletionGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> ManaCost.ManaCost) -> Cost Keyword.Type.Keyword -> GameState -> Bool
+canPaySomeCompletionGiven :: [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> (ManaCost.ManaCost -> [ManaCost.ManaCost]) -> Cost Keyword.Type.Keyword -> GameState -> Bool
 canPaySomeCompletionGiven grants pcs pid oid total_ cost gs = case Cost.mana cost of
   Nothing -> False
   Just (ManaCost.MkManaCost symbols) ->
     let outside = lifeOwedBy (Cost.components cost)
         payable (completed, life) =
-          Mana.canPayCommittingGiven grants pcs pid (outside + life) (total_ (ManaCost.MkManaCost completed)) gs
+          any
+            (\totalled -> Mana.canPayCommittingGiven grants pcs pid (outside + life) totalled gs)
+            (total_ (ManaCost.MkManaCost completed))
      in any payable (Mana.completions symbols)
           && all (\component -> canPayComponent pid oid component gs) (Cost.components cost)
           && jointlyPayable pid oid (Cost.components cost) gs
@@ -1323,9 +1373,9 @@ applyAdjustments adjustments cost =
         ManaSymbol.Hybrid _ _ -> 0
         -- A symbol still spelled {2/R} HERE is one CR 118.7e's choice has not
         -- been made for -- announceReductions leaves a Generic behind when the
-        -- {2} half is taken, which the arm above reads. What reaches this arm is
-        -- the castability gate's reduction, which no announcement precedes
-        -- (#813).
+        -- {2} half is taken, which the arm above reads, and the gate enumerates
+        -- the same halves. What reaches this arm is `total`'s unannounced
+        -- reading, which nothing in the engine asks for.
         ManaSymbol.MonocoloredHybrid _ -> 0
         -- CR 118.7f gives a Phyrexian reduction to the typed side whole --
         -- "one mana of that symbol's color" -- so it takes no generic mana.
@@ -1401,13 +1451,13 @@ applyAdjustments adjustments cost =
         -- so answering it here would be the engine making it. A symbol still
         -- spelled {W/U} at this point is one nobody has been asked about --
         -- announceReductions leaves the chosen half's OfType behind when they
-        -- have -- and what reaches this arm is the castability gate's reduction,
-        -- which no announcement precedes (#813).
+        -- have -- and what reaches this arm is `total`'s unannounced reading,
+        -- which nothing in the engine asks for.
         ManaSymbol.Hybrid _ _ -> Nothing
         -- CR 118.7e's other shape, unread here for the same reason. Whichever
         -- half of a {2/R} the payer takes, announceReductions leaves behind the
         -- symbol that half is -- an OfType this arm reads, or a Generic
-        -- reducingGenericOf does (#813).
+        -- reducingGenericOf does.
         ManaSymbol.MonocoloredHybrid _ -> Nothing
         -- CR 118.7f: "If a cost is reduced by an amount of mana represented by a
         -- Phyrexian mana symbol, the cost is reduced by one mana of that symbol's
