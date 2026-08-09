@@ -257,9 +257,13 @@ attackedThisStep pid gs =
 --
 -- So the state pawl stores -- an attacker whose recorded target is no longer
 -- attackable -- and the state the rules describe are observationally the same
--- board, and stay so until something asks a question that separates them. The
--- candidate for that is a card whose text reads WHAT a creature is attacking (CR
--- 508.3b, CR 702.19c's trample over planeswalkers); none is in the pool (#537).
+-- board. CR 702.19e is now in the pool and reads the record after removal
+-- (Thrasta, Tempest's Roar), and it does not separate them: rule 702.19e is
+-- stated as an exception to CR 506.4c, so KEEPING the record naming the
+-- planeswalker is what lets Damage.combatRecipient tell "was attacking a
+-- planeswalker that is gone" from "was never attacking anything". What is still
+-- unmodeled is a trigger that reads WHAT was attacked (CR 508.3b) and CR 508.5's
+-- last known information (#537).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   -- No defending player is no attack (see Pawl.Types.Combat's defender field), so

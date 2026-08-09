@@ -17,7 +17,10 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 -- differing only in which creature each remembers -- and those really are
 -- interchangeable, since either order gains the same life. Carrying the bindings
 -- would make them distinct on the wire and raise a question with no answer. Such
--- a batch is still ASKED about rather than elided (#590).
+-- a batch is elided entirely, by Pawl.Engine.Engine.orderInert -- which is what
+-- makes the absence of `bindings` here safe rather than merely tidy: Aether
+-- Flash's two entries are equal in the same way and are NOT interchangeable, and
+-- it is that function, not this type, that tells them apart.
 --
 -- `source` is what the ability hangs on (CR 113.7), or CR 725.2's absence of one.
 -- `ability` is the DISCRIMINATOR (#61): a source with two DISTINCT triggered

@@ -3804,6 +3804,117 @@ planeswalkerAttackSpec s registry = Spec.describe s "AttackingAPlaneswalker" $ d
     Spec.assertEqWith s "so bob is untouched" (S.lifeOf S.bob after) (Just 20)
     Spec.assertEqWith s "the same board attacked at bob is 2 + 2 + 2" (S.lifeOf S.bob control) (Just 14)
 
+-- Run whole combat steps under a MONADIC interpreter, so an assignment prompt can
+-- be recorded as well as answered. S.runCombat's interpreter is pure and cannot
+-- report what it was offered, and what CR 702.19c is about is the shape of the
+-- offer.
+runCombatLogging ::
+  (forall r. Prompt.Prompt r -> State.State [Map.Map Recipient.Recipient Natural] r) ->
+  GameState.GameState ->
+  (GameState.GameState, [Map.Map Recipient.Recipient Natural])
+runCombatLogging answer gs0 =
+  let go n g =
+        if n <= (0 :: Int) || Maybe.isJust (GameState.result g) || not (S.inCombatPhase (GameState.phase g))
+          then pure g
+          else do
+            (_, next) <- Engine.runGame answer g Engine.runStep
+            go (n - 1) next
+   in State.runState (go 24 gs0) []
+
+-- Record every CR 702.19b/702.19c threshold map the engine offers, and answer it
+-- with `answer` -- a fixed division the test picked, which is what makes the
+-- assignment a CHOICE the interpreter made rather than one the engine computed.
+assignmentLog ::
+  Map.Map Recipient.Recipient Natural ->
+  Prompt.Prompt r ->
+  State.State [Map.Map Recipient.Recipient Natural] r
+assignmentLog answer p = case p of
+  Prompt.AssignCombatDamage _ _ _ thresholds _ -> do
+    State.modify' (\seen -> seen <> [thresholds])
+    pure answer
+  _ -> pure (attackThePlaneswalker p)
+
+-- CR 702.19c / CR 702.19e / CR 702.19f: trample over planeswalkers, through
+-- Thrasta, Tempest's Roar -- the only card that prints it.
+--
+-- A 7/7 into a 3-loyalty Jace Beleren, so the three numbers the rule turns on --
+-- power, loyalty, and the 4 that spills past it -- are all distinct and no two
+-- readings of CR 702.19c land on the same board.
+--
+-- "That planeswalker's controller" and "the defending player" are one seat here.
+-- That is not the two-player collapse that hides a bug: CR 702.19c names the
+-- planeswalker's controller precisely because the attack was declared against
+-- that player's planeswalker (CR 508.1b), so the two are the same player on every
+-- board pawl can build.
+--
+-- Thrasta's other two printed clauses are omitted (#1090, #1091). Neither
+-- can reach these boards: nothing is cast and nothing targets Thrasta.
+trampleOverPlaneswalkersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+trampleOverPlaneswalkersSpec s registry = Spec.describe s "TrampleOverPlaneswalkers" $ do
+  Spec.it s "CR 702.19c an unblocked 7/7 pays Jace's 3 loyalty and sends the other 4 at bob" $ do
+    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [thrasta]
+        answer = Map.fromList [(Recipient.ToPlaneswalker jaceId, 3), (Recipient.ToPlayer S.bob, 4)]
+        (after, offered) = runCombatLogging (assignmentLog answer) gs
+    Spec.assertEqWith
+      s
+      "CR 702.19c: the planeswalker at its LOYALTY, its controller behind it at 0"
+      offered
+      [Map.fromList [(Recipient.ToPlaneswalker jaceId, 3), (Recipient.ToPlayer S.bob, 0)]]
+    Spec.assertEqWith s "bob took the 4 past Jace" (S.lifeOf S.bob after) (Just 16)
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "CR 704.5i: Jace took all 3 and is buried"
+  -- The pair that makes CR 702.19c's "may be assigned as the attacking creature's
+  -- controller chooses" a choice: ONE board, two interpreters, two games. An
+  -- engine that computed "the excess goes to the player" passes the case above
+  -- and fails this one.
+  Spec.it s "CR 702.19c the whole 7 may stay on Jace instead" $ do
+    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [thrasta]
+        answer = Map.singleton (Recipient.ToPlaneswalker jaceId) 7
+        (after, offered) = runCombatLogging (assignmentLog answer) gs
+    Spec.assertEqWith s "the same offer was made" (fmap Map.keys offered) [[Recipient.ToPlaneswalker jaceId, Recipient.ToPlayer S.bob]]
+    Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "Jace dies either way"
+  -- CR 702.19f, the negative control: a plain trampler attacking a planeswalker
+  -- can assign the defending player nothing, "even if ... the damage the attacking
+  -- creature could assign is greater than the planeswalker's loyalty".
+  --
+  -- Panglacial Wurm and not War Mammoth, and that is the whole point of the case:
+  -- a 3/3 into 3 loyalty is forced whether or not the keyword is there, so it
+  -- could not tell the two apart. The Wurm is 9/5 with plain trample, so 6 would
+  -- spill past Jace if CR 702.19f were not enforced.
+  Spec.it s "CR 702.19f plain trample offers the defending player nothing" $ do
+    wurm <- S.printingOf s registry "Panglacial Wurm"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [wurm]
+        answer = Map.fromList [(Recipient.ToPlaneswalker jaceId, 3), (Recipient.ToPlayer S.bob, 6)]
+        (after, offered) = runCombatLogging (assignmentLog answer) gs
+    Spec.assertEqWith s "no division was ever asked for, so no map held the player" offered []
+    Spec.assertEqWith s "bob is untouched" (S.lifeOf S.bob after) (Just 20)
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "all 9 went to Jace (CR 704.5i)"
+  -- CR 702.19e, the exception to CR 506.4c: two 2/1 first strikers bury Jace in the
+  -- FIRST combat damage step (CR 510.4), and Thrasta -- still recorded as attacking
+  -- it -- assigns to the defending player in the second. The control is the same
+  -- board with War Mammoth in Thrasta's seat, where CR 506.4c stands and the
+  -- attacker assigns nothing (the existing CR 510.1b case above is that rule).
+  Spec.it s "CR 702.19e whole cards: a planeswalker killed by first strike does not stop the trampler" $ do
+    thrasta <- S.printingOf s registry "Thrasta, Tempest's Roar"
+    warMammoth <- S.printingOf s registry "War Mammoth"
+    tiger <- S.printingOf s registry "Sabretooth Tiger"
+    jace <- S.printingOf s registry "Jace Beleren"
+    let (gs, _, jaceId) = jaceBoard jace [tiger, tiger, thrasta]
+        (control, _, _) = jaceBoard jace [tiger, tiger, warMammoth]
+        after = S.runCombat attackThePlaneswalker gs
+    Spec.assertBool s (not (Set.member jaceId (GameState.battlefield after))) "the two first strikers buried Jace"
+    Spec.assertEqWith s "CR 702.19e: Thrasta's 7 reached bob anyway" (S.lifeOf S.bob after) (Just 13)
+    Spec.assertEqWith
+      s
+      "CR 506.4c / CR 510.1b: a plain trampler in the same seat assigns nothing"
+      (S.lifeOf S.bob (S.runCombat attackThePlaneswalker control))
+      (Just 20)
+
 -- CR 508.4 / CR 508.3a / CR 508.8, through the one card in the pool that puts a
 -- creature onto the battlefield attacking WITHOUT anything having been declared.
 --
@@ -4247,4 +4358,5 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   putOntoBattlefieldAttackingSpec s registry
   towershellSpec s registry
   planeswalkerAttackSpec s registry
+  trampleOverPlaneswalkersSpec s registry
   attackCostSpec s registry

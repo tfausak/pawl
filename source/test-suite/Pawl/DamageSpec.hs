@@ -1514,6 +1514,59 @@ assignmentLegalitySpec s =
               ]
        in Spec.assertBool s (Damage.legalAssignment thresholds 5 answer) "accepted"
 
+    -- CR 702.19c's SECOND tier, the mirror of the blocker pair above: with
+    -- trample over planeswalkers the map holds the attacked planeswalker at its
+    -- loyalty AND that planeswalker's controller at 0, and the player's share is
+    -- gated on the planeswalker having been assigned its whole loyalty. Power 7
+    -- over loyalty 3, so the two answers below differ only in whether Jace is one
+    -- short.
+    Spec.it s "CR 702.19c the planeswalker one short of its loyalty gates its controller" $
+      let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+          thresholds =
+            Map.fromList
+              [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 3),
+                (Recipient.ToPlayer S.bob, 0)
+              ]
+          answer :: Map.Map Recipient.Recipient Natural.Natural
+          answer =
+            Map.fromList
+              [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 2),
+                (Recipient.ToPlayer S.bob, 5)
+              ]
+       in Spec.assertBool s (not (Damage.legalAssignment thresholds 7 answer)) "rejected"
+
+    Spec.it s "CR 702.19c the planeswalker at its loyalty frees its controller" $
+      let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+          thresholds =
+            Map.fromList
+              [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 3),
+                (Recipient.ToPlayer S.bob, 0)
+              ]
+          answer :: Map.Map Recipient.Recipient Natural.Natural
+          answer =
+            Map.fromList
+              [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 3),
+                (Recipient.ToPlayer S.bob, 4)
+              ]
+       in Spec.assertBool s (Damage.legalAssignment thresholds 7 answer) "accepted"
+
+    -- "At least equal to the loyalty" (CR 702.19c), so the threshold is a floor on
+    -- the planeswalker's share and not a cap on it.
+    Spec.it s "CR 702.19c over-paying the loyalty and still spilling over is legal" $
+      let thresholds :: Map.Map Recipient.Recipient Natural.Natural
+          thresholds =
+            Map.fromList
+              [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 3),
+                (Recipient.ToPlayer S.bob, 0)
+              ]
+          answer :: Map.Map Recipient.Recipient Natural.Natural
+          answer =
+            Map.fromList
+              [ (Recipient.ToPlaneswalker (ObjectId.MkObjectId 1), 5),
+                (Recipient.ToPlayer S.bob, 2)
+              ]
+       in Spec.assertBool s (Damage.legalAssignment thresholds 7 answer) "accepted"
+
     -- Without trample the defending player is not among the thresholds at all
     -- (Damage.attackerAssignment adds that entry only for a trampler), so a
     -- point aimed at them is an illegal RECIPIENT rather than a gated one.

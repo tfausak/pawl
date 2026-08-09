@@ -266,6 +266,123 @@ conditionSlots condition =
     (Quantity.slots $ Condition.Type.measured condition)
     (Quantity.slots $ Condition.Type.threshold condition)
 
+-- CR 603.3b: is slotsOf's answer for this effect the WHOLE of what APPLYING it
+-- reads off the resolving object's bindings? A CLASSIFICATION of effects, in the
+-- genre of Replacement.readsApplier: what SHAPE an effect has, never which
+-- effect it is. Engine.orderInert is the sole caller, and may elide CR 603.3b's
+-- ordering prompt only for an ability that reads nothing.
+--
+-- slotsOf answers the dataflow LINT's question -- which TARGET slots does this
+-- effect name -- so a Set.empty there is not the same claim. Four ways the two
+-- come apart, one per False or guard below:
+--
+--   * ArmDelayedTrigger captures the resolving object's WHOLE environment (CR
+--     603.7c), which the ability it arms then reads.
+--   * a Duration slotsOf's own arm does not union in (GainControl,
+--     AffectPlayers) can still name a slot through CR 611.2b's condition.
+--   * a PlayerRef nested in a Quantity is a TARGET slot Quantity.slots leaves to
+--     this module, which cannot see it -- Quantity.slotsAreExhaustive is that half.
+--   * CR 725.2's ControllerOfSource reads the reserved trigger-source slot, which
+--     monarchTargetSlots must not report because a source is not a target.
+--
+-- One arm per constructor, no wildcard, and BecomeMonarch split per target: a
+-- new opcode must answer HERE as well as in slotsOf. A wildcard defaulting to
+-- True would hand a future nested payload an unsound elision instead of a build
+-- failure. Fields are spelled out wherever hlint's record-pattern rule allows
+-- it; the four `{}` arms below all answer a constant, so a new FIELD on one of
+-- those is the one change this case will not force.
+slotsAreExhaustive :: Effect Card.Type.Card -> Bool
+slotsAreExhaustive effect = case effect of
+  Effect.DealDamage _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.ModifyTarget duration modification _ ->
+    durationSlotsAreExhaustive duration
+      && all Quantity.slotsAreExhaustive (Projection.quantitiesOf modification)
+  Effect.ChangeText {} -> True
+  Effect.AddMana _ -> True
+  Effect.Search _ _ -> True
+  Effect.ExileAllGraveyards -> True
+  Effect.Proliferate -> True
+  Effect.TemptWithTheRing -> True
+  Effect.ExileHandThenDraw -> True
+  Effect.PlayerSacrifices _ _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.RestartGame -> True
+  Effect.ControlPlayerNextTurn _ -> True
+  Effect.Destroy {} -> True
+  Effect.Sacrifice _ -> True
+  Effect.TurnFaceDown _ -> True
+  Effect.RemoveFromCombat _ -> True
+  Effect.MoveToZone {} -> True
+  Effect.Draw _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Mill _ quantity _ -> Quantity.slotsAreExhaustive quantity
+  Effect.Discard _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.LoseLife _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.GainLife _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.IncreaseSpeed _ quantity -> Quantity.slotsAreExhaustive quantity
+  -- The embedded card is literal text, not a read: CR 111.1's token is minted
+  -- with its own empty bindings, so nothing in it sees this environment.
+  Effect.Create quantity _ _ _ -> Quantity.slotsAreExhaustive quantity
+  -- The ReplacementEffect holds no Quantity and no reference, so slotsOf's two
+  -- unions are the whole of it once their quantities check out.
+  Effect.Replace duration _ _ condition _ ->
+    durationSlotsAreExhaustive duration && all conditionSlotsAreExhaustive condition
+  Effect.SkipNextPhase _ _ -> True
+  Effect.PreventNextDamage duration _ quantity ->
+    durationSlotsAreExhaustive duration && Quantity.slotsAreExhaustive quantity
+  Effect.PreventAllDamage duration _ -> durationSlotsAreExhaustive duration
+  Effect.Counter _ -> True
+  Effect.PutCounters _ quantity _ -> Quantity.slotsAreExhaustive quantity
+  Effect.RemoveCounters _ quantity _ -> Quantity.slotsAreExhaustive quantity
+  Effect.GainPlayerCounters _ _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.RemovePlayerCounters _ _ quantity -> Quantity.slotsAreExhaustive quantity
+  Effect.Tap _ -> True
+  Effect.Untap _ -> True
+  Effect.Transform _ -> True
+  Effect.AddPhases _ -> True
+  -- slotsOf's arm drops this Duration, so the slotless test is made here.
+  Effect.GainControl duration _ ->
+    Set.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- CR 603.7c: the armed ability inherits this object's whole environment, so
+  -- what it reads is not stated here at all.
+  Effect.ArmDelayedTrigger {} -> False
+  -- GainControl's reason for the Duration; the PlayerScope and the PlayerEffect
+  -- beside it hold no reference of any sort.
+  Effect.AffectPlayers duration _ _ ->
+    Set.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- CR 114.2's emblem is minted with EMPTY bindings (Event.createEmblem), so its
+  -- embedded card is literal text for Create's reason.
+  Effect.CreateEmblem _ -> True
+  Effect.BecomeMonarch MonarchTarget.TheController -> True
+  -- The one arm that answers NO here: CR 725.2 reads Binding.triggerSource,
+  -- which monarchTargetSlots reports as nothing.
+  Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
+  Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
+  Effect.ItBecomes _ -> True
+  Effect.ExileUntilMonarch _ -> True
+  Effect.Attach _ -> True
+  Effect.AttachTarget _ _ -> True
+  -- CR 729.1b: the slot is a DEFINITION, and the subgame itself reads no binding
+  -- of the game that spawned it.
+  Effect.PlaySubgame _ -> True
+  Effect.TakeExtraTurn _ _ -> True
+  Effect.ShuffleIntoLibrary _ -> True
+  Effect.OfferCast _ _ -> True
+  Effect.GrantPlayFromExile duration _ -> durationSlotsAreExhaustive duration
+
+-- CR 611.2b: only ForAsLongAs reads anything, through its Condition.
+durationSlotsAreExhaustive :: Duration.Duration -> Bool
+durationSlotsAreExhaustive duration = case duration of
+  Duration.UntilEndOfTurn -> True
+  Duration.Indefinite -> True
+  Duration.UntilYourNextTurn -> True
+  Duration.ForAsLongAs condition -> conditionSlotsAreExhaustive condition
+  Duration.UntilEndOfCombat -> True
+
+-- conditionSlots' mirror: both sides are a Quantity.
+conditionSlotsAreExhaustive :: Condition.Type.Condition -> Bool
+conditionSlotsAreExhaustive condition =
+  Quantity.slotsAreExhaustive (Condition.Type.measured condition)
+    && Quantity.slotsAreExhaustive (Condition.Type.threshold condition)
+
 -- Does any of these effects read X? A card that reads X must declare {X} in its
 -- cost (CR 107.3, CR 107.3a, CR 118.4) -- the same reads-equal-declares contract
 -- slotsOf draws for target slots. Quantity.readsX does the looking, so a nested
