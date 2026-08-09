@@ -655,6 +655,7 @@ handInPlay printing board =
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
+            Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,

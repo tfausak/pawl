@@ -242,6 +242,25 @@ data Object = MkObject
     -- because CR 400.7 makes the moved object a new one that has never
     -- transformed.
     turnedOverAt :: Maybe Timestamp.Timestamp,
+    -- | CR 704.5k: WHEN this permanent last became world, which is the clock the
+    -- world rule measures ("the one that has had the world supertype for the
+    -- shortest amount of time"). Nothing for everything that is not world, which
+    -- is almost every object.
+    --
+    -- NOT CR 613.7d's `timestamp` above, and that is the whole point: world-ness
+    -- is a layer-4 projection (CR 613.1d, Modification.AddSupertype), so a
+    -- permanent can become world long after it entered, and its entry stamp is
+    -- then the wrong clock.
+    --
+    -- STORED where world-ness is DERIVED, so it is SAMPLED rather than computed:
+    -- Engine.sampleWorldSince writes it once per settle pass, before the
+    -- state-based-action check reads it. One writer, so a permanent that enters
+    -- already world and one granted the supertype later carry comparable clocks.
+    --
+    -- Per-incarnation state, like damage and counters: cleared by newIncarnation,
+    -- because CR 400.7 makes the moved object a new one -- a world permanent that
+    -- is bounced and replayed has been world only since it returned.
+    worldSince :: Maybe Timestamp.Timestamp,
     -- | CR 601.3: the standing permission to play this card, as the player who
     -- holds it and the duration it lasts. Nothing for every object nothing has
     -- permitted, which is almost all of them -- and for an adventurer card that
@@ -420,6 +439,7 @@ newIncarnation object =
       chosenNames = Set.empty,
       face = Nothing,
       turnedOverAt = Nothing,
+      worldSince = Nothing,
       playableFromExile = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,

@@ -73,6 +73,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Program as Program
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import Pawl.Types.Prompt (Prompt)
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.RestartSignal as RestartSignal
@@ -80,6 +81,7 @@ import Pawl.Types.Result (Result)
 import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.Source as Source
+import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
@@ -173,8 +175,11 @@ priorityHolder gs =
         then active
         else nextStillPlaying gs active
 
+-- The step's own CR 704.3 check. Samples CR 704.5k's clock first, for the reason
+-- performSettle does: this site follows the turn-based actions, and CR 514.2's
+-- sweep ending an "until end of turn" grant is one that can change who is world.
 checkSba :: Game ()
-checkSba = Sba.checkStateBasedActions
+checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
@@ -238,6 +243,56 @@ checkControlContinuity = do
               then objs
               else Map.insert oid obj {Object.sickness = Sickness.Sick} objs
   State.put gs {GameState.objects = foldr interrupted (GameState.objects gs) (Set.toList (GameState.battlefield gs))}
+
+-- CR 704.5k asks how long each permanent has "had the world supertype", and
+-- world-ness is DERIVED (a layer-4 projection, CR 613.1d) while the clock must be
+-- STORED -- so this samples it into Object.worldSince, the way
+-- checkControlContinuity above samples control. A supertype granted by a static
+-- ability is re-read live by the projection and has no event to hang a stamp on.
+--
+-- Unlike checkControlContinuity this both WRITES and CLEARS, and the asymmetry
+-- that keeps it sound is different: the sample is taken at every point the board
+-- can change and BEFORE the rule reads it, so a stamp is minted at the first
+-- settle after the permanent became world and dropped at the first settle after it
+-- stopped. A stamp-only version would latch, leaving a permanent that lost the
+-- supertype and regained it claiming the older clock.
+--
+-- ONE fresh timestamp for the whole pass, minted only if something is actually
+-- stamped: CR 704.5k's tie clause is a sentence of the rule, so permanents that
+-- became world simultaneously must compare equal.
+--
+-- No special case for a PRINTED world supertype. Such a permanent is world from
+-- the moment it exists, so the first settle after it enters stamps it like any
+-- other -- one writer, one clock. Seeding worldSince from Object.timestamp at
+-- entry instead would make a printed world permanent's clock an ENTRY instant and
+-- a granted one's a SETTLE instant, and the two are not comparable.
+--
+-- Battlefield-scoped: CR 704.5k is about permanents, and Object.newIncarnation
+-- clears the stamp on the way out (CR 400.7).
+--
+-- One Projection.projectAll, the same whole-board gather Sba.performStateBasedActions
+-- already pays on every pass -- not a fresh projection per object.
+sampleWorldSince :: Game ()
+sampleWorldSince = do
+  gs <- State.get
+  let pcs = Projection.projectAll gs
+      isWorld oid = case Map.lookup oid pcs of
+        Nothing -> False
+        Just pc -> Set.member Supertype.World (PC.supertypes pc)
+      isStamped oid = case Map.lookup oid (GameState.objects gs) of
+        Nothing -> False
+        Just obj -> Maybe.isJust (Object.worldSince obj)
+      ids = Set.toList (GameState.battlefield gs)
+      toStamp = filter (\oid -> isWorld oid && not (isStamped oid)) ids
+      toClear = filter (\oid -> isStamped oid && not (isWorld oid)) ids
+      unstamp obj = obj {Object.worldSince = Nothing}
+      cleared = foldr (Map.adjust unstamp) (GameState.objects gs) toClear
+  case toStamp of
+    [] -> State.put gs {GameState.objects = cleared}
+    _ -> do
+      let (ts, gs1) = Game.freshTimestamp gs
+          stamp obj = obj {Object.worldSince = Just ts}
+      State.put gs1 {GameState.objects = foldr (Map.adjust stamp) cleared toStamp}
 
 -- CR 514.1's cleanup discard -- NOT CR 514.2, the damage-removal and
 -- end-of-turn sweep beside it. Non-identical cards share a hand, so trimming
@@ -682,6 +737,7 @@ placeBorne srcId pending = do
             Object.timestamp = ts,
             Object.face = Nothing,
             Object.turnedOverAt = Nothing,
+            Object.worldSince = Nothing,
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
@@ -808,10 +864,10 @@ settleForPriority = Monad.void performSettle
 -- firing, a trigger being placed -- so a settle that changes nothing costs one
 -- board projection and one length comparison per carrier, NOT a deep GameState
 -- equality check. On top of
--- that, every pass pays three samples of derived state (checkControlContinuity
--- for CR 302.6, Combat.removeChanged for CR 506.4, Ring.endOnControlChange for
--- CR 701.54a), because a derived change to control or to card types has nothing
--- else to notice it.
+-- that, every pass pays four samples of derived state (sampleWorldSince for
+-- CR 704.5k, checkControlContinuity for CR 302.6, Combat.removeChanged for
+-- CR 506.4, Ring.endOnControlChange for CR 701.54a), because a derived change to
+-- control, to card types or to supertypes has nothing else to notice it.
 --
 -- CR 611.2b's condition is checked continuously, and CR 704.3 makes "whenever
 -- a player would get priority" the coarsest moment anything could observe it,
@@ -844,6 +900,11 @@ performSettle = do
   -- turning a permanent over changes its power and toughness and CR 704.5f must
   -- read the board the turn leaves behind.
   dayNight <- Daytime.settle
+  -- Before the SBA pass for Daytime.settle's reason: a permanent that just became
+  -- world must be stamped before CR 704.5k reads the clock. Inside the recursion
+  -- guard because it runs on every pass, but not part of it -- stamping makes no
+  -- further work, so it is never a reason to loop.
+  sampleWorldSince
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: all three
