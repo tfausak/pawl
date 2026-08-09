@@ -539,15 +539,19 @@ isTapped oid gs = case lookupObject oid gs of
 -- object's KIND, a classification in the same standing as isSpell, never the
 -- card's identity. False for an unknown id and for every non-token kind.
 isToken :: ObjectId -> GameState -> Bool
-isToken oid gs = case lookupObject oid gs of
-  Nothing -> False
-  Just obj -> case Object.source obj of
-    Source.OfToken _ -> True
-    Source.OfCard _ -> False
-    Source.OfAbility _ _ -> False
-    Source.OfTrigger _ _ -> False
-    Source.OfEmblem _ -> False
-    Source.OfInherentTrigger _ _ -> False
+isToken oid gs = maybe False (sourceIsToken . Object.source) (lookupObject oid gs)
+
+-- The same question of a bare Source, which is what CR 608.2h's record keeps of
+-- an object that has ceased (LastKnown.source). One classification, so a live
+-- object and a departed one cannot answer it differently.
+sourceIsToken :: Source.Source -> Bool
+sourceIsToken source = case source of
+  Source.OfToken _ -> True
+  Source.OfCard _ -> False
+  Source.OfAbility _ _ -> False
+  Source.OfTrigger _ _ -> False
+  Source.OfEmblem _ -> False
+  Source.OfInherentTrigger _ _ -> False
 
 -- CR 104.2a: who is still in the game. Here rather than in
 -- Pawl.Engine.Departure because Departure imports Pawl.Engine.Monarch, which
