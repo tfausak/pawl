@@ -39,8 +39,9 @@ data Affected
     -- Projection.viewOfObject has no zone gate, so a card in a hand, library,
     -- graveyard or exile IS matched against its projected view through every
     -- caller that goes via it (cost criteria, targeting). Inside the CR 613 fold
-    -- Projection.viewUpTo instead falls back to viewOfCard off the battlefield,
-    -- so the same card is matched against its PRINTED characteristics. That
+    -- Projection.viewUpTo instead falls back to viewOfCardIn off the battlefield,
+    -- so the same card is matched against its PRINTED characteristics -- bar CR
+    -- 208.2a's characteristic-defining power, which functions in all zones. That
     -- split is the defect, not an under-reach on this arm's part (#160, #623).
     --
     -- Not implemented, the symmetric OVER-reach, recorded here because the card's

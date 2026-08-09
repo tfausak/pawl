@@ -75,7 +75,7 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   --
   -- Nothing when the view cannot say: no object at all, or an object with no
   -- card behind it. Off the battlefield the view is the printed card's
-  -- (Projection.viewOfCard), which answers CR 202.3 in every zone.
+  -- (Projection.viewOfCardIn), which answers CR 202.3 in every zone.
   Quantity.ManaValue -> viewOf oid >>= Filter.manaValue
   -- CR 208.1 read through the injected view, so this arm never learns whether
   -- it is looking at a live projection or a CR 608.2h snapshot -- the caller
@@ -116,10 +116,12 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.InSlot slot ->
     let boundOn holder = Game.lookupObject holder gs >>= Binding.amountOf slot . Object.bindings
      in fmap toInteger (boundOn oid <|> boundOn announcedOn)
-  -- CR 208.2: a bare star has no value of its own. The projection substitutes
-  -- the object's characteristic-defining quantity for it at the seed
-  -- (Projection.baseCharacteristics), so reaching this arm means the star was
-  -- never resolved -- honestly Nothing, not a hole.
+  -- CR 208.2: a bare star has no value of its own. Both readers of a
+  -- characteristic-defining P/T substitute the object's quantity for it first,
+  -- through Projection.seedCharacteristicPT -- the projection at its seed
+  -- (Projection.baseCharacteristics), and Projection.characteristicPowerIn off
+  -- the battlefield -- so reaching this arm means the star was never resolved,
+  -- honestly Nothing rather than a hole.
   Quantity.Star -> Nothing
   Quantity.Plus a b -> case (evaluateFor viewOf context gs announcedOn oid a, evaluateFor viewOf context gs announcedOn oid b) of
     (Just x, Just y) -> Just (x + y)
@@ -224,10 +226,11 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
 -- its count cannot be determined, because it is the COUNT that becomes 0 and
 -- not the sum. Plus is the only calculation Pawl.Types.Quantity has.
 --
--- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is:
--- Projection.applyCharacteristicPT is the only caller, and every other reader
--- of a quantity must keep evaluate's honest Nothing, since no rule tells those
--- to invent a number.
+-- SCOPED TO THE CHARACTERISTIC-DEFINING ABILITY, as CR 208.2a is: the callers
+-- are Projection.applyCharacteristicPT on the battlefield and
+-- Projection.characteristicPowerIn off it (CR 604.3 makes the ability function
+-- in all zones), and every other reader of a quantity must keep evaluate's
+-- honest Nothing, since no rule tells those to invent a number.
 --
 -- It does NOT descend into a Count, and does not need to: an undeterminable
 -- count IS the number CR 208.2a is talking about, so the 0 goes in whole here

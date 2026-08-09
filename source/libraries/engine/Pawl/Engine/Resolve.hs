@@ -1590,13 +1590,15 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.AddMana _ -> pure ()
   Effect.Search filter_ destination ->
     -- CR 701.23a: match each library card through the PRINTED-card view -- a card
-    -- in a library has no projection. The context has no perspective (CR 109.5): a
-    -- search filter never references a player, so ControlledBy is vacuously False.
-    -- No source in scope at this site.
+    -- in a library has no projection. Its power is CR 208.2a's exception, which
+    -- is why the view is Projection.viewOfCardIn: Imperial Recruiter's "creature
+    -- card with power 2 or less" sees a Tarmogoyf's real power. The context has
+    -- no perspective (CR 109.5): a search filter never references a player, so
+    -- ControlledBy is vacuously False. No source in scope at this site.
     let searchContext = Filter.MkContext Nothing Nothing
         matches1 g oid = case Game.faceOf oid g of
           Nothing -> False
-          Just face -> Filter.matches searchContext (Projection.viewOfCard face) filter_
+          Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
      in do
           -- CR 601.3 (Panglacial Wurm): the chance to cast a
           -- castable-while-searching card is offered AT THE SEARCH, not when the
@@ -2083,7 +2085,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       let tallyContext = Filter.MkContext Nothing Nothing
           counted oid = case Game.faceOf oid gs of
             Nothing -> False
-            Just face -> Filter.matches tallyContext (Projection.viewOfCard face) (MillTally.filter tally)
+            Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
        in State.modify' (bindAmountSlot source (MillTally.slot tally) (Natural.length (filter counted milled)))
   Effect.Discard slot quantity -> do
     gs <- State.get
