@@ -1633,8 +1633,7 @@ ashnodsAltarSpec s registry = Spec.describe s "Ashnod's Altar" $ do
     altar <- S.printingOf s registry "Ashnod's Altar"
     piker <- S.printingOf s registry "Goblin Piker"
     arbiter <- S.printingOf s registry "Silent Arbiter"
-    let board = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate 2 piker)
-        (withSpell, oid) = S.handOne arbiter board
+    let (withSpell, oid) = S.handOne arbiter (altarBoard altar piker 2)
         offers = State.execState (Engine.runGame recordingManaSources withSpell (S.cast S.alice oid)) []
     Spec.assertEqWith s "asked for a source twice, the Altar the only candidate each time" (fmap length offers) [1, 1]
 
