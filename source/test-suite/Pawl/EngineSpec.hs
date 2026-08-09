@@ -5,8 +5,12 @@
 -- because the claim is about the turn loop, the SBA sweep and the departure
 -- gate agreeing with each other over hundreds of turns.
 --
--- Every case runs at least one full game, so this is the suite's most expensive
--- module by a wide margin. Main.hs wires it with a timeout for the same reason
+-- Every case runs at least one full game, so this module holds the suite's two
+-- slowest cases: 2.13s and 1.66s, against 1.06s for the slowest case anywhere
+-- else (Pawl.Engine.Replay), measured 2026-08-09 on GHC 9.14.1 /
+-- aarch64-darwin. By module total it is only just the most expensive (4.5s,
+-- against 3.7s for Replay and 3.6s for Card), because it has three cases and
+-- they have hundreds. Main.hs wires it with a timeout for the same reason
 -- Pawl.ReplacementSpec has one: every case here depends on a game ENDING, and a
 -- driver that fails to terminate hangs the suite rather than failing it.
 --

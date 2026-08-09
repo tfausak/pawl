@@ -1596,11 +1596,15 @@ aimCreature oid p = case p of
 -- hanging, not failing. "CR 614.5 two Hardened Scales are two instances" below
 -- is the case that asserts the CORRECTNESS half (each gets exactly one
 -- opportunity); this timeout is the safety net for the TERMINATION half -- it
--- asserts nothing on a green run. Five seconds, not two: this guards against a
--- hang, not a slowdown, and the group runs in ~0.01s today, so a tight bound
--- would only risk becoming a CI flake. The timeout is not applied here --
--- Pawl.Spec cannot express one -- but where this spec is wired into the tasty
--- runner.
+-- asserts nothing on a green run. Five seconds, not two: this guards a hang,
+-- not a slowdown. Measured 2026-08-09 on GHC 9.14.1 / aarch64-darwin: the
+-- slowest case in this group runs 0.02s and all 105 run in 0.08s, so five
+-- seconds is 250x the worst case -- more than a loaded shared runner can eat.
+-- It is also the ONLY timeout this group has under CI, which passes no
+-- --timeout at all (flake.nix's check phase is a bare `Setup test`), so
+-- deleting it would let a non-terminating regression run to the job limit
+-- rather than fail. The timeout is not applied here -- Pawl.Spec cannot
+-- express one -- but where this spec is wired into the tasty runner.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   -- P9: a pattern's permanent match runs through the lower Pawl.Engine.Filter over
