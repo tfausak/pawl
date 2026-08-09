@@ -233,7 +233,7 @@ spec s registry = Spec.describe s "Adventure" $ do
     -- is there so the Adventure half is not gated on targeting either.
     let (withArtifact, _) = S.handOne mountain (snd (S.addCreature bonesplitter S.alice (S.landsInPlay mountain 3)))
         (exiledId, gs) = S.addExiledCard shieldbreaker S.alice withArtifact
-    Spec.assertEqWith s "no permission on the card" (fmap Object.playableFromExileBy (Game.lookupObject exiledId gs)) (Just Nothing)
+    Spec.assertEqWith s "no permission on the card" (fmap Object.playableFromExile (Game.lookupObject exiledId gs)) (Just Nothing)
     Spec.assertBool s (not (Cast.castable S.alice exiledId shieldbreakerName Facing.FaceUp gs)) "the creature is not castable"
     Spec.assertBool s (not (Cast.castable S.alice exiledId battleDisplayName Facing.FaceUp gs)) "nor is the Adventure"
   -- The same ruling's other half: an Adventure spell that leaves the stack "by

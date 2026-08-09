@@ -30,6 +30,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.CastingRestriction as CastingRestriction
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
+import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Facing as Facing
@@ -327,24 +328,27 @@ castableZones pid oid face gs =
         _ -> False
    in filter permitted castZones
 
--- CR 715.3d: may this player cast this half of this exiled card? Both halves of
--- the rule, and the second is why the Adventure half of an exiled adventurer
--- card is not offered while the same card in a hand offers both:
+-- CR 601.3: may this player cast this half of this exiled card? Two conjuncts,
+-- from two rules, and CR 715.3d's are why the Adventure half of an exiled
+-- adventurer card is not offered while the same card in a hand offers both:
 --
---   * "For as long as that card remains exiled, that player may play it" -- the
---     permission the resolution wrote (Object.playableFromExileBy), which naming
---     a player is what keeps it from being an offer to everyone.
---   * "It can't be cast as an Adventure this way" -- so the proposed face must
---     not be the Adventure one.
+--   * Object.playableFromExile names a player -- which is what keeps a
+--     permission from being an offer to the table. Written either by CR 715.3d's
+--     own "for as long as that card remains exiled, that player may play it" or
+--     by an Effect.GrantPlayFromExile a card states.
+--   * CR 715.3d's "it can't be cast as an Adventure this way" -- so the proposed
+--     face must not be the Adventure one.
 --
--- The rule's own last clause, "although other effects that allow a player to
--- cast it may allow a player to cast it as an Adventure", is about a DIFFERENT
--- permission granting the Adventure half from exile. No card in this pool grants
--- one, and this function is only ever asked about the CR 715.3d permission
--- (#669).
+-- Not implemented: the rule's own last clause, "although other effects that
+-- allow a player to cast it may allow a player to cast it as an Adventure".
+-- The Adventure exclusion is applied to every permission this field can hold,
+-- where CR 715.3d scopes it to the one CR 715.3d itself grants -- so a card
+-- permitted to be played by some other effect is refused its Adventure half
+-- (#669). STRICTER than printed, which is the admissible direction: the engine
+-- offers fewer casts than the rules allow, never more.
 permitsCastFromExile :: PlayerId -> ObjectId -> Face.Face Card.Type.Card -> GameState -> Bool
 permitsCastFromExile pid oid face gs =
-  (Game.lookupObject oid gs >>= Object.playableFromExileBy) == Just pid
+  fmap ExilePlayPermission.player (Game.lookupObject oid gs >>= Object.playableFromExile) == Just pid
     && not (Card.isAdventure face)
 
 -- Is this object somewhere this player may cast it from?

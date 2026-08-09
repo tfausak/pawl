@@ -581,6 +581,7 @@ library types
     Pawl.Types.EntwineDecision
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
+    Pawl.Types.ExilePlayPermission
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
     Pawl.Types.ExtraTurn

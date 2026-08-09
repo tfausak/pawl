@@ -157,6 +157,7 @@ toJson codec e = case e of
       if offer == CastOffer.defaultValue
         then SlotName.toJson s
         else Common.array [SlotName.toJson s, CastOffer.toJson offer]
+  Effect.GrantPlayFromExile d r -> Common.tagged "GrantPlayFromExile" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
 
 -- Everything a MoveToZone payload may carry after its ObjectRef and its
 -- destination zone: the EntryRiders (CR 110.5b), the slot binding the destination
@@ -343,4 +344,7 @@ fromJson decode value = do
     "OfferCast" -> case mv of
       Just (Value.Array (Array.MkArray [s, o])) -> Effect.OfferCast <$> SlotName.fromJson s <*> CastOffer.fromJson o
       _ -> Common.withValue mv (fmap (\s -> Effect.OfferCast s CastOffer.defaultValue) . SlotName.fromJson)
+    "GrantPlayFromExile" -> case mv of
+      Just (Value.Array (Array.MkArray [d, r])) -> Effect.GrantPlayFromExile <$> Duration.fromJson d <*> ObjectRef.fromJson r
+      _ -> Left . Text.pack $ "GrantPlayFromExile expects [duration, objectRef]"
     _ -> Left . Text.pack $ "unknown Effect: " <> t
