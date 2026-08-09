@@ -3103,8 +3103,8 @@ selfBecomesBlockedSpec s registry =
           case mine of
             [prey] -> do
               Spec.assertEqWith s "alice gained 1" (S.lifeOf S.alice blocked) (Just 21)
-              Spec.assertEqWith s "and the Piker's 2 killed the 1/1 Prey rather than reaching bob" (S.lifeOf S.bob blocked) (Just 20)
-              Spec.assertBool s (not (S.onBattlefield prey blocked)) "the Prey died in combat, after its trigger had resolved"
+              Spec.assertEqWith s "and bob took nothing: the blocked Prey's 1 went to the Piker" (S.lifeOf S.bob blocked) (Just 20)
+              Spec.assertBool s (not (S.onBattlefield prey blocked)) "the 1/1 Prey died to the Piker's 2, after its trigger had resolved"
               Spec.assertEqWith s "control leg: unblocked, so no gain" (S.lifeOf S.alice unblocked) (Just 20)
               Spec.assertEqWith s "and its 1 gets through" (S.lifeOf S.bob unblocked) (Just 19)
             _ -> Spec.assertFailure s "fixture should give alice one Sacred Prey"
