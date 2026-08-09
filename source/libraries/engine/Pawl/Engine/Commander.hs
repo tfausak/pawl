@@ -1,10 +1,10 @@
 -- | CR 903, the Commander variant, as far as one commander in the command zone
 -- reaches it: CR 903.3's designation, CR 903.6's starting zone, CR 903.8's cost
--- increase, and CR 903.9's replacement sending a commander back to the command
--- zone instead of anywhere else.
+-- increase, CR 903.9's replacement sending a commander back to the command zone
+-- instead of anywhere else, and CR 903.10a's twenty-one-damage loss.
 --
 -- A FORMAT and not a card, which is what makes this module the right home for
--- all four. No card's printed text says "cast this from the command zone" or
+-- all five. No card's printed text says "cast this from the command zone" or
 -- "this costs {2} more" -- rule 903 says both, of whatever card the player
 -- designated. So none of this is a Pawl.Types.CastingPermission, a
 -- Pawl.Types.PlayerEffect or a printed replacement: those are things a CARD
@@ -21,8 +21,6 @@
 --
 --   * CR 903.4's colour identity and CR 903.5's singleton deck construction
 --     (#940) -- both are deck-legality rules, and pawl validates no deck.
---   * CR 903.10's commander damage, the 21-damage-from-one-commander loss
---     condition (#941).
 --   * Two commanders via partner or a background (#939).
 --   * The Brawl and Oathbreaker variants (CR 903.12 and beyond).
 module Pawl.Engine.Commander where
@@ -74,6 +72,36 @@ isCommander oid gs = case Game.lookupObject oid gs of
     Source.OfCard printing ->
       fmap Player.commander (Map.lookup (Object.owner obj) (GameState.players gs)) == Just (Just printing)
     _ -> False
+
+-- | CR 903.10a's key: the owner of the commander that dealt this damage, or
+-- Nothing when the source was not a commander at all.
+--
+-- The OWNER and not the object, for `isCommander`'s reason: rule 903.3's
+-- designation survives CR 400.7's fresh incarnations and Player.commander is
+-- one printing per player, so the owner names exactly one commander (#939 is
+-- the partner/background widening).
+commanderOwnerOf :: ObjectId -> GameState -> Maybe PlayerId
+commanderOwnerOf oid gs
+  | isCommander oid gs = fmap Object.owner (Game.lookupObject oid gs)
+  | otherwise = Nothing
+
+-- | CR 903.10a / CR 704.6c: "a player who's been dealt 21 or more combat damage
+-- by the same commander over the course of the game loses the game". The
+-- predicate Pawl.Engine.Sba.losesNow reads, kept here for the reason this
+-- module's header gives -- Sba owns WHEN a state-based action is checked, not
+-- what each one means, the same split it takes with CR 704.5z and
+-- Pawl.Engine.Speed.
+--
+-- The MAXIMUM over the tally and never its sum, which is the whole of "by the
+-- SAME commander": two commanders that between them dealt 24 have killed
+-- nobody.
+--
+-- ">= 21" and not "== 21", because rule 903.10a says "21 or more" and one
+-- damage event can carry the difference on its own.
+lethalDamage :: PlayerId -> GameState -> Bool
+lethalDamage pid gs = case Map.lookup pid (GameState.players gs) of
+  Nothing -> False
+  Just player -> any (>= 21) (Map.elems (Player.commanderDamage player))
 
 -- | CR 903.8: "a commander's owner may cast it from the command zone for its mana
 -- cost plus {2} for each previous time they cast it from the command zone this

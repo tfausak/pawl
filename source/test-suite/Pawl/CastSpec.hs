@@ -174,7 +174,7 @@ castEngineSpec s registry = Spec.describe s "CastEngine" $ do
     gs <- castGameState s registry
     Spec.assertBool
       s
-      (any (\pl -> Player.life pl < Setup.startingLife) (Map.elems (GameState.players gs)))
+      (any (\pl -> Player.life pl < Setup.startingLife Nothing) (Map.elems (GameState.players gs)))
       "a spell resolved and dealt damage"
   Spec.it s "a casting game still terminates" $ do
     gs <- castGameState s registry
