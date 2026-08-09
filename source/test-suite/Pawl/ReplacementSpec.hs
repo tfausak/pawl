@@ -810,9 +810,9 @@ mendingHandsSpec s registry = Spec.describe s "Mending Hands (CR 615.7)" $ do
 testOfFaithSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
   let shieldsLeft gs = Maybe.mapMaybe (Replacement.shieldRemaining . ActiveReplacement.effect) (GameState.replacements gs)
-      -- alice is active with a Goblin Piker (2/1) and two Plains; bob defends
-      -- with a Jedit Ojanen (5/5). Positioned at declare attackers, so
-      -- S.runCombat drives the rest.
+      -- Put a board at declare attackers with alice active and bob defending,
+      -- so S.runCombat drives the remaining steps -- S.combatBoardOf's shape,
+      -- reached from a board that has already cast a spell.
       atCombat gs =
         gs
           { GameState.activePlayer = S.alice,
@@ -895,7 +895,7 @@ testOfFaithSpec s registry = Spec.describe s "Test of Faith (CR 615.5)" $ do
 -- damage is dealt in full though an applicable shield is there, and "existing
 -- damage prevention shields won't be reduced by damage that can't be prevented".
 -- The middle clause -- the applied effect's additional effect still happening --
--- is not implemented: a row can carry one (CR 615.5, testOfFaithSpec below), but
+-- is not implemented: a row can carry one (CR 615.5, testOfFaithSpec above), but
 -- `inertPrevention` short-circuits before it could fire (#1106).
 --
 -- EVERY case here has a CONTROL on a board that differs in Spider-Punk and in
