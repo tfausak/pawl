@@ -15,11 +15,11 @@ import qualified Pawl.Engine.AttackRequirement as AttackRequirement
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
@@ -1323,7 +1323,7 @@ declareAttackers pid = do
         -- caller.
         let owed = AttackCost.totalCost recorded gs1
         -- CR 508.1i's mana-ability window and CR 508.1j's all-costs-or-nothing
-        -- payment are both Mana.payCost: it prompts for which source to tap until
+        -- payment are both Cost.payMana: it prompts for which source to tap until
         -- the pool covers the cost, and restores the entry state rather than
         -- spending half of it. Skipped outright at {0}, so a combat with no
         -- Ghostly Prison in it reaches no mana code at all.
@@ -1340,7 +1340,7 @@ declareAttackers pid = do
         paid <-
           if null (ManaCost.unwrap owed)
             then pure True
-            else Mana.payCost pid owed
+            else Cost.payMana pid owed
         if not paid
           then
             -- CR 508.1's preamble: the declaration is illegal and the game returns

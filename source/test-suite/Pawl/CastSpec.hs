@@ -406,7 +406,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
           Spec.assertEqWith s "four mana spent (paid {3}{R})" (S.tappedCount S.alice after) 4
   -- CR 601.2g: a legal answer that cannot pay. Birds of Paradise offers all five
   -- colours, so answering green against Lightning Bolt's {R} is a choice the
-  -- engine must honour (Mana.payCost argues why) and then cannot pay with. This
+  -- engine must honour (Cost.payMana argues why) and then cannot pay with. This
   -- is the reachable mid-announcement failure castSpell's haddock calls
   -- deliberate, and the class #418 did NOT remove -- the player chose it.
   --

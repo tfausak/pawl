@@ -726,7 +726,7 @@ castWhileSearching pid = do
 -- fully-fillable casts. A legal answer CAN still fail after the prompt, and one
 -- class of it is deliberate: castability asks whether SOME sequence of choices
 -- pays the cost, and a player who then taps their only Birds of Paradise for the
--- wrong colour cannot pay (Mana.payCost argues why the engine must let them).
+-- wrong colour cannot pay (Cost.payMana argues why the engine must let them).
 -- What must NOT happen is pawl offering a route it can already see the total cost
 -- cannot pay, which is why Cost.announce is handed CR 601.2f's totalling below.
 --

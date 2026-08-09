@@ -12,13 +12,13 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
-import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
@@ -870,7 +870,7 @@ untilEndOfCombatSpec s registry = Spec.describe s "UntilEndOfCombat" $ do
     let staged expiry =
           let gs0 = Setup.emptyGame S.bothPlayers
               (mtn, gs1) = S.addCreature mountain S.alice gs0
-              floated = S.runPure S.identityAnswer gs1 (Mana.tapForMana mtn)
+              floated = S.runPure S.identityAnswer gs1 (Cost.tapForMana mtn)
            in S.addPlayerEffect
                 expiry
                 PlayerScope.EachPlayer

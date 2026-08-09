@@ -21,10 +21,14 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import Pawl.Types.Cost (Cost)
+import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CostComponent as CostComponent
 import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HybridPayment as HybridPayment
+import qualified Pawl.Types.Keyword as Keyword
 import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import Pawl.Types.ManaCost (ManaCost)
@@ -98,14 +102,15 @@ producedTypes oid gs production = case production of
 -- payment and never on the stack (CR 605.3b).
 --
 -- CR 106.12 narrows "tap for mana" to a mana ability that includes {T} in its
--- activation cost, and NOTHING here reads a cost -- not this function and not
--- isManaAbility. Every mana ability in the pool costs exactly {T}
--- (manaSourcesGiven leans on the same fact for CR 302.6), so the filter would
--- change no answer; one that did not would be enumerated here as though it
--- tapped (#238).
+-- activation cost, and this function does not FILTER on that -- it only carries
+-- the cost, so a mana ability without {T} would be enumerated here as though it
+-- tapped. Every mana ability in the pool costs {T} and nothing else does the
+-- narrowing (manaSourcesGiven leans on the same fact for CR 302.6, and
+-- isManaAbility reads no cost at all) (#1116).
 --
 -- The nesting is the whole point. The OUTER list is the options -- which ability
--- of this permanent, and which of its modes. The INNER list is that one
+-- of this permanent, and which of its modes -- and each carries the COST CR
+-- 602.2b makes that option's activation pay. The INNER list is that one
 -- activation's YIELD, its AddMana effects in printed order (CR 608.2c). Sol
 -- Ring's "{T}: Add {C}{C}" is one option adding two mana; an Urborg'd Mountain
 -- is two options of one mana each.
@@ -125,16 +130,30 @@ producedTypes oid gs production = case production of
 -- Takes a PRE-PROJECTED board, because every caller asks this of every source a
 -- player controls, and each of the two projection reads here was a fresh gather
 -- per source (#200).
-manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [[ManaProduction]]
+manaRoutesOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, [ManaProduction])]
 manaRoutesOfGiven pcs oid gs =
   let fromSubtypes =
         fmap
-          (\manaType -> [ManaProduction.OfType manaType])
+          (\manaType -> (intrinsicManaCost, [ManaProduction.OfType manaType]))
           (Maybe.mapMaybe subtypeMana (Set.toList (Projection.subtypesGiven pcs oid gs)))
       selectionRoutes ability =
-        fmap (Maybe.mapMaybe ManaAbility.manaProduced) (Modal.selectionEffects (ActivatedAbility.modal ability))
+        fmap
+          (\effects -> (ActivatedAbility.cost ability, Maybe.mapMaybe ManaAbility.manaProduced effects))
+          (Modal.selectionEffects (ActivatedAbility.modal ability))
       fromAbilities = concatMap selectionRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
+
+-- CR 305.6's intrinsic mana ability is "{T}: Add [the type]", printed on no card
+-- and so minted here rather than read off one: {T} and nothing else. What makes
+-- the cost worth carrying at all is that a PRINTED mana ability's need not be
+-- (Mana Confluence's is "{T}, Pay 1 life"), and CR 602.2b makes an activation
+-- pay whichever it has.
+intrinsicManaCost :: Cost Keyword.Keyword
+intrinsicManaCost =
+  Cost.MkCost
+    { Cost.mana = Just (ManaCost.MkManaCost []),
+      Cost.components = [CostComponent.TapThis]
+    }
 
 -- What tapping this object for mana could actually put in a pool: every route
 -- above with each ManaProduction resolved to a concrete type, so one entry per
@@ -143,28 +162,51 @@ manaRoutesOfGiven pcs oid gs =
 -- yields.
 --
 -- A Mana rather than a list of types because that is what a yield IS: some mana,
--- headed for a pool (CR 106.4). tapForMana adds the chosen one whole.
+-- headed for a pool (CR 106.4). Pawl.Engine.Cost.tapForMana adds the chosen one
+-- whole.
 --
--- Deduplicated by the WHOLE yield. Two routes producing identical mana (an
--- Urborg'd Swamp is a Swamp twice over) are indistinguishable options -- no cost
--- and no rider tells two of this permanent's mana abilities apart yet (#238) --
--- so collapsing them elides a prompt with no content. Deliberately order-
--- sensitive: {R} then {B} and {B} then {R} stay two options, which can only ever
--- ASK where a set-valued dedup would not.
+-- Deduplicated by the WHOLE yield, and by it ALONE -- which is what separates
+-- this from manaOptionsOf below, where the cost rides along. The supply model
+-- (sourceOptions) is the reader that wants the yields on their own: what a source
+-- could put in a pool is a question about mana, not about what it charges.
+-- Deliberately order-sensitive: {R} then {B} and {B} then {R} stay two options,
+-- which can only ever ASK where a set-valued dedup would not.
 manaYieldsOf :: ObjectId -> GameState -> [Mana]
 manaYieldsOf = manaYieldsOfGiven Map.empty
 
 -- The same yields against a pre-projected board, which is manaRoutesOfGiven's
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
-manaYieldsOfGiven pcs oid gs =
+manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs))
+
+-- Every way this object could be tapped for mana, as the COST CR 602.2b makes
+-- that activation pay paired with the mana it adds -- one entry per (route,
+-- colour choice) pair. `traverse` over the list applicative is that product:
+-- Birds of Paradise's one route becomes CR 105.4's five one-mana options.
+--
+-- Deduplicated by the PAIR. Two routes producing identical mana for an identical
+-- cost (an Urborg'd Swamp is a Swamp twice over) are indistinguishable options,
+-- so collapsing them elides a prompt with no content; two that charge differently
+-- are not, and survive as two.
+--
+-- Not implemented: what a player is asked when two surviving options share a
+-- yield and differ only in cost. Prompt.ChooseManaYield carries the yield alone,
+-- so the answer would name both and Pawl.Engine.Cost.tapForMana would take the
+-- first (#1117).
+manaOptionsOf :: ObjectId -> GameState -> [(Cost Keyword.Keyword, Mana)]
+manaOptionsOf = manaOptionsOfGiven Map.empty
+
+-- The same options against a pre-projected board (#200).
+manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, Mana)]
+manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       asMana manaTypes =
         Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags}) manaTypes)
-   in List.nub (fmap asMana (concatMap (traverse (producedTypes oid gs)) (manaRoutesOfGiven pcs oid gs)))
+      expand (cost, productions) = fmap (\manaTypes -> (cost, asMana manaTypes)) (traverse (producedTypes oid gs) productions)
+   in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object
--- adds will carry. THE one place they are decided; manaYieldsOfGiven just above
+-- adds will carry. THE one place they are decided; manaOptionsOfGiven just above
 -- is the one place they are stamped onto a unit. They are captured rather than
 -- looked up later because the mana outlives the source (Pawl.Types.ManaUnit).
 --
@@ -176,8 +218,9 @@ manaYieldsOfGiven pcs oid gs =
 --
 -- CR 205.4g is PERMANENT-scoped and CR 106.3's first clause is wider, so this
 -- read would be too narrow for a source that is not a permanent. Nothing reaches
--- it with one: the two engine paths in are tapForMana and payableResolutions,
--- and both take their oid from manaSourcesGiven, which filters the battlefield.
+-- it with one: the two engine paths in are Pawl.Engine.Cost.tapForMana and
+-- payableResolutions, and both take their oid from manaSourcesGiven, which
+-- filters the battlefield.
 productionTagsGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> Set.Set ProductionTag.ProductionTag
 productionTagsGiven pcs oid gs =
   if Set.member Supertype.Snow (Projection.supertypesGiven pcs oid gs)
@@ -196,7 +239,8 @@ typesOf = fmap ManaUnit.manaType . unitsOf
 -- its yields and deduplicated. A strictly weaker question than manaYieldsOf --
 -- it says nothing about how MUCH a single activation adds, so a Sol Ring answers
 -- [{C}] here and yields {C}{C} there. Kept apart deliberately: conflating them
--- is what made Sol Ring read as a choice between two singles (#238).
+-- makes Sol Ring read as a choice between two singles, which Pawl.ManaSpec's
+-- solRingSpec is the standing proof against.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 
@@ -289,61 +333,6 @@ manaSourcesGiven grants pcs pid gs =
         Just obj -> Object.tapped obj == TapState.Untapped && not (null (manaRoutesOfGiven pcs oid gs)) && notSickCreature oid
    in filter isSource (Projection.controlsGiven grants pid gs)
 
--- CR 106.12's "tap [a permanent] for mana" -- add the mana one activation of one
--- of its mana abilities yields, and tap it. CR 605.3b: a mana ability does not
--- use the stack, so this is immediate -- which is also why the colour choice is
--- made HERE and not by Resolve.
---
--- Monadic because of that choice. A Mountain offers one yield and is never
--- asked; Birds of Paradise (CR 105.4) and an Urborg'd Mountain (CR 305.6/305.7)
--- offer several, and the engine never picks for the player. Which SOURCE to tap
--- is a separate question, and payCost asks it.
---
--- The whole yield lands, so Sol Ring's "{T}: Add {C}{C}" adds two units from one
--- activation. What this still does NOT do is run the ability's own activation
--- cost or its riders: CR 602.2b routes an activation through CR 601.2b-i, and
--- this taps directly instead (#238).
-tapForMana :: ObjectId -> Game ()
-tapForMana oid = do
-  gs <- State.get
-  case Game.lookupObject oid gs of
-    Nothing -> pure ()
-    Just obj -> case manaYieldsOf oid gs of
-      [] -> pure ()
-      first : rest -> do
-        -- CR 109.4a/110.2: mana goes to the mana ability's controller, which is
-        -- the permanent's controller (CR 106.4 only says it lands in "a player's
-        -- mana pool", not whose) -- and that same player makes the colour
-        -- choice. Falls back to owner in the impossible case lookupObject just
-        -- proved oid exists but controllerOf returns Nothing.
-        let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-        chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
-        let tapped = obj {Object.tapped = TapState.Tapped}
-            gs1 = gs {GameState.objects = Map.insert oid tapped (GameState.objects gs)}
-        case chosen of
-          Mana.MkMana produced -> State.put (addMana controller produced gs1)
-
--- Which mana this source produces -- which of its mana abilities, in which mode,
--- and which colour each of that mode's AddMana effects makes, asked as ONE
--- question because the answer is one yield.
---
--- Elided exactly when the source offers ONE yield, where no choice exists --
--- manaYieldsOf has already collapsed routes producing identical mana, so a
--- remaining list of two is two genuinely different yields.
---
--- FILTERED, NOT TRUSTED, the posture chooseSource and Cost.payComponents take.
--- Here that is not merely hygiene -- honouring a yield the source cannot make
--- would mint mana out of nothing.
-chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty Mana -> GameState -> Game Mana
-chooseManaYield pid oid candidates gs = case candidates of
-  only NonEmpty.:| [] -> pure only
-  _ -> do
-    answer <- Game.choose (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid candidates)
-    pure $
-      if List.elem answer (NonEmpty.toList candidates)
-        then answer
-        else NonEmpty.head candidates
-
 -- What ONE mana must be to satisfy one typed symbol of a cost: one of these mana
 -- types, carrying at least these production-time tags.
 --
@@ -384,7 +373,7 @@ serves supply demand =
 
 -- A pool unit as a supply. Its type is settled, so the option set is a
 -- singleton, and its tags are the ones production stamped on it
--- (manaYieldsOfGiven).
+-- (manaOptionsOfGiven).
 supplyOf :: ManaUnit -> Supply
 supplyOf unit =
   MkSupply
@@ -571,87 +560,6 @@ spend budget cost (Mana.MkMana units) =
         left <- Monad.foldM takeAny afterTyped [1 .. generic]
         pure (Mana.MkMana left, life)
    in Maybe.listToMaybe (Maybe.mapMaybe attempt (resolutions cost))
-
--- CR 601.2g: if the total cost includes a mana payment, the player then has a
--- chance to activate mana abilities. Reached from an ability too, by CR 602.2b.
---
--- Returns whether it was paid; on failure nothing is spent, which is CR 601.2h's
--- bar on partial payments rather than mere tidiness. The prompts themselves are
--- NOT rolled back -- they live in the Program, outside the state -- so a failed
--- payment still asked its questions.
---
--- Failure is REACHABLE, and a source offering a colour choice is what makes it
--- so. canPay asks whether SOME sequence of choices pays the cost; this asks the
--- player to make them. A player who taps their only Birds of Paradise for green
--- cannot then pay {B}, and the engine must let them: choosing badly is a choice,
--- and second-guessing it here would be the engine playing the game.
---
--- One prompt per source tapped, against a shrinking candidate list, rather than
--- one prompt for a whole subset: a cost needing {G}{G} is two decisions, and the
--- second is made knowing the first.
---
--- The life budget only ever binds a cost NOTHING ANNOUNCED for: a cast (CR
--- 601.2b) and an activation (CR 602.2b) both run `announce` first, so the cost
--- arriving here holds no Phyrexian symbol and the budget is 0. What is left
--- under it is CR 118.13b/c, a cost paid during a resolution or for a special
--- action, where pawl still chooses (#373).
---
--- It is recomputed on EVERY pass rather than fixed at entry, because a tap can
--- change it: a Birds of Paradise tapped for blue takes the mana way to an
--- unannounced {G/P} off the board, and the cost is then payable only by CR
--- 107.4f's 2 life. Recomputing means pawl pays it, rather than failing the
--- payment the way the paragraph above lets a mis-tapped {B} fail -- the same MORE
--- PERMISSIVE posture, and reachable only where nothing announced (#373). Zero
--- when the cost is unpayable outright.
-payCost :: PlayerId -> ManaCost -> Game Bool
-payCost pid cost = do
-  before <- State.get
-  paid <- tapUntilPaid
-  Monad.unless paid (State.put before)
-  pure paid
-  where
-    tapUntilPaid = do
-      gs <- State.get
-      let budget = Maybe.fromMaybe 0 (lifeNeeded pid cost gs)
-      case spend budget cost (Game.poolOf pid gs) of
-        Just (left, life) -> do
-          State.put (Event.payLife pid life (setPool pid left gs))
-          pure True
-        Nothing -> case manaSources pid gs of
-          [] -> pure False
-          candidate : rest -> do
-            oid <- chooseSource pid (candidate NonEmpty.:| rest) gs
-            tapForMana oid
-            tapUntilPaid
-
--- Which source to tap next.
---
--- Asked whenever there is more than one candidate, and elided ONLY when there is
--- exactly one -- where no choice exists to make. A deliberately blunt reading of
--- "eliding a prompt is legitimate only for indistinguishable options": it never
--- has to be right about what indistinguishable MEANS.
---
--- The obvious cheaper rule -- elide when every candidate is a copy of the same
--- card -- is unsound in this pool, and the counterexamples are ordinary. Two
--- Llanowar Elves are one card, but one may be equipped or enchanted, one may
--- carry +1/+1 counters, one may be borrowed until end of turn, and one may be
--- blocking (CR 506.4 does not remove a creature from combat for tapping).
--- `Game.cardOf` compares PRINTED identity and cannot see any of it, so that rule
--- would suppress exactly the prompts the invariant exists to force (#217).
---
--- FILTERED, NOT TRUSTED, the posture Combat.declareAttackers and
--- Cost.payComponents already take. That is not only hygiene -- tapForMana is a
--- no-op on an unknown or mana-less id, so honouring a bogus answer would leave
--- the state unchanged and loop forever.
-chooseSource :: PlayerId -> NonEmpty.NonEmpty ObjectId -> GameState -> Game ObjectId
-chooseSource pid candidates gs = case candidates of
-  only NonEmpty.:| [] -> pure only
-  _ -> do
-    answer <- Game.choose (Prompt.ChooseManaSource (Decide.deciderFor pid gs) pid candidates)
-    pure $
-      if List.elem answer (NonEmpty.toList candidates)
-        then answer
-        else NonEmpty.head candidates
 
 -- CR 107.4f's 2 life. The one place that number is written.
 phyrexianLife :: Natural
@@ -916,7 +824,7 @@ canPayCommittingGiven grants pcs pid committed cost gs = not (null (payableResol
 -- collapse to one option, so five Birds are one board rather than 5^5. A source
 -- with ONE yield needs no collapse, so Sol Ring takes the other branch.
 --
--- The TAGS mix by union, and there too the union is exact: manaYieldsOfGiven
+-- The TAGS mix by union, and there too the union is exact: manaOptionsOfGiven
 -- stamps one tag set on every unit of every yield of a source, because CR 106.3
 -- makes them all facts about that one source.
 sourceOptions :: [Mana] -> [[Supply]]

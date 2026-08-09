@@ -1104,7 +1104,7 @@ exercises resolving controller idx cIdx clause = case Clause.optionality clause 
 -- restores the entry state, so an Unpaid result is a complete no-op and no cost
 -- was paid to read a choice off. Nothing in the pool reaches it, and the reason
 -- is Mana Leak's cost specifically: {3} is GENERIC, so every tap pays it. A
--- coloured resolution cost would reach it the way Pawl.Engine.Mana.payCost's own
+-- coloured resolution cost would reach it the way Pawl.Engine.Cost.payMana's own
 -- haddock describes -- failure there is reachable, because a player who taps
 -- their only Birds of Paradise for green cannot then pay {B} (#417, #56).
 --
@@ -1778,7 +1778,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- the resolution before any effect is applied.
     _ -> pure ()
   -- CR 605.3b: a mana ability never resolves on the stack. AddMana is applied by
-  -- Mana.tapForMana at payment, never here. Reaching this arm means a mana ability
+  -- Cost.tapForMana at payment, never here. Reaching this arm means a mana ability
   -- was wrongly put on the stack -- an isManaAbility classification bug.
   Effect.AddMana _ -> pure ()
   Effect.Search filter_ destination ->

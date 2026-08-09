@@ -2165,7 +2165,7 @@ textChangedCombatRestrictionSpec s registry = Spec.describe s "TextChangedCombat
 -- castHackAt's twin for a board where alice controls more than one land, and the
 -- one thing it does differently is NAME THE LAND THAT PAYS. The Swamp the Bell has
 -- animated is itself a mana source, so the shared caster's interpreter -- which
--- takes the head of Pawl.Engine.Mana.chooseSource's candidates -- taps the very
+-- takes the head of Pawl.Engine.Cost.chooseSource's candidates -- taps the very
 -- creature the cases below are about, and CR 508.1a's "must be untapped" then
 -- refuses the attack for a reason that has nothing to do with a text change. That
 -- is not hypothetical: it is how this group's first red run lied about which
