@@ -1023,6 +1023,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.attackCosts = [],
               Face.mulliganActions = [],
               Face.openingHandActions = [],
+              Face.specialActions = [],
               Face.additionalCosts = [],
               Face.alternativeCosts = [],
               Face.enchant = [],
@@ -1101,6 +1102,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Face.attackCosts = [],
               Face.mulliganActions = [],
               Face.openingHandActions = [],
+              Face.specialActions = [],
               Face.additionalCosts = [],
               Face.alternativeCosts = [],
               Face.enchant = [],
@@ -1606,6 +1608,11 @@ bobPaysAndCounters notThis p = case p of
 payResponses :: [Response.Response] -> [Response.Response]
 payResponses = filter isPayResponse
 
+isExileResponse :: Response.Response -> Bool
+isExileResponse response = case response of
+  Response.ChoseExilesFromGraveyard _ -> True
+  _ -> False
+
 isPayResponse :: Response.Response -> Bool
 isPayResponse response = case response of
   Response.ChoseToPay _ -> True
@@ -1796,6 +1803,90 @@ whipstitchedZombieSpec s registry = Spec.describe s "WhipstitchedZombie" $ do
     Spec.assertBool s (S.onBattlefield zombieId after) "the Zombie is still on the battlefield"
     Spec.assertEqWith s "nothing was sacrificed" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
     Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+
+-- The names of the cards in one player's copy of a zone, in that zone's order.
+-- Named rather than compared by id because CR 400.7 mints a new object on every
+-- move, so an id taken before a zone change never matches the one after it.
+namesIn :: Zone.Zone -> PlayerId.PlayerId -> GameState.GameState -> [Maybe CardName.CardName]
+namesIn zone pid gs = fmap (\oid -> fmap S.nameOf (Game.cardOf oid gs)) (Game.zoneMembers zone pid gs)
+
+-- Circling Vultures on alice's battlefield with the given cards already in her
+-- graveyard, IN THE ORDER GIVEN so the last one is the top (CR 404.1), her
+-- upkeep begun and the trigger settled onto the stack -- zombieUpkeep's shape
+-- one card over. Returns the Vultures, the graveyard ids and that state.
+vulturesUpkeep :: Printing.Printing -> [Printing.Printing] -> (ObjectId.ObjectId, [ObjectId.ObjectId], GameState.GameState)
+vulturesUpkeep vultures buried =
+  let (vulturesId, g1) = S.addCreature vultures S.alice (Setup.emptyGame S.bothPlayers)
+      bury (ids, g) printing = let (oid, g') = S.addGraveyardCard printing S.alice g in (ids <> [oid], g')
+      (buriedIds, g2) = List.foldl' bury ([], g1) buried
+      upkeep = Phase.Beginning BeginningStep.Upkeep
+      begun =
+        Event.recordEvent
+          (GameEvent.StepBegan upkeep S.alice)
+          (g2 {GameState.phase = upkeep, GameState.activePlayer = S.alice})
+   in (vulturesId, buriedIds, snd (Engine.runGamePure S.identityAnswer begun Engine.settleForPriority))
+
+-- CR 118.12a's gate again, over the cost component that has no choice in it:
+-- Circling Vultures' "At the beginning of your upkeep, sacrifice this creature
+-- unless you exile the top creature card of your graveyard"
+-- (CostComponent.ExileTopFromGraveyard). CR 404.2 keeps a graveyard's order
+-- fixed, so "the top creature card" names ONE card and nothing is prompted for
+-- -- which is the whole difference from Headless Skaab's chosen exile
+-- (Pawl.CostSpec).
+--
+-- THE FIXTURE SHAPE that makes the last case discriminating: TWO creature cards
+-- in the graveyard, buried in a known order. An implementation reading the
+-- wrong end exiles the other one and passes every other case here.
+circlingVulturesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+circlingVulturesSpec s registry = Spec.describe s "CirclingVultures" $ do
+  Spec.it s "CR 118.3 an empty graveyard cannot pay, so the Vultures are sacrificed" $ do
+    vultures <- S.printingOf s registry "Circling Vultures"
+    let (vulturesId, _, onStack) = vulturesUpkeep vultures []
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    Spec.assertBool s (S.onBattlefield vulturesId onStack) "the Vultures are on the battlefield before the trigger resolves"
+    Spec.assertBool s (not (null (GameState.stack onStack))) "and the upkeep trigger really reached the stack"
+    Spec.assertBool s (not (S.onBattlefield vulturesId after)) "the Vultures were sacrificed"
+    Spec.assertEqWith s "CR 701.21a into alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
+    Spec.assertEqWith s "and nothing was exiled" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+    -- CR 118.3: an unpayable cost is not offered, so this interpreter's
+    -- willingness to pay never comes up.
+    Spec.assertEqWith s "alice was not asked to pay" (payResponses transcript) []
+  -- The primary negative, Headless Skaab's argument unchanged: an
+  -- implementation that ignored the Filter still refuses an empty graveyard,
+  -- and only a graveyard holding exactly one INELIGIBLE card tells the two
+  -- apart.
+  Spec.it s "CR 601.2f a noncreature card in the graveyard cannot pay it either" $ do
+    vultures <- S.printingOf s registry "Circling Vultures"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let (vulturesId, _, onStack) = vulturesUpkeep vultures [bolt]
+        ((_, after), _) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    Spec.assertBool s (not (S.onBattlefield vulturesId after)) "the Vultures were sacrificed"
+    Spec.assertEqWith s "and the Bolt is still in the graveyard" (length (Game.zoneMembers Zone.Exile S.alice after)) 0
+  Spec.it s "CR 118.12a a creature card in the graveyard pays it and the Vultures survive" $ do
+    vultures <- S.printingOf s registry "Circling Vultures"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (vulturesId, _, onStack) = vulturesUpkeep vultures [piker]
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    Spec.assertBool s (S.onBattlefield vulturesId after) "the Vultures are still on the battlefield"
+    Spec.assertEqWith s "CR 406.2 the Piker was exiled" (namesIn Zone.Exile S.alice after) [Just (S.printingName piker)]
+    Spec.assertEqWith s "and alice's graveyard is empty" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 0
+    Spec.assertEqWith s "alice was asked whether to pay, and once" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+    -- CR 404.2 leaves nothing to choose, so paying prompts for no exile.
+    Spec.assertEqWith s "and never asked WHICH card to exile" (filter isExileResponse transcript) []
+  -- CR 404.1 / 404.2: "the TOP creature card". The Bird Maiden went to the
+  -- graveyard second, so it is the one that leaves; the Piker underneath it
+  -- stays. Nothing is prompted for, which is the claim the assertion on the
+  -- Piker carries.
+  Spec.it s "CR 404.2 with two creature cards it is the TOP one that is exiled" $ do
+    vultures <- S.printingOf s registry "Circling Vultures"
+    piker <- S.printingOf s registry "Goblin Piker"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    let (vulturesId, _, onStack) = vulturesUpkeep vultures [piker, birdMaiden]
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    Spec.assertBool s (S.onBattlefield vulturesId after) "the Vultures are still on the battlefield"
+    Spec.assertEqWith s "the Bird Maiden, buried last, was exiled" (namesIn Zone.Exile S.alice after) [Just (S.printingName birdMaiden)]
+    Spec.assertEqWith s "and the Piker under it is still in the graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName piker)]
+    Spec.assertEqWith s "with two candidates, alice was still never asked which" (filter isExileResponse transcript) []
 
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
 -- added FIRST, so it holds the lowest object id and identityAnswer's
@@ -5172,6 +5263,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   counterSpec s registry
   manaLeakSpec s registry
   whipstitchedZombieSpec s registry
+  circlingVulturesSpec s registry
   magicalHackTimingSpec s registry
   artificialEvolutionSpec s registry
   stifleSpec s registry

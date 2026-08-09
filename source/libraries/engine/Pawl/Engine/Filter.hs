@@ -528,18 +528,20 @@ rewriteKeyword pairs keyword = case keyword of
 rewriteCost :: [(Subtype.Subtype, Subtype.Subtype)] -> Cost.Cost Keyword.Type.Keyword -> Cost.Cost Keyword.Type.Keyword
 rewriteCost pairs cost = cost {Cost.components = fmap (rewriteComponent pairs) (Cost.components cost)}
 
--- rewriteCost's per-component half. Three components carry a Filter and are the
--- three that descend; the rest name a number, or the object the cost is on, and
+-- rewriteCost's per-component half. Four components carry a Filter and are the
+-- four that descend; the rest name a number, or the object the cost is on, and
 -- CR 612.2 finds no word in them to swap.
 --
--- Of the three, only Sacrifice has a producer -- Dark Heart of the Wood.
--- TapForTotalPower's and ExileCardsFromGraveyard's arms are a regression fence:
--- no printing pairs either with a basic land type, so no test can falsify them.
+-- Of the four, only Sacrifice has a producer -- Dark Heart of the Wood. The
+-- TapForTotalPower, ExileCardsFromGraveyard and ExileTopFromGraveyard arms are a
+-- regression fence: no printing pairs any of them with a basic land type, so no
+-- test can falsify them.
 rewriteComponent :: [(Subtype.Subtype, Subtype.Subtype)] -> CostComponent.CostComponent Keyword.Type.Keyword -> CostComponent.CostComponent Keyword.Type.Keyword
 rewriteComponent pairs component = case component of
   CostComponent.Sacrifice n criterion -> CostComponent.Sacrifice n (rewrite pairs criterion)
   CostComponent.TapForTotalPower n criterion -> CostComponent.TapForTotalPower n (rewrite pairs criterion)
   CostComponent.ExileCardsFromGraveyard n criterion -> CostComponent.ExileCardsFromGraveyard n (rewrite pairs criterion)
+  CostComponent.ExileTopFromGraveyard criterion -> CostComponent.ExileTopFromGraveyard (rewrite pairs criterion)
   CostComponent.TapThis -> component
   CostComponent.UntapThis -> component
   CostComponent.SacrificeThis -> component

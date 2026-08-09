@@ -38,6 +38,7 @@ import qualified Pawl.Codec.Power as Power
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Codec.SacrificeRestriction as SacrificeRestriction
+import qualified Pawl.Codec.SpecialAction as SpecialAction
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.TargetSpec as TargetSpec
 import qualified Pawl.Codec.Toughness as Toughness
@@ -83,6 +84,8 @@ toJson encodeCard f =
       -- face granting two of them is writable (Pawl.Types.Face).
       Common.optionalPair "mulliganActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.mulliganActions f),
       Common.optionalPair "openingHandActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.openingHandActions f),
+      -- CR 116.2: the special actions this face grants (Pawl.Types.Face).
+      Common.optionalPair "specialActions" [] (Common.encodeList SpecialAction.toJson) (Face.specialActions f),
       -- CR 113.6g: Counterable is the absence of a card stating it can't be
       -- countered.
       Common.optionalPair "counterability" Counterability.Counterable Counterability.toJson (Face.counterability f)
@@ -119,6 +122,7 @@ fromJson decodeCard value = do
   alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList (Cost.fromJson Keyword.fromJson)) ps
   mulliganActions <- Common.defaultedField "mulliganActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   openingHandActions <- Common.defaultedField "openingHandActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
+  specialActions <- Common.defaultedField "specialActions" [] (Common.decodeList SpecialAction.fromJson) ps
   enchant <- Common.defaultedField "enchant" [] (Common.decodeList TargetSpec.fromJson) ps
   counterability <- Common.defaultedField "counterability" Counterability.Counterable Counterability.fromJson ps
   pure
@@ -151,6 +155,7 @@ fromJson decodeCard value = do
         Face.alternativeCosts = alternativeCosts,
         Face.mulliganActions = mulliganActions,
         Face.openingHandActions = openingHandActions,
+        Face.specialActions = specialActions,
         Face.enchant = enchant,
         Face.counterability = counterability
       }

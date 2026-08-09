@@ -518,6 +518,7 @@ isLoyaltyComponent component = case component of
   CostComponent.PayEnergy _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard _ _ -> False
+  CostComponent.ExileTopFromGraveyard _ -> False
 
 -- CR 113.6m's COST half: "an ability whose cost or effect specifies that it
 -- moves the object it's on out of a particular zone functions only in that
@@ -566,6 +567,9 @@ zoneOfComponent component = case component of
   -- graveyard here would make an activated ability with this cost unactivatable
   -- from the battlefield, which no rule asks for.
   CostComponent.ExileCardsFromGraveyard _ _ -> Nothing
+  -- ExileCardsFromGraveyard's answer for its reason: this too moves cards other
+  -- than the object the cost is on, so CR 113.6m does not reach it.
+  CostComponent.ExileTopFromGraveyard _ -> Nothing
   CostComponent.DiscardCards _ -> Nothing
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
@@ -627,6 +631,22 @@ exileCandidates pid criterion gs =
         Nothing -> False
         Just face -> Filter.matches context (Projection.viewOfCardIn gs candidate face) criterion
    in filter matches (Game.zoneMembers Zone.Graveyard pid gs)
+
+-- The one card an ExileTopFromGraveyard component takes: the TOP matching card
+-- of this player's graveyard, or Nothing where it holds none.
+--
+-- The LAST of exileCandidates' answer is the top. CR 404.1 puts an arrival "on
+-- top of its owner's graveyard" and Pawl.Engine.Game.insertIntoZone appends it,
+-- so the most recent card is last -- the opposite end from a library, whose head
+-- Event.drawCard takes as CR 121.1's top card. Reading the head here would exile
+-- the OLDEST matching card, which no rule asks for.
+--
+-- No prompt, and that is CR 404.2 rather than an elision: a player "normally
+-- can't change" a graveyard's order, so "the top creature card" names exactly
+-- one card and there is nothing to choose.
+topExileCandidate :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> Maybe ObjectId
+topExileCandidate pid criterion gs =
+  Maybe.listToMaybe (reverse (exileCandidates pid criterion gs))
 
 -- The permanents this player may tap to pay a TapForTotalPower component on
 -- `oid`: every battlefield object matching the criterion, ascending, the order
@@ -718,6 +738,11 @@ removalClaim pid oid component gs = case component of
   CostComponent.DiscardThis -> Just (Zone.Hand, itself (isOwnedIn Zone.Hand), 1)
   CostComponent.ExileCardsFromGraveyard n criterion ->
     Just (Zone.Graveyard, Set.fromList (exileCandidates pid criterion gs), n)
+  -- A pool of at most ONE, and the claim is on that one card rather than on a
+  -- choice among several: CR 404.2's order picks it. An empty pool is how this
+  -- arm spells the refusal canPayComponent gives below.
+  CostComponent.ExileTopFromGraveyard criterion ->
+    Just (Zone.Graveyard, Set.fromList (Maybe.maybeToList (topExileCandidate pid criterion gs)), 1)
   CostComponent.ExileThisFromGraveyard -> Just (Zone.Graveyard, itself (isOwnedIn Zone.Graveyard), 1)
   CostComponent.TapThis -> Nothing
   CostComponent.UntapThis -> Nothing
@@ -899,6 +924,7 @@ lifeOwedByComponent component = case component of
   CostComponent.RemoveLoyaltyFromThis _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileCardsFromGraveyard _ _ -> 0
+  CostComponent.ExileTopFromGraveyard _ -> 0
 
 canPayComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> GameState -> Bool
 canPayComponent pid oid component gs = case component of
@@ -1004,6 +1030,10 @@ canPayComponent pid oid component gs = case component of
   -- object-removing components of one cost together.
   CostComponent.ExileCardsFromGraveyard n criterion ->
     Natural.length (exileCandidates pid criterion gs) >= n
+  -- CR 118.3 again: payable only if the graveyard holds a matching card at all,
+  -- since the top one is then determined.
+  CostComponent.ExileTopFromGraveyard criterion ->
+    Maybe.isJust (topExileCandidate pid criterion gs)
   -- CR 107.14 / CR 118.3: payable only if the player has at least that many
   -- energy counters. GainPlayerCounters (#37) adds them; this spends them.
   CostComponent.PayEnergy n -> case Map.lookup pid (GameState.players gs) of
@@ -1273,6 +1303,17 @@ payComponent pid oid component = case component of
         Monad.mapM_ (\c -> Event.changeZone c Zone.Exile) (Set.toAscList chosen)
         pure Payment.Paid
       else pure Payment.Unpaid
+  -- CR 406.2 with no prompt at all: the card is determined by CR 404.2's order,
+  -- so this reads it and exiles it. Unpaid where the graveyard holds no matching
+  -- card, which agrees with canPayComponent above and leaves `pay`'s restore to
+  -- undo the rest.
+  CostComponent.ExileTopFromGraveyard criterion -> do
+    gs <- State.get
+    case topExileCandidate pid criterion gs of
+      Nothing -> pure Payment.Unpaid
+      Just candidate -> do
+        Event.changeZone candidate Zone.Exile
+        pure Payment.Paid
 
 -- The arithmetic half, pure and board-free.
 --
