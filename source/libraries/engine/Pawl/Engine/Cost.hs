@@ -49,8 +49,8 @@ import Pawl.Types.Game (Game)
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
-import qualified Pawl.Types.Mana as Mana.Type
 import qualified Pawl.Types.ManaCost as ManaCost
+import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Object as Object
@@ -1289,16 +1289,15 @@ tapForMana oid = do
       -- and pays the cost. Falls back to owner in the impossible case
       -- lookupObject just proved oid exists but controllerOf returns Nothing.
       let controller = Maybe.fromMaybe (Object.owner obj) (Projection.controllerOf oid gs)
-      case filter (\(cost, _) -> canPayActivation controller oid cost gs) (Mana.manaOptionsOf oid gs) of
+      case filter (\option -> canPayActivation controller oid (ManaOption.cost option) gs) (Mana.manaOptionsOf oid gs) of
         [] -> pure False
-        options@(first : rest) -> do
-          chosen <- chooseManaYield controller oid (fmap snd (first NonEmpty.:| rest)) gs
-          let (cost, yield) = Maybe.fromMaybe first (List.find ((==) chosen . snd) options)
-          outcome <- payActivation controller oid cost
+        first : rest -> do
+          chosen <- chooseManaYield controller oid (first NonEmpty.:| rest) gs
+          outcome <- payActivation controller oid (ManaOption.cost chosen)
           case outcome of
             Payment.Unpaid -> pure False
             Payment.Paid -> do
-              State.modify' (Mana.addMana controller (Mana.unitsOf yield))
+              State.modify' (Mana.addMana controller (Mana.unitsOf (ManaOption.yield chosen)))
               pure True
 
 -- CR 602.2b sends an activation cost through CR 601.2b-i, so a mana ability pays
@@ -1332,26 +1331,32 @@ payActivation pid oid cost = do
   Monad.unless paid (State.put before)
   pure (if paid then Payment.Paid else Payment.Unpaid)
 
--- Which mana this source produces -- which of its mana abilities, in which mode,
+-- Which way this source is tapped -- which of its mana abilities, in which mode,
 -- and which colour each of that mode's AddMana effects makes, asked as ONE
--- question because the answer is one yield.
+-- question because the answer is one activation.
 --
--- Elided exactly when the source offers ONE yield, where no choice exists --
--- Mana.manaOptionsOf has already collapsed routes producing identical mana for an
--- identical cost, so a remaining list of two is two genuinely different options.
+-- The COST rides along with the yield (Pawl.Types.ManaOption) rather than the
+-- yield going alone, because two of one permanent's mana abilities can add the
+-- same mana for different costs: an Urborg'd Mana Confluence adds {B} for {T},
+-- and adds {B} for {T} plus a life. A yield-only answer names both, and the
+-- engine picking either is it deciding what the player pays.
+--
+-- Elided exactly when the source offers ONE option, where no choice exists --
+-- Mana.manaOptionsOf has already collapsed routes alike in cost and yield, so
+-- what arrives here is distinct and a list of two is two real options.
 --
 -- FILTERED, NOT TRUSTED, the posture chooseSource and payComponents take. Here
--- that is not merely hygiene -- honouring a yield the source cannot make would
--- mint mana out of nothing.
-chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty Mana.Type.Mana -> GameState -> Game Mana.Type.Mana
-chooseManaYield pid oid candidates gs = case NonEmpty.nub candidates of
+-- that is not merely hygiene -- honouring an option the source does not offer
+-- would mint mana out of nothing, or charge the wrong cost for it.
+chooseManaYield :: PlayerId -> ObjectId -> NonEmpty.NonEmpty ManaOption.ManaOption -> GameState -> Game ManaOption.ManaOption
+chooseManaYield pid oid candidates gs = case candidates of
   only NonEmpty.:| [] -> pure only
-  distinct -> do
-    answer <- Game.choose (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid distinct)
+  _ -> do
+    answer <- Game.choose (Prompt.ChooseManaYield (Decide.deciderFor pid gs) pid oid candidates)
     pure $
-      if List.elem answer (NonEmpty.toList distinct)
+      if List.elem answer (NonEmpty.toList candidates)
         then answer
-        else NonEmpty.head distinct
+        else NonEmpty.head candidates
 
 payComponent :: PlayerId -> ObjectId -> CostComponent.CostComponent Keyword.Type.Keyword -> Game Payment.Payment
 payComponent pid oid component = case component of

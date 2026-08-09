@@ -71,6 +71,8 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.HandActionPerformer as HandActionPerformer
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -225,6 +227,20 @@ isCreatureRecipient r = case r of
   Recipient.ToBattle _ -> False
   Recipient.ToPlayer _ -> False
   Recipient.ToObject _ -> False
+
+-- The offered way of tapping a source whose YIELD is `wanted`, or the head where
+-- it offers no such yield. What a Prompt.ChooseManaYield answerer that cares
+-- about a colour wants: the prompt names a whole option, cost and all (#1117),
+-- and a caller choosing a colour is indifferent to what it is charged.
+--
+-- The FIRST such option, where a source offers one yield for two costs (an
+-- Urborg'd Mana Confluence). A fixture that cares which cost it pays picks the
+-- candidate itself; ManaSpec's Urborg'd Mana Confluence is the one that does.
+optionYielding :: Mana.Mana -> NonEmpty.NonEmpty ManaOption.ManaOption -> ManaOption.ManaOption
+optionYielding wanted candidates =
+  Maybe.fromMaybe
+    (NonEmpty.head candidates)
+    (List.find ((==) wanted . ManaOption.yield) (NonEmpty.toList candidates))
 
 -- Identity interpreter: shuffle returns ids unchanged; actions never occur here.
 identityAnswer :: Prompt.Prompt r -> r
