@@ -156,6 +156,26 @@ data GameEvent
     -- question -- CR 508.3a's attacks-a-permanent form, CR 508.3b and CR 508.3e,
     -- which need trigger conditions no card in the pool declares (#538).
     AttackerDeclared ObjectId.ObjectId PlayerId.PlayerId
+  | -- | CR 509.1i: a blocker was DECLARED -- one entry per creature the defending
+    -- player chose in CR 509.1's turn-based action, naming the blocker and the
+    -- attacking creature chosen for it (CR 509.1a). AttackerDeclared's mirror,
+    -- and appended by Pawl.Engine.Combat.declareBlockers alone.
+    --
+    -- The declaration is the event, for AttackerDeclared's reason: CR 509.4 says
+    -- a creature put onto the battlefield blocking is "blocking" but never
+    -- "blocked", and Combat.blockers cannot tell the two apart.
+    --
+    -- ONE event per blocker rather than per blocked creature. That is CR 509.1a's
+    -- own shape -- one creature chosen for each blocker to block -- but only
+    -- because nothing can widen it here: an effect MAY let a creature block
+    -- several, and pawl's declaration has nowhere to put the second attacker
+    -- (#1145). While that holds, one blocker is one event.
+    --
+    -- The ATTACKER is carried and read by nothing today, the payload CR 509.3b's
+    -- "blocks a creature" and CR 509.3d's "becomes blocked by a creature" need --
+    -- and it cannot be derived later, since a blocker removed from combat (CR
+    -- 506.4) leaves no record of what it was declared against.
+    BlockerDeclared ObjectId.ObjectId ObjectId.ObjectId
   | -- | CR 701.20a: a player revealed a card.
     --
     -- A reveal is the one game action whose entire content is INFORMATION, so

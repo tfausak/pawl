@@ -30,6 +30,7 @@ toJson e = case e of
     Common.tagged "Discarded" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid, DiscardCause.toJson cause]
   GameEvent.Revealed pid pc -> Common.tagged "Revealed" . Just . Common.array $ [PlayerId.toJson pid, ProjectedCharacteristics.toJson pc]
   GameEvent.AttackerDeclared oid pid -> Common.tagged "AttackerDeclared" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson pid]
+  GameEvent.BlockerDeclared blocker attacker -> Common.tagged "BlockerDeclared" . Just . Common.array $ [ObjectId.toJson blocker, ObjectId.toJson attacker]
   GameEvent.SpellCountered c -> Common.tagged "SpellCountered" . Just $ Countering.toJson c
   GameEvent.LifeLost p n -> Common.tagged "LifeLost" . Just $ Common.array [PlayerId.toJson p, Common.encodeNatural n]
   GameEvent.LifeGained p n -> Common.tagged "LifeGained" . Just $ Common.array [PlayerId.toJson p, Common.encodeNatural n]
@@ -58,6 +59,7 @@ fromJson value = do
       GameEvent.Discarded <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid <*> DiscardCause.fromJson cause
     ("Revealed", Just (Value.Array (Array.MkArray [pid, pc]))) -> GameEvent.Revealed <$> PlayerId.fromJson pid <*> ProjectedCharacteristics.fromJson pc
     ("AttackerDeclared", Just (Value.Array (Array.MkArray [oid, pid]))) -> GameEvent.AttackerDeclared <$> ObjectId.fromJson oid <*> PlayerId.fromJson pid
+    ("BlockerDeclared", Just (Value.Array (Array.MkArray [blocker, attacker]))) -> GameEvent.BlockerDeclared <$> ObjectId.fromJson blocker <*> ObjectId.fromJson attacker
     ("SpellCountered", Just v) -> GameEvent.SpellCountered <$> Countering.fromJson v
     ("LifeLost", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeLost <$> PlayerId.fromJson p <*> Common.decodeNatural n
     ("LifeGained", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeGained <$> PlayerId.fromJson p <*> Common.decodeNatural n

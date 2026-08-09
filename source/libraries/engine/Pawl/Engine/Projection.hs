@@ -1524,6 +1524,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
+  TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> condition
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> condition
   TriggerCondition.SelfDies -> condition

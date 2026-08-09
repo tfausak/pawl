@@ -120,6 +120,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn)
       """ {"type":"SelfAttacks","value":{"type":"FirstTimeEachTurn"}} """
+  -- CR 509.3a, and nullary where its mirror is not: rule 509.3a's
+  -- once-each-combat is not a frequency a card chooses.
+  Spec.it s "SelfBlocks" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfBlocks
+      """ {"type":"SelfBlocks"} """
   -- CR 113.6k's condition, which names a zone pair rather than the battlefield.
   Spec.it s "SelfPutIntoGraveyardFromLibrary" $
     Common.assertJsonCodec

@@ -36,7 +36,8 @@
 -- CR 702.108 prowess, the fourth such keyword and the first whose event is not
 -- its bearer's combat -- CR 601.2i's cast, watched through the same
 -- TriggerCondition.SpellCast a card writes -- with Monastery Swiftspear --
--- `prowessSpec`.
+-- `prowessSpec`. CR 509.3a's blocking-side declaration trigger, the mirror of
+-- CR 508.3a's, with Pride Guardian -- `selfBlocksSpec`.
 -- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
@@ -2988,6 +2989,88 @@ counterTriggerSpec s registry =
           Spec.assertEqWith s "four untapped permanents before" (untapped gs) 4
           Spec.assertEqWith s "two after, so only two Islands were tapped" (untapped cast) 2
 
+-- CR 509.3a: "Whenever [a creature] blocks, . . ." -- the blocking side's
+-- declaration trigger, matched against GameEvent.BlockerDeclared, which only
+-- Pawl.Engine.Combat.declareBlockers appends.
+--
+-- Pride Guardian {W} Creature -- Cat Monk 0/3, "Defender / Whenever this creature
+-- blocks, you gain 3 life", is the card. It is the cheapest producer in the pool:
+-- its payload names nothing about the attacker it blocked, so these cases isolate
+-- the trigger CONDITION, and 0 power keeps combat damage from moving the number
+-- the assertions read.
+--
+-- The blocker is BOB's, since CR 509.1 has the defending player declare blocks,
+-- so every life total below is read off the defending seat.
+selfBlocksSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfBlocksSpec s registry =
+  let -- Attacks with everything and declines every block. aggressiveAnswer's
+      -- control leg: the same game with CR 509.1's declaration switched off, and
+      -- the only difference between the two answerers.
+      noBlocks :: Prompt.Prompt r -> r
+      noBlocks p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+   in Spec.describe s "SelfBlocks" $ do
+        -- The proving test, and its control. alice attacks with a 2/1 Goblin
+        -- Piker; bob blocks with the Guardian. 20 + 3 = 23 blocking, and
+        -- 20 - 2 = 18 declining -- distinct numbers, and neither reachable from
+        -- the other by an off-by-one.
+        Spec.it s "CR 509.3a whole card: blocking gains 3 life, declining to block gains none" $ do
+          (gs, _, theirs) <- board ["Goblin Piker"] ["Pride Guardian"]
+          let blocked = S.runCombat S.aggressiveAnswer gs
+              unblocked = S.runCombat noBlocks gs
+          case theirs of
+            [guardian] -> do
+              Spec.assertEqWith s "the 0/3 Guardian survives the Piker's 2" (S.lifeOf S.bob blocked) (Just 23)
+              Spec.assertBool s (S.onBattlefield guardian blocked) "and is still on the battlefield"
+              Spec.assertEqWith s "alice gains nothing: the trigger is the blocker controller's (CR 603.3a)" (S.lifeOf S.alice blocked) (Just 20)
+              Spec.assertEqWith s "control leg: no block, no gain, and the Piker's 2 gets through" (S.lifeOf S.bob unblocked) (Just 18)
+            _ -> Spec.assertFailure s "fixture should give bob one Pride Guardian"
+        -- CR 509.2a: the abilities that triggered on blockers being declared go
+        -- onto the stack before the active player gets priority, so they resolve
+        -- in the declare blockers step -- not at combat damage, and not at end of
+        -- combat. Read at the combat damage step, before any damage is dealt.
+        Spec.it s "CR 509.2a the trigger has already resolved when the combat damage step begins" $ do
+          (gs, _, _) <- board ["Goblin Piker"] ["Pride Guardian"]
+          let atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer gs
+          Spec.assertEqWith s "the fixture reached the combat damage step" (GameState.phase atDamage) (Phase.Combat CombatStep.CombatDamage)
+          Spec.assertEqWith s "and bob is already at 23" (S.lifeOf S.bob atDamage) (Just 23)
+        -- CR 603.2: the condition is the BEARER's own declaration. bob blocks one
+        -- attacker with two creatures, so two declarations are recorded and only
+        -- one of them is the Guardian's. The falsifier is a match that ignores
+        -- the blocker on the event: that fires twice, for 26.
+        Spec.it s "CR 603.2 another creature's block does not fire the Guardian's ability" $ do
+          (gs, _, _) <- board ["Goblin Piker"] ["Pride Guardian", "Goblin Piker"]
+          let after = S.runCombat S.aggressiveAnswer gs
+          Spec.assertEqWith s "one gain of 3, not two" (S.lifeOf S.bob after) (Just 23)
+        -- CR 509.1a gives each blocker one creature to block, so a second
+        -- ATTACKER adds a declaration the Guardian is not in. alice attacks with
+        -- two Pikers and aggressiveAnswer blocks the first; the second's 2 gets
+        -- through. 20 + 3 - 2 = 21. The falsifier is a condition that matched an
+        -- attacker's declaration too -- three events rather than one, for 25.
+        Spec.it s "CR 509.3a an attacker's own declaration is not a block" $ do
+          (gs, _, _) <- board ["Goblin Piker", "Goblin Piker"] ["Pride Guardian"]
+          let after = S.runCombat S.aggressiveAnswer gs
+          Spec.assertEqWith s "gained 3 once, then took 2 from the unblocked Piker" (S.lifeOf S.bob after) (Just 21)
+        -- The other side of the same coin, and CR 508.3a's own words: a creature
+        -- that BLOCKS did not attack. Hanweir Garrison {2}{R} 2/3, "Whenever this
+        -- creature attacks, create two 1/1 red Human creature tokens that are
+        -- tapped and attacking", is the pool's cheapest attack trigger; here it
+        -- is bob's, and blocking. The falsifier is a SelfAttacks arm that matched
+        -- the blocking declaration: two tokens rather than none.
+        Spec.it s "CR 508.3a a block is not an attack, so a blocking Hanweir Garrison makes no tokens" $ do
+          (blocking, _, _) <- board ["Goblin Piker"] ["Hanweir Garrison"]
+          (attacking, _, _) <- board ["Hanweir Garrison"] ["Goblin Piker"]
+          Spec.assertEqWith s "the Garrison blocked and made nothing" (length (S.tokensOf (S.runCombat S.aggressiveAnswer blocking))) 0
+          -- The positive control: the same card on the attacking side really does
+          -- have the ability, so the zero above is a fact about blocking rather
+          -- than about the fixture.
+          Spec.assertEqWith s "the same card attacking makes two" (length (S.tokensOf (S.runCombat S.aggressiveAnswer attacking))) 2
+
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
 -- enters, you gain 1 life", the card that proves it. Its effect names nothing
@@ -4380,6 +4463,7 @@ representativeEvents cond =
         -- arm that bound the attacking side instead would still agree with
         -- eventBindingSlots here if the two coincided.
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
+        TriggerCondition.SelfBlocks -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -4477,6 +4561,7 @@ everyTriggerCondition =
     TriggerCondition.SelfCycled,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+    TriggerCondition.SelfBlocks,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
@@ -6598,6 +6683,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   annihilatorSpec s registry
   battleCrySpec s registry
   prowessSpec s registry
+  selfBlocksSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   graveyardEffectZoneTriggerSpec s registry

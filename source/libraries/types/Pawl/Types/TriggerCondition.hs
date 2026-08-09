@@ -96,6 +96,24 @@ data TriggerCondition
     -- turn" -- a payload rather than a sibling condition, because it narrows this
     -- same trigger event rather than naming a different one.
     SelfAttacks TriggerFrequency.TriggerFrequency
+  | -- | CR 509.3a: "whenever [a creature] blocks" -- Pride Guardian's.
+    -- SelfAttacks' mirror, self-scoped like SelfEnters.
+    --
+    -- DECLARED, for that condition's reason read on the blocking side: CR 509.4
+    -- says a creature put onto the battlefield blocking never "blocked", so this
+    -- matches GameEvent.BlockerDeclared and never Combat.blockers.
+    --
+    -- No TriggerFrequency, and no dedup either, though rule 509.3a says "generally
+    -- triggers only once each combat for that creature, even if it blocks multiple
+    -- creatures". One declaration is one GameEvent.BlockerDeclared, so matching
+    -- once IS the rule -- and what makes that hold is a capability pawl lacks
+    -- rather than anything in the CR: no effect can give a blocker a second
+    -- attacker (#1145). The rule's "even if" has no case in reach until it can.
+    --
+    -- The ATTACKER the event also carries is not compared here. CR 509.3b's
+    -- "blocks a creature", CR 509.3c's and CR 509.3d's "becomes blocked" are
+    -- separate conditions no card in the pool declares (#1146).
+    SelfBlocks
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.
     --
