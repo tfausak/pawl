@@ -369,6 +369,10 @@ data Effect card
     -- already gates Duration.ForAsLongAs the same way). An `If condition [Effect]
     -- [Effect]` arm would put a BRANCH between two effect lists, which is the
     -- control flow design.md section 1 keeps out of the ISA.
+    --
+    -- NOT Pawl.Types.Clause.condition: that one gates whether a clause's
+    -- instructions run at all, while this one gates only whether this opcode
+    -- installs its row.
     Replace Duration.Duration Uses.Uses ReplacementOrigin.ReplacementOrigin (Maybe Condition.Condition) ReplacementEffect.ReplacementEffect
   | -- | CR 614.10a: each player the PlayerRef names skips their NEXT occurrence of
     -- this step or phase. Fatigue names a step; Stonehorn Dignitary names a whole

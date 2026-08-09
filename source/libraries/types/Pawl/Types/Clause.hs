@@ -1,6 +1,7 @@
 module Pawl.Types.Clause where
 
 import qualified Data.Sequence as Seq
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.UnlessPaid as UnlessPaid
@@ -24,7 +25,22 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 -- payload, so a concrete `Effect Card` here would make the two modules mutually
 -- importing.
 data Clause card = MkClause
-  { -- | CR 603.5's printed "may", covering this clause's effects -- see
+  { -- | CR 701.46a's "if this permanent has no +1/+1 counters on it" -- a gate on
+    -- THIS clause's effects rather than on the whole ability, which is why the
+    -- rider rides the same carrier CR 603.5's "may" does. CR 701.37a prints the
+    -- other shape, gating a proper prefix of a longer ability; no card in the
+    -- pool reaches it, so the clause-vs-mode scope is unproven (#1085, #1086).
+    --
+    -- Read as this clause is APPLIED (CR 608.2c's "in the order written"), not
+    -- once at CR 601.2b -- so an earlier clause's effects can flip it. Nothing
+    -- is the unmarked case every other card in the corpus takes.
+    --
+    -- NOT Pawl.Types.Effect.Replace's own Maybe Condition: that one gates
+    -- whether a floating replacement effect gets INSTALLED and travels with the
+    -- installed row, while this one gates whether the clause's instructions run
+    -- at all.
+    condition :: Maybe Condition.Condition,
+    -- | CR 603.5's printed "may", covering this clause's effects -- see
     -- Pawl.Types.Optionality for why the flag rides a carrier rather than
     -- wrapping each effect, and Pawl.Engine.Resolve.exercises for where the
     -- choice is asked.
@@ -40,9 +56,11 @@ data Clause card = MkClause
     -- is a rewriting, so this clause's effects are its "if they don't" branch.
     -- Nothing for every card that states no such cost.
     --
-    -- The two gates are independent, and Pawl.Engine.Resolve asks them in
-    -- printed order -- the "may" first, since a declined clause has no
-    -- instruction left for an "unless" to qualify.
+    -- The three riders are independent, and Pawl.Engine.Resolve asks them in
+    -- printed order: `condition` first (CR 701.46a prints its "if" ahead of the
+    -- instructions, and a clause that cannot happen is no question to ask), then
+    -- the "may", then this -- a declined clause has no instruction left for an
+    -- "unless" to qualify.
     --
     -- NEGATIVE only: the effects run when the cost was NOT paid. CR 118.12's
     -- other half -- "[Do something]. If [a player] does, [effect]", where they
