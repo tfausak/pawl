@@ -490,6 +490,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Intimidate -> keyword
   Keyword.Type.Morph cost variant -> Keyword.Type.Morph (rewriteCost pairs cost) variant
   Keyword.Type.Entwine cost -> Keyword.Type.Entwine (rewriteCost pairs cost)
+  -- CR 702.45a's N is a number and not a word, so CR 612.2 has nothing to swap.
+  Keyword.Type.Bushido _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword

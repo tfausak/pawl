@@ -317,6 +317,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (entwine 1)
       """ {"type":"Entwine","value":{"mana":[{"type":"Generic","value":1}]}} """
     Spec.assertBool s (Keyword.toJson (entwine 1) /= Keyword.toJson (flashbackOf 1)) "entwine {1} is not flashback {1}"
+  -- CR 702.45a's N rides the constructor as poisonous' does.
+  Spec.it s "Bushido carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Bushido 2)
+      """ {"type":"Bushido","value":2} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Bushido 3) /= Keyword.toJson (Keyword.Poisonous 3))
+      "bushido 3 is not poisonous 3"
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do

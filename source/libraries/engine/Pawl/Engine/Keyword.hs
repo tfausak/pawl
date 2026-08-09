@@ -57,17 +57,17 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.70, 702.86, 702.91 and 702.108 do not: they spell poisonous,
--- annihilator, battle cry and prowess out as TRIGGERED abilities, so those have
--- to be MINTED and handed to the ordinary CR 603 machinery rather than merely
--- consulted.
+-- Rules 702.45, 702.70, 702.86, 702.91 and 702.108 do not: they spell bushido,
+-- poisonous, annihilator, battle cry and prowess out as TRIGGERED abilities, so
+-- those have to be MINTED and handed to the ordinary CR 603 machinery rather
+-- than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
 -- this module must never do is grow an arm for a CARD.
 --
 -- triggeredAbilitiesOf derives its abilities from a projection's POST-LAYER
--- keyword counts, so Humility takes all four of those abilities away for free
+-- keyword counts, so Humility takes all of those abilities away for free
 -- and an Aura's layer-6 grant adds them. Its one caller is
 -- Pawl.Engine.Event's EVENT scan; rule 702 has no state-triggered (CR 603.8) or
 -- delayed (CR 603.7) keyword ability, so the first keyword that needs one must
@@ -86,8 +86,9 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and
 -- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
--- 702.86b says the same of annihilator, CR 702.91b of battle cry and CR 702.108b
--- of prowess, so the four minting arms below are the same shape.
+-- 702.45b says the same of bushido, CR 702.86b of annihilator, CR 702.91b of
+-- battle cry and CR 702.108b of prowess, so the five minting arms below are the
+-- same shape -- bushido's `concat` aside, since its instance is two abilities.
 --
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
 -- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
@@ -99,6 +100,9 @@ triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList co
 abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
+  -- The one arm that yields TWO abilities per instance: rule 702.45a's ability
+  -- watches two events, and a TriggeredAbility carries one condition.
+  Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Prowess -> List.genericReplicate count prowess
@@ -189,6 +193,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
+  Keyword.Bushido _ -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -301,6 +306,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
+  Keyword.Bushido _ -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -481,6 +487,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
+  Keyword.Bushido _ -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -754,6 +761,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
+  Keyword.Bushido _ -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -805,6 +813,7 @@ familyOf keyword = case keyword of
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
   Keyword.Morph _ _ -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
+  Keyword.Bushido _ -> Just KeywordFamily.Bushido
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
@@ -999,4 +1008,54 @@ prowess =
       Effect.ModifyTarget
         Duration.UntilEndOfTurn
         (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+        (ObjectRef.EachMatching Filter.IsSource)
+
+-- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
+-- blocked, it gets +N/+N until end of turn.'" The fifth keyword in this pool
+-- whose rule text IS a triggered ability, and the only one whose sentence names
+-- TWO events: "blocks" is CR 509.3a and "becomes blocked" is CR 509.3c, two
+-- separate trigger conditions.
+--
+-- So this returns a LIST of two abilities where its four siblings return one.
+-- The alternative -- one TriggeredAbility with a disjunctive condition -- would
+-- need a TriggerCondition combinator nothing else in rule 702 wants, and the
+-- split costs nothing: CR 603.2 triggers an ability once per occurrence of its
+-- event, so one ability watching two events and two abilities watching one each
+-- put the same number of objects on the stack however many of the events happen.
+--
+-- The payload is prowess', with N in place of its 1: "it" is the bearer, so
+-- ObjectRef.EachMatching Filter.IsSource, and CR 611.2c fixes that singleton as
+-- the effect begins. Both abilities carry the same payload, because rule 702.45a
+-- states one.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as either
+-- ability is placed -- rule 702.45a leaves nothing to choose, and has no "if"
+-- clause, so intervening = Nothing.
+bushido :: Natural -> [TriggeredAbility Card]
+bushido n = [bushidoBlocks n, bushidoBecomesBlocked n]
+
+-- CR 509.3a's half of rule 702.45a.
+bushidoBlocks :: Natural -> TriggeredAbility Card
+bushidoBlocks = bushidoHalf TriggerCondition.SelfBlocks
+
+-- CR 509.3c's half of rule 702.45a.
+bushidoBecomesBlocked :: Natural -> TriggeredAbility Card
+bushidoBecomesBlocked = bushidoHalf TriggerCondition.SelfBecomesBlocked
+
+-- The +N/+N the two halves share.
+bushidoHalf :: TriggerCondition.TriggerCondition -> Natural -> TriggeredAbility Card
+bushidoHalf condition n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = condition,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness (Quantity.Literal (toInteger n)) (Quantity.Literal (toInteger n)))
         (ObjectRef.EachMatching Filter.IsSource)

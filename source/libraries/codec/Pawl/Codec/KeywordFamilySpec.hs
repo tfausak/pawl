@@ -57,6 +57,14 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Entwine
       """ {"type":"Entwine"} """
 
+  Spec.it s "Bushido" $
+    Common.assertJsonCodec
+      s
+      KeywordFamily.toJson
+      KeywordFamily.fromJson
+      KeywordFamily.Bushido
+      """ {"type":"Bushido"} """
+
   Spec.it s "Poisonous" $
     Common.assertJsonCodec
       s
