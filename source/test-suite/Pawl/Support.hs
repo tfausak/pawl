@@ -1509,6 +1509,10 @@ stubView table oid =
                 Filter.power = Nothing,
                 Filter.manaValue = Nothing,
                 Filter.controller = ctrl,
+                -- CR 108.3: the table registers no owner, and no Count in the
+                -- pool filters by one, so this stub answers Nothing and OwnedBy
+                -- is vacuously False against it.
+                Filter.owner = Nothing,
                 Filter.identity = Just o,
                 Filter.playerIdentity = Nothing,
                 Filter.attacking = False,

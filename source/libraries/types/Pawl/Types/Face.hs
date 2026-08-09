@@ -39,6 +39,7 @@ import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Toughness as Toughness
@@ -238,6 +239,17 @@ data Face card = MkFace
     -- where the requirements take two fields: Pawl.Types.CombatRestriction argues
     -- why the axis that split those is absent here.
     combatRestrictions :: [CombatRestriction.CombatRestriction],
+    -- | CR 604.1/604.2 / 701.21a / 101.2: this face's printed SACRIFICE
+    -- PROHIBITIONS -- "creatures you control but don't own ... can't be
+    -- sacrificed" (Garland, Royal Kidnapper); read by
+    -- Pawl.Engine.SacrificeRestriction, never by Pawl.Engine.Projection, for
+    -- blockRequirements' CR 613.11 reason.
+    --
+    -- Its own field rather than an arm of combatRestrictions above, because the
+    -- two forbid unrelated game actions: a combat restriction is read only by
+    -- the two declarations CR 508.1 and CR 509.1 describe, and this is read
+    -- wherever CR 701.21a's sacrifice is reached from.
+    sacrificeRestrictions :: [SacrificeRestriction.SacrificeRestriction],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,
     -- never by Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.

@@ -260,6 +260,11 @@ viewOfSnapshot mController snapshot =
       -- (#674).
       Filter.manaValue = PC.manaValue snapshot,
       Filter.controller = mController,
+      -- CR 108.3: an owner is read off an OBJECT, and a ProjectedCharacteristics
+      -- carries none -- the position `supertypes` and `counters` below are in
+      -- (#646). Unlike those two the fact does not change, so the event's id
+      -- would be enough to recover it; nothing here has the id (#1069).
+      Filter.owner = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
       Filter.attacking = False,

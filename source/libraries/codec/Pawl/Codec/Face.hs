@@ -37,6 +37,7 @@ import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
 import qualified Pawl.Codec.Power as Power
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Codec.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Codec.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Codec.StaticAbility as StaticAbility
 import qualified Pawl.Codec.TargetSpec as TargetSpec
 import qualified Pawl.Codec.Toughness as Toughness
@@ -74,6 +75,7 @@ toJson encodeCard f =
       Common.optionalPair "blockRequirements" [] (Common.encodeList BlockRequirement.toJson) (Face.blockRequirements f),
       Common.optionalPair "attackRequirements" [] (Common.encodeList AttackRequirement.toJson) (Face.attackRequirements f),
       Common.optionalPair "combatRestrictions" [] (Common.encodeList CombatRestriction.toJson) (Face.combatRestrictions f),
+      Common.optionalPair "sacrificeRestrictions" [] (Common.encodeList SacrificeRestriction.toJson) (Face.sacrificeRestrictions f),
       Common.optionalPair "attackCosts" [] (Common.encodeList AttackCost.toJson) (Face.attackCosts f),
       Common.optionalPair "additionalCosts" [] (Common.encodeList (CostComponent.toJson Keyword.toJson)) (Face.additionalCosts f),
       Common.optionalPair "alternativeCosts" [] (Common.encodeList (Cost.toJson Keyword.toJson)) (Face.alternativeCosts f),
@@ -111,6 +113,7 @@ fromJson decodeCard value = do
   blockRequirements <- Common.defaultedField "blockRequirements" [] (Common.decodeList BlockRequirement.fromJson) ps
   attackRequirements <- Common.defaultedField "attackRequirements" [] (Common.decodeList AttackRequirement.fromJson) ps
   combatRestrictions <- Common.defaultedField "combatRestrictions" [] (Common.decodeList CombatRestriction.fromJson) ps
+  sacrificeRestrictions <- Common.defaultedField "sacrificeRestrictions" [] (Common.decodeList SacrificeRestriction.fromJson) ps
   attackCosts <- Common.defaultedField "attackCosts" [] (Common.decodeList AttackCost.fromJson) ps
   additionalCosts <- Common.defaultedField "additionalCosts" [] (Common.decodeList (CostComponent.fromJson Keyword.fromJson)) ps
   alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList (Cost.fromJson Keyword.fromJson)) ps
@@ -142,6 +145,7 @@ fromJson decodeCard value = do
         Face.blockRequirements = blockRequirements,
         Face.attackRequirements = attackRequirements,
         Face.combatRestrictions = combatRestrictions,
+        Face.sacrificeRestrictions = sacrificeRestrictions,
         Face.attackCosts = attackCosts,
         Face.additionalCosts = additionalCosts,
         Face.alternativeCosts = alternativeCosts,

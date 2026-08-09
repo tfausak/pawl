@@ -509,6 +509,17 @@ viewOfCard face =
           -- candidates being cards in a graveyard.
           Filter.manaValue = Just (Quantity.manaValueOf face),
           Filter.controller = Nothing,
+          -- CR 108.3 gives an owner to a card IN THE GAME, which is an object in
+          -- some zone; this builder describes a printed FACE, so there is no
+          -- object to read Object.owner off. Nothing, and OwnedBy vacuously
+          -- False -- the posture the controller above takes, though for a
+          -- different reason: `controller` is Nothing because CR 108.4 gives a
+          -- card in a library none, where an owner it certainly has.
+          --
+          -- Not implemented: the owner of a card matched OFF the battlefield,
+          -- where viewUpTo falls back here with an object id in hand and CR
+          -- 400.3 would answer from Object.owner (#1068).
+          Filter.owner = Nothing,
           -- Not an object, so no identity for IsSource to compare.
           Filter.identity = Nothing,
           Filter.playerIdentity = Nothing,
@@ -614,6 +625,18 @@ viewOfCharacteristics oid pc controller counters gs =
       -- CR 712.8e's front-face rule and CR 708.2a's face-down rule are honoured.
       Filter.manaValue = PC.manaValue pc,
       Filter.controller = controller,
+      -- CR 108.3 / 110.2 / 111.2: read straight off the OBJECT rather than off
+      -- the projection beside it and rather than through the `controller`
+      -- parameter, which is what makes Garland's "you control but don't own" a
+      -- real question -- CR 613.1b's layer 2 has moved control by the time this
+      -- is assembled, and nothing has moved ownership. A token's owner is the
+      -- player who created it (CR 111.2), which Event.createTokens wrote into
+      -- Object.owner, so it needs no separate case.
+      --
+      -- Nothing when the id names nothing, which is CR 608.2h's territory: this
+      -- is reached with a last-known record for an object that has left, and
+      -- Pawl.Types.LastKnown carries a controller but no owner (#1069).
+      Filter.owner = fmap Object.owner (Game.lookupObject oid gs),
       Filter.identity = Just oid,
       Filter.playerIdentity = Nothing,
       -- CR 508.1k: attacking is a combat status, not a characteristic (CR 109.3),
@@ -2075,6 +2098,15 @@ filterReads f = case f of
   Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
   Filter.Type.PowerAtMost _ -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
+  -- Reads NOTHING, where its sibling above reads Controller, and the contrast is
+  -- CR 108.3's: no Modification writes Object.owner, because no rule changes an
+  -- owner at all -- CR 613.1b's layer 2 moves control and rule 108.3 has no
+  -- counterpart. So CR 613.8a's clause (b) can never hold on this atom's account.
+  -- The position IsToken is in, and for the same immutability. A set the atom
+  -- appears in may still be movable through its OTHER conjuncts: Garland, Royal
+  -- Kidnapper pairs it with ControlledBy, so its set moves with layer 2 as it
+  -- should.
+  Filter.Type.OwnedBy _ -> Set.empty
   Filter.Type.IsSource -> Set.empty
   Filter.Type.IsPlayer _ -> Set.empty
   Filter.Type.IsAttacking -> Set.empty
