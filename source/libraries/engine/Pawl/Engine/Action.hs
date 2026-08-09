@@ -190,7 +190,7 @@ legalActions pid gs =
       --
       -- Mana.manaSourcesGiven is the whole gate, and it is the SAME list CR
       -- 605.3a's other two windows are served from (Cost.payMana's candidates):
-      -- controlled, and offering some route Cost.canActivateManaAbility admits
+      -- controlled, and offering some route Cost.manaActivations admits
       -- -- CR 118.3's payability of the ability's own cost (CR 602.2b), which
       -- carries CR 107.5's tapped permanent and CR 302.6's sick creature with
       -- it. ONE sweep for the whole enumeration rather than one per permanent,
@@ -204,5 +204,5 @@ legalActions pid gs =
       -- asked at the offer and at the payment, so the two cannot disagree.
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
-      manaActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.canActivateManaAbility grants pcs pid gs)
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaActivations
+      manaAbilityActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.manaActivations grants pcs pid gs)
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaAbilityActivations
