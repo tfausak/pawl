@@ -121,9 +121,11 @@ asZoneChange event = case event of
 -- cannot be got backwards.
 collect :: GameState -> [ActiveReplacement.ActiveReplacement] -> [ReplacementCandidate]
 collect sources floating =
-  let fromPermanent (src, re) =
+  let fromPermanent (instance_, (src, re)) =
         ReplacementCandidate.MkReplacementCandidate
-          { ReplacementCandidate.identity = CandidateId.OfPermanent src re,
+          { -- CR 614.5 / 702.136b: one identity per INSTANCE, so a permanent
+            -- carrying one ability twice gets the rule's two opportunities.
+            ReplacementCandidate.identity = CandidateId.OfPermanent src re instance_,
             ReplacementCandidate.effect = re,
             ReplacementCandidate.source = src,
             -- CR 109.5: "you" is the SOURCE's controller, read live off the
@@ -167,8 +169,32 @@ collect sources floating =
             -- (`setShield` drops a shield reduced to 0).
             ReplacementCandidate.rider = ActiveReplacement.rider active
           }
-   in fmap fromPermanent (Projection.replacementsAffecting sources)
+   in fmap fromPermanent (numberInstances (Projection.replacementsAffecting sources))
         <> fmap fromFloating floating
+
+-- CR 614.5 / 702.136b: number each gathered row by how many rows EQUAL to it
+-- came before, so a permanent holding one ability twice offers two instances
+-- rather than one -- "if a permanent has multiple instances of riot, each works
+-- separately".
+--
+-- An ordinal among EQUALS rather than a position in the list, because the list
+-- is re-derived every CR 616.1f iteration and CR 616.2 lets an application
+-- change what is in it -- an entry replacement gained or lost anywhere earlier
+-- would renumber a surviving row, handing it an identity CR 614.5 has already
+-- spent. Counting equals cannot do that: a row is only ever renumbered by
+-- another row it is already equal to.
+--
+-- Swapping this for a plain `zip [0 ..]` leaves the suite green, so that is a
+-- fence rather than a proven line: no board in the pool moves a duplicated
+-- replacement's position mid-loop. What the ordinal DOES prove is the duplicate
+-- itself -- dropping it to a constant reddens Pawl.ReplacementSpec's two
+-- "CR 702.136b riot twice" cases.
+numberInstances :: [(ObjectId, ReplacementEffect)] -> [(Natural, (ObjectId, ReplacementEffect))]
+numberInstances =
+  let step seen row =
+        let n = Map.findWithDefault 0 row seen
+         in (Map.insert row (n + 1) seen, (n, row))
+   in snd . List.mapAccumL step Map.empty
 
 -- The candidates that apply to this event. `asOf` is Nothing for a lone event
 -- and Just the pre-batch board for a CR 608.2f batch (see Event.applyReplacementsIn);
@@ -508,10 +534,11 @@ bucketOfEffect re = case re of
   -- this bucket's ordering is unexercised (#73). An entering Clone on its own
   -- does not exercise it: AsCopy is the only applicable candidate on the first
   -- iteration, and what carries the rest is CR 616.1f's re-collection plus CR
-  -- 614.5's identity being keyed on the effect VALUE, which keeps the
-  -- newly-acquired ChoiceOf distinct from the already-applied AsCopy. Gather
-  -- Specimens racing an entering Clone is a real same-iteration race, but CR
-  -- 616.1b's bucket outranks this one, so it exercises that arm instead.
+  -- 614.5's identity being keyed on the effect VALUE rather than a list
+  -- position, which keeps the newly-acquired ChoiceOf distinct from the
+  -- already-applied AsCopy. Gather Specimens racing an entering Clone is a real
+  -- same-iteration race, but CR 616.1b's bucket outranks this one, so it
+  -- exercises that arm instead.
   ReplacementEffect.EntryR _ EntryRewrite.AsCopy -> ReplacementBucket.CopyOnEntry
   -- CR 616.1a-d name self-replacement, entering under a control effect, entering
   -- as a copy and entering with the back face up. None of the next four arms is
@@ -813,7 +840,7 @@ legalCopyTargets batch self gs =
 -- store is touched here.
 consume :: CandidateId -> Game ()
 consume identity_ = case identity_ of
-  CandidateId.OfPermanent _ _ -> pure ()
+  CandidateId.OfPermanent {} -> pure ()
   CandidateId.OfFloating src ts ->
     State.modify' $ \gs ->
       let spent active =
@@ -840,7 +867,7 @@ consume identity_ = case identity_ of
 -- arm has no producer.
 setShield :: CandidateId -> DamagePattern.DamagePattern -> Natural -> Game ()
 setShield identity_ pat left = case identity_ of
-  CandidateId.OfPermanent _ _ -> pure ()
+  CandidateId.OfPermanent {} -> pure ()
   CandidateId.OfFloating src ts ->
     State.modify' $ \gs ->
       let mine active =

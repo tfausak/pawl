@@ -2942,11 +2942,32 @@ riotChoosing choice p = case p of
   _ -> S.aggressiveAnswer p
 
 wasAskedForRiot :: [Response.Response] -> Bool
-wasAskedForRiot responses =
+wasAskedForRiot responses = riotAsks responses > 0
+
+-- How many times riot's "may" was put to a player. CR 702.136b turns this into
+-- an assertion rather than a diagnostic: one instance, one ask.
+riotAsks :: [Response.Response] -> Int
+riotAsks responses =
   let isRiot r = case r of
         Response.ChoseRiot _ -> True
         _ -> False
-   in any isRiot responses
+   in length (filter isRiot responses)
+
+-- Turn the LAST riot answer in a transcript into a decline, leaving every other
+-- answer alone.
+--
+-- A transcript rewrite because a `Prompt r -> r` answerer cannot do it: CR
+-- 702.136b's two prompts name the same decider, the same player and the same
+-- permanent, so nothing in the prompt tells them apart, while a positional
+-- transcript does. Pawl.Engine.Replay.replay is the same machinery MulliganSpec
+-- replays an opening hand with.
+declineLastRiot :: [Response.Response] -> [Response.Response]
+declineLastRiot responses =
+  let flipFirst rs = case rs of
+        [] -> []
+        Response.ChoseRiot _ : rest -> Response.ChoseRiot OptionalDecision.Declines : rest
+        r : rest -> r : flipFirst rest
+   in reverse (flipFirst (reverse responses))
 
 -- The board moved to alice's declare-attackers step, with bob defending. Stated
 -- rather than played out, exactly as S.combatBoardOf states it: a direct-call
@@ -2983,7 +3004,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
               Just goblin -> do
                 Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne goblin after) 1
                 -- Printed 2/2, so the counter is visible in the projection (CR
-                -- 613.4d, layer 7d).
+                -- 613.4c, layer 7c).
                 Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 3)
                 Spec.assertEqWith s "toughness" (Projection.toughnessOf goblin after) (Just 3)
                 -- CR 702.136a's "if you don't" is what grants haste, so taking
@@ -3120,6 +3141,64 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
               Just spider -> do
                 Spec.assertBool s (not (wasAskedForRiot asked)) "no ChooseRiot was raised"
                 Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste spider after)) "no haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- CR 702.136b: "If a permanent has multiple instances of riot, each works
+  -- separately." Zhur-Taa Goblin PRINTS riot and Rhythm of the Wild GRANTS it to
+  -- her nontoken creatures, so the goblin enters holding riot twice -- two
+  -- textually identical replacement abilities on ONE source, which is the shape
+  -- CR 614.5's identity had to learn to tell apart.
+  --
+  -- The single-riot leg in the same case is what keeps the counter count from
+  -- being read as a doubling: one instance still asks once and still yields one
+  -- counter, on a board differing only in the enchantment.
+  Spec.it s "CR 702.136b riot twice is asked twice, and both counters land" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    rhythm <- S.printingOf s registry "Rhythm of the Wild"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+        (_, board) = S.addCreature rhythm S.alice gs
+        answer = riotChoosing OptionalDecision.Exercises
+    case held of
+      goblinCard : _ ->
+        let play = S.cast S.alice goblinCard >> Stack.resolveTop
+            after = S.runPure answer board play
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> do
+                Spec.assertEqWith s "two ChooseRiot were raised" (riotAsks (answersFor answer board play)) 2
+                Spec.assertEqWith s "one ChooseRiot without the grant" (riotAsks (answersFor answer gs play)) 1
+                Spec.assertEqWith s "two +1/+1 counters" (countersOn CounterKind.PlusOnePlusOne goblin after) 2
+                -- Printed 2/2 (CR 613.4c, layer 7c).
+                Spec.assertEqWith s "power" (Projection.powerOf goblin after) (Just 4)
+                Spec.assertEqWith s "toughness" (Projection.toughnessOf goblin after) (Just 4)
+                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste goblin after)) "no haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- CR 702.136b's "each works separately" read at its sharpest: the rule's own
+  -- consequence is that one instance may take the counter while the other takes
+  -- haste, which no single application of riot can produce -- CR 702.136a's two
+  -- halves are exclusive.
+  Spec.it s "CR 702.136b one instance takes the counter and the other takes haste" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    rhythm <- S.printingOf s registry "Rhythm of the Wild"
+    let (gs, held) = riotBoard mountain 1 forest 1 [zhurTaa]
+        (_, board) = S.addCreature rhythm S.alice gs
+        answer = riotChoosing OptionalDecision.Exercises
+    case held of
+      goblinCard : _ ->
+        let play = S.cast S.alice goblinCard >> Stack.resolveTop
+            script = declineLastRiot (answersFor answer board play)
+            ((_, after), desync) = Replay.replay script board play
+         in case newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after of
+              Nothing -> Spec.assertFailure s "Zhur-Taa Goblin did not reach the battlefield"
+              Just goblin -> do
+                -- An exhausted or mismatched transcript would fall back to
+                -- Replay.defaultAnswer, which would decide riot itself.
+                Spec.assertBool s (Maybe.isNothing desync) "the transcript answered every prompt"
+                Spec.assertEqWith s "the exercised instance's counter" (countersOn CounterKind.PlusOnePlusOne goblin after) 1
+                Spec.assertBool s (Projection.hasKeyword Keyword.Haste goblin after) "and the declined instance's haste"
       _ -> Spec.assertFailure s "fixture did not deal a card"
 
 -- The tap state of a permanent, which is what CR 502.3's untap step writes -- and
