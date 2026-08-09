@@ -3217,7 +3217,7 @@ loseLifeSpec s registry = Spec.describe s "LoseLife" $ do
 -- `remaining` still begins with the upkeep step, so a runStep-driven test would
 -- otherwise advance out of the step the card names.
 mirrorBoard :: Printing.Printing -> Integer -> Integer -> Integer -> (ObjectId.ObjectId, GameState.GameState)
-mirrorBoard mirror hers his theirs =
+mirrorBoard mirror aliceLife bobLife carolLife =
   let (mirrorId, gs1) = S.addCreature mirror S.alice S.threePlayerGame
       at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
    in ( mirrorId,
@@ -3226,7 +3226,7 @@ mirrorBoard mirror hers his theirs =
             GameState.phase = Phase.Beginning BeginningStep.Upkeep,
             GameState.priority = Just S.alice,
             GameState.remaining = Seq.drop 1 (GameState.remaining gs1),
-            GameState.players = at S.alice hers (at S.bob his (at S.carol theirs (GameState.players gs1)))
+            GameState.players = at S.alice aliceLife (at S.bob bobLife (at S.carol carolLife (GameState.players gs1)))
           }
       )
 
@@ -3249,6 +3249,7 @@ isActivation a = case a of
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
   A.ActivateManaAbility _ -> False
+  A.Ignore _ -> False
 
 -- The life events the whole step logged, by player and amount. CR 701.12c makes
 -- the exchange a GAIN and a LOSS rather than two assignments, so this is what a
@@ -3306,7 +3307,7 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
         after = S.runPure (exchangeAnswer S.bob) board Engine.runStep
     Spec.assertEqWith s "alice is still at 15" (S.lifeOf S.alice after) (Just 15)
     Spec.assertEqWith s "bob is still at 15" (S.lifeOf S.bob after) (Just 15)
-    Spec.assertBool s (not (Set.member mirrorId (GameState.battlefield after))) "and the ability did resolve, its cost paid"
+    Spec.assertBool s (not (Set.member mirrorId (GameState.battlefield after))) "and the ability was activated: its sacrifice was paid"
     Spec.assertEqWith s "no gain" (lifeGains after) []
     Spec.assertEqWith s "no loss" (lifeLosses after) []
 

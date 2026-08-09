@@ -299,9 +299,9 @@ data Effect card
   | -- | CR 701.12c: this effect's controller and the slot's target player
     -- exchange life totals -- Mirror Universe's "exchange life totals with
     -- target opponent". Each of the two gains or loses whatever it takes to
-    -- reach the other's PREVIOUS total, so this is not two opcodes a card could
-    -- write itself: the second adjustment must read a total the first has
-    -- already overwritten.
+    -- reach the other's PREVIOUS total, which is why a card cannot spell this
+    -- with a GainLife and a LoseLife of its own: the second would read a total
+    -- the first had already overwritten.
     --
     -- Not LoseLife's and GainLife's PlayerRef, and not two of them: an exchange
     -- has exactly two sides, where a PlayerRef may name every player at once.
