@@ -1479,6 +1479,10 @@ keywordFilters keyword = case keyword of
   -- written into the keyword.
   Keyword.Intimidate -> []
   Keyword.Poisonous _ -> []
+  -- CR 702.45a names no quality either: the "+N/+N" and the two combat events
+  -- are written into the abilities Pawl.Engine.Keyword mints, not into the
+  -- keyword.
+  Keyword.Bushido _ -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []

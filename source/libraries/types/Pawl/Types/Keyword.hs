@@ -292,6 +292,14 @@ data Keyword
     -- the payload's own Modal.modeCount rather than a number restated here, and
     -- Pawl.Types.ModeSelection stays what the card PRINTS.
     Entwine (Cost.Cost Keyword)
+  | -- | 702.45a: whenever this creature blocks or becomes blocked, it gets +N/+N
+    -- until end of turn. N rides the constructor, as Poisonous' does, and for the
+    -- same reason: CR 702.45b says each instance triggers separately.
+    --
+    -- ONE constructor for the rule's TWO trigger events (CR 509.3a and CR
+    -- 509.3c), because rule 702.45a prints one ability. The split into two
+    -- TriggeredAbility values is Pawl.Engine.Keyword.bushido's problem.
+    Bushido Natural.Natural
   | -- | 702.70a: whenever this creature deals combat damage to a player, that
     -- player gets N poison counters. N rides the constructor, as Toxic's does.
     -- Unlike toxic, the N values are NOT summed: CR 702.70b says each instance
