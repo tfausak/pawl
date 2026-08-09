@@ -472,6 +472,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Flash -> keyword
   Keyword.Type.Banding -> keyword
   Keyword.Type.Phasing -> keyword
+  Keyword.Type.Shadow -> keyword
   Keyword.Type.Aftermath -> keyword
   Keyword.Type.Flying -> keyword
   Keyword.Type.Haste -> keyword

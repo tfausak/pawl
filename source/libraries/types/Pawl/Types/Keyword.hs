@@ -195,6 +195,22 @@ data Keyword
     -- ability and so never phases back in on its own. That is why "is it phased
     -- out" lives on Pawl.Types.GameState and not here.
     Phasing
+  | -- | 702.28b: a creature with shadow can't be blocked by creatures without
+    -- shadow, and a creature WITHOUT shadow can't be blocked by creatures with
+    -- shadow.
+    --
+    -- The pool's first SYMMETRIC evasion ability, and the reason it is worth a
+    -- constructor rather than a rewrite of an existing gate: flying, fear,
+    -- intimidate, landwalk and menace all restrict being BLOCKED and read the
+    -- keyword off the ATTACKER, where 702.28b's second sentence restricts
+    -- BLOCKING too, so the blocker's own shadow disqualifies it from blocking
+    -- anything else. Pawl.Engine.Combat.shadowAllows is where the two sentences
+    -- collapse into one equality.
+    --
+    -- Payload-free, because rule 702.28b takes no parameter, and CR 702.28c makes
+    -- multiple instances redundant -- so its reader takes membership rather than
+    -- the per-keyword count the projection carries.
+    Shadow
   | -- | 702.29a: pay the cost and discard this card to draw a card, functioning
     -- only while the card is in a player's hand. The cost rides the constructor,
     -- as Flashback's does, because rule 702.29a states it as part of the keyword
