@@ -89,6 +89,7 @@ data Keyword
     -- what its "the same hexproof ability" means.
     Hexproof (Maybe (Filter.Filter Keyword))
   | Indestructible -- 702.12
+  | Intimidate -- 702.13
   | -- | 702.14a: "[type]walk", where the type is usually a land type but need not
     -- be. The qualification rides the constructor, as Cycling's Filter does, so
     -- `Landwalk (HasSubtype Swamp)` and `Landwalk (HasSubtype Island)` are

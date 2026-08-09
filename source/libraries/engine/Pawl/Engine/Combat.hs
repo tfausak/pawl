@@ -680,6 +680,43 @@ fearAllowsGiven pcs blocker attacker gs =
     || Set.member CardType.Artifact (Projection.cardTypesGiven pcs blocker gs)
     || Set.member Color.Black (Projection.colorsGiven pcs blocker gs)
 
+-- CR 702.13b: a creature with intimidate can't be blocked except by artifact
+-- creatures and/or creatures that SHARE A COLOR WITH IT.
+--
+-- Fear's shape with one clause generalised, and the generalisation is the whole
+-- of the difference: 702.36b names a fixed colour, 702.13b compares the two
+-- creatures, so the colour half asks whether their two colour sets OVERLAP rather
+-- than whether one of them contains a named colour.
+-- Both sides are read off the PROJECTION, for fearAllowsGiven's reason -- a
+-- creature made black at CR 613 layer 5 blocks a black intimidator legally, and a
+-- devoid creature with a black mana cost does not.
+--
+-- The overlap test is what gets a COLOURLESS attacker right, and that case is the
+-- one a reader should check: CR 105.2c says a colourless object has no color, so
+-- a colourless intimidator shares a colour with nobody and only artifact
+-- creatures may block it. Fear cannot express that, which is why the two are
+-- separate gates rather than one parameterized by a colour.
+--
+-- The same asymmetry the other evasion gates have (see evasionAllows): intimidate
+-- restricts being BLOCKED, never blocking, so the question is asked of the
+-- ATTACKER first.
+--
+-- Keyword MEMBERSHIP and never a count, because CR 702.13c makes multiple
+-- instances redundant -- landwalkAllowsGiven's posture, for CR 702.14e's matching
+-- reason.
+intimidateAllows :: ObjectId -> ObjectId -> GameState -> Bool
+intimidateAllows = intimidateAllowsGiven Map.empty
+
+intimidateAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+intimidateAllowsGiven pcs blocker attacker gs =
+  not (Projection.hasKeywordGiven pcs Keyword.Intimidate attacker gs)
+    || Set.member CardType.Artifact (Projection.cardTypesGiven pcs blocker gs)
+    || not
+      ( Set.disjoint
+          (Projection.colorsGiven pcs blocker gs)
+          (Projection.colorsGiven pcs attacker gs)
+      )
+
 -- CR 702.14c: a creature with landwalk can't be blocked as long as the defending
 -- player controls at least one land matching the specified criterion.
 --
@@ -820,6 +857,7 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
     && List.elem attacker attackers
     && evasionAllowsGiven pcs blocker attacker gs
     && fearAllowsGiven pcs blocker attacker gs
+    && intimidateAllowsGiven pcs blocker attacker gs
     && landwalkAllowsGiven grants pcs attacker gs
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
@@ -828,8 +866,8 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- The unit of legality is the whole declaration, not the pair, and that is not a
 -- stylistic choice: menace (CR 702.111b) constrains the SET blocking an attacker,
 -- which no per-pair predicate can express. Every other evasion ability the pool
--- has -- flying, reach, fear, landwalk -- is pairwise or narrower; designing to
--- them would be designing to the case that misleads.
+-- has -- flying, reach, fear, intimidate, landwalk -- is pairwise or narrower;
+-- designing to them would be designing to the case that misleads.
 --
 -- So the three shapes of restriction are all asked here, one conjunct each:
 -- pairAllowed over the pairs, menaceAllows over the creatures blocking each
