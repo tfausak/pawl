@@ -1159,6 +1159,20 @@ priorityLoop = do
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop
+                              -- CR 116.2e: a special action too, so the
+                              -- TurnFaceUp arm's shape above applies unchanged.
+                              -- The discard goes through the CR 701.9a funnel
+                              -- rather than a zone move, so an ability that
+                              -- triggers on a discard sees it.
+                              --
+                              -- Ordinary, not ToPayCyclingCost: CR 702.29c's
+                              -- cause is a cycling ability's cost, and this is
+                              -- neither a cost nor a cycle.
+                              Action.Type.DiscardFromHand oid -> do
+                                Event.discard DiscardCause.Ordinary p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
                               Action.Type.Activate oid ability -> do
                                 Activate.activateAbility p oid ability
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
