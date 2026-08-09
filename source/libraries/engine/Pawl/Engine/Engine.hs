@@ -27,6 +27,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Monarch as Monarch
@@ -1218,6 +1219,15 @@ priorityLoop = do
                               -- neither a cost nor a cycle.
                               Action.Type.DiscardFromHand oid -> do
                                 Event.discard DiscardCause.Ordinary p oid
+                                State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
+                                settleForPriority
+                                loop
+                              -- CR 116.2d: a special action too, so the
+                              -- TurnFaceUp arm's shape above applies unchanged --
+                              -- the payment goes on nothing and no player gets a
+                              -- window to respond to it.
+                              Action.Type.Ignore oid -> do
+                                Ignore.ignore p oid
                                 State.modify' (\g -> g {GameState.passes = 0, GameState.priority = Just p})
                                 settleForPriority
                                 loop

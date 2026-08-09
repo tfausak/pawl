@@ -155,6 +155,7 @@ isActivateOf oid action = case action of
   A.TurnFaceUp _ -> False
   A.Unlock _ _ -> False
   A.DiscardFromHand _ -> False
+  A.Ignore _ -> False
   A.ActivateManaAbility _ -> False
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()

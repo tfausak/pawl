@@ -197,3 +197,11 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       (PlayerEffect.DamageCantBePrevented (DamagePattern.MkDamagePattern Nothing SourceRelation.TheSource Nothing))
       """ {"type":"DamageCantBePrevented","value":{"whichSource":{"type":"TheSource"}}} """
+  -- CR 701.23 / Leonin Arbiter.
+  Spec.it s "CantSearchLibraries" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantSearchLibraries
+      """ {"type":"CantSearchLibraries"} """

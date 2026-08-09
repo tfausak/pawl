@@ -135,6 +135,7 @@ landPlays actions =
         A.Unlock _ _ -> Nothing
         A.Activate _ _ -> Nothing
         A.DiscardFromHand _ -> Nothing
+        A.Ignore _ -> Nothing
         A.ActivateManaAbility _ -> Nothing
    in Maybe.mapMaybe playOf actions
 

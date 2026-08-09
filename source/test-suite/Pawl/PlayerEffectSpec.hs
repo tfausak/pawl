@@ -255,6 +255,7 @@ isCast action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
@@ -1991,6 +1992,7 @@ isSilenceActivate action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
@@ -2607,6 +2609,7 @@ isActivateOf oid action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 
@@ -2618,6 +2621,7 @@ isPlay action = case action of
   Action.Type.TurnFaceUp _ -> False
   Action.Type.Unlock _ _ -> False
   Action.Type.DiscardFromHand _ -> False
+  Action.Type.Ignore _ -> False
   Action.Type.ActivateManaAbility _ -> False
   Action.Type.Pass -> False
 

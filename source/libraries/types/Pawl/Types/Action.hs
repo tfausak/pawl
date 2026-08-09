@@ -7,9 +7,10 @@ import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.ObjectId as ObjectId
 
 -- | What a player with priority may do. CR 116.2 lists twelve SPECIAL actions
--- and four of them are here -- CR 116.2a's land play, CR 116.2b's turning a
--- face-down permanent face up, CR 116.2e's Circling Vultures discard and CR
--- 116.2m's unlock cost; the tracker for the other eight is #875. Grows.
+-- and five of them are here -- CR 116.2a's land play, CR 116.2b's turning a
+-- face-down permanent face up, CR 116.2d's ignoring a static ability's effect,
+-- CR 116.2e's Circling Vultures discard and CR 116.2m's unlock cost; the tracker
+-- for the other seven is #875. Grows.
 data Action
   = Pass
   | -- | CR 305.1's special action: put this land card onto the battlefield. The
@@ -110,4 +111,14 @@ data Action
     -- CR 116.1 is also why this is only ever OFFERED: a special action is not
     -- one the game generates, so the engine never takes it unasked.
     DiscardFromHand ObjectId.ObjectId
+  | -- | CR 116.2d: pay a cost to ignore, until end of turn, the effect of the
+    -- static abilities this permanent grants the permission on. It does not use
+    -- the stack (CR 116.1), so it is an Action rather than anything that goes
+    -- through Pawl.Engine.Stack, exactly as CR 116.2a's land play is.
+    --
+    -- Carries only the SOURCE PERMANENT, TurnFaceUp's shape. What it costs is
+    -- printed on that permanent, and which of its abilities is ignored is not a
+    -- choice pawl offers -- see Pawl.Types.SpecialAction (#1139). WHO ignores it
+    -- is the player taking the action, which is the priority holder.
+    Ignore ObjectId.ObjectId
   deriving (Eq, Ord, Show)

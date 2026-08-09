@@ -8,6 +8,7 @@ import qualified Pawl.Engine.Cast as Cast
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.FaceDown as FaceDown
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Ignore as Ignore
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
@@ -150,6 +151,15 @@ legalActions pid gs =
       -- consulted. legalActions is only ever called for the player with
       -- priority, so the rule's condition is already met by being here.
       discards = fmap Action.DiscardFromHand (discardableCards pid gs)
+      -- CR 116.2d: the fifth special action, and the THIRD ungated by phase and
+      -- by an empty stack -- "a player can take such an action any time they
+      -- have priority", CR 116.2b's window again.
+      --
+      -- ONE ACTION PER PERMANENT, not per ability: which of a permanent's static
+      -- abilities is ignored is not a choice the rules leave open once the
+      -- permanent is chosen, because no printed producer grants the permission
+      -- on more than one (#1139).
+      ignores = fmap Action.Ignore (Ignore.ignorable pid gs)
       -- CR 702.29a: a HAND is a source of activations too, not just the
       -- battlefield -- cycling functions only while the card is in a player's
       -- hand. So is a GRAVEYARD, by CR 113.6m: Loxodon Surveyor's "{3}, Exile
@@ -205,4 +215,4 @@ legalActions pid gs =
       -- Pawl.ManaSpec's "the menu carries one activation per untapped source" is
       -- the proof.
       manaAbilityActivations = fmap Action.ActivateManaAbility (Mana.manaSourcesGiven Cost.manaActivations grants pcs pid gs)
-   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> activations <> manaAbilityActivations
+   in Action.Pass : lands <> spells <> turnUps <> unlocks <> discards <> ignores <> activations <> manaAbilityActivations
