@@ -394,7 +394,8 @@ chooseLegendVictims (controller, candidates) = do
 
 -- CR 704.5k: with two or more world permanents, all but the one that has been
 -- world for the shortest time are put into their owners' graveyards, and on a tie
--- for shortest all of them are. So: every world permanent but the newest arrival.
+-- for shortest all of them are. So: every world permanent but the last one to
+-- have become world.
 --
 -- The neighbouring legend rule (CR 704.5j) differs in three ways, each a place
 -- this could have been wrongly copied from it:
@@ -405,29 +406,25 @@ chooseLegendVictims (controller, candidates) = do
 -- 2. It is scoped to one controller and one name; this is scoped to neither, so
 --    two players each with a world permanent -- a board the legend rule leaves
 --    alone -- is exactly the case this rule fires on.
--- 3. It has no tie clause; this one does. Game.freshTimestamp hands out a
---    distinct stamp per object, so the tie arm below is unreachable today.
---    Written regardless, because it costs one `case` and it is what the rule
---    says.
+-- 3. It has no tie clause; this one does, and the tie is REACHABLE:
+--    Engine.sampleWorldSince stamps everything that became world in one settle
+--    pass with ONE timestamp, so two permanents made world simultaneously compare
+--    equal and both are buried.
 --
--- Not implemented: a per-object "world since" clock. The CLOCK read here is
--- Object.timestamp -- when the permanent entered the battlefield (CR 613.7d) --
--- and NOT a record of when it became world. The two are the same instant for
--- every board pawl can reach TODAY, which is a fact about the card pool rather
--- than a fact about Magic. All three ways they could come apart are closed by
--- something checkable:
+-- The CLOCK is Object.worldSince -- when the permanent became world -- and NOT
+-- Object.timestamp, which is when it entered the battlefield (CR 613.7d). The two
+-- part company whenever layer 4 grants the supertype to a permanent already on
+-- the battlefield (CR 613.1d, Modification.AddSupertype), and a permanent that
+-- entered EARLIER but became world LATER is the survivor. Pawl.DamageSpec's
+-- "CR 704.5k the clock is when it became world, not when it entered" is that
+-- board.
 --
--- 1. A supertype gained or lost on the battlefield. Modification.AddSupertype
---    and RemoveSupertype apply at layer 4, so this is now expressible in
---    general -- but no card in the pool moves the WORLD supertype, which
---    Pawl.CardSpec's "no card adds or removes the world supertype" corpus lint
---    holds (#998).
--- 2. A permanent that BECOMES a copy of a world permanent, which needs no
---    supertype-changing effect at all (CR 707.2). pawl copies only as an object
---    ENTERS, the same moment it is stamped; CR 707.3's on-the-battlefield half is
---    #313, and Crystalline Resonance is the card that would break this reading.
--- 3. A restamp with no zone change. CR 701.3c's is the only one, and it needs the
---    world permanent to be attachable, which no world printing is.
+-- An unstamped world permanent is not a candidate. Unreachable rather than
+-- tolerated: Engine.sampleWorldSince runs ahead of every pass this module has,
+-- both inside Engine.performSettle and at Engine.checkSba, so anything world here
+-- has a stamp. Deliberately NOT defaulted to
+-- Object.timestamp, which would restore the proxy on exactly the boards the clock
+-- exists for.
 --
 -- Read off the PROJECTION rather than the printed type line, for the reason
 -- legendGroups is: CR 707.2 makes a copy of a world permanent world too.
@@ -444,14 +441,14 @@ worldVictims pcs gs =
         Nothing -> Nothing
         Just pc
           | Set.member Supertype.World (PC.supertypes pc) ->
-              fmap (\obj -> (Object.timestamp obj, oid)) (Game.lookupObject oid gs)
+              fmap (\ts -> (ts, oid)) (Game.lookupObject oid gs >>= Object.worldSince)
           | otherwise -> Nothing
       worlds = Maybe.mapMaybe stamped (Set.toList (GameState.battlefield gs))
    in case fmap fst worlds of
         [] -> []
         ts : rest ->
-          -- The SHORTEST amount of time is the LARGEST timestamp: the newest
-          -- arrival is the one that has been world for the least time.
+          -- The SHORTEST amount of time is the LARGEST timestamp: the last one to
+          -- become world has been world for the least time.
           let newest = List.foldl' max ts rest
               (survivors, older) = List.partition (\(t, _) -> t == newest) worlds
            in case survivors of
