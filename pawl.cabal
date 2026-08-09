@@ -613,6 +613,7 @@ library types
     Pawl.Types.ManaCost
     Pawl.Types.ManaCount
     Pawl.Types.ManaFilter
+    Pawl.Types.ManaOption
     Pawl.Types.ManaProduction
     Pawl.Types.ManaSymbol
     Pawl.Types.ManaType

@@ -31,6 +31,8 @@ import Pawl.Types.Mana (Mana)
 import qualified Pawl.Types.Mana as Mana
 import Pawl.Types.ManaCost (ManaCost)
 import qualified Pawl.Types.ManaCost as ManaCost
+import Pawl.Types.ManaOption (ManaOption)
+import qualified Pawl.Types.ManaOption as ManaOption
 import Pawl.Types.ManaProduction (ManaProduction)
 import qualified Pawl.Types.ManaProduction as ManaProduction
 import Pawl.Types.ManaSymbol (ManaSymbol)
@@ -188,7 +190,7 @@ manaYieldsOf = manaYieldsOfGiven Map.empty
 -- The same yields against a pre-projected board, which is manaRoutesOfGiven's
 -- argument and carries its reason (#200).
 manaYieldsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [Mana]
-manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs))
+manaYieldsOfGiven pcs oid gs = List.nub (fmap ManaOption.yield (manaOptionsOfGiven pcs oid gs))
 
 -- The same yields narrowed to the ones this player could actually get: an
 -- activation the gate refuses -- CR 118.3's unpayable cost, CR 302.6's sick
@@ -201,32 +203,31 @@ manaYieldsOfGiven pcs oid gs = List.nub (fmap snd (manaOptionsOfGiven pcs oid gs
 -- on answering the ungated question.
 manaYieldsAvailableGiven :: Gate -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> ObjectId -> GameState -> [Mana]
 manaYieldsAvailableGiven gate pcs pid oid gs =
-  List.nub (fmap snd (filter (\(cost, _) -> gate pcs pid oid cost gs) (manaOptionsOfGiven pcs oid gs)))
+  List.nub (fmap ManaOption.yield (filter (\option -> gate pcs pid oid (ManaOption.cost option) gs) (manaOptionsOfGiven pcs oid gs)))
 
 -- Every way this object could be tapped for mana, as the COST CR 602.2b makes
 -- that activation pay paired with the mana it adds -- one entry per (route,
 -- colour choice) pair. `traverse` over the list applicative is that product:
 -- Birds of Paradise's one route becomes CR 105.4's five one-mana options.
 --
--- Deduplicated by the PAIR. Two routes producing identical mana for an identical
--- cost (an Urborg'd Swamp is a Swamp twice over) are indistinguishable options,
--- so collapsing them elides a prompt with no content; two that charge differently
--- are not, and survive as two.
---
--- Not implemented: what a player is asked when two surviving options share a
--- yield and differ only in cost. Prompt.ChooseManaYield carries the yield alone,
--- so the answer would name both and Pawl.Engine.Cost.tapForMana would take the
--- first (#1117).
-manaOptionsOf :: ObjectId -> GameState -> [(Cost Keyword.Keyword, Mana)]
+-- Deduplicated by the WHOLE option. Two routes producing identical mana for an
+-- identical cost (an Urborg'd Swamp is a Swamp twice over) are indistinguishable
+-- options, so collapsing them elides a prompt with no content; two that charge
+-- differently are not, and survive as two -- which is why what survives here is
+-- what Pawl.Engine.Cost.chooseManaYield offers whole.
+manaOptionsOf :: ObjectId -> GameState -> [ManaOption]
 manaOptionsOf = manaOptionsOfGiven Map.empty
 
 -- The same options against a pre-projected board (#200).
-manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [(Cost Keyword.Keyword, Mana)]
+manaOptionsOfGiven :: Map.Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> GameState -> [ManaOption]
 manaOptionsOfGiven pcs oid gs =
   let tags = productionTagsGiven pcs oid gs
       asMana manaTypes =
         Mana.MkMana (fmap (\manaType -> ManaUnit.MkManaUnit {ManaUnit.manaType = manaType, ManaUnit.tags = tags}) manaTypes)
-      expand (cost, productions) = fmap (\manaTypes -> (cost, asMana manaTypes)) (traverse (producedTypes oid gs) productions)
+      expand (cost, productions) =
+        fmap
+          (\manaTypes -> ManaOption.MkManaOption {ManaOption.cost = cost, ManaOption.yield = asMana manaTypes})
+          (traverse (producedTypes oid gs) productions)
    in List.nub (concatMap expand (manaRoutesOfGiven pcs oid gs))
 
 -- The production-time tags (Pawl.Types.ProductionTag) every mana this object

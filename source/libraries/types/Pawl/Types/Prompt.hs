@@ -24,7 +24,7 @@ import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
-import qualified Pawl.Types.Mana as Mana
+import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.ModeIndex as ModeIndex
@@ -123,26 +123,25 @@ data Prompt r where
   ChooseExtraManaSource :: Decider.Decider -> PlayerId.PlayerId -> NonEmpty.NonEmpty ObjectId.ObjectId -> Prompt (Maybe ObjectId.ObjectId)
   -- | CR 605.3b: which mana the source produces, asked as the mana ability
   -- resolves -- immediately, a mana ability never using the stack. The answer is a
-  -- YIELD, the whole mana one activation adds, so "{T}: Add {C}{C}" is one
-  -- candidate of two units. Three things reach this one prompt, being
-  -- observationally the same question:
+  -- Pawl.Types.ManaOption, the whole mana one activation adds together with what
+  -- CR 602.2b charges for it, so "{T}: Add {C}{C}" is one candidate of two units.
+  -- Four things reach this one prompt, being observationally the same question:
   --
   --   * one AddMana effect offering a choice, whose options are CR 105.4's colours;
   --   * a permanent with several single-type mana abilities, an Urborg'd Mountain
-  --     being both a Mountain and a Swamp (CR 305.6/305.7); and
-  --   * a mana ability with several MODES (CR 700.2). No card in the pool has one.
+  --     being both a Mountain and a Swamp (CR 305.6/305.7);
+  --   * a mana ability with several MODES (CR 700.2), which no card in the pool
+  --     has; and
+  --   * two abilities adding the same mana for DIFFERENT costs, an Urborg'd Mana
+  --     Confluence's free {B} beside the {B} it charges 1 life for (#1117).
   --
-  -- Collapsing them is sound because a source taps once and adds one yield, so all
-  -- three have the same answer set and consequences.
+  -- Collapsing them is sound because a source taps once, so all four are one
+  -- question: which single activation.
   --
-  -- The answer is a yield ALONE, where Cost.tapForMana chooses among (cost, yield)
-  -- pairs. Not implemented: what to ask when two of one permanent's mana abilities
-  -- add the same mana for different costs, which this prompt cannot tell apart
-  -- (#1117). No permanent in the pool is in that position.
-  --
-  -- Candidates are deduplicated by the WHOLE yield, the one elision needing no
-  -- judgement: two ways to produce black mana add the same mana.
-  ChooseManaYield :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty Mana.Mana -> Prompt Mana.Mana
+  -- Candidates are deduplicated by the whole option (Mana.manaOptionsOf), the one
+  -- elision needing no judgement: two ways to produce black mana for the same
+  -- cost add the same mana and charge the same for it.
+  ChooseManaYield :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty ManaOption.ManaOption -> Prompt ManaOption.ManaOption
   -- | CR 701.34a: which permanents and players a proliferating player gives another
   -- counter to. The lists are every permanent and player holding at least one
   -- counter; the answer is the subset of each that gets one more of every kind it
