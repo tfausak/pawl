@@ -203,6 +203,9 @@ unspent rewrite = case rewrite of
   DamageRewrite.PreventAll -> True
   DamageRewrite.SetAmount _ -> True
   DamageRewrite.Scale _ -> True
+  -- CR 614.9's redirection has nothing to spend: it moves the recipient and
+  -- leaves the amount alone, so no application can exhaust it.
+  DamageRewrite.Redirect _ -> True
 
 applies :: GameState -> ProposedEvent -> ReplacementCandidate -> Bool
 applies gs event candidate =
@@ -741,6 +744,10 @@ chooserOf gs event = case event of
   -- permanent -- which for an entry is the player it WOULD enter under, and
   -- which a CR 616.1b rewrite may already have changed on an earlier iteration.
   ProposedEvent.WouldEnter oid -> Projection.controllerOf oid gs
+  -- Read LIVE off the event in hand, as the entry arm above is: CR 614.9's
+  -- redirection changes the recipient, so an earlier CR 616.1f iteration may
+  -- already have moved the question to another player's object. Event.loop
+  -- re-enters with the rewritten event, so this is that player.
   ProposedEvent.WouldDealDamage de -> case DamageEvent.target de of
     Recipient.ToPlayer pid -> Just pid
     Recipient.ToCreature oid -> Projection.controllerOf oid gs
@@ -859,6 +866,46 @@ prevents rewrite = case rewrite of
   DamageRewrite.PreventAll -> True
   DamageRewrite.SetAmount _ -> False
   DamageRewrite.Scale _ -> False
+  -- CR 614.9's redirection is a rule-614 replacement. Turn the Tables never says
+  -- "prevent" -- the damage is still dealt, one recipient over -- so this False
+  -- is what keeps `preventionBy`, `inertPrevention` and CR 615.13's trigger away
+  -- from it.
+  DamageRewrite.Redirect _ -> False
+
+-- CR 614.9: the destination a redirection effect may still use, re-derived
+-- against the CURRENT state at redirect time. Nothing is the rule's guard --
+-- "if one of those permanents is no longer on the battlefield ... or is no
+-- longer a battle, creature, or planeswalker ... the effect does nothing" --
+-- and Event.apply then hands the event back UNCHANGED rather than dropping it.
+--
+-- BOTH of the rule's conditions, though only the card-type one has an observer
+-- today: a destination that LEFT is caught by that one already, because CR
+-- 400.7 mints a new object on a zone change and the dead id then projects no
+-- card types at all. The membership test is what covers the route CR 400.7 does
+-- not -- CR 702.26b's phased-out permanent, which keeps its id and its zone and
+-- is nonetheless treated as not existing. Deleting it leaves the suite green;
+-- it is a fence, not a proven line.
+--
+-- Damage.damageRecipient asks the card-type half alone, of an object that is on
+-- the battlefield by construction. Not shared with it because Pawl.Engine.Damage
+-- sits ABOVE this module.
+--
+-- Re-TAGGED off the live projection rather than merely tested, so a destination
+-- that stopped being a creature and became a planeswalker is redirected to as
+-- what it now is (CR 613.1d).
+--
+-- Not implemented, and unreachable: the rule's last sentence, damage redirected
+-- to or from a player who has left the game. Pawl has no leave-the-game path, so
+-- a ToPlayer destination is always live.
+redirectDestination :: GameState -> Recipient.Recipient -> Maybe Recipient.Recipient
+redirectDestination gs dest = case Recipient.objectOf dest of
+  Nothing -> Just dest
+  Just oid
+    | not (Set.member oid (GameState.battlefield gs)) -> Nothing
+    | Projection.isCreatureOf oid gs -> Just (Recipient.ToCreature oid)
+    | Projection.isPlaneswalkerOf oid gs -> Just (Recipient.ToPlaneswalker oid)
+    | Projection.isBattleOf oid gs -> Just (Recipient.ToBattle oid)
+    | otherwise -> Nothing
 
 -- CR 615.12: could a prevention effect prevent any of this damage event, or is
 -- this damage that "can't be prevented" (Spider-Punk)?
@@ -935,9 +982,13 @@ preventionBy candidate before after = case (ReplacementCandidate.effect candidat
                 Just
                   Prevention.MkPrevention
                     { Prevention.by = ReplacementCandidate.identity candidate,
-                      -- The recipient of the event as PROPOSED. Nothing in the
-                      -- pool redirects damage, and if anything did, CR 615.13's
-                      -- ability watches the damage that WOULD have been dealt.
+                      -- The recipient of the event as PROPOSED, which is the
+                      -- reading CR 615.13 asks for: its ability watches "damage
+                      -- that WOULD be dealt [and] is prevented". Damage CAN now
+                      -- be redirected (DamageRewrite.Redirect), and the two
+                      -- readings still never diverge, because a redirect
+                      -- prevents nothing (CR 615.1a) -- `prevents` refuses it
+                      -- above, so no redirect ever reaches here.
                       Prevention.recipient = DamageEvent.target de,
                       Prevention.amount = was - now
                     }
@@ -1118,6 +1169,7 @@ shieldRemaining re = case re of
     DamageRewrite.PreventAll -> Nothing
     DamageRewrite.SetAmount _ -> Nothing
     DamageRewrite.Scale _ -> Nothing
+    DamageRewrite.Redirect _ -> Nothing
   ReplacementEffect.ZoneChangeR _ _ -> Nothing
   ReplacementEffect.EntryR _ _ -> Nothing
   ReplacementEffect.DestructionR _ -> Nothing
