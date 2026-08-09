@@ -120,6 +120,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.BlockerDeclared (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7))
       """ {"type":"BlockerDeclared","value":[6,7]} """
+  -- One ObjectId and not a pair, unlike the sibling above: CR 509.3c's event is
+  -- per blocked ATTACKER, so the blockers are not in it.
+  Spec.it s "AttackerBlocked" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.AttackerBlocked (ObjectId.MkObjectId 8))
+      """ {"type":"AttackerBlocked","value":8} """
   Spec.it s "SpellCountered" $
     Common.assertJsonCodec
       s

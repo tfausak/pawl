@@ -129,6 +129,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfBlocks
       """ {"type":"SelfBlocks"} """
+  -- CR 509.3c, nullary for the same reason, and a distinct tag from the sibling
+  -- above: the two name opposite sides of one declaration.
+  Spec.it s "SelfBecomesBlocked" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfBecomesBlocked
+      """ {"type":"SelfBecomesBlocked"} """
   -- CR 113.6k's condition, which names a zone pair rather than the battlefield.
   Spec.it s "SelfPutIntoGraveyardFromLibrary" $
     Common.assertJsonCodec

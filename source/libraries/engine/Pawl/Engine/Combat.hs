@@ -1586,3 +1586,28 @@ declareBlockers = do
           -- blocking -- never "blocked", and `merged` cannot tell it from one
           -- that was.
           State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared blocker attacker) h) g (Map.toList declaration)
+          -- CR 509.1h: and the same declaration makes each attacker it named a
+          -- BLOCKED creature. One event per attacker rather than per pair, which
+          -- is what makes CR 509.3c's "only once each combat for that creature,
+          -- even if it's blocked by multiple creatures" hold -- the defending
+          -- player really can put two blockers on one attacker, so this is a
+          -- dedup and not an arity that happens to be one (contrast CR 509.3a's,
+          -- which is #1145's missing capability).
+          --
+          -- CR 509.3c's "only if the attacking creature was an unblocked creature
+          -- at that time" is the difference: an attacker already in
+          -- Combat.blockers -- CR 509.1h's blocked status -- does not become
+          -- blocked a second time. A regression
+          -- fence rather than a proof today: Pawl.Engine.Engine runs this once,
+          -- at CR 509's step, and CR 511.3's end-of-combat reset empties
+          -- Combat.blockers before the next combat phase reaches it.
+          --
+          -- Over `declaration` and not `merged`, which is STRICTER than rule
+          -- 509.3c on the attacking side: an attacker whose only blocker was put
+          -- onto the battlefield blocking really does become blocked -- CR 509.4
+          -- denies that creature having "blocked", not the attacker -- and this
+          -- misses it. So does the effect-blocks-it case. Neither has a producer
+          -- in the pool (#1146).
+          let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs1))
+              becameBlocked = Set.difference (Set.fromList (Map.elems declaration)) wasBlocked
+          State.modify' $ \g -> List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked attacker) h) g (Set.toList becameBlocked)

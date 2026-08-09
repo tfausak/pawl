@@ -37,7 +37,8 @@
 -- its bearer's combat -- CR 601.2i's cast, watched through the same
 -- TriggerCondition.SpellCast a card writes -- with Monastery Swiftspear --
 -- `prowessSpec`. CR 509.3a's blocking-side declaration trigger, the mirror of
--- CR 508.3a's, with Pride Guardian -- `selfBlocksSpec`.
+-- CR 508.3a's, with Pride Guardian -- `selfBlocksSpec`. CR 509.3c's attacking
+-- side of that same declaration, with Sacred Prey -- `selfBecomesBlockedSpec`.
 -- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
@@ -3071,6 +3072,70 @@ selfBlocksSpec s registry =
           -- than about the fixture.
           Spec.assertEqWith s "the same card attacking makes two" (length (S.tokensOf (S.runCombat S.aggressiveAnswer attacking))) 2
 
+-- CR 509.3c: "Whenever [a creature] becomes blocked, . . ." -- the ATTACKING
+-- side of the same declaration selfBlocksSpec reads, matched against
+-- GameEvent.AttackerBlocked.
+--
+-- Sacred Prey {G} Creature -- Horse 1/1, "Whenever this creature becomes blocked,
+-- you gain 1 life", is the card: the cheapest producer in the pool, and its
+-- payload names nothing about the blockers, so these cases isolate the
+-- CONDITION. The gain lands on the ATTACKING seat (alice), which is the seat
+-- combat damage never moves here, so every number below is the trigger's alone.
+selfBecomesBlockedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfBecomesBlockedSpec s registry =
+  let noBlocks :: Prompt.Prompt r -> r
+      noBlocks p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+   in Spec.describe s "SelfBecomesBlocked" $ do
+        -- The proving test, and its control: the same game with CR 509.1's
+        -- declaration switched off. 20 + 1 = 21 blocked, 20 declining -- and bob
+        -- moves the other way, 20 blocked against 20 - 1 = 19 letting it through,
+        -- so no single number can be read two ways.
+        Spec.it s "CR 509.3c whole card: becoming blocked gains 1 life, going unblocked gains none" $ do
+          (gs, mine, _) <- board ["Sacred Prey"] ["Goblin Piker"]
+          let blocked = S.runCombat S.aggressiveAnswer gs
+              unblocked = S.runCombat noBlocks gs
+          case mine of
+            [prey] -> do
+              Spec.assertEqWith s "alice gained 1" (S.lifeOf S.alice blocked) (Just 21)
+              Spec.assertEqWith s "and bob took nothing: the blocked Prey's 1 went to the Piker" (S.lifeOf S.bob blocked) (Just 20)
+              Spec.assertBool s (not (S.onBattlefield prey blocked)) "the 1/1 Prey died to the Piker's 2, after its trigger had resolved"
+              Spec.assertEqWith s "control leg: unblocked, so no gain" (S.lifeOf S.alice unblocked) (Just 20)
+              Spec.assertEqWith s "and its 1 gets through" (S.lifeOf S.bob unblocked) (Just 19)
+            _ -> Spec.assertFailure s "fixture should give alice one Sacred Prey"
+        -- CR 509.3c's "only once each combat for that creature, even if it's
+        -- blocked by multiple creatures". Two Pikers block the one Prey, so two
+        -- GameEvent.BlockerDeclared are recorded and exactly one
+        -- GameEvent.AttackerBlocked. The falsifier is a condition matched against
+        -- the declaration's pairs instead: that fires twice, for 22.
+        --
+        -- Unlike CR 509.3a's once (#1145), this dedup is reachable: nothing stops
+        -- the defending player putting two blockers on one attacker.
+        Spec.it s "CR 509.3c two blockers on one attacker still gain 1, not 2" $ do
+          (gs, _, _) <- board ["Sacred Prey"] ["Goblin Piker", "Goblin Piker"]
+          Spec.assertEqWith s "one gain of 1" (S.lifeOf S.alice (S.runCombat S.aggressiveAnswer gs)) (Just 21)
+        -- CR 509.3a and CR 509.3c on one board, which is what tells the two arms
+        -- apart: alice's Prey becomes blocked by bob's Guardian, so alice gains 1
+        -- and bob gains 3 off a single declaration. Either arm reading the other's
+        -- event moves one of those two numbers.
+        Spec.it s "CR 509.3a and CR 509.3c fire on opposite sides of one declaration" $ do
+          (gs, _, _) <- board ["Sacred Prey"] ["Pride Guardian"]
+          let after = S.runCombat S.aggressiveAnswer gs
+          Spec.assertEqWith s "the attacker's controller gained 1" (S.lifeOf S.alice after) (Just 21)
+          Spec.assertEqWith s "the blocker's controller gained 3" (S.lifeOf S.bob after) (Just 23)
+        -- The converse, and CR 509.3c's own words: a creature that BLOCKS does not
+        -- become blocked. Here the Prey is bob's and blocking a Piker; the
+        -- falsifier is an arm that matched GameEvent.BlockerDeclared, which would
+        -- put bob at 21.
+        Spec.it s "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing" $ do
+          (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]
+          Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs)) (Just 20)
+
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
 -- enters, you gain 1 life", the card that proves it. Its effect names nothing
@@ -4464,6 +4529,7 @@ representativeEvents cond =
         -- eventBindingSlots here if the two coincided.
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
         TriggerCondition.SelfBlocks -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
+        TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked departed)
         TriggerCondition.SelfPutIntoGraveyardFromLibrary -> one (moved Zone.Library Zone.Graveyard)
         -- Every origin zone is admitted, but the floor is the same for all of
         -- them: the destination is always a graveyard, which CR 400.2 makes
@@ -4562,6 +4628,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfBlocks,
+    TriggerCondition.SelfBecomesBlocked,
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
     TriggerCondition.SelfPutIntoGraveyardFromAnywhere,
     TriggerCondition.SelfDies,
@@ -6684,6 +6751,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   battleCrySpec s registry
   prowessSpec s registry
   selfBlocksSpec s registry
+  selfBecomesBlockedSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   graveyardEffectZoneTriggerSpec s registry
