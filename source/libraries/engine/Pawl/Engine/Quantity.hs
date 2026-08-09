@@ -164,9 +164,15 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   Quantity.Speed ref -> case Count.playersFor context gs ref of
     Just [pid] -> fmap (maybe 0 toInteger . Player.speed) (Map.lookup pid (GameState.players gs))
     _ -> Nothing
-  -- CR 725.1: is that player the monarch? LifeTotal's and Speed's arm again --
-  -- read live off GameState, resolved through the same Count.playersFor, and
-  -- Nothing for a reference naming anything but exactly one player.
+  -- CR 725.1: is that player the monarch? LifeTotal's and Speed's arm in what it
+  -- reads and how the reference is resolved, but NOT in arity: CR 725.3 makes the
+  -- monarch unique, so a disjunction over the named players and a sum over them
+  -- agree on every board, and Queen Marchesa's "if an opponent is the monarch" is
+  -- answerable at any number of seats. The siblings keep their one-player
+  -- restriction, where the multi-player answer really is an aggregation choice
+  -- (#681). EachPlayer therefore asks "is there a monarch?", and the empty list a
+  -- departure (CR 800.4) can leave behind answers 0. Nothing stays reserved for a
+  -- reference that could not be resolved at all.
   --
   -- CR 725.5 is applied HERE and only here: NO MONARCH answers Just 0, not
   -- Nothing. GameState.monarch of Nothing means CR 725.1's "there is no monarch
@@ -176,12 +182,9 @@ evaluateFor viewOf context gs announcedOn oid quantity = case quantity of
   -- prescribes. Nothing would instead collapse to False through
   -- Condition.holds' undeterminable path, which reaches the same answer for
   -- this comparison by accident and would be the wrong claim about the rule.
-  --
-  -- Not implemented: a reference naming several players is unanswered, so no
-  -- card can ask whether an OPPONENT is the monarch in a multiplayer game (#1019).
   Quantity.IsMonarch ref -> case Count.playersFor context gs ref of
-    Just [pid] -> Just (if GameState.monarch gs == Just pid then 1 else 0)
-    _ -> Nothing
+    Nothing -> Nothing
+    Just pids -> Just (if any (\pid -> GameState.monarch gs == Just pid) pids then 1 else 0)
   -- CR 122.1: how many counters of a kind that player has. The third arm on
   -- LifeTotal's and Speed's terms -- live, one player only, through the same
   -- Count.playersFor.
