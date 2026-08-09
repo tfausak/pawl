@@ -1806,6 +1806,61 @@ sharedVictimBoard s registry victims = do
 paysGeneric :: Natural -> GameState.GameState -> Bool
 paysGeneric n = Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost [ManaSymbol.Generic n])
 
+-- CR 118.3's "fully" across a cost's OWN components and its mana SOURCES, which
+-- is the same rule one level up from sharedVictimSpec. Village Rites ("{B}", "As
+-- an additional cost to cast this spell, sacrifice a creature") beside Phyrexian
+-- Tower and one Goblin Piker: the Piker buys the {B} or pays the additional cost,
+-- never both, because CR 601.2g's mana window comes before CR 601.2h's payment
+-- and both sacrifices happen. The two halves were asked apart, so the cast was
+-- offered and the payment then rolled back (#1134).
+villageRitesSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+villageRitesSpec s registry = Spec.describe s "A cost's own sacrifice and its source's" $ do
+  -- The OFFER and not the outcome: an overstated supply and a correct one both
+  -- leave the spell uncast, since the payment after a bad offer just fails. What
+  -- the bug did was menu a cast that could not be paid.
+  Spec.it s "CR 118.3 one creature cannot pay the {B} and the additional cost" $ do
+    rites <- S.printingOf s registry "Village Rites"
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let board victims = alicePermanents (tower : replicate victims piker)
+    Spec.assertBool s (not (offersCast rites (board 1))) "one Piker is not enough"
+    Spec.assertBool s (offersCast rites (board 2)) "a second one pays for the second sacrifice"
+
+  -- The same ONE Piker, with the {B} coming from a Swamp instead: nothing now
+  -- contends for it, so the refusal above is about the contention and not about a
+  -- creature too few. The Tower stays on the board, so what changes is only that
+  -- a claimless source can pay the mana.
+  Spec.it s "CR 601.2g a Swamp frees the creature for the additional cost" $ do
+    rites <- S.printingOf s registry "Village Rites"
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    swamp <- S.printingOf s registry "Swamp"
+    Spec.assertBool s (offersCast rites (alicePermanents [tower, piker, swamp])) "offered"
+
+  -- The same question at Cost.canPay, which is the gate CR 118.3 is asked at for
+  -- an unlock, a morph's turn-up and an "unless that player pays" -- none of them
+  -- reachable with an instant, so it is asked of the Rites' own cost directly.
+  -- Read through costsFor so the cost is the one the engine would use.
+  Spec.it s "CR 118.3 Cost.canPay asks it too" $ do
+    rites <- S.printingOf s registry "Village Rites"
+    tower <- S.printingOf s registry "Phyrexian Tower"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let pays victims =
+          let (gs, oid) = S.handOne rites (alicePermanents (tower : replicate victims piker))
+           in any (\cost -> Cost.canPay S.alice oid cost gs) (Cost.costsFor (S.printingName rites) oid gs)
+    Spec.assertBool s (not (pays 1)) "one Piker is not enough"
+    Spec.assertBool s (pays 2) "two are"
+
+-- Whether alice is offered the cast of one card of this printing from her hand.
+offersCast :: Printing.Printing -> GameState.GameState -> Bool
+offersCast printing board =
+  let (withSpell, oid) = S.handOne printing board
+   in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+
+-- These printings on the battlefield under alice's control, untapped and settled.
+alicePermanents :: [Printing.Printing] -> GameState.GameState
+alicePermanents = foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers)
+
 -- S.identityAnswer, recording the candidates of every Prompt.ChooseManaSource --
 -- the offers CR 601.2g's window made while the cost was still uncovered. A
 -- Prompt.ChooseExtraManaSource is a different question and is not recorded.
@@ -1851,6 +1906,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   ashnodsAltarSpec s registry
   phyrexianAltarSpec s registry
   sharedVictimSpec s registry
+  villageRitesSpec s registry
 
 -- Icehide Golem's whole printed cost. Restated rather than read off the card,
 -- for the reason javelinCost gives; Pawl.CardsSpec pins it against

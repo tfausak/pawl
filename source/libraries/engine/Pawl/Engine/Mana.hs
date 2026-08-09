@@ -696,9 +696,13 @@ monocoloredHybridGeneric = 2
 -- whose components spend no life, which is every cost that reached here before
 -- one did.
 --
+-- `claimed` is the same thing for objects: the components' own claims on a zone,
+-- which every route offered here has to be payable alongside (#1134). Empty for a
+-- cost whose components take nothing out of a zone.
+--
 -- FILTERED, NOT TRUSTED, the chooseSource posture.
-announce :: Capacity -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> ManaCost -> Game (ManaCost, Natural)
-announce capacity pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 symbols
+announce :: Capacity -> PlayerId -> ObjectId -> (ManaCost -> [ManaCost]) -> Natural -> [Claim] -> ManaCost -> Game (ManaCost, Natural)
+announce capacity pid oid total outside claimed (ManaCost.MkManaCost symbols) = go [] 0 symbols
   where
     -- "Payable" here means SOME completion of the remaining announcements pays
     -- it, which is what CR 601.2b's last sentence makes the question. Enumerated
@@ -712,7 +716,7 @@ announce capacity pid oid total outside (ManaCost.MkManaCost symbols) = go [] 0 
     stillPayable done rest gs extra ways =
       let candidate (tail_, life) =
             any
-              (\totalled -> canPayCommitting capacity pid (outside + extra + life) totalled gs)
+              (\totalled -> canPayCommitting capacity pid (outside + extra + life) claimed totalled gs)
               (total (ManaCost.MkManaCost (reverse done <> ways <> tail_)))
        in any candidate (completions rest)
     -- One symbol's announcement. Asked only where two routes are payable, and
@@ -850,22 +854,29 @@ hybridHalves a b = if a == b then [a] else [a, b]
 -- instead, because its components may want life too (CR 118.3 again). What is
 -- left here is the mana cost asked about on its own.
 canPay :: Capacity -> PlayerId -> ManaCost -> GameState -> Bool
-canPay capacity pid = canPayCommitting capacity pid 0
+canPay capacity pid = canPayCommitting capacity pid 0 []
 
--- The same question with `committed` life already spoken for, which CR 119.4's
--- floor must still admit alongside whatever the rest of this cost costs. Two
--- callers commit life: `announce`, for CR 118.13a's choices -- both those already
--- made and those a `completions` entry is standing in for -- and
+-- The same question with resources already spoken for: `committed` life, which CR
+-- 119.4's floor must still admit alongside whatever the rest of this cost costs,
+-- and `claimed`, the objects the rest of this cost will take out of a zone.
+--
+-- Two callers commit life: `announce`, for CR 118.13a's choices -- both those
+-- already made and those a `completions` entry is standing in for -- and
 -- Pawl.Engine.Cost's canPay and canPaySomeCompletion(Given), for the CR 119.4
--- payments the cost's COMPONENTS owe. Zero everywhere else, which is what
--- `canPay` is.
-canPayCommitting :: Capacity -> PlayerId -> Natural -> ManaCost -> GameState -> Bool
-canPayCommitting capacity pid committed cost gs = canPayCommittingGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
+-- payments the cost's COMPONENTS owe.
+--
+-- The same callers claim objects, and only from the components
+-- (Cost.removalClaim):
+-- Village Rites' "sacrifice a creature" and Phyrexian Tower's are one demand on
+-- one creature under CR 118.3, exactly as two sources' are (#1134). Zero and
+-- empty everywhere else, which is what `canPay` is.
+canPayCommitting :: Capacity -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommitting capacity pid committed claimed cost gs = canPayCommittingGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid committed claimed cost gs
 
 -- The same question given a board already walked -- see payableResolutionsGiven
 -- for what `grants` and `pcs` are and why handing them in changes no answer.
-canPayCommittingGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> Bool
-canPayCommittingGiven capacity grants pcs pid committed cost gs = not (null (payableResolutionsGiven capacity grants pcs pid committed cost gs))
+canPayCommittingGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> Bool
+canPayCommittingGiven capacity grants pcs pid committed claimed cost gs = not (null (payableResolutionsGiven capacity grants pcs pid committed claimed cost gs))
 
 -- One source's contribution to the supply side, as the OPTIONS it offers: one
 -- option per group of yields (see the collapse below), and each option is that
@@ -958,9 +969,10 @@ sourceOptions supplies =
 --
 -- A BOARD is the pool plus one option taken from every source -- the mana the
 -- player would actually have in front of them after tapping everything -- and it
--- is a board only if the activations it took are JOINTLY payable, since two of
--- them may claim one object (payableResolutionsGiven below). A RESOLVED cost is
--- payable when clause 3 holds and SOME board satisfies clauses 1 and 2:
+-- is a board only if the activations it took are JOINTLY payable alongside
+-- `claimed`, since two of them, or one of them and the cost being paid, may claim
+-- one object (payableResolutionsGiven below). A RESOLVED cost is payable when
+-- clause 3 holds and SOME board satisfies clauses 1 and 2:
 --
 --   1. every typed demand can be met at once -- a matching of demands into
 --      supplies that saturates the demand side;
@@ -1013,8 +1025,8 @@ sourceOptions supplies =
 -- into charging {2/B} a single mana. CR 107.4f's {G/P} rides on the same
 -- enumeration: its life way is a resolution with one fewer demand, so neither
 -- has to learn about a symbol that consumes no supply at all.
-payableResolutions :: Capacity -> PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutions capacity pid committed cost gs = payableResolutionsGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid committed cost gs
+payableResolutions :: Capacity -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutions capacity pid committed claimed cost gs = payableResolutionsGiven capacity (Projection.controlGrants gs) (Projection.projectAll gs) pid committed claimed cost gs
 
 -- The same list given a board the CALLER has already walked, which is the half
 -- Action.legalActions' enumeration wants: the wrapper above takes one
@@ -1032,12 +1044,17 @@ payableResolutions capacity pid committed cost gs = payableResolutionsGiven capa
 -- are several claims on one pool, so CR 118.3's "fully" reaches across the
 -- sources exactly as it reaches across one cost's components -- one creature
 -- cannot be sacrificed to both Ashnod's Altar and Phyrexian Tower, and counting
--- each source alone against the untouched board said it could (#1126). Asked of
--- the SOURCES only. The claims the cost being paid makes with its own components
--- are still counted apart from these, so a cast that both sacrifices a creature
--- and pays for a Tower reads the one creature twice (#1134).
-payableResolutionsGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
-payableResolutionsGiven capacity grants pcs pid committed cost gs =
+-- each source alone against the untouched board said it could (#1126).
+--
+-- `claimed` joins them, which is the same rule one level up: the cost being paid
+-- has components of its own that take objects out of a zone, and CR 601.2g's mana
+-- window comes BEFORE CR 601.2h's payment, so both happen and both need their own
+-- object. Village Rites beside Phyrexian Tower and one creature is the printed
+-- case -- the creature buys the {B} or pays the additional cost, not both
+-- (#1134). It is the whole cost's claims and not the remainder's, which is
+-- exact: `Cost.canPay` asks this before any part of the cost is paid.
+payableResolutionsGiven :: Capacity -> [Projection.ControlGrant] -> Map.Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> Natural -> [Claim] -> ManaCost -> GameState -> [([Demand], Natural, Natural)]
+payableResolutionsGiven capacity grants pcs pid committed claimed cost gs =
   let Mana.MkMana units = Game.poolOf pid gs
       pooled = fmap supplyOf units
       options = fmap (\oid -> sourceOptions (manaSuppliesGiven capacity pcs pid oid gs)) (manaSourcesGiven capacity grants pcs pid gs)
@@ -1047,7 +1064,7 @@ payableResolutionsGiven capacity grants pcs pid committed cost gs =
       boards =
         [ pooled <> concatMap fst taken
         | taken <- sequenceA options,
-          Claim.satisfiable (concatMap snd taken)
+          Claim.satisfiable (claimed <> concatMap snd taken)
         ]
       payable (demands, generic, life) =
         let subsets = List.subsequences (List.nub demands)
@@ -1070,7 +1087,13 @@ payableResolutionsGiven capacity grants pcs pid committed cost gs =
 -- This is the budget payCost pays under. A cast or an activation has already
 -- announced its Phyrexian symbols away (`announce`, CR 118.13a), so this answers
 -- 0 for them; it decides anything only where nothing announced (#373).
+--
+-- Nothing committed and nothing claimed, unlike the gates: this runs DURING the
+-- payment, where the cost's components may already have been paid, so the whole
+-- cost's claims would be partly spent ones. Refusing an unpayable cost is the
+-- gates' job (Pawl.Engine.Cost.canPay); all this picks is which resolution the
+-- mana is spent under.
 lifeNeeded :: Capacity -> PlayerId -> ManaCost -> GameState -> Maybe Natural
-lifeNeeded capacity pid cost gs = case payableResolutions capacity pid 0 cost gs of
+lifeNeeded capacity pid cost gs = case payableResolutions capacity pid 0 [] cost gs of
   (_, _, life) : _ -> Just life
   [] -> Nothing
