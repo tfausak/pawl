@@ -119,6 +119,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Phasing -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
+  Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
@@ -175,6 +176,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Phasing -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
+  Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Flashback _ -> []
@@ -279,6 +281,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Phasing -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
+  Keyword.Intimidate -> []
   -- CR 702.37e: turning a face-down permanent face up is a SPECIAL ACTION and
   -- doesn't use the stack (CR 116), so morph gives a permanent no activated
   -- ability. Pawl.Engine.Keyword.morphCost serves that action instead.
@@ -456,6 +459,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- Pawl.Engine.Cast's to apply, at its Zone.Hand arm.
   Keyword.Aftermath -> [CastingPermission.CastFromGraveyard]
   Keyword.Fear -> []
+  Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
@@ -703,6 +707,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Phasing -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
+  Keyword.Intimidate -> []
   -- CR 702.37a's plain morph mints nothing: rule 702.37a is one alternative cost
   -- and one special action, and neither rewrites an event.
   Keyword.Morph _ MorphVariant.Plain -> []
@@ -800,6 +805,7 @@ familyOf keyword = case keyword of
   Keyword.Banding -> Nothing
   Keyword.Phasing -> Nothing
   Keyword.Fear -> Nothing
+  Keyword.Intimidate -> Nothing
   Keyword.Infect -> Nothing
   Keyword.BattleCry -> Nothing
   Keyword.Menace -> Nothing
