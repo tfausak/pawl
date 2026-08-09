@@ -187,6 +187,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Trample
       """ {"type":"Trample"} """
+  -- CR 702.19c is a keyword of its own and not a flavour of the one above, so
+  -- the pair is asserted distinct: a fromJson arm that fell through to Trample
+  -- would round-trip the tag and quietly drop the variant.
+  Spec.it s "TrampleOverPlaneswalkers" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.TrampleOverPlaneswalkers
+      """ {"type":"TrampleOverPlaneswalkers"} """
+    Spec.assertBool s (Keyword.toJson Keyword.TrampleOverPlaneswalkers /= Keyword.toJson Keyword.Trample) "the variant is not trample"
   Spec.it s "Vigilance" $
     Common.assertJsonCodec
       s

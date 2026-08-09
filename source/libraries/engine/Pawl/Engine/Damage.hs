@@ -10,6 +10,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Battle as Battle
 import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
+import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
@@ -61,36 +62,49 @@ removeAllDamage gs =
 onBattlefield :: ObjectId -> GameState -> Bool
 onBattlefield oid gs = Set.member oid (GameState.battlefield gs)
 
--- CR 510.1e / 702.19b, as a pure predicate over the whole assignment. Legal iff
--- it totals power, uses only legal recipients, and -- the trample implication --
--- the defender got damage ONLY if every blocker is at its lethal threshold. The
--- threshold is NOT a per-blocker floor: a blocker may be under-assigned as long
--- as the defender then gets nothing.
+-- CR 510.1e / 702.19b / 702.19c, as a pure predicate over the whole assignment.
+-- Legal iff it totals power, uses only legal recipients, and clears the gates the
+-- trample rules stack. Those gates are ORDERED TIERS rather than one split:
+--
+--   * CR 702.19b: nothing may go past the blocking creatures until EVERY one of
+--     them is at its lethal threshold. Not a per-blocker floor -- a blocker may
+--     be under-assigned as long as nothing spills past it.
+--   * CR 702.19c: the attacked planeswalker's CONTROLLER sits behind a second
+--     gate, that planeswalker's own threshold (its loyalty).
+--
+-- The tier of a recipient is read off which recipient it IS, because CR 702.19b's
+-- own sentence is that case split: the blocking creatures, then "the player,
+-- planeswalker, or battle the creature is attacking", then -- only under CR
+-- 702.19c -- that planeswalker's controller.
+--
+-- Vacuous for every attacker but that one, and that is what keeps this the same
+-- predicate it was: attackerAssignment gives the attacked permanent threshold 0
+-- without trample over planeswalkers, and CR 702.19f is why it never offers the
+-- defending player alongside a planeswalker at all, so the middle tier is either
+-- empty or free and the answer turns on the blockers alone.
+--
+-- Recipient.ToObject shares the blockers' tier, i.e. is ungated, which is where
+-- the old two-way split had it: combat never builds one (CR 510.1b-d name a
+-- creature, a player, a planeswalker or a battle), so no assignment reaches here
+-- holding one.
 legalAssignment :: Map.Map Recipient.Recipient Natural -> Natural -> Map.Map Recipient.Recipient Natural -> Bool
 legalAssignment thresholds power answer =
   let assigned r = Map.findWithDefault 0 r answer
       totalsPower = sum (Map.elems answer) == power
       onlyLegal = all (\r -> Map.member r thresholds) (Map.keys answer)
-      isDefender r = case r of
-        Recipient.ToPlayer _ -> True
-        Recipient.ToCreature _ -> False
-        -- CR 702.19b: the excess is assigned among the blocking creatures and
-        -- what the creature is attacking, so an attacked planeswalker is on THIS
-        -- side of the split, not the blockers'. CR 702.19f is why it is the only
-        -- non-blocker recipient the map can hold for such an attacker --
-        -- attackerAssignment never offers the player alongside it, and the gate
-        -- below reads the whole non-blocker share either way.
-        Recipient.ToPlaneswalker _ -> True
-        -- And a battle, for the same clause of CR 702.19b: it is what the creature
-        -- is attacking, so the excess going to it is on the defender's side of the
-        -- split rather than the blockers'.
-        Recipient.ToBattle _ -> True
-        Recipient.ToObject _ -> False
-      defenderAmount = sum (Map.elems (Map.filterWithKey (\r _ -> isDefender r) answer))
-      blockerThresholds = Map.filterWithKey (\r _ -> not (isDefender r)) thresholds
-      everyBlockerLethal = all (\(r, t) -> assigned r >= t) (Map.toList blockerThresholds)
-      defenderGated = defenderAmount == 0 || everyBlockerLethal
-   in totalsPower && onlyLegal && defenderGated
+      tier :: Recipient.Recipient -> Int
+      tier r = case r of
+        Recipient.ToCreature _ -> 0
+        Recipient.ToObject _ -> 0
+        Recipient.ToPlaneswalker _ -> 1
+        Recipient.ToBattle _ -> 1
+        Recipient.ToPlayer _ -> 2
+      -- Every recipient in a STRICTLY EARLIER tier is at its threshold. Vacuously
+      -- true at tier 0, which is CR 702.19b's "need not assign lethal damage to
+      -- all those blocking creatures".
+      earlierTiersMet t = all (\(r, threshold) -> assigned r >= threshold) (filter (\(r, _) -> tier r < t) (Map.toList thresholds))
+      gated = all (\(r, n) -> n == 0 || earlierTiersMet (tier r)) (Map.toList answer)
+   in totalsPower && onlyLegal && gated
 
 -- CR 702.19b / 702.2c: a blocker's lethal threshold is toughness minus marked
 -- damage -- but 702.2c makes any nonzero assignment by a deathtouch source
@@ -169,29 +183,49 @@ damageEvent gs kind source target amount =
 --     CR 510.1b then gives it nothing to assign to. Combat.stillAttacked is that
 --     rule.
 --
+-- CR 702.19e is the stated exception to that second arm, and it is why this asks
+-- about the ATTACKER at all: a creature with trample over planeswalkers whose
+-- planeswalker was removed from combat assigns to the defending player instead of
+-- nothing. Rule 702.19e's own last sentence is why the answer is a recipient
+-- rather than a rewritten attack target -- "it does not cause the creature to be
+-- attacking that player" -- so Combat.attackers still names the planeswalker and
+-- CR 506.4c's record is untouched.
+--
+-- The defending player is read off the combat record (Combat.defender) and not
+-- re-derived from the planeswalker, which is gone. Pawl's combat has ONE
+-- defending player (see Pawl.Types.Combat), and an attack on a planeswalker is
+-- declared against that player's planeswalkers (CR 508.1b), so the record's
+-- player is CR 508.5's answer for this attacker without the last known
+-- information CR 508.5's second sentence would otherwise want (#537).
+--
 -- Read at ASSIGNMENT and at every place assignment can name a recipient (the
 -- unblocked/trample-through event and the CR 702.19b threshold map the prompt
 -- offers), never as a filter over the finished batch: filtering afterwards would
 -- let the attacker's controller legally assign trample excess to something that
 -- cannot take it and then lose that damage, rather than never offering the
 -- choice.
-combatRecipient :: GameState -> AttackTarget -> Maybe Recipient.Recipient
-combatRecipient gs target = case target of
-  AttackTarget.OfPlayer defender ->
-    if List.elem defender (Game.stillPlaying gs)
-      then Just (Recipient.ToPlayer defender)
-      else Nothing
-  AttackTarget.OfPlaneswalker oid ->
-    if Combat.stillAttacked oid gs
-      then Just (Recipient.ToPlaneswalker oid)
-      else Nothing
-  -- CR 310.5 / 506.4, the planeswalker arm's twin: a battle that has left the
-  -- battlefield is removed from combat and stops being attacked, so CR 510.1b
-  -- gives the creature nothing to assign to.
-  AttackTarget.OfBattle oid ->
-    if Combat.stillAttackedBattle oid gs
-      then Just (Recipient.ToBattle oid)
-      else Nothing
+combatRecipient :: GameState -> ObjectId -> AttackTarget -> Maybe Recipient.Recipient
+combatRecipient gs attacker target =
+  let -- CR 800.4e: a player who has left the game is nobody to assign to.
+      stillPlaying pid =
+        if List.elem pid (Game.stillPlaying gs)
+          then Just (Recipient.ToPlayer pid)
+          else Nothing
+   in case target of
+        AttackTarget.OfPlayer defender -> stillPlaying defender
+        AttackTarget.OfPlaneswalker oid
+          | Combat.stillAttacked oid gs -> Just (Recipient.ToPlaneswalker oid)
+          | Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs ->
+              stillPlaying =<< Combat.Type.defender (GameState.combat gs)
+          | otherwise -> Nothing
+        -- CR 310.5 / 506.4, the planeswalker arm's twin: a battle that has left the
+        -- battlefield is removed from combat and stops being attacked, so CR 510.1b
+        -- gives the creature nothing to assign to. No CR 702.19e for a battle: that
+        -- rule names a planeswalker only.
+        AttackTarget.OfBattle oid ->
+          if Combat.stillAttackedBattle oid gs
+            then Just (Recipient.ToBattle oid)
+            else Nothing
 
 -- What one attacking creature assigns, as damage events carrying the source.
 -- CR 510.1a: a creature that would assign 0 or less assigns none, so events all
@@ -205,12 +239,42 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
       else do
         let power :: Natural
             power = Integer.toNaturalSaturating p
-            trample = Projection.hasKeyword Keyword.Trample attacker gs
+            -- CR 702.19c makes trample over planeswalkers a VARIANT of trample --
+            -- it assigns "as described in rule 702.19b, with one exception" -- and
+            -- CR 702.19d names the two side by side, so the variant tramples
+            -- whether or not the creature also has plain trample. Not separately
+            -- observable in the pool: Thrasta, its only printing, has both.
+            overPlaneswalkers = Projection.hasKeyword Keyword.TrampleOverPlaneswalkers attacker gs
+            trample = overPlaneswalkers || Projection.hasKeyword Keyword.Trample attacker gs
             -- CR 510.1b: what this creature is attacking, if it is still
             -- attacking anything. Reachable both ways in the pool -- a defending
             -- player conceding mid-combat (CR 800.4e), and an attacked
             -- planeswalker burned off the battlefield (CR 506.4).
-            attacked = combatRecipient gs target
+            attacked = combatRecipient gs attacker target
+            -- CR 508.5 / CR 310.8d, shared with the landwalk reading in
+            -- Combat.defendingPlayerOf so the two cannot drift. Read once, for CR
+            -- 702.19c's third recipient below and for CR 702.22j's chooser.
+            defending = Combat.defendingPlayerOf (Projection.controlGrants gs) target gs
+            -- CR 702.19b: the trample-through recipient is whatever the creature
+            -- is attacking, at threshold 0 -- there is no minimum to assign to it.
+            --
+            -- CR 702.19c raises that threshold to the attacked planeswalker's
+            -- LOYALTY (CR 306.5c) and puts that planeswalker's controller behind
+            -- it at threshold 0. Both entries in one map is what makes
+            -- legalAssignment's second tier reachable, and CR 702.19f is what
+            -- keeps every other attacker from ever getting the player entry.
+            --
+            -- NOT taking into account damage other creatures are assigning in the
+            -- same combat damage step, which rule 702.19c's last sentence asks for
+            -- (#1092): assignment here is per attacker, the same elision CR
+            -- 702.19b's identical clause already carries in blockerThreshold.
+            defenderEntries :: [(Recipient.Recipient, Natural)]
+            defenderEntries = case attacked of
+              Just recipient@(Recipient.ToPlaneswalker oid)
+                | overPlaneswalkers ->
+                    (recipient, Cost.loyaltyCountersOn oid gs)
+                      : fmap (\pid -> (Recipient.ToPlayer pid, 0)) (Maybe.maybeToList defending)
+              _ -> fmap (\recipient -> (recipient, 0)) (Maybe.maybeToList attacked)
         -- Whether it is BLOCKED and WHO is blocking it are two questions, and the
         -- branch below asks each of the reader that answers it. CR 509.1h makes
         -- blocked-ness a status the declaration confers (Combat.isBlocked, the
@@ -222,19 +286,52 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
         -- Reading emptiness as unblocked gets the second case wrong and lets the
         -- attacker hit the defending player.
         let recorded = Combat.blockersOf attacker gs
-            toDefender :: [DamageEvent.DamageEvent]
-            toDefender =
+            allToAttacked :: [DamageEvent.DamageEvent]
+            allToAttacked =
               fmap (\recipient -> damageEvent gs DamageKind.Combat attacker recipient power) (Maybe.maybeToList attacked)
+            -- With no blocker left to gate, everything the creature assigns goes
+            -- to what it is attacking -- except under CR 702.19c, where the
+            -- attacked planeswalker's controller stands behind it and the split is
+            -- a real choice. So this is an action and not a list.
+            --
+            -- Forced, and so not asked, in the two shapes where the rules leave
+            -- nothing to ask: one recipient, and a planeswalker whose loyalty (CR
+            -- 702.19c's threshold) is at least the creature's power, which absorbs
+            -- everything it could assign.
+            toDefender :: Game [DamageEvent.DamageEvent]
+            toDefender = case defenderEntries of
+              _ : _ : _
+                | power > sum (fmap snd defenderEntries) ->
+                    case Projection.controllerOf attacker gs of
+                      Nothing -> pure []
+                      -- No blocker, so CR 702.22j's inversion cannot apply and CR
+                      -- 702.19c's "as the attacking creature's controller chooses"
+                      -- stands unqualified.
+                      Just pid -> divide pid defenderEntries
+              _ -> pure allToAttacked
+            -- CR 702.19b / CR 510.1e: ask the chooser to divide `power` over
+            -- `entries`, and keep the answer only if it is legal --
+            -- reject-not-repair (NOT the CR 733 human-error rewind). An illegal
+            -- answer assigns nothing.
+            divide chooser entries = do
+              let thresholds = Map.fromList entries
+              chosen <- Game.choose (Prompt.AssignCombatDamage (Decide.deciderFor chooser gs) chooser attacker thresholds power)
+              let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n
+              pure
+                ( if legalAssignment thresholds power chosen
+                    then fmap toEvent (filter (\(_, n) -> n > 0) (Map.toList chosen))
+                    else []
+                )
         if not (Combat.isBlocked attacker gs)
           then -- CR 510.1b: never blocked, so it hits what it is attacking.
-            pure toDefender
+            toDefender
           else case filter (\oid -> onBattlefield oid gs) (Set.toList recorded) of
             -- Blocked, but nothing is blocking it now. CR 702.19d: a trampler
             -- assigns everything to the defending player. CR 510.1c: anything
             -- else assigns no combat damage at all -- not damage addressed to an
             -- object that is not there, which would still be recorded in the CR
             -- 608.2i history even though marking it is a no-op.
-            [] -> pure (if trample then toDefender else [])
+            [] -> if trample then toDefender else pure []
             -- CR 510.1c / 702.19b: a single blocker with no trample -- or trample
             -- but no power past its threshold -- is forced: all onto the blocker.
             -- A single trample blocker WITH excess falls to the prompt arm.
@@ -261,41 +358,19 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                 -- several.
                 --
                 -- The defending player falls back to the attacker's controller
-                -- rather than skipping the assignment: an attacker whose target
-                -- is gone (CR 506.4, a burned planeswalker) has already been
-                -- handled above, so this fallback is unreachable, and answering
-                -- with the CR 510.1c default is the conservative reading.
+                -- rather than skipping the assignment. Unreachable: an attacker
+                -- with no target at all assigns nothing and never gets here, and
+                -- CR 702.19e's attacker -- which does get here, with its
+                -- planeswalker off the battlefield -- still reads that
+                -- planeswalker's controller out of the graveyard, since
+                -- Combat.defendingPlayerOf asks the object and not the combat
+                -- record. Answering with the CR 510.1c default is the
+                -- conservative reading either way.
                 let banded = any (\b -> Projection.hasKeyword Keyword.Banding b gs) blockers
-                    -- CR 508.5 / CR 310.8d, shared with the landwalk reading in
-                    -- Combat.defendingPlayerOf so the two cannot drift.
-                    defending = Combat.defendingPlayerOf (Projection.controlGrants gs) target gs
                     chooser = if banded then Maybe.fromMaybe pid defending else pid
-                let decider = Decide.deciderFor chooser gs
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
                     blockerEntries = fmap (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
-                    -- CR 702.19b: the trample-through recipient is whatever the
-                    -- creature is attacking, at threshold 0 -- there is no
-                    -- minimum to assign to it. CR 702.19c's larger threshold (a
-                    -- planeswalker's loyalty) belongs to trample OVER
-                    -- PLANESWALKERS, which is not a keyword pawl has (#539), and
-                    -- CR 702.19f is what keeps plain trample from ever putting
-                    -- the defending PLAYER here alongside a planeswalker.
-                    defenderEntry =
-                      if trample
-                        then fmap (\recipient -> (recipient, 0 :: Natural)) (Maybe.maybeToList attacked)
-                        else []
-                    thresholds = Map.fromList (blockerEntries <> defenderEntry)
-                chosen <-
-                  Game.choose (Prompt.AssignCombatDamage decider chooser attacker thresholds power)
-                -- CR 510.1e / 702.19b: reject-not-repair (NOT the CR 733
-                -- human-error rewind). An illegal answer assigns nothing.
-                let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n
-                    positive (_, n) = n > 0
-                pure
-                  ( if legalAssignment thresholds power chosen
-                      then fmap toEvent (filter positive (Map.toList chosen))
-                      else []
-                  )
+                divide chooser (blockerEntries <> (if trample then defenderEntries else []))
 
 -- CR 510.1d: a blocking creature assigns combat damage to the creatures it's
 -- blocking, and none at all if it isn't currently blocking any.
