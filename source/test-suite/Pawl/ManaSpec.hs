@@ -1644,6 +1644,97 @@ altarBoard :: Printing.Printing -> Printing.Printing -> Int -> GameState.GameSta
 altarBoard altar piker victims =
   foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker)
 
+-- The half #1128 gave up: WHICH mana each of a repeatable source's activations
+-- makes. Phyrexian Altar ({3} Artifact, "Sacrifice a creature: Add one mana of
+-- any color") is the pool's first mana ability that is both repeatable and offers
+-- a choice, so two creatures buy two mana of any two colours -- where one option
+-- per yield offered "n of one colour" and read {R}{G} as unpayable (#1131).
+--
+-- Goblin Piker is the victim throughout and makes no mana, so every mana on these
+-- boards comes through the Altar.
+phyrexianAltarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+phyrexianAltarSpec s registry = Spec.describe s "Phyrexian Altar" $ do
+  -- ONE board for all three, so what separates {R}{R} from {R}{G} is only whether
+  -- the two activations could pick different colours -- not how many there are.
+  Spec.it s "CR 118.3 two activations of one Altar make two different colors" $ do
+    board <- phyrexianAltarBoard s registry 2
+    Spec.assertBool s (paysColors [Color.Red, Color.Red] board) "two of one colour, which never wanted a mix"
+    Spec.assertBool s (paysColors [Color.Red, Color.Green] board) "and one of each, which does"
+    Spec.assertBool s (not (paysColors [Color.Red, Color.Green, Color.Blue] board)) "and there is no third creature, so not three"
+
+  Spec.it s "CR 118.3 a third creature buys a third color" $ do
+    board <- phyrexianAltarBoard s registry 3
+    Spec.assertBool s (paysColors [Color.Red, Color.Green, Color.Blue] board) "three activations, three colours"
+    Spec.assertBool s (not (paysColors [Color.Red, Color.Green, Color.Blue, Color.White] board)) "and not a fourth"
+
+  Spec.it s "CR 118.3 one creature is one mana of one color" $ do
+    board <- phyrexianAltarBoard s registry 1
+    Spec.assertBool s (paysColors [Color.Red] board) "the one activation's colour is the player's"
+    Spec.assertBool s (not (paysColors [Color.Red, Color.Green] board)) "and one activation is one mana"
+
+  -- The gameplay-level offer (design.md section 4). Zhur-Taa Goblin is {R}{G} and
+  -- targets nothing as it is cast, so the whole cast turns on the two activations
+  -- being allowed different colours.
+  Spec.it s "CR 601.2g Zhur-Taa Goblin is offered off two activations" $ do
+    goblin <- S.printingOf s registry "Zhur-Taa Goblin"
+    one <- phyrexianAltarBoard s registry 1
+    two <- phyrexianAltarBoard s registry 2
+    let offered board =
+          let (withSpell, oid) = S.handOne goblin board
+           in any (S.isCastOf oid) (Action.legalActions S.alice withSpell)
+    Spec.assertBool s (not (offered one)) "one creature cannot pay {R}{G}"
+    Spec.assertBool s (offered two) "two creatures can"
+
+  -- And the payment carries it out, which the offer alone cannot say: the colours
+  -- are SCRIPTED, one per activation, so the second half is the same board and the
+  -- same spell with one answer changed. If the engine picked the colours itself
+  -- both halves would pass.
+  Spec.it s "CR 605.3a the Goblin is cast off a red activation and a green one" $ do
+    goblin <- S.printingOf s registry "Zhur-Taa Goblin"
+    board <- phyrexianAltarBoard s registry 2
+    let countOf name = S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack name) S.alice
+        mixed = castScripted goblin board [Color.Red, Color.Green]
+        monochrome = castScripted goblin board [Color.Red, Color.Red]
+    Spec.assertEqWith s "the Goblin resolved" (countOf "Zhur-Taa Goblin" mixed) 1
+    Spec.assertEqWith s "both Pikers paid for it" (countOf "Goblin Piker" mixed) 0
+    Spec.assertEqWith s "two red activations pay no {G}, so the cast fails" (countOf "Zhur-Taa Goblin" monochrome) 0
+    Spec.assertEqWith s "and CR 601.2h rolled the sacrifices back" (countOf "Goblin Piker" monochrome) 2
+
+-- Alice's Phyrexian Altar and `victims` Goblin Pikers.
+phyrexianAltarBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m GameState.GameState
+phyrexianAltarBoard s registry victims = do
+  altar <- S.printingOf s registry "Phyrexian Altar"
+  piker <- S.printingOf s registry "Goblin Piker"
+  pure (foldr (\p gs -> snd (S.addCreature p S.alice gs)) (Setup.emptyGame S.bothPlayers) (altar : replicate victims piker))
+
+-- Whether alice could pay one mana of each of these colors off this board.
+paysColors :: [Color.Color] -> GameState.GameState -> Bool
+paysColors colors =
+  Mana.canPay Cost.manaActivations S.alice (ManaCost.MkManaCost (fmap (ManaSymbol.OfType . ManaType.Colored) colors))
+
+-- `spell` cast off `board` and resolved, with the mana-yield choices answered off
+-- `script` in order -- the fixture a repeatable source needs, since one answer
+-- has to serve two activations of one permanent.
+castScripted :: Printing.Printing -> GameState.GameState -> [Color.Color] -> GameState.GameState
+castScripted spell board script =
+  let (withSpell, oid) = S.handOne spell board
+      afterCast = snd (State.evalState (Engine.runGame nextColor withSpell (S.cast S.alice oid)) script)
+   in S.runPure S.identityAnswer afterCast Stack.resolveTop
+
+-- The next colour in the script, or the default answer once it runs out.
+nextColor :: Prompt.Prompt r -> State.State [Color.Color] r
+nextColor p = case p of
+  Prompt.ChooseManaYield _ _ _ candidates -> do
+    scripted <- State.gets Maybe.listToMaybe
+    State.modify' (drop 1)
+    pure $ case scripted of
+      Nothing -> S.identityAnswer p
+      Just color ->
+        S.optionYielding
+          (Mana.Type.MkMana [ManaUnit.MkManaUnit {ManaUnit.manaType = ManaType.Colored color, ManaUnit.tags = Set.empty}])
+          candidates
+  _ -> pure (S.identityAnswer p)
+
 -- CR 118.3's "fully" across TWO mana sources. Ashnod's Altar ("Sacrifice a
 -- creature: Add {C}{C}") and Phyrexian Tower ("{T}: Add {C}", "{T}, Sacrifice a
 -- creature: Add {B}{B}") both buy their mana with a creature, and the supply
@@ -1814,6 +1905,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Mana" $ do
   phyrexianTowerSpec s registry
   bloodPetSpec s registry
   ashnodsAltarSpec s registry
+  phyrexianAltarSpec s registry
   sharedVictimSpec s registry
   villageRitesSpec s registry
 
