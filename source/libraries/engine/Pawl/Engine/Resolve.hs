@@ -534,7 +534,9 @@ namesEveryToken quantity = quantity /= Quantity.Type.Literal 1
 -- always chosen.
 --
 -- Modes rather than a flat effect list because CR 603.5's "may" is a property of
--- the mode. A text change rewrites EFFECTS only, so optionality passes through.
+-- a clause within a mode, not of the effect list. A text change rewrites the
+-- printed words -- a clause's effects and its CR 701.46a gate -- so optionality
+-- passes through untouched.
 --
 -- Not implemented: a SPELL's mode target specs are left unrewritten, so CR
 -- 608.2b's re-validation in targetsAllIllegal below measures the printed clause
@@ -547,8 +549,15 @@ modesOf oid gs = case Game.lookupObject oid gs of
     Nothing -> []
     Just face ->
       let chosen = Binding.modesOf (Object.bindings obj)
-          rewrite = Projection.rewriteEffect (Projection.textChangesAffecting oid gs)
-          rewriteClause c = c {Clause.effects = fmap rewrite (Clause.effects c)}
+          changes = Projection.textChangesAffecting oid gs
+          rewrite = Projection.rewriteEffect changes
+          rewriteClause c =
+            c
+              { Clause.effects = fmap rewrite (Clause.effects c),
+                -- Projection.rewriteModal's reason: a clause gate's Filters are
+                -- printed words CR 612.1 changes.
+                Clause.condition = fmap (Projection.rewriteCondition changes) (Clause.condition c)
+              }
           rewriteMode m = m {Mode.clauses = fmap rewriteClause (Mode.clauses m)}
        in fmap (fmap rewriteMode) (Card.chosenModes chosen face)
 
@@ -639,12 +648,16 @@ resolveSpellWith runSubgame oid = do
                           (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) legalityNow)
                           (Modal.instanceView modeSpecs mi (Mode.targetSpecs mode) chosenNow)
                           eff
-                  -- CR 608.2e's clause is the unit both gates cover, so the pair
-                  -- is asked once per clause rather than once per mode -- between
-                  -- the preceding clause's instructions and this one's.
+                  -- CR 608.2e's clause is the unit all three gates cover, so they
+                  -- are asked once per clause rather than once per mode --
+                  -- between the preceding clause's instructions and this one's.
                   Monad.forM_ (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))) $ \(cIdx, clause) -> do
-                    -- CR 603.5 / 608.2d: the printed "may" first.
-                    taken <- exercises oid effectController idx cIdx clause
+                    -- CR 701.46a's printed "if" first: it precedes the
+                    -- instructions in written order (CR 608.2c), and a clause
+                    -- that cannot happen is no question to ask.
+                    gated <- gateHolds effectController oid clause
+                    -- CR 603.5 / 608.2d: then the printed "may".
+                    taken <- if gated then exercises oid effectController idx cIdx clause else pure False
                     -- CR 118.12a: and then this clause's "unless [a player]
                     -- pays", offered only for a clause that is happening at all.
                     -- The legality and the targets are the START-of-resolution
@@ -796,13 +809,18 @@ resolveModes stackId srcId modes = do
                   let chosenNow = Binding.targetsOf bindingsNow
                       legalityNow = Map.mapWithKey legalSlot chosenNow
                   applyEffect stackId srcId effectController (instanceView legalityNow) (instanceView chosenNow) eff
-             in -- CR 608.2e's clause is what each gate covers, so the pair is
+             in -- CR 608.2e's clause is what each gate covers, so all three are
                 -- asked once per clause. Run only when `fizzles` is False, so no
                 -- question is asked about an ability that never resolves.
                 Monad.forM_ (zip (fmap ClauseIndex.MkClauseIndex [0 ..]) (Foldable.toList (Mode.clauses mode))) $ \(cIdx, clause) -> do
-                  -- CR 603.5 / 608.2d: the printed "may", answered as this
+                  -- CR 701.46a: the printed "if" first, for the spell path's
+                  -- reason. Read against `srcId`, the source permanent, not the
+                  -- ability object -- CR 701.46a says "this permanent", which is
+                  -- also why `paid` is given `srcId`.
+                  gated <- gateHolds effectController srcId clause
+                  -- CR 603.5 / 608.2d: then the printed "may", answered as this
                   -- clause's instructions are applied.
-                  taken <- exercises stackId effectController idx cIdx clause
+                  taken <- if gated then exercises stackId effectController idx cIdx clause else pure False
                   -- CR 118.12a: then the "unless [a player] pays", against the
                   -- START-of-resolution slots -- the spell path's own note says
                   -- why it follows the "may", and why the gate is asked before
@@ -812,6 +830,32 @@ resolveModes stackId srcId modes = do
        in do
             Monad.unless fizzles (Monad.forM_ modes resolveOne)
             State.modify' (Game.cease stackId)
+
+-- CR 701.46a: does this clause's printed "if" hold? Adapt's "if this permanent
+-- has no +1/+1 counters on it" is the shape in the pool; CR 701.37a's
+-- monstrosity prints the same gate on a proper prefix of a longer ability, which
+-- is why the rider is on CR 608.2e's clause rather than on the mode. A clause
+-- stating no condition always happens.
+--
+-- Asked as this clause is REACHED (CR 608.2c's written order), so an earlier
+-- clause's effects are already on the board -- not once at the start of
+-- resolution. Asked BEFORE `exercises`, because the engine must not raise a
+-- CR 603.5 prompt whose answer cannot matter.
+--
+-- `controller` is CR 109.5's "you". `source` is the object both Quantities read,
+-- and it is the source PERMANENT rather than the ability on the stack -- CR
+-- 701.46a says "this permanent", and CR 113.7a's separation of the two is why
+-- `paid` takes `source` apart from `resolving` for its own reason. The two are
+-- the same object for a spell.
+--
+-- The full view: the clause is resolving and the board is live, unlike CR
+-- 603.4's intervening "if" on a leaves-the-battlefield trigger.
+gateHolds :: PlayerId -> ObjectId -> Clause.Clause Card.Type.Card -> Game Bool
+gateHolds controller source clause = case Clause.condition clause of
+  Nothing -> pure True
+  Just condition -> do
+    gs <- State.get
+    pure (Condition.holds (Projection.fullView gs) (Filter.MkContext (Just controller) (Just source)) gs source condition)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made

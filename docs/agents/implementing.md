@@ -120,6 +120,9 @@ Before pushing, run what CI runs:
 
     ormolu --mode check $(git ls-files '*.hs')
     hlint .
-    script/format-json.sh check
+    script/format-json.sh check data/cards/*.json
+
+That script takes `MODE FILE...`. Run bare it iterates over nothing and passes
+vacuously, so always give it the corpus.
 
 Then stop. Do not wait on CI, and do not start another unit.

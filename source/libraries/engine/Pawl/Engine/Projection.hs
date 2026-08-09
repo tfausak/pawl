@@ -1480,7 +1480,13 @@ rewriteTriggeredAbility pairs ability =
 -- correct way" finds nothing in it to swap.
 rewriteModal :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Modal.Modal Card.Type.Card -> Modal.Modal Card.Type.Card
 rewriteModal pairs modal =
-  let rewriteClause c = c {Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c)}
+  let rewriteClause c =
+        c
+          { Clause.effects = fmap (rewriteEffect pairs) (Clause.effects c),
+            -- CR 701.46a's clause gate is a Condition, so its Filters are
+            -- printed words a text change must reach too.
+            Clause.condition = fmap (rewriteCondition pairs) (Clause.condition c)
+          }
       rewriteTargetSpec ts = ts {TargetSpec.filter = fmap (Filter.rewrite pairs) (TargetSpec.filter ts)}
       rewriteMode m =
         m
