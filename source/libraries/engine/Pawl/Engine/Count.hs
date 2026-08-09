@@ -25,6 +25,7 @@ import qualified Pawl.Types.GameEvent as GameEvent
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword.Type
+import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import Pawl.Types.PlayerId (PlayerId)
@@ -63,7 +64,7 @@ evaluate viewOf quantityOf context gs count = case Count.Type.scope count of
   -- (CR 608.2h last-known information), never from a live object -- a token has
   -- no printed card at all (CR 111.3) and an animated land died as a creature.
   Scope.InHistory shape ->
-    let views = Maybe.mapMaybe (snapshotView shape . snd) (Foldable.toList (GameState.events gs))
+    let views = Maybe.mapMaybe (snapshotView gs shape . snd) (Foldable.toList (GameState.events gs))
         kept = fmap ((,) Nothing) (Maybe.mapMaybe (keep predicate context . Just) views)
      in aggregate quantityOf aggregation kept
   where
@@ -168,25 +169,38 @@ playersFor context gs ref =
 -- below): card types, colours, subtypes, keywords (CR 109.3 counts abilities
 -- among an object's characteristics), power and mana value. Everything that is
 -- not a characteristic is vacuously empty over a past event -- identity and
--- playerIdentity are Nothing, and combat status, attachment, tokenhood, tap
--- status and what the object did this turn are all False.
+-- playerIdentity are Nothing, and combat status, attachment, tap status and
+-- what the object did this turn are all False.
 --
--- `controller` is the exception, and it is the EVENT rather than the snapshot
--- that answers: CR 601.2a makes the player who cast a spell its controller, so
--- a recorded cast can say who "you've cast" means and a recorded move cannot.
+-- `controller` and `token` are the exceptions, and neither is a characteristic
+-- (CR 109.3 / CR 111.6), so neither can ride the snapshot. Each arm answers
+-- them for itself: CR 601.2a makes the player who cast a spell its controller,
+-- and a move reads CR 608.2h's record filed under the id it left behind.
 --
 -- `supertypes` is the odd one out: it IS a characteristic and
 -- ProjectedCharacteristics records it, but this view leaves it empty, so a
 -- supertype filter over a past event answers False (#646).
-snapshotView :: EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
-snapshotView shape event = case event of
+snapshotView :: GameState -> EventShape.EventShape -> GameEvent.GameEvent -> Maybe Filter.View
+snapshotView gs shape event = case event of
   GameEvent.Moved zc snapshot -> case shape of
     EventShape.MovedBetween from to ->
       if ZoneChange.from zc == from && ZoneChange.to zc == to
-        then -- Not implemented: who controlled the object, which the cast arm
-        -- below does supply, so ControlledBy is vacuously False over a move
-        -- (#1000).
-          Just (viewOfSnapshot Nothing snapshot)
+        then -- CR 608.2h: who controlled it and what KIND of object it was, read
+        -- from the record the move funnel filed under the DEPARTED id as the
+        -- object ceased -- the same pre-move state `snapshot` was taken
+        -- against, and the route Event.departedFrom already takes back from a
+        -- Moved event (CR 400.7 makes that id name nothing else, ever).
+        --
+        -- No record only where nothing departed: Event.recordTokenEntry's
+        -- battlefield-to-battlefield pseudo-move for a new token, whose object
+        -- is therefore still live and can be asked directly.
+          let lastKnown = Map.lookup (ZoneChange.departed zc) (GameState.lastKnown gs)
+           in Just
+                ( viewOfSnapshot
+                    (fmap LastKnown.controller lastKnown)
+                    (maybe (Game.isToken (ZoneChange.object zc) gs) (Game.sourceIsToken . LastKnown.source) lastKnown)
+                    snapshot
+                )
         else Nothing
     EventShape.SpellCast -> Nothing
   GameEvent.DamageDealt _ -> Nothing
@@ -206,7 +220,9 @@ snapshotView shape event = case event of
     -- for the reason the Moved arm leaves its own out: a look-back view is of a
     -- past event rather than of an object, and Filter.IsSource asking about one
     -- would be asking about an incarnation that no longer exists.
-    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) snapshot)
+    -- CR 111.1 / 111.7: a token represents a PERMANENT and ceases to exist
+    -- anywhere else, so nothing on the stack to be cast was ever one.
+    EventShape.SpellCast -> Just (viewOfSnapshot (Just caster) False snapshot)
     EventShape.MovedBetween _ _ -> Nothing
   GameEvent.BecameMonarch _ -> Nothing
   -- CR 702.29c's cycling records no characteristics snapshot -- the Moved event
@@ -239,11 +255,12 @@ snapshotView shape event = case event of
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a
--- snapshot says. The `controller` is the arm's to supply, since it is the one
--- field no ProjectedCharacteristics carries and the events differ on whether
--- they recorded a player at all.
-viewOfSnapshot :: Maybe PlayerId -> PC.ProjectedCharacteristics -> Filter.View
-viewOfSnapshot mController snapshot =
+-- snapshot says. The `controller` and the tokenhood flag are the arm's to
+-- supply, since they are the two fields no ProjectedCharacteristics carries
+-- (CR 109.3 / CR 111.6) and the events differ on where each is recoverable
+-- from.
+viewOfSnapshot :: Maybe PlayerId -> Bool -> PC.ProjectedCharacteristics -> Filter.View
+viewOfSnapshot mController isToken snapshot =
   Filter.MkView
     { Filter.cardTypes = PC.cardTypes snapshot,
       Filter.supertypes = Set.empty,
@@ -262,8 +279,9 @@ viewOfSnapshot mController snapshot =
       Filter.controller = mController,
       -- CR 108.3: an owner is read off an OBJECT, and a ProjectedCharacteristics
       -- carries none -- the position `supertypes` and `counters` below are in
-      -- (#646). Unlike those two the fact does not change, so the event's id
-      -- would be enough to recover it; nothing here has the id (#1069).
+      -- (#646). Unlike those two the fact does not change, and the Moved arm's
+      -- CR 608.2h record would be the place to keep it, but no field of it holds
+      -- one (#1069).
       Filter.owner = Nothing,
       Filter.identity = Nothing,
       Filter.playerIdentity = Nothing,
@@ -273,13 +291,16 @@ viewOfSnapshot mController snapshot =
       Filter.attachedToCreature = False,
       Filter.attachedToPermanent = False,
       Filter.canHostSubject = False,
-      Filter.token = False,
+      -- CR 111.6: "A token isn't a card", which is a fact about the OBJECT and
+      -- not a characteristic, so the arm supplies it above.
+      Filter.token = isToken,
       Filter.tapped = False,
       -- CR 122.1: a ProjectedCharacteristics records no counters -- CR 613.4c
       -- has already folded them into the power and toughness above -- so a past
-      -- event carries none to read, the position `supertypes` is in (#646). A
-      -- quantity asking an event snapshot for a counter tally is answered 0
-      -- rather than with what was on the object (#993).
+      -- event carries none to read, the position `supertypes` is in (#646). The
+      -- Moved arm's CR 608.2h record does carry them, and is not read for them:
+      -- no card in the pool asks an event snapshot for a counter tally, so a
+      -- quantity that does is still answered 0 (#993).
       Filter.counters = Map.empty,
       -- CR 701.54b: a designation, which a ProjectedCharacteristics does not carry
       -- and never could -- CR 109.3's characteristic list has no room for one. So a
