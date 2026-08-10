@@ -6,8 +6,9 @@
 -- Also Pawl.Engine.BlockRequirement, whose only consumer is Pawl.Engine.Combat's CR 509.1c
 -- check, Pawl.Engine.AttackRequirement, whose only consumer is its CR 508.1d
 -- check, Pawl.Engine.CombatRestriction, whose only consumer is that module's CR
--- 508.1c and CR 509.1b checks, and Pawl.Engine.AttackCost, whose only consumer is
--- its CR 508.1d cost clause and CR 508.1h total.
+-- 508.1c and CR 509.1b checks, Pawl.Engine.AttackCost, whose only consumer is
+-- its CR 508.1d cost clause and CR 508.1h total, and Pawl.Engine.BlockPermission,
+-- whose only consumer is its CR 509.1a arity.
 module Pawl.CombatSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -1303,19 +1304,6 @@ withMenace oid gs =
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
 
--- CR 702.111b, proved by Boggart Brute ("Creature -- Goblin Warrior 3/2,
--- Menace") -- the blocking side's SET-SHAPED combat restriction, and the first
--- evasion ability that is not a question about a (blocker, attacker) pair. Its
--- attacking counterpart is Bonded Construct's "can't attack alone"
--- (attacksAloneSpec below).
---
--- The whole group turns on the difference between "two or more creatures block
--- it" and "each creature blocking it passes some test". Flying, reach, fear and
--- landwalk are all the second kind, so they are checked in
--- Pawl.Engine.Combat.pairAllowed; menace is the first of the first kind, and is
--- checked in blockDeclarationAllowed, which sees the whole map at once. The
--- zero-blockers case below is what separates 702.111b's "can't be blocked EXCEPT
--- BY two or more" from the naive "at least two creatures must block it".
 -- CR 509.1a: the defending player chooses ONE creature for each blocker to
 -- block, and an effect can raise that number. Foriysian Brigade {3}{W} 2/4,
 -- "This creature can block an additional creature each combat", is the pool's
@@ -1507,6 +1495,19 @@ divisionChooser attackers gs =
             []
         )
 
+-- CR 702.111b, proved by Boggart Brute ("Creature -- Goblin Warrior 3/2,
+-- Menace") -- the blocking side's SET-SHAPED combat restriction, and the first
+-- evasion ability that is not a question about a (blocker, attacker) pair. Its
+-- attacking counterpart is Bonded Construct's "can't attack alone"
+-- (attacksAloneSpec below).
+--
+-- The whole group turns on the difference between "two or more creatures block
+-- it" and "each creature blocking it passes some test". Flying, reach, fear and
+-- landwalk are all the second kind, so they are checked in
+-- Pawl.Engine.Combat.pairAllowed; menace is the first of the first kind, and is
+-- checked in blockDeclarationAllowed, which sees the whole map at once. The
+-- zero-blockers case below is what separates 702.111b's "can't be blocked EXCEPT
+-- BY two or more" from the naive "at least two creatures must block it".
 menaceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 menaceSpec s registry = Spec.describe s "Menace" $ do
   Spec.it s "CR 702.111b a declaration in which ONE creature blocks a menace attacker is illegal" $ do

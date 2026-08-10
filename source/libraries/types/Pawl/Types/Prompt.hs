@@ -212,7 +212,7 @@ data Prompt r where
   --
   -- A SET per blocker, and never a single attacker: CR 509.1a gives a creature one
   -- attacker to block, but a permission can raise that (Foriysian Brigade), and
-  -- fixed arity is the recurring root cause (design doc S2.11). A blocker that
+  -- fixed arity is the recurring root cause (design doc §2.11). A blocker that
   -- blocks nothing is absent rather than mapped to the empty set.
   --
   -- WHICH attackers each blocker may take is not offered per blocker: the

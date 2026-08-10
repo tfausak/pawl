@@ -47,7 +47,8 @@
 -- puts CR 509.3c's event and CR 508.5's defending player in one sentence, with
 -- Khenra Eternal at three seats -- `afflictSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
--- CR
+-- CR 509.3e's form that counts them, with Lairwatch Giant --
+-- `selfBlocksAtLeastSpec`. CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
 -- zone off a triggered ability's EFFECT rather than its condition, with Squee,
