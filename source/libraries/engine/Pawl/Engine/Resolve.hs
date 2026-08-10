@@ -2125,7 +2125,12 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- such an instruction, so its controller (CR 109.5) is who the permanent
         -- enters under -- Meandering Towershell's "return it to the battlefield
         -- under your control" is that rule restated on the card rather than an
-        -- exception to it. Handed to the FUNNEL, not applied after it returns,
+        -- exception to it. The EXCEPTION rule 110.2a allows -- "unless the effect
+        -- states otherwise" -- is the riders' `underOwner`, which undying and
+        -- persist set and changeZoneEntering reads; this arm hands the funnel
+        -- the ability's controller either way.
+        --
+        -- Handed to the FUNNEL, not applied after it returns,
         -- for the reason the tap state is: control is settled on the entering
         -- incarnation before CR 614.1c's entry loop and the Moved snapshot can
         -- read it, so a CR 616.1b entry replacement that filters on control

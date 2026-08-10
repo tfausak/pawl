@@ -61,12 +61,14 @@ toJson k = case k of
   Keyword.Vanishing n -> Common.tagged "Vanishing" . Just $ Common.encodeNatural n
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
   Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
+  Keyword.Persist -> Common.nullary "Persist"
   Keyword.Infect -> Common.nullary "Infect"
   Keyword.Wither -> Common.nullary "Wither"
   Keyword.Exalted -> Common.nullary "Exalted"
   Keyword.Mentor -> Common.nullary "Mentor"
   Keyword.Provoke -> Common.nullary "Provoke"
   Keyword.BattleCry -> Common.nullary "BattleCry"
+  Keyword.Undying -> Common.nullary "Undying"
   Keyword.Evolve -> Common.nullary "Evolve"
   Keyword.Outlast cost -> Common.tagged "Outlast" . Just $ Cost.toJson toJson cost
   Keyword.Prowess -> Common.nullary "Prowess"
@@ -123,12 +125,14 @@ fromJson value = do
     ("Vanishing", Just v) -> Keyword.Vanishing <$> Common.decodeNatural v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
     ("Annihilator", Just v) -> Keyword.Annihilator <$> Common.decodeNatural v
+    ("Persist", _) -> Right Keyword.Persist
     ("Infect", _) -> Right Keyword.Infect
     ("Wither", _) -> Right Keyword.Wither
     ("Exalted", _) -> Right Keyword.Exalted
     ("Mentor", _) -> Right Keyword.Mentor
     ("Provoke", _) -> Right Keyword.Provoke
     ("BattleCry", _) -> Right Keyword.BattleCry
+    ("Undying", _) -> Right Keyword.Undying
     ("Evolve", _) -> Right Keyword.Evolve
     ("Outlast", Just v) -> Keyword.Outlast <$> Cost.fromJson fromJson v
     ("Prowess", _) -> Right Keyword.Prowess

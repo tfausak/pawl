@@ -599,3 +599,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Toxic 1)
       """ {"type":"Toxic","value":1} """
     Spec.assertBool s (Keyword.toJson (Keyword.Toxic 1) /= Keyword.toJson (Keyword.Toxic 2)) "toxic 1 and toxic 2 encode differently"
+  Spec.it s "Persist" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Persist
+      """ {"type":"Persist"} """
+  -- Persist's mirror, and told apart from it by the tag alone: rules 702.79a and
+  -- 702.93a differ only in a counter kind neither encoding carries.
+  Spec.it s "Undying" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Undying
+      """ {"type":"Undying"} """
+    Spec.assertBool s (Keyword.toJson Keyword.Undying /= Keyword.toJson Keyword.Persist) "undying and persist encode differently"

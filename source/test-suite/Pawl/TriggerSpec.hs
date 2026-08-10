@@ -91,7 +91,9 @@
 -- read against a source that no longer exists (CR 608.2h), with Deathknell Berserker
 -- -- `lookBackInterveningSpec`, and the same clause asking about a COUNTER rather
 -- than a characteristic -- the one thing CR 613 folds away before the snapshot
--- is taken -- with Promising Duskmage -- `counterLookBackSpec`.
+-- is taken -- with Promising Duskmage -- `counterLookBackSpec`. CR 702.93
+-- undying and CR 702.79 persist, the pair of keywords that return their bearer
+-- with a counter on it, with Young Wolf and Putrid Goblin -- `undyingSpec`.
 -- CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
@@ -7025,6 +7027,92 @@ counterLookBackSpec s registry =
           Spec.assertEqWith s "and was removed on the resolution read, drawing nothing" (S.handSize S.alice after, librarySize S.alice after) (0, 5)
           Spec.assertEqWith s "the stack is empty either way" (GameState.stack after) []
 
+-- CR 702.93a undying and CR 702.79a persist: one sentence in two counter kinds,
+-- minted by Pawl.Engine.Keyword.returns.
+--
+-- Young Wolf, {G} Creature -- Wolf 1/1, and Putrid Goblin, {1}{B} Creature --
+-- Zombie Goblin 2/2. Each keyword is the card's whole text box, so nothing else
+-- printed there can be producing the return.
+--
+-- KILLED TWICE, rather than the counter being placed by hand as
+-- counterLookBackSpec's Duskmage does: the second death is what proves the
+-- counter actually arrived, since CR 603.4's "if it had no counters" reads it off
+-- CR 608.2h last known information. Murder rather than damage, for that spec's
+-- reason -- the two deaths are at different toughnesses.
+--
+-- The two keywords are one group because rules 702.79a and 702.93a are one
+-- sentence: what separates the legs is the counter kind, and persist's is the one
+-- that makes the returned permanent SMALLER (CR 122.1a).
+undyingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+undyingSpec s registry =
+  let -- The named creature on alice's board with two Murders in hand and six
+      -- Swamps, which is {1}{B}{B} twice with nothing left over. No untap step
+      -- runs between the two casts.
+      board name = do
+        swamp <- S.printingOf s registry "Swamp"
+        murder <- S.printingOf s registry "Murder"
+        creature <- S.printingOf s registry name
+        let (oid, withCreature) = S.addCreature creature S.alice (S.landsInPlay swamp 6)
+            (gs1, firstMurder) = S.handOne murder withCreature
+            (secondMurder, gs2) = S.addHandCard murder S.alice gs1
+        pure (oid, gs2, firstMurder, secondMurder)
+      -- Cast the Murder, resolve it, settle -- CR 704.5g buries the creature and
+      -- the same CR 117.5 scan sees the death -- then resolve what it placed.
+      murderWith spellId gs =
+        let cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+            destroyed = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer destroyed Engine.settleForPriority
+         in (settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      named name gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))) (Set.toList (GameState.battlefield gs))
+      inGraveyard name pid gs = elem (CardName.MkCardName (Text.pack name)) (Maybe.mapMaybe (\oid -> fmap Face.name (Game.faceOf oid gs)) (Game.zoneMembers Zone.Graveyard pid gs))
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+      -- One leg per keyword: die, come back with the counter at the stated size,
+      -- die again, stay dead.
+      twiceKilled name kind power toughness =
+        Spec.it s ("CR 702 " <> name <> " returns once, with its counter, and not a second time") $ do
+          (firstId, gs, m1, m2) <- board name
+          let (settled, after) = murderWith m1 gs
+          Spec.assertEqWith s "the dies trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject firstId after)) "CR 400.7: the permanent that died is a spent id"
+          case named name after of
+            [backId] -> do
+              Spec.assertEqWith s "it entered with exactly one counter, of that kind" (countersOn backId after) (Map.singleton kind 1)
+              Spec.assertEqWith s "CR 122.1a resizes it" (Projection.powerOf backId after, Projection.toughnessOf backId after) (Just power, Just toughness)
+              Spec.assertEqWith s "CR 110.2a: under its owner's control" (Projection.controllerOf backId after) (Just S.alice)
+              Spec.assertBool s (not (inGraveyard name S.alice after)) "and no longer in the graveyard"
+              let (settled2, after2) = murderWith m2 after
+              Spec.assertEqWith s "CR 603.4: with the counter on it, the second death triggers nothing" (GameState.stack settled2) []
+              Spec.assertEqWith s "so nothing comes back" (named name after2) []
+              Spec.assertBool s (inGraveyard name S.alice after2) "and it stays in the graveyard"
+            other -> Spec.assertFailure s ("expected exactly one " <> name <> " back on the battlefield, got " <> show other)
+   in Spec.describe s "CR 702.93 undying and CR 702.79 persist" $ do
+        twiceKilled "Young Wolf" CounterKind.PlusOnePlusOne 2 2
+        twiceKilled "Putrid Goblin" CounterKind.MinusOneMinusOne 1 1
+        -- CR 110.2a's "unless the effect states otherwise". Alice steals bob's
+        -- Wolf and kills it, so CR 603.3a hands ALICE the dies trigger -- which
+        -- is what makes this discriminating, since a return under the ability's
+        -- controller and a return under the owner are the same board at one
+        -- seat. Lightning Bolt does the killing so the whole fixture is red.
+        Spec.it s "CR 110.2a a stolen Young Wolf comes back under its OWNER's control" $ do
+          mountain <- S.printingOf s registry "Mountain"
+          treason <- S.printingOf s registry "Act of Treason"
+          bolt <- S.printingOf s registry "Lightning Bolt"
+          wolf <- S.printingOf s registry "Young Wolf"
+          let (wolfId, withWolf) = S.addCreature wolf S.bob (S.landsInPlay mountain 4)
+              (gs1, treasonId) = S.handOne treason withWolf
+              (boltId, gs2) = S.addHandCard bolt S.alice gs1
+              stolen = S.runPure S.identityAnswer (S.runPure S.identityAnswer gs2 (S.cast S.alice treasonId)) Stack.resolveTop
+              burned = S.runPure S.identityAnswer (S.runPure S.identityAnswer stolen (S.cast S.alice boltId)) Stack.resolveTop
+              settled = S.runPure S.identityAnswer burned Engine.settleForPriority
+              after = S.runPure S.identityAnswer settled Stack.resolveTop
+          Spec.assertEqWith s "alice controls the Wolf when it dies" (Projection.controllerOf wolfId stolen) (Just S.alice)
+          Spec.assertEqWith s "CR 603.3a: so the dies trigger is alice's" (fmap (\oid -> Projection.controllerOf oid settled) (GameState.stack settled)) [Just S.alice]
+          case named "Young Wolf" after of
+            [backId] -> do
+              Spec.assertEqWith s "and it returns under bob's" (Projection.controllerOf backId after) (Just S.bob)
+              Spec.assertEqWith s "with its +1/+1 counter" (countersOn backId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+            other -> Spec.assertFailure s ("expected the Wolf back on the battlefield, got " <> show other)
+
 -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. / {T}: Add
 -- {C}." A nonbasic land whose whole text box is one triggered ability and one
 -- activated one, which is what makes it the pool's witness for CR 305.7's
@@ -8763,6 +8851,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   promiseOfTomorrowSpec s registry
   lookBackInterveningSpec s registry
   counterLookBackSpec s registry
+  undyingSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
   bystanderZoneSpec s registry
