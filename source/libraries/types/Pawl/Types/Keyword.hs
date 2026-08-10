@@ -336,6 +336,33 @@ data Keyword
     -- the payload's own Modal.modeCount rather than a number restated here, and
     -- Pawl.Types.ModeSelection stays what the card PRINTS.
     Entwine (Cost.Cost Keyword)
+  | -- | 702.43a: modular N, which is TWO abilities -- "this permanent enters with
+    -- N +1/+1 counters on it" and "when this permanent is put into a graveyard
+    -- from the battlefield, you may put a +1/+1 counter on target artifact
+    -- creature for each +1/+1 counter on this permanent". Vanishing's split
+    -- across Pawl.Engine.Keyword's two mints, one ability shorter: the first is a
+    -- CR 614.1c entry replacement (mintedReplacementsFor) and the second an
+    -- ordinary triggered ability.
+    --
+    -- N rides the constructor, as Vanishing's does, and CR 702.43b says each
+    -- instance works separately -- so its readers take the per-keyword COUNT, and
+    -- a permanent with modular twice enters with both lots of counters and dies
+    -- with two triggers.
+    --
+    -- The DEATH half reads no N at all: the rule counts the +1/+1 counters
+    -- actually on the permanent, so two instances of `Modular 1` each move the
+    -- whole pile rather than one counter apiece.
+    --
+    -- NOT a creature-only keyword: rule 702.43a says "permanent", and Power Depot
+    -- (an artifact land) prints it, so nothing here or in the mint asks whether
+    -- the bearer is a creature. Rule 702.43b's "creature" is the narrower word,
+    -- and narrowing the multiplicity clause alone would be a distinction without
+    -- a reader.
+    --
+    -- A Natural and not a Quantity: CR 702.44c's "Modular--Sunburst" (Arcbound
+    -- Wanderer) is the one printing whose N is another keyword's count, and
+    -- sunburst itself has no representation yet (#877).
+    Modular Natural.Natural
   | -- | 702.45a: whenever this creature blocks or becomes blocked, it gets +N/+N
     -- until end of turn. N rides the constructor, as Poisonous' does, and for the
     -- same reason: CR 702.45b says each instance triggers separately.

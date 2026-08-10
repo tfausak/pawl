@@ -125,6 +125,10 @@ abilitiesFor keyword count = case keyword of
   -- The SECOND such arm: rule 702.63a states three abilities, and the first of
   -- them is a replacement effect rather than a trigger, so two land here.
   Keyword.Vanishing _ -> concat (List.genericReplicate count vanishing)
+  -- CR 702.43a's SECOND ability, one per instance -- CR 702.43b says each works
+  -- separately, so a permanent with modular twice dies with two triggers and
+  -- each moves the whole pile.
+  Keyword.Modular _ -> List.genericReplicate count modular
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
@@ -249,6 +253,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -376,6 +381,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -607,6 +613,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -832,6 +839,10 @@ mintedReplacementsFor keyword count = case keyword of
   -- add up: two instances of vanishing 2 enter the permanent with four time
   -- counters, since each rewrite places its own N.
   Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters CounterKind.Time n))
+  -- CR 702.43a's FIRST ability, vanishing's row with a different counter kind:
+  -- "this permanent enters with N +1/+1 counters on it". One row per instance
+  -- for the same reason, and CR 702.43b makes them add up.
+  Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters CounterKind.PlusOnePlusOne n))
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -949,6 +960,7 @@ familyOf keyword = case keyword of
   Keyword.Morph _ _ -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
+  Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
@@ -1773,3 +1785,59 @@ vanishingLastCounter =
     }
   where
     effect = Effect.Sacrifice Binding.triggerSource
+
+-- CR 702.43a's SECOND ability: "when this permanent is put into a graveyard from
+-- the battlefield, you may put a +1/+1 counter on target artifact creature for
+-- each +1/+1 counter on this permanent." Mentor's shape -- one target slot, one
+-- Effect.PutCounters -- with a "may" and a counted quantity where mentor has a
+-- mandatory clause and a literal 1.
+--
+-- TriggerCondition.SelfDies is CR 700.4's battlefield-to-graveyard pair, which is
+-- what rule 702.43a's longhand spells out. So the ability's source is the
+-- DEPARTING incarnation, the id GameState.lastKnown files under -- which is what
+-- makes the count below answerable at all.
+--
+-- THE COUNT is Quantity.ObjectCounters, which names no object and takes the one
+-- the evaluation is aimed at: CR 113.7a's source, read through
+-- Projection.viewWithLastKnown. That is CR 608.2h doing the work -- the permanent
+-- is in a graveyard by the time this resolves and CR 122.2 made its counters
+-- cease with it, so the last known record is the only place the number still is.
+-- Promising Duskmage's intervening "if" reads the same record the same way; this
+-- is the first to read it at RESOLUTION, which Pawl.TriggerSpec's modularSpec
+-- proves by emptying the record while the trigger sits on the stack.
+--
+-- Optionality.Optional is rule 702.43a's "you may", asked of the controller as
+-- the ability resolves (Pawl.Engine.Resolve.exercises). A REAL choice: declining
+-- with a legal target on the board leaves the counters nowhere, which is why
+-- nothing here elides it.
+--
+-- The target is Pool.Creatures narrowed to artifacts -- rule 702.43a's "target
+-- artifact creature", CR 109.2 drawing the candidates from the battlefield. No
+-- controller conjunct, because the rule states none, and no `Not IsSource`: the
+-- bearer is in a graveyard and is not a candidate anyway.
+--
+-- ZERO counters is an ordinary answer rather than a failure, the position
+-- Quantity.OpponentsAttacked takes: a modular permanent whose counters were all
+-- removed before it died still triggers, still targets, and puts nothing on.
+modular :: TriggeredAbility Card
+modular =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfDies,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton effect))) (Map.singleton modularTarget spec)))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.HasCardType CardType.Artifact))
+    effect =
+      Effect.PutCounters
+        CounterKind.PlusOnePlusOne
+        (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)
+        (ObjectRef.InSlot modularTarget)
+
+-- The slot rule 702.43a's one target is chosen into, mentorTarget's position and
+-- for its reason.
+modularTarget :: SlotName.SlotName
+modularTarget = SlotName.MkSlotName (Text.pack "modularRecipient")

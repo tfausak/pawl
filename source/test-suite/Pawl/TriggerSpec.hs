@@ -65,7 +65,10 @@
 -- 702.63 vanishing, the sixteenth, and the first keyword whose rule text spans
 -- BOTH mints -- one CR 614.1c entry replacement and two triggers, one of them
 -- watching the counter removal the other performs -- with Waning Wurm --
--- `vanishingSpec`. CR
+-- `vanishingSpec`. CR 702.43 modular, the seventeenth, whose rule text spans both
+-- mints too and whose trigger PAYLOAD counts the dead permanent's own +1/+1
+-- counters out of CR 608.2h last known information, with Arcbound Hybrid and
+-- Arcbound Worker -- `modularSpec`. CR
 -- 510.2's combat damage watched by a bystander rather than by the creature that
 -- dealt it, with Tovolar, Dire Overlord -- `tovolarSpec`. The same condition's
 -- damager slot, read by a payload that aims at it, with Aragorn, Hornburg Hero --
@@ -4293,6 +4296,162 @@ vanishingSpec s registry =
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
             (replicate 2 (ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Time 2)))
 
+-- CR 702.43 modular, the seventeenth keyword rule 702 states as abilities, and
+-- the second whose rule text spans BOTH mints -- one CR 614.1c entry replacement
+-- and one death trigger. What is new is the trigger's PAYLOAD: rule 702.43a
+-- counts "each +1/+1 counter on this permanent" at a moment when the permanent
+-- is in a graveyard, so the number comes from CR 608.2h last known information.
+-- counterLookBackSpec above proves the same record answering an intervening "if";
+-- this is the first read of it at RESOLUTION.
+--
+-- Two printings, so no number below can be read two ways:
+--
+--   * Arcbound Hybrid {4} Artifact Creature -- Beast 0/0, haste and modular 2.
+--   * Arcbound Worker {1} Artifact Creature -- Construct 0/0, modular 1.
+--
+-- The dying Hybrid is SEEDED to three counters against its printed modular 2,
+-- which is the discriminator that matters: an implementation reading the
+-- keyword's N instead of the counters on the permanent moves 2, and one reading a
+-- literal moves 1. Only counting the pile moves 3.
+--
+-- Murder does the killing, counterLookBackSpec's reason: a 0/0 body plus counters
+-- makes lethal damage a different number per leg, and CR 701.8a's destroy does
+-- not care.
+modularSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+modularSpec s registry =
+  let plusOnes = S.counterOf CounterKind.PlusOnePlusOne
+      -- Rule 702.43a's "you may", exercised. S.identityAnswer declines it, which
+      -- is what the declining leg below rides.
+      exercising :: Prompt.Prompt r -> r
+      exercising p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      -- A Hybrid seeded with three +1/+1 counters and one companion creature,
+      -- with a Murder in hand. The Hybrid is added FIRST so it holds the lesser
+      -- ObjectId: Murder's pool is Pool.Creatures and identityAnswer takes the
+      -- least recipient, so this is what aims the removal at it rather than at
+      -- the companion.
+      board companion = do
+        swamp <- S.printingOf s registry "Swamp"
+        murder <- S.printingOf s registry "Murder"
+        hybrid <- S.printingOf s registry "Arcbound Hybrid"
+        other <- S.printingOf s registry companion
+        let lands = S.landsInPlay swamp 3
+            (hybridId, g1) = S.addCreature hybrid S.alice lands
+            g2 = S.addCounter CounterKind.PlusOnePlusOne 3 hybridId g1
+            (otherId, g3) = S.addCreature other S.alice g2
+            -- The companion carries a counter of its own, so a payload that
+            -- overwrote rather than added would be visible, and so that a 0/0
+            -- Worker survives CR 704.5f.
+            g4 = S.addCounter CounterKind.PlusOnePlusOne 1 otherId g3
+            -- CR 104.3c: nothing here draws, but a stocked library keeps a leg
+            -- from ending on an empty one.
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g4 [1 .. 5 :: Int]
+        pure (hybridId, otherId, S.handOne murder stocked)
+      -- Cast the Murder, resolve it (the Hybrid dies), settle so the death
+      -- trigger is gathered (CR 603.3), then resolve the trigger.
+      murderIt :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, GameState.GameState)
+      murderIt answer (gs, spellId) =
+        let cast = S.runPure answer gs (S.cast S.alice spellId)
+            destroyed = S.runPure answer cast Stack.resolveTop
+            settled = S.runPure answer destroyed Engine.settleForPriority
+         in (settled, S.runPure answer settled Stack.resolveTop)
+      -- A printing CAST rather than placed, because rule 702.43a's first ability
+      -- is a replacement on the ENTRY -- S.addCreature reaches no CR 616.1 loop.
+      castOne name lands = do
+        swamp <- S.printingOf s registry "Swamp"
+        printing <- S.printingOf s registry name
+        let (held, gs0) = S.addHandCard printing S.alice (S.landsInPlay swamp lands)
+            gs =
+              gs0
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
+            named oid = fmap Face.name (Game.faceOf oid entered) == Just (CardName.MkCardName (Text.pack name))
+        pure (List.find named (Set.toList (GameState.battlefield entered)), entered)
+   in Spec.describe s "Modular" $ do
+        -- Rule 702.43a's FIRST ability, at both printed values: the N is the
+        -- card's and not the rule's, so one leg alone could not tell a mint that
+        -- always placed one counter from a correct one.
+        Spec.it s "CR 702.43a the entry places the printed N of +1/+1 counters" $ do
+          (foundWorker, workerBoard) <- castOne "Arcbound Worker" 1
+          case foundWorker of
+            Nothing -> Spec.assertFailure s "Arcbound Worker did not reach the battlefield"
+            Just worker -> do
+              Spec.assertEqWith s "modular 1 enters with one counter" (plusOnes worker workerBoard) 1
+              -- CR 122.1a at layer 7c, which is also why a printed 0/0 survives
+              -- CR 704.5f at all.
+              Spec.assertEqWith s "so the printed 0/0 is a 1/1" (S.powerToughnessOf worker workerBoard) (Just (1, 1))
+          (foundHybrid, hybridBoard) <- castOne "Arcbound Hybrid" 4
+          case foundHybrid of
+            Nothing -> Spec.assertFailure s "Arcbound Hybrid did not reach the battlefield"
+            Just hybrid -> do
+              Spec.assertEqWith s "modular 2 enters with two" (plusOnes hybrid hybridBoard) 2
+              Spec.assertEqWith s "a 2/2" (S.powerToughnessOf hybrid hybridBoard) (Just (2, 2))
+        -- The proving test. Rule 702.43a's SECOND ability, counting the pile the
+        -- dead permanent had rather than its printed N.
+        Spec.it s "CR 702.43a whole card: the dead Hybrid moves all three of its counters" $ do
+          (hybridId, workerId, gs) <- board "Arcbound Worker"
+          let (settled, after) = murderIt exercising gs
+          Spec.assertEqWith s "the Hybrid held three, not its printed two" (plusOnes hybridId (fst gs)) 3
+          Spec.assertEqWith s "the Worker held one" (plusOnes workerId (fst gs)) 1
+          Spec.assertEqWith s "the death trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertBool s (not (S.onBattlefield hybridId after)) "and the Hybrid is gone"
+          -- CR 608.2h: four is one plus THREE, so the count came from the last
+          -- known record. Two would be the printed N and one a literal.
+          Spec.assertEqWith s "the Worker is up to four" (plusOnes workerId after) 4
+          Spec.assertEqWith s "so it is a 4/4" (S.powerToughnessOf workerId after) (Just (4, 4))
+        -- CR 603.5's "may" is a real fork, and the control for the case above --
+        -- same board, same Murder, and the trigger still reaches the stack.
+        Spec.it s "CR 603.5 declining the may leaves the counters nowhere" $ do
+          (_, workerId, gs) <- board "Arcbound Worker"
+          let (settled, after) = murderIt S.identityAnswer gs
+          Spec.assertEqWith s "the trigger reached the stack all the same" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "the Worker is still on one" (plusOnes workerId after) 1
+          Spec.assertEqWith s "a 1/1" (S.powerToughnessOf workerId after) (Just (1, 1))
+        -- CR 608.2h in isolation, counterLookBackSpec's third case in the payload
+        -- rather than in an intervening "if": the record is emptied while the
+        -- trigger sits on the stack, which no rule can do to last known
+        -- information -- so only a payload that really reads it notices.
+        Spec.it s "CR 608.2h the count comes from the last known record, not from the board" $ do
+          (hybridId, workerId, gs) <- board "Arcbound Worker"
+          let (settled, _) = murderIt exercising gs
+              forgotten =
+                settled
+                  { GameState.lastKnown =
+                      Map.adjust (\lk -> lk {LastKnown.counters = Map.empty}) hybridId (GameState.lastKnown settled)
+                  }
+              after = S.runPure exercising forgotten Stack.resolveTop
+          Spec.assertEqWith s "the trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "and resolved off it" (GameState.stack after) []
+          Spec.assertEqWith s "and moved nothing, the record being empty" (plusOnes workerId after) 1
+        -- "Target ARTIFACT creature": Goblin Piker 2/1 is a creature and not an
+        -- artifact, so CR 603.3d finds no legal target and the ability never
+        -- reaches the stack. The case above is the control -- the only difference
+        -- between the two boards is which creature stands beside the Hybrid.
+        Spec.it s "CR 702.43a a nonartifact creature is no target at all" $ do
+          (_, pikerId, gs) <- board "Goblin Piker"
+          let (settled, after) = murderIt exercising gs
+          Spec.assertEqWith s "nothing reached the stack" (GameState.stack settled) []
+          Spec.assertEqWith s "and the Piker is still on the one it started with" (plusOnes pikerId after) 1
+        -- CR 702.43b: each instance works separately. Asserted of BOTH mints,
+        -- vanishing's position, no printing in the pool carrying modular twice.
+        -- Spelled out rather than compared against Keyword.modular itself, for
+        -- vanishingSpec's reason.
+        Spec.it s "CR 702.43b each instance is its own two abilities" $ do
+          Spec.assertEqWith
+            s
+            "modular 2 held twice mints two death triggers"
+            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Modular 2) 2)))
+            [TriggerCondition.SelfDies, TriggerCondition.SelfDies]
+          Spec.assertEqWith
+            s
+            "and two entry rewrites of two counters each, which is what makes them add up"
+            (Keyword.mintedReplacementsFor (Keyword.Type.Modular 2) 2)
+            (replicate 2 (ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.PlusOnePlusOne 2)))
+
 -- CR 510.1b / 510.2's combat damage watched by a BYSTANDER rather than by the
 -- creature that dealt it -- TriggerCondition.PermanentDealsCombatDamageToPlayer,
 -- the filtered twin of poisonousSpec's SelfDealsCombatDamageToPlayer.
@@ -6780,7 +6939,7 @@ lookBackInterveningSpec s registry =
 -- Murder rather than a damage spell does the killing on purpose: the counter
 -- moves the Duskmage from 2/3 to 3/4, so any lethal-damage removal would need a
 -- different amount per leg and the two legs would stop being one fixture. CR
--- 701.7a's destroy does not care what the toughness is.
+-- 701.8a's destroy does not care what the toughness is.
 --
 -- Both of CR 603.4's reads are covered, and separately:
 --
@@ -8587,6 +8746,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   krasisSpec s registry
   renownSpec s registry
   vanishingSpec s registry
+  modularSpec s registry
   tovolarSpec s registry
   aragornSpec s registry
   afflictSpec s registry

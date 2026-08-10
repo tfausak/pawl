@@ -56,6 +56,7 @@ toJson k = case k of
   -- keyword with a second field rather than a tag of its own.
   Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Common.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
   Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
+  Keyword.Modular n -> Common.tagged "Modular" . Just $ Common.encodeNatural n
   Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Common.encodeNatural n
   Keyword.Vanishing n -> Common.tagged "Vanishing" . Just $ Common.encodeNatural n
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
@@ -117,6 +118,7 @@ fromJson value = do
     ("Intimidate", _) -> Right Keyword.Intimidate
     ("Morph", Just (Value.Array (Array.MkArray [c, v]))) -> Keyword.Morph <$> Cost.fromJson fromJson c <*> MorphVariant.fromJson v
     ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
+    ("Modular", Just v) -> Keyword.Modular <$> Common.decodeNatural v
     ("Bushido", Just v) -> Keyword.Bushido <$> Common.decodeNatural v
     ("Vanishing", Just v) -> Keyword.Vanishing <$> Common.decodeNatural v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
