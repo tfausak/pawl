@@ -634,6 +634,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Entwine cost -> Keyword.Type.Entwine (rewriteCost pairs cost)
   -- CR 702.45a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Bushido _ -> keyword
+  -- CR 702.61a names no word CR 612.2 can swap: "mana ability" is CR 605.1a's
+  -- own classification and "the stack" is a zone.
+  Keyword.Type.SplitSecond -> keyword
   -- CR 702.43a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "+1/+1 counter" is the rule's own noun and no card prints it.
   Keyword.Type.Modular _ -> keyword

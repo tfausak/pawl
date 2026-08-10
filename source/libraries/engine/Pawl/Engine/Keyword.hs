@@ -149,6 +149,7 @@ abilitiesFor keyword count = case keyword of
   -- 702.45a's ability watches two events, and a TriggeredAbility carries one
   -- condition.
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
+  Keyword.SplitSecond -> []
   -- Another: rule 702.63a states three abilities, and the first of
   -- them is a replacement effect rather than a trigger, so two land here.
   Keyword.Vanishing _ -> concat (List.genericReplicate count vanishing)
@@ -270,6 +271,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -404,6 +406,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -642,6 +645,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -955,6 +959,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -1078,6 +1083,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
@@ -1184,6 +1190,7 @@ familyOf keyword = case keyword of
   Keyword.Menace -> Nothing
   Keyword.Renown _ -> Just KeywordFamily.Renown
   Keyword.Changeling -> Nothing
+  Keyword.SplitSecond -> Nothing
   Keyword.Devoid -> Nothing
   Keyword.Skulk -> Nothing
   -- CR 702.121a takes no parameter, so there is no variant for a card to name.

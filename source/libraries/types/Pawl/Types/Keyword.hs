@@ -371,6 +371,22 @@ data Keyword
     -- 509.3c), because rule 702.45a prints one ability. The split into two
     -- TriggeredAbility values is Pawl.Engine.Keyword.bushido's problem.
     Bushido Natural.Natural
+  | -- | 702.61a: split second. "As long as this spell is on the stack, players
+    -- can't cast spells or activate abilities that aren't mana abilities."
+    --
+    -- A static ability of an object ON THE STACK, which is what makes it unlike
+    -- every other keyword here: it is not minted into an ability object and it
+    -- says nothing about its own spell. It is a RULES-MODIFYING continuous
+    -- effect (CR 611.1's third clause) that other players' gates ask about, so
+    -- Pawl.Engine.SplitSecond is the reader and Pawl.Engine.Cast and
+    -- Pawl.Engine.Activate are the two askers.
+    --
+    -- Nullary, and CR 702.61c makes multiple instances redundant -- so its
+    -- reader takes membership rather than the per-keyword count. No
+    -- Pawl.Types.KeywordFamily constructor is owed: that type holds only the
+    -- payload-carrying keywords, since a nullary keyword's family would be the
+    -- keyword.
+    SplitSecond
   | -- | 702.63a: vanishing N, which is THREE abilities -- "this permanent enters
     -- with N time counters on it", "at the beginning of your upkeep, if this
     -- permanent has a time counter on it, remove a time counter from it", and
