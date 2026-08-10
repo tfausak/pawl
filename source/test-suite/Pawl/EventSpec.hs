@@ -152,7 +152,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     let goblinCard = Printing.card piker
         gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
-        after = S.runPure S.identityAnswer gone (Event.createTokens S.alice goblinCard 2 TapState.Untapped)
+        after = S.runPure S.identityAnswer gone (Event.createTokens S.alice goblinCard Nothing 2 TapState.Untapped)
     Spec.assertBool s (notElem S.alice (Game.stillPlaying gone)) "alice really has left"
     Spec.assertEqWith s "no object was ever minted" (Game.objectCount after) before
     Spec.assertEqWith s "and nothing reached the battlefield" (Set.size (GameState.battlefield after)) 0
@@ -164,7 +164,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     let goblinCard = Printing.card piker
         gone = Departure.depart Departure.Type.Conceded S.alice S.threePlayerGame
         before = Game.objectCount gone
-        after = S.runPure S.identityAnswer gone (Event.createTokens S.bob goblinCard 2 TapState.Untapped)
+        after = S.runPure S.identityAnswer gone (Event.createTokens S.bob goblinCard Nothing 2 TapState.Untapped)
     Spec.assertEqWith s "bob's two tokens exist" (Game.objectCount after) (before + 2)
     Spec.assertEqWith s "both on the battlefield" (Set.size (GameState.battlefield after)) 2
 
@@ -173,7 +173,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Event" $ do
     let base = Setup.emptyGame S.bothPlayers
         goblinCard = Printing.card piker
         before = Game.objectCount base
-        after = S.runPure S.identityAnswer base (Event.createTokens S.alice goblinCard 1 TapState.Untapped)
+        after = S.runPure S.identityAnswer base (Event.createTokens S.alice goblinCard Nothing 1 TapState.Untapped)
         newIds = Set.toList (GameState.battlefield after)
     Spec.assertEqWith s "one more object exists" (Game.objectCount after) (before + 1)
     Spec.assertEqWith s "exactly one battlefield object" (length newIds) 1

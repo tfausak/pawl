@@ -2374,8 +2374,14 @@ sacrifice pid oid = do
 --
 -- Inline rather than delegating to a `createTokensFor` body: the project writes no
 -- export lists, so a second top-level name would be a public door past the check.
-createTokens :: PlayerId -> Card -> Natural -> TapState.TapState -> Game [ObjectId]
-createTokens controller card n tapped = do
+--
+-- The Maybe snapshot is CR 707.1's other kind of token -- one whose text is a
+-- copy of a permanent rather than given (`copiedSnapshot`) -- and it comes
+-- through this one funnel rather than a second so that CR 614.16's count
+-- replacement, CR 800.4b's departed-player guard and each token's own CR 614.12
+-- entry loop are the same code for both kinds.
+createTokens :: PlayerId -> Card -> Maybe PC.ProjectedCharacteristics -> Natural -> TapState.TapState -> Game [ObjectId]
+createTokens controller card copy n tapped = do
   gs <- State.get
   if List.notElem controller (Game.stillPlaying gs)
     then pure []
@@ -2399,7 +2405,16 @@ createTokens controller card n tapped = do
                     Object.facing = Facing.FaceUp,
                     Object.damage = 0,
                     Object.sickness = Sickness.Sick,
-                    Object.bindings = Map.empty,
+                    -- CR 707.2 / 111.3: a token copy's copiable values are the
+                    -- copied permanent's, stamped into the layer-1 snapshot the
+                    -- projection starts from -- the same binding the CR 614.1c
+                    -- entry rewrite writes, and the same read
+                    -- (Projection.copiableCharacteristics) on the way out.
+                    -- Written HERE rather than after the entry loop because CR
+                    -- 614.12 asks for the characteristics the permanent would
+                    -- have on the battlefield, and for this token those are the
+                    -- copy's from the instant it exists.
+                    Object.bindings = maybe Map.empty (\pc -> Binding.setCopy pc Map.empty) copy,
                     Object.counters = Map.empty,
                     Object.attachedTo = Nothing,
                     Object.chosenColor = Nothing,

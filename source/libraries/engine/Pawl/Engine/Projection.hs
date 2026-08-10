@@ -1374,6 +1374,11 @@ rewriteEffect pairs effect = case effect of
   -- name with the same words, so a text change reaches both. Those words live in
   -- the token's defining card, which this arm hands to rewriteCard.
   Effect.Create quantity card riders slot -> Effect.Create quantity (rewriteCard pairs card) riders slot
+  -- The ObjectRef alone, exactly as Tap above: an EachMatching's Filter is a
+  -- word a CR 612.1 swap reaches. What the token BECOMES is not text on this
+  -- card at all -- it is the copied permanent's copiable values, and CR 707.2
+  -- excludes text-changing effects from those, so nothing here rewrites them.
+  Effect.CreateCopy ref -> Effect.CreateCopy (rewriteObjectRef pairs ref)
   Effect.Replace {} -> effect
   Effect.SkipNextPhase {} -> effect
   -- CR 612.1: a rider's text is as changeable as any other, so the recursion

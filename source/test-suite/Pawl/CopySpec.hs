@@ -2,8 +2,10 @@
 {-# LANGUAGE RankNTypes #-}
 
 -- Covers: Pawl.Engine.Replacement's EntryR AsCopy arm (the CR 614.12a copy choice, run
--- from inside Pawl.Engine.Event's changeZone), the P2 copy gate (Clone). Gameplay-level:
--- Clone enters via the zone-change funnel and its projected characteristics are
+-- from inside Pawl.Engine.Event's changeZone), the P2 copy gate (Clone), and
+-- Pawl.Engine.Resolve's CreateCopy arm (CR 707.2's token copy, Cackling
+-- Counterpart). Gameplay-level: Clone enters via the zone-change funnel and the
+-- Counterpart is cast and resolved, and their projected characteristics are
 -- asserted.
 module Pawl.CopySpec where
 
@@ -27,6 +29,8 @@ import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.ObjectId as ObjectId
+import qualified Pawl.Types.Printing as Printing
+import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Regenerability as Regenerability
 
@@ -64,6 +68,30 @@ copyNewest p = case p of
   Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
   Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
   _ -> S.identityAnswer p
+
+-- copyNewest's opposite: decline every as-enters copy choice. The token-copy
+-- tests answer with this so that a token which wrongly kept its base card's own
+-- `EntryR AsCopy` (Clone's) copies NOTHING and dies as a 0/0, rather than being
+-- repaired into the right answer by the answerer.
+declineCopy :: Prompt.Prompt r -> r
+declineCopy p = case p of
+  Prompt.ChooseCopyTarget {} -> Nothing
+  Prompt.OrderTriggers _ _ entries -> zipWith const [0 ..] entries
+  Prompt.OrderDamage _ _ events -> zipWith const [0 ..] events
+  _ -> S.identityAnswer p
+
+-- The tokens on the battlefield (CR 111.6), newest first.
+tokensOnBattlefield :: GameState.GameState -> [ObjectId]
+tokensOnBattlefield gs = List.sortOn Ord.Down (filter (`Game.isToken` gs) (Set.toList (GameState.battlefield gs)))
+
+-- alice casts `spell` (paying from lands already in play) and the stack top
+-- resolves, then the board settles. Cast and resolution run under the same
+-- answerer, so a prompt either side of the boundary is answered alike.
+castAndResolve :: (forall r. Prompt.Prompt r -> r) -> Printing.Printing -> GameState.GameState -> GameState.GameState
+castAndResolve answer spell board =
+  let (staged, oid) = S.handOne spell board
+      afterCast = S.runPure answer staged (S.cast S.alice oid)
+   in resolveAndSettle answer afterCast
 
 -- Resolve the stack top (a permanent enters -- the copy choice is now made INSIDE
 -- that resolution, CR 614.12a) AND run the settle boundary (so a 0/0 Clone with
@@ -198,3 +226,55 @@ spec s registry = Spec.describe s "Pawl.Engine.Copy" $ do
         Spec.assertEqWith s "the source moves to 2" (Projection.powerOf goyfId later) $ Just 2
         Spec.assertEqWith s "and so does the COPY" (Projection.powerOf cloneId later) $ Just 2
         Spec.assertEqWith s "the copy's toughness moves too" (Projection.toughnessOf cloneId later) $ Just 3
+
+  Spec.it s "Cackling Counterpart mints a token copy of the targeted creature (CR 707.2, CR 111.3)" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let (_, board) = S.addCreature piker S.alice (S.landsInPlay island 3)
+        resolved = castAndResolve declineCopy counterpart board
+    case tokensOnBattlefield resolved of
+      [tokenId] -> do
+        Spec.assertEqWith s "the token's name is the copied creature's" (PC.name (Projection.project tokenId resolved)) $ CardName.MkCardName (Text.pack "Goblin Piker")
+        Spec.assertEqWith s "the token's power is the copied creature's" (Projection.powerOf tokenId resolved) $ Just 2
+        Spec.assertEqWith s "the token's toughness is the copied creature's" (Projection.toughnessOf tokenId resolved) $ Just 1
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- THE PROVING TEST for the copiable stamp. The target is itself a copy, so
+  -- its printed card (Clone, a 0/0 with an as-enters copy ability) and its
+  -- copiable values (the Piker's) disagree -- and CR 707.2's "as modified by
+  -- other copy effects" says the token takes the latter. Under declineCopy a
+  -- token that fell back on the printed card is a 0/0 that CR 704.5f buries.
+  Spec.it s "a token copy of a Clone copies what the Clone copies (CR 707.2)" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    clone <- S.printingOf s registry "Clone"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let (_, board) = S.addCreature piker S.bob (S.landsInPlay island 3)
+        (_, staged) = S.spellOnStack clone S.alice board
+        -- alice's Clone is now her only creature, so it is the Counterpart's
+        -- only legal target ("target creature you control").
+        withClone = resolveAndSettle copyNewest staged
+        resolved = castAndResolve declineCopy counterpart withClone
+    case tokensOnBattlefield resolved of
+      [tokenId] -> do
+        Spec.assertEqWith s "the token is named for the Piker, not the Clone" (PC.name (Projection.project tokenId resolved)) $ CardName.MkCardName (Text.pack "Goblin Piker")
+        Spec.assertEqWith s "the token is a 2, not a 0" (Projection.powerOf tokenId resolved) $ Just 2
+        Spec.assertEqWith s "the token is a 1, not a 0" (Projection.toughnessOf tokenId resolved) $ Just 1
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))
+
+  -- CR 707.2's exclusion: counters are not copied. The falsifier for stamping
+  -- the PROJECTION rather than the copiable values.
+  Spec.it s "a token copy of a counter-boosted creature is the base P/T (CR 707.2)" $ do
+    island <- S.printingOf s registry "Island"
+    piker <- S.printingOf s registry "Goblin Piker"
+    counterpart <- S.printingOf s registry "Cackling Counterpart"
+    let (pikerId, board0) = S.addCreature piker S.alice (S.landsInPlay island 3)
+        board = S.addCounter CounterKind.PlusOnePlusOne 1 pikerId board0
+        resolved = castAndResolve declineCopy counterpart board
+    Spec.assertEqWith s "the source is boosted to 3/2" (Projection.powerOf pikerId resolved) $ Just 3
+    case tokensOnBattlefield resolved of
+      [tokenId] -> do
+        Spec.assertEqWith s "the token copies the base 2, not 3" (Projection.powerOf tokenId resolved) $ Just 2
+        Spec.assertEqWith s "the token copies the base 1, not 2" (Projection.toughnessOf tokenId resolved) $ Just 1
+      tokens -> Spec.assertFailure s ("expected exactly one token, got " <> show (length tokens))

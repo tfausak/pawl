@@ -114,6 +114,7 @@ toJson codec e = case e of
       [Quantity.toJson q, codec c]
         <> (if te == EntryRiders.defaultValue then [] else [EntryRiders.toJson te])
         <> fmap SlotName.toJson (Maybe.maybeToList ms)
+  Effect.CreateCopy r -> Common.tagged "CreateCopy" (Just (ObjectRef.toJson r))
   Effect.Replace d u o c re ->
     Common.tagged "Replace" . Just . Common.array $
       [Duration.toJson d, Uses.toJson u, ReplacementOrigin.toJson o, Common.encodeMaybe Condition.toJson c, ReplacementEffect.toJson re]
@@ -292,6 +293,7 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [q, c, s])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> pure EntryRiders.defaultValue <*> (Just <$> SlotName.fromJson s)
       Just (Value.Array (Array.MkArray [q, c, e, s])) -> Effect.Create <$> Quantity.fromJson q <*> decode c <*> EntryRiders.fromJson e <*> (Just <$> SlotName.fromJson s)
       _ -> Left . Text.pack $ "Create expects [Quantity, Card], optionally with EntryRiders and/or a slot"
+    "CreateCopy" -> Common.withValue mv (fmap Effect.CreateCopy . ObjectRef.fromJson)
     -- The three shapes the encoder above can emit, told apart by LENGTH.
     "ArmDelayedTrigger" -> case mv of
       Just (Value.Array (Array.MkArray [n, o, d])) ->
