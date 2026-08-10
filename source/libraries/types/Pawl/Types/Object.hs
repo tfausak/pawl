@@ -403,7 +403,7 @@ data Object = MkObject
     -- names no player: it is a mark on the permanent alone, and nothing ends it on
     -- a change of control the way CR 701.54a ends the Ring-bearer's.
     --
-    -- STORED rather than projected, and rule 702.112b says why twice over --
+    -- STORED rather than projected, and rule 702.112b says why outright --
     -- "neither an ability nor part of the permanent's copiable values". So no CR
     -- 613 layer writes it, and a Clone of a renowned creature is not renowned, for
     -- the reason ringBearerFor's note gives.

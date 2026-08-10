@@ -1541,8 +1541,9 @@ provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 -- is CR 113.7a's source (Pawl.Engine.Stack's OfTrigger arm).
 --
 -- ONE clause holding BOTH effects, in rule 702.112a's printed order and under one
--- Optionality.Mandatory -- the rule prints one sentence and no "may". The order is
--- not observable: nothing between the two can see the board.
+-- Optionality.Mandatory -- the rule prints one sentence and no "may". Nobody gets
+-- priority between them (CR 117.3b), and no CR 614.16 counter replacement in the
+-- pool reads the designation, so the order is unobservable today.
 --
 -- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
 -- placed -- rule 702.112a leaves nothing to choose.
