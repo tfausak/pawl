@@ -220,10 +220,11 @@ data Quantity
     -- known information answer for a creature that is gone when the ability
     -- resolves.
     --
-    -- NOT a Filter atom, though CR 701.54b's Ring-bearer designation is one: rule
+    -- NOT the Filter atom, which is Pawl.Types.Filter's own IsRenowned: rule
     -- 702.112a asks about the ability's own bearer, which is Power's position and
-    -- not a candidate's. "A renowned creature you control" (Valeron Wardens) is the
-    -- Filter reading, and no card in the pool asks it yet (#1167).
+    -- not a candidate's. "A renowned creature you control" (Aragorn, Hornburg
+    -- Hero) is the candidate reading, and asks the same designation of the other
+    -- side.
     --
     -- A LEAF: it holds no Quantity.
     IsRenowned

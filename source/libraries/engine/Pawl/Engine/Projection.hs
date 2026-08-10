@@ -2293,6 +2293,11 @@ filterReads f = case f of
   -- Pawl.Engine.Ring.theRingIsLegendary pairs it with ControlledBy, which reads
   -- Controller, so the emblem's set moves with CR 613.1b's layer 2 as it should.
   Filter.Type.IsRingBearer -> Set.empty
+  -- Reads nothing for that atom's reason, restated by rule 702.112b itself:
+  -- renowned is "neither an ability nor part of the permanent's copiable values",
+  -- so no Modification writes Object.renowned and no CR 613 layer can move a set
+  -- this atom selects.
+  Filter.Type.IsRenowned -> Set.empty
   -- CR 202.3 reads the printed mana cost, and no Modification writes one -- there
   -- is no mana-cost Aspect for this to name, because nothing could change it.
   Filter.Type.ManaValueAtMost _ -> Set.empty

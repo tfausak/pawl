@@ -320,6 +320,31 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 attackingCreature :: SlotName
 attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
 
+-- CR 510.2: the reserved slot under which the PERMANENT THAT DEALT the combat
+-- damage is bound -- Aragorn, Hornburg Hero's "double the number of +1/+1
+-- counters on IT". Stamped by Pawl.Engine.Event.eventBindings off the same
+-- GameEvent.DamageDealt the condition matched, so the payload is an ordinary slot
+-- read rather than a "the creature that hit them" opcode.
+--
+-- Distinct from `triggerSource` (CR 113.7a) for the reason `attackingCreature`
+-- is: the bystander form of the condition watches every permanent its controller
+-- has, so the bearer is routinely a different permanent from the damager, and
+-- Aragorn watching a Wolf of his own is the ordinary case rather than the corner
+-- one. The self-scoped SelfDealsCombatDamageToPlayer needs no such slot, its
+-- damager BEING the bearer.
+--
+-- One object per event, never a group: CR 510.2 deals all the assigned damage at
+-- once, but Pawl.Engine.Damage records one DamageEvent per source-and-recipient
+-- pair, so two creatures connecting are two events and two abilities each naming
+-- one object.
+--
+-- Not a target (nothing was chosen), so the same CR 608.2b posture and the same
+-- "no card's targetSpecs may name it" sweep as `blockingCreature`. A dead id is
+-- possible and is the payload's problem: a trampler can die to its blocker in the
+-- same CR 510.2 event.
+combatDamager :: SlotName
+combatDamager = SlotName.MkSlotName (Text.pack "thatDamager")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -380,6 +405,10 @@ setBlockedCreature oid = Map.insert blockedCreature (toObject oid)
 -- Bind an object under the reserved attackingCreature slot (CR 506.5).
 setAttackingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setAttackingCreature oid = Map.insert attackingCreature (toObject oid)
+
+-- Bind an object under the reserved combatDamager slot (CR 510.2).
+setCombatDamager :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setCombatDamager oid = Map.insert combatDamager (toObject oid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

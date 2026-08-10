@@ -445,6 +445,12 @@ matches context view predicate = case predicate of
   Filter.IsRingBearer -> case (ringBearerFor view, perspective context) of
     (Just designated, Just you) -> designated == you
     _ -> False
+  -- CR 702.112b's designation, asked of the CANDIDATE. A live read of
+  -- Object.renowned, never a stamp on the candidate: the rule ends the
+  -- designation when the permanent leaves the battlefield, and CR 400.7's new
+  -- incarnation simply arrives without it. Asks nothing of the perspective,
+  -- unlike the arm above -- the designation belongs to no player.
+  Filter.IsRenowned -> renowned view
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
@@ -513,6 +519,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
   Filter.IsRingBearer -> predicate
+  Filter.IsRenowned -> predicate
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as
