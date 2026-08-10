@@ -43,7 +43,8 @@
 -- and the only one to name both of those events, with Inner-Chamber Guard --
 -- `bushidoSpec`. CR 509.3d's once-per-blocker form of the same declaration,
 -- which names the blocker, and CR 702.25 flanking, the sixth such keyword, with
--- Benalish Cavalry -- `flankingSpec`.
+-- Benalish Cavalry -- `flankingSpec`. CR 509.3b's blocking-side form that names
+-- the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR
 -- 113.6k's non-battlefield scan -- the graveyard, with Tome Scour milling
 -- Narcomoeba -- `graveyardTriggerSpec`, and CR 113.6m's reading of the same
@@ -3077,6 +3078,100 @@ selfBlocksSpec s registry =
           -- than about the fixture.
           Spec.assertEqWith s "the same card attacking makes two" (length (S.tokensOf (S.runCombat S.aggressiveAnswer attacking))) 2
 
+-- CR 509.3b: "Whenever [a creature] blocks a creature, . . ." -- selfBlocksSpec's
+-- condition with the attacker NAMED, bound under Binding.blockedCreature.
+--
+-- Loyal Sentry {W} Creature -- Human Soldier 1/1, "When this creature blocks a
+-- creature, destroy that creature and this creature", is the card: the trigger is
+-- its whole text, and "that creature" is the binding under test. Every reading is
+-- taken at the COMBAT DAMAGE step, before damage is dealt, so a death there is
+-- the trigger's (CR 509.2a) and never combat's.
+selfBlocksCreatureSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfBlocksCreatureSpec s registry =
+  let noBlocks :: Prompt.Prompt r -> r
+      noBlocks p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      -- aggressiveAnswer blocks the FIRST attacker with everything, which cannot
+      -- tell "the attacker the bearer blocked" from "the first attacker". This
+      -- one blocks the SECOND.
+      blockSecond :: Prompt.Prompt r -> r
+      blockSecond p = case p of
+        Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
+          _ : a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
+          _ -> Map.empty
+        _ -> S.aggressiveAnswer p
+      board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer
+      atDamageWithout = S.runToStep (Phase.Combat CombatStep.CombatDamage) noBlocks
+      atDamageSecond = S.runToStep (Phase.Combat CombatStep.CombatDamage) blockSecond
+   in Spec.describe s "SelfBlocksCreature" $ do
+        -- The proving test, and its control: the same board with CR 509.1's
+        -- declaration switched off. Blocking, both creatures are gone before
+        -- damage; declining, both are alive and the Piker's 2 gets through.
+        Spec.it s "CR 509.3b whole card: blocking destroys the attacker and the Sentry" $ do
+          (gs, mine, theirs) <- board ["Goblin Piker"] ["Loyal Sentry"]
+          case (mine, theirs) of
+            ([piker], [sentry]) -> do
+              Spec.assertEqWith
+                s
+                "both are gone at the combat damage step, and bob took nothing"
+                (S.onBattlefield piker (atDamage gs), S.onBattlefield sentry (atDamage gs), S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs))
+                (False, False, Just 20)
+              Spec.assertEqWith
+                s
+                "control leg: no block, so neither dies and the Piker's 2 gets through"
+                (S.onBattlefield piker (atDamageWithout gs), S.onBattlefield sentry (atDamageWithout gs), S.lifeOf S.bob (S.runCombat noBlocks gs))
+                (True, True, Just 18)
+            _ -> Spec.assertFailure s "fixture should give each seat one creature"
+        -- The binding, which is the whole difference from CR 509.3a: "that
+        -- creature" is the attacker THIS blocker was declared against, not the
+        -- first one nor the bearer. alice attacks with a 2/1 Piker and a 3/3 Hill
+        -- Giant; the Sentry blocks the Giant.
+        --
+        -- The load-bearing reading is the Piker's: a binding taken off the wrong
+        -- attacker kills it instead, and one that named the bearer kills nothing
+        -- but the Sentry.
+        Spec.it s "CR 509.3b that creature is the attacker the bearer blocked" $ do
+          (gs, mine, theirs) <- board ["Goblin Piker", "Hill Giant"] ["Loyal Sentry"]
+          case (mine, theirs) of
+            ([piker, giant], [sentry]) -> do
+              let struck = atDamageSecond gs
+              Spec.assertEqWith
+                s
+                "the blocked Giant died, the unblocked Piker lived, and the Sentry died with it"
+                (S.onBattlefield giant struck, S.onBattlefield piker struck, S.onBattlefield sentry struck)
+                (False, True, False)
+              Spec.assertEqWith s "and only the Piker's 2 reached bob" (S.lifeOf S.bob (S.runCombat blockSecond gs)) (Just 18)
+            _ -> Spec.assertFailure s "fixture should give alice two attackers and bob one blocker"
+        -- CR 509.3b's bearer is the BLOCKER. The same card attacking and becoming
+        -- blocked matches nothing, which is what pins the arm's `blocker ==
+        -- bearer` against reading the pair the other way round -- that reading
+        -- destroys the blocking Piker in the declare blockers step.
+        Spec.it s "CR 509.3b becoming blocked is not blocking" $ do
+          (gs, mine, theirs) <- board ["Loyal Sentry"] ["Goblin Piker"]
+          case (mine, theirs) of
+            ([sentry], [piker]) -> do
+              let struck = atDamage gs
+              Spec.assertEqWith
+                s
+                "nothing triggered, so both are still there when damage is about to be dealt"
+                (S.onBattlefield sentry struck, S.onBattlefield piker struck)
+                (True, True)
+              -- The positive control on the same pair of cards: with the Sentry
+              -- blocking instead, both are gone by then.
+              (blocking, otherPikers, otherSentries) <- board ["Goblin Piker"] ["Loyal Sentry"]
+              let controlStruck = atDamage blocking
+              Spec.assertEqWith
+                s
+                "the same two cards with the Sentry blocking do trigger"
+                (fmap (`S.onBattlefield` controlStruck) (otherPikers <> otherSentries))
+                [False, False]
+            _ -> Spec.assertFailure s "fixture should give each seat one creature"
+
 -- CR 509.3c: "Whenever [a creature] becomes blocked, . . ." -- the ATTACKING
 -- side of the same declaration selfBlocksSpec reads, matched against
 -- GameEvent.AttackerBlocked.
@@ -4707,6 +4802,9 @@ representativeEvents cond =
         -- eventBindingSlots here if the two coincided.
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
         TriggerCondition.SelfBlocks -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
+        -- The same event, same way round: CR 509.3b's bearer is the BLOCKER too,
+        -- and the attacker beside it is what this one binds.
+        TriggerCondition.SelfBlocksCreature -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
         TriggerCondition.SelfBecomesBlocked -> one (GameEvent.AttackerBlocked departed)
         -- The same declaration event SelfBlocks names, with the ids the other way
         -- round: this condition's bearer is the ATTACKER, and the blocker is what
@@ -4810,6 +4908,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfBlocks,
+    TriggerCondition.SelfBlocksCreature,
     TriggerCondition.SelfBecomesBlocked,
     TriggerCondition.SelfBecomesBlockedBy (Filter.Type.And []),
     TriggerCondition.SelfPutIntoGraveyardFromLibrary,
@@ -6934,6 +7033,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   battleCrySpec s registry
   prowessSpec s registry
   selfBlocksSpec s registry
+  selfBlocksCreatureSpec s registry
   selfBecomesBlockedSpec s registry
   bushidoSpec s registry
   flankingSpec s registry

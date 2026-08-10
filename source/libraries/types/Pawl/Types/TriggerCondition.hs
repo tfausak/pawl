@@ -110,11 +110,31 @@ data TriggerCondition
     -- rather than anything in the CR: no effect can give a blocker a second
     -- attacker (#1145). The rule's "even if" has no case in reach until it can.
     --
-    -- The ATTACKER the event also carries is not compared here. CR 509.3b's
-    -- "blocks a creature" is a separate condition no card in the pool declares
-    -- (#1146); CR 509.3c's is SelfBecomesBlocked below and CR 509.3d's is
-    -- SelfBecomesBlockedBy, which reads this same event from the attacker's side.
+    -- The ATTACKER the event also carries is not compared here, and not bound:
+    -- CR 509.3b's "blocks a creature" is the form that names it, and that is
+    -- SelfBlocksCreature below. CR 509.3c's is SelfBecomesBlocked and CR 509.3d's
+    -- is SelfBecomesBlockedBy, which read this same event from the attacker's
+    -- side.
     SelfBlocks
+  | -- | CR 509.3b: "whenever [a creature] blocks a creature" -- Loyal Sentry's.
+    -- SelfBlocks with the attacker named, self-scoped and DECLARED for the same
+    -- reasons, and matched against the same GameEvent.BlockerDeclared.
+    --
+    -- The whole difference from SelfBlocks is the BINDING: the attacker goes into
+    -- Pawl.Engine.Binding.blockedCreature for the payload's "that creature" to
+    -- read. Rule 509.3b's other difference, "once for each attacking creature the
+    -- creature with the ability blocks", is not one pawl can show -- a blocker
+    -- gets exactly one attacker (#1145), so one declaration is one event here as
+    -- it is for SelfBlocks.
+    --
+    -- No Filter over the attacker, unlike SelfBecomesBlockedBy: every printing of
+    -- this form says "a creature" and nothing more.
+    --
+    -- Rule 509.3b's other producer, an effect that causes the bearer to block,
+    -- records no event and so does not reach this (#1146). CR 509.4's creature
+    -- put onto the battlefield blocking is excluded by the rule itself, and by
+    -- the same construction that excludes it from SelfBlocks.
+    SelfBlocksCreature
   | -- | CR 509.3c: "whenever [a creature] becomes blocked" -- Sacred Prey's. The
     -- ATTACKING side of SelfBlocks, and self-scoped the same way.
     --

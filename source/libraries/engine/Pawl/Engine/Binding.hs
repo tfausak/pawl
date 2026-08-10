@@ -277,6 +277,22 @@ castSpell = SlotName.MkSlotName (Text.pack "thatSpell")
 blockingCreature :: SlotName
 blockingCreature = SlotName.MkSlotName (Text.pack "thatBlocker")
 
+-- CR 509.3b: `blockingCreature`'s mirror -- the reserved slot under which the
+-- CREATURE THE BEARER BLOCKED is bound, Loyal Sentry's "that creature". Stamped
+-- by Pawl.Engine.Event.eventBindings off the same GameEvent.BlockerDeclared,
+-- read from the BLOCKING side, so the bearer is the blocker and this names the
+-- attacker.
+--
+-- Distinct from `blockingCreature` rather than one "the other creature in this
+-- declaration" slot: a card reads whichever of the two it is not, and a payload
+-- that named the wrong one would still typecheck. Two slots make the mismatch a
+-- dead name instead.
+--
+-- One slot, never a group, and not a target: the same posture as
+-- `blockingCreature`, for the same reasons.
+blockedCreature :: SlotName
+blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -329,6 +345,10 @@ setCastSpell oid = Map.insert castSpell (toObject oid)
 -- Bind an object under the reserved blockingCreature slot (CR 509.3d).
 setBlockingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBlockingCreature oid = Map.insert blockingCreature (toObject oid)
+
+-- Bind an object under the reserved blockedCreature slot (CR 509.3b).
+setBlockedCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setBlockedCreature oid = Map.insert blockedCreature (toObject oid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

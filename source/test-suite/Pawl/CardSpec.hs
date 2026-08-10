@@ -460,6 +460,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfBlocks -> []
+  -- CR 509.3b names the attacker without counting anything, so no Count either.
+  TriggerCondition.SelfBlocksCreature -> []
   TriggerCondition.SelfBecomesBlocked -> []
   -- CR 509.3d's Filter is a predicate over the blocker, and holds no Count for
   -- PermanentEnters' reason.
@@ -1163,7 +1165,8 @@ reservedSlots =
       Binding.eventAmount,
       Binding.sacrificedCount,
       Binding.castSpell,
-      Binding.blockingCreature
+      Binding.blockingCreature,
+      Binding.blockedCreature
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -1649,6 +1652,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
   TriggerCondition.SelfBlocks -> []
+  -- CR 509.3b names no quality the attacker must have: every printing of that
+  -- form says "a creature" and stops there.
+  TriggerCondition.SelfBlocksCreature -> []
   TriggerCondition.SelfBecomesBlocked -> []
   -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
   -- Filter -- rule 702.25a's "without flanking".
