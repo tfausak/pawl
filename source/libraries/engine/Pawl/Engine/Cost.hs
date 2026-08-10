@@ -655,7 +655,7 @@ discardCandidates pid oid gs = filter (/= oid) (Game.zoneMembers Zone.Hand pid g
 -- reason: Game.zoneMembers already returns a fixed order.
 exileCandidates :: PlayerId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 exileCandidates pid criterion gs =
-  let context = Filter.MkContext (Just pid) Nothing
+  let context = Filter.contextFor (Just pid) Nothing
       matches candidate = case Game.faceOf candidate gs of
         Nothing -> False
         Just face -> Filter.matches context (Projection.viewOfCardIn gs candidate face) criterion
@@ -695,7 +695,7 @@ topExileCandidate pid criterion gs =
 -- and silently make a component whose Filter says otherwise mean something else.
 tapCandidates :: PlayerId -> ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> GameState -> [ObjectId]
 tapCandidates pid oid criterion gs =
-  let context = Filter.MkContext (Just pid) (Just oid)
+  let context = Filter.contextFor (Just pid) (Just oid)
       matches candidate =
         Filter.matches context (Projection.viewOfObject candidate gs) criterion
    in List.sort (filter matches (Set.toList (GameState.battlefield gs)))

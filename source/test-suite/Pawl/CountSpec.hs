@@ -71,7 +71,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
               (a2, land, swamp, Just S.alice),
               (b1, land, swamp, Just S.bob)
             ]
-    Spec.assertEq s (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs swampsYouControl) $ Just 2
+    Spec.assertEq s (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs swampsYouControl) $ Just 2
 
   Spec.it s "CR 208.2a DistinctCardTypes counts the union, not the objects" $ do
     -- Three graveyard cards, two of them Creatures: the answer is 2 types,
@@ -93,7 +93,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Scope.InZone Zone.Graveyard PlayerRef.EachPlayer)
             (Filter.Type.And [])
             Aggregation.DistinctCardTypes
-    Spec.assertEqWith s "two types" (S.countOf viewOf (Filter.MkContext Nothing Nothing) gs count) $ Just 2
+    Spec.assertEqWith s "two types" (S.countOf viewOf (Filter.contextFor Nothing Nothing) gs count) $ Just 2
 
   Spec.it s "CR 102.2 Relative Opponent excludes the perspective" $ do
     -- The same board as the first case, read from Bob's perspective: his
@@ -110,7 +110,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Objects
-    Spec.assertEqWith s "Alice's one" (S.countOf viewOf (Filter.MkContext (Just S.bob) Nothing) gs count) $ Just 1
+    Spec.assertEqWith s "Alice's one" (S.countOf viewOf (Filter.contextFor (Just S.bob) Nothing) gs count) $ Just 1
 
   Spec.it s "CR 806.1 at three seats Relative Opponent folds BOTH opponents' zones" $ do
     -- Nightmare's shape (a count of Swamps you control) read from the OTHER
@@ -139,7 +139,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Scope.InZone Zone.Battlefield (PlayerRef.Relative PlayerRelation.Opponent))
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Objects
-    Spec.assertEqWith s "bob's one plus carol's two, and none of alice's" (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs count) $ Just 3
+    Spec.assertEqWith s "bob's one plus carol's two, and none of alice's" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) $ Just 3
 
   -- CR 102.1 / CR 800.4a (#279). Asserted against playersFor directly rather
   -- than through Count.evaluate, because no count can tell the difference: a
@@ -153,12 +153,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     Spec.assertEqWith
       s
       "EachPlayer names the two still in the game"
-      (Count.playersFor (Filter.MkContext Nothing Nothing) gs PlayerRef.EachPlayer)
+      (Count.playersFor (Filter.contextFor Nothing Nothing) gs PlayerRef.EachPlayer)
       (Just [S.alice, S.bob])
     Spec.assertEqWith
       s
       "and from alice, carol is not an opponent either"
-      (Count.playersFor (Filter.MkContext (Just S.alice) Nothing) gs (PlayerRef.Relative PlayerRelation.Opponent))
+      (Count.playersFor (Filter.contextFor (Just S.alice) Nothing) gs (PlayerRef.Relative PlayerRelation.Opponent))
       (Just [S.bob])
 
   Spec.it s "CR 109.5 Relative with no perspective is undeterminable" $ do
@@ -168,7 +168,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Scope.InZone Zone.Hand (PlayerRef.Relative PlayerRelation.You))
             (Filter.Type.And [])
             Aggregation.Objects
-    Spec.assertEq s (S.countOf (S.stubView []) (Filter.MkContext Nothing Nothing) gs count) Nothing
+    Spec.assertEq s (S.countOf (S.stubView []) (Filter.contextFor Nothing Nothing) gs count) Nothing
 
   Spec.it s "CR 700.4 InHistory counts deaths from the event snapshot" $ do
     -- A battlefield -> graveyard move whose SNAPSHOT is a creature counts,
@@ -183,7 +183,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Scope.InHistory (EventShape.MovedBetween Zone.Battlefield Zone.Graveyard))
             (Filter.Type.HasCardType CardType.Creature)
             Aggregation.Objects
-    Spec.assertEqWith s "one death" (S.countOf (S.stubView []) (Filter.MkContext Nothing Nothing) gs count) $ Just 1
+    Spec.assertEqWith s "one death" (S.countOf (S.stubView []) (Filter.contextFor Nothing Nothing) gs count) $ Just 1
 
   Spec.it s "EachPlayer folds every player's copy" $ do
     -- The first case's board with the ControlledBy conjunct dropped: all
@@ -206,7 +206,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
             (Filter.Type.HasSubtype Subtype.Swamp)
             Aggregation.Objects
-    Spec.assertEqWith s "three" (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs count) $ Just 3
+    Spec.assertEqWith s "three" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) $ Just 3
 
   Spec.it s "Relative You resolves against the perspective" $ do
     -- The first case's board, read from Bob's perspective: Bob's own one
@@ -224,7 +224,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
               (a2, land, swamp, Just S.alice),
               (b1, land, swamp, Just S.bob)
             ]
-    Spec.assertEqWith s "one" (S.countOf viewOf (Filter.MkContext (Just S.bob) Nothing) gs swampsYouControl) $ Just 1
+    Spec.assertEqWith s "one" (S.countOf viewOf (Filter.contextFor (Just S.bob) Nothing) gs swampsYouControl) $ Just 1
 
   Spec.it s "InSlot reads the bound player" $ do
     -- A source object binds Bob under the "target" slot (Sudden Impact's
@@ -243,7 +243,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Scope.InZone Zone.Hand (PlayerRef.InSlot slot))
             (Filter.Type.And [])
             Aggregation.Objects
-    Spec.assertEqWith s "one card" (S.countOf viewOf (Filter.MkContext Nothing (Just srcId)) gs count) $ Just 1
+    Spec.assertEqWith s "one card" (S.countOf viewOf (Filter.contextFor Nothing (Just srcId)) gs count) $ Just 1
 
   -- The three cases below are Aggregation.Greatest at the fold, where the
   -- answers Pawl.ResolveSpec's One with the Machine cases cannot tell apart
@@ -273,8 +273,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
     -- Alice keeps none of Bob's one Swamp, so the fold has no members. The
     -- same count with Aggregation.Objects is Just 0 -- a count of nothing IS
     -- zero -- which is exactly the answer a maximum must NOT borrow.
-    Spec.assertEqWith s "no maximum" (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs count) Nothing
-    Spec.assertEqWith s "though counting the same empty set is 0" (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs swampsYouControl) (Just 0)
+    Spec.assertEqWith s "no maximum" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) Nothing
+    Spec.assertEqWith s "though counting the same empty set is 0" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs swampsYouControl) (Just 0)
 
   Spec.it s "CR 208.1 Greatest reads the PROJECTED power, not the printed one" $ do
     -- The one case here driven against a real projection rather than
@@ -298,7 +298,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
             (Aggregation.Greatest Quantity.Type.Power)
         greatestPower g =
-          S.countOf (\oid -> Just (Projection.viewOfObject oid g)) (Filter.MkContext (Just S.alice) Nothing) g count
+          S.countOf (\oid -> Just (Projection.viewOfObject oid g)) (Filter.contextFor (Just S.alice) Nothing) g count
     Spec.assertEqWith s "the Mammoth's 3" (greatestPower printed) $ Just 3
     Spec.assertEqWith s "and the pumped Piker's 4" (greatestPower pumped) $ Just 4
 
@@ -317,7 +317,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Count" $ do
             (Filter.Type.ControlledBy PlayerRelation.You)
             (Aggregation.Greatest Quantity.Type.Power)
         viewOf = S.stubView [(a1, Set.singleton CardType.Land, Set.singleton Subtype.Swamp, Just S.alice)]
-    Spec.assertEqWith s "undeterminable" (S.countOf viewOf (Filter.MkContext (Just S.alice) Nothing) gs count) Nothing
+    Spec.assertEqWith s "undeterminable" (S.countOf viewOf (Filter.contextFor (Just S.alice) Nothing) gs count) Nothing
 
   aetherfluxReservoirSpec s registry
   tobiasSpec s registry

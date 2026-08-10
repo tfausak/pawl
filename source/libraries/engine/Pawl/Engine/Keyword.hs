@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
@@ -40,10 +41,13 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
@@ -119,6 +123,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Melee -> List.genericReplicate count melee
+  Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -217,6 +222,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -335,6 +341,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -521,6 +528,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -800,6 +808,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -877,6 +886,8 @@ familyOf keyword = case keyword of
   Keyword.Wither -> Nothing
   -- CR 702.83a takes no parameter, so there is no variant for a card to name.
   Keyword.Exalted -> Nothing
+  -- CR 702.134a takes no parameter either, so mentor has no family of its own.
+  Keyword.Mentor -> Nothing
   Keyword.BattleCry -> Nothing
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
@@ -1269,3 +1280,59 @@ afflict n =
       Effect.LoseLife
         (PlayerRef.InSlot Binding.triggerPlayer)
         (Quantity.Literal (toInteger n))
+
+-- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
+-- attacking creature with power less than this creature's power. The TENTH
+-- keyword in this pool whose rule text IS a triggered ability, and the first that
+-- TARGETS -- so it is the first to declare a target slot here rather than an
+-- empty Map.
+--
+-- The slot is filled by CR 603.3d as the ability is placed
+-- (Pawl.Engine.Engine.placeBorne) and re-checked by CR 608.2b as it resolves,
+-- both through Pawl.Engine.Target. A REAL choice, asked of the controller: with
+-- two smaller attackers the rules leave which one open, so nothing here elides
+-- it.
+--
+-- CR 508.3a is what "attacks" means, so the condition is annihilator's and battle
+-- cry's -- SelfAttacks, EveryTime, rule 702.134a stating no "for the first time
+-- each turn" narrowing.
+--
+-- The spec's three parts are the rule's three printed words. Pool.Creatures is
+-- "creature" (CR 109.2 draws it from the battlefield), IsAttacking is "attacking"
+-- (CR 508.1k), and Filter.PowerLessThanSource is "with power less than this
+-- creature's power" -- a comparison against the SOURCE, which is why that atom
+-- carries no literal. No controller conjunct, because rule 702.134a states none:
+-- CR 508.1 makes every attacking creature the active player's, so a creature an
+-- opponent controls is never in the set to be excluded.
+--
+-- The BEARER excludes itself with no `Not IsSource` of its own -- nothing has
+-- power less than its own power -- which is why the atom is strict rather than
+-- "no greater than".
+--
+-- Effect.PutCounters and not battle cry's ModifyTarget: rule 702.134a puts a
+-- COUNTER on, so it is CR 122.6's funnel (and CR 614.16's replacement
+-- opportunity), and what it grants outlives the turn because CR 613.4c reads the
+-- counter every projection.
+--
+-- Single mode, ChooseExactly 1, and no "if" clause, so intervening = Nothing --
+-- the only thing rule 702.134a leaves to choose is the target.
+mentor :: TriggeredAbility Card
+mentor =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget spec)))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
+    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) mentorTarget
+
+-- The slot rule 702.134a's one target is chosen into. Named here rather than in
+-- Pawl.Engine.Binding, which holds the RESERVED names a card may not use: this is
+-- an ordinary target slot, declared by the ability that reads it, and it can
+-- collide with nothing -- a card's slots live on that card's own abilities.
+mentorTarget :: SlotName.SlotName
+mentorTarget = SlotName.MkSlotName (Text.pack "mentored")

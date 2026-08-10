@@ -141,7 +141,18 @@ admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.Control
 admittedGiven pcs grants perspective source spec gs =
   let pool = TargetSpec.pool spec
       narrowing = TargetSpec.filter spec
-      context = Filter.MkContext perspective (Just source)
+      -- THE one site that fills Filter.sourcePower, because it is the one site
+      -- that matches a TARGET SLOT's Filter -- both of CR 115's moments (CR
+      -- 601.2c's choosing and CR 608.2b's re-check) reach the atom through here,
+      -- and CR 702.134a is the only clause that writes it. A thunk, like `pcs`
+      -- above it: a slot whose filter never names the atom pays for no projection
+      -- of the source.
+      context =
+        Filter.MkContext
+          { Filter.perspective = perspective,
+            Filter.source = Just source,
+            Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs
+          }
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
       -- view are asked of every object on the battlefield, and each was a fresh
@@ -262,7 +273,7 @@ targetable pcs perspective source sourceView gs recipient =
             -- that rule making it several abilities rather than one compound one.
             stops quality = case quality of
               Nothing -> True
-              Just f -> Filter.matches (Filter.MkContext controller (Just source)) sourceView f
+              Just f -> Filter.matches (Filter.contextFor controller (Just source)) sourceView f
             -- The three conjuncts are in cost order, and the order is the whole
             -- reason `sourceView` costs nothing on an ordinary board: no hexproof
             -- ability at all reads no controller, a hexproof ability its own

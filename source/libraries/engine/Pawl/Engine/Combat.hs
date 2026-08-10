@@ -849,7 +849,7 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- takes. No landwalk in the pool reads either, so the context is
       -- well-defined rather than exercised. Hoisted, since it does not vary per
       -- candidate.
-      context = Filter.MkContext (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
+      context = Filter.contextFor (Projection.controllerOfGiven grants Set.empty attacker gs) (Just attacker)
       -- ONE projection per candidate: Filter.cardTypes is the very set
       -- Projection.cardTypesGiven would rebuild, so the land test reads it off
       -- the view rather than projecting the object a second time (#200).
