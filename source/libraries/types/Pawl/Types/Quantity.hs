@@ -283,4 +283,26 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     BlockersBeyondFirst
+  | -- | Read the inner quantity against the OBJECT A SLOT NAMES rather than
+    -- against the effect's source (CR 113.7) -- Soul's Majesty's "cards equal to
+    -- the power of target creature you control", where the power read is the
+    -- target's.
+    --
+    -- The one arm that MOVES the object every other object-reading arm (Power,
+    -- ManaValue, ObjectCounters, IsRenowned, BlockersBeyondFirst) is aimed at.
+    -- Those arms deliberately name no object, so this is the only way a card can
+    -- say which one; without it a payload can read only its own source.
+    --
+    -- NOT InSlot, which reads an AMOUNT an earlier effect bound at a slot. This
+    -- names a TARGET slot and reads a characteristic off what it points at, so
+    -- the payload is a whole Quantity rather than nothing.
+    --
+    -- CR 109.5's "you" is untouched: the perspective stays the resolving
+    -- controller's, so a Count inside still means the controller's permanents and
+    -- not the target controller's.
+    --
+    -- Nothing when the slot names no object -- a player recipient, a slot the
+    -- resolution never filled, an illegal target (CR 608.2b), or any evaluation
+    -- outside a resolution, where there are no slots at all.
+    AgainstSlot SlotName.SlotName Quantity
   deriving (Eq, Ord, Show)

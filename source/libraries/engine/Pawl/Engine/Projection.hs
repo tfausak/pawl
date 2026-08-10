@@ -1650,6 +1650,9 @@ rewriteQuantity pairs quantity = case quantity of
   -- And a leaf: CR 509.1h's declaration names object ids, not a word CR 612.1
   -- could swap.
   Quantity.Type.BlockersBeyondFirst -> quantity
+  -- Not a leaf: the slot names no word CR 612.1 could swap, but the payload is a
+  -- whole Quantity and may hide a Count whose Filter does.
+  Quantity.Type.AgainstSlot slot inner -> Quantity.Type.AgainstSlot slot (rewriteQuantity pairs inner)
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.

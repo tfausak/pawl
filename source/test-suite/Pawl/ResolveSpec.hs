@@ -3558,6 +3558,59 @@ copyTheOnlyTarget p = case p of
   Prompt.ChooseCopyTarget _ _ _ legal -> Maybe.listToMaybe legal
   _ -> S.identityAnswer p
 
+-- Aims every target slot at one creature, for a fixture with several legal ones.
+targetingCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+targetingCreature oid p = case p of
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  _ -> S.identityAnswer p
+
+-- Soul's Majesty, the card that proves Quantity.AgainstSlot (#1171): "Draw cards
+-- equal to the power of target creature you control." The power read is the
+-- TARGET's, where every other object-reading quantity is aimed at the effect's
+-- SOURCE (CR 113.7) -- here a sorcery, which has no power at all, so the source
+-- reading answers Nothing and draws nothing.
+--
+-- Alice's Thragtusk is 5/3 and her Giant Spider 2/4; bob's Panglacial Wurm is
+-- 9/5. Targeting each of hers in turn separates the slot's power (5, then 2)
+-- from that creature's toughness (3, then 4), from the other creature's power
+-- (2, then 5), from the count of her creatures (2), from the greatest power in
+-- the game (9), and from the source's nothing (0).
+soulsMajestySpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulsMajestySpec s registry = Spec.describe s "SoulsMajesty" $ do
+  Spec.it s "CR 113.7 draws the power of the TARGET rather than of the sorcery" $ do
+    forest <- S.printingOf s registry "Forest"
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    giantSpider <- S.printingOf s registry "Giant Spider"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
+    piker <- S.printingOf s registry "Goblin Piker"
+    soulsMajesty <- S.printingOf s registry "Soul's Majesty"
+    let base = S.landsInPlay forest 5
+        (tusk, withTusk) = S.addCreature thragtusk S.alice base
+        (_, withSpider) = S.addCreature giantSpider S.alice withTusk
+        (_, withWurm) = S.addCreature panglacialWurm S.bob withSpider
+        -- CR 104.3c: twelve is far more than any reading here draws.
+        withLib = stockLibrary piker S.alice 12 withWurm
+        (gs, spellId) = S.handOne soulsMajesty withLib
+        cast = snd (Engine.runGamePure (targetingCreature tusk) gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure (targetingCreature tusk) cast Stack.resolveTop)
+    Spec.assertEqWith s "alice drew five" (S.handSize S.alice after) 5
+  Spec.it s "CR 601.2c the SAME board draws two when the other creature is the target" $ do
+    forest <- S.printingOf s registry "Forest"
+    thragtusk <- S.printingOf s registry "Thragtusk"
+    giantSpider <- S.printingOf s registry "Giant Spider"
+    panglacialWurm <- S.printingOf s registry "Panglacial Wurm"
+    piker <- S.printingOf s registry "Goblin Piker"
+    soulsMajesty <- S.printingOf s registry "Soul's Majesty"
+    let base = S.landsInPlay forest 5
+        (_, withTusk) = S.addCreature thragtusk S.alice base
+        (spider, withSpider) = S.addCreature giantSpider S.alice withTusk
+        (_, withWurm) = S.addCreature panglacialWurm S.bob withSpider
+        withLib = stockLibrary piker S.alice 12 withWurm
+        (gs, spellId) = S.handOne soulsMajesty withLib
+        cast = snd (Engine.runGamePure (targetingCreature spider) gs (S.cast S.alice spellId))
+        after = snd (Engine.runGamePure (targetingCreature spider) cast Stack.resolveTop)
+    Spec.assertEqWith s "alice drew two" (S.handSize S.alice after) 2
+
 countersSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 countersSpec s registry = Spec.describe s "Counters" $ do
   Spec.it s "CR 122.6 Battlegrowth puts a +1/+1 counter (gate)" $ do
@@ -5574,6 +5627,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   loseLifeSpec s registry
   exchangeLifeTotalsSpec s registry
   greatestSpec s registry
+  soulsMajestySpec s registry
   counterSpec s registry
   manaLeakSpec s registry
   whipstitchedZombieSpec s registry
