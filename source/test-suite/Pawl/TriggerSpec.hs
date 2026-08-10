@@ -3317,9 +3317,9 @@ bushidoSpec s registry =
           Spec.assertEqWith s "and held twice is four abilities" (length (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Bushido 2) 2))) 4
 
 -- CR 702.130a: "'Afflict N' means 'Whenever this creature becomes blocked,
--- defending player loses N life.'" The sixth keyword in this pool whose rule text
--- IS a triggered ability, and the first to put CR 509.3c's event and CR 508.5's
--- defending player in one sentence.
+-- defending player loses N life.'" The seventh keyword in this pool whose rule
+-- text IS a triggered ability, and the first to put CR 509.3c's event and CR
+-- 508.5's defending player in one sentence.
 --
 -- Khenra Eternal {1}{B} Creature -- Zombie Jackal Warrior 2/2 with afflict 1 and
 -- nothing else printed on it, so every number below is the keyword's.

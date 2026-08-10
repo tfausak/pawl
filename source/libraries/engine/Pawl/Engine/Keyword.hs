@@ -1122,7 +1122,7 @@ bushidoHalf condition n =
         (ObjectRef.EachMatching Filter.IsSource)
 
 -- CR 702.130a: whenever this creature becomes blocked, defending player loses N
--- life. The SIXTH keyword in this pool whose rule text IS a triggered ability,
+-- life. The SEVENTH keyword in this pool whose rule text IS a triggered ability,
 -- and the one that adds nothing new -- its condition is bushido's CR 509.3c half
 -- and its player is annihilator's CR 508.5 one.
 --
