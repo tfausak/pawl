@@ -67,6 +67,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfDealsCombatDamageToPlayer
       """ {"type":"SelfDealsCombatDamageToPlayer"} """
+  -- The same event read by a bystander, carrying Tovolar's "you control": the
+  -- Filter is the whole payload, so it has to survive both directions.
+  Spec.it s "PermanentDealsCombatDamageToPlayer round-trips with its Filter" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.ControlledBy PlayerRelation.You))
+      """ {"type":"PermanentDealsCombatDamageToPlayer","value":{"type":"ControlledBy","value":{"type":"You"}}} """
   -- CR 725.2: a creature dealt combat damage to the monarch.
   Spec.it s "CreatureDealtCombatDamageToMonarch" $
     Common.assertJsonCodec

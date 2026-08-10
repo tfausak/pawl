@@ -2638,6 +2638,48 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+  -- The same event read by a BYSTANDER (CR 510.1b / 510.2): a permanent the Filter
+  -- admits dealt combat damage to a player. The Filter reads the event's DAMAGER,
+  -- the bearer contributing only CR 109.5's "you" and the Filter.Context's source
+  -- -- which is what would make Filter.IsSource the self-scoped reading.
+  --
+  -- viewWithLastKnown, not fullView: CR 603.10's first sentence wants the damager
+  -- as it existed immediately after the damage, and pawl scans the log after CR
+  -- 704's pass, so a trampler that connected and died to its blocker in the same
+  -- CR 510.2 event is already gone. CR 608.2h's record is what still answers "was
+  -- it a Wolf". No board in the pool reaches that -- Tovolar's Wolves are vanilla
+  -- and unblocked -- so this is a fence rather than a tested branch.
+  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> case event of
+    GameEvent.DamageDealt ev ->
+      DamageEvent.kind ev == DamageKind.Combat
+        && isPlayerRecipient (DamageEvent.target ev)
+        && ( let damager = DamageEvent.source ev
+              in case Projection.viewWithLastKnown damager gs damager of
+                   Nothing -> False
+                   Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
+           )
+    GameEvent.Moved _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameRenowned _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Engine.Monarch.inherentMatch, not here.
@@ -3952,6 +3994,7 @@ reactsToAbilityTriggering cond = case cond of
   -- game state is not an ability triggering.
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
@@ -4271,6 +4314,10 @@ eventBindingSlots cond = case cond of
   TriggerCondition.StateIs _ -> Set.empty
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.singleton Binding.triggerPlayer
+  -- And the bystander's form claims NOTHING, PermanentTurnedFaceUp's position:
+  -- the event names a damager and a damaged player, and Tovolar reads neither
+  -- (#1173).
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.empty
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.
@@ -4557,6 +4604,7 @@ looksBack condition = case condition of
   TriggerCondition.StepBegins _ _ -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.OpponentLostLifeDuringYourTurn -> False
   TriggerCondition.SelfCycled -> False
@@ -5092,6 +5140,7 @@ zoneTriggeredFrom cond = case cond of
   -- reader in any zone; stateTriggers below gathers them from the battlefield.
   TriggerCondition.StateIs _ -> Nothing
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Nothing
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Nothing
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> Nothing
   TriggerCondition.OpponentLostLifeDuringYourTurn -> Nothing
   -- CR 302.6 / 508.1a: only a permanent on the battlefield can be declared as an
@@ -5230,6 +5279,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.PermanentSacrificed -> False
   TriggerCondition.StateIs _ -> False
   TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
   TriggerCondition.SelfCycled -> False
   TriggerCondition.PlayerDiscards _ -> False
@@ -5355,6 +5405,7 @@ stateTriggers gs
               TriggerCondition.PermanentEnters _ -> False
               TriggerCondition.StepBegins _ _ -> False
               TriggerCondition.SelfDealsCombatDamageToPlayer -> False
+              TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> False
               TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
               TriggerCondition.OpponentLostLifeDuringYourTurn -> False
               TriggerCondition.SelfAttacks _ -> False

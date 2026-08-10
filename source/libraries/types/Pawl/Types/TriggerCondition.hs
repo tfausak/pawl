@@ -44,6 +44,23 @@ data TriggerCondition
   | -- | CR 603.2 / 509-510: the bearer dealt combat damage to a player, read off
     -- the DamageDealt event history.
     SelfDealsCombatDamageToPlayer
+  | -- | CR 603.2 / 509-510 again, read by a BYSTANDER: a permanent the Filter
+    -- admits dealt combat damage to a player -- Tovolar, Dire Overlord's
+    -- "whenever a Wolf or Werewolf you control deals combat damage to a player".
+    -- The Filter carries the "you control" conjunct, as every other one does.
+    --
+    -- Beside SelfDealsCombatDamageToPlayer rather than replacing it. The self form
+    -- is not a card's: rules 702.70a and 702.112a mint it (Pawl.Engine.Keyword's
+    -- poisonous and renown), and an id comparison states those without reading the
+    -- damager's characteristics at all -- where this one must, so it goes through
+    -- CR 608.2h's last known information for a trampler that died to its blocker
+    -- in the same event. SelfTurnedFaceUp and PermanentTurnedFaceUp are the
+    -- standing pair; Filter.IsSource would collapse them, and buys a keyword
+    -- nothing.
+    --
+    -- No eventBindings arm: Tovolar draws a card and names no "it" and no "that
+    -- player" (#1173).
+    PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
   | -- | CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
     -- (any creature); matched only via Pawl.Engine.Monarch.inherentMatch, never through a
     -- card's bearer.
