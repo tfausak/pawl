@@ -729,8 +729,8 @@ shadowAllowsGiven pcs blocker attacker gs =
 -- CR 702.31b: a creature with horsemanship can't be blocked by creatures without
 -- horsemanship.
 --
--- Shadow's first sentence with shadow's second dropped, and the drop is the
--- rule's own: 702.31b's second sentence says a creature with horsemanship can
+-- Shadow's first sentence without shadow's second, and the omission is the rule's
+-- own: 702.31b's second sentence says a creature with horsemanship can
 -- block a creature with OR WITHOUT it. So this is the asymmetry evasionAllows
 -- describes -- the keyword is read off the ATTACKER first -- and the equality
 -- shadowAllowsGiven writes would be wrong here, barring a horseman from blocking

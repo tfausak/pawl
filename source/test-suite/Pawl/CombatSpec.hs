@@ -937,9 +937,10 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     Spec.assertEqWith s "the shadow creature lives" (S.creaturesInPlay S.alice after) 1
     Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
 
-  -- CR 702.31's three cases, off a PRINTED keyword: Shu Cavalry ({2}{W} Creature
-  -- -- Human Soldier 2/2, horsemanship and nothing else) has no other text for a
-  -- case to pass on. Goblin Piker is the non-horsemanship creature throughout.
+  -- CR 702.31's three legality cases and its gameplay one, off a PRINTED keyword:
+  -- Shu Cavalry ({2}{W} Creature -- Human Soldier 2/2, horsemanship and nothing
+  -- else) has no other text for a case to pass on. Goblin Piker is the
+  -- non-horsemanship creature throughout.
   Spec.it s "CR 702.31b a creature without horsemanship may not block a creature with horsemanship" $ do
     shuCavalry <- S.printingOf s registry "Shu Cavalry"
     piker <- S.printingOf s registry "Goblin Piker"
