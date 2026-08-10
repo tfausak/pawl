@@ -83,6 +83,17 @@ spec s = Spec.describe s "Pawl.Codec.EntryRewrite" $ do
       EntryRewrite.fromJson
       EntryRewrite.Riot
       """ {"type":"Riot"} """
+  -- CR 702.98a: unleash's rewrite, riot's without the declining half, and
+  -- payload-free for the same reason. Encoded distinctly from Riot, since a
+  -- transcript of one must not decode as the other.
+  Spec.it s "Unleash (Gore-House Chainwalker)" $ do
+    Common.assertJsonCodec
+      s
+      EntryRewrite.toJson
+      EntryRewrite.fromJson
+      EntryRewrite.Unleash
+      """ {"type":"Unleash"} """
+    Spec.assertBool s (EntryRewrite.toJson EntryRewrite.Unleash /= EntryRewrite.toJson EntryRewrite.Riot) "unleash and riot encode differently"
   -- CR 614.1d: the tap-state rewrite a permanent's own text prints, payload-free
   -- because rule 614.1d and CR 110.5b fix both halves.
   Spec.it s "Tapped (Zof Bloodbog)" $

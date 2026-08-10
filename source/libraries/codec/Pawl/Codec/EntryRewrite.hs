@@ -20,6 +20,7 @@ toJson r = case r of
   EntryRewrite.ChooseCardNames f -> Common.tagged "ChooseCardNames" . Just $ Filter.toJson Keyword.toJson f
   EntryRewrite.UnderSourceControl -> Common.nullary "UnderSourceControl"
   EntryRewrite.Riot -> Common.nullary "Riot"
+  EntryRewrite.Unleash -> Common.nullary "Unleash"
   EntryRewrite.Tapped -> Common.nullary "Tapped"
   EntryRewrite.PayLifeOrTapped n -> Common.tagged "PayLifeOrTapped" . Just $ Common.encodeNatural n
   EntryRewrite.SacrificeAnyNumber f kind -> Common.tagged "SacrificeAnyNumber" . Just . Common.array $ [Filter.toJson Keyword.toJson f, Common.encodeMaybe (CounterKind.toJson Keyword.toJson) kind]
@@ -33,6 +34,7 @@ fromJson value = do
     ("ChooseBasicLandType", _) -> Right EntryRewrite.ChooseBasicLandType
     ("UnderSourceControl", _) -> Right EntryRewrite.UnderSourceControl
     ("Riot", _) -> Right EntryRewrite.Riot
+    ("Unleash", _) -> Right EntryRewrite.Unleash
     ("Tapped", _) -> Right EntryRewrite.Tapped
     ("PayLifeOrTapped", Just v) -> EntryRewrite.PayLifeOrTapped <$> Common.decodeNatural v
     ("ChoiceOf", Just v) -> EntryRewrite.ChoiceOf <$> Common.decodeList EntryOption.fromJson v

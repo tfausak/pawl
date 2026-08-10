@@ -1613,6 +1613,10 @@ keywordFilters keyword = case keyword of
   -- ability is built with lives in Pawl.Engine.Keyword and is not card data.
   Keyword.Crew _ -> []
   Keyword.Riot -> []
+  -- CR 702.98a names no quality either: the +1/+1 counter its minted replacement
+  -- places and the Filter its minted combat restriction carries are written in
+  -- Pawl.Engine.Keyword, not into the keyword.
+  Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Training -> []
@@ -1989,6 +1993,7 @@ entryRewriteFilters entryRewrite = case entryRewrite of
   EntryRewrite.WithCounters _ _ -> []
   EntryRewrite.UnderSourceControl -> []
   EntryRewrite.Riot -> []
+  EntryRewrite.Unleash -> []
   EntryRewrite.Tapped -> []
   EntryRewrite.PayLifeOrTapped _ -> []
   EntryRewrite.SacrificeAnyNumber f _ -> [f]

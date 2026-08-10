@@ -552,6 +552,8 @@ bucketOfEffect re = case re of
   -- CR 702.136a is none of CR 616.1a-d either: riot rewrites what the permanent
   -- enters WITH, never whose it is, what it copies or which face is up.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> ReplacementBucket.Other
+  -- CR 702.98a is none of CR 616.1a-d for riot's reason, one keyword over.
+  ReplacementEffect.EntryR _ EntryRewrite.Unleash -> ReplacementBucket.Other
   -- CR 614.1d is none of CR 616.1a-d either: a tap-state rewrite changes the
   -- STATUS the permanent enters with (CR 110.5b), never whose it is, what it
   -- copies or which face is up. So CR 616.1e.
@@ -630,6 +632,10 @@ readsApplier re = case re of
   -- offer that permanent's controller the same two outcomes -- so which applies
   -- first is not a board difference.
   ReplacementEffect.EntryR _ EntryRewrite.Riot -> False
+  -- CR 702.98a: riot's answer, and every word of its reasoning holds -- the
+  -- chooser is the entering object's controller and the rewrite carries no
+  -- payload, so two unleash rows offer that player the same counter twice.
+  ReplacementEffect.EntryR _ EntryRewrite.Unleash -> False
   -- CR 614.1d: no chooser at all, and no payload -- the rewrite sets one status on
   -- the object the event already named (CR 110.5b), so it applies the same way
   -- whoever's row is applying it. Two such rows are the same write twice.

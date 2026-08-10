@@ -594,6 +594,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Riot
       """ {"type":"Riot"} """
+  Spec.it s "Unleash" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Unleash
+      """ {"type":"Unleash"} """
+    Spec.assertBool s (Keyword.toJson Keyword.Unleash /= Keyword.toJson Keyword.Riot) "unleash and riot encode differently"
   Spec.it s "Daybound" $
     Common.assertJsonCodec
       s

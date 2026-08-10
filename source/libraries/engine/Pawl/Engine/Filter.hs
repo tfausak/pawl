@@ -666,6 +666,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.122a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Crew _ -> keyword
   Keyword.Type.Riot -> keyword
+  Keyword.Type.Unleash -> keyword
   Keyword.Type.Daybound -> keyword
   Keyword.Type.Nightbound -> keyword
   Keyword.Type.Toxic _ -> keyword

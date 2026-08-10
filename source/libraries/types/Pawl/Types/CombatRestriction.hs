@@ -76,6 +76,10 @@ import qualified Pawl.Types.Condition as Condition
 -- here is casing on which rulebook declaration a restriction forbids and in what
 -- shape, not on an effect's identity.
 --
+-- Card data is not ALL it carries. Rule 702 mints one of these from a keyword
+-- (unleash, CR 702.98a), which is the closed half writing its own rules rather
+-- than a card writing text -- the position Pawl.Types.EntryRewrite.Riot is in.
+--
 -- Gathered LIVE from the battlefield on every read and never captured, the
 -- posture all five siblings take -- so a Pacifism leaving the battlefield lifts
 -- its restriction with nothing to unwind. The gate is re-read on the same
@@ -113,8 +117,10 @@ data CombatRestriction
     CantAttack Affected.Affected (Maybe Condition.Condition)
   | -- | CR 509.1b: these creatures can't block, unless the gate holds.
     -- Pacifism's second half and Blind-Spot Giant's are the pool's only printed
-    -- blocking restrictions; every other one today is an evasion keyword on the
-    -- ATTACKER, which restricts being blocked rather than blocking.
+    -- blocking restrictions, and CR 702.98a's unleash is the one rule 702 mints
+    -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor); every other one today is
+    -- an evasion keyword on the ATTACKER, which restricts being blocked rather
+    -- than blocking.
     CantBlock Affected.Affected (Maybe Condition.Condition)
   | -- | CR 508.1c together with CR 506.5: these creatures can't be the ONLY
     -- creature declared as an attacker, unless the gate holds. Bonded Construct
