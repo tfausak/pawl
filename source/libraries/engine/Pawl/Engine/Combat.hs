@@ -1322,7 +1322,12 @@ declareAttackers pid = do
         -- Filtered, not trusted: an interpreter cannot attack with a creature
         -- that is not legally an attacker.
         let isCandidate oid = List.elem oid candidates
-            offered = filter isCandidate chosen
+            -- Deduplicated as well as filtered, for the same "an interpreter
+            -- cannot" reason: CR 508.1a's declaration is a SET of creatures, and
+            -- every other reader below funnels through a Set or a Map already.
+            -- The event fold does not, so a repeated id would record a creature's
+            -- declaration twice and make CR 506.5's count disagree with it.
+            offered = List.nub (filter isCandidate chosen)
             -- CR 508.1c's set-shaped restrictions and CR 508.1d's maximization,
             -- taken ONCE for all three questions below -- one battlefield walk
             -- each, against the same candidate list the prompt was built from.
@@ -1481,6 +1486,13 @@ declareAttackers pid = do
               -- attacks-a-permanent form, CR 508.3b and CR 508.3e are still
               -- unavailable (#538).
               --
+              -- It also names how many creatures THIS declaration has, which is
+              -- CR 506.5's "the only creature declared as an attacker" -- the
+              -- same number on every event of the batch, since being alone is a
+              -- fact about the declaration. Written here because here is the only
+              -- place that number exists: CR 508.1c's CantAttackAlone makes the
+              -- same argument one step earlier.
+              --
               -- The defending player is computed HERE, per creature, because
               -- here is the moment CR 508.5 reads: the rule resolves "defending
               -- player" through what the creature is attacking, and both the
@@ -1502,7 +1514,8 @@ declareAttackers pid = do
                 ( \g ->
                     let grants = Projection.controlGrants g
                         defendingFor oid = Maybe.fromMaybe defender ((\t -> defendingPlayerOf grants t g) =<< Map.lookup oid recorded)
-                     in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid (defendingFor oid)) h) g attacking
+                        declared = Natural.length attacking
+                     in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid (defendingFor oid) declared) h) g attacking
                 )
 
 -- CR 508.4: a creature put onto the battlefield attacking has its controller

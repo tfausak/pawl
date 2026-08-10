@@ -464,6 +464,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
+  TriggerCondition.CreatureAttacksAlone _ -> []
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names the attacker without counting anything, so no Count either.
   TriggerCondition.SelfBlocksCreature -> []
@@ -1178,7 +1179,8 @@ reservedSlots =
       Binding.sacrificedCount,
       Binding.castSpell,
       Binding.blockingCreature,
-      Binding.blockedCreature
+      Binding.blockedCreature,
+      Binding.attackingCreature
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -1521,6 +1523,9 @@ keywordFilters keyword = case keyword of
   Keyword.Infect -> []
   -- CR 702.80a names no quality either: what it changes is where damage goes.
   Keyword.Wither -> []
+  -- CR 702.83a names no quality: "a creature you control" is written into the
+  -- ability Pawl.Engine.Keyword mints, not into the keyword.
+  Keyword.Exalted -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
@@ -1672,6 +1677,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
+  -- CR 506.5's condition names a quality the ATTACKER must have, so it carries a
+  -- Filter -- rule 702.83a's "a creature you control".
+  TriggerCondition.CreatureAttacksAlone f -> [f]
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names no quality the attacker must have: every printing of that
   -- form says "a creature" and stops there.

@@ -96,6 +96,33 @@ data TriggerCondition
     -- turn" -- a payload rather than a sibling condition, because it narrows this
     -- same trigger event rather than naming a different one.
     SelfAttacks TriggerFrequency.TriggerFrequency
+  | -- | CR 506.5: "whenever a creature you control attacks alone" -- rule
+    -- 702.83a's exalted. SelfAttacks read by a BYSTANDER and narrowed to a
+    -- one-creature declaration, matched against the same
+    -- GameEvent.AttackerDeclared.
+    --
+    -- NOT self-scoped, and that is the constructor's whole point: rule 702.83a
+    -- says "a creature YOU CONTROL", so an Aven Squire held back while another
+    -- creature attacks alone still triggers, and the attacker is not the bearer.
+    -- PermanentEnters' shape rather than SelfAttacks': the bearer frames the
+    -- match -- it is the Filter context's source, its controller CR 109.5's "you"
+    -- (CR 603.3a) -- rather than being it.
+    --
+    -- ALONE rides the constructor rather than the Filter, because CR 506.5 makes
+    -- it a fact about the DECLARATION and not a characteristic of the creature --
+    -- the same argument CombatRestriction.CantAttackAlone makes one step earlier.
+    -- Pawl.Types.Filter's atoms are all characteristics of a candidate, so no
+    -- Filter can say it. The number is read off the count
+    -- GameEvent.AttackerDeclared carries, which is why rule 702.83b's "in a given
+    -- combat phase" holds across an extra combat phase.
+    --
+    -- No TriggerFrequency: rule 702.83a states none, and CR 506.1 gives a combat
+    -- phase one declare attackers step, so the event cannot repeat within one.
+    --
+    -- The attacker is bound under Pawl.Engine.Binding.attackingCreature for rule
+    -- 702.83a's "that creature" to read -- a different object from the bearer, as
+    -- SelfBecomesBlockedBy's blocker is.
+    CreatureAttacksAlone (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3a: "whenever [a creature] blocks" -- Pride Guardian's.
     -- SelfAttacks' mirror, self-scoped like SelfEnters.
     --

@@ -316,6 +316,20 @@ data Keyword
     -- keywords together, while CR 120.3a's life-loss exception names infect
     -- alone, so wither damage to a player is ordinary life loss.
     Wither
+  | -- | 702.83a: whenever a creature you control attacks alone, that creature
+    -- gets +1/+1 until end of turn. The EIGHTH keyword rule 702 states as a
+    -- triggered ability, and the first whose ability watches a permanent that is
+    -- not its bearer: "a creature you control" is every creature its controller
+    -- has, so an untapped Aven Squire triggers off another creature's attack.
+    -- Pawl.Engine.Keyword.exalted mints it, and
+    -- TriggerCondition.CreatureAttacksAlone is the condition that says it.
+    --
+    -- Nullary, because rule 702.83a takes no parameter -- and its reader takes the
+    -- per-keyword COUNT rather than membership: rule 702.83 prints no
+    -- "multiple instances are redundant" clause, unlike the static keywords that
+    -- do (CR 702.28c's shadow), so two instances are two triggered abilities and
+    -- +2/+2.
+    Exalted
   | -- | 702.86a: whenever this creature attacks, defending player sacrifices N
     -- permanents. N rides the constructor, as Poisonous' does, and for the same
     -- reason: CR 702.86b says each instance triggers separately, so
