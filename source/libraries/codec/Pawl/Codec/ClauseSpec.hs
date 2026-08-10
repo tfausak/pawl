@@ -83,7 +83,7 @@ spec s = Spec.describe s "Pawl.Codec.Clause" $ do
       toJson
       fromJson
       ( Clause.MkClause
-          (Just (Condition.MkCondition (Quantity.ObjectCounters CounterKind.PlusOnePlusOne) Comparison.Exactly (Quantity.Literal 0)))
+          (Just (Condition.Compares (Quantity.ObjectCounters CounterKind.PlusOnePlusOne) Comparison.Exactly (Quantity.Literal 0)))
           Optionality.Mandatory
           Nothing
           Seq.empty

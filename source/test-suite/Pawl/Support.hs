@@ -381,7 +381,7 @@ giveControl oid pid gs =
 -- StateCondition.YouControlSource's one replacement value.
 youControlSource :: Condition.Type.Condition
 youControlSource =
-  Condition.Type.MkCondition
+  Condition.Type.Compares
     ( Quantity.Type.Count
         ( Count.Type.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
@@ -399,7 +399,7 @@ youControlSource =
 -- corpus are pinned against -- the shape youControlSource already has.
 youControlNoSwamps :: Condition.Type.Condition
 youControlNoSwamps =
-  Condition.Type.MkCondition
+  Condition.Type.Compares
     ( Quantity.Type.Count
         ( Count.Type.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)
@@ -1584,6 +1584,7 @@ stubView table oid =
                 Filter.subtypes = ss,
                 Filter.keywords = Set.empty,
                 Filter.power = Nothing,
+                Filter.toughness = Nothing,
                 Filter.manaValue = Nothing,
                 Filter.controller = ctrl,
                 -- CR 108.3: the table registers no owner, and no Count in the

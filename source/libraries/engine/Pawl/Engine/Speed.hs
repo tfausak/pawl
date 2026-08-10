@@ -149,11 +149,10 @@ increaseAbility =
 -- state the same set -- this is the pool's first producer for AtMost (#158).
 belowMaxSpeed :: Condition.Condition
 belowMaxSpeed =
-  Condition.MkCondition
-    { Condition.measured = Quantity.Speed (PlayerRef.Relative PlayerRelation.You),
-      Condition.comparison = Comparison.AtMost,
-      Condition.threshold = Quantity.Literal (toInteger maxSpeed - 1)
-    }
+  Condition.Compares
+    (Quantity.Speed (PlayerRef.Relative PlayerRelation.You))
+    Comparison.AtMost
+    (Quantity.Literal (toInteger maxSpeed - 1))
 
 -- | CR 702.179d: the inherent trigger this batch of events fires, if any, as an
 -- ordinary PendingTrigger whose source is TriggerSource.Sourceless -- what lets

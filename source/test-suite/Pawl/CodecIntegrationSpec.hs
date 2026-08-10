@@ -250,7 +250,7 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
 -- Zombies, unlike S.youControlNoSwamps's ControlledBy conjunct.
 noZombiesOnBattlefield :: Condition.Type.Condition
 noZombiesOnBattlefield =
-  Condition.Type.MkCondition
+  Condition.Type.Compares
     ( Quantity.Count
         ( Count.Type.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)

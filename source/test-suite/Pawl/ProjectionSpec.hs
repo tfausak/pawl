@@ -819,7 +819,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
         hacked = S.withEffectAt outcastId (Timestamp.MkTimestamp 100) (Modification.ChangeSubtypeWord Subtype.Type.Swamp Subtype.Type.Island) plain
         asksAbout gs = case Projection.triggeredAbilitiesOf outcastId gs of
           ability : _ -> case TriggeredAbility.condition ability of
-            TriggerCondition.StateIs condition -> countedSubtypes (Condition.Type.measured condition)
+            TriggerCondition.StateIs (Condition.Type.Compares measured _ _) -> countedSubtypes measured
             _ -> []
           [] -> []
         countedSubtypes quantity = case quantity of

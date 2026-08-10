@@ -86,7 +86,7 @@ spec s = Spec.describe s "Pawl.Codec.TriggeredAbility" $ do
                 (ModeSelection.ChooseExactly 1),
             TriggeredAbility.intervening =
               Just
-                ( Condition.MkCondition
+                ( Condition.Compares
                     (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Zombie) Aggregation.Objects))
                     Comparison.Exactly
                     (Quantity.Literal 0)

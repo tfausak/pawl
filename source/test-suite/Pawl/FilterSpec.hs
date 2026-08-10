@@ -30,6 +30,7 @@ blackCreature =
       Filter.subtypes = Set.singleton Subtype.Zombie,
       Filter.keywords = Set.singleton Keyword.Flying,
       Filter.power = Just 2,
+      Filter.toughness = Just 2,
       Filter.manaValue = Just 3,
       Filter.controller = Just (PlayerId.MkPlayerId 0),
       -- CR 108.3: OWNED by player 1 while CONTROLLED by player 0, the one board
@@ -62,6 +63,7 @@ devoidBigCreature =
       Filter.subtypes = Set.empty,
       Filter.keywords = Set.empty,
       Filter.power = Just 5,
+      Filter.toughness = Just 5,
       Filter.manaValue = Just 5,
       Filter.controller = Nothing,
       Filter.owner = Nothing,

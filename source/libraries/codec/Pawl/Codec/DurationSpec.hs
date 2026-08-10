@@ -41,7 +41,7 @@ spec s = Spec.describe s "Pawl.Codec.Duration" $ do
       s
       Duration.toJson
       Duration.fromJson
-      (Duration.ForAsLongAs (Condition.MkCondition (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
+      (Duration.ForAsLongAs (Condition.Compares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
       """ {"type":"ForAsLongAs","value":{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}} """
   -- CR 500.5a: until end of combat.
   Spec.it s "UntilEndOfCombat" $

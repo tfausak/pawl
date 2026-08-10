@@ -278,6 +278,7 @@ viewOfSnapshot mController isToken snapshot =
       Filter.subtypes = PC.subtypes snapshot,
       Filter.keywords = Map.keysSet (PC.keywords snapshot),
       Filter.power = PC.power snapshot,
+      Filter.toughness = PC.toughness snapshot,
       -- CR 202.3 off the snapshot, which carries the number: a
       -- ProjectedCharacteristics records a mana value, so this reads what the
       -- object's was AT THE EVENT rather than throwing the question away.

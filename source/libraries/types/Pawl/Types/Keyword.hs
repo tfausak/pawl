@@ -399,6 +399,21 @@ data Keyword
     -- siblings, its reader takes the per-keyword count rather than membership,
     -- since CR 702.91b gives it the multiplicity CR 702.70b gives poisonous.
     BattleCry
+  | -- | 702.100a: whenever a creature you control enters, if that creature's power
+    -- and/or toughness is greater than this creature's, put a +1/+1 counter on
+    -- this creature. Minted by Pawl.Engine.Keyword.evolve like the triggered
+    -- keywords around it.
+    --
+    -- The first minted ability whose intervening "if" (CR 603.4) is about the
+    -- EVENT's object rather than the bearer -- rule 702.112a's renown asks about
+    -- the source, this one about the entrant -- and the first Condition in the
+    -- pool that needs a disjunction, rule 702.100a's "and/or" comparing two
+    -- different characteristics.
+    --
+    -- Nullary: rule 702.100a takes no parameter, so no KeywordFamily is owed. Its
+    -- reader takes the per-keyword count rather than membership, CR 702.100d
+    -- giving it the multiplicity CR 702.108b gives prowess.
+    Evolve
   | -- | 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
     -- until end of turn. The FOURTH keyword rule 702 states as a triggered
     -- ability, after poisonous (702.70a), annihilator (702.86a) and battle cry

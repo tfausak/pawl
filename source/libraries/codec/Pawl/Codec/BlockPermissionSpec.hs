@@ -43,6 +43,6 @@ spec s = Spec.describe s "Pawl.Codec.BlockPermission" $ do
       ( BlockPermission.MkBlockPermission
           (Affected.Matching Filter.IsSource)
           (Just 1)
-          (Just (Condition.MkCondition (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You)) Comparison.AtLeast (Quantity.Literal 1)))
+          (Just (Condition.Compares (Quantity.IsMonarch (PlayerRef.Relative PlayerRelation.You)) Comparison.AtLeast (Quantity.Literal 1)))
       )
       """ {"affected":{"type":"Matching","value":{"type":"IsSource"}},"additional":1,"while":{"comparison":{"type":"AtLeast"},"measured":{"type":"IsMonarch","value":{"type":"Relative","value":{"type":"You"}}},"threshold":{"type":"Literal","value":1}}} """

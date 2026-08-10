@@ -57,7 +57,7 @@ spec s = Spec.describe s "Pawl.Codec.StaticAbility" $ do
       ( StaticAbility.MkStaticAbility
           Affected.Attached
           ( Just
-              ( Condition.MkCondition
+              ( Condition.Compares
                   (Quantity.Count (Count.MkCount (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer) (Filter.HasSubtype Subtype.Forest) Aggregation.Objects))
                   Comparison.AtLeast
                   (Quantity.Literal 1)

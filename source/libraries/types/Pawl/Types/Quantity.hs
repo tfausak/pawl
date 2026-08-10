@@ -38,10 +38,15 @@ data Quantity
     -- where mana value is computed from the printed cost, so this arm goes
     -- through the injected ViewOf -- which is also what lets a caller substitute
     -- CR 608.2h last known information for a source that is gone.
-    --
-    -- No Toughness sibling: nothing in the pool reads one, and an unused arm is
-    -- the speculative construction the project forbids.
     Power
+  | -- | CR 208.1's other half: the toughness of the object this quantity is
+    -- evaluated against. Power's sibling in every respect -- projected, read
+    -- through the same injected ViewOf, naming no object of its own.
+    --
+    -- CR 702.100a's evolve is what asks: "that creature's power is greater than
+    -- this creature's power and/or that creature's toughness is greater than this
+    -- creature's toughness" is two comparisons, and only one of them is power's.
+    Toughness
   | -- | A number an EARLIER effect of the same resolution bound into a slot --
     -- Bane of Progress' "for each permanent destroyed this way". Read from the
     -- binding environment of whichever object the evaluation is aimed at; for

@@ -520,6 +520,9 @@ viewOfCard face =
           Filter.keywords = Face.keywords face,
           -- CR 208.1 read off the PRINTED power box -- see printedPower below.
           Filter.power = printedPower face,
+          -- CR 208.1's other half, read the same way off the printed toughness
+          -- box.
+          Filter.toughness = printedToughness face,
           -- CR 202.3: answerable here for the same reason power above is -- the
           -- mana cost is printed on the card and rule 202.3 names no zone. This
           -- is the arm Ojutai's Command's "mana value 2 or less" reads, its
@@ -581,10 +584,13 @@ viewOfCard face =
 -- must read. The view every off-battlefield reader gets; viewOfCard survives for
 -- the FACE-only callers, and as the blind inner view below.
 --
--- Only Filter.power differs. Filter.View has no toughness axis at all, so CR
--- 208.2a's other half has nothing here to land on.
+-- Only the power and toughness axes differ, CR 208.2a naming both.
 viewOfCardIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Filter.View
-viewOfCardIn gs oid face = (viewOfCard face) {Filter.power = characteristicPowerIn gs oid face}
+viewOfCardIn gs oid face =
+  (viewOfCard face)
+    { Filter.power = characteristicPowerIn gs oid face,
+      Filter.toughness = characteristicToughnessIn gs oid face
+    }
 
 -- CR 208.2a's power for a face whose CDA sets it, and printedPower's answer for
 -- every other face -- including a face with a characteristicPT but no printed
@@ -619,6 +625,17 @@ characteristicPowerIn gs oid face = case seedCharacteristicPT face of
         viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
      in Just (Quantity.determine viewOf context gs oid power)
 
+-- characteristicPowerIn's mirror, reading CR 208.2a's other half. Every argument
+-- that function's comment makes is this one's too, the two differing only in
+-- which member of the pair they take.
+characteristicToughnessIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Maybe Integer
+characteristicToughnessIn gs oid face = case seedCharacteristicPT face of
+  Nothing -> printedToughness face
+  Just (_, toughness) ->
+    let context = Filter.contextFor (controllerOf oid gs) (Just oid)
+        viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
+     in Just (Quantity.determine viewOf context gs oid toughness)
+
 -- CR 208.1's PRINTED power box, for a card off the battlefield where there is no
 -- projection to read one from. Nothing for a face with no power box:
 -- CR 208.1 gives power only to creature cards, so a land or an instant has none
@@ -646,6 +663,16 @@ printedPower face = case Face.characteristicPT face of
     -- CR 208.2 makes a star stand for a characteristic-defining ability, so a
     -- composite box like 1+* comes with a characteristicPT and left through the
     -- arm above -- and Nothing is the honest answer rather than a guessed number.
+    _ -> Nothing
+
+-- printedPower's mirror, arm for arm, on the printed toughness box. CR 208.2b's
+-- sentence names power and toughness together, so the star reads 0 here too.
+printedToughness :: Face.Face Card.Type.Card -> Maybe Integer
+printedToughness face = case Face.characteristicPT face of
+  Just _ -> Nothing
+  Nothing -> case fmap Toughness.unwrap (Face.toughness face) of
+    Just (Quantity.Type.Literal n) -> Just n
+    Just Quantity.Type.Star -> Just 0
     _ -> Nothing
 
 -- CR 508.3a: does this event record THIS object being declared as an attacker?
@@ -683,6 +710,7 @@ viewOfCharacteristics oid pc controller counters gs =
       -- Filter.HasKeyword asks only membership.
       Filter.keywords = Map.keysSet (PC.keywords pc),
       Filter.power = PC.power pc,
+      Filter.toughness = PC.toughness pc,
       -- CR 202.3 / 707.2 off the PROJECTION, not the printed face: mana cost is
       -- one of the copiable values, so layer 1 replaces it and a Clone entering
       -- as a copy of Darksteel Myr reports 3 rather than its own printed 4. The
@@ -1616,11 +1644,10 @@ rewriteTriggerCondition pairs condition = case condition of
 -- A CR 611.2b duration is stored rather than printed, so no text change reaches
 -- it here. Both sides are rewritten, both being full Quantities.
 rewriteCondition :: [(Subtype.Type.Subtype, Subtype.Type.Subtype)] -> Condition.Type.Condition -> Condition.Type.Condition
-rewriteCondition pairs condition =
-  condition
-    { Condition.Type.measured = rewriteQuantity pairs (Condition.Type.measured condition),
-      Condition.Type.threshold = rewriteQuantity pairs (Condition.Type.threshold condition)
-    }
+rewriteCondition pairs condition = case condition of
+  Condition.Type.Compares measured comparison threshold ->
+    Condition.Type.Compares (rewriteQuantity pairs measured) comparison (rewriteQuantity pairs threshold)
+  Condition.Type.Any conditions -> Condition.Type.Any (fmap (rewriteCondition pairs) conditions)
 
 -- CR 612.1 through a Quantity. A Count's Filter is where the subtype word hides,
 -- and its Aggregation may name a further Quantity; the descent is structural and
@@ -1637,6 +1664,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Literal _ -> quantity
   Quantity.Type.ManaValue -> quantity
   Quantity.Type.Power -> quantity
+  Quantity.Type.Toughness -> quantity
   Quantity.Type.InSlot _ -> quantity
   Quantity.Type.Star -> quantity
   Quantity.Type.ManaCount _ -> quantity

@@ -290,12 +290,12 @@ modeSlots mode =
     -- a slot the card owes a declaration for.
     payerSlot = maybe Set.empty (Set.singleton . UnlessPaid.payer) . Clause.unlessPaid
 
--- Both sides of a Condition are a Quantity, and either may read a slot.
+-- Both sides of a comparison are a Quantity, and either may read a slot.
 conditionSlots :: Condition.Type.Condition -> Set SlotName
-conditionSlots condition =
-  Set.union
-    (Quantity.slots $ Condition.Type.measured condition)
-    (Quantity.slots $ Condition.Type.threshold condition)
+conditionSlots condition = case condition of
+  Condition.Type.Compares measured _ threshold ->
+    Set.union (Quantity.slots measured) (Quantity.slots threshold)
+  Condition.Type.Any conditions -> foldMap conditionSlots conditions
 
 -- CR 603.3b: is slotsOf's answer for this effect the WHOLE of what APPLYING it
 -- reads off the resolving object's bindings? A CLASSIFICATION of effects, in the
@@ -417,9 +417,10 @@ durationSlotsAreExhaustive duration = case duration of
 
 -- conditionSlots' mirror: both sides are a Quantity.
 conditionSlotsAreExhaustive :: Condition.Type.Condition -> Bool
-conditionSlotsAreExhaustive condition =
-  Quantity.slotsAreExhaustive (Condition.Type.measured condition)
-    && Quantity.slotsAreExhaustive (Condition.Type.threshold condition)
+conditionSlotsAreExhaustive condition = case condition of
+  Condition.Type.Compares measured _ threshold ->
+    Quantity.slotsAreExhaustive measured && Quantity.slotsAreExhaustive threshold
+  Condition.Type.Any conditions -> all conditionSlotsAreExhaustive conditions
 
 -- Does any of these effects read X? A card that reads X must declare {X} in its
 -- cost (CR 107.3, CR 107.3a, CR 118.4) -- the same reads-equal-declares contract

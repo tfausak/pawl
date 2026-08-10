@@ -483,6 +483,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Prowess
       """ {"type":"Prowess"} """
+  -- CR 702.100a's evolve is nullary too, and CR 702.100d makes the COUNT
+  -- multiple rather than the value.
+  Spec.it s "Evolve" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Evolve
+      """ {"type":"Evolve"} """
   Spec.it s "Menace" $
     Common.assertJsonCodec
       s

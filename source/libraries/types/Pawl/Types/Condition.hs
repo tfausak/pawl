@@ -15,28 +15,35 @@ import qualified Pawl.Types.Quantity as Quantity
 -- keeps them apart: the duration ENDS a stored effect once, while the static
 -- ability's clause gates one that is re-derived every projection.
 --
--- Exactly ONE constructor: there is no escape hatch. CR 611.2b's "for as long as
--- you control this creature" is a source-restricted count of one
--- (Filter.IsSource), not a special arm.
+-- ONE comparison plus a disjunction of them, and no other escape hatch. CR
+-- 611.2b's "for as long as you control this creature" is a source-restricted
+-- count of one (Filter.IsSource), not a special arm.
 --
--- BOTH SIDES are a full Quantity, and both are evaluated symmetrically --
--- Pawl.Engine.Condition.holds passes each through Pawl.Engine.Quantity.evaluate
--- against the same object and view, so a Quantity.Power on either side reads the
--- same object. The field names record only where the pool happens to put the
--- constant; only the Comparison is oriented, AtLeast meaning `measured` is at
--- least `threshold`. That width is what lets a condition read the object it is
--- evaluated against rather than a set swept out of a zone, which CR 603.4's
--- intervening "if" on a leaves-the-battlefield ability needs: the source is gone,
--- so CR 608.2h answers through Projection.viewWithLastKnown.
+-- BOTH SIDES of Compares are a full Quantity, and both are evaluated
+-- symmetrically -- Pawl.Engine.Condition.holds passes each through
+-- Pawl.Engine.Quantity.evaluate against the same object and view, so a
+-- Quantity.Power on either side reads the same object. Only the Comparison is
+-- oriented, AtLeast meaning the first side is at least the second. That width is
+-- what lets a condition read the object it is evaluated against rather than a set
+-- swept out of a zone, which CR 603.4's intervening "if" on a
+-- leaves-the-battlefield ability needs: the source is gone, so CR 608.2h answers
+-- through Projection.viewWithLastKnown.
 --
 -- A Count's Scope may name a slot (PlayerRef.InSlot), and this Condition may be
 -- stored into a Pawl.Types.Expiry.While for a "for as long as" duration. An
 -- InSlot count stored that way outlives its slot binding: Pawl.Engine.Count.playersFor
 -- then yields Nothing, and Pawl.Engine.Condition.holds collapses that to False
 -- silently (#159).
-data Condition = MkCondition
-  { measured :: Quantity.Quantity,
-    comparison :: Comparison.Comparison,
-    threshold :: Quantity.Quantity
-  }
+data Condition
+  = -- | One comparison: the first Quantity relates thus to the second.
+    Compares Quantity.Quantity Comparison.Comparison Quantity.Quantity
+  | -- | True when ANY of these is -- CR 702.100a's "power is greater ... and/or
+    -- toughness is greater", which is two comparisons of two different
+    -- characteristics and so cannot be folded into one Compares.
+    --
+    -- Filter's Or, transplanted: a flat sibling arm rather than a wrapper type,
+    -- so it nests. There is no And and no Not, those being arms no rule in the
+    -- pool asks for. `Any []` is False, which is the fold's unit and not a
+    -- trivial-truth arm -- Filter's `And []` spells that.
+    Any [Condition]
   deriving (Eq, Ord, Show)

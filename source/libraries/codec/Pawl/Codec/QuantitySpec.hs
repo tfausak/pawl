@@ -44,6 +44,14 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       Quantity.Power
       """ {"type":"Power"} """
+  -- CR 208.1's other half, and Power's sibling on the wire as in the type.
+  Spec.it s "Toughness" $
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.Toughness
+      """ {"type":"Toughness"} """
   -- A number an earlier effect of the same resolution bound into a slot. Unlike
   -- X it carries the slot name on the wire, nested under Plus here since
   -- composition is where a recursive decoder loses a payload.

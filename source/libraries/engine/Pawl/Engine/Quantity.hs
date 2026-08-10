@@ -100,6 +100,8 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- Projection.viewWithLastKnown). Nothing when the object has no power: it is
   -- not a creature, or it is gone and no last known information was kept.
   Quantity.Power -> mView >>= Filter.power
+  -- CR 208.1's other half, read off the same view and Nothing in the same places.
+  Quantity.Toughness -> mView >>= Filter.toughness
   -- A value bound into the slot, read off the effect's SOURCE and then off the
   -- object on the stack. Nothing when neither holds an amount there: the
   -- producing effect has not run, or bound nothing.
@@ -349,6 +351,7 @@ substituteStar star quantity = case quantity of
   Quantity.Literal _ -> quantity
   Quantity.ManaValue -> quantity
   Quantity.Power -> quantity
+  Quantity.Toughness -> quantity
   Quantity.InSlot _ -> quantity
   Quantity.Count _ -> quantity
   Quantity.ManaCount _ -> quantity
@@ -380,6 +383,7 @@ slots quantity = case quantity of
   Quantity.Literal _ -> Set.empty
   Quantity.ManaValue -> Set.empty
   Quantity.Power -> Set.empty
+  Quantity.Toughness -> Set.empty
   Quantity.InSlot slot -> Set.singleton slot
   Quantity.Star -> Set.empty
   Quantity.Plus a b -> Set.union (slots a) (slots b)
@@ -436,6 +440,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.Literal _ -> True
   Quantity.ManaValue -> True
   Quantity.Power -> True
+  Quantity.Toughness -> True
   Quantity.InSlot _ -> True
   Quantity.Star -> True
   Quantity.Plus a b -> slotsAreExhaustive a && slotsAreExhaustive b
@@ -502,6 +507,7 @@ readsX quantity = case quantity of
   Quantity.Literal _ -> False
   Quantity.ManaValue -> False
   Quantity.Power -> False
+  Quantity.Toughness -> False
   Quantity.Star -> False
   Quantity.ManaCount _ -> False
   Quantity.LifeTotal _ -> False
