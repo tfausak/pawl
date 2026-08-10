@@ -307,7 +307,7 @@ data Keyword
     -- "DEFENDING PLAYER CONTROLS" rides the ability's target slot as mentor's
     -- power comparison does, and for the same reason: it is a fact about the pair.
     -- Filter.ControlledByDefendingPlayer is the atom, and NOT ControlledBy
-    -- Opponent, which CR 506.2 makes too wide on a board with three seats.
+    -- Opponent, which CR 506.2a makes too wide on a board with three seats.
     Provoke
   | -- | 702.42a: you may choose all modes of this modal spell (rule 700.2) instead
     -- of the number specified, paying an additional cost if you do.

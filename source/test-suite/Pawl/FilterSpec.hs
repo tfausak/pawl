@@ -250,7 +250,7 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
       Spec.assertBool s (not (Filter.matches (defended 1) blackCreature Filter.Type.ControlledByDefendingPlayer)) "owner is not the controller"
 
     -- NOT ControlledBy Opponent: `self`'s perspective is player 0, so that atom
-    -- would answer the opposite of this one on the very same view. CR 506.2 is
+    -- would answer the opposite of this one on the very same view. CR 506.2a is
     -- what makes them different questions.
     Spec.it s "is not ControlledBy Opponent" $ do
       Spec.assertBool s (not (Filter.matches (defended 0) blackCreature (Filter.Type.ControlledBy PlayerRelation.Opponent))) "player 0 is the perspective"

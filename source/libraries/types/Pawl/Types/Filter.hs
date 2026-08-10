@@ -140,7 +140,8 @@ data Filter keyword
     -- is and for the same reason.
     --
     -- NOT ControlledBy Opponent, and the difference is a wrong answer rather than
-    -- a nicety: CR 506.2 makes exactly one opponent the defending player, so on a
+    -- a nicety: CR 506.2a and CR 508.5a make exactly one opponent the defending
+    -- player, so on a
     -- board with three seats that filter admits a creature controlled by an
     -- opponent who is not being attacked at all.
     --

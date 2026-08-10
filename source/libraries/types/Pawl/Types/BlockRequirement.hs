@@ -26,12 +26,17 @@ import qualified Pawl.Types.Affected as Affected
 -- it: after the layer system has run, never inside it. Pawl.Engine.BlockRequirement is
 -- the only module that reads it; Pawl.Engine.Projection never sees it.
 --
--- ONE requirement shape, which is the one the pool prints: "all creatures able to
--- block X do so". The two axes CR 509.1c implies -- WHICH creatures are required,
--- and WHAT they must block -- are collapsed to the second, because "all
--- creatures" is the only subject any printing here has. A requirement with a
--- narrower subject, and the subjectless "blocks each combat if able" shape, are
--- unrepresentable (#341).
+-- ONE requirement shape, which is the one the pool prints as a STATIC ability:
+-- "all creatures able to block X do so". The two axes CR 509.1c implies -- WHICH
+-- creatures are required, and WHAT they must block -- are collapsed to the
+-- second, because "all creatures" is the only subject any static printing here
+-- has. A static requirement with a narrower subject, and the subjectless "blocks
+-- each combat if able" shape, are unrepresentable (#341).
+--
+-- Pawl.Types.ActiveBlockRequirement is the sibling that carries both axes, and it
+-- is not a widening of this one: it is the RESOLUTION-created carrier (CR 702.39a's
+-- provoke), where the creature is named by targeting and so is one object rather
+-- than an affected set.
 --
 -- Gathered LIVE from the battlefield on every read and never captured, the
 -- posture both siblings take -- so a Lure leaving the battlefield lifts its

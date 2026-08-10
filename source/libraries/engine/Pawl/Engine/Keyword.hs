@@ -1454,8 +1454,9 @@ training =
 --
 -- The spec is Pool.Creatures ("creature", drawn from the battlefield by CR 109.2)
 -- narrowed by Filter.ControlledByDefendingPlayer ("defending player controls",
--- CR 508.5). One atom rather than ControlledBy Opponent, which CR 506.2 makes too
--- wide: with three seats only one opponent is the defending player.
+-- CR 508.5). One atom rather than ControlledBy Opponent, which CR 506.2a makes
+-- too wide: with three seats only one opponent is the defending player, and CR
+-- 508.5a says an ability means that one.
 --
 -- ONE clause holding BOTH effects, under one Optionality.Optional. That is CR
 -- 608.2e's span: rule 702.39a prints one "may", and its "if you do" makes the
