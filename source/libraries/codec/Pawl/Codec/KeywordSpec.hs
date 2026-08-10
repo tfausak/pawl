@@ -629,6 +629,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (Keyword.Crew 6)
       """ {"type":"Crew","value":6} """
     Spec.assertBool s (Keyword.toJson (Keyword.Crew 1) /= Keyword.toJson (Keyword.Crew 6)) "crew 1 and crew 6 encode differently"
+  -- CR 702.123a's N is both the counters and the tokens, so fabricate 1 and
+  -- fabricate 2 are distinct keywords, Crew's shape.
+  Spec.it s "Fabricate carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Fabricate 2)
+      """ {"type":"Fabricate","value":2} """
+    Spec.assertBool s (Keyword.toJson (Keyword.Fabricate 1) /= Keyword.toJson (Keyword.Fabricate 2)) "fabricate 1 and fabricate 2 encode differently"
   Spec.it s "Riot" $
     Common.assertJsonCodec
       s

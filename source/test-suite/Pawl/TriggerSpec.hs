@@ -97,6 +97,9 @@
 -- with a counter on it, with Young Wolf and Putrid Goblin -- `undyingSpec`.
 -- CR 702.135 afterlife, the first minted keyword ability that CREATES a token,
 -- with Ministrant of Obligation -- `afterlifeSpec`.
+-- CR 702.123 fabricate, the first minted keyword ability whose resolution ASKS a
+-- question -- CR 118.12a's "unless", over a cost that puts counters -- with
+-- Glint-Sleeve Artisan -- `fabricateSpec`.
 -- CR 702.46 soulshift, the first minted keyword ability that TARGETS a card in a
 -- graveyard, with Kami of Empty Graves -- `soulshiftSpec`.
 -- CR 603.10's first sentence for a BYSTANDER -- a
@@ -176,6 +179,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Saga as Saga
 -- Aliased Condition.Type, not Condition, per the project-wide convention
 -- (CardSpec's note): the evaluator module Pawl.Engine.Condition may later be imported
@@ -204,6 +208,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind
+import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
@@ -227,6 +232,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.Object as Object
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
+import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -241,6 +247,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
@@ -7310,6 +7317,156 @@ afterlifeSpec s registry =
 -- legal target. The dead Kami's own graveyard incarnation is a Spirit too and is
 -- excluded by its mana value of 4 rather than by an "another" the rule does not
 -- print.
+-- Pays wherever `who` is offered a resolution cost, and answers everything else
+-- as S.identityAnswer does -- so a transcript with no ChooseToPay in it says the
+-- prompt was never raised rather than that the offer was refused. The Decider is
+-- checked alongside the player because CR 723.1 can part the two; nothing in
+-- these fixtures controls anybody, so they must agree.
+paysFor :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+paysFor who p = case p of
+  Prompt.ChooseToPay (Decider.MkDecider d) player _ _ _ _
+    | d == who && player == who ->
+        PaymentDecision.Pays
+  _ -> S.identityAnswer p
+
+-- The pay-or-not answers in a transcript, in order.
+payResponses :: [Response.Response] -> [Response.Response]
+payResponses = filter isPayResponse
+
+isPayResponse :: Response.Response -> Bool
+isPayResponse response = case response of
+  Response.ChoseToPay _ -> True
+  _ -> False
+
+-- CR 702.123 fabricate N: "When this permanent enters, you may put N +1/+1
+-- counters on it. If you don't, create N 1/1 colorless Servo artifact creature
+-- tokens." Rule 702.123a prints CR 118.12a's rewriting already done, so the
+-- minted clause is one UnlessPaid over
+-- CostComponent.PutPlusOneCountersOnThis and the tokens are its "if you don't"
+-- branch -- afterlife's mint with a gate on it, and the first minted keyword
+-- ability that ASKS a question at resolution.
+--
+-- Glint-Sleeve Artisan, {2}{W} Creature -- Dwarf Artificer 2/2, whose entire
+-- text box is "Fabricate 1". Every reading is a different board: 3/3 with the
+-- counter, 2/2 plus a Servo without it, 4/4 under Hardened Scales.
+--
+-- The first two cases start from the SAME board and the SAME settled trigger and
+-- differ in NOTHING but alice's answer.
+fabricateSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fabricateSpec s registry =
+  let named name gs = filter (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))) (Set.toList (GameState.battlefield gs))
+      artisansOn = named "Glint-Sleeve Artisan"
+      -- The bearer cast from alice's hand off three lands and resolved, with its
+      -- CR 603.6a enters trigger settled onto the stack but NOT resolved.
+      -- `others` go onto alice's battlefield first.
+      entersOnStack land bearer others =
+        let base = List.foldl' (\g p -> snd (S.addCreature p S.alice g)) (S.landsInPlay land 3) others
+            (gs, spellId) = S.handOne bearer base
+            cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+         in S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+      boardOf landName bearerName others = do
+        land <- S.printingOf s registry landName
+        bearer <- S.printingOf s registry bearerName
+        rest <- traverse (S.printingOf s registry) others
+        pure (entersOnStack land bearer rest)
+      board = boardOf "Plains" "Glint-Sleeve Artisan"
+   in Spec.describe s "CR 702.123 fabricate" $ do
+        Spec.it s "CR 702.123a paying the counter leaves the Artisan a 3/3 and makes no Servo" $ do
+          onStack <- board []
+          let ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+          case artisansOn onStack of
+            [artisanId] -> do
+              -- The controls: the Artisan really entered, and its trigger really
+              -- reached the stack, before anything below is read.
+              Spec.assertEqWith s "it entered as a 2/2 with no counters" (S.powerToughnessOf artisanId onStack, S.counterOf CounterKind.PlusOnePlusOne artisanId onStack) (Just (2, 2), 0)
+              Spec.assertEqWith s "CR 603.6a: its enters trigger is on the stack" (length (GameState.stack onStack)) 1
+              Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+              Spec.assertEqWith s "CR 122.6: one +1/+1 counter went on" (S.counterOf CounterKind.PlusOnePlusOne artisanId after) 1
+              Spec.assertEqWith s "CR 613.4c: so it reads 3/3" (S.powerToughnessOf artisanId after) (Just (3, 3))
+              Spec.assertEqWith s "CR 118.12a: the paid branch made no Servo" (S.tokensOf after) []
+            other -> Spec.assertFailure s ("expected one Glint-Sleeve Artisan, got " <> show (length other))
+        -- Every characteristic rule 702.123a states is asserted, because the mint
+        -- writes each of them out by hand and a wrong one compiles. Colorless
+        -- matters most: the pool's other minted token, afterlife's Spirit, is
+        -- white and black, so a mint copied from it would pass everything else.
+        Spec.it s "CR 702.123a declining creates a 1/1 colorless Servo artifact creature" $ do
+          onStack <- board []
+          let ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
+          case artisansOn onStack of
+            [artisanId] -> do
+              Spec.assertEqWith s "alice was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+              Spec.assertEqWith s "no counter went on" (S.counterOf CounterKind.PlusOnePlusOne artisanId after) 0
+              Spec.assertEqWith s "so it is still a 2/2" (S.powerToughnessOf artisanId after) (Just (2, 2))
+              case S.tokensOf after of
+                [servoId] ->
+                  Spec.assertEqWith
+                    s
+                    "the token is rule 702.123a's exactly"
+                    ( fmap Face.name (Game.faceOf servoId after),
+                      S.powerToughnessOf servoId after,
+                      Projection.colorsOf servoId after,
+                      Projection.cardTypesOf servoId after,
+                      Projection.subtypesOf servoId after,
+                      Projection.controllerOf servoId after
+                    )
+                    ( -- CR 111.4 names it, CR 105.2 makes an object with no mana
+                      -- cost and no colour indicator colorless, and CR 111.2 gives
+                      -- it to the ability's controller.
+                      Just (CardName.MkCardName (Text.pack "Servo Token")),
+                      Just (1, 1),
+                      Set.empty,
+                      Set.fromList [CardType.Artifact, CardType.Creature],
+                      Set.singleton Subtype.Servo,
+                      Just S.alice
+                    )
+                other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+            other -> Spec.assertFailure s ("expected one Glint-Sleeve Artisan, got " <> show (length other))
+        -- CR 614.16 over a cost paid DURING a resolution: the board differs from
+        -- the first case in nothing but the Hardened Scales, and it applies,
+        -- because CR 118.12 pays this cost as the ability resolves and CR 609.1
+        -- makes what happens then an effect of that ability.
+        Spec.it s "CR 614.16 Hardened Scales sees fabricate's counter, so the Artisan reads 4/4" $ do
+          onStack <- board ["Hardened Scales"]
+          let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
+          case artisansOn onStack of
+            [artisanId] -> do
+              Spec.assertEqWith s "it still entered as a 2/2" (S.powerToughnessOf artisanId onStack) (Just (2, 2))
+              Spec.assertEqWith s "one counter became two" (S.counterOf CounterKind.PlusOnePlusOne artisanId after) 2
+              Spec.assertEqWith s "so it reads 4/4" (S.powerToughnessOf artisanId after) (Just (4, 4))
+              Spec.assertEqWith s "and still no Servo" (S.tokensOf after) []
+            other -> Spec.assertFailure s ("expected one Glint-Sleeve Artisan, got " <> show (length other))
+        -- The keyword's N, at gameplay level and on BOTH halves. Weaponcraft
+        -- Enthusiast, {2}{B} Creature -- Aetherborn Artificer 0/1, whose entire
+        -- text box is "Fabricate 2": a mint that dropped the payload would put
+        -- one counter on (1/2, not 2/3) and make one Servo, and 0/1 keeps every
+        -- reading a different number from the Artisan's.
+        Spec.it s "CR 702.123a fabricate 2 puts two counters on the Enthusiast" $ do
+          onStack <- boardOf "Swamp" "Weaponcraft Enthusiast" []
+          let after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
+          case named "Weaponcraft Enthusiast" onStack of
+            [enthusiastId] -> do
+              Spec.assertEqWith s "it entered as a 0/1" (S.powerToughnessOf enthusiastId onStack) (Just (0, 1))
+              Spec.assertEqWith s "two +1/+1 counters went on" (S.counterOf CounterKind.PlusOnePlusOne enthusiastId after) 2
+              Spec.assertEqWith s "so it reads 2/3" (S.powerToughnessOf enthusiastId after) (Just (2, 3))
+              Spec.assertEqWith s "and no Servo" (S.tokensOf after) []
+            other -> Spec.assertFailure s ("expected one Weaponcraft Enthusiast, got " <> show (length other))
+        Spec.it s "CR 702.123a declining fabricate 2 creates two Servos" $ do
+          onStack <- boardOf "Swamp" "Weaponcraft Enthusiast" []
+          let after = S.runPure S.identityAnswer onStack Stack.resolveTop
+          case named "Weaponcraft Enthusiast" onStack of
+            [enthusiastId] -> do
+              Spec.assertEqWith s "no counter went on" (S.counterOf CounterKind.PlusOnePlusOne enthusiastId after) 0
+              Spec.assertEqWith s "so it is still a 0/1" (S.powerToughnessOf enthusiastId after) (Just (0, 1))
+              Spec.assertEqWith s "and there are two Servos" (length (S.tokensOf after)) 2
+            other -> Spec.assertFailure s ("expected one Weaponcraft Enthusiast, got " <> show (length other))
+        -- CR 702.123b: "if a permanent has multiple instances of fabricate, each
+        -- triggers separately". Asserted of the MINT, as afterlife's multiplicity
+        -- is, no card in the pool printing fabricate twice.
+        Spec.it s "CR 702.123b each instance of fabricate is its own ability" $ do
+          Spec.assertEqWith s "fabricate 1 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fabricate 1) 2)) [Keyword.fabricate 1, Keyword.fabricate 1]
+          Spec.assertEqWith s "and fabricate 2 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Fabricate 2) 1)) [Keyword.fabricate 2]
+          Spec.assertBool s (Keyword.fabricate 1 /= Keyword.fabricate 2) "and the N reaches the minted ability"
+
 soulshiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 soulshiftSpec s registry =
   let ancestorName = CardName.MkCardName (Text.pack "Disowned Ancestor")
@@ -9115,6 +9272,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   counterLookBackSpec s registry
   undyingSpec s registry
   afterlifeSpec s registry
+  fabricateSpec s registry
   soulshiftSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry

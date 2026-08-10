@@ -76,6 +76,8 @@ data KeywordFamily
     Renown
   | -- | CR 702.122a: crew N.
     Crew
+  | -- | CR 702.123a: fabricate N.
+    Fabricate
   | -- | CR 702.130a: afflict N.
     Afflict
   | -- | CR 702.135a: afterlife N.
