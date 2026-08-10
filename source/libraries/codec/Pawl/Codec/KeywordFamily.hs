@@ -22,6 +22,7 @@ toJson f = Common.nullary $ case f of
   KeywordFamily.Poisonous -> "Poisonous"
   KeywordFamily.Annihilator -> "Annihilator"
   KeywordFamily.Crew -> "Crew"
+  KeywordFamily.Afflict -> "Afflict"
   KeywordFamily.Toxic -> "Toxic"
 
 fromJson :: Value.Value -> Either Text.Text KeywordFamily.KeywordFamily
@@ -38,5 +39,6 @@ fromJson =
       ("Poisonous", KeywordFamily.Poisonous),
       ("Annihilator", KeywordFamily.Annihilator),
       ("Crew", KeywordFamily.Crew),
+      ("Afflict", KeywordFamily.Afflict),
       ("Toxic", KeywordFamily.Toxic)
     ]

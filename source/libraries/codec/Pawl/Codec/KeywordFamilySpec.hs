@@ -89,6 +89,14 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Crew
       """ {"type":"Crew"} """
 
+  Spec.it s "Afflict" $
+    Common.assertJsonCodec
+      s
+      KeywordFamily.toJson
+      KeywordFamily.fromJson
+      KeywordFamily.Afflict
+      """ {"type":"Afflict"} """
+
   Spec.it s "Toxic" $
     Common.assertJsonCodec
       s

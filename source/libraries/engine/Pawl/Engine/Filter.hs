@@ -475,6 +475,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Phasing -> keyword
   Keyword.Type.Shadow -> keyword
   Keyword.Type.Aftermath -> keyword
+  -- CR 702.130a's N is a number and not a word, so CR 612.2 has nothing to swap.
+  Keyword.Type.Afflict _ -> keyword
   Keyword.Type.Flying -> keyword
   Keyword.Type.Haste -> keyword
   Keyword.Type.Indestructible -> keyword

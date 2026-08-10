@@ -130,7 +130,8 @@ data TriggerCondition
     -- -- do not reach it. Neither has a producer in the pool (#1146).
     --
     -- No blocker is bound: rule 509.3c's form names none. CR 509.3d's does, and
-    -- that is SelfBecomesBlockedBy below.
+    -- that is SelfBecomesBlockedBy below. CR 508.5's defending player IS bound,
+    -- the event carrying it -- rule 702.130a's afflict is what reads it.
     SelfBecomesBlocked
   | -- | CR 509.3d: "whenever [a creature] becomes blocked by a creature" -- rule
     -- 702.25a's flanking, whose Filter is "without flanking". Self-scoped on the
