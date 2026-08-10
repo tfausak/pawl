@@ -3934,6 +3934,84 @@ evolveSpec s registry =
             (fmap TriggeredAbility.condition abilities)
             [expected, expected]
 
+-- CR 702.100b: a creature "evolves" when one or more +1/+1 counters are put on it
+-- as a result of its evolve ability RESOLVING -- the marker rule 702.100b makes
+-- other abilities able to identify. Renegade Krasis {1}{G}{G} 3/2 is the card:
+-- evolve, plus "whenever this creature evolves, put a +1/+1 counter on each other
+-- creature you control with a +1/+1 counter on it".
+--
+-- Four permanents, each pinning one conjunct of that sentence:
+--
+--   * the Krasis itself -- "each OTHER", so its own count must stay at the one
+--     its evolve put there.
+--   * alice's Goblin Piker and Hill Giant, each seeded with a counter -- two
+--     recipients, so "EACH other creature" is more than one object.
+--   * alice's Birds of Paradise, with none -- "with a +1/+1 counter on it".
+--   * bob's Piker, seeded with one -- "you control".
+--
+-- The ENTRANT is Llanowar Augur 0/3: it beats the Krasis' 2 toughness and nothing
+-- else, so the Krasis evolves. Goblin Piker 2/1 is the entrant that does not,
+-- which the self-scope case below turns on.
+krasisSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+krasisSpec s registry =
+  let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      plusOnes = S.counterOf CounterKind.PlusOnePlusOne
+      seeded printing pid gs =
+        let (oid, g1) = S.addCreature printing pid gs
+         in (oid, S.addCounter CounterKind.PlusOnePlusOne 1 oid g1)
+      boardOn base = do
+        krasisPrinting <- S.printingOf s registry "Renegade Krasis"
+        pikerPrinting <- S.printingOf s registry "Goblin Piker"
+        birdsPrinting <- S.printingOf s registry "Birds of Paradise"
+        giantPrinting <- S.printingOf s registry "Hill Giant"
+        let (krasis, g1) = S.addCreature krasisPrinting S.alice base
+            (mine, g2) = seeded pikerPrinting S.alice g1
+            (giant, g3) = seeded giantPrinting S.alice g2
+            (birds, g4) = S.addCreature birdsPrinting S.alice g3
+            (theirs, g5) = seeded pikerPrinting S.bob g4
+        pure (krasis, mine, giant, birds, theirs, g5)
+      board = boardOn (Setup.emptyGame S.bothPlayers)
+   in Spec.describe s "Renegade Krasis" $ do
+        -- The proving test.
+        Spec.it s "CR 702.100b whole card: the Krasis evolves and pays out its other counter-bearers" $ do
+          augur <- S.printingOf s registry "Llanowar Augur"
+          (krasis, mine, giant, birds, theirs, gs) <- board
+          let (_, entered) = S.entersWithTrigger augur S.alice gs
+              after = resolveAll (settle entered)
+          Spec.assertEqWith s "the Krasis keeps only its evolve counter" (plusOnes krasis after) 1
+          Spec.assertEqWith s "alice's Piker gains a second" (plusOnes mine after) 2
+          Spec.assertEqWith s "and so does her Giant -- EACH other creature" (plusOnes giant after) 2
+          Spec.assertEqWith s "the counterless Bird gains none" (plusOnes birds after) 0
+          Spec.assertEqWith s "bob's counter-bearer gains none" (plusOnes theirs after) 1
+        -- Self-scoped, not filtered: a Cloudfin Raptor evolving beside the Krasis
+        -- is another creature alice controls evolving, and the Krasis' ability
+        -- says "this creature". The Piker 2/1 beats the Raptor's 0/1 power and
+        -- neither of the Krasis' numbers, so exactly one of the two evolves.
+        Spec.it s "CR 702.100b another creature evolving is not this creature evolving" $ do
+          raptorPrinting <- S.printingOf s registry "Cloudfin Raptor"
+          pikerPrinting <- S.printingOf s registry "Goblin Piker"
+          (krasis, mine, _, _, _, gs) <- board
+          let (raptor, withRaptor) = S.addCreature raptorPrinting S.alice gs
+              (_, entered) = S.entersWithTrigger pikerPrinting S.alice withRaptor
+              after = resolveAll (settle entered)
+          Spec.assertEqWith s "the Raptor did evolve" (plusOnes raptor after) 1
+          Spec.assertEqWith s "the Krasis did not" (plusOnes krasis after) 0
+          Spec.assertEqWith s "so its trigger paid out nothing" (plusOnes mine after) 1
+        -- CR 702.100b's "as a result of its evolve ability resolving": the same
+        -- counter, on the same permanent, from Battlegrowth instead, is not an
+        -- evolution. The falsifier for a condition written against
+        -- GameEvent.CountersPut.
+        Spec.it s "CR 702.100b a +1/+1 counter from anything else is not an evolution" $ do
+          forest <- S.printingOf s registry "Forest"
+          battlegrowth <- S.printingOf s registry "Battlegrowth"
+          (krasis, mine, _, _, _, gs) <- boardOn (S.landsInPlay forest 1)
+          let (handed, spellId) = S.handOne battlegrowth gs
+              cast = snd (Engine.runGamePure (aimedCast spellId krasis) handed (S.cast S.alice spellId))
+              after = resolveAll (settle cast)
+          Spec.assertEqWith s "the Krasis took the counter" (plusOnes krasis after) 1
+          Spec.assertEqWith s "and nothing evolved, so nothing was paid out" (plusOnes mine after) 1
+
 renownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 renownSpec s registry =
   let board mine theirs = do
@@ -6207,6 +6285,11 @@ representativeEvents cond =
         -- CR 702.112b's own event, and the only one this condition admits, on
         -- `departed` for the arm above's reason.
         TriggerCondition.PermanentBecomesRenowned _ -> one (GameEvent.BecameRenowned departed)
+        -- CR 702.100b's own event, and the only one this condition admits. The
+        -- pair does NOT match -- the condition is self-scoped and `departed` is
+        -- not the bearer -- which pins the floor for a matching pair too, since
+        -- this arm binds nothing either way.
+        TriggerCondition.SelfEvolves -> one (GameEvent.Evolved departed)
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- payload is arbitrary: the condition compares nothing, so any sacrifice
         -- matches and the floor is the same for all of them.
@@ -6279,6 +6362,7 @@ everyTriggerCondition =
     TriggerCondition.SelfTurnedFaceUp,
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
     TriggerCondition.PermanentBecomesRenowned (Filter.Type.And []),
+    TriggerCondition.SelfEvolves,
     TriggerCondition.PermanentSacrificed,
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
     -- BOTH relations, on the SpellCast pair's reasoning above: an eventBindings
@@ -8383,6 +8467,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   trainingSpec s registry
   provokeSpec s registry
   evolveSpec s registry
+  krasisSpec s registry
   renownSpec s registry
   tovolarSpec s registry
   aragornSpec s registry

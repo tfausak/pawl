@@ -1244,7 +1244,7 @@ tapObject oid gs =
 -- Put `n` counters of a kind directly onto an object's per-incarnation state,
 -- bypassing the PutCounters opcode -- so a projection or SBA test can set up
 -- counters without resolving a spell.
-addCounter :: CounterKind.CounterKind -> Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+addCounter :: CounterKind.CounterKind Keyword.Keyword -> Natural -> ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
 addCounter kind n oid gs =
   let bump obj = obj {Object.counters = Map.insertWith (+) kind n (Object.counters obj)}
    in gs {GameState.objects = Map.adjust bump oid (GameState.objects gs)}
@@ -1288,7 +1288,7 @@ addPlayerCounter kind n pid gs =
 
 -- How many counters of a kind an object has (absent kind = zero). The object
 -- mirror of playerCounterOf below.
-counterOf :: CounterKind.CounterKind -> ObjectId.ObjectId -> GameState.GameState -> Natural
+counterOf :: CounterKind.CounterKind Keyword.Keyword -> ObjectId.ObjectId -> GameState.GameState -> Natural
 counterOf kind oid gs =
   maybe 0 (Map.findWithDefault 0 kind . Object.counters) (Game.lookupObject oid gs)
 

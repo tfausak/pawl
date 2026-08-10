@@ -11,7 +11,7 @@ import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 
 toJson :: TurnUpRewrite.TurnUpRewrite -> Value.Value
 toJson r = case r of
-  TurnUpRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Common.array $ [CounterKind.toJson kind, Common.encodeNatural n]
+  TurnUpRewrite.WithCounters kind n -> Common.tagged "WithCounters" . Just . Common.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
   TurnUpRewrite.MayAttachTo f -> Common.tagged "MayAttachTo" . Just $ Filter.toJson Keyword.toJson f
 
 fromJson :: Value.Value -> Either Text.Text TurnUpRewrite.TurnUpRewrite
@@ -19,7 +19,7 @@ fromJson value = do
   (t, mv) <- Common.asTagged value
   case (t, mv) of
     ("WithCounters", Just (Value.Array (Array.MkArray [k, n]))) -> do
-      kind <- CounterKind.fromJson k
+      kind <- CounterKind.fromJson Keyword.fromJson k
       count <- Common.decodeNatural n
       pure (TurnUpRewrite.WithCounters kind count)
     ("MayAttachTo", Just f) -> TurnUpRewrite.MayAttachTo <$> Filter.fromJson Keyword.fromJson f

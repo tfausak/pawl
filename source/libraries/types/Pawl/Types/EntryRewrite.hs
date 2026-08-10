@@ -75,7 +75,7 @@ data EntryRewrite
     -- intrinsic ability is minted per object from the PROJECTION
     -- (Pawl.Engine.Projection.intrinsicReplacementsOf) and the number is settled
     -- there, where CR 707.2's copiable loyalty is visible.
-    WithCounters CounterKind.CounterKind Natural.Natural
+    WithCounters (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
   | -- | CR 616.1b's shape: a replacement modifying UNDER WHOSE CONTROL an object
     -- enters the battlefield. Gather Specimens is the one producer, and the whole
     -- of its text is this rewrite.
@@ -125,7 +125,7 @@ data EntryRewrite
     -- counters for EACH creature sacrificed this way" -- so it wants this
     -- constructor plus a per-permanent count. Not carried: one is what Shimatsu
     -- needs, and no devour card is in the pool.
-    SacrificeAnyNumber (Filter.Filter Keyword.Keyword) (Maybe CounterKind.CounterKind)
+    SacrificeAnyNumber (Filter.Filter Keyword.Keyword) (Maybe (CounterKind.CounterKind Keyword.Keyword))
   | -- | CR 702.136a via CR 614.1c: riot. "You may have this permanent enter with
     -- an additional +1/+1 counter on it. If you don't, it gains haste."
     --

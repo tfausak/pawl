@@ -68,6 +68,7 @@ import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.Count as Count.Type
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.CounterPattern as CounterPattern
 import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.DamageKind as DamageKind
@@ -462,6 +463,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PermanentTurnedFaceUp _ -> []
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
   TriggerCondition.PermanentBecomesRenowned _ -> []
+  TriggerCondition.SelfEvolves -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
   TriggerCondition.PermanentSacrificed -> []
   -- CR 603.3b's carries a PlayerRelation, which holds no Count.
@@ -573,6 +575,7 @@ effectCounts effect = case effect of
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -811,6 +814,7 @@ effectReplacements effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1291,6 +1295,7 @@ effectMintedFaces effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1437,6 +1442,16 @@ canHostSubjects predicate = case predicate of
   -- run -- but still a Filter position a card author can write the atom into,
   -- which is the only thing this lint is about.
   Filter.Type.HasKeyword keyword -> sum (fmap canHostSubjects (keywordFilters keyword))
+  -- CR 122.1b's keyword counter carries a whole Keyword, so a Filter can hide one
+  -- level further down than the atom above -- and this lint is about the
+  -- positions, not about which of them a card has used.
+  Filter.Type.HasCounters kind -> case kind of
+    CounterKind.Keyword keyword -> sum (fmap canHostSubjects (keywordFilters keyword))
+    CounterKind.PlusOnePlusOne -> 0
+    CounterKind.MinusOneMinusOne -> 0
+    CounterKind.Loyalty -> 0
+    CounterKind.Lore -> 0
+    CounterKind.Defense -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
   Filter.Type.HasKeywordFamily _ -> 0
@@ -1714,6 +1729,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PermanentTurnedFaceUp f -> [f]
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesRenowned f -> [f]
+  TriggerCondition.SelfEvolves -> []
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
   -- PermanentDies below there is no Filter to sweep.
   TriggerCondition.PermanentSacrificed -> []
@@ -2070,7 +2086,10 @@ effectFilters effect = case effect of
   Effect.TurnFaceDown _ -> []
   Effect.RemoveFromCombat _ -> []
   Effect.Counter _ -> []
-  Effect.PutCounters _ quantity _ -> unframed (quantityFilters quantity)
+  -- BOTH positions: the ObjectRef carries Renegade Krasis' "each other creature
+  -- you control with a +1/+1 counter on it", and a Filter there would otherwise
+  -- escape the lint.
+  Effect.PutCounters _ quantity ref -> unframed (quantityFilters quantity <> objectRefFilters ref)
   Effect.RemoveCounters _ quantity _ -> unframed (quantityFilters quantity)
   Effect.GainPlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
   Effect.RemovePlayerCounters _ _ quantity -> unframed (quantityFilters quantity)
@@ -2086,6 +2105,7 @@ effectFilters effect = case effect of
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and

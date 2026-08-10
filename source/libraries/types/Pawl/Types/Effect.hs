@@ -515,12 +515,23 @@ data Effect card
     -- (CR 113.6g's and CR 613.11's), and recording for a SPELL a distinct "was
     -- countered" event the zone change alone could not be told apart from.
     Counter SlotName.SlotName
-  | -- | CR 122.6: put this many counters of this kind on the slot's target
-    -- permanent. A counter is persistent object state, NOT a zone change --
+  | -- | CR 122.6: put this many counters of this kind on the permanents the
+    -- ObjectRef names. A counter is persistent object state, NOT a zone change --
     -- Resolve.applyEffect edits Object.counters in place, never through
     -- Event.changeZone. The counter's P/T effect is the projection's (CR 122.1a /
     -- 613.4c), not this opcode's.
-    PutCounters CounterKind.CounterKind Quantity.Quantity SlotName.SlotName
+    --
+    -- An ObjectRef rather than a bare slot, so that Renegade Krasis' "each other
+    -- creature you control with a +1/+1 counter on it" can be written: CR 115.10a
+    -- makes such a set a description and never a target, which is exactly the
+    -- distinction that type draws. `InSlot` is the old spelling, and the JSON is
+    -- unchanged for it -- Pawl.Codec.ObjectRef encodes a slot as the same bare
+    -- string SlotName does.
+    --
+    -- Each named permanent gets its OWN call to Event.putCounters, because CR
+    -- 614.16 replaces one placement at a time: a Hardened Scales seeing three
+    -- creatures gets three opportunities, not one.
+    PutCounters (CounterKind.CounterKind Keyword.Keyword) Quantity.Quantity ObjectRef.ObjectRef
   | -- | CR 122: remove this many counters of this kind from the slot's target
     -- permanent. PutCounters' mirror, and a SEPARATE constructor rather than one
     -- signed amount for the reason RemovePlayerCounters is separate from
@@ -536,7 +547,11 @@ data Effect card
     --
     -- The P/T consequence is the projection's (CR 122.1a / 613.4c), not this
     -- opcode's, exactly as PutCounters' haddock says of the other direction.
-    RemoveCounters CounterKind.CounterKind Quantity.Quantity SlotName.SlotName
+    --
+    -- Still a bare SLOT where PutCounters now takes an ObjectRef: no printing in
+    -- the pool takes counters off a swept set, so the widening was owed on one
+    -- side only.
+    RemoveCounters (CounterKind.CounterKind Keyword.Keyword) Quantity.Quantity SlotName.SlotName
   | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
     -- player-counter kind. Subsumes any self-scoped player counter (energy,
     -- experience, rad) as `Relative You` -- Longtusk Cub's "you get {E}{E}".
@@ -722,6 +737,23 @@ data Effect card
     -- CR 702.112c leans on that -- the second renown ability to resolve "will have
     -- no effect", which its intervening "if" already stops before reaching here.
     BecomeRenowned SlotName.SlotName
+  | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
+    -- permanent, and if one or more actually land, that permanent EVOLVES --
+    -- rule 702.100b's marker, which Renegade Krasis' "whenever this creature
+    -- evolves" reads. The second half of the ability Pawl.Engine.Keyword.evolve
+    -- mints, and its only producer.
+    --
+    -- ONE opcode and not a PutCounters beside a marker, unlike renown's pair
+    -- above: rule 702.112a prints "and it becomes renowned" as a second action,
+    -- while rule 702.100b makes the marker CONDITIONAL on counters having been put
+    -- ("when one or more +1/+1 counters are put on it as a result of its evolve
+    -- ability resolving"). Two effects in a clause cannot state that dependency --
+    -- the second would fire on a placement CR 614.16 had replaced away to nothing.
+    --
+    -- The counter's kind and count are the rule's, not the card's, so neither is a
+    -- payload. A SlotName for BecomeRenowned's reason: rule 702.100a's "this
+    -- creature" is Binding.triggerSource, one object.
+    Evolve SlotName.SlotName
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that
     -- designation. Tovolar, Dire Overlord's upkeep trigger is `ItBecomes Night`.
     --

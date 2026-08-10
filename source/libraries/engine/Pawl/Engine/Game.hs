@@ -618,6 +618,7 @@ castOf event = case event of
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
   GameEvent.BecameRenowned _ -> Nothing
+  GameEvent.Evolved _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.Moved _ _ -> Nothing

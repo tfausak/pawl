@@ -21,7 +21,7 @@ data TurnUpRewrite
     -- constructor, as EntryRewrite.WithCounters' do, and the counters are placed
     -- through Pawl.Engine.Event.putCounters -- CR 122.6's funnel -- so CR 614.16
     -- applies and Doubling Season doubles a megamorph's counter.
-    WithCounters CounterKind.CounterKind Natural.Natural
+    WithCounters (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
   | -- | CR 303.4k: "you may attach it to a creature" (Gift of Doom), the one
     -- printing of the "effect [that] allows an Aura that's being turned face up
     -- to become attached" that rule is conditional on.

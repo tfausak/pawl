@@ -420,6 +420,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PermanentBecomesRenowned (Filter.ControlledBy PlayerRelation.You))
       """ {"type":"PermanentBecomesRenowned","value":{"type":"ControlledBy","value":{"type":"You"}}} """
+  -- CR 702.100b's marker, self-scoped, so nullary.
+  Spec.it s "SelfEvolves" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfEvolves
+      """ {"type":"SelfEvolves"} """
   -- CR 603.10a's sacrifice family. Nullary: "a player" is neither PlayerRelation
   -- arm and "a permanent" names no Filter, so there is nothing to encode.
   Spec.it s "PermanentSacrificed" $

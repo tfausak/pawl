@@ -44,8 +44,8 @@ toJson c = case c of
   TriggerCondition.DamageToPlayerPrevented r -> Common.tagged "DamageToPlayerPrevented" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerGainsLife r -> Common.tagged "PlayerGainsLife" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerLosesLife r -> Common.tagged "PlayerLosesLife" . Just $ PlayerRelation.toJson r
-  TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Common.array $ [CounterKind.toJson kind, Common.encodeNatural n]
-  TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ CounterKind.toJson kind
+  TriggerCondition.SelfCountersReached kind n -> Common.tagged "SelfCountersReached" . Just . Common.array $ [CounterKind.toJson Keyword.toJson kind, Common.encodeNatural n]
+  TriggerCondition.SelfLastCounterRemoved kind -> Common.tagged "SelfLastCounterRemoved" . Just $ CounterKind.toJson Keyword.toJson kind
   TriggerCondition.SpellCast f s -> Common.tagged "SpellCast" . Just . Common.array $ [Filter.toJson Keyword.toJson f, TurnScope.toJson s]
   TriggerCondition.SelfCast -> Common.nullary "SelfCast"
   TriggerCondition.SelfHalfUnlocked n -> Common.tagged "SelfHalfUnlocked" . Just $ CardName.toJson n
@@ -56,6 +56,7 @@ toJson c = case c of
   TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
   TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.PermanentBecomesRenowned f -> Common.tagged "PermanentBecomesRenowned" . Just $ Filter.toJson Keyword.toJson f
+  TriggerCondition.SelfEvolves -> Common.nullary "SelfEvolves"
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerBecomesMonarch r -> Common.tagged "PlayerBecomesMonarch" . Just $ PlayerRelation.toJson r
@@ -91,8 +92,8 @@ fromJson value = do
     ("DamageToPlayerPrevented", Just v) -> TriggerCondition.DamageToPlayerPrevented <$> PlayerRelation.fromJson v
     ("PlayerGainsLife", Just v) -> TriggerCondition.PlayerGainsLife <$> PlayerRelation.fromJson v
     ("PlayerLosesLife", Just v) -> TriggerCondition.PlayerLosesLife <$> PlayerRelation.fromJson v
-    ("SelfCountersReached", Just (Value.Array (Array.MkArray [kind, n]))) -> TriggerCondition.SelfCountersReached <$> CounterKind.fromJson kind <*> Common.decodeNatural n
-    ("SelfLastCounterRemoved", Just v) -> TriggerCondition.SelfLastCounterRemoved <$> CounterKind.fromJson v
+    ("SelfCountersReached", Just (Value.Array (Array.MkArray [kind, n]))) -> TriggerCondition.SelfCountersReached <$> CounterKind.fromJson Keyword.fromJson kind <*> Common.decodeNatural n
+    ("SelfLastCounterRemoved", Just v) -> TriggerCondition.SelfLastCounterRemoved <$> CounterKind.fromJson Keyword.fromJson v
     ("SpellCast", Just (Value.Array (Array.MkArray [f, s]))) -> TriggerCondition.SpellCast <$> Filter.fromJson Keyword.fromJson f <*> TurnScope.fromJson s
     ("SelfCast", _) -> Right TriggerCondition.SelfCast
     ("SelfHalfUnlocked", Just v) -> TriggerCondition.SelfHalfUnlocked <$> CardName.fromJson v
@@ -101,6 +102,7 @@ fromJson value = do
     ("SelfTurnedFaceUp", _) -> Right TriggerCondition.SelfTurnedFaceUp
     ("PermanentTurnedFaceUp", Just v) -> TriggerCondition.PermanentTurnedFaceUp <$> Filter.fromJson Keyword.fromJson v
     ("PermanentBecomesRenowned", Just v) -> TriggerCondition.PermanentBecomesRenowned <$> Filter.fromJson Keyword.fromJson v
+    ("SelfEvolves", _) -> Right TriggerCondition.SelfEvolves
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
     ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> PlayerRelation.fromJson v
     ("PlayerBecomesMonarch", Just v) -> TriggerCondition.PlayerBecomesMonarch <$> PlayerRelation.fromJson v

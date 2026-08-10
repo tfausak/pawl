@@ -51,6 +51,7 @@ import qualified Pawl.Types.ClauseIndex as ClauseIndex
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterCause as CounterCause
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageKind as DamageKind
 import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
@@ -227,7 +228,7 @@ slotsOf effect = case effect of
   Effect.RedirectDamage duration _ srcRef destRef ->
     Set.unions [durationSlots duration, objectRefSlots srcRef, objectRefSlots destRef]
   Effect.Counter slot -> Set.singleton slot
-  Effect.PutCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
+  Effect.PutCounters _ quantity ref -> Set.union (objectRefSlots ref) (Quantity.slots quantity)
   Effect.RemoveCounters _ quantity slot -> Set.insert slot (Quantity.slots quantity)
   Effect.GainPlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
   Effect.RemovePlayerCounters ref _ quantity -> Set.union (playerRefSlots ref) (Quantity.slots quantity)
@@ -248,6 +249,9 @@ slotsOf effect = case effect of
   -- rather than a target on every producer today (rule 702.112a's "it"), but
   -- the lint's question is which slots the effect names, not which are targets.
   Effect.BecomeRenowned slot -> Set.singleton slot
+  -- A READ, BecomeRenowned's: the slot names the permanent rule 702.100a's
+  -- counter goes on.
+  Effect.Evolve slot -> Set.singleton slot
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch slot -> Set.singleton slot
   Effect.Attach slot -> Set.singleton slot
@@ -399,6 +403,7 @@ slotsAreExhaustive effect = case effect of
   Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
   Effect.BecomeRenowned _ -> True
+  Effect.Evolve _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
   Effect.Attach _ -> True
@@ -494,6 +499,7 @@ readsX = any effectReadsX
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.BecomeRenowned _ -> False
+      Effect.Evolve _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
       Effect.Attach _ -> False
@@ -561,6 +567,7 @@ searchesLibrary effect = case effect of
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.BecomeRenowned _ -> False
+  Effect.Evolve _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.Attach _ -> False
@@ -687,6 +694,7 @@ boundSlots effect = case effect of
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.BecomeRenowned _ -> Set.empty
+  Effect.Evolve _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
   Effect.Attach _ -> Set.empty
@@ -2972,6 +2980,24 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
               (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.renowned = True}) target (GameState.objects g)})
             State.modify' (Event.recordEvent (GameEvent.BecameRenowned target))
       _ -> pure ()
+  -- CR 702.100a's counter and CR 702.100b's marker, in that order and in one arm
+  -- because the rule ties them: the creature evolves only if the placement
+  -- actually put one or more counters on it, which is what Event.putCounters
+  -- answers.
+  --
+  -- The gate is a FENCE rather than a tested branch: no pooled board reaches a
+  -- resolution here with nothing to place. Rule 702.100a's intervening "if" (CR
+  -- 608.2a) already removes the ability when the bearer has left or stopped being
+  -- a creature, and every CR 614.16 replacement in the pool only increases a
+  -- placement.
+  Effect.Evolve slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target -> do
+          placed <- Event.putCounters CounterCause.ByEffect target CounterKind.PlusOnePlusOne 1
+          Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Evolved target)))
+      _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
   -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes
   -- immediately -- is Pawl.Engine.Daytime's, so this arm names no field and asks
@@ -3087,22 +3113,24 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- exactly -- see Pawl.Types.Countering, which sets out the two cases.
       (Just recipient, True) -> mapM_ (Event.counter source controller) $ Recipient.objectOf recipient
       _ -> pure ()
-  Effect.PutCounters kind quantity slot -> do
+  Effect.PutCounters kind quantity ref -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
         context = effectContext controller source legality chosen
-    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
-      (Just recipient, True) -> case Recipient.objectOf recipient of
-        Nothing -> pure () -- a player recipient takes no counters
-        Just target -> case Quantity.evaluateFor viewOf context gs resolving source quantity of
-          Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
-          -- CR 122.6: through the single funnel, so CR 614's counter replacements
-          -- (Hardened Scales, Doubling Season) get their opportunity.
-          Just n -> Monad.when (n > 0) (Event.putCounters CounterCause.ByEffect target kind (Integer.toNaturalSaturating n))
-      _ -> pure () -- illegal slot at resolution (CR 608.2b): no-op
-      -- CR 122: PutCounters' mirror, and deliberately NOT through a CR 614.16 gate
-      -- -- that rule replaces a placement, and nothing in CR 614 replaces a removal,
-      -- so there is no loop for this to enter.
+        -- CR 608.2c: the set is swept as this instruction is reached, and an
+        -- illegal slot (CR 608.2b) or a player recipient answers with nobody.
+        targets = objectRefObjects legality chosen resolving controller source gs ref
+    case Quantity.evaluateFor viewOf context gs resolving source quantity of
+      Nothing -> pure () -- unevaluable quantity: no-op (the powerOf posture)
+      -- ONE evaluation for the whole set (CR 608.2f), then CR 122.6's single
+      -- funnel per recipient, so CR 614's counter replacements (Hardened Scales,
+      -- Doubling Season) get their opportunity against each placement.
+      Just n ->
+        Monad.when (n > 0) . Monad.forM_ targets $ \target ->
+          Event.putCounters CounterCause.ByEffect target kind (Integer.toNaturalSaturating n)
+  -- CR 122: PutCounters' mirror, and deliberately NOT through a CR 614.16 gate
+  -- -- that rule replaces a placement, and nothing in CR 614 replaces a removal,
+  -- so there is no loop for this to enter.
   Effect.RemoveCounters kind quantity slot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
