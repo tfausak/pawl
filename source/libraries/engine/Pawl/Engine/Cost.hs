@@ -189,9 +189,23 @@ costsFor name oid gs = case Game.lookupObject oid gs of
             -- `withAdditional printed` -- that wrapper exists to bolt the face's
             -- additional costs onto an ALTERNATIVE, and `printed` already carries
             -- them.
+            --
+            -- CR 702.133a pays the PRINTED cost plus a discard, which is the
+            -- third of the three shapes this arm offers: flashback replaces the
+            -- mana cost, aftermath replaces nothing, and jump-start ADDS to it
+            -- ("by discarding a card as an additional cost to cast it", CR
+            -- 601.2b/601.2f-h). So the component is appended to `printed`, which
+            -- already carries the face's own additional costs -- and not through
+            -- `withAdditional`, which exists to bolt those onto an ALTERNATIVE.
+            --
+            -- One discard however many jump-start abilities the card has: see
+            -- Pawl.Engine.Keyword.hasJumpStart.
             Zone.Graveyard ->
               fmap withAdditional (Maybe.maybeToList (Keyword.flashbackCost (Face.keywords face)))
                 <> [printed | Keyword.hasAftermath (Face.keywords face)]
+                <> [ printed {Cost.components = Cost.components printed <> [CostComponent.DiscardCards 1]}
+                   | Keyword.hasJumpStart (Face.keywords face)
+                   ]
             _ -> printed : fmap withAdditional (Face.alternativeCosts face)
     Source.OfToken _ -> []
     Source.OfAbility _ _ -> []

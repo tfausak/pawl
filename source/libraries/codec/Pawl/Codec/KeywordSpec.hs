@@ -259,6 +259,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Aftermath
       """ {"type":"Aftermath"} """
+  -- CR 702.133a: nullary for aftermath's reason and one more -- the discard the
+  -- rule names is the rule's, not the card's, so there is no payload to carry.
+  Spec.it s "JumpStart" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.JumpStart
+      """ {"type":"JumpStart"} """
   -- CR 702.29e: the typecycling filter rides the same keyword arm and
   -- is absent for plain cycling, so both spellings have to survive the trip.
   Spec.it s "Cycling round-trips with and without a typecycling filter" $ do
