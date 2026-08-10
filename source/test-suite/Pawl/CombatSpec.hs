@@ -1000,8 +1000,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     homunculus <- S.printingOf s registry "Furtive Homunculus"
     hillGiant <- S.printingOf s registry "Hill Giant"
     piker <- S.printingOf s registry "Goblin Piker"
-    let play theirs =
-          let (gs, _, _) = S.combatBoardOf [homunculus] [theirs]
+    let play defender =
+          let (gs, _, _) = S.combatBoardOf [homunculus] [defender]
               after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
            in (S.lifeOf S.bob after, S.creaturesInPlay S.alice after, S.creaturesInPlay S.bob after)
     Spec.assertEqWith

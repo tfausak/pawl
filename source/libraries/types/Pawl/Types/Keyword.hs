@@ -369,12 +369,13 @@ data Keyword
   | -- | 702.118b: a creature with skulk can't be blocked by creatures with greater
     -- power.
     --
-    -- The asymmetric shape flying, fear, intimidate and menace share -- 702.118b
-    -- restricts being BLOCKED and never blocking -- with the exception stated as a
-    -- COMPARISON between the two creatures rather than as a property of the
-    -- blocker alone. Intimidate (702.13b) is the other gate of that shape, over
-    -- colours instead of power, so the two are siblings and neither can be
-    -- expressed as the other. Read by Pawl.Engine.Combat.skulkAllowsGiven.
+    -- Asymmetric, the shape flying, fear, intimidate, landwalk and menace share
+    -- and shadow does not: 702.118b restricts being BLOCKED and says nothing
+    -- about blocking. What it adds to them is the EXCEPTION -- a comparison
+    -- between the two creatures rather than a property of the blocker alone.
+    -- Intimidate (702.13b) is the other gate written that way, over colours
+    -- instead of power, so neither can be expressed as the other. Read by
+    -- Pawl.Engine.Combat.skulkAllowsGiven.
     --
     -- Both powers come off the PROJECTION, never the printed box: CR 509.1b is
     -- checked as blockers are declared, so what counts is the power CR 613 gives
