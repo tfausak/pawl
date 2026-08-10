@@ -218,6 +218,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.TurnedFaceUp (ObjectId.MkObjectId 5))
       """ {"type":"TurnedFaceUp","value":5} """
+  -- CR 702.112b. One id, TurnedFaceUp's payload exactly: the designation says only
+  -- which permanent got it.
+  Spec.it s "BecameRenowned" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.BecameRenowned (ObjectId.MkObjectId 5))
+      """ {"type":"BecameRenowned","value":5} """
   -- CR 701.21a: the sacrificing player and the permanent, in that order, and the
   -- id is the PRE-MOVE one -- the record is written before the zone change, which
   -- is CR 603.10a's look-back.

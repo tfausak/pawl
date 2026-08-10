@@ -43,6 +43,7 @@ toJson e = case e of
     Common.tagged "CountersRemoved" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Common.array $ [ObjectId.toJson oid, CardName.toJson name, Common.boolean fully]
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ ObjectId.toJson oid
+  GameEvent.BecameRenowned oid -> Common.tagged "BecameRenowned" . Just $ ObjectId.toJson oid
   GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid]
   GameEvent.AbilityTriggered oid pid cond ->
     Common.tagged "AbilityTriggered" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson pid, TriggerCondition.toJson cond]
@@ -74,6 +75,7 @@ fromJson value = do
       GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     ("HalfUnlocked", Just (Value.Array (Array.MkArray [oid, name, fully]))) -> GameEvent.HalfUnlocked <$> ObjectId.fromJson oid <*> CardName.fromJson name <*> Common.asBoolean fully
     ("TurnedFaceUp", Just v) -> GameEvent.TurnedFaceUp <$> ObjectId.fromJson v
+    ("BecameRenowned", Just v) -> GameEvent.BecameRenowned <$> ObjectId.fromJson v
     ("PermanentSacrificed", Just (Value.Array (Array.MkArray [pid, oid]))) -> GameEvent.PermanentSacrificed <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid
     ("AbilityTriggered", Just (Value.Array (Array.MkArray [oid, pid, cond]))) ->
       GameEvent.AbilityTriggered <$> ObjectId.fromJson oid <*> PlayerId.fromJson pid <*> TriggerCondition.fromJson cond

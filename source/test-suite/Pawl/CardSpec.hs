@@ -457,6 +457,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count for
   -- PermanentEnters' reason.
   TriggerCondition.PermanentTurnedFaceUp _ -> []
+  -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
+  TriggerCondition.PermanentBecomesRenowned _ -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
   TriggerCondition.PermanentSacrificed -> []
   -- CR 603.3b's carries a PlayerRelation, which holds no Count.
@@ -1693,6 +1695,8 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- Its watcher-scoped sibling carries one, and Aven Farseer's is the trivial
   -- `And []` -- which this sweep must still see, an empty Filter being a Filter.
   TriggerCondition.PermanentTurnedFaceUp f -> [f]
+  -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
+  TriggerCondition.PermanentBecomesRenowned f -> [f]
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
   -- PermanentDies below there is no Filter to sweep.
   TriggerCondition.PermanentSacrificed -> []

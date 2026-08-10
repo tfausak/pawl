@@ -720,6 +720,21 @@ data TriggerCondition
     -- all -- a face-down permanent is a 2/2 with no subtypes (CR 708.2a), so
     -- reading it before would answer every narrowed form wrong.
     PermanentTurnedFaceUp (Filter.Filter Keyword.Keyword)
+  | -- | CR 702.112b: a permanent the Filter admits BECAME RENOWNED -- Valeron
+    -- Wardens' "whenever a creature you control becomes renowned". The designation
+    -- CR 702.112b calls "a marker that the renown ability and other spells and
+    -- abilities can identify", read at the moment it is given.
+    --
+    -- PermanentTurnedFaceUp's shape exactly, and for its reasons: one FILTERED
+    -- constructor rather than a self-scoped pair, the bearer entering only as the
+    -- Filter.Context's source and CR 109.5's "you". Relic Seeker's "when THIS
+    -- creature becomes renowned" is this condition with Filter.IsSource, so the
+    -- self form needs no constructor of its own.
+    --
+    -- A LIVE read of the permanent, PermanentTurnedFaceUp's posture: nothing here
+    -- is a zone change, so CR 603.10a's look-back does not reach it and the
+    -- designation is written while the permanent is still on the battlefield.
+    PermanentBecomesRenowned (Filter.Filter Keyword.Keyword)
   | -- | CR 603.10a: "whenever a player sacrifices a permanent". One of the four
     -- look-back families that rule names, and the second pawl builds.
     --

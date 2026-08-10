@@ -2919,18 +2919,26 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- PutCounters' slot read without the quantity: a player recipient takes no
   -- designation (rule 702.112b: "only permanents can be or become renowned"), an
   -- illegal slot at resolution is CR 608.2b's no-op, and an id naming no object --
-  -- the permanent has left the battlefield (CR 400.7) -- writes nothing, which
-  -- Map.adjust gives for free.
+  -- the permanent has left the battlefield (CR 400.7) -- writes nothing and emits
+  -- nothing, the lookup below answering Nothing.
   --
-  -- Emits no event, so "when this creature becomes renowned" (Relic Seeker) has
-  -- nothing to trigger on (#1168).
+  -- GameEvent.BecameRenowned is what "whenever a creature you control becomes
+  -- renowned" (Valeron Wardens) triggers on. Emitted only on a TRANSITION, the
+  -- same gate Event.unlockHalf applies to CR 709.5c's designation: a permanent
+  -- that is already renowned does not become renowned again. No board in the pool
+  -- can reach an already-renowned permanent here -- CR 603.4's intervening "if"
+  -- removes rule 702.112a's second ability from the stack (CR 608.2a) -- so the
+  -- gate is a fence rather than a tested branch.
   Effect.BecomeRenowned slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure ()
-        Just target ->
-          State.modify'
-            (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.renowned = True}) target (GameState.objects gs)})
+        Just target -> do
+          gs <- State.get
+          Monad.when (maybe False (not . Object.renowned) (Game.lookupObject target gs)) $ do
+            State.modify'
+              (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.renowned = True}) target (GameState.objects g)})
+            State.modify' (Event.recordEvent (GameEvent.BecameRenowned target))
       _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
   -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes
