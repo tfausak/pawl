@@ -584,6 +584,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Evolve
       """ {"type":"Evolve"} """
+  -- CR 702.105a's dethrone is nullary as well, CR 702.105b making the COUNT
+  -- multiple rather than the value.
+  Spec.it s "Dethrone" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Dethrone
+      """ {"type":"Dethrone"} """
   Spec.it s "Menace" $
     Common.assertJsonCodec
       s

@@ -567,6 +567,20 @@ data Keyword
     -- reader takes the per-keyword count rather than membership, CR 702.100d
     -- giving it the multiplicity CR 702.108b gives prowess.
     Evolve
+  | -- | 702.105a: whenever this creature attacks the player with the most life or
+    -- tied for most life, put a +1/+1 counter on it. Rule 702 states it as a
+    -- triggered ability, minted by Pawl.Engine.Keyword.dethrone like the triggered
+    -- keywords around it.
+    --
+    -- What it adds to those is a condition that reads the LIFE TOTALS of every
+    -- player still in the game as the declaration happens
+    -- (TriggerCondition.SelfAttacksPlayerWithMostLife), where every other minted
+    -- attack trigger asks only about the declaration itself.
+    --
+    -- Nullary: rule 702.105a takes no parameter, so no KeywordFamily is owed. Its
+    -- reader takes the per-keyword count rather than membership, CR 702.105b
+    -- giving it the multiplicity CR 702.108b gives prowess.
+    Dethrone
   | -- | 702.107a: outlast [cost], an ACTIVATED ability meaning "[Cost], {T}: Put
     -- a +1/+1 counter on this creature. Activate only as a sorcery."
     -- Pawl.Engine.Keyword.outlast mints the whole ability from this one value, as
