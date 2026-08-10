@@ -1929,6 +1929,125 @@ circlingVulturesSpec s registry = Spec.describe s "CirclingVultures" $ do
     Spec.assertEqWith s "and the Piker under it is still in the graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName piker)]
     Spec.assertEqWith s "with two candidates, alice was still never asked which" (filter isExileResponse transcript) []
 
+-- The battlefield objects whose sole face carries this name. Used instead of an
+-- id taken before the cast, since CR 400.7 mints a new object on the way in.
+byNameOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
+byNameOnBattlefield name gs =
+  [ oid
+  | oid <- Set.toList (GameState.battlefield gs),
+    fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack name))
+  ]
+
+-- Fortress Kin-Guard cast from alice's hand off two Plains and resolved, with its
+-- CR 603.6a enters trigger settled onto the stack but NOT resolved -- zombieUpkeep's
+-- shape, so a case can read the board before the endure happens. `others` are put
+-- on alice's battlefield first.
+kinGuardOnStack :: Printing.Printing -> Printing.Printing -> [Printing.Printing] -> GameState.GameState
+kinGuardOnStack plains kinGuard others =
+  let base = List.foldl' (\g p -> snd (S.addCreature p S.alice g)) (S.landsInPlay plains 2) others
+      (gs, spellId) = S.handOne kinGuard base
+      cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+   in S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+
+-- CR 701.63a's endure, which is CR 118.12a's "unless" over a cost that puts
+-- counters rather than one that spends a resource: "that permanent's controller
+-- creates an N/N white Spirit creature token UNLESS THEY PUT N +1/+1 COUNTERS ON
+-- THAT PERMANENT" (CostComponent.PutPlusOneCountersOnThis). Fortress Kin-Guard
+-- ({1}{W} 1/2 Creature -- Dog Soldier, "When this creature enters, it endures 1")
+-- is the printing.
+--
+-- The first two cases start from the SAME board and the SAME settled trigger and
+-- differ in NOTHING but alice's answer, Whipstitched Zombie's shape. Endure 1 on a
+-- 1/2 keeps every reading distinct: 2/3 with the counter, 1/2 with the token, 3/4
+-- under Hardened Scales.
+fortressKinGuardSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+fortressKinGuardSpec s registry = Spec.describe s "FortressKinGuard" $ do
+  let kinGuardOf = byNameOnBattlefield "Fortress Kin-Guard"
+  Spec.it s "CR 701.63a paying the counters leaves the Kin-Guard a 2/3 and makes no token" $ do
+    plains <- S.printingOf s registry "Plains"
+    kinGuard <- S.printingOf s registry "Fortress Kin-Guard"
+    let onStack = kinGuardOnStack plains kinGuard []
+        ((_, after), transcript) = Replay.record (paysFor S.alice) onStack Stack.resolveTop
+    case kinGuardOf onStack of
+      [guardId] -> do
+        -- The controls: the Kin-Guard really entered, and its trigger really
+        -- reached the stack, before anything below is read.
+        Spec.assertEqWith s "it entered as a 1/2 with no counters" (S.powerToughnessOf guardId onStack, S.counterOf CounterKind.PlusOnePlusOne guardId onStack) (Just (1, 2), 0)
+        Spec.assertEqWith s "and its enters trigger is on the stack" (length (GameState.stack onStack)) 1
+        Spec.assertEqWith s "alice was asked exactly once, and paid" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Pays]
+        Spec.assertEqWith s "CR 122.6: one +1/+1 counter went on" (S.counterOf CounterKind.PlusOnePlusOne guardId after) 1
+        Spec.assertEqWith s "CR 613.4c: so it reads 2/3" (S.powerToughnessOf guardId after) (Just (2, 3))
+        Spec.assertEqWith s "CR 118.12a: the paid branch made no Spirit" (S.tokensOf after) []
+        Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+      other -> Spec.assertFailure s ("expected one Fortress Kin-Guard, got " <> show (length other))
+  Spec.it s "CR 701.63a declining creates a 1/1 white Spirit and leaves the Kin-Guard a 1/2" $ do
+    plains <- S.printingOf s registry "Plains"
+    kinGuard <- S.printingOf s registry "Fortress Kin-Guard"
+    let onStack = kinGuardOnStack plains kinGuard []
+        ((_, after), transcript) = Replay.record S.identityAnswer onStack Stack.resolveTop
+    case kinGuardOf onStack of
+      [guardId] -> do
+        Spec.assertEqWith s "alice was asked exactly once, and declined" (payResponses transcript) [Response.ChoseToPay PaymentDecision.Declines]
+        Spec.assertEqWith s "no counter went on" (S.counterOf CounterKind.PlusOnePlusOne guardId after) 0
+        Spec.assertEqWith s "so it is still a 1/2" (S.powerToughnessOf guardId after) (Just (1, 2))
+        case S.tokensOf after of
+          [spiritId] -> do
+            Spec.assertEqWith s "CR 111.4: the token is named Spirit Token" (fmap Face.name (Game.faceOf spiritId after)) (Just . CardName.MkCardName $ Text.pack "Spirit Token")
+            Spec.assertEqWith s "a Creature" (Projection.cardTypesOf spiritId after) (Set.singleton CardType.Creature)
+            Spec.assertEqWith s "with subtype Spirit" (Projection.subtypesOf spiritId after) (Set.singleton Subtype.Spirit)
+            -- CR 202.2e: the token face carries a colour indicator, which is how
+            -- "white" is spelled for an object with no mana cost.
+            Spec.assertEqWith s "and white" (Projection.colorsOf spiritId after) (Set.singleton Color.White)
+            Spec.assertEqWith s "endure 1 makes it 1/1" (S.powerToughnessOf spiritId after) (Just (1, 1))
+            Spec.assertEqWith s "CR 111.2: alice created it, so alice controls it" (Projection.controllerOf spiritId after) (Just S.alice)
+          other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+      other -> Spec.assertFailure s ("expected one Fortress Kin-Guard, got " <> show (length other))
+  -- CR 614.16 over a cost paid DURING a resolution. The board differs from the
+  -- first case in NOTHING but the Hardened Scales, and Hardened Scales does apply,
+  -- because CR 118.12 pays this cost as the ability resolves and CR 609.1 makes
+  -- what happens then an effect of that ability. A payment routed around the
+  -- counter funnel reads 2/3 here.
+  Spec.it s "CR 614.16 Hardened Scales sees endure's counter, so the Kin-Guard reads 3/4" $ do
+    plains <- S.printingOf s registry "Plains"
+    kinGuard <- S.printingOf s registry "Fortress Kin-Guard"
+    scales <- S.printingOf s registry "Hardened Scales"
+    let onStack = kinGuardOnStack plains kinGuard [scales]
+        after = S.runPure (paysFor S.alice) onStack Stack.resolveTop
+    case kinGuardOf onStack of
+      [guardId] -> do
+        Spec.assertEqWith s "it still entered as a 1/2" (S.powerToughnessOf guardId onStack) (Just (1, 2))
+        Spec.assertEqWith s "one counter became two" (S.counterOf CounterKind.PlusOnePlusOne guardId after) 2
+        Spec.assertEqWith s "so it reads 3/4" (S.powerToughnessOf guardId after) (Just (3, 4))
+        Spec.assertEqWith s "and still no Spirit" (S.tokensOf after) []
+      other -> Spec.assertFailure s ("expected one Fortress Kin-Guard, got " <> show (length other))
+  -- CR 118.3 plus CR 701.63a's own ruling: "if you can't put +1/+1 counters on the
+  -- creature for any reason (for example, if the creature is no longer on the
+  -- battlefield), you'll just create a Spirit token." A Lightning Bolt kills the
+  -- 1/2 while its endure trigger waits, and CR 113.7a resolves the trigger off a
+  -- source that has left.
+  --
+  -- The interpreter PAYS wherever it is offered a cost, so an empty transcript
+  -- says the prompt was never raised rather than that alice would have refused.
+  Spec.it s "CR 118.3 a Kin-Guard that has left cannot pay, so the Spirit is created unasked" $ do
+    plains <- S.printingOf s registry "Plains"
+    mountain <- S.printingOf s registry "Mountain"
+    kinGuard <- S.printingOf s registry "Fortress Kin-Guard"
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    let base = snd (S.addCreature mountain S.alice (S.landsInPlay plains 2))
+        (withGuard, guardSpell) = S.handOne kinGuard base
+        (boltSpell, withBolt) = S.addHandCard bolt S.alice withGuard
+        cast = S.runPure S.identityAnswer withBolt (S.cast S.alice guardSpell)
+        onStack = S.runPure S.identityAnswer cast (Stack.resolveTop >> Engine.settleForPriority)
+        -- The Kin-Guard is the only creature on the board, so identityAnswer's
+        -- lowest recipient is it; CR 704.5g then buries it in the settle.
+        bolted = S.runPure S.identityAnswer onStack (S.cast S.alice boltSpell >> Stack.resolveTop >> Engine.settleForPriority)
+        ((_, after), transcript) = Replay.record (paysFor S.alice) bolted Stack.resolveTop
+    Spec.assertEqWith s "the Kin-Guard entered and its trigger is on the stack" (length (kinGuardOf onStack), length (GameState.stack onStack)) (1, 1)
+    Spec.assertEqWith s "the Bolt killed it, and the endure trigger is still there" (length (kinGuardOf bolted), length (GameState.stack bolted)) (0, 1)
+    Spec.assertEqWith s "CR 118.3: alice was never offered the counters" (payResponses transcript) []
+    Spec.assertEqWith s "and the Spirit was created anyway" (length (S.tokensOf after)) 1
+    Spec.assertEqWith s "stack empty" (length (GameState.stack after)) 0
+
 -- The board both Magical Hack timing cases start from. alice has a Mountain --
 -- added FIRST, so it holds the lowest object id and identityAnswer's
 -- ChooseTargets (Set.lookupMin over the recipients) aims the Hack at it -- plus
@@ -5727,6 +5846,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   manaLeakSpec s registry
   whipstitchedZombieSpec s registry
   circlingVulturesSpec s registry
+  fortressKinGuardSpec s registry
   magicalHackTimingSpec s registry
   artificialEvolutionSpec s registry
   stifleSpec s registry

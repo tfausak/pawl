@@ -45,6 +45,7 @@ import qualified Pawl.Types.Claim as Claim.Type
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Face as Face
@@ -545,6 +546,7 @@ isLoyaltyComponent component = case component of
   CostComponent.DiscardCards _ -> False
   CostComponent.DiscardThis -> False
   CostComponent.PayEnergy _ -> False
+  CostComponent.PutPlusOneCountersOnThis _ -> False
   CostComponent.ExileThisFromGraveyard -> False
   CostComponent.ExileCardsFromGraveyard _ _ -> False
   CostComponent.ExileTopFromGraveyard _ -> False
@@ -603,6 +605,9 @@ zoneOfComponent component = case component of
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+  -- CR 122.6 puts counters on a permanent already where it is, so nothing moves
+  -- out of any zone and CR 113.6m does not reach this either.
+  CostComponent.PutPlusOneCountersOnThis _ -> Nothing
 
 -- CR 306.5c: a planeswalker's loyalty is the number of loyalty counters on it.
 -- Zero for an object with none, which CR 704.5i then reads as loyalty 0 -- so
@@ -780,6 +785,7 @@ removalClaim pid oid component gs = case component of
   CostComponent.PayEnergy _ -> Nothing
   CostComponent.AddLoyaltyToThis _ -> Nothing
   CostComponent.RemoveLoyaltyFromThis _ -> Nothing
+  CostComponent.PutPlusOneCountersOnThis _ -> Nothing
   where
     claim z p n = Just (Claim.Type.MkClaim {Claim.Type.zone = z, Claim.Type.pool = p, Claim.Type.count = n})
     itself condition = if condition then Set.singleton oid else Set.empty
@@ -1023,6 +1029,7 @@ lifeOwedByComponent component = case component of
   CostComponent.PayEnergy _ -> 0
   CostComponent.AddLoyaltyToThis _ -> 0
   CostComponent.RemoveLoyaltyFromThis _ -> 0
+  CostComponent.PutPlusOneCountersOnThis _ -> 0
   CostComponent.ExileThisFromGraveyard -> 0
   CostComponent.ExileCardsFromGraveyard _ _ -> 0
   CostComponent.ExileTopFromGraveyard _ -> 0
@@ -1159,6 +1166,15 @@ canPayComponent pid oid component gs = case component of
     Set.member oid (GameState.battlefield gs)
       && Projection.controllerOf oid gs == Just pid
       && loyaltyCountersOn oid gs >= n
+  -- CR 701.63a puts the counters on "that permanent", so the one thing that can
+  -- make this unpayable is the permanent no longer being there -- which is the
+  -- only reason CR 701.63a's and CR 702.123a's rulings name ("if you can't put
+  -- +1/+1 counters on the creature for any reason, for example if it's no longer
+  -- on the battlefield, you'll just create a Spirit token"). Deliberately NOT
+  -- gated on control, unlike the two loyalty arms above: the payer is the
+  -- ability's controller (CR 118.12), and CR 122.6 lets counters go onto a
+  -- permanent whoever controls it by the time the ability resolves.
+  CostComponent.PutPlusOneCountersOnThis _ -> Set.member oid (GameState.battlefield gs)
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are
 -- paid in PRINTED order; CR 601.2h lets the player pay in any order, which is an
@@ -1593,10 +1609,15 @@ payComponent pid oid component = case component of
   -- CR 606.4: put the loyalty counters on. A DIRECT edit and deliberately NOT
   -- through Event.putCounters, which is the CR 614 funnel: CR 614.16 admits
   -- a counter-scaling replacement (Doubling Season, Hardened Scales) only where a
-  -- resolving spell or ability's EFFECT puts the counter on, and a cost is not an
-  -- effect. The counters CR 306.5b's enters-with replacement places DO go through
-  -- that funnel, by CR 614.16's next clause -- which is what makes Doubling Season
-  -- double a planeswalker's starting loyalty and leave its +1 alone.
+  -- resolving spell or ability's EFFECT puts the counter on, and CR 602.2b pays
+  -- an activation cost as part of ACTIVATING the ability (CR 601.2h) rather than
+  -- as part of resolving it -- so CR 609.1's "when a spell, activated ability, or
+  -- triggered ability resolves, it may create one or more ... effects" has no
+  -- resolution to hang this placement on. The counters CR 306.5b's
+  -- enters-with replacement places DO go through that funnel, by CR 614.16's next
+  -- clause -- which is what makes Doubling Season double a planeswalker's starting
+  -- loyalty and leave its +1 alone. Contrast PutPlusOneCountersOnThis below, the
+  -- one component paid DURING a resolution.
   CostComponent.AddLoyaltyToThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (addLoyalty n) oid (GameState.objects gs)})
     pure Payment.Paid
@@ -1605,6 +1626,22 @@ payComponent pid oid component = case component of
   -- guarantees `have >= n` at pay time, and the guard keeps this total anyway.
   CostComponent.RemoveLoyaltyFromThis n -> do
     State.modify' (\gs -> gs {GameState.objects = Map.adjust (removeLoyalty n) oid (GameState.objects gs)})
+    pure Payment.Paid
+  -- CR 122.6's placement, through the Event.putCounters funnel as
+  -- CounterCause.ByEffect -- the opposite call from AddLoyaltyToThis above, and
+  -- the difference is WHEN the cost is paid. CR 118.12 pays this one "when the
+  -- spell or ability resolves", so the counters land as part of that resolution,
+  -- which is what CR 609.1 calls an effect and so what CR 614.16 reaches: "the
+  -- effect of a resolving spell or ability puts a counter on a permanent".
+  -- Hardened Scales therefore sees endure's counter; it still does not see a
+  -- planeswalker's +1.
+  --
+  -- Paid whatever the funnel then places. CR 118.3's "fully" is answered by
+  -- canPayComponent above, and a replacement that grows or erases the placement
+  -- afterwards is CR 614's business rather than the payment's -- the counters
+  -- were put on, so the "if you don't" branch does not run.
+  CostComponent.PutPlusOneCountersOnThis n -> do
+    Monad.void (Event.putCounters CounterCause.ByEffect oid CounterKind.PlusOnePlusOne n)
     pure Payment.Paid
   -- CR 406.2's move, through Event.changeZone -- the shared zone-change funnel, so
   -- the card gets a CR 400.7 incarnation and anything watching a graveyard-to-exile

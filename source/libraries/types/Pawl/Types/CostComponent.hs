@@ -126,6 +126,26 @@ data CostComponent keyword
     -- which Pawl.Engine.Cost.canPayComponent answers by counting
     -- CounterKind.Loyalty on the source.
     RemoveLoyaltyFromThis Natural.Natural
+  | -- | CR 118.12's counter-placing cost: put this many +1/+1 counters on the
+    -- permanent the cost is on. CR 701.63a's endure -- "creates an N/N white
+    -- Spirit creature token UNLESS THEY PUT N +1/+1 COUNTERS ON THAT PERMANENT"
+    -- (Fortress Kin-Guard) -- is the printing, and CR 702.123a's fabricate prints
+    -- the same shape spelled out. What makes the action a cost rather than an
+    -- effect is CR 118.12a's rewriting plus CR 118.12's own sentence: "the action
+    -- [do something] is a cost, paid when the spell or ability resolves".
+    --
+    -- +1/+1 SPECIFICALLY, PayEnergy's call: loyalty is the only other counter any
+    -- cost puts on the object it is on, and AddLoyaltyToThis above already has
+    -- it. A CounterKind payload would also pull a Keyword -- and through it a
+    -- Filter -- into every traversal of this type, for a kind no card asks for.
+    --
+    -- RESOLUTION-TIME only, unlike every other component here, and that is what
+    -- decides CR 614.16 -- see Pawl.Engine.Cost.payComponent for why this one
+    -- goes through the counter funnel as an effect while AddLoyaltyToThis does
+    -- not.
+    --
+    -- A Natural and not a Quantity, for PayLife's reason.
+    PutPlusOneCountersOnThis Natural.Natural
   | -- | CR 406.2 as a cost: exile the card the cost is on, from the graveyard it
     -- is in. Loxodon Surveyor's "{3}, Exile this card from your graveyard: Draw a
     -- card" is the printing. CR 601.2f's list of what a cost may include ends in

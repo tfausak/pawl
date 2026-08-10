@@ -106,6 +106,14 @@ spec s = Spec.describe s "Pawl.Codec.CostComponent" $ do
       fromJson
       (CostComponent.RemoveLoyaltyFromThis 1)
       """ {"type":"RemoveLoyaltyFromThis","value":1} """
+  -- CR 118.12's counter-placing cost, CR 701.63a's endure.
+  Spec.it s "PutPlusOneCountersOnThis" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (CostComponent.PutPlusOneCountersOnThis 1)
+      """ {"type":"PutPlusOneCountersOnThis","value":1} """
   -- CR 406.2's two halves: the one that names the object the cost is on, and
   -- the one that names a count and a criterion.
   Spec.it s "ExileThisFromGraveyard" $

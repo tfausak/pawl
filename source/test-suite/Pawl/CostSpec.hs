@@ -213,6 +213,18 @@ doorSpec s registry =
           three = S.addPlayerCounter PlayerCounterKind.Energy 3 S.alice gs0
           after = S.runPure S.identityAnswer three (Monad.void (Cost.payComponent S.alice oid (CostComponent.PayEnergy 2)))
       Spec.assertEqWith s "one energy left" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 1
+    -- CR 118.12's counter-placing cost (CR 701.63a's endure). The gate is the
+    -- permanent still being on the battlefield to take the counters, and NOT
+    -- control -- Pawl.ResolveSpec's Fortress Kin-Guard cases prove the two
+    -- branches at gameplay level, and this is where the control reading is ruled
+    -- out, since on that card the payer is the controller either way.
+    Spec.it s "CR 118.12 PutPlusOneCountersOnThis needs the permanent on the battlefield, whoever controls it" $ do
+      piker <- S.printingOf s registry "Goblin Piker"
+      let (onField, gs0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
+          (inHand, gs1) = S.addHandCard piker S.alice gs0
+      Spec.assertBool s (Cost.canPayComponent S.alice onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "a permanent on the battlefield pays"
+      Spec.assertBool s (Cost.canPayComponent S.bob onField (CostComponent.PutPlusOneCountersOnThis 1) gs1) "and pays for a player who does not control it"
+      Spec.assertBool s (not (Cost.canPayComponent S.alice inHand (CostComponent.PutPlusOneCountersOnThis 1) gs1)) "a card in hand does not"
 
 -- Greed {3}{B} Enchantment: "{B}, Pay 2 life: Draw a card."
 --
