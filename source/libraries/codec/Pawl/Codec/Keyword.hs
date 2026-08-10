@@ -60,6 +60,7 @@ toJson k = case k of
   Keyword.Infect -> Common.nullary "Infect"
   Keyword.Wither -> Common.nullary "Wither"
   Keyword.Exalted -> Common.nullary "Exalted"
+  Keyword.Mentor -> Common.nullary "Mentor"
   Keyword.BattleCry -> Common.nullary "BattleCry"
   Keyword.Prowess -> Common.nullary "Prowess"
   Keyword.Menace -> Common.nullary "Menace"
@@ -111,6 +112,7 @@ fromJson value = do
     ("Infect", _) -> Right Keyword.Infect
     ("Wither", _) -> Right Keyword.Wither
     ("Exalted", _) -> Right Keyword.Exalted
+    ("Mentor", _) -> Right Keyword.Mentor
     ("BattleCry", _) -> Right Keyword.BattleCry
     ("Prowess", _) -> Right Keyword.Prowess
     ("Menace", _) -> Right Keyword.Menace

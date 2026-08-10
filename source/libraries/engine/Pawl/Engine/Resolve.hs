@@ -1050,7 +1050,7 @@ gateHolds controller source clause = case Clause.condition clause of
   Nothing -> pure True
   Just condition -> do
     gs <- State.get
-    pure (Condition.holds (Projection.fullView gs) (Filter.MkContext (Just controller) (Just source)) gs source condition)
+    pure (Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source condition)
 
 -- CR 603.5 / 608.2d: does this clause's instruction list happen at all? A
 -- mandatory clause always does; an optional one is its controller's call, made
@@ -1333,7 +1333,7 @@ objectRefObjects legality chosen resolving controller source gs ref = case ref o
       (Just recipient, True) -> Maybe.maybeToList (Recipient.objectOf recipient)
       _ -> []
   ObjectRef.EachMatching filter_ ->
-    let context = Filter.MkContext (Just controller) (Just source)
+    let context = Filter.contextFor (Just controller) (Just source)
         matching =
           filter
             (\oid -> Filter.matches context (Projection.viewOfObject oid gs) filter_)
@@ -1635,7 +1635,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.DealDamage ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         -- CR 120.1a: "Damage can't be dealt to an object that's not a battle, a
         -- creature, or a planeswalker." Both arms of the ObjectRef can name
         -- something that is not one of those, so both go through
@@ -1794,7 +1794,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- card with power 2 or less" sees a Tarmogoyf's real power. The context has
     -- no perspective (CR 109.5): a search filter never references a player, so
     -- ControlledBy is vacuously False. No source in scope at this site.
-    let searchContext = Filter.MkContext Nothing Nothing
+    let searchContext = Filter.contextFor Nothing Nothing
         matches1 g oid = case Game.faceOf oid g of
           Nothing -> False
           Just face -> Filter.matches searchContext (Projection.viewOfCardIn g oid face) filter_
@@ -2245,7 +2245,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Draw ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         -- Whoever the PlayerRef names draws -- the controller for Divination's
         -- `Relative You`, the targeted player for Ancestral Recall's `InSlot`,
         -- each opponent for Master of the Feast's `Relative Opponent`, the whole
@@ -2277,7 +2277,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Mill ref quantity mTally -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         -- An illegal slot (CR 608.2b) or a reference naming nobody arrives here
         -- as the empty list and mills nothing, the posture every PlayerRef arm
         -- takes.
@@ -2303,7 +2303,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- ONE number across every miller. Rule 728.1's mill names one player, and a
     -- per-player tally would need a per-player reader, which no Quantity has.
     Monad.forM_ mTally $ \tally ->
-      let tallyContext = Filter.MkContext Nothing Nothing
+      let tallyContext = Filter.contextFor Nothing Nothing
           counted oid = case Game.faceOf oid gs of
             Nothing -> False
             Just face -> Filter.matches tallyContext (Projection.viewOfCardIn gs oid face) (MillTally.filter tally)
@@ -2311,7 +2311,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Discard slot quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer target), True) ->
         case Quantity.evaluateFor viewOf context gs resolving source quantity of
@@ -2358,7 +2358,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.LoseLife ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         -- Whoever the PlayerRef names loses the life -- the targeted player for
         -- Sign in Blood's `InSlot`, the controller for a `Relative You`
         -- drawback. Unordered, on the footing GainPlayerCounters is on rather
@@ -2392,7 +2392,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.GainLife ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         gainers = playerRefPlayers chosen legality controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
@@ -2448,7 +2448,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.IncreaseSpeed ref quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         revving = playerRefPlayers chosen legality controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
@@ -2469,7 +2469,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.PlayerSacrifices slot filter_ quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just (Recipient.ToPlayer victim), True) ->
         case Quantity.evaluateFor viewOf context gs resolving source quantity of
@@ -2520,7 +2520,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.Create quantity card entry mSlot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 -> do
@@ -2639,7 +2639,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
       -- not viewWithLastKnown: a spell creating a self-replacement is on the
       -- stack and the board is live, unlike CR 603.4's intervening "if" on a
       -- leaves-the-battlefield trigger.
-      let met = maybe True (Condition.holds (Projection.fullView gs) (Filter.MkContext (Just controller) (Just source)) gs source) condition
+      let met = maybe True (Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source) condition
        in case (met, Expiry.arm controller source duration gs) of
             -- The stated condition is false, so the clause creates nothing.
             (False, _) -> gs
@@ -2685,7 +2685,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- either, and a shield installed over it could never match anything.
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         recipients = Maybe.mapMaybe (Damage.damageRecipient gs) (objectRefRecipients legality chosen resolving controller source gs ref)
         -- CR 615.5: the additional effect, BAKED onto the row with the
         -- environment it will need -- this resolution's chosen targets, which is
@@ -2966,7 +2966,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.PutCounters kind quantity slot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient takes no counters
@@ -2982,7 +2982,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.RemoveCounters kind quantity slot -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of
         Nothing -> pure () -- a player recipient has no object counters
@@ -3065,7 +3065,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.GainPlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         recipients = playerRefPlayers chosen legality controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
@@ -3089,7 +3089,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   Effect.RemovePlayerCounters ref kind quantity -> do
     gs <- State.get
     let viewOf = Projection.viewWithLastKnown source gs
-        context = Filter.MkContext (Just controller) (Just source)
+        context = Filter.contextFor (Just controller) (Just source)
         recipients = playerRefPlayers chosen legality controller gs ref
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n

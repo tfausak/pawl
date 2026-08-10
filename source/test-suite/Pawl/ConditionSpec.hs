@@ -57,7 +57,7 @@ boardOf swamp n =
    in (S.stubView table, gs)
 
 context :: Filter.Context
-context = Filter.MkContext (Just S.alice) (Just (ObjectId.MkObjectId 0))
+context = Filter.contextFor (Just S.alice) (Just (ObjectId.MkObjectId 0))
 
 check :: Printing.Printing -> Integer -> Comparison.Comparison -> Integer -> Bool
 check swamp n comparison threshold =
@@ -174,7 +174,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
         ( not $
             Condition.holds
               viewOf
-              (Filter.MkContext Nothing Nothing)
+              (Filter.contextFor Nothing Nothing)
               gs
               (ObjectId.MkObjectId 0)
               (Condition.Type.MkCondition (Quantity.Type.Count count) Comparison.Exactly (Quantity.Type.Literal 0))

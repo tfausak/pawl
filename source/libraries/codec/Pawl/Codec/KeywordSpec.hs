@@ -404,6 +404,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Exalted
       """ {"type":"Exalted"} """
+  -- CR 702.134a takes no parameter either, and CR 702.134b makes the instances
+  -- separate rather than redundant -- so, like exalted, a bare tag over a count.
+  Spec.it s "Mentor" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Mentor
+      """ {"type":"Mentor"} """
   -- CR 702.91a's battle cry takes no parameter, so it encodes as a bare tag.
   -- What CR 702.91b makes multiple is the COUNT the projection keeps, never the
   -- value.

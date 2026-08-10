@@ -233,9 +233,29 @@ playerView pid =
 -- player and no source frame the match (an off-battlefield search).
 data Context = MkContext
   { perspective :: Maybe PlayerId.PlayerId,
-    source :: Maybe ObjectId.ObjectId
+    source :: Maybe ObjectId.ObjectId,
+    -- CR 208.1: the SOURCE's power, for the one atom that compares a candidate
+    -- against it (PowerLessThanSource, CR 702.134a). Not derivable from `source`
+    -- here -- this module holds no game state and cannot project -- so the caller
+    -- that has the board supplies it, which is Pawl.Engine.Target.admittedGiven
+    -- and nothing else.
+    --
+    -- LAZY, and load-bearingly so: filling it costs a projection of the source,
+    -- and no filter that omits the atom ever forces it. That is the posture
+    -- View.attackedThisTurn takes for its event-log fold.
+    --
+    -- Nothing wherever the atom cannot appear, which `contextFor` below is the
+    -- spelling of.
+    sourcePower :: Maybe Integer
   }
   deriving (Eq, Show)
+
+-- A Context for every match whose Filter cannot name PowerLessThanSource -- that
+-- is, every match but a target slot's. The atom reaches a card only through
+-- Pawl.Engine.Keyword.mentor's own TargetSpec, and Pawl.CardSpec's lint keeps it
+-- out of card data, so no other position can read the Nothing this leaves.
+contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -271,6 +291,15 @@ matches context view predicate = case predicate of
   Filter.PowerAtMost n -> case power view of
     Nothing -> False
     Just p -> p <= n
+  -- CR 702.134a's "power less than this creature's power", the one power
+  -- comparison whose bound is another object rather than a literal. False unless
+  -- BOTH powers are readable, which is the two arms above joined: a candidate
+  -- with no power is no more "a creature with lesser power" than it is one with
+  -- power 2 or less, and a source whose power nothing supplied names no bound to
+  -- be less than.
+  Filter.PowerLessThanSource -> case (power view, sourcePower context) of
+    (Just p, Just s) -> p < s
+    _ -> False
   -- CR 202.3, and answerable in every zone -- see the View field's own note.
   -- Vacuously False for a player, which has no mana value to compare.
   Filter.ManaValueAtMost n -> case manaValue view of
@@ -399,6 +428,9 @@ rewrite pairs predicate = case predicate of
   Filter.HasKeywordFamily _ -> predicate
   Filter.PowerAtLeast _ -> predicate
   Filter.PowerAtMost _ -> predicate
+  -- Untouched for the two above's reason: the atom names a comparison, and CR
+  -- 612.1 finds no word in it to swap.
+  Filter.PowerLessThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
@@ -502,6 +534,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Infect -> keyword
   Keyword.Type.Wither -> keyword
   Keyword.Type.Exalted -> keyword
+  Keyword.Type.Mentor -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword

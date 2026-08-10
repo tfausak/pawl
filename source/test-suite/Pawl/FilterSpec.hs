@@ -90,13 +90,13 @@ ringBearer :: Filter.View
 ringBearer = blackCreature {Filter.ringBearerFor = Just (PlayerId.MkPlayerId 0)}
 
 self :: Filter.Context
-self = Filter.MkContext (Just (PlayerId.MkPlayerId 0)) Nothing
+self = Filter.contextFor (Just (PlayerId.MkPlayerId 0)) Nothing
 
 other :: Filter.Context
-other = Filter.MkContext (Just (PlayerId.MkPlayerId 1)) Nothing
+other = Filter.contextFor (Just (PlayerId.MkPlayerId 1)) Nothing
 
 noPerspective :: Filter.Context
-noPerspective = Filter.MkContext Nothing Nothing
+noPerspective = Filter.contextFor Nothing Nothing
 
 -- The player candidate every "vacuously false" case below is asked about.
 aPlayer :: Filter.View
@@ -191,6 +191,31 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.assertBool s (not (Filter.matches self noPower (Filter.Type.PowerAtMost 99))) "no power"
     Spec.assertBool s (Filter.matches self noPower (Filter.Type.Not (Filter.Type.PowerAtLeast 99))) "where the negation of PowerAtLeast admits it"
 
+  -- CR 702.134a's comparison, whose bound is the Context's source power rather
+  -- than a literal the atom carries. blackCreature is power 2 and
+  -- devoidBigCreature power 5, so one source power between them tells the two
+  -- apart in both directions.
+  Spec.describe s "PowerLessThanSource" $ do
+    let sourced n = self {Filter.sourcePower = Just n}
+    Spec.it s "holds below the source's power and fails above it" $ do
+      Spec.assertBool s (Filter.matches (sourced 3) blackCreature Filter.Type.PowerLessThanSource) "2 < 3"
+      Spec.assertBool s (not (Filter.matches (sourced 3) devoidBigCreature Filter.Type.PowerLessThanSource)) "5 is not < 3"
+
+    -- STRICTLY less, which is what keeps a mentor from targeting itself: rule
+    -- 702.134a says "less than", not "no greater than".
+    Spec.it s "is False at equal power" $ do
+      Spec.assertBool s (not (Filter.matches (sourced 2) blackCreature Filter.Type.PowerLessThanSource)) "2 is not < 2"
+
+    -- The two vacuity postures, PowerAtMost's on the candidate side and
+    -- ControlledBy's on the context side.
+    Spec.it s "is False when either power is absent" $ do
+      let noPower = blackCreature {Filter.power = Nothing}
+      Spec.assertBool s (not (Filter.matches (sourced 3) noPower Filter.Type.PowerLessThanSource)) "no candidate power"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.PowerLessThanSource)) "no source power"
+
+    Spec.it s "is False for a player" $ do
+      Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.PowerLessThanSource)) "player"
+
   -- CR 202.3, a ceiling on a different characteristic: Ojutai's Command's
   -- "mana value 2 or less".
   Spec.it s "ManaValueAtMost compares the mana value" $ do
@@ -251,25 +276,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "matches the context's source" $ do
       Spec.assertBool
         s
-        (Filter.matches (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) blackCreature Filter.Type.IsSource)
+        (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) blackCreature Filter.Type.IsSource)
         "is the source"
 
     Spec.it s "does not match a different object" $ do
       Spec.assertBool
         s
-        (not (Filter.matches (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 8))) blackCreature Filter.Type.IsSource))
+        (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 8))) blackCreature Filter.Type.IsSource))
         "not the source"
 
     Spec.it s "no source in context is vacuously false" $ do
       Spec.assertBool
         s
-        (not (Filter.matches (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) Nothing) blackCreature Filter.Type.IsSource))
+        (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) Nothing) blackCreature Filter.Type.IsSource))
         "no source"
 
     Spec.it s "no identity in view is vacuously false" $ do
       Spec.assertBool
         s
-        (not (Filter.matches (Filter.MkContext (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) devoidBigCreature Filter.Type.IsSource))
+        (not (Filter.matches (Filter.contextFor (Just (PlayerId.MkPlayerId 0)) (Just (ObjectId.MkObjectId 7))) devoidBigCreature Filter.Type.IsSource))
         "no identity"
 
   Spec.describe s "IsAttacking" $ do
