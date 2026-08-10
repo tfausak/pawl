@@ -4058,6 +4058,19 @@ eventBindings cond event = case (cond, event) of
       Recipient.ToPlaneswalker _ -> Map.empty
       Recipient.ToBattle _ -> Map.empty
       Recipient.ToObject _ -> Map.empty
+  -- CR 510.2's "it": the permanent that dealt the combat damage, which Aragorn,
+  -- Hornburg Hero's payload doubles the counters on. Read off the event's source,
+  -- the same field matchesTrigger applied the Filter to, so the slot names exactly
+  -- the permanent the condition admitted.
+  --
+  -- Unconditional given a match, which is what eventBindingSlots' per-condition
+  -- promise needs: every GameEvent.DamageDealt carries a DamageEvent.source.
+  --
+  -- The DAMAGED PLAYER is not bound alongside it. The event names one and CR
+  -- 702.70a's `triggerPlayer` is the slot it would take, but no card in the pool
+  -- reads it under this condition (#1175).
+  (TriggerCondition.PermanentDealsCombatDamageToPlayer _, GameEvent.DamageDealt ev) ->
+    Binding.setCombatDamager (DamageEvent.source ev) Map.empty
   -- CR 400.7e: a zone-change trigger can find the new object the card became in
   -- the zone it moved to, if that zone is public. CR 603.6c and CR 603.6e say it
   -- from the other side.
@@ -4316,10 +4329,15 @@ eventBindingSlots cond = case cond of
   TriggerCondition.StateIs _ -> Set.empty
   -- CR 702.70a's "that player": the player the bearer dealt combat damage to.
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Set.singleton Binding.triggerPlayer
-  -- And the bystander's form claims NOTHING, PermanentTurnedFaceUp's position:
-  -- the event names a damager and a damaged player, and Tovolar reads neither
-  -- (#1173).
-  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.empty
+  -- CR 510.2's damager, which the bystander's form needs and the self-scoped one
+  -- above does not: there the damager IS the bearer, already bound as CR 113.7a's
+  -- source. Aragorn, Hornburg Hero's "double the number of +1/+1 counters on it"
+  -- is the reader. Guaranteed given a match -- every DamageDealt event carries a
+  -- source.
+  --
+  -- No `triggerPlayer`: the event names the damaged player too, and no card in the
+  -- pool reads it under this condition (#1175).
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> Set.singleton Binding.combatDamager
   -- CR 725.2's inherent ability is borne by no card, and its bindings come from
   -- Monarch.inherentMatch rather than eventBindings -- so a card declaring this
   -- condition would honestly get nothing from the event.

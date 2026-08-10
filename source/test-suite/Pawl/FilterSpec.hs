@@ -91,6 +91,11 @@ withKeyword keyword = blackCreature {Filter.keywords = Set.singleton keyword}
 ringBearer :: Filter.View
 ringBearer = blackCreature {Filter.ringBearerFor = Just (PlayerId.MkPlayerId 0)}
 
+-- CR 702.112b's designation, which belongs to no player -- so unlike ringBearer
+-- above there is no second view for "somebody else's".
+renownedCreature :: Filter.View
+renownedCreature = blackCreature {Filter.renowned = True}
+
 self :: Filter.Context
 self = Filter.contextFor (Just (PlayerId.MkPlayerId 0)) Nothing
 
@@ -628,3 +633,25 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 701.54b: Ring-bearer is a designation A PERMANENT can have.
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsRingBearer)) "player"
+
+  -- CR 702.112b's designation asked of a CANDIDATE. Perspective-free, unlike the
+  -- atom above: rule 702.112b's marker names no player, so `self` and `other`
+  -- must answer alike.
+  Spec.describe s "IsRenowned" $ do
+    Spec.it s "matches a renowned permanent" $ do
+      Spec.assertBool s (Filter.matches self renownedCreature Filter.Type.IsRenowned) "renowned"
+
+    Spec.it s "does not match an undesignated permanent" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.IsRenowned)) "no designation"
+
+    -- The discriminating pair for "asks nothing of the perspective": an atom
+    -- written on IsRingBearer's model would answer False here.
+    Spec.it s "answers the same for another player's perspective" $ do
+      Spec.assertBool s (Filter.matches other renownedCreature Filter.Type.IsRenowned) "not yours, still renowned"
+
+    Spec.it s "and with no perspective at all" $ do
+      Spec.assertBool s (Filter.matches noPerspective renownedCreature Filter.Type.IsRenowned) "no perspective"
+
+    -- CR 702.112b: "only permanents can be or become renowned".
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsRenowned)) "player"

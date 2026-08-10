@@ -58,8 +58,10 @@ data TriggerCondition
     -- standing pair for that; Filter.IsSource would collapse the two here as it
     -- does for PermanentBecomesRenowned, and buys a minted keyword nothing.
     --
-    -- No eventBindings arm: Tovolar draws a card and names no "it" and no "that
-    -- player" (#1173).
+    -- Binds CR 510.2's damager under Pawl.Engine.Binding.combatDamager, which the
+    -- self form needs no slot for -- there the damager is the bearer. The damaged
+    -- player gets none: the event names one, and nothing in the pool reads it here
+    -- (#1175).
     PermanentDealsCombatDamageToPlayer (Filter.Filter Keyword.Keyword)
   | -- | CR 725.2: a creature dealt combat damage to the monarch. NOT bearer-scoped
     -- (any creature); matched only via Pawl.Engine.Monarch.inherentMatch, never through a
