@@ -1591,6 +1591,9 @@ rewriteTriggerCondition pairs condition = case condition of
   -- one: "whenever a Dragon is turned face up" becomes "whenever a Knight is"
   -- under CR 612.1, exactly as PermanentEnters' does.
   TriggerCondition.PermanentTurnedFaceUp f -> TriggerCondition.PermanentTurnedFaceUp (Filter.rewrite pairs f)
+  -- The same, one condition over: Valeron Wardens' "a creature you control" is a
+  -- Filter, so CR 612.1 reaches it too.
+  TriggerCondition.PermanentBecomesRenowned f -> TriggerCondition.PermanentBecomesRenowned (Filter.rewrite pairs f)
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
   TriggerCondition.PermanentSacrificed -> condition

@@ -60,7 +60,8 @@
 -- `trainingSpec`. CR 702.39 provoke, the thirteenth, and the first whose payload
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
 -- `provokeSpec`. CR 702.112 renown, the fourteenth, and the first minted
--- ability with CR 603.4's intervening "if", with Rhox Maulers -- `renownSpec`. CR 509.3b's blocking-side form
+-- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
+-- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -3822,9 +3823,15 @@ provokeSpec s registry =
 -- why the blocked case needs a blocker that absorbs all four damage (Apprentice
 -- Sharpshooter, 1/4), since a smaller one would let renown's own event through.
 --
--- CR 702.112b's "until it leaves the battlefield" is not read here: the
--- designation is per-incarnation state, and Pawl.SetupSpec's "no per-incarnation
--- state survives" case is what proves Object.newIncarnation clears it.
+-- Valeron Wardens {2}{G} Creature -- Human Monk 1/3 is the second card, and the
+-- only printing that WATCHES the designation: renown 2 plus "whenever a creature
+-- you control becomes renowned, draw a card" (CR 702.112b's marker read by
+-- something other than renown itself).
+--
+-- CR 702.112b's "until it leaves the battlefield" is read on Object.newIncarnation
+-- directly, below. Pawl.SetupSpec's "no per-incarnation state survives" case does
+-- NOT cover it -- that case asks whether the forgetting is idempotent, which is
+-- blind to a field it never touches.
 renownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 renownSpec s registry =
   let board mine theirs = do
@@ -3843,6 +3850,15 @@ renownSpec s registry =
       countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
       -- CR 702.112b's designation itself, which no characteristic reports.
       renownedness oid gs = fmap Object.renowned (Game.lookupObject oid gs)
+      -- CR 104.3c: a draw case needs a library to draw from, and more of one than
+      -- it draws, so an extra draw is visible rather than fatal.
+      stock printing n pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      -- CR 509.1: no blocks. S.aggressiveAnswer blocks with everything, which
+      -- would put the defender's own watcher in front of an attacker.
+      noBlocks :: Prompt.Prompt r -> r
+      noBlocks p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
    in Spec.describe s "Renown" $ do
         -- The proving test. CR 702.112a: two counters on the BEARER, and the
         -- designation with them. The counter assertion is what separates rule
@@ -3918,11 +3934,64 @@ renownSpec s registry =
                 Spec.assertEqWith s "the control: this incarnation is renowned" (Object.renowned obj) True
                 Spec.assertEqWith s "the next one is not" (Object.renowned (Object.newIncarnation obj)) False
             _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
+        -- CR 702.112b's designation read by a WATCHER, which is what the rule
+        -- calls it a marker FOR: Valeron Wardens {2}{G} Creature -- Human Monk
+        -- 1/3, renown 2 and "whenever a creature you control becomes renowned,
+        -- draw a card". Both attackers connect, so the Wardens' trigger fires
+        -- TWICE -- once for the Maulers and once for itself, which is what "a
+        -- creature you control" says and a self-scoped reading would not.
+        --
+        -- The library is stocked past the two draws, so a third draw would show as
+        -- an extra card rather than as CR 104.3c losing alice the game before the
+        -- assertions run.
+        Spec.it s "CR 702.112b a watcher draws once per creature that becomes renowned" $ do
+          (gs, mine, _) <- board ["Valeron Wardens", "Rhox Maulers"] []
+          piker <- S.printingOf s registry "Goblin Piker"
+          case mine of
+            [wardens, maulers] -> do
+              let after = S.runCombat S.aggressiveAnswer (stock piker 3 S.alice gs)
+              Spec.assertEqWith s "both connected, for five" (S.lifeOf S.bob after) (Just 15)
+              Spec.assertEqWith s "the Wardens is renowned" (renownedness wardens after) (Just True)
+              Spec.assertEqWith s "and so is the Maulers" (renownedness maulers after) (Just True)
+              Spec.assertEqWith s "so two cards were drawn, not one" (length (Game.zoneMembers Zone.Hand S.alice after)) 2
+              Spec.assertEqWith s "leaving one in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Wardens and a Maulers"
+        -- What the condition is NOT: combat damage. Goblin Piker connects for two
+        -- and has no renown, so it never becomes renowned and contributes no draw
+        -- -- the one card is the Wardens' own designation.
+        Spec.it s "CR 702.112b a creature that connects without renown draws nothing" $ do
+          (gs, mine, _) <- board ["Valeron Wardens", "Goblin Piker"] []
+          piker <- S.printingOf s registry "Goblin Piker"
+          case mine of
+            [wardens, goblin] -> do
+              let after = S.runCombat S.aggressiveAnswer (stock piker 3 S.alice gs)
+              Spec.assertEqWith s "both connected, for three" (S.lifeOf S.bob after) (Just 17)
+              Spec.assertEqWith s "the Wardens is renowned" (renownedness wardens after) (Just True)
+              Spec.assertEqWith s "the Piker is not" (renownedness goblin after) (Just False)
+              Spec.assertEqWith s "so exactly one card was drawn" (length (Game.zoneMembers Zone.Hand S.alice after)) 1
+            _ -> Spec.assertFailure s "fixture should give alice a Wardens and a Piker"
+        -- CR 109.5's "you control", and with it WHICH permanent the Filter reads:
+        -- bob has a Valeron Wardens of his own, watching from the defending side.
+        -- Nothing he controls becomes renowned, so he draws nothing -- an arm that
+        -- read the BEARER instead of the event's subject would have his Wardens
+        -- match itself and draw twice.
+        Spec.it s "CR 702.112b the defender's own Wardens sees no creature of his become renowned" $ do
+          (gs, mine, theirs) <- board ["Valeron Wardens", "Rhox Maulers"] ["Valeron Wardens"]
+          piker <- S.printingOf s registry "Goblin Piker"
+          case (mine, theirs) of
+            ([wardens, maulers], [hisWardens]) -> do
+              let after = S.runCombat noBlocks (stock piker 3 S.bob (stock piker 3 S.alice gs))
+              Spec.assertEqWith s "both of alice's connected, for five" (S.lifeOf S.bob after) (Just 15)
+              Spec.assertEqWith s "hers are renowned" (fmap (`renownedness` after) [wardens, maulers]) [Just True, Just True]
+              Spec.assertEqWith s "his is not" (renownedness hisWardens after) (Just False)
+              Spec.assertEqWith s "she drew two" (length (Game.zoneMembers Zone.Hand S.alice after)) 2
+              Spec.assertEqWith s "and he drew none" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
+            _ -> Spec.assertFailure s "fixture should give alice a Wardens and a Maulers, bob a Wardens"
         -- CR 702.112c: "if a creature has multiple instances of renown, each
         -- triggers separately". Asserted of the MINT, as poisonous' multiplicity
         -- is, no card in the pool printing renown twice. What rule 702.112c says
         -- happens NEXT -- the second resolving to nothing -- is the intervening
-        -- "if" the gameplay case above reads.
+        -- "if" the gameplay cases above read.
         Spec.it s "CR 702.112c each instance of renown is its own ability" $ do
           Spec.assertEqWith s "renown 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 2) 2)) [Keyword.renown 2, Keyword.renown 2]
           Spec.assertEqWith s "and renown 6 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 6) 1)) [Keyword.renown 6]
@@ -5865,6 +5934,9 @@ representativeEvents cond =
         -- is instantiated with below is the trivial one, which admits whatever the
         -- id resolves to.
         TriggerCondition.PermanentTurnedFaceUp _ -> one (GameEvent.TurnedFaceUp departed)
+        -- CR 702.112b's own event, and the only one this condition admits, on
+        -- `departed` for the arm above's reason.
+        TriggerCondition.PermanentBecomesRenowned _ -> one (GameEvent.BecameRenowned departed)
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- payload is arbitrary: the condition compares nothing, so any sacrifice
         -- matches and the floor is the same for all of them.
@@ -5935,6 +6007,7 @@ everyTriggerCondition =
     TriggerCondition.AnyOf [TriggerCondition.PermanentEnters Filter.Type.IsSource, TriggerCondition.RoomFullyUnlocked PlayerRelation.You],
     TriggerCondition.SelfTurnedFaceUp,
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
+    TriggerCondition.PermanentBecomesRenowned (Filter.Type.And []),
     TriggerCondition.PermanentSacrificed,
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
     -- BOTH relations, on the SpellCast pair's reasoning above: an eventBindings

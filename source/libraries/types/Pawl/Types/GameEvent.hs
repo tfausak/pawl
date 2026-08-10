@@ -445,6 +445,20 @@ data GameEvent
     -- sentence) is the opposite change and would be its own event -- and no
     -- printed card triggers on it, so there would be nothing to feed.
     TurnedFaceUp ObjectId.ObjectId
+  | -- | CR 702.112b: a permanent BECAME RENOWNED -- it was given the renowned
+    -- designation. Emitted by Pawl.Engine.Resolve's Effect.BecomeRenowned arm, the
+    -- one place the designation is written, and only on a TRANSITION: a permanent
+    -- already renowned does not become renowned again. HalfUnlocked's emission
+    -- applies the same gate to its own designation.
+    --
+    -- The PERMANENT by id and nothing else, for TurnedFaceUp's reasons. No player:
+    -- rule 702.112b names none, and CR 603.3a reads a watcher's controller off its
+    -- own source.
+    --
+    -- One DIRECTION only, and here the rules make it the only one: rule 702.112b's
+    -- "it stays renowned until it leaves the battlefield" leaves nothing to undo,
+    -- and CR 400.7's new object is not a permanent losing a designation.
+    BecameRenowned ObjectId.ObjectId
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice in the engine
     -- goes through -- a cost payment, Effect.Sacrifice, Effect.PlayerSacrifices
