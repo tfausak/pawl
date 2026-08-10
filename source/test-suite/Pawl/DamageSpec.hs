@@ -819,7 +819,10 @@ lastKnownRiderSpec s registry =
                     LastKnown.source = Source.OfCard prodigalSorcerer,
                     -- CR 122.1: nothing put a counter on the Sorcerer, and this
                     -- case is about a keyword grant rather than a counter.
-                    LastKnown.counters = Map.empty
+                    LastKnown.counters = Map.empty,
+                    -- Nothing here copies anything; the field is filled to
+                    -- build the record.
+                    LastKnown.copiable = Projection.copiableCharacteristics srcId equipped
                   }
               humbled = S.withHumility humility equipped
               planted =

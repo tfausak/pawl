@@ -1253,6 +1253,20 @@ copiedSnapshot src gs =
         _ -> False
    in if backFace then snapshot {PC.manaValue = Just 0} else snapshot
 
+-- CR 608.2h: `copiedSnapshot` for an object that may already be gone -- the
+-- record filed as it ceased, which is the same value this function would have
+-- returned an instant earlier. Game.cardOfWithLastKnown is the twin fallback for
+-- the card behind it, and a copy effect needs both.
+--
+-- A separate name rather than widening `copiedSnapshot`, for
+-- Game.cardOfWithLastKnown's reason: the live reader is asked by the CR 614.1c
+-- entry rewrite, whose subject is on the battlefield by construction, and
+-- answering there for an object that is not would resurrect it.
+copiedSnapshotWithLastKnown :: ObjectId -> GameState -> PC.ProjectedCharacteristics
+copiedSnapshotWithLastKnown oid gs = case Projection.lastKnownOf oid gs of
+  Just lk -> LastKnown.copiable lk
+  Nothing -> copiedSnapshot oid gs
+
 -- CR 614.1c / 614.12: run the entry loop for an object that has just been
 -- materialized on the battlefield.
 --
@@ -2024,7 +2038,13 @@ changeZoneAttaching asOf oid requestedDest position seed tapped under shown faci
                     -- off the incarnation `mkObj` builds: CR 122.2 makes them
                     -- cease to exist on the zone change, so the last moment they
                     -- can be recorded is this one.
-                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj)) (GameState.lastKnown g1)
+                    --
+                    -- The COPIABLE snapshot is taken here for the counters'
+                    -- reason: it is layer 1 (CR 613.1a) rather than the fold
+                    -- `snapshot` is, and the copy binding and face it reads live
+                    -- on `obj`, which is about to cease. No third board walk --
+                    -- it reads that binding or the printed face and stops.
+                    GameState.lastKnown = Map.insert oid (LastKnown.MkLastKnown snapshot lastController (Object.source obj) (Object.counters obj) (copiedSnapshot oid gs)) (GameState.lastKnown g1)
                   }
           newId <- placeObject pid mkObj dest position
           -- CR 614.1c-d: entry replacements apply to BATTLEFIELD entries and

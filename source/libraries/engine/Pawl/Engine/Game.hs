@@ -271,8 +271,10 @@ cardOf oid gs = cardOfSource (fmap Object.source (lookupObject oid gs))
 -- Projection.viewWithLastKnown is the same fallback for an object's
 -- CHARACTERISTICS; this is the one for its printed card, which the projection
 -- cannot answer for -- CR 603.7's delayed-ability declarations are card data
--- and are never projected. Its one caller is Resolve's ArmDelayedTrigger, whose
--- source can have exiled itself an opcode earlier (Meandering Towershell).
+-- and are never projected. Resolve's ArmDelayedTrigger calls it, its source
+-- being able to exile itself an opcode earlier (Meandering Towershell); so does
+-- its CreateCopy, whose named permanent can die in response to the trigger that
+-- names it (Watchful Radstag).
 --
 -- A separate name rather than widening `cardOf`, whose many callers ask a
 -- different question: "what card is this object" is about an object that IS

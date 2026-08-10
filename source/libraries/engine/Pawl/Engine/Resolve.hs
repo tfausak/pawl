@@ -196,7 +196,8 @@ slotsOf effect = case effect of
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> Quantity.slots quantity
   -- A READ, unlike Create's slot: the ref names the permanent being copied,
-  -- which on every producer in the pool is a target (CR 115.10a).
+  -- which is a target on Cackling Counterpart and the reserved self slot on
+  -- Watchful Radstag. Both are reads; only the first is a target (CR 115.10a).
   Effect.CreateCopy ref -> objectRefSlots ref
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
@@ -2646,14 +2647,16 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- It is not what the token's characteristics come FROM: the snapshot is
     -- layer 1 (CR 613.1a), and Projection.copiableCharacteristics stops there.
     --
-    -- Not implemented: CR 608.2h's last known information. An `ObjectRef` naming
-    -- a permanent that has already left the battlefield yields no card here and
-    -- so creates nothing, where the rule would have the token copy what the
-    -- permanent last was (#1183).
+    -- CR 608.2h: both reads take the LAST KNOWN branch for a named permanent
+    -- that is already gone, so the token is a copy of what it last was --
+    -- Watchful Radstag killed in response to its own "create a token that's a
+    -- copy of it". The pair has to move together: the card without the snapshot
+    -- would mint the printed card rather than the copy, and the snapshot without
+    -- the card would mint nothing to stamp it on.
     let sources = objectRefObjects legality chosen resolving controller source gs ref
     Monad.forM_ sources $ \src ->
-      Monad.forM_ (Game.cardOf src gs) $ \card ->
-        Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshot src gs)) 1 TapState.Untapped)
+      Monad.forM_ (Game.cardOfWithLastKnown src gs) $ \card ->
+        Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshotWithLastKnown src gs)) 1 TapState.Untapped)
   Effect.ArmDelayedTrigger name onset duration -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and NOT belt and braces: the source can
