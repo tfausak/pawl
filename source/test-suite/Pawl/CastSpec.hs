@@ -659,7 +659,8 @@ handInPlay printing board =
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),

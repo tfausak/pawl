@@ -423,7 +423,22 @@ data Object = MkObject
     -- values"), and per-incarnation, which IS rule 701.37b's "it stays monstrous
     -- until it leaves the battlefield". Two fields rather than one designation
     -- set (#1193).
-    monstrous :: Bool
+    monstrous :: Bool,
+    -- | CR 701.60b: the SUSPECTED designation. A Bool, stored rather than
+    -- projected ("neither an ability nor part of the permanent's copiable
+    -- values"), and per-incarnation, all for renowned's reasons above -- which is
+    -- rule 701.60a's "until it leaves the battlefield".
+    --
+    -- Unlike those two this designation HAS rules meaning: CR 701.60c gives the
+    -- permanent menace and "this creature can't block" for as long as it is
+    -- suspected. Both are read off this field live rather than stamped when it is
+    -- set -- Pawl.Engine.Projection.designationGathered for the keyword and
+    -- Pawl.Engine.CombatRestriction.inForce for the restriction -- so nothing has
+    -- to be unwound if it ends.
+    --
+    -- Not implemented: rule 701.60a's other ending, "until a spell or ability
+    -- causes it to no longer be suspected" (#1214).
+    suspected :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -474,5 +489,6 @@ newIncarnation object =
       protector = Nothing,
       unlockedHalves = Set.empty,
       renowned = False,
-      monstrous = False
+      monstrous = False,
+      suspected = False
     }

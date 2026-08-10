@@ -753,7 +753,8 @@ placeBorne srcId pending = do
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
   State.put gs2 {GameState.objects = Map.insert abilId obj (GameState.objects gs2), GameState.stack = abilId : GameState.stack gs2}
   if not (Modal.selectionPossible legal selection)

@@ -254,6 +254,8 @@ slotsOf effect = case effect of
   Effect.BecomeRenowned slot -> Set.singleton slot
   -- A READ, BecomeRenowned's: CR 701.37a's "it" is the ability's own bearer.
   Effect.BecomeMonstrous slot -> Set.singleton slot
+  -- A READ, BecomeRenowned's: CR 701.60a's "suspect a creature" names one.
+  Effect.Suspect slot -> Set.singleton slot
   -- A READ, BecomeRenowned's: the slot names the permanent rule 702.100a's
   -- counter goes on.
   Effect.Evolve slot -> Set.singleton slot
@@ -409,6 +411,7 @@ slotsAreExhaustive effect = case effect of
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
   Effect.BecomeRenowned _ -> True
   Effect.BecomeMonstrous _ -> True
+  Effect.Suspect _ -> True
   Effect.Evolve _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
@@ -506,6 +509,7 @@ readsX = any effectReadsX
       Effect.BecomeMonarch {} -> False
       Effect.BecomeRenowned _ -> False
       Effect.BecomeMonstrous _ -> False
+      Effect.Suspect _ -> False
       Effect.Evolve _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
@@ -575,6 +579,7 @@ searchesLibrary effect = case effect of
   Effect.BecomeMonarch {} -> False
   Effect.BecomeRenowned _ -> False
   Effect.BecomeMonstrous _ -> False
+  Effect.Suspect _ -> False
   Effect.Evolve _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
@@ -703,6 +708,7 @@ boundSlots effect = case effect of
   Effect.BecomeMonarch {} -> Set.empty
   Effect.BecomeRenowned _ -> Set.empty
   Effect.BecomeMonstrous _ -> Set.empty
+  Effect.Suspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
@@ -3019,6 +3025,22 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         Just target ->
           State.modify'
             (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.monstrous = True}) target (GameState.objects g)})
+      _ -> pure ()
+  -- CR 701.60a's "suspect a creature", BecomeMonstrous' arm above in every
+  -- respect: an idempotent write, which is CR 701.60d's "a suspected permanent
+  -- can't become suspected again", and no event (#1215).
+  --
+  -- CR 701.60c's menace and "this creature can't block" are not written here.
+  -- They are read off Object.suspected by Pawl.Engine.Projection and
+  -- Pawl.Engine.CombatRestriction, which is rule 701.60c's "for as long as it's
+  -- suspected".
+  Effect.Suspect slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target ->
+          State.modify'
+            (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.suspected = True}) target (GameState.objects g)})
       _ -> pure ()
   -- CR 702.100a's counter and CR 702.100b's marker, in that order and in one arm
   -- because the rule ties them: the creature evolves only if the placement

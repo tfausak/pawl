@@ -171,7 +171,8 @@ createCard pid printing = do
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
       gs3 =
         gs2

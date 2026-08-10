@@ -748,9 +748,23 @@ data Effect card
     -- of the permanent's copiable values".
     --
     -- A SECOND designation opcode rather than one parameterised over which
-    -- designation, which is the shape this pair will want once a third arrives
-    -- (#1193). Emits no event, so nothing can trigger on it (#1194).
+    -- designation; Suspect below is the third, and consolidating all three is
+    -- still open (#1193). Emits no event, so nothing can trigger on it (#1194).
     BecomeMonstrous SlotName.SlotName
+  | -- | CR 701.60a: the permanent in the slot BECOMES SUSPECTED -- "certain spells
+    -- and abilities instruct a player to suspect a creature". Person of Interest's
+    -- "when this creature enters, suspect it".
+    --
+    -- A SlotName, a state write rather than a Modification, and idempotent (CR
+    -- 701.60d: "a suspected permanent can't become suspected again"), all for
+    -- BecomeRenowned's reasons above -- rule 701.60b words the designation the way
+    -- rule 702.112b words renowned.
+    --
+    -- What rule 701.60c hangs off the designation -- menace and "this creature
+    -- can't block" -- is NOT written here: those are read off Object.suspected
+    -- wherever they are asked. Emits no event, so nothing can trigger on it
+    -- (#1215).
+    Suspect SlotName.SlotName
   | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
     -- permanent, and if one or more actually land, that permanent EVOLVES --
     -- rule 702.100b's marker, which Renegade Krasis' "whenever this creature
