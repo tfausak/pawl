@@ -61,7 +61,9 @@
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
 -- `provokeSpec`. CR 702.112 renown, the fourteenth, and the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
--- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR 509.3b's blocking-side form
+-- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
+-- 510.2's combat damage watched by a bystander rather than by the creature that
+-- dealt it, with Tovolar, Dire Overlord -- `tovolarSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -3996,6 +3998,87 @@ renownSpec s registry =
           Spec.assertEqWith s "renown 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 2) 2)) [Keyword.renown 2, Keyword.renown 2]
           Spec.assertEqWith s "and renown 6 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 6) 1)) [Keyword.renown 6]
 
+-- CR 510.1b / 510.2's combat damage watched by a BYSTANDER rather than by the
+-- creature that dealt it -- TriggerCondition.PermanentDealsCombatDamageToPlayer,
+-- the filtered twin of poisonousSpec's SelfDealsCombatDamageToPlayer.
+--
+-- Tovolar, Dire Overlord {1}{R}{G} Legendary Creature -- Human Werewolf 3/3 is
+-- the card: "whenever a Wolf or Werewolf you control deals combat damage to a
+-- player, draw a card". Both faces print it; the back face's copy goes through
+-- Pawl.CardSpec's corpus lints, but no case here reaches it -- that needs the CR
+-- 731 transform Pawl.DaytimeSpec drives.
+--
+-- Tovolar is himself a Werewolf, so the filter admits the watcher: a self-scoped
+-- reading would draw one card where these cases draw two. Russet Wolves (Wolf
+-- 3/3) is the other subtype of the printed "or", and Goblin Piker (Goblin Warrior
+-- 2/1) is the creature the filter must reject.
+--
+-- Every library is stocked past the draws, so an extra draw shows as an extra
+-- card rather than as CR 104.3c ending the game before the assertions run.
+tovolarSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+tovolarSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      stock printing n pid gs = List.foldl' (\g _ -> snd (S.addLibraryCard printing pid g)) gs [1 .. (n :: Int)]
+      handSize pid gs = length (Game.zoneMembers Zone.Hand pid gs)
+      -- CR 508.1's declaration narrowed to the named creatures, and CR 509.1's
+      -- left empty: S.aggressiveAnswer attacks and blocks with everything, which
+      -- a case about one attacker connecting cannot allow.
+      plan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      plan attackers p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      -- CR 508.1 / 509.1: one named attacker, met by one named blocker.
+      oneOnOne :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      oneOnOne attacker blocker p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== attacker) ids
+        Prompt.DeclareBlockers _ _ _ attackers -> Map.singleton blocker (Set.fromList attackers)
+        _ -> S.aggressiveAnswer p
+   in Spec.describe s "Filtered combat damage" $ do
+        -- The proving test. Three unblocked attackers, two of which the filter
+        -- admits: Tovolar for "Werewolf" and the Wolves for "Wolf". The Piker
+        -- connects too and draws nothing, which is the filter doing its work
+        -- inside the same event.
+        Spec.it s "CR 510.2 a bystander draws once per Wolf or Werewolf that connects" $ do
+          (gs, _, _) <- board ["Tovolar, Dire Overlord", "Russet Wolves", "Goblin Piker"] []
+          piker <- S.printingOf s registry "Goblin Piker"
+          let after = S.runCombat S.aggressiveAnswer (stock piker 4 S.alice gs)
+          Spec.assertEqWith s "all three connected, for eight" (S.lifeOf S.bob after) (Just 12)
+          Spec.assertEqWith s "so two cards were drawn, not three and not one" (handSize S.alice after) 2
+          Spec.assertEqWith s "leaving two in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 2
+        -- CR 510.1c: a BLOCKED creature assigns its combat damage to the blocker,
+        -- so the Wolves deals its three to bob's Piker and the condition's
+        -- player-recipient half rejects the event. The watcher is on the board and
+        -- the damager is a Wolf she controls; only the recipient differs.
+        Spec.it s "CR 510.1c combat damage dealt to a creature draws nothing" $ do
+          (gs, mine, theirs) <- board ["Tovolar, Dire Overlord", "Russet Wolves"] ["Goblin Piker"]
+          piker <- S.printingOf s registry "Goblin Piker"
+          case (mine, theirs) of
+            ([_, wolves], [blocker]) -> do
+              let after = S.runCombat (oneOnOne wolves blocker) (stock piker 4 S.alice gs)
+              Spec.assertEqWith s "bob took none of it" (S.lifeOf S.bob after) (Just 20)
+              Spec.assertEqWith s "and his Piker died for it" (S.creaturesInPlay S.bob after) 0
+              Spec.assertEqWith s "so no card was drawn" (handSize S.alice after) 0
+            _ -> Spec.assertFailure s "fixture should give alice a Tovolar and a Wolves, bob a Piker"
+        -- CR 109.5's "you control", which is what makes this a bystander's
+        -- condition rather than the board's: bob has a Tovolar of his own,
+        -- watching alice's two connect. He controls neither, so he draws nothing
+        -- -- an arm that read the event's damager without the Filter's
+        -- ControlledBy would have him draw twice.
+        Spec.it s "CR 109.5 the defender's own Tovolar sees no Wolf of his connect" $ do
+          (gs, mine, theirs) <- board ["Tovolar, Dire Overlord", "Russet Wolves"] ["Tovolar, Dire Overlord"]
+          piker <- S.printingOf s registry "Goblin Piker"
+          case (mine, theirs) of
+            ([tovolar, wolves], [_]) -> do
+              let after = S.runCombat (plan [tovolar, wolves]) (stock piker 4 S.bob (stock piker 4 S.alice gs))
+              Spec.assertEqWith s "both of alice's connected, for six" (S.lifeOf S.bob after) (Just 14)
+              Spec.assertEqWith s "she drew two" (handSize S.alice after) 2
+              Spec.assertEqWith s "and he drew none" (handSize S.bob after) 0
+            _ -> Spec.assertFailure s "fixture should give alice a Tovolar and a Wolves, bob a Tovolar"
+
 -- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
 -- block-trigger form that fires once per BLOCKER and names it.
@@ -5835,6 +5918,9 @@ representativeEvents cond =
         -- event). Any event is therefore as representative as any other.
         TriggerCondition.StateIs _ -> one (GameEvent.StepBegan (Phase.Ending EndingStep.EndStep) S.alice)
         TriggerCondition.SelfDealsCombatDamageToPlayer -> one combatDamage
+        -- The same event read by a bystander, and the only one this condition
+        -- admits.
+        TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> one combatDamage
         TriggerCondition.CreatureDealtCombatDamageToMonarch -> one combatDamage
         -- CR 702.179d's own event. Like the monarch's condition above it, this
         -- one is matched by Pawl.Engine.Speed.inherentPending rather than by
@@ -5967,6 +6053,7 @@ everyTriggerCondition =
     TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn,
     TriggerCondition.StateIs (Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
+    TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
     TriggerCondition.OpponentLostLifeDuringYourTurn,
     TriggerCondition.SelfCycled,
@@ -8112,6 +8199,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   trainingSpec s registry
   provokeSpec s registry
   renownSpec s registry
+  tovolarSpec s registry
   afflictSpec s registry
   meleeSpec s registry
   rampageSpec s registry

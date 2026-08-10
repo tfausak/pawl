@@ -19,12 +19,11 @@
 -- only other card here, and only to reach the trigger's "three or more Wolves
 -- and/or Werewolves"; restrictionSpec adds Moonmist, Forest and Humility.
 --
--- Two clauses of Tovolar's printed text are NOT modeled by the card file, and no
--- case here asserts on them: "Then transform any number of Human Werewolves you
+-- One clause of Tovolar's printed text is NOT modeled by the card file, and no
+-- case here asserts on it: "Then transform any number of Human Werewolves you
 -- control" needs a player-chosen subset of permanents, which pawl's ObjectRef
--- cannot express (#774), and "Whenever a Wolf or Werewolf you control deals
--- combat damage to a player, draw a card" needs a combat-damage trigger scoped
--- to a filter rather than to the bearer (#775).
+-- cannot express (#774). His combat-damage trigger IS modeled, and is read by
+-- Pawl.TriggerSpec's `tovolarSpec` rather than here.
 --
 -- Moonmist's second sentence is not modeled by its card file either, and no case
 -- here asserts on it: "prevent all combat damage that would be dealt this turn by

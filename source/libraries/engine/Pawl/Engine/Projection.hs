@@ -1542,6 +1542,10 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfEnters -> condition
   TriggerCondition.StepBegins _ _ -> condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> condition
+  -- Its watcher-scoped sibling carries a Filter, so CR 612.1 reaches it:
+  -- Tovolar's "a Wolf or Werewolf you control" is two subtype words a text
+  -- change can swap.
+  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.rewrite pairs f)
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> condition
   TriggerCondition.OpponentLostLifeDuringYourTurn -> condition
   TriggerCondition.SelfCycled -> condition

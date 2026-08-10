@@ -470,6 +470,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.StateIs condition -> conditionCounts condition
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  -- Its watcher-scoped sibling carries a Filter, and a Filter holds no Count.
+  TriggerCondition.PermanentDealsCombatDamageToPlayer _ -> []
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
@@ -1708,6 +1710,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.SelfEnters -> []
   TriggerCondition.StepBegins _ _ -> []
   TriggerCondition.SelfDealsCombatDamageToPlayer -> []
+  -- Its watcher-scoped sibling carries one -- Tovolar's "a Wolf or Werewolf you
+  -- control", which the card lint must sweep.
+  TriggerCondition.PermanentDealsCombatDamageToPlayer f -> [f]
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
