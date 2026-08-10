@@ -15,6 +15,7 @@ import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.Supertype as Supertype
 
@@ -270,7 +271,17 @@ data Context = MkContext
     --
     -- LAZY like sourcePower, and load-bearingly so: filling it costs a
     -- control-grant walk, and no filter that omits the atom ever forces it.
-    defendingPlayer :: Maybe PlayerId.PlayerId
+    defendingPlayer :: Maybe PlayerId.PlayerId,
+    -- The objects the surrounding resolution's LEGAL slots name, for
+    -- Quantity.AgainstSlot to aim an evaluation at one (CR 608.2b keeps an
+    -- illegal slot out). No Filter atom reads it -- it rides here because this
+    -- record is already the evaluation context every Quantity is handed, and a
+    -- slot map is exactly the part of a resolution the evaluator cannot derive.
+    --
+    -- EMPTY everywhere but a resolution, which is the honest answer rather than a
+    -- forgotten filler: outside one there are no slots. Pawl.Engine.Resolve's
+    -- effectContext is the sole non-empty producer.
+    slotObjects :: Map.Map SlotName.SlotName ObjectId.ObjectId
   }
   deriving (Eq, Show)
 
@@ -281,7 +292,12 @@ data Context = MkContext
 -- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
 -- position can read the Nothings this leaves.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing, slotObjects = Map.empty}
+
+-- contextFor with the resolution's slot objects supplied. The one caller is
+-- Pawl.Engine.Resolve.effectContext; see slotObjects above.
+contextWithSlots :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Map.Map SlotName.SlotName ObjectId.ObjectId -> Context
+contextWithSlots p s m = (contextFor p s) {slotObjects = m}
 
 -- contextFor with the source's power supplied. Kept lazy at the call site, since
 -- the field is: a Filter that never names the atom pays for no projection.
@@ -289,7 +305,7 @@ contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, 
 -- The defending player stays Nothing: this is CR 702.149a's TRIGGER match, and
 -- rule 702.39a's atom lives only in a target slot.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing, slotObjects = Map.empty}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the

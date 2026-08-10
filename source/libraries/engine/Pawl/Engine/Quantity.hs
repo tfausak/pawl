@@ -140,6 +140,25 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- the battlefield -- so reaching this arm means the star was never resolved,
   -- honestly Nothing rather than a hole.
   Quantity.Star -> Nothing
+  -- CR 608.2b: an effect may require information about a TARGET, which is not
+  -- the ability's source (CR 113.7). Re-aim the fold at the object the slot
+  -- names, so a payload can read the thing it points at. The CONTEXT rides
+  -- through unchanged -- CR 109.5's "you" is still the resolving controller's --
+  -- and only the object moves, which is what makes every object-reading arm
+  -- (Power, ManaValue, ObjectCounters, IsRenowned) work under it at once.
+  --
+  -- `announcedOn` is fixed too, for the Count arm's reason: CR 601.2b's X belongs
+  -- to the resolving object however the evaluation is aimed.
+  --
+  -- Nothing when the slot names no object. Filter.slotObjects is empty outside a
+  -- resolution and omits an illegal slot (CR 608.2b) and a player recipient, so
+  -- the three cases collapse onto the one answer -- unanswered, which every
+  -- caller already treats as a no-op.
+  --
+  -- Terminating: the payload is a strictly smaller subterm.
+  Quantity.AgainstSlot slot inner -> case Map.lookup slot (Filter.slotObjects context) of
+    Nothing -> Nothing
+    Just oid -> evaluateAgainst viewOf context gs announcedOn (Just oid) (viewOf oid) inner
   Quantity.Plus a b -> case (recur a, recur b) of
     (Just x, Just y) -> Just (x + y)
     _ -> Nothing
@@ -341,6 +360,10 @@ substituteStar star quantity = case quantity of
   Quantity.IsRenowned -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.BlockersBeyondFirst -> quantity
+  -- No descent, for the Count arm's reason: CR 604.3 makes a CDA a static
+  -- ability with no resolution and so no slots, and Pawl.CardSpec's
+  -- powerToughnessSlots keeps a slot-naming quantity out of a printed P/T.
+  Quantity.AgainstSlot _ _ -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -392,6 +415,12 @@ slots quantity = case quantity of
   -- And a nullary arm, which names nothing at all: CR 509.1h's declaration is
   -- read against the object the evaluation is aimed at, as ObjectCounters is.
   Quantity.BlockersBeyondFirst -> Set.empty
+  -- The one arm that names a TARGET slot and reports it here anyway. Every other
+  -- nested target slot is a PlayerRef this function leaves to Resolve.slotsOf,
+  -- which cannot see it (#1079); reporting this one is what lets slotsOf recover
+  -- it, and so what keeps Soul's Majesty's declared target on the read side of
+  -- the D4 lint. The payload may hide slots of its own.
+  Quantity.AgainstSlot slot inner -> Set.insert slot (slots inner)
 
 -- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
 -- off the resolving object's bindings? It is not wherever a PlayerRef is nested
@@ -424,6 +453,9 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.IsRenowned -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.BlockersBeyondFirst -> True
+  -- True because `slots` above DOES report this arm's slot, unlike the nested
+  -- PlayerRefs -- so the reported set is the whole of what evaluating it reads.
+  Quantity.AgainstSlot _ inner -> slotsAreExhaustive inner
 
 -- Only InSlot names a slot; the other two are answered from the evaluation
 -- context alone (Resolve.playerRefSlots says the same thing as a set).
@@ -480,6 +512,10 @@ readsX quantity = case quantity of
   Quantity.IsRenowned -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.BlockersBeyondFirst -> False
+  -- Not a leaf: its payload is a whole Quantity and may read X, the same recursion
+  -- Plus above needs. Its own SlotName names a target rather than an amount, and X
+  -- is only ever an amount.
+  Quantity.AgainstSlot _ inner -> readsX inner
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A
