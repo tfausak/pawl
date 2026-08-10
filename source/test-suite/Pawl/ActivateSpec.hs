@@ -62,6 +62,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.ProjectedCharacteristics as PC
 import qualified Pawl.Types.Prompt as Prompt
@@ -502,6 +503,7 @@ lastKnownSpec s registry = Spec.describe s "LastKnownInformation" $ do
       (Projection.fullView pumped S.noSource >>= Filter.power)
 
   cyclingSpec s registry
+  reinforceSpec s registry
 
 -- CR 702.29: cycling, the first activated ability in the pool that is activated
 -- from a zone other than the battlefield. Barkhide Mauler is a {4}{G} 4/4 whose
@@ -816,6 +818,106 @@ cyclingSpec s registry = Spec.describe s "Cycling" $ do
     let (g0, oid) = S.handOne piker (S.landsInPlay forest 2)
         gs = g0 {GameState.priority = Just S.alice}
     Spec.assertEqWith s "no abilities minted" (Activate.abilitiesFor oid gs) []
+    Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "and no Activate offered"
+
+-- CR 702.77: reinforce, cycling's zone with a TARGET. Mosquito Guard is a {W}
+-- 1/1 whose only other text is first strike, so nothing but rule 702.77a
+-- produces the ability under test.
+--
+-- Alice holds it and has two Plains for the {1}{W}. The two creatures are the
+-- target pool, and they belong to DIFFERENT players with different power boxes:
+-- rule 702.77a prints "target creature" with no controller qualifier, so aiming
+-- at Bob's is the reading under test, and 4/4 against 2/1 means a counter that
+-- landed on the wrong one is visible in the power.
+reinforceBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+reinforceBoard s registry = do
+  guard <- S.printingOf s registry "Mosquito Guard"
+  plains <- S.printingOf s registry "Plains"
+  piker <- S.printingOf s registry "Goblin Piker"
+  mauler <- S.printingOf s registry "Barkhide Mauler"
+  let (pikerId, g0) = S.addCreature piker S.alice (S.landsInPlay plains 2)
+      (maulerId, g1) = S.addCreature mauler S.bob g0
+      (g2, guardId) = S.handOne guard g1
+  pure (guardId, pikerId, maulerId, g2 {GameState.priority = Just S.alice})
+
+reinforceSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+reinforceSpec s registry = Spec.describe s "Reinforce" $ do
+  -- CR 702.77a: "Reinforce is an activated ability that functions only while
+  -- the card with reinforce is in a player's hand. 'Reinforce N-[cost]' means
+  -- '[Cost], Discard this card: Put N +1/+1 counters on target creature.'"
+  -- The card prints no activated ability; what is offered is minted.
+  Spec.it s "CR 702.77a the minted ability is '{1}{W}, Discard this card: put a counter on target creature'" $ do
+    guard <- S.printingOf s registry "Mosquito Guard"
+    (guardId, _, _, gs) <- reinforceBoard s registry
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.combinedFace guard)) []
+    Spec.assertBool s (any isActivate (Action.legalActions S.alice gs)) "an Activate is offered from the hand"
+    case Activate.abilitiesFor guardId gs of
+      [ability] -> do
+        Spec.assertEqWith
+          s
+          "the printed {1}{W} plus rule 702.77a's discard"
+          (ActivatedAbility.cost ability)
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.White)])) [CostComponent.DiscardThis])
+        Spec.assertEqWith s "instant speed" (ActivatedAbility.restrictions ability) []
+        Spec.assertEqWith
+          s
+          "one slot, 'target creature' with nothing narrowing it"
+          (foldMap (Map.elems . Mode.targetSpecs) (Modal.modes (ActivatedAbility.modal ability)))
+          [TargetSpec.MkTargetSpec Pool.Creatures Nothing]
+      abilities -> Spec.assertFailure s ("expected one reinforce ability, got " <> show (length abilities))
+
+  -- The whole card, aimed across the table. The Guard is in the graveyard while
+  -- the ability is still on the stack, which is rule 702.77a's discard sitting
+  -- before the colon; then N counters land on the chosen creature and on no
+  -- other.
+  Spec.it s "CR 702.77a whole card: reinforce discards the Guard and puts one counter on Bob's Mauler" $ do
+    (guardId, pikerId, maulerId, gs) <- reinforceBoard s registry
+    case Activate.abilitiesFor guardId gs of
+      [ability] -> do
+        let activated = S.runPure (aimAtCreature maulerId) gs (Activate.activateAbility S.alice guardId ability)
+            resolved = S.runPure (aimAtCreature maulerId) activated Stack.resolveTop
+            countersOn oid g = fmap (Map.lookup CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid g)
+            tapped g = length (filter (\o -> Object.tapped o == TapState.Tapped) (Maybe.mapMaybe (\o -> Game.lookupObject o g) (Set.toList (GameState.battlefield g))))
+        Spec.assertEqWith s "the Guard left the hand as the cost was paid" (length (Game.zoneMembers Zone.Hand S.alice activated)) 0
+        Spec.assertEqWith s "and is in the graveyard while the ability is still on the stack" (length (Game.zoneMembers Zone.Graveyard S.alice activated)) 1
+        Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack activated)) 1
+        Spec.assertEqWith s "both Plains paid" (tapped activated) 2
+        Spec.assertEqWith s "nothing has a counter yet" (countersOn maulerId activated) (Just Nothing)
+        Spec.assertEqWith s "reinforce 1 puts exactly one counter on the target" (countersOn maulerId resolved) (Just (Just 1))
+        Spec.assertEqWith s "so Bob's 4/4 Mauler is a 5/5" (S.powerToughnessOf maulerId resolved) (Just (5, 5))
+        Spec.assertEqWith s "Alice's own Piker was not the target and is untouched" (countersOn pikerId resolved) (Just Nothing)
+        Spec.assertEqWith s "still a 2/1" (S.powerToughnessOf pikerId resolved) (Just (2, 1))
+        Spec.assertEqWith s "the stack is empty" (GameState.stack resolved) []
+      abilities -> Spec.assertFailure s ("expected one reinforce ability, got " <> show (length abilities))
+
+  -- CR 601.2c through CR 602.2b: an ability with a target it cannot legally
+  -- choose cannot be activated. This board is reinforceBoard's with the two
+  -- creatures taken away and nothing else changed -- same Guard, same two
+  -- Plains -- so the offer flipping is the empty target pool and not the mana.
+  Spec.it s "CR 601.2c reinforce is not offered with no creature to target" $ do
+    guard <- S.printingOf s registry "Mosquito Guard"
+    plains <- S.printingOf s registry "Plains"
+    let (g0, guardId) = S.handOne guard (S.landsInPlay plains 2)
+        gs = g0 {GameState.priority = Just S.alice}
+    Spec.assertEqWith s "the ability is still minted" (length (Activate.abilitiesFor guardId gs)) 1
+    Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "but no Activate is offered"
+
+  -- The zone gate, cycling's test one keyword over: a Mosquito Guard that
+  -- resolved as a creature cannot be reinforced. Rule 702.77b keeps the ability
+  -- in existence there; what it does not do is make it activatable (#1207).
+  --
+  -- A FENCE rather than a proof of where the ability is minted: minting it from
+  -- battlefieldAbilitiesFor instead leaves this green, because CR 113.6m already
+  -- withholds an ability whose cost discards the card from the battlefield
+  -- (Activate.functionsIn). Two rules answer here, and either alone suffices.
+  Spec.it s "CR 702.77a reinforce is NOT offered from the battlefield" $ do
+    guard <- S.printingOf s registry "Mosquito Guard"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (_, g0) = S.addCreature piker S.alice (S.landsInPlay plains 2)
+        (guardId, g1) = S.addCreature guard S.alice g0
+        gs = g1 {GameState.priority = Just S.alice}
+    Spec.assertEqWith s "nothing minted for it on the battlefield" (Activate.abilitiesFor guardId gs) []
     Spec.assertBool s (not (any isActivate (Action.legalActions S.alice gs))) "and no Activate offered"
 
 isActivate :: A.Action -> Bool

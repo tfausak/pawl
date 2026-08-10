@@ -413,8 +413,9 @@ activatableGiven grants pcs pid srcId ability gs =
 -- keeps them off the stack).
 --
 -- CR 701.20a's duration -- revealed until the ability leaves the stack -- is not
--- modeled, and is vacuous for every card in the pool: cycling discards the card
--- as a cost (CR 702.29a), so it is in a public graveyard a moment later. A
+-- modeled, and is vacuous for every card in the pool: cycling and reinforce both
+-- discard the card as a cost (CR 702.29a, CR 702.77a), so it is in a public
+-- graveyard a moment later. A
 -- forecast ability (CR 702.57a) is the shape that would make the duration
 -- observable; none is in the pool (#185, #282).
 revealIfHidden :: PlayerId -> ObjectId -> Game ()

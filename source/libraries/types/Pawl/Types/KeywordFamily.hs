@@ -29,9 +29,9 @@ module Pawl.Types.KeywordFamily where
 -- parameter that CR 702.14c's landwalk filter and CR 702.37a's morph cost force
 -- on it. A family type that named Keyword instead would reopen that cycle.
 --
--- NINETEEN is this pool's count, not Magic's. Rule 702 runs to 702.194 and so
+-- TWENTY is this pool's count, not Magic's. Rule 702 runs to 702.194 and so
 -- states 193 keywords past its own general 702.1, roughly a third of them written
--- with a cost or an N; of the keywords Pawl.Types.Keyword models, these nineteen
+-- with a cost or an N; of the keywords Pawl.Types.Keyword models, these twenty
 -- carry a payload. The set grows with that type -- ward N and
 -- the alternative-cost keywords all land here eventually -- so a constructor is
 -- owed whenever a payload-carrying Keyword constructor is added, not whenever a
@@ -66,6 +66,8 @@ data KeywordFamily
     Vanishing
   | -- | CR 702.70a: poisonous N.
     Poisonous
+  | -- | CR 702.77a: reinforce N-[cost].
+    Reinforce
   | -- | CR 702.86a: annihilator N.
     Annihilator
   | -- | CR 702.107a: outlast [cost].

@@ -62,6 +62,9 @@ toJson k = case k of
   Keyword.Vanishing n -> Common.tagged "Vanishing" . Just $ Common.encodeNatural n
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
   Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
+  -- An ARRAY, as Cycling's and Morph's are: CR 702.77a writes both an N and a
+  -- cost.
+  Keyword.Reinforce n cost -> Common.tagged "Reinforce" . Just . Common.array $ [Common.encodeNatural n, Cost.toJson toJson cost]
   Keyword.Persist -> Common.nullary "Persist"
   Keyword.Infect -> Common.nullary "Infect"
   Keyword.Wither -> Common.nullary "Wither"
@@ -131,6 +134,7 @@ fromJson value = do
     ("Vanishing", Just v) -> Keyword.Vanishing <$> Common.decodeNatural v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
     ("Annihilator", Just v) -> Keyword.Annihilator <$> Common.decodeNatural v
+    ("Reinforce", Just (Value.Array (Array.MkArray [n, c]))) -> Keyword.Reinforce <$> Common.decodeNatural n <*> Cost.fromJson fromJson c
     ("Persist", _) -> Right Keyword.Persist
     ("Infect", _) -> Right Keyword.Infect
     ("Wither", _) -> Right Keyword.Wither

@@ -424,6 +424,23 @@ data Keyword
     -- creature types, so it is the identity -- redundant by arithmetic, where
     -- CR 702.80d's wither says so outright.
     Changeling
+  | -- | 702.77a: reinforce N-[cost], an ACTIVATED ability that functions only
+    -- while the card is in a player's hand, meaning "[cost], Discard this card:
+    -- Put N +1/+1 counters on target creature." Cycling's zone and cycling's
+    -- discard-in-the-cost shape (702.29a); what is new is a target, so
+    -- Pawl.Engine.Keyword.reinforce is the first hand ability that has one.
+    --
+    -- BOTH halves ride the constructor, and neither is redundant: the cost is
+    -- what is paid, as Cycling's and Flashback's are, and N is how many counters
+    -- the minted ability puts on -- so `Reinforce 1 c` and `Reinforce 2 c` are
+    -- distinct keywords. Rule 702.77 states no redundancy clause and no card
+    -- prints two, so its reader takes MEMBERSHIP, which is the Set
+    -- Pawl.Engine.Keyword.handAbilitiesOf already takes.
+    --
+    -- Rule 702.77b's other half -- the ability keeps existing in every other
+    -- zone, so an object with reinforce counts as having an activated ability --
+    -- is not modelled (#1207).
+    Reinforce Natural.Natural (Cost.Cost Keyword)
   | -- | 702.79a: persist. "When this permanent is put into a graveyard from the
     -- battlefield, if it had no -1/-1 counters on it, return it to the
     -- battlefield under its owner's control with a -1/-1 counter on it" -- which
