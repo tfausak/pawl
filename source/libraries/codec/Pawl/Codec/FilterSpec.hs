@@ -104,6 +104,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.PowerGreaterThanSource
       """ {"type":"PowerGreaterThanSource"} """
+  Spec.it s "ControlledByDefendingPlayer" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.ControlledByDefendingPlayer
+      """ {"type":"ControlledByDefendingPlayer"} """
   Spec.it s "ManaValueAtMost" $
     Common.assertJsonCodec
       s

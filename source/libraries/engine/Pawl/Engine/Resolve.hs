@@ -39,6 +39,7 @@ import qualified Pawl.Extra.Integer as Integer
 import qualified Pawl.Extra.Natural as Natural
 import Pawl.Types.AbilityName (AbilityName)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.ActivePlayerEffect as ActivePlayerEffect
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.Affected as Affected
@@ -234,6 +235,8 @@ slotsOf effect = case effect of
   Effect.GainControl _ ref -> objectRefSlots ref
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
+  -- Both refs, for Tap and Untap's reason: either may name a slot.
+  Effect.RequireBlock _ blocker attacker -> Set.union (objectRefSlots blocker) (objectRefSlots attacker)
   Effect.CreateEmblem {} -> Set.empty
   -- CR 725.1's crown names a target slot only in the InSlot arm (Denethor's
   -- "target player"); the other two derive their player and read nothing.
@@ -374,6 +377,10 @@ slotsAreExhaustive effect = case effect of
   -- beside it hold no reference of any sort.
   Effect.AffectPlayers duration _ _ ->
     Set.null (durationSlots duration) && durationSlotsAreExhaustive duration
+  -- slotsOf's arm reports both refs but drops the Duration, so the slotless
+  -- test is made here -- AffectPlayers' reason.
+  Effect.RequireBlock duration _ _ ->
+    Set.null (durationSlots duration) && durationSlotsAreExhaustive duration
   -- CR 114.2's emblem is minted with EMPTY bindings (Event.createEmblem), so its
   -- embedded card is literal text for Create's reason.
   Effect.CreateEmblem _ -> True
@@ -471,6 +478,7 @@ readsX = any effectReadsX
       Effect.GainControl _ _ -> False
       Effect.ArmDelayedTrigger {} -> False
       Effect.AffectPlayers {} -> False
+      Effect.RequireBlock {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.ItBecomes _ -> False
@@ -535,6 +543,7 @@ searchesLibrary effect = case effect of
   Effect.GainControl _ _ -> False
   Effect.ArmDelayedTrigger {} -> False
   Effect.AffectPlayers {} -> False
+  Effect.RequireBlock {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.ItBecomes _ -> False
@@ -657,6 +666,7 @@ boundSlots effect = case effect of
   Effect.GainControl _ _ -> Set.empty
   Effect.ArmDelayedTrigger {} -> Set.empty
   Effect.AffectPlayers {} -> Set.empty
+  Effect.RequireBlock {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.ItBecomes _ -> Set.empty
@@ -2815,6 +2825,34 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                   ActivePlayerEffect.effect = playerEffect
                 }
          in gs1 {GameState.playerEffects = active : GameState.playerEffects gs1}
+  Effect.RequireBlock duration blockerRef attackerRef ->
+    -- CR 509.1c / 613.11: store one requirement per (blocker, attacker) pair the
+    -- two refs name. Rule 509.1c counts requirements PER CREATURE, so the pairs
+    -- are what has to be stored -- Pawl.Engine.BlockRequirement.instances mints
+    -- the printed carrier's pairs the same way.
+    --
+    -- Both sets are enumerated ONCE, for the CR 608.2f simultaneity
+    -- objectRefObjects buys; an illegal slot (CR 608.2b) arrives as the empty
+    -- list and stores nothing, which is provoke's fizzle.
+    State.modify' $ \gs -> case Expiry.arm controller source duration gs of
+      -- CR 611.2b: the duration never started, so nothing is stored.
+      Nothing -> gs
+      Just expiry ->
+        let blockers = objectRefObjects legality chosen resolving controller source gs blockerRef
+            attackers = objectRefObjects legality chosen resolving controller source gs attackerRef
+            (ts, gs1) = Game.freshTimestamp gs
+            stored =
+              [ ActiveBlockRequirement.MkActiveBlockRequirement
+                  { ActiveBlockRequirement.source = source,
+                    ActiveBlockRequirement.timestamp = ts,
+                    ActiveBlockRequirement.expiry = expiry,
+                    ActiveBlockRequirement.blocker = blocker,
+                    ActiveBlockRequirement.attacker = attacker
+                  }
+              | blocker <- blockers,
+                attacker <- attackers
+              ]
+         in gs1 {GameState.blockRequirements = stored <> GameState.blockRequirements gs1}
   Effect.CreateEmblem card -> do
     -- CR 114.2: the resolving controller gets the emblem. The whole minting is
     -- Event.createEmblem's, shared with CR 701.54c's Ring emblem.

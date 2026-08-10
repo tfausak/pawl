@@ -57,7 +57,9 @@
 -- read off the declaration, with Wolverine Pack and Horrible Hordes --
 -- `rampageSpec`. CR 702.149 training, the twelfth, whose CONDITION reads the rest
 -- of the declaration for a bigger companion, with Apprentice Sharpshooter --
--- `trainingSpec`. CR 509.3b's blocking-side form
+-- `trainingSpec`. CR 702.39 provoke, the thirteenth, and the first whose payload
+-- creates a CR 509.1c blocking requirement, with Goblin Grappler --
+-- `provokeSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -3669,6 +3671,146 @@ trainingSpec s registry =
             "each watching CR 702.149a's declaration"
             (fmap TriggeredAbility.condition abilities)
             [expected, expected]
+
+-- CR 702.39a's provoke, the THIRTEENTH keyword rule 702 states as a triggered
+-- ability and the FIRST whose payload creates a CR 509.1c blocking REQUIREMENT
+-- -- so this is the group that runs a resolution-created requirement through the
+-- declare blockers step, and with it Filter.ControlledByDefendingPlayer.
+--
+-- Goblin Grappler {R} Creature -- Goblin 1/1 is the card: provoke and nothing
+-- else, so every reading below is the keyword's. Its victims are the pool's
+-- vanillas.
+--
+-- The answerer DECLINES to block throughout. That is what makes every positive
+-- reading a claim about CR 509.1c: the block that happens is the one the rules
+-- force, never one the interpreter asked for.
+provokeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+provokeSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- Exercise or decline rule 702.39a's "may", aim its target, and never
+      -- block voluntarily. S.aggressiveAnswer would block with everything and
+      -- Script.declining would decline the "may", so a case about either has to
+      -- say both itself.
+      plan :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      plan may target p = case p of
+        Prompt.ChooseOptional {} -> may
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature target)) sets
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      atBlockers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+      tapStateOf oid gs = fmap Object.tapped (Game.lookupObject oid gs)
+   in Spec.describe s "Provoke" $ do
+        -- The proving test, and it covers both halves of rule 702.39a at once:
+        -- bob's only creature is TAPPED, so CR 509.1a makes it no candidate at
+        -- all until the untap, and the block that follows is CR 509.1c's
+        -- requirement overriding an interpreter that declined to block.
+        Spec.it s "CR 702.39a whole card: the provoked creature untaps and blocks" $ do
+          (gs0, mine, theirs) <- board ["Goblin Grappler"] ["Goblin Piker"]
+          case (mine, theirs) of
+            ([grappler], [piker]) -> do
+              let after = atDamage (plan OptionalDecision.Exercises piker) (S.tapObject piker gs0)
+              Spec.assertEqWith s "the Piker is blocking the Grappler" (Combat.blockersOf grappler after) (Set.singleton piker)
+            _ -> Spec.assertFailure s "fixture should give alice a Grappler and bob a Piker"
+        -- CR 603.5 / 608.2e: one printed "may" over one clause, so declining it
+        -- withholds BOTH instructions. The same board and the same declining
+        -- blocker answer as the proving test; only the answer to the "may"
+        -- differs, which is what makes that test's block the keyword's.
+        Spec.it s "CR 603.5 declining the may leaves the creature tapped and blocking nothing" $ do
+          (gs0, mine, theirs) <- board ["Goblin Grappler"] ["Goblin Piker"]
+          case (mine, theirs) of
+            ([grappler], [piker]) -> do
+              let after = atDamage (plan OptionalDecision.Declines piker) (S.tapObject piker gs0)
+              Spec.assertEqWith s "nothing blocks" (Combat.blockersOf grappler after) Set.empty
+              Spec.assertEqWith s "and it is still tapped" (tapStateOf piker after) (Just TapState.Tapped)
+            _ -> Spec.assertFailure s "fixture should give alice a Grappler and bob a Piker"
+        -- The REQUIREMENT alone, with the untap taken out of the picture: bob's
+        -- creature is already untapped, so it could have blocked or not, and CR
+        -- 509.1c is the only thing that makes declining illegal.
+        Spec.it s "CR 509.1c an untapped provoked creature must block anyway" $ do
+          (gs0, mine, theirs) <- board ["Goblin Grappler"] ["Goblin Piker"]
+          case (mine, theirs) of
+            ([grappler], [piker]) ->
+              Spec.assertEqWith
+                s
+                "the Piker is blocking"
+                (Combat.blockersOf grappler (atDamage (plan OptionalDecision.Exercises piker) gs0))
+                (Set.singleton piker)
+            _ -> Spec.assertFailure s "fixture should give alice a Grappler and bob a Piker"
+        -- The control for the case above, and the reason it is not vacuous: the
+        -- same board with a provokeless attacker lets the declining answer
+        -- stand. Goblin Piker {1}{R} 2/1 is the pool's vanilla, so the ONLY
+        -- difference between the two boards is the keyword.
+        Spec.it s "CR 509.1 the same board without provoke lets the defender decline" $ do
+          (gs0, mine, theirs) <- board ["Goblin Piker"] ["Goblin Piker"]
+          case (mine, theirs) of
+            ([attacker], [piker]) ->
+              Spec.assertEqWith
+                s
+                "nothing blocks"
+                (Combat.blockersOf attacker (atDamage (plan OptionalDecision.Exercises piker) gs0))
+                Set.empty
+            _ -> Spec.assertFailure s "fixture should give alice and bob a Piker each"
+        -- CR 508.5 at THREE seats, where "defending player" and "an opponent"
+        -- come apart: alice attacks carol, so bob's creature is an opponent's and
+        -- is still no legal target. Asked of the slot itself rather than through
+        -- a block, because a wrongly admitted target would be untapped and then
+        -- pruned by CR 509.1b anyway -- the illegal CHOICE is the observable.
+        --
+        -- The slot is read off the MINTED ability rather than restated here, so
+        -- this is a claim about what provoke writes and not about the atom alone.
+        Spec.it s "CR 508.5 only the defending player's creature is a legal target" $ do
+          grappler <- S.printingOf s registry "Goblin Grappler"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (gs0, mine, theirs, others) = S.threePlayerCombat [grappler] [piker] [piker]
+              minted = concatMap (concatMap (Map.elems . Mode.targetSpecs) . Modal.modes . TriggeredAbility.modal) (Keyword.abilitiesFor Keyword.Type.Provoke 1)
+          case (mine, theirs, others, minted) of
+            ([attacker], [bobs], [carols], [slot]) -> do
+              let after = atBlockers (S.attackTo S.carol) gs0
+              Spec.assertEqWith
+                s
+                "carol is the defending player, so only her creature"
+                (Target.legalRecipients (Just S.alice) attacker slot after)
+                (Set.singleton (Recipient.ToCreature carols))
+              Spec.assertBool
+                s
+                (Set.notMember (Recipient.ToCreature bobs) (Target.legalRecipients (Just S.alice) attacker slot after))
+                "bob is an opponent but not the defender"
+            _ -> Spec.assertFailure s "fixture should give each seat one creature"
+        -- CR 500.5a: "this combat" ends with the combat PHASE, so the stored
+        -- requirement is swept before the postcombat main phase. Read off the
+        -- store rather than through a block, there being no second declare
+        -- blockers step in one combat phase to observe it in.
+        Spec.it s "CR 500.5a the stored requirement lasts exactly the combat phase" $ do
+          (gs0, _, theirs) <- board ["Goblin Grappler"] ["Goblin Piker"]
+          case theirs of
+            [piker] -> do
+              let atBlock = atBlockers (plan OptionalDecision.Exercises piker) gs0
+                  -- S.runToStep stops as soon as combat is left, so naming the
+                  -- postcombat main phase runs the rest of the combat phase.
+                  afterCombat = S.runToStep Phase.PostcombatMain (plan OptionalDecision.Exercises piker) atBlock
+              Spec.assertEqWith s "stored while the ability has resolved" (length (GameState.blockRequirements atBlock)) 1
+              Spec.assertEqWith s "and gone once the phase ends" (GameState.blockRequirements afterCombat) []
+            _ -> Spec.assertFailure s "fixture should give bob a Piker"
+        -- CR 702.39b's instances, asserted of the MINT as mentor's are, and with
+        -- them the slot the gameplay cases can only see through its effects: CR
+        -- 508.3a's condition, and rule 702.39a's one printed narrowing.
+        Spec.it s "CR 702.39b two instances mint two targeting abilities" $ do
+          let abilities = Keyword.abilitiesFor Keyword.Type.Provoke 2
+              expectedSpec = TargetSpec.MkTargetSpec Pool.Creatures (Just Filter.Type.ControlledByDefendingPlayer)
+              specsOf ability = concatMap (Map.elems . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
+          Spec.assertEqWith s "two abilities" (length abilities) 2
+          Spec.assertEqWith
+            s
+            "each on CR 508.3a's condition"
+            (fmap TriggeredAbility.condition abilities)
+            [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
+          Spec.assertEqWith s "each with rule 702.39a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
 
 -- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
@@ -7780,6 +7922,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   exaltedSpec s registry
   mentorSpec s registry
   trainingSpec s registry
+  provokeSpec s registry
   afflictSpec s registry
   meleeSpec s registry
   rampageSpec s registry

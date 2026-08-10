@@ -239,6 +239,27 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
     Spec.it s "is False for a player" $ do
       Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.PowerGreaterThanSource)) "player"
+  -- CR 702.39a's "defending player controls", whose player comes from the
+  -- Context rather than from the perspective. blackCreature is controlled by
+  -- player 0 and OWNED by player 1, so a reading that consulted the wrong field
+  -- would not agree with either arm below.
+  Spec.describe s "ControlledByDefendingPlayer" $ do
+    let defended n = self {Filter.defendingPlayer = Just (PlayerId.MkPlayerId n)}
+    Spec.it s "holds only for the defending player's creature" $ do
+      Spec.assertBool s (Filter.matches (defended 0) blackCreature Filter.Type.ControlledByDefendingPlayer) "controller is the defender"
+      Spec.assertBool s (not (Filter.matches (defended 1) blackCreature Filter.Type.ControlledByDefendingPlayer)) "owner is not the controller"
+
+    -- NOT ControlledBy Opponent: `self`'s perspective is player 0, so that atom
+    -- would answer the opposite of this one on the very same view. CR 506.2a is
+    -- what makes them different questions.
+    Spec.it s "is not ControlledBy Opponent" $ do
+      Spec.assertBool s (not (Filter.matches (defended 0) blackCreature (Filter.Type.ControlledBy PlayerRelation.Opponent))) "player 0 is the perspective"
+
+    -- ControlledBy's vacuity posture on both sides.
+    Spec.it s "is False when either player is absent" $ do
+      let noController = blackCreature {Filter.controller = Nothing}
+      Spec.assertBool s (not (Filter.matches (defended 0) noController Filter.Type.ControlledByDefendingPlayer)) "no candidate controller"
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.ControlledByDefendingPlayer)) "no defending player"
 
   -- CR 202.3, a ceiling on a different characteristic: Ojutai's Command's
   -- "mana value 2 or less".

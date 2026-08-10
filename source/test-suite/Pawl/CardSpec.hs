@@ -556,6 +556,7 @@ effectCounts effect = case effect of
   Effect.GainControl duration _ -> durationCounts duration
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers duration _ _ -> durationCounts duration
+  Effect.RequireBlock duration _ _ -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.ItBecomes _ -> []
@@ -792,6 +793,7 @@ effectReplacements effect = case effect of
   Effect.GainControl _ _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
+  Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -1267,6 +1269,7 @@ effectMintedFaces effect = case effect of
   Effect.GainControl _ _ -> []
   Effect.ArmDelayedTrigger {} -> []
   Effect.AffectPlayers {} -> []
+  Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -1425,6 +1428,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.PowerAtMost _ -> 0
   Filter.Type.PowerLessThanSource -> 0
   Filter.Type.PowerGreaterThanSource -> 0
+  Filter.Type.ControlledByDefendingPlayer -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
@@ -1539,6 +1543,7 @@ keywordFilters keyword = case keyword of
   -- CR 702.134a is payload-free too: the Filter its minted ability carries -- the
   -- target slot's -- is the ENGINE's, never a card's.
   Keyword.Mentor -> []
+  Keyword.Provoke -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
@@ -2039,6 +2044,7 @@ effectFilters effect = case effect of
   Effect.GainControl duration ref -> unframed (durationFilters duration <> objectRefFilters ref)
   Effect.ArmDelayedTrigger _ _ mDuration -> unframed (concatMap durationFilters (Maybe.maybeToList mDuration))
   Effect.AffectPlayers duration _ playerEffect -> unframed (durationFilters duration <> playerEffectFilters playerEffect)
+  Effect.RequireBlock duration blocker attacker -> unframed (durationFilters duration <> objectRefFilters blocker <> objectRefFilters attacker)
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
@@ -3550,6 +3556,28 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
+  -- CR 702.39a's atom is in exactly the position CR 702.134a's is:
+  -- Filter.Context.defendingPlayer is filled by Pawl.Engine.Target.admittedGiven
+  -- and is Nothing everywhere else, so a card writing it anywhere else would get a
+  -- silent False. Only Pawl.Engine.Keyword.provoke writes it.
+  Spec.it s "CR 702.39a no card writes ControlledByDefendingPlayer" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "ControlledByDefendingPlayer") (Face.Codec.toJson Card.toJson c)
+        offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
+    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- Not vacuous, for the sibling sweep's reason: the same counter over a
+    -- hand-built face carrying the atom in a target spec finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.ControlledByDefendingPlayer]]
+        slotSpec = TargetSpec.MkTargetSpec Pool.Creatures (Just buried)
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slotSpec)))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
   -- Graft only exercises the ACCEPTING direction, so the rejecting direction is
   -- proven here instead -- hand-built, never a card file, because a card that

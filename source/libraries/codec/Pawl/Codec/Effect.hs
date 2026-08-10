@@ -147,6 +147,7 @@ toJson codec e = case e of
     (Onset.Immediately, Just d) -> Common.array [AbilityName.toJson n, Duration.toJson d]
     _ -> Common.array [AbilityName.toJson n, Onset.toJson o, Common.encodeMaybe Duration.toJson md]
   Effect.AffectPlayers d s pe -> Common.tagged "AffectPlayers" (Just (Common.array [Duration.toJson d, PlayerScope.toJson s, PlayerEffect.toJson pe]))
+  Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Common.array [Duration.toJson d, ObjectRef.toJson b, ObjectRef.toJson a]))
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Daytime.toJson d))
@@ -343,6 +344,9 @@ fromJson decode value = do
     "AffectPlayers" -> case mv of
       Just (Value.Array (Array.MkArray [d, s, pe])) -> Effect.AffectPlayers <$> Duration.fromJson d <*> PlayerScope.fromJson s <*> PlayerEffect.fromJson pe
       _ -> Left . Text.pack $ "AffectPlayers expects [Duration, PlayerScope, PlayerEffect]"
+    "RequireBlock" -> case mv of
+      Just (Value.Array (Array.MkArray [d, b, a])) -> Effect.RequireBlock <$> Duration.fromJson d <*> ObjectRef.fromJson b <*> ObjectRef.fromJson a
+      _ -> Left . Text.pack $ "RequireBlock expects [Duration, ObjectRef, ObjectRef]"
     "CreateEmblem" -> Common.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Common.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
     "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Daytime.fromJson)

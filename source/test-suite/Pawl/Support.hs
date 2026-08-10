@@ -1396,6 +1396,7 @@ oneMountainState mountain ph =
           GameState.replacements = [],
           GameState.pendingPreventionRiders = Seq.empty,
           GameState.playerEffects = [],
+          GameState.blockRequirements = [],
           GameState.ignoredAbilities = [],
           GameState.turnOrder = [alice],
           GameState.activePlayer = alice,

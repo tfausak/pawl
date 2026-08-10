@@ -1358,6 +1358,10 @@ rewriteEffect pairs effect = case effect of
   Effect.GainControl duration ref -> Effect.GainControl duration (rewriteObjectRef pairs ref)
   Effect.ArmDelayedTrigger {} -> effect
   Effect.AffectPlayers {} -> effect
+  -- CR 612.1 swaps a WORD, and both refs can carry one: an EachMatching's
+  -- Filter is subtype-shaped exactly as Untap's is.
+  Effect.RequireBlock duration blocker attacker ->
+    Effect.RequireBlock duration (rewriteObjectRef pairs blocker) (rewriteObjectRef pairs attacker)
   -- Identity, not a rewriteCard call: CR 114.3 leaves an emblem no type line and
   -- no name, the two things rewriteCard reaches. What CR 612.1 could reach on one
   -- is its abilities, which nothing here walks (#643).
@@ -2213,6 +2217,11 @@ filterReads f = case f of
   -- it into a trigger condition, which no CR 613.8a dependency reads either.
   Filter.Type.PowerGreaterThanSource -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
+  -- The same aspect its sibling above reads: the atom compares the CANDIDATE's
+  -- controller, and who defends is a fact about the combat record rather than
+  -- about any projection. Nothing in the pool puts this atom in an affected set
+  -- either -- CR 702.39a writes it into a target slot.
+  Filter.Type.ControlledByDefendingPlayer -> Set.singleton Controller
   -- Reads NOTHING, where its sibling above reads Controller, and the contrast is
   -- CR 108.3's: no Modification writes Object.owner, because no rule changes an
   -- owner at all -- CR 613.1b's layer 2 moves control and rule 108.3 has no

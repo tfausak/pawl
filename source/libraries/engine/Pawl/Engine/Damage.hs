@@ -13,6 +13,7 @@ import qualified Pawl.Engine.Combat as Combat
 import qualified Pawl.Engine.Commander as Commander
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
@@ -254,9 +255,9 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
             -- planeswalker burned off the battlefield (CR 506.4).
             attacked = combatRecipient gs attacker target
             -- CR 508.5 / CR 310.8d, shared with the landwalk reading in
-            -- Combat.defendingPlayerOf so the two cannot drift. Read once, for CR
+            -- Defender.playerOf so the two cannot drift. Read once, for CR
             -- 702.19c's third recipient below and for CR 702.22j's chooser.
-            defending = Combat.defendingPlayerOf (Projection.controlGrants gs) target gs
+            defending = Defender.playerOf (Projection.controlGrants gs) target gs
             -- CR 702.19b: the trample-through recipient is whatever the creature
             -- is attacking, at threshold 0 -- there is no minimum to assign to it.
             --
@@ -349,7 +350,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                 -- CR 702.19e's attacker -- which does get here, with its
                 -- planeswalker off the battlefield -- still reads that
                 -- planeswalker's controller out of the graveyard, since
-                -- Combat.defendingPlayerOf asks the object and not the combat
+                -- Defender.playerOf asks the object and not the combat
                 -- record. Answering with the CR 510.1c default is the
                 -- conservative reading either way.
                 let banded = any (\b -> Projection.hasKeyword Keyword.Banding b gs) blockers

@@ -249,22 +249,34 @@ data Context = MkContext
     --
     -- Nothing wherever the atom cannot appear, which `contextFor` below is the
     -- spelling of.
-    sourcePower :: Maybe Integer
+    sourcePower :: Maybe Integer,
+    -- CR 508.5: the DEFENDING PLAYER for the source, for the one atom that asks
+    -- (ControlledByDefendingPlayer, CR 702.39a). Supplied by the caller for
+    -- sourcePower's reason -- this module holds no game state and cannot read the
+    -- combat record -- and by the same caller, Pawl.Engine.Target.admittedGiven.
+    --
+    -- LAZY like sourcePower, and load-bearingly so: filling it costs a
+    -- control-grant walk, and no filter that omits the atom ever forces it.
+    defendingPlayer :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Show)
 
--- A Context for every match whose Filter cannot name either source-power atom --
+-- A Context for every match whose Filter cannot name a context-relative atom --
 -- that is, every match but a target slot's and CR 702.149a's trigger condition.
--- The atoms reach a card only through Pawl.Engine.Keyword's own mentor and
--- training, and Pawl.CardSpec's lint keeps them out of card data, so no other
--- position can read the Nothing this leaves.
+-- The source-power atoms reach a card only through Pawl.Engine.Keyword's own
+-- mentor and training, and CR 702.39a's defending-player atom only through
+-- provoke; Pawl.CardSpec's lints keep all three out of card data, so no other
+-- position can read the Nothings this leaves.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing}
 
 -- contextFor with the source's power supplied. Kept lazy at the call site, since
 -- the field is: a Filter that never names the atom pays for no projection.
+--
+-- The defending player stays Nothing: this is CR 702.149a's TRIGGER match, and
+-- rule 702.39a's atom lives only in a target slot.
 contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
-contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n}
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n, defendingPlayer = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -330,6 +342,14 @@ matches context view predicate = case predicate of
     (Just c, Just p) -> case relation of
       PlayerRelation.You -> c == p
       PlayerRelation.Opponent -> c /= p
+    _ -> False
+  -- CR 508.5 / 702.39a: the candidate's controller IS the defending player, which
+  -- the Context supplies because it is a fact about the combat record rather than
+  -- about the candidate. False unless both are readable, the posture
+  -- PowerLessThanSource takes: a candidate with no controller and a source with no
+  -- defending player each leave nothing to compare.
+  Filter.ControlledByDefendingPlayer -> case (controller view, defendingPlayer context) of
+    (Just c, Just d) -> c == d
     _ -> False
   -- CR 108.3 / 110.2: the same comparison ControlledBy makes, against the other
   -- player -- so Garland's "creatures you control but don't own" is the two atoms
@@ -448,6 +468,8 @@ rewrite pairs predicate = case predicate of
   Filter.PowerGreaterThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
+  -- Untouched for ControlledBy's reason.
+  Filter.ControlledByDefendingPlayer -> predicate
   -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
@@ -553,6 +575,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Wither -> keyword
   Keyword.Type.Exalted -> keyword
   Keyword.Type.Mentor -> keyword
+  Keyword.Type.Provoke -> keyword
   Keyword.Type.Training -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Prowess -> keyword

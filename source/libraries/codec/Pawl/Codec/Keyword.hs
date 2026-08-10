@@ -62,6 +62,7 @@ toJson k = case k of
   Keyword.Wither -> Common.nullary "Wither"
   Keyword.Exalted -> Common.nullary "Exalted"
   Keyword.Mentor -> Common.nullary "Mentor"
+  Keyword.Provoke -> Common.nullary "Provoke"
   Keyword.BattleCry -> Common.nullary "BattleCry"
   Keyword.Prowess -> Common.nullary "Prowess"
   Keyword.Menace -> Common.nullary "Menace"
@@ -117,6 +118,7 @@ fromJson value = do
     ("Wither", _) -> Right Keyword.Wither
     ("Exalted", _) -> Right Keyword.Exalted
     ("Mentor", _) -> Right Keyword.Mentor
+    ("Provoke", _) -> Right Keyword.Provoke
     ("BattleCry", _) -> Right Keyword.BattleCry
     ("Prowess", _) -> Right Keyword.Prowess
     ("Menace", _) -> Right Keyword.Menace
