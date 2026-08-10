@@ -412,7 +412,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Renown 2) /= Keyword.toJson (Keyword.Poisonous 2))
       "renown 2 is not poisonous 2"
-  -- CR 702.135a's N is a FOURTH keyword's, and it must not collide either.
+  -- CR 702.135a's N is written like the rest, so it must not collide either.
   Spec.it s "Afterlife carries its N" $ do
     Common.assertJsonCodec
       s
