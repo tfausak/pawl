@@ -120,7 +120,7 @@ layer m = case m of
 -- Building the context from `oid` instead of `src` fails that test alone.
 applyModification :: Layer -> ObjectId -> [Gathered] -> GameState -> ObjectId -> Modification -> ProjectedCharacteristics -> ProjectedCharacteristics
 applyModification lyr src cands gs oid m pc =
-  let context = Filter.MkContext (controllerOf src gs) (Just src)
+  let context = Filter.contextFor (controllerOf src gs) (Just src)
       viewOf = viewUpTo lyr cands gs
    in case m of
         -- CR 613.1f layer 6: a grant adds an ability, so two grants of the same
@@ -351,12 +351,12 @@ affects source oid a partial gs = case a of
         -- answer wrong (#197).
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
-          && Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+          && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- Matching's body without the battlefield conjunct. The `perspective` laziness
   -- caveat in the Matching arm above applies here unchanged (#197).
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
-     in Filter.matches (Filter.MkContext perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
+     in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
   -- CR 303.4b / 303.4m: the source's attachment again, read for the PLAYER it
   -- names. A source that is unattached, or attached to an object, names no player
   -- and affects nobody. The controller comparison is CR 613.1b's layer 2, already
@@ -376,7 +376,7 @@ affects source oid a partial gs = case a of
       let controller = controllerOf oid gs
        in Set.member oid (GameState.battlefield gs)
             && controller == Just pid
-            && Filter.matches (Filter.MkContext (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller (countersOf oid gs) gs) f
+            && Filter.matches (Filter.contextFor (controllerOf source gs) (Just source)) (viewOfCharacteristics oid partial controller (countersOf oid gs) gs) f
     _ -> False
 
 -- The characteristics view of a battlefield/stack object: its CR 613 projection
@@ -468,6 +468,17 @@ controllerWithLastKnown :: ObjectId -> GameState -> Maybe PlayerId.PlayerId
 controllerWithLastKnown oid gs = case lastKnownOf oid gs of
   Just lk -> Just (LastKnown.controller lk)
   Nothing -> controllerOf oid gs
+
+-- powerGiven with the same fallback, on the authority of CR 608.2b's own
+-- sentence: "if the source of an ability has left the zone it was in, its last
+-- known information is used during this process". The process is target
+-- re-validation, and the source's power is what CR 702.134a's slot compares
+-- against -- so a mentor killed in response leaves its trigger's target legal
+-- rather than fizzling it. Pawl.Engine.Target.admittedGiven is the caller.
+powerWithLastKnownGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Maybe Integer
+powerWithLastKnownGiven pcs oid gs = case lastKnownOf oid gs of
+  Just lk -> PC.power (LastKnown.characteristics lk)
+  Nothing -> powerGiven pcs oid gs
 
 -- The ViewOf a count gets when it is evaluated while `bound` is being applied:
 -- candidates projected through the layers BEFORE that one. Off-battlefield
@@ -600,7 +611,7 @@ characteristicPowerIn :: GameState -> ObjectId -> Face.Face Card.Type.Card -> Ma
 characteristicPowerIn gs oid face = case seedCharacteristicPT face of
   Nothing -> printedPower face
   Just (power, _) ->
-    let context = Filter.MkContext (controllerOf oid gs) (Just oid)
+    let context = Filter.contextFor (controllerOf oid gs) (Just oid)
         viewOf candidate = fmap viewOfCard (Game.faceOf candidate gs)
      in Just (Quantity.determine viewOf context gs oid power)
 
@@ -794,7 +805,7 @@ baseCharacteristics oid gs = case Game.faceOf oid gs of
     -- controller, the CR 604.3a(3) posture this shares with
     -- applyCharacteristicPT.
     let seedViewOf = const Nothing
-        seedContext = Filter.MkContext (controllerOf oid gs) (Just oid)
+        seedContext = Filter.contextFor (controllerOf oid gs) (Just oid)
      in PC.MkProjectedCharacteristics
           { PC.name = Face.name face,
             PC.supertypes = TypeLine.supertypes (Face.typeLine face),
@@ -956,7 +967,7 @@ affectsBase source oid a gs = affects source oid a (baseCharacteristics oid gs) 
 freezeQuantities :: GameState -> ObjectId -> Maybe PlayerId.PlayerId -> Modification -> Maybe Modification
 freezeQuantities gs oid you m =
   let viewOf = fullView gs
-      context = Filter.MkContext you (Just oid)
+      context = Filter.contextFor you (Just oid)
       freeze q = fmap Quantity.Type.Literal (Quantity.evaluate viewOf context gs oid q)
    in case m of
         Modification.SetBasePowerToughness p t -> Modification.SetBasePowerToughness <$> freeze p <*> freeze t
@@ -1708,7 +1719,7 @@ anyConditional gs =
 -- reads the permanent the ability is printed on.
 conditionHolds :: [Gathered] -> GameState -> ObjectId -> Layer -> Condition.Type.Condition -> Bool
 conditionHolds cands gs src lowest =
-  Condition.holds (viewUpTo lowest cands gs) (Filter.MkContext (controllerOf src gs) (Just src)) gs src
+  Condition.holds (viewUpTo lowest cands gs) (Filter.contextFor (controllerOf src gs) (Just src)) gs src
 
 -- gather's body with both ability gates left open: `stripped` answers whether a
 -- permanent's abilities were removed by the time layer 6 finished, and
@@ -2189,6 +2200,12 @@ filterReads f = case f of
   Filter.Type.HasKeywordFamily _ -> Set.singleton Keywords
   Filter.Type.PowerAtLeast _ -> Set.singleton PowerA
   Filter.Type.PowerAtMost _ -> Set.singleton PowerA
+  -- The same aspect the two above read, covering BOTH powers the atom compares:
+  -- Aspect names an aspect of one object's projection, so there is no way to say
+  -- "the source's power" separately, and PowerA is what an effect writing either
+  -- one writes. Nothing in the pool puts this atom in an affected set -- CR
+  -- 702.134a writes it into a target slot, which no CR 613.8a dependency reads.
+  Filter.Type.PowerLessThanSource -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   -- Reads NOTHING, where its sibling above reads Controller, and the contrast is
   -- CR 108.3's: no Modification writes Object.owner, because no rule changes an
@@ -2380,7 +2397,7 @@ applyCharacteristicPT :: Layer -> [Gathered] -> GameState -> ObjectId -> Project
 applyCharacteristicPT lyr cands gs oid pc = case PC.characteristicPT pc of
   Nothing -> pc
   Just (p, t) ->
-    let context = Filter.MkContext (controllerOf oid gs) (Just oid)
+    let context = Filter.contextFor (controllerOf oid gs) (Just oid)
         viewOf = viewUpTo lyr cands gs
      in pc
           { PC.power = Just (Quantity.determine viewOf context gs oid p),
@@ -2819,7 +2836,7 @@ abilitiesGiven pcs oid gs =
   let pc = projectGiven pcs oid gs
       granted ability = case ActivatedAbility.condition ability of
         Nothing -> True
-        Just cond -> Condition.holds (fullView gs) (Filter.MkContext (controllerOf oid gs) (Just oid)) gs oid cond
+        Just cond -> Condition.holds (fullView gs) (Filter.contextFor (controllerOf oid gs) (Just oid)) gs oid cond
    in -- Rule 702's own activated abilities are appended here, the shape
       -- intrinsicReplacementsOf takes one function down: the card's printed list
       -- is the projection's, and Pawl.Engine.Keyword mints the rule's from the

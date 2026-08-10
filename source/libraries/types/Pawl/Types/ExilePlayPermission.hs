@@ -24,7 +24,7 @@ import qualified Pawl.Types.PlayerId as PlayerId
 --
 -- `source` is the object the granting effect came from, and it is load-bearing
 -- rather than bookkeeping: Pawl.Engine.Expiry.sweepConditional evaluates an
--- Expiry.While through Filter.MkContext (Just player) (Just source), so a
+-- Expiry.While through Filter.contextFor (Just player) (Just source), so a
 -- duration whose Condition counts Filter.IsSource -- which is exactly how CR
 -- 611.2b's "for as long as you control this creature" is spelled -- has nothing
 -- to resolve against without it and would silently count zero, ending the

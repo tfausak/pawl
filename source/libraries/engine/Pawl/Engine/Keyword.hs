@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
@@ -40,10 +41,13 @@ import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SearchDestination as SearchDestination
+import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
@@ -57,11 +61,11 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.23, 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108, 702.121
--- and 702.130 do not: they spell rampage, flanking, bushido, poisonous, exalted,
--- annihilator, battle cry, prowess, melee and afflict out as TRIGGERED abilities,
--- so those have to be MINTED and handed to the ordinary CR 603 machinery rather
--- than merely consulted.
+-- Rules 702.23, 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108, 702.121,
+-- 702.130 and 702.134 do not: they spell rampage, flanking, bushido, poisonous,
+-- exalted, annihilator, battle cry, prowess, melee, afflict and mentor out as
+-- TRIGGERED abilities, so those have to be MINTED and handed to the ordinary CR
+-- 603 machinery rather than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -89,9 +93,9 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
 -- 702.23c says the same of rampage, CR 702.25b of flanking, CR 702.45b of
 -- bushido, CR 702.86b of annihilator, CR 702.91b of battle cry, CR 702.108b of
--- prowess, CR 702.121b of melee and CR 702.130b of afflict, so the ten minting
--- arms below are the same shape -- bushido's `concat` aside, since its instance
--- is two abilities.
+-- prowess, CR 702.121b of melee, CR 702.130b of afflict and CR 702.134b of
+-- mentor, so the eleven minting arms below are the same shape -- bushido's
+-- `concat` aside, since its instance is two abilities.
 --
 -- Exalted is the one with no such clause of its own: rule 702.83 states only
 -- that exalted IS a triggered ability, and the "multiple instances are
@@ -119,6 +123,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Melee -> List.genericReplicate count melee
+  Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
@@ -218,6 +223,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -337,6 +343,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -524,6 +531,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -804,6 +812,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Exalted -> []
+  Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -883,6 +892,8 @@ familyOf keyword = case keyword of
   Keyword.Wither -> Nothing
   -- CR 702.83a takes no parameter, so there is no variant for a card to name.
   Keyword.Exalted -> Nothing
+  -- CR 702.134a takes no parameter either, so mentor has no family of its own.
+  Keyword.Mentor -> Nothing
   Keyword.BattleCry -> Nothing
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
@@ -1102,8 +1113,8 @@ melee =
         (ObjectRef.EachMatching Filter.IsSource)
 
 -- CR 702.23a: whenever this creature becomes blocked, it gets +N/+N until end of
--- turn for each creature blocking it beyond the first. The TENTH keyword rule 702
--- states as a triggered ability, minted here like the nine around it.
+-- turn for each creature blocking it beyond the first. The ELEVENTH keyword rule
+-- 702 states as a triggered ability, minted here like the ten around it.
 --
 -- The condition is bushido's blocked half, TriggerCondition.SelfBecomesBlocked --
 -- CR 509.3c, which fires ONCE however many creatures blocked, where flanking's CR
@@ -1319,3 +1330,59 @@ afflict n =
       Effect.LoseLife
         (PlayerRef.InSlot Binding.triggerPlayer)
         (Quantity.Literal (toInteger n))
+
+-- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
+-- attacking creature with power less than this creature's power. The TENTH
+-- keyword in this pool whose rule text IS a triggered ability, and the first that
+-- TARGETS -- so it is the first to declare a target slot here rather than an
+-- empty Map.
+--
+-- The slot is filled by CR 603.3d as the ability is placed
+-- (Pawl.Engine.Engine.placeBorne) and re-checked by CR 608.2b as it resolves,
+-- both through Pawl.Engine.Target. A REAL choice, asked of the controller: with
+-- two smaller attackers the rules leave which one open, so nothing here elides
+-- it.
+--
+-- CR 508.3a is what "attacks" means, so the condition is annihilator's and battle
+-- cry's -- SelfAttacks, EveryTime, rule 702.134a stating no "for the first time
+-- each turn" narrowing.
+--
+-- The spec's three parts are the rule's three printed words. Pool.Creatures is
+-- "creature" (CR 109.2 draws it from the battlefield), IsAttacking is "attacking"
+-- (CR 508.1k), and Filter.PowerLessThanSource is "with power less than this
+-- creature's power" -- a comparison against the SOURCE, which is why that atom
+-- carries no literal. No controller conjunct, because rule 702.134a states none:
+-- CR 508.1 makes every attacking creature the active player's, so a creature an
+-- opponent controls is never in the set to be excluded.
+--
+-- The BEARER excludes itself with no `Not IsSource` of its own -- nothing has
+-- power less than its own power -- which is why the atom is strict rather than
+-- "no greater than".
+--
+-- Effect.PutCounters and not battle cry's ModifyTarget: rule 702.134a puts a
+-- COUNTER on, so it is CR 122.6's funnel (and CR 614.16's replacement
+-- opportunity), and what it grants outlives the turn because CR 613.4c reads the
+-- counter every projection.
+--
+-- Single mode, ChooseExactly 1, and no "if" clause, so intervening = Nothing --
+-- the only thing rule 702.134a leaves to choose is the target.
+mentor :: TriggeredAbility Card
+mentor =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton mentorTarget spec)))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
+    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) mentorTarget
+
+-- The slot rule 702.134a's one target is chosen into. Named here rather than in
+-- Pawl.Engine.Binding, which holds the RESERVED names a card may not use: this is
+-- an ordinary target slot, declared by the ability that reads it, and it can
+-- collide with nothing -- a card's slots live on that card's own abilities.
+mentorTarget :: SlotName.SlotName
+mentorTarget = SlotName.MkSlotName (Text.pack "mentored")

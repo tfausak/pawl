@@ -2549,7 +2549,7 @@ matchesTrigger gs bearer you cond event = case cond of
           let entrant = ZoneChange.object zc
            in case Projection.viewWithLastKnown entrant gs entrant of
                 Nothing -> False
-                Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+                Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
@@ -2801,7 +2801,7 @@ matchesTrigger gs bearer you cond event = case cond of
       | count == 1 ->
           case Projection.viewWithLastKnown attacker gs attacker of
             Nothing -> False
-            Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+            Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.AttackerDeclared {} -> False
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
@@ -2970,7 +2970,7 @@ matchesTrigger gs bearer you cond event = case cond of
       | attacker == bearer ->
           case Projection.viewWithLastKnown blocker gs blocker of
             Nothing -> False
-            Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+            Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.BlockerDeclared _ _ -> False
     GameEvent.BlocksDeclared _ _ -> False
     -- The GROUPED event is CR 509.3c's, and matching it here would collapse two
@@ -3126,7 +3126,7 @@ matchesTrigger gs bearer you cond event = case cond of
           let deceased = ZoneChange.departed zc
            in case Projection.viewWithLastKnown deceased gs deceased of
                 Nothing -> False
-                Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+                Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.StepBegan _ _ -> False
@@ -3475,7 +3475,7 @@ matchesTrigger gs bearer you cond event = case cond of
       Nothing -> False
       Just _ ->
         turnScopeAdmits scope (GameState.activePlayer gs) you
-          && Filter.matches (Filter.MkContext (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
+          && Filter.matches (Filter.contextFor (Just you) (Just bearer)) (Projection.viewOfSpell caster spell gs) f
     GameEvent.HalfUnlocked {} -> False
     GameEvent.TurnedFaceUp _ -> False
     GameEvent.PermanentSacrificed {} -> False
@@ -3630,7 +3630,7 @@ matchesTrigger gs bearer you cond event = case cond of
   TriggerCondition.PermanentTurnedFaceUp f -> case event of
     GameEvent.TurnedFaceUp oid -> case Projection.viewWithLastKnown oid gs oid of
       Nothing -> False
-      Just view -> Filter.matches (Filter.MkContext (Just you) (Just bearer)) view f
+      Just view -> Filter.matches (Filter.contextFor (Just you) (Just bearer)) view f
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.HalfUnlocked {} -> False
@@ -5201,7 +5201,7 @@ stateTriggers gs
         let live ab = liveCondition (TriggeredAbility.condition ab)
             liveCondition condition = case condition of
               TriggerCondition.StateIs cond ->
-                Condition.holds (Projection.fullView gs) (Filter.MkContext (Just ctrl) (Just oid)) gs oid cond
+                Condition.holds (Projection.fullView gs) (Filter.contextFor (Just ctrl) (Just oid)) gs oid cond
               TriggerCondition.SelfEnters -> False
               -- CR 603.6a is an EVENT trigger, matched against the log; nothing
               -- about it is a CR 603.8 state.
@@ -5456,7 +5456,7 @@ interveningHolds gs pending =
     (Just cond, TriggerSource.OfObject oid) ->
       Condition.holds
         (Projection.viewWithLastKnown oid gs)
-        (Filter.MkContext (Just (PendingTrigger.controller pending)) (Just oid))
+        (Filter.contextFor (Just (PendingTrigger.controller pending)) (Just oid))
         gs
         oid
         cond

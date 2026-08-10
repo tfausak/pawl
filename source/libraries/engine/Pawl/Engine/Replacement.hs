@@ -428,7 +428,7 @@ matchesZoneOwner gs src rel oid =
 -- step (#111).
 matchesPermanent :: GameState -> Maybe ObjectId -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesPermanent gs source filter_ oid =
-  Filter.matches (Filter.MkContext Nothing source) (Projection.viewOfObject oid gs) filter_
+  Filter.matches (Filter.contextFor Nothing source) (Projection.viewOfObject oid gs) filter_
 
 -- CR 701.21a: the permanents this player may sacrifice for a Filter, ascending --
 -- the order Prompt.ChooseSacrifices and Prompt.ChooseAnyNumberToSacrifice offer
@@ -491,7 +491,7 @@ sacrificeCandidates pid source filter_ gs =
 -- Replacement.applicable passed down, which is that same reading.
 matchesFiltered :: GameState -> ReplacementCandidate -> Filter.Type.Filter Keyword.Type.Keyword -> ObjectId -> Bool
 matchesFiltered gs candidate filter_ oid =
-  let context = Filter.MkContext (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
+  let context = Filter.contextFor (ReplacementCandidate.controller candidate) (Just (ReplacementCandidate.source candidate))
    in Filter.matches context (Projection.viewOfObject oid gs) filter_
 
 -- CR 614.1a: apply a scaling to a number. "Plus one" and "twice that many" are

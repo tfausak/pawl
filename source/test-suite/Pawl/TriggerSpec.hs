@@ -50,9 +50,12 @@
 -- one, with Aven Squire -- `exaltedSpec`. CR 702.121 melee, the ninth, and the
 -- first keyword whose payload is a number read off game state -- CR 508.3b's
 -- record of who was declared attacked -- with Wings of the Guard at three seats
--- -- `meleeSpec`. CR 702.23 rampage, the tenth, whose bonus multiplies a printed
--- N by a number read off the declaration, with Wolverine Pack and Horrible
--- Hordes -- `rampageSpec`. CR 509.3b's blocking-side form
+-- -- `meleeSpec`. CR 702.134 mentor, the tenth, and the first keyword whose
+-- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
+-- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
+-- CR 702.23 rampage, the eleventh, whose bonus multiplies a printed N by a number
+-- read off the declaration, with Wolverine Pack and Horrible Hordes --
+-- `rampageSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -3413,6 +3416,153 @@ exaltedSpec s registry =
           Spec.assertEqWith s "two abilities" (length abilities) 2
           Spec.assertEqWith s "each watching CR 506.5, filtered on the attacker's controller" (fmap TriggeredAbility.condition abilities) [expected, expected]
 
+-- CR 702.134a's mentor, the TENTH keyword rule 702 states as a triggered ability
+-- and the FIRST whose ability TARGETS -- so this is the group that runs a
+-- keyword-minted TargetSpec through CR 601.2c's choosing, and with it
+-- Filter.PowerLessThanSource, the one atom whose bound is the source's own power
+-- rather than a literal.
+--
+-- Blade Instructor {2}{W} Creature -- Human Soldier 3/1 is the card: mentor and
+-- nothing else, so every number below is the keyword's. Its fellow attackers are
+-- the pool's vanillas, picked so no two readings land on the same pair -- a
+-- mentored Goblin Piker is 3/2, which is neither its printed 2/1 nor the
+-- Instructor's 3/1, and a mentored Icehide Golem is 3/3, which is neither.
+--
+-- Every reading is taken at the COMBAT DAMAGE step, after the trigger has
+-- resolved in the declare attackers step and before damage is dealt, so the
+-- counter is read directly rather than through what survives combat.
+mentorSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mentorSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- CR 508.1's declaration narrowed to the named creatures, and CR 603.3d's
+      -- target named outright. S.aggressiveAnswer attacks with everything and
+      -- Replay.defaultAnswer would take whichever target sorts first, so a case
+      -- that is about WHICH creature has to say both itself.
+      plan :: [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      plan attackers target p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature target)) sets
+        _ -> S.aggressiveAnswer p
+      atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+      -- CR 122.1: what is actually on the permanent, which a +1/+1 EFFECT would
+      -- leave empty while reading the same 3/2.
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+   in Spec.describe s "Mentor" $ do
+        -- The proving test. Both attack, the Instructor mentors the smaller
+        -- attacker, and the assertion covers all three things at once: the
+        -- counter lands on the TARGET, the bearer takes none, and what landed is
+        -- a CR 122.1a counter rather than a pump.
+        Spec.it s "CR 702.134a whole card: the mentored attacker takes a +1/+1 counter" $ do
+          (gs, mine, _) <- board ["Blade Instructor", "Goblin Piker"] []
+          case mine of
+            [instructor, piker] -> do
+              let after = atDamage (plan [instructor, piker] piker) gs
+              Spec.assertEqWith
+                s
+                "the Piker is 3/2 and the Instructor is untouched"
+                (S.powerToughnessOf piker after, S.powerToughnessOf instructor after)
+                (Just (3, 2), Just (3, 1))
+              Spec.assertEqWith s "and it is a counter" (countersOn piker after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+            _ -> Spec.assertFailure s "fixture should give alice an Instructor and a Piker"
+        -- "POWER LESS THAN this creature's power" is strict, so a 3/3 attacking
+        -- beside a 3-power Instructor is no legal target -- and neither is the
+        -- Instructor itself, which is why nothing at all is mentored here. Same
+        -- declaration as the proving test; only the fellow attacker's power
+        -- differs. S.aggressiveAnswer rather than `plan`, so that a filter that
+        -- admitted the Giant would take the default target and go red.
+        Spec.it s "CR 702.134a a creature whose power is not less is no legal target" $ do
+          (gs, mine, _) <- board ["Blade Instructor", "Hill Giant"] []
+          case mine of
+            [instructor, giant] -> do
+              let after = atDamage S.aggressiveAnswer gs
+              Spec.assertEqWith
+                s
+                "both are at their printed sizes"
+                (S.powerToughnessOf giant after, S.powerToughnessOf instructor after)
+                (Just (3, 3), Just (3, 1))
+            _ -> Spec.assertFailure s "fixture should give alice an Instructor and a Giant"
+        -- CR 508.1k's "attacking": the same Piker, small enough and on the same
+        -- side, is no target while it stays home. The answerer aims at it anyway,
+        -- so an ability that dropped the IsAttacking conjunct would mentor it.
+        Spec.it s "CR 508.1k a creature that stayed home is no legal target" $ do
+          (gs, mine, _) <- board ["Blade Instructor", "Goblin Piker"] []
+          case mine of
+            [instructor, piker] ->
+              Spec.assertEqWith
+                s
+                "the Piker is its printed 2/1"
+                (S.powerToughnessOf piker (atDamage (plan [instructor] piker) gs))
+                (Just (2, 1))
+            _ -> Spec.assertFailure s "fixture should give alice an Instructor and a Piker"
+        -- CR 603.3d, which sends a trigger through CR 601.2c-d: with TWO smaller
+        -- attackers the rules leave which one open,
+        -- so the controller is asked and the answer is honoured. More candidates
+        -- than the slot needs, so the prompt cannot be short-circuited away.
+        Spec.it s "CR 603.3d the controller picks which smaller attacker is mentored" $ do
+          (gs, mine, _) <- board ["Blade Instructor", "Goblin Piker", "Icehide Golem"] []
+          case mine of
+            [instructor, piker, golem] -> do
+              let after = atDamage (plan [instructor, piker, golem] golem) gs
+              Spec.assertEqWith
+                s
+                "the Golem took the counter and the Piker did not"
+                (S.powerToughnessOf golem after, S.powerToughnessOf piker after)
+                (Just (3, 3), Just (2, 1))
+            _ -> Spec.assertFailure s "fixture should give alice an Instructor, a Piker and a Golem"
+        -- The bound is the SOURCE's power and not a number written into the
+        -- ability: Hammer Dropper {2}{R}{W} Creature -- Giant Soldier 5/2 is the
+        -- pool's other mentor, and the Hill Giant its 3-power sibling could not
+        -- touch two cases up is a legal target for it -- same board, same
+        -- declaration, only the mentor's power differs.
+        Spec.it s "CR 702.134a a 5-power mentor reaches the 3/3 a 3-power one cannot" $ do
+          (gs, mine, _) <- board ["Hammer Dropper", "Hill Giant"] []
+          case mine of
+            [dropper, giant] ->
+              Spec.assertEqWith
+                s
+                "3 < 5, so the Giant is 4/4"
+                (S.powerToughnessOf giant (atDamage (plan [dropper, giant] giant) gs))
+                (Just (4, 4))
+            _ -> Spec.assertFailure s "fixture should give alice a Dropper and a Giant"
+        -- CR 608.2b re-checks the slot as the ability resolves, and rule 702.134a's
+        -- comparison is part of what it re-checks. Two Instructors both aim at the
+        -- 2/1 Piker; the first counter makes it 3/2, and 3 is no longer less than
+        -- 3, so the second ability has no legal target and does not resolve. An
+        -- engine that only checked at CR 601.2c would leave a 4/3.
+        --
+        -- That the second ability EXISTS is asserted at the mint below, not here:
+        -- this board cannot tell a fizzled second trigger from a missing one.
+        Spec.it s "CR 608.2b the second mentor's target is no longer legal" $ do
+          (gs, mine, _) <- board ["Blade Instructor", "Blade Instructor", "Goblin Piker"] []
+          case mine of
+            [first, second, piker] -> do
+              let after = atDamage (plan [first, second, piker] piker) gs
+              Spec.assertEqWith s "one counter landed" (S.powerToughnessOf piker after) (Just (3, 2))
+              Spec.assertEqWith s "one, not two" (countersOn piker after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+            _ -> Spec.assertFailure s "fixture should give alice two Instructors and a Piker"
+        -- The same multiplicity asserted of the MINT, as exalted's and flanking's
+        -- instance cases are, and with it the slot the gameplay cases above can
+        -- only see through its effects: CR 508.3a's condition, and a spec whose
+        -- filter is the rule's two printed narrowings.
+        Spec.it s "CR 702.134b two instances mint two targeting abilities" $ do
+          let abilities = Keyword.abilitiesFor Keyword.Type.Mentor 2
+              expectedSpec =
+                TargetSpec.MkTargetSpec
+                  Pool.Creatures
+                  (Just (Filter.Type.And [Filter.Type.IsAttacking, Filter.Type.PowerLessThanSource]))
+              specsOf ability = concatMap (Map.elems . Mode.targetSpecs) (Modal.modes (TriggeredAbility.modal ability))
+          Spec.assertEqWith s "two abilities" (length abilities) 2
+          Spec.assertEqWith
+            s
+            "each watching CR 508.3a's declaration"
+            (fmap TriggeredAbility.condition abilities)
+            [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
+          Spec.assertEqWith s "each with rule 702.134a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
+
 -- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
 -- block-trigger form that fires once per BLOCKER and names it.
@@ -3781,7 +3931,7 @@ meleeSpec s registry =
           Spec.assertEqWith s "melee held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 2)) [Keyword.melee, Keyword.melee]
           Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 1)) [Keyword.melee]
 
--- CR 702.23 rampage, the TENTH keyword whose rule text is a triggered ability,
+-- CR 702.23 rampage, the ELEVENTH keyword whose rule text is a triggered ability,
 -- and the first whose bonus multiplies a printed N by a number read off the
 -- board.
 --
@@ -7516,6 +7666,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   bushidoSpec s registry
   flankingSpec s registry
   exaltedSpec s registry
+  mentorSpec s registry
   afflictSpec s registry
   meleeSpec s registry
   rampageSpec s registry

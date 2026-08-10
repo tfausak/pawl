@@ -1233,7 +1233,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith
       s
       "Alice's five"
-      (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.MkContext (Just S.alice) Nothing) gs yourHand)
+      (S.countOf (\oid -> Just (Projection.viewOfObject oid gs)) (Filter.contextFor (Just S.alice) Nothing) gs yourHand)
       (Just 5)
   -- CR 205.4g, end to end: "any permanent with the supertype 'snow' is a
   -- snow permanent." Skred deals damage equal to the number of snow

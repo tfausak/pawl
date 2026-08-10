@@ -475,6 +475,25 @@ data Keyword
     -- which Annihilator above already reads -- so Pawl.Engine.Keyword.afflict is
     -- the two put together and adds nothing of its own.
     Afflict Natural.Natural
+  | -- | 702.134a: whenever this creature attacks, put a +1/+1 counter on target
+    -- attacking creature with power less than this creature's power. The TENTH
+    -- keyword rule 702 states as a triggered ability, and the first whose ability
+    -- TARGETS -- Pawl.Engine.Keyword.mentor mints it, slot and all.
+    --
+    -- Payload-free, because rule 702.134a takes no parameter, and its reader takes
+    -- the per-keyword COUNT rather than membership: CR 702.134b says each instance
+    -- triggers separately, so a creature with mentor twice puts two abilities on
+    -- the stack and each chooses its own target.
+    --
+    -- The power comparison rides the ability's TARGET SLOT rather than anything
+    -- here: it is a fact about the pair, so it is Filter.PowerLessThanSource in the
+    -- minted spec, the way rule 702.118b's comparison is written into
+    -- Pawl.Engine.Combat rather than into Skulk.
+    --
+    -- CR 702.134c -- "an ability that triggers whenever a creature mentors another
+    -- creature" -- is a trigger condition no card in pawl's pool prints, so nothing
+    -- watches for it (#1159).
+    Mentor
   | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
     -- enter with an additional +1/+1 counter on it. If you don't, it gains
     -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,

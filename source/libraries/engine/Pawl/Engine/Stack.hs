@@ -138,7 +138,7 @@ resolveTopWith runSubgame = do
           -- for no reason.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnown srcId gs) (Filter.MkContext (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnown srcId gs) (Filter.contextFor (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -173,7 +173,7 @@ resolveTopWith runSubgame = do
           -- none to read.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnown oid gs) (Filter.MkContext (Just (Object.owner obj)) (Just oid)) gs oid cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnown oid gs) (Filter.contextFor (Just (Object.owner obj)) (Just oid)) gs oid cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)

@@ -222,7 +222,7 @@ whileEffect src target you gs =
 -- Condition S.youControlSource replaces StateCondition.YouControlSource with.
 holdsYouControlSource :: PlayerId.PlayerId -> ObjectId.ObjectId -> GameState.GameState -> Bool
 holdsYouControlSource you source gs =
-  Condition.holds (Projection.fullView gs) (Filter.MkContext (Just you) (Just source)) gs source S.youControlSource
+  Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source S.youControlSource
 
 -- The OTHER carrier's shape of whileEffect: a floating replacement whose expiry
 -- is a live condition over `src`. The effect payload is irrelevant to what this

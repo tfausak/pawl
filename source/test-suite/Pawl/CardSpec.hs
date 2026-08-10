@@ -1421,6 +1421,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.HasSubtype _ -> 0
   Filter.Type.PowerAtLeast _ -> 0
   Filter.Type.PowerAtMost _ -> 0
+  Filter.Type.PowerLessThanSource -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
@@ -1532,6 +1533,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.83a names no quality: "a creature you control" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Exalted -> []
+  -- CR 702.134a is payload-free too: the Filter its minted ability carries -- the
+  -- target slot's -- is the ENGINE's, never a card's.
+  Keyword.Mentor -> []
   Keyword.Menace -> []
   Keyword.Devoid -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
@@ -2153,22 +2157,26 @@ canHostSubjectCounts card =
   let total wanted = sum [canHostSubjects f | (framed, f) <- cardFilters card, framed == wanted]
    in (total True, total False)
 
--- Every occurrence of the atom's codec tag in an ENCODED face. The completeness
+-- Every occurrence of one atom's codec tag in an ENCODED face. The completeness
 -- witness for the traversal above: Pawl.Codec.Face.toJson visits every field
 -- of a Face and every type under it, is round-tripped by
 -- Pawl.CodecIntegrationSpec's "honesty round-trip over allPrintings", and was
 -- written for another purpose entirely -- so a Filter position cardFilters forgets
 -- is one this still sees.
 --
--- A tag and not a name: Pawl.Codec.Filter spells the atom `Common.nullary
--- "CanHostSubject"`, so the only string equal to this in a card's encoding is
--- that tag (a card NAMED "CanHostSubject" would be a false positive, and a loud
--- one rather than a silent miss).
-jsonCanHostSubjects :: Value.Value -> Int
-jsonCanHostSubjects value = case value of
-  Value.String s -> if String.unwrap s == Text.pack "CanHostSubject" then 1 else 0
-  Value.Array a -> sum (fmap jsonCanHostSubjects (Array.unwrap a))
-  Value.Object o -> sum (fmap (jsonCanHostSubjects . Pair.value) (Object.unwrap o))
+-- A tag and not a name: Pawl.Codec.Filter spells a nullary atom
+-- `Common.nullary "CanHostSubject"`, so the only string equal to one of these in
+-- a card's encoding is that tag (a card NAMED "CanHostSubject" would be a false
+-- positive, and a loud one rather than a silent miss).
+--
+-- Parameterized because two atoms want it: CR 701.3a's, counted here for the
+-- traversal cross-check, and CR 702.134a's Filter.PowerLessThanSource, which no
+-- card may carry at all.
+jsonAtoms :: Text.Text -> Value.Value -> Int
+jsonAtoms tag value = case value of
+  Value.String s -> if String.unwrap s == tag then 1 else 0
+  Value.Array a -> sum (fmap (jsonAtoms tag) (Array.unwrap a))
+  Value.Object o -> sum (fmap (jsonAtoms tag . Pair.value) (Object.unwrap o))
   Value.Null _ -> 0
   Value.Boolean _ -> 0
   Value.Number _ -> 0
@@ -2195,7 +2203,7 @@ jsonCanHostSubjects value = case value of
 canHostSubjectOffends :: Face.Face Card.Type.Card -> Bool
 canHostSubjectOffends card =
   let (framed, unframedCount) = canHostSubjectCounts card
-   in unframedCount /= 0 || framed + unframedCount /= jsonCanHostSubjects (Face.Codec.toJson Card.toJson card)
+   in unframedCount /= 0 || framed + unframedCount /= jsonAtoms (Text.pack "CanHostSubject") (Face.Codec.toJson Card.toJson card)
 
 -- A lint fixture built as a FACE, put back into the one-face card an
 -- Effect.Create's token payload has to be.
@@ -3498,6 +3506,31 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
+  -- CR 702.134a's comparison is answerable only where a TARGET SLOT frames the
+  -- match: Filter.Context.sourcePower is filled by Pawl.Engine.Target.admittedGiven
+  -- and is Nothing everywhere else, so the atom in a card's affected set, Count
+  -- filter or search filter would be a silent False. Only
+  -- Pawl.Engine.Keyword.mentor writes it, and this is what keeps that true.
+  Spec.it s "CR 702.134a no card writes PowerLessThanSource" $ do
+    ps <- S.allPrintings s
+    let atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Face.Codec.toJson Card.toJson c)
+        offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
+    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+    -- NOT vacuous, the way the sweep above would be on its own: the same counter
+    -- over a hand-built face that DOES carry the atom -- buried under all three
+    -- combinators, in a target spec, the one position a card author would reach
+    -- for -- finds it.
+    piker <- S.printingOf s registry "Goblin Piker"
+    let buried = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerLessThanSource]]
+        slotSpec = TargetSpec.MkTargetSpec Pool.Creatures (Just buried)
+        planted =
+          (S.combinedFace piker)
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) slotSpec)))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
   -- Graft only exercises the ACCEPTING direction, so the rejecting direction is
   -- proven here instead -- hand-built, never a card file, because a card that
@@ -3630,7 +3663,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertEqWith
       s
       "and the codec counts exactly the atoms the traversal does"
-      (fmap (\(_, card) -> jsonCanHostSubjects (Face.Codec.toJson Card.toJson card)) planted)
+      (fmap (\(_, card) -> jsonAtoms (Text.pack "CanHostSubject") (Face.Codec.toJson Card.toJson card)) planted)
       (fmap (const 1) planted)
     -- The nesting, stated on its own: a top-level-only check would score every
     -- one of these zero but the first.

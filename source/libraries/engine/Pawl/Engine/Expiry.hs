@@ -54,7 +54,7 @@ arm controller source duration gs = case duration of
   Duration.Indefinite -> Just Expiry.Never
   Duration.UntilYourNextTurn -> Just (Expiry.AtTurnOf controller)
   Duration.ForAsLongAs cond ->
-    if Condition.holds (Projection.fullView gs) (Filter.MkContext (Just controller) (Just source)) gs source cond
+    if Condition.holds (Projection.fullView gs) (Filter.contextFor (Just controller) (Just source)) gs source cond
       then Just (Expiry.While controller cond)
       else Nothing
   -- CR 500.5a / 511.2: "until end of combat" is the end of the combat PHASE, so
@@ -115,7 +115,7 @@ sweepConditional :: Game Bool
 sweepConditional = do
   gs <- State.get
   let survives source expiry = case expiry of
-        Expiry.While you cond -> Condition.holds (Projection.fullView gs) (Filter.MkContext (Just you) (Just source)) gs source cond
+        Expiry.While you cond -> Condition.holds (Projection.fullView gs) (Filter.contextFor (Just you) (Just source)) gs source cond
         Expiry.AtCleanup -> True
         Expiry.Never -> True
         Expiry.AtTurnOf _ -> True

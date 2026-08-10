@@ -457,7 +457,7 @@ chosenNamesOf source gs = maybe Set.empty Object.chosenNames (source >>= \oid ->
 matchesSpell :: Filter Keyword -> ObjectId -> GameState -> Bool
 matchesSpell filter_ oid gs =
   -- No source in scope at this site: `oid` is the AFFECTED object, not a source.
-  Filter.matches (Filter.MkContext (Projection.controllerOf oid gs) Nothing) (Projection.viewOfObject oid gs) filter_
+  Filter.matches (Filter.contextFor (Projection.controllerOf oid gs) Nothing) (Projection.viewOfObject oid gs) filter_
 
 -- CR 613.11 / 601.2f: the cost increases and the cost reductions that apply to
 -- `pid` casting `oid`, as two lists.

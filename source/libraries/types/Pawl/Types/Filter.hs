@@ -83,6 +83,24 @@ data Filter keyword
     -- what Imperial Recruiter's "creature card with power 2 or less" reads as it
     -- searches a library, Tarmogoyf included.
     PowerAtMost Integer
+  | -- | CR 208.1 compared against the SOURCE rather than a literal: the object's
+    -- power is less than the power of the object the evaluation comes from. CR
+    -- 702.134a's "target attacking creature with power less than this creature's
+    -- power" is the one clause that asks, and Pawl.Engine.Keyword.mentor is the
+    -- only site that writes it -- Pawl.CardSpec's lint keeps it out of card data,
+    -- where it would read a source power no other Filter position supplies.
+    --
+    -- Context-relative like IsSource, and for the same reason the two power atoms
+    -- above are not: there is no literal to carry, since the bound is whatever the
+    -- source's power is when the match is made. Pawl.Engine.Filter.Context's
+    -- sourcePower is where that arrives, filled by Pawl.Engine.Target.admittedGiven
+    -- -- the one site that evaluates a target slot's Filter, at both of CR 115's
+    -- moments -- and Nothing everywhere else, where this atom cannot appear.
+    --
+    -- STRICTLY less, and vacuously False when either power is absent: an object
+    -- with no power is not "a creature with lesser power", the posture PowerAtMost
+    -- takes for the same reason.
+    PowerLessThanSource
   | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
     -- Command's "creature card with mana value 2 or less".
     --
