@@ -515,7 +515,14 @@ viewOfCard face =
             if definesColorless (Face.keywords face)
               then Set.empty
               else printedColorsOf face,
-          Filter.subtypes = TypeLine.subtypes typeLine,
+          -- CR 604.3 / 702.73a, the line above's reason one layer down: rule
+          -- 702.73a says outright that changeling "works everywhere", and a
+          -- card in a graveyard is never projected (#160), so it is applied
+          -- here too.
+          Filter.subtypes =
+            if definesEveryCreatureType (Face.keywords face)
+              then Set.union Subtype.everyCreatureType (TypeLine.subtypes typeLine)
+              else TypeLine.subtypes typeLine,
           -- CR 702: read off the printed face, like the type line above.
           Filter.keywords = Face.keywords face,
           -- CR 208.1 read off the PRINTED power box -- see printedPower below.
@@ -907,6 +914,11 @@ printedColorsOf face =
 definesColorless :: Set Keyword -> Bool
 definesColorless = Set.member Keyword.Type.Devoid
 
+-- CR 702.73a, definesColorless' twin one layer down: the one place that decides
+-- what changeling means, for the same reason.
+definesEveryCreatureType :: Set Keyword -> Bool
+definesEveryCreatureType = Set.member Keyword.Type.Changeling
+
 -- CR 613.3 / 613.1e: the object's own colour-defining ability, applied at the
 -- start of layer 5.
 --
@@ -932,6 +944,31 @@ applyColorDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
 applyColorDefining pc =
   if definesColorless (Map.keysSet (PC.keywords pc))
     then pc {PC.colors = Set.empty}
+    else pc
+
+-- CR 613.3 / 613.1d: the object's own subtype-defining ability, CR 702.73a's
+-- changeling, applied at the start of layer 4. applyColorDefining's shape one
+-- layer down, and every reason in its header carries over unchanged.
+--
+-- A UNION rather than a set: rule 702.73a says the object IS every creature
+-- type, and CR 205.1b keeps the subtypes of its other families -- a Vehicle
+-- with changeling stays a Vehicle. Adding types the object already had is the
+-- identity, so a second instance changes nothing.
+--
+-- Being at the START of layer 4 is what makes Turn to Frog's SetCreatureSubtype
+-- win over it: that effect strips every creature type and inserts Frog, and it
+-- folds after this. Humility cannot undo it either, LoseAllAbilities being
+-- layer 6.
+--
+-- Not implemented: changeling GRANTED by another object's static ability, which
+-- CR 604.3a denies CDA status and which would need devoid's second route
+-- (grantedDevoidParts). No card in the pool grants it -- Maskwood Nexus and
+-- Amoeboid Changeling write the SUBTYPE sentence rather than the keyword
+-- (#1200).
+applySubtypeDefining :: ProjectedCharacteristics -> ProjectedCharacteristics
+applySubtypeDefining pc =
+  if definesEveryCreatureType (Map.keysSet (PC.keywords pc))
+    then pc {PC.subtypes = Set.union Subtype.everyCreatureType (PC.subtypes pc)}
     else pc
 
 -- CR 202.1b: a land has no mana cost at all, so it contributes no colours.
@@ -2526,10 +2563,10 @@ projectDeciding :: (Layer -> Bool) -> [Gathered] -> ObjectId -> GameState -> (Pr
 -- board instead of rebuilding it per object.
 projectDeciding admits cands = forObject
   where
-    -- Layers 5 and 7a are always visited, even with no gathered effect there: an
-    -- object's own CDAs are not gathered candidates. For an object with neither,
+    -- Layers 4, 5 and 7a are always visited, even with no gathered effect there:
+    -- an object's own CDAs are not gathered candidates. For an object with none,
     -- each extra pass is the identity.
-    layers = filter admits (Set.toAscList (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands)))))
+    layers = filter admits (Set.toAscList (Set.insert Layer.Type (Set.insert Layer.Color (Set.insert Layer.CharacteristicPT (Set.fromList (fmap gLayer cands))))))
     -- The layers CR 613.8 could reorder anything in: those holding an effect whose
     -- affected set another can move (staticallyMovable). Bound before the object,
     -- so a whole-board sweep pays once rather than per object per layer.
@@ -2541,10 +2578,12 @@ projectDeciding admits cands = forObject
     forObject oid gs =
       let applyLayer (partial, decided) lyr =
             let -- CR 613.3: characteristic-defining abilities first, within the
-                -- layer they define. Colour is layer 5 (CR 613.1e), P/T is layer 7a
-                -- (CR 613.4a). Taken per OBJECT, since the dependency scan seeds
-                -- every other object's snapshot the same way.
+                -- layer they define. Subtype is layer 4 (CR 613.1d), colour is
+                -- layer 5 (CR 613.1e), P/T is layer 7a (CR 613.4a). Taken per
+                -- OBJECT, since the dependency scan seeds every other object's
+                -- snapshot the same way.
                 seedFor o p = case lyr of
+                  Layer.Type -> applySubtypeDefining p
                   Layer.Color -> applyColorDefining p
                   Layer.CharacteristicPT -> applyCharacteristicPT lyr cands gs o p
                   _ -> p

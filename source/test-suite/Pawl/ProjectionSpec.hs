@@ -1277,6 +1277,63 @@ spec s registry = Spec.describe s "Pawl.Engine.Projection" $ do
     Spec.assertBool s (Projection.isCreatureOf forestId gs) "and a creature"
     Spec.assertBool s (Set.member CardType.Land (Projection.cardTypesOf forestId gs)) "and still a land"
 
+  -- CR 702.73a's changeling, the subtype-defining ability -- CR 604.3 makes it a
+  -- CDA, so CR 613.3 applies it at the start of its layer (4, CR 613.1d) rather
+  -- than in timestamp order, and Pawl.Engine.Projection.applySubtypeDefining is
+  -- where it lands. Woodland Changeling ({1}{G} Creature -- Shapeshifter 2/2,
+  -- changeling and nothing else) is the card.
+  Spec.it s "CR 702.73a a changeling is every creature type, and no other family's" $ do
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    let (oid, gs) = S.addCreature changeling S.alice (Setup.emptyGame S.bothPlayers)
+        subtypes = Projection.subtypesOf oid gs
+    Spec.assertBool s (Set.member Subtype.Type.Shapeshifter subtypes) "still its printed Shapeshifter"
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk subtypes) "a Merfolk"
+    Spec.assertBool s (Set.member Subtype.Type.Goblin subtypes) "a Goblin"
+    -- CR 205.3m is the family rule 702.73a names, so the other families of CR
+    -- 205.3 stay out: an "every subtype" reading would make it a land.
+    Spec.assertBool s (not (Set.member Subtype.Type.Island subtypes)) "not a land type"
+    Spec.assertBool s (not (Set.member Subtype.Type.Equipment subtypes)) "not an artifact type"
+    Spec.assertBool s (not (Set.member Subtype.Type.Aura subtypes)) "not an enchantment type"
+
+  -- THE GAMEPLAY PROOF, and the reader half: a lord has to SEE the type.
+  -- Lord of Atlantis gives other Merfolk +1/+1 and islandwalk, and its affected
+  -- set is a Filter.HasSubtype Merfolk read off the projection.
+  Spec.it s "CR 702.73a Lord of Atlantis pumps a changeling and not a Goblin Piker" $ do
+    lord <- S.printingOf s registry "Lord of Atlantis"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let base = Setup.emptyGame S.bothPlayers
+        (_, withLord) = S.addCreature lord S.alice base
+        (changelingId, withChangeling) = S.addCreature changeling S.alice withLord
+        (pikerId, gs) = S.addCreature piker S.alice withChangeling
+    Spec.assertEqWith s "the 2/2 changeling is a Merfolk, so 3/3" (Projection.powerOf changelingId gs) (Just 3)
+    Spec.assertBool s (Projection.hasKeyword (Keyword.Landwalk (Filter.Type.HasSubtype Subtype.Type.Island)) changelingId gs) "and has islandwalk"
+    -- The control: the Piker is a Goblin Warrior and no changeling, so the same
+    -- lord on the same board leaves it alone.
+    Spec.assertEqWith s "the Piker is untouched" (Projection.powerOf pikerId gs) (Just 2)
+
+  -- THE ORDERING FALSIFIER. Turn to Frog sets the creature types (CR 205.1b),
+  -- and it is an ordinary timestamped layer-4 effect. CR 613.3 puts the CDA
+  -- first, so the set wipes every type changeling defined and Frog alone
+  -- survives; applying changeling after layer 4's effects leaves all of them.
+  Spec.it s "CR 613.3 Turn to Frog beats a changeling's CDA: a Frog and nothing else" $ do
+    island <- S.printingOf s registry "Island"
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    turnToFrog <- S.printingOf s registry "Turn to Frog"
+    let (oid, board) = S.addCreature changeling S.alice (S.landsInPlay island 3)
+        after = turnToFrogAt oid turnToFrog board
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk (Projection.subtypesOf oid board)) "before: a Merfolk among the rest"
+    Spec.assertEqWith s "after: Creature -- Frog alone" (Projection.subtypesOf oid after) (Set.singleton Subtype.Type.Frog)
+
+  -- CR 702.73a says the ability "works everywhere", and nothing off the
+  -- battlefield is projected (#160), so viewOfCard applies it too -- devoid's
+  -- posture at CR 702.114a.
+  Spec.it s "CR 702.73a a changeling is every creature type OFF the battlefield too" $ do
+    changeling <- S.printingOf s registry "Woodland Changeling"
+    let view = Projection.viewOfCard (S.combinedFace changeling)
+    Spec.assertBool s (Set.member Subtype.Type.Merfolk (Filter.subtypes view)) "a Merfolk in a library"
+    Spec.assertBool s (not (Set.member Subtype.Type.Island (Filter.subtypes view))) "and still not a land type"
+
   -- CR 613.8b's loop clause reached by two PRINTED cards, and the proving pair
   -- for deciding CR 613.8a over the whole board rather than per projected object.
   -- Each permanent shows one edge only (see limbBloodMoon), so a per-object

@@ -102,9 +102,9 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- 702.23c says the same of rampage, CR 702.25b of flanking, CR 702.45b of
 -- bushido, CR 702.86b of annihilator, CR 702.91b of battle cry, CR 702.108b of
 -- prowess, CR 702.121b of melee, CR 702.130b of afflict, CR 702.134b of mentor
--- and CR 702.63c of vanishing, so the thirteen minting arms below are the same
--- shape -- bushido's and vanishing's `concat` aside, since each of those
--- instances is two abilities.
+-- and CR 702.63c of vanishing, so the minting arms below are the same shape --
+-- bushido's and vanishing's `concat` aside, since each of those instances is two
+-- abilities.
 --
 -- Exalted is the one with no such clause of its own: rule 702.83 states only
 -- that exalted IS a triggered ability, and the "multiple instances are
@@ -119,13 +119,20 @@ triggeredAbilitiesOf :: Map Keyword Natural -> [TriggeredAbility Card]
 triggeredAbilitiesOf counts = concatMap (uncurry abilitiesFor) (Map.toAscList counts)
 
 -- The abilities one keyword, held `count` times, contributes.
+--
+-- This case is the ROSTER of the keywords rule 702 states as triggered
+-- abilities: it is exhaustive under -Werror, so it cannot fall behind rule 702
+-- the way a count in prose can. Comments elsewhere say "rule 702 states it as a
+-- triggered ability" and point here rather than numbering the pool; the running
+-- ordinals that used to do that job disagreed with each other across modules.
 abilitiesFor :: Keyword -> Natural -> [TriggeredAbility Card]
 abilitiesFor keyword count = case keyword of
   Keyword.Poisonous n -> List.genericReplicate count (poisonous n)
-  -- The one arm that yields TWO abilities per instance: rule 702.45a's ability
-  -- watches two events, and a TriggeredAbility carries one condition.
+  -- An arm that yields TWO abilities per instance -- hence the `concat`: rule
+  -- 702.45a's ability watches two events, and a TriggeredAbility carries one
+  -- condition.
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
-  -- The SECOND such arm: rule 702.63a states three abilities, and the first of
+  -- Another: rule 702.63a states three abilities, and the first of
   -- them is a replacement effect rather than a trigger, so two land here.
   Keyword.Vanishing _ -> concat (List.genericReplicate count vanishing)
   -- CR 702.43a's SECOND ability, one per instance -- CR 702.43b says each works
@@ -179,6 +186,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Changeling -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Riot -> []
@@ -253,6 +261,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Exalted -> []
   Keyword.Mentor -> []
   Keyword.Provoke -> []
+  Keyword.Changeling -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -383,6 +392,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Exalted -> []
   Keyword.Mentor -> []
   Keyword.Provoke -> []
+  Keyword.Changeling -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -617,6 +627,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Exalted -> []
   Keyword.Mentor -> []
   Keyword.Provoke -> []
+  Keyword.Changeling -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -921,6 +932,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Exalted -> []
   Keyword.Mentor -> []
   Keyword.Provoke -> []
+  Keyword.Changeling -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -1017,6 +1029,7 @@ familyOf keyword = case keyword of
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
   Keyword.Renown _ -> Just KeywordFamily.Renown
+  Keyword.Changeling -> Nothing
   Keyword.Devoid -> Nothing
   Keyword.Skulk -> Nothing
   -- CR 702.121a takes no parameter, so there is no variant for a card to name.
@@ -1063,10 +1076,9 @@ poisonous n =
         (Quantity.Literal (toInteger n))
 
 -- CR 702.86a: whenever this creature attacks, defending player sacrifices N
--- permanents. The SECOND keyword in this pool stated as a triggered ability, and
--- minted exactly as rule 702.70a's poisonous above and rule 702.91a's battle cry
--- below are -- handed to the ordinary CR 603 machinery, which never learns a
--- keyword produced it.
+-- permanents. Rule 702 states it as a triggered ability, minted exactly as rule
+-- 702.70a's poisonous above and rule 702.91a's battle cry below are -- handed to
+-- the ordinary CR 603 machinery, which never learns a keyword produced it.
 --
 -- CR 508.3a is what "attacks" means -- being declared as an attacker -- so the
 -- condition is battle cry's: the self-scoped SelfAttacks, EveryTime, rule
@@ -1153,10 +1165,10 @@ battleCry =
         )
 
 -- CR 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
--- until end of turn. The fourth keyword rule 702 states as a triggered ability,
--- minted here like the three above and handed to the same CR 603 machinery.
+-- until end of turn. Rule 702 states it as a triggered ability, minted here like
+-- its siblings and handed to the same CR 603 machinery.
 --
--- The first of the four whose event is NOT its bearer's combat: CR 601.2i's
+-- The first minted trigger whose event is NOT its bearer's combat: CR 601.2i's
 -- "any abilities that trigger when a spell is cast trigger at this time" is the
 -- event, so the condition is TriggerCondition.SpellCast -- the constructor Young
 -- Pyromancer already writes, read the same way. "You cast" is
@@ -1261,8 +1273,8 @@ prowess =
         (ObjectRef.EachMatching Filter.IsSource)
 
 -- CR 702.121a: whenever this creature attacks, it gets +1/+1 until end of turn
--- for each opponent you attacked with a creature this combat. The NINTH keyword
--- rule 702 states as a triggered ability, minted here like the eight around it.
+-- for each opponent you attacked with a creature this combat. Rule 702 states it
+-- as a triggered ability, minted here like its siblings in `abilitiesFor`.
 --
 -- The condition is battle cry's, TriggerCondition.SelfAttacks: rule 702.121a's
 -- event is the bearer's own declaration. Attacking a PLANESWALKER fires it just
@@ -1305,8 +1317,8 @@ melee =
         (ObjectRef.EachMatching Filter.IsSource)
 
 -- CR 702.23a: whenever this creature becomes blocked, it gets +N/+N until end of
--- turn for each creature blocking it beyond the first. The ELEVENTH keyword rule
--- 702 states as a triggered ability, minted here like the ten around it.
+-- turn for each creature blocking it beyond the first. Rule 702 states it as a
+-- triggered ability, minted here like its siblings in `abilitiesFor`.
 --
 -- The condition is bushido's blocked half, TriggerCondition.SelfBecomesBlocked --
 -- CR 509.3c, which fires ONCE however many creatures blocked, where flanking's CR
@@ -1349,8 +1361,8 @@ rampage n =
         (ObjectRef.EachMatching Filter.IsSource)
 
 -- CR 702.25a: whenever this creature becomes blocked by a creature without
--- flanking, the blocking creature gets -1/-1 until end of turn. The sixth keyword
--- rule 702 states as a triggered ability, minted here like the five above.
+-- flanking, the blocking creature gets -1/-1 until end of turn. Rule 702 states
+-- it as a triggered ability, minted here like its siblings in `abilitiesFor`.
 --
 -- CR 509.3d is the event -- "becomes blocked by a creature", which triggers once
 -- for each creature that blocks -- and NOT CR 509.3c's "becomes blocked", which
@@ -1397,8 +1409,8 @@ flankingEffect =
     (ObjectRef.InSlot Binding.blockingCreature)
 
 -- CR 702.83a: whenever a creature you control attacks alone, that creature gets
--- +1/+1 until end of turn. The EIGHTH keyword rule 702 states as a triggered
--- ability, minted here like the five above and the two below.
+-- +1/+1 until end of turn. Rule 702 states it as a triggered ability, minted
+-- here like its siblings in `abilitiesFor`.
 --
 -- The first whose ability is borne by a BYSTANDER on both sides at once. Battle
 -- cry's condition is the bearer's own attack and prowess' payload is the bearer
@@ -1442,8 +1454,8 @@ exalted =
         (ObjectRef.InSlot Binding.attackingCreature)
 
 -- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
--- blocked, it gets +N/+N until end of turn.'" The fifth keyword in this pool
--- whose rule text IS a triggered ability, and the only one whose sentence names
+-- blocked, it gets +N/+N until end of turn.'" Rule 702 states it as a triggered
+-- ability, and it is the only one whose sentence names
 -- TWO events: "blocks" is CR 509.3a and "becomes blocked" is CR 509.3c, two
 -- separate trigger conditions.
 --
@@ -1492,9 +1504,9 @@ bushidoHalf condition n =
         (ObjectRef.EachMatching Filter.IsSource)
 
 -- CR 702.130a: whenever this creature becomes blocked, defending player loses N
--- life. The SEVENTH keyword in this pool whose rule text IS a triggered ability,
--- and the one that adds nothing new -- its condition is bushido's CR 509.3c half
--- and its player is annihilator's CR 508.5 one.
+-- life. Rule 702 states it as a triggered ability, and it adds nothing new --
+-- its condition is bushido's CR 509.3c half and its player is annihilator's CR
+-- 508.5 one.
 --
 -- "DEFENDING PLAYER" is read off GameEvent.AttackerBlocked through the reserved
 -- Binding.triggerPlayer slot, exactly as annihilator reads it off
@@ -1524,10 +1536,9 @@ afflict n =
         (Quantity.Literal (toInteger n))
 
 -- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
--- attacking creature with power less than this creature's power. The TENTH
--- keyword in this pool whose rule text IS a triggered ability, and the first that
--- TARGETS -- so it is the first to declare a target slot here rather than an
--- empty Map.
+-- attacking creature with power less than this creature's power. Rule 702 states
+-- it as a triggered ability, and it is the first that TARGETS -- so the first to
+-- declare a target slot here rather than an empty Map.
 --
 -- The slot is filled by CR 603.3d as the ability is placed
 -- (Pawl.Engine.Engine.placeBorne) and re-checked by CR 608.2b as it resolves,
@@ -1581,8 +1592,8 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 
 -- CR 702.149a: whenever this creature and at least one other creature with power
 -- greater than this creature's power attack, put a +1/+1 counter on this
--- creature. The TWELFTH keyword in this pool whose rule text IS a triggered
--- ability, minted here like the eleven above.
+-- creature. Rule 702 states it as a triggered ability, minted here like its
+-- siblings in `abilitiesFor`.
 --
 -- Mentor's clause with the comparison reversed and the target dropped, which is
 -- the whole of the difference: rule 702.149a pumps the BEARER, so there is
@@ -1623,8 +1634,8 @@ training =
 
 -- CR 702.39a's provoke: whenever this creature attacks, you may choose to have
 -- target creature defending player controls block this creature this combat if
--- able; if you do, untap that creature. The THIRTEENTH keyword rule 702 states as a
--- triggered ability, and the first whose payload creates a CR 509.1c blocking
+-- able; if you do, untap that creature. Rule 702 states it as a triggered
+-- ability, and it is the first whose payload creates a CR 509.1c blocking
 -- REQUIREMENT rather than changing a characteristic.
 --
 -- CR 508.3a is what "attacks" means, so the condition is mentor's -- SelfAttacks,
@@ -1682,9 +1693,8 @@ provokeTarget :: SlotName.SlotName
 provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
 
 -- CR 702.112a: when this creature deals combat damage to a player, if it isn't
--- renowned, put N +1/+1 counters on it and it becomes renowned. The FOURTEENTH
--- keyword in this pool whose rule text IS a triggered ability, minted here like
--- the thirteen above.
+-- renowned, put N +1/+1 counters on it and it becomes renowned. Rule 702 states
+-- it as a triggered ability, minted here like its siblings in `abilitiesFor`.
 --
 -- Poisonous' condition with training's payload: rule 702.112a's event is the
 -- bearer's combat damage to a player (SelfDealsCombatDamageToPlayer, rule
@@ -1804,7 +1814,7 @@ returns kind =
 -- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
 -- first is mintedReplacementsFor's, so vanishing is the first keyword here whose
 -- rule text spans both mints. Bushido's "one instance, two abilities" shape, and
--- the second use of abilitiesFor's `concat`.
+-- another of abilitiesFor's `concat` arms.
 --
 -- Ordered as rule 702.63a prints them, which is also the order they fire in: the
 -- upkeep removal is what takes the last counter off, and the sacrifice watches
