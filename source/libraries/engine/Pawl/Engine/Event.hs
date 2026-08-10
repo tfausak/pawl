@@ -2648,7 +2648,9 @@ matchesTrigger gs bearer you cond event = case cond of
   -- 704's pass, so a trampler that connected and died to its blocker in the same
   -- CR 510.2 event is already gone. CR 608.2h's record is what still answers "was
   -- it a Wolf". No board in the pool reaches that -- Tovolar's Wolves are vanilla
-  -- and unblocked -- so this is a fence rather than a tested branch.
+  -- and unblocked -- so this is a fence rather than a tested branch, as is the
+  -- DamageKind test beside it: no card in the pool makes a Wolf or Werewolf deal
+  -- NONCOMBAT damage while a Tovolar watches.
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> case event of
     GameEvent.DamageDealt ev ->
       DamageEvent.kind ev == DamageKind.Combat

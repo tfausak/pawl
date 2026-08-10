@@ -54,9 +54,9 @@ data TriggerCondition
     -- poisonous and renown), and an id comparison states those without reading the
     -- damager's characteristics at all -- where this one must, so it goes through
     -- CR 608.2h's last known information for a trampler that died to its blocker
-    -- in the same event. SelfTurnedFaceUp and PermanentTurnedFaceUp are the
-    -- standing pair; Filter.IsSource would collapse them, and buys a keyword
-    -- nothing.
+    -- in the same event. SelfTurnedFaceUp beside PermanentTurnedFaceUp is the
+    -- standing pair for that; Filter.IsSource would collapse the two here as it
+    -- does for PermanentBecomesRenowned, and buys a minted keyword nothing.
     --
     -- No eventBindings arm: Tovolar draws a card and names no "it" and no "that
     -- player" (#1173).

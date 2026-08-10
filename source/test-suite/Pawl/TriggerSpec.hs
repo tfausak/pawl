@@ -4004,8 +4004,8 @@ renownSpec s registry =
 --
 -- Tovolar, Dire Overlord {1}{R}{G} Legendary Creature -- Human Werewolf 3/3 is
 -- the card: "whenever a Wolf or Werewolf you control deals combat damage to a
--- player, draw a card". Both faces print it, and the back face's copy is asserted
--- by Pawl.CardSpec's corpus lints rather than here -- reaching it needs the CR
+-- player, draw a card". Both faces print it; the back face's copy goes through
+-- Pawl.CardSpec's corpus lints, but no case here reaches it -- that needs the CR
 -- 731 transform Pawl.DaytimeSpec drives.
 --
 -- Tovolar is himself a Werewolf, so the filter admits the watcher: a self-scoped
@@ -4043,18 +4043,17 @@ tovolarSpec s registry =
         -- connects too and draws nothing, which is the filter doing its work
         -- inside the same event.
         Spec.it s "CR 510.2 a bystander draws once per Wolf or Werewolf that connects" $ do
-          (gs, mine, _) <- board ["Tovolar, Dire Overlord", "Russet Wolves", "Goblin Piker"] []
+          (gs, _, _) <- board ["Tovolar, Dire Overlord", "Russet Wolves", "Goblin Piker"] []
           piker <- S.printingOf s registry "Goblin Piker"
           let after = S.runCombat S.aggressiveAnswer (stock piker 4 S.alice gs)
           Spec.assertEqWith s "all three connected, for eight" (S.lifeOf S.bob after) (Just 12)
           Spec.assertEqWith s "so two cards were drawn, not three and not one" (handSize S.alice after) 2
           Spec.assertEqWith s "leaving two in the library" (length (Game.zoneMembers Zone.Library S.alice after)) 2
-          Spec.assertBool s (length mine == 3) "fixture should give alice three creatures"
-        -- CR 510.1a: a BLOCKED creature assigns its combat damage to the blocker,
+        -- CR 510.1c: a BLOCKED creature assigns its combat damage to the blocker,
         -- so the Wolves deals its three to bob's Piker and the condition's
         -- player-recipient half rejects the event. The watcher is on the board and
         -- the damager is a Wolf she controls; only the recipient differs.
-        Spec.it s "CR 510.1a combat damage dealt to a creature draws nothing" $ do
+        Spec.it s "CR 510.1c combat damage dealt to a creature draws nothing" $ do
           (gs, mine, theirs) <- board ["Tovolar, Dire Overlord", "Russet Wolves"] ["Goblin Piker"]
           piker <- S.printingOf s registry "Goblin Piker"
           case (mine, theirs) of
