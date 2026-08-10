@@ -97,9 +97,9 @@
 -- with a counter on it, with Young Wolf and Putrid Goblin -- `undyingSpec`.
 -- CR 702.135 afterlife, the first minted keyword ability that CREATES a token,
 -- with Ministrant of Obligation -- `afterlifeSpec`.
--- CR 702.123 fabricate, the first minted keyword ability whose resolution ASKS a
--- question -- CR 118.12a's "unless", over a cost that puts counters -- with
--- Glint-Sleeve Artisan -- `fabricateSpec`.
+-- CR 702.123 fabricate, the first minted keyword ability whose resolution offers
+-- a COST -- CR 118.12a's "unless", over a cost that puts counters -- with
+-- Glint-Sleeve Artisan and Weaponcraft Enthusiast -- `fabricateSpec`.
 -- CR 702.46 soulshift, the first minted keyword ability that TARGETS a card in a
 -- graveyard, with Kami of Empty Graves -- `soulshiftSpec`.
 -- CR 603.10's first sentence for a BYSTANDER -- a
@@ -7344,7 +7344,8 @@ isPayResponse response = case response of
 -- minted clause is one UnlessPaid over
 -- CostComponent.PutPlusOneCountersOnThis and the tokens are its "if you don't"
 -- branch -- afterlife's mint with a gate on it, and the first minted keyword
--- ability that ASKS a question at resolution.
+-- ability that offers a COST at resolution. (Soulshift's and provoke's clauses
+-- ask a question there too, but a printed "may" rather than a cost.)
 --
 -- Glint-Sleeve Artisan, {2}{W} Creature -- Dwarf Artificer 2/2, whose entire
 -- text box is "Fabricate 1". Every reading is a different board: 3/3 with the
