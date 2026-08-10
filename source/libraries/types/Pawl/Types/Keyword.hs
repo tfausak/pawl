@@ -544,6 +544,24 @@ data Keyword
     -- where nightbound's makes it night only if no permanent with daybound is on
     -- the battlefield.
     Nightbound
+  | -- | 702.149a: whenever this creature and at least one other creature with power
+    -- greater than this creature's power attack, put a +1/+1 counter on this
+    -- creature. The TWELFTH keyword rule 702 states as a triggered ability;
+    -- Pawl.Engine.Keyword.training mints it.
+    --
+    -- Payload-free, because rule 702.149a takes no parameter, and its reader takes
+    -- the per-keyword COUNT rather than membership: CR 702.149b says each instance
+    -- triggers separately, so a creature with training twice gets two counters.
+    --
+    -- Mentor's comparison with the sides swapped, and it rides the TRIGGER
+    -- CONDITION rather than a target slot, because rule 702.149a targets nothing
+    -- and asks about the declaration instead -- TriggerCondition.SelfAttacksWithAnother
+    -- carrying Filter.PowerGreaterThanSource.
+    --
+    -- CR 702.149c -- "whenever this creature trains", an ability that triggers on a
+    -- resolving training ability putting counters on -- is a trigger condition
+    -- nothing here watches for (#1163).
+    Training
   | -- | 702.164a: toxic N. N rides the constructor, so `Toxic 1` and `Toxic 2` are
     -- distinct keywords, and CR 702.164b's total toxic value is the sum over every
     -- toxic ability the creature has (Pawl.Engine.Projection.totalToxic) --

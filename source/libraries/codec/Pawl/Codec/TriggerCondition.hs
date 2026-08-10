@@ -25,6 +25,7 @@ toJson c = case c of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> Common.nullary "CreatureDealtCombatDamageToMonarch"
   TriggerCondition.OpponentLostLifeDuringYourTurn -> Common.nullary "OpponentLostLifeDuringYourTurn"
   TriggerCondition.SelfAttacks f -> Common.tagged "SelfAttacks" . Just $ TriggerFrequency.toJson f
+  TriggerCondition.SelfAttacksWithAnother f -> Common.tagged "SelfAttacksWithAnother" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.CreatureAttacksAlone f -> Common.tagged "CreatureAttacksAlone" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.SelfBlocks -> Common.nullary "SelfBlocks"
   TriggerCondition.SelfBlocksCreature -> Common.nullary "SelfBlocksCreature"
@@ -69,6 +70,7 @@ fromJson value = do
     ("CreatureDealtCombatDamageToMonarch", _) -> Right TriggerCondition.CreatureDealtCombatDamageToMonarch
     ("OpponentLostLifeDuringYourTurn", _) -> Right TriggerCondition.OpponentLostLifeDuringYourTurn
     ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> TriggerFrequency.fromJson v
+    ("SelfAttacksWithAnother", Just v) -> TriggerCondition.SelfAttacksWithAnother <$> Filter.fromJson Keyword.fromJson v
     ("CreatureAttacksAlone", Just v) -> TriggerCondition.CreatureAttacksAlone <$> Filter.fromJson Keyword.fromJson v
     ("SelfBlocks", _) -> Right TriggerCondition.SelfBlocks
     ("SelfBlocksCreature", _) -> Right TriggerCondition.SelfBlocksCreature

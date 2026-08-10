@@ -1535,6 +1535,9 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
+  -- CR 702.149a's Filter is a predicate over the OTHER attackers, so a subtype
+  -- rewrite reaches it as it reaches CreatureAttacksAlone's below.
+  TriggerCondition.SelfAttacksWithAnother f -> TriggerCondition.SelfAttacksWithAnother (Filter.rewrite pairs f)
   -- CR 506.5's Filter is a predicate over the ATTACKER, so a subtype rewrite
   -- reaches it as it reaches SelfBecomesBlockedBy's below.
   TriggerCondition.CreatureAttacksAlone f -> TriggerCondition.CreatureAttacksAlone (Filter.rewrite pairs f)
@@ -2206,6 +2209,9 @@ filterReads f = case f of
   -- one writes. Nothing in the pool puts this atom in an affected set -- CR
   -- 702.134a writes it into a target slot, which no CR 613.8a dependency reads.
   Filter.Type.PowerLessThanSource -> Set.singleton PowerA
+  -- Its sibling, reading the same aspect for the same reason. CR 702.149a writes
+  -- it into a trigger condition, which no CR 613.8a dependency reads either.
+  Filter.Type.PowerGreaterThanSource -> Set.singleton PowerA
   Filter.Type.ControlledBy _ -> Set.singleton Controller
   -- Reads NOTHING, where its sibling above reads Controller, and the contrast is
   -- CR 108.3's: no Modification writes Object.owner, because no rule changes an

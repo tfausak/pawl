@@ -96,6 +96,33 @@ data TriggerCondition
     -- turn" -- a payload rather than a sibling condition, because it narrows this
     -- same trigger event rather than naming a different one.
     SelfAttacks TriggerFrequency.TriggerFrequency
+  | -- | CR 508.3a again, with a companion required: "whenever this creature and at
+    -- least one OTHER creature [the Filter admits] attack" -- rule 702.149a's
+    -- training. Self-scoped like SelfAttacks, matched against the same
+    -- GameEvent.AttackerDeclared, and DECLARED for that condition's reason.
+    --
+    -- A SIBLING of SelfAttacks rather than a Filter payload on it, because the two
+    -- ask about different objects: SelfAttacks' subject is the bearer, and this
+    -- one's Filter is a predicate over everybody ELSE the same declaration named.
+    -- CreatureAttacksAlone is the third shape -- a bystander's reading of a
+    -- declaration the bearer need not be in -- and this one sits between them:
+    -- the bearer must attack, and somebody else must too.
+    --
+    -- AT LEAST ONE, so the Filter is asked existentially; rule 702.149a triggers
+    -- once however many companions qualify, since CR 603.2 counts occurrences of
+    -- the EVENT and one declaration is one event.
+    --
+    -- The companions come from the combat record and not from the event log,
+    -- which is what makes a second combat phase right: the log keeps a turn's
+    -- declarations, where Pawl.Types.Combat is cleared per combat phase.
+    -- Reading the record is exact at this moment despite CR 508.4 -- a creature
+    -- put onto the battlefield attacking needs an effect to resolve, and CR 508.2b
+    -- puts these triggers on the stack before any player gets priority.
+    --
+    -- Nothing is bound: rule 702.149a's payload names only "this creature", so no
+    -- companion has to be pointed at afterwards. Which one qualified is therefore
+    -- not observable, and there is nothing to ask the controller.
+    SelfAttacksWithAnother (Filter.Filter Keyword.Keyword)
   | -- | CR 506.5: "whenever a creature you control attacks alone" -- rule
     -- 702.83a's exalted. SelfAttacks read by a BYSTANDER and narrowed to a
     -- one-creature declaration, matched against the same

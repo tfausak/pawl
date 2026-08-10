@@ -54,6 +54,7 @@ import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.ContinuousEffect as ContinuousEffect
 import qualified Pawl.Types.CounterCause as CounterCause
 import qualified Pawl.Types.CounterKind as CounterKind
@@ -2785,6 +2786,56 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+  -- CR 702.149a: the bearer was declared as an attacker, and at least one OTHER
+  -- attacking creature satisfies the Filter. SelfAttacks' event and its identity
+  -- check, with an existential over the rest of the declaration added.
+  --
+  -- The companions come from Combat.attackers, which at this moment IS the
+  -- declaration: CR 508.2b puts these triggers on the stack before any player gets
+  -- priority, so the only creatures CR 508.4 could add have had no window to
+  -- arrive. The event log would answer the same question one turn too widely: it
+  -- keeps an earlier combat phase's declarations, where the combat record is
+  -- cleared per phase.
+  --
+  -- The source's power is supplied here rather than left Nothing, which is what
+  -- makes CR 702.149a's PowerGreaterThanSource evaluable at a trigger match at
+  -- all; it is a thunk for the reason Target.admittedGiven's is. Both it and each
+  -- candidate view read through the bearer's last known information (CR 608.2h),
+  -- a REGRESSION FENCE rather than a live path: the bearer was declared an
+  -- attacker a moment ago and nothing has had priority since.
+  TriggerCondition.SelfAttacksWithAnother f -> case event of
+    GameEvent.AttackerDeclared oid _ _
+      | oid == bearer ->
+          let viewOf = Projection.viewWithLastKnown bearer gs
+              context = Filter.contextComparingPower (Just you) bearer (Filter.power =<< viewOf bearer)
+              -- Rule 702.149a's "OTHER". Not independently observable while the
+              -- Filter's comparison is strict -- nothing has power greater than
+              -- its own -- so dropping it leaves the suite green; it is here
+              -- because the rule says it, not because a test proves it.
+              admits other = other /= bearer && maybe False (\view -> Filter.matches context view f) (viewOf other)
+           in any admits (Map.keys (Combat.attackers (GameState.combat gs)))
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 506.5: a creature the Filter admits was declared as an attacker, and it
   -- was the ONLY one the declaration named. The same event SelfAttacks reads,
   -- with the count taken instead of the bearer's identity.
@@ -3839,6 +3890,7 @@ reactsToAbilityTriggering cond = case cond of
   -- an ability triggering, whatever put the crown there.
   TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.SelfAttacks _ -> False
+  TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
@@ -4167,6 +4219,10 @@ eventBindingSlots cond = case cond of
   -- Unconditional, as this classification has to be: every AttackerDeclared event
   -- carries a PlayerId, so no shape of the event withholds it.
   TriggerCondition.SelfAttacks _ -> Set.singleton Binding.triggerPlayer
+  -- NOTHING, unlike SelfAttacks above: rule 702.149a's payload names only "this
+  -- creature", so neither the companion that qualified nor CR 508.5's defending
+  -- player is pointed at afterwards.
+  TriggerCondition.SelfAttacksWithAnother _ -> Set.empty
   -- CR 506.5's lone attacker, which the same event names -- rule 702.83a's
   -- exalted is the reader. Where SelfAttacks above needs a slot for the PLAYER
   -- and gets the creature free (it is the bearer), this one needs a slot for the
@@ -4427,6 +4483,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfCycled -> False
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.SelfAttacks _ -> False
+  TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
@@ -4955,6 +5012,7 @@ zoneTriggeredFrom cond = case cond of
   -- CR 302.6 / 508.1a: only a permanent on the battlefield can be declared as an
   -- attacker, so CR 113.6k never reaches this.
   TriggerCondition.SelfAttacks _ -> Nothing
+  TriggerCondition.SelfAttacksWithAnother _ -> Nothing
   TriggerCondition.CreatureAttacksAlone _ -> Nothing
   TriggerCondition.SelfBlocks -> Nothing
   TriggerCondition.SelfBlocksCreature -> Nothing
@@ -5091,6 +5149,7 @@ controllerTurnScoped cond = case cond of
   -- CR 109.5's "you" is the ability's controller, and a stolen creature attacks on
   -- its thief's turn.
   TriggerCondition.SelfAttacks _ -> False
+  TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
@@ -5211,6 +5270,7 @@ stateTriggers gs
               TriggerCondition.CreatureDealtCombatDamageToMonarch -> False
               TriggerCondition.OpponentLostLifeDuringYourTurn -> False
               TriggerCondition.SelfAttacks _ -> False
+              TriggerCondition.SelfAttacksWithAnother _ -> False
               TriggerCondition.CreatureAttacksAlone _ -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature -> False
