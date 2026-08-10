@@ -936,6 +936,79 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     Spec.assertEqWith s "the shadow creature lives" (S.creaturesInPlay S.alice after) 1
     Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
 
+  -- CR 702.118b, off a PRINTED keyword: Furtive Homunculus ({1}{U} Creature --
+  -- Homunculus 2/1, skulk and nothing else) has no other text for a case to pass
+  -- on. Its power 2 is the threshold every case here is measured against, and the
+  -- three blockers have powers 3, 2 and 1 -- distinct, and straddling it.
+  Spec.it s "CR 702.118b skulk bars a bigger blocker, admits an equal or smaller one" $ do
+    -- One tuple, three powers: greater is barred, EQUAL is not (702.118b says
+    -- "greater", so the boundary is the case a >= would get wrong), lesser is not.
+    homunculus <- S.printingOf s registry "Furtive Homunculus"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    let (gs, mine, theirs) = attacking [homunculus] [hillGiant, piker, elves]
+        blocks b a = Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs
+    case (mine, theirs) of
+      (a : _, [bigger, equal, smaller]) ->
+        Spec.assertEqWith
+          s
+          "3 is barred, 2 and 1 are not"
+          (blocks bigger a, blocks equal a, blocks smaller a)
+          (False, True, True)
+      _ -> Spec.assertFailure s "fixture should have an attacker and three blockers"
+  Spec.it s "CR 702.118b a skulker may block an attacker of any power" $ do
+    -- THE ASYMMETRY, 702.9b's for skulk: 702.118b restricts being BLOCKED and
+    -- says nothing about blocking. The SMALLER attacker is the falsifier -- an
+    -- implementation that reads skulk off the blocker bars the 2/1 skulker from
+    -- the 1/1 Elves, and a blocker-read cannot be told from an attacker-read on
+    -- the 3/3 Giant, where 2 <= 3 either way.
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    elves <- S.printingOf s registry "Llanowar Elves"
+    homunculus <- S.printingOf s registry "Furtive Homunculus"
+    let blocks attacker =
+          let (gs, mine, theirs) = attacking [attacker] [homunculus]
+           in case (mine, theirs) of
+                (a : _, b : _) -> Just (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)
+                _ -> Nothing
+    Spec.assertEqWith
+      s
+      "the skulker blocks a 3/3 and a 1/1 alike"
+      (blocks hillGiant, blocks elves)
+      (Just True, Just True)
+  Spec.it s "CR 702.118b the powers compared are the PROJECTED ones" $ do
+    -- The same Piker, blocking legally at its printed 2 and illegally at 3 after
+    -- a CR 122.1a +1/+1 counter -- so the gate reads CR 613's answer and not the
+    -- printed box. One board, one counter apart.
+    homunculus <- S.printingOf s registry "Furtive Homunculus"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [homunculus] [piker]
+        blocks b a = Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a))
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertEqWith
+          s
+          "printed 2 blocks, counter-boosted 3 does not"
+          (blocks b a gs, blocks b a (S.addCounter CounterKind.PlusOnePlusOne 1 b gs))
+          (True, False)
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.118b a skulker connects past a bigger untapped creature, in a real combat" $ do
+    -- The gameplay-level case, with its own control: the SAME attacker into a
+    -- Piker it does not outclass is blocked, and both 2/1s trade. So the Hill
+    -- Giant reading is skulk talking, not a fixture that never blocks.
+    homunculus <- S.printingOf s registry "Furtive Homunculus"
+    hillGiant <- S.printingOf s registry "Hill Giant"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let play theirs =
+          let (gs, _, _) = S.combatBoardOf [homunculus] [theirs]
+              after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
+           in (S.lifeOf S.bob after, S.creaturesInPlay S.alice after, S.creaturesInPlay S.bob after)
+    Spec.assertEqWith
+      s
+      "unblockable past the Giant; traded with the Piker"
+      (play hillGiant, play piker)
+      ((Just 18, 1, 1), (Just 20, 0, 0))
+
   Spec.it s "CR 702.14c a swampwalker may not be blocked while the defending player controls a Swamp" $ do
     -- Bog Wraith is "Creature -- Wraith 3/3, Swampwalk" and nothing else, so
     -- this asks about the keyword and no other text.
