@@ -56,3 +56,10 @@ spec s = Spec.describe s "Pawl.Codec.CounterKind" $ do
       (CounterKind.fromJson Keyword.fromJson)
       CounterKind.Defense
       """ {"type":"Defense"} """
+  Spec.it s "Time" $
+    Common.assertJsonCodec
+      s
+      (CounterKind.toJson Keyword.toJson)
+      (CounterKind.fromJson Keyword.fromJson)
+      CounterKind.Time
+      """ {"type":"Time"} """
