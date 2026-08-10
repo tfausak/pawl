@@ -97,6 +97,8 @@
 -- with a counter on it, with Young Wolf and Putrid Goblin -- `undyingSpec`.
 -- CR 702.135 afterlife, the first minted keyword ability that CREATES a token,
 -- with Ministrant of Obligation -- `afterlifeSpec`.
+-- CR 702.46 soulshift, the first minted keyword ability that TARGETS a card in a
+-- graveyard, with Kami of Empty Graves -- `soulshiftSpec`.
 -- CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
@@ -7285,6 +7287,93 @@ afterlifeSpec s registry =
           Spec.assertEqWith s "and afterlife 3 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afterlife 3) 1)) [Keyword.afterlife 3]
           Spec.assertBool s (Keyword.afterlife 2 /= Keyword.afterlife 3) "and the N reaches the minted ability"
 
+-- CR 702.46 soulshift N, the first minted keyword ability that TARGETS A CARD IN
+-- A GRAVEYARD -- CR 115.2's clause (a) pool, which until now only card data
+-- (Raise Dead) reached. Its dies condition is afterlife's and its optional
+-- targeted clause is provoke's; what is new is the pool and the filter.
+--
+-- Kami of Empty Graves, {3}{B} Creature -- Spirit 4/1, whose entire text box is
+-- "Soulshift 3". Murder does the killing, modularSpec's reason.
+--
+-- Alice's graveyard is seeded so that every way the minted filter could be wrong
+-- picks a DIFFERENT card, and each wrong card has a SMALLER ObjectId than the
+-- right one -- S.identityAnswer takes the least legal recipient, so a widened
+-- filter is not merely permitted to go wrong, it is made to:
+--
+--   * Goblin Piker -- in the graveyard, not a Spirit. Drops out on the subtype.
+--   * Shimatsu the Bloodcloaked -- a Spirit, mana value 4. Drops out on rule
+--     702.46a's "N or less", which here is 3.
+--   * bob's own Disowned Ancestor -- a Spirit of mana value 1 in the WRONG
+--     graveyard (CR 400.1), which is what makes PlayerScope.You load-bearing.
+--
+-- leaving alice's Disowned Ancestor ({B} Creature -- Spirit Warrior) as the only
+-- legal target. The dead Kami's own graveyard incarnation is a Spirit too and is
+-- excluded by its mana value of 4 rather than by an "another" the rule does not
+-- print.
+soulshiftSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+soulshiftSpec s registry =
+  let ancestorName = CardName.MkCardName (Text.pack "Disowned Ancestor")
+      -- Rule 702.46a's "you may", exercised. S.identityAnswer declines it, which
+      -- is what the declining leg below rides.
+      exercising :: Prompt.Prompt r -> r
+      exercising p = case p of
+        Prompt.ChooseOptional {} -> OptionalDecision.Exercises
+        _ -> S.identityAnswer p
+      board = do
+        swamp <- S.printingOf s registry "Swamp"
+        murder <- S.printingOf s registry "Murder"
+        kami <- S.printingOf s registry "Kami of Empty Graves"
+        piker <- S.printingOf s registry "Goblin Piker"
+        shimatsu <- S.printingOf s registry "Shimatsu the Bloodcloaked"
+        ancestor <- S.printingOf s registry "Disowned Ancestor"
+        let (kamiId, g1) = S.addCreature kami S.alice (S.landsInPlay swamp 3)
+            (pikerId, g2) = S.addGraveyardCard piker S.alice g1
+            (shimatsuId, g3) = S.addGraveyardCard shimatsu S.alice g2
+            (theirsId, g4) = S.addGraveyardCard ancestor S.bob g3
+            (mineId, g5) = S.addGraveyardCard ancestor S.alice g4
+            -- CR 104.3c: nothing here draws, but a stocked library keeps a leg
+            -- from ending on an empty one.
+            stocked = List.foldl' (\g _ -> snd (S.addLibraryCard swamp S.alice g)) g5 [1 .. 5 :: Int]
+        pure (kamiId, (pikerId, shimatsuId, theirsId, mineId), S.handOne murder stocked)
+      -- Cast the Murder, resolve it (the Kami dies), settle so the death trigger
+      -- is gathered and its target chosen (CR 603.3d), then resolve the trigger.
+      murderIt :: (forall r. Prompt.Prompt r -> r) -> (GameState.GameState, ObjectId.ObjectId) -> (GameState.GameState, GameState.GameState)
+      murderIt answer (gs, spellId) =
+        let cast = S.runPure answer gs (S.cast S.alice spellId)
+            destroyed = S.runPure answer cast Stack.resolveTop
+            settled = S.runPure answer destroyed Engine.settleForPriority
+         in (settled, S.runPure answer settled Stack.resolveTop)
+      graveyardOf = Game.zoneMembers Zone.Graveyard
+   in Spec.describe s "Soulshift" $ do
+        -- The proving case.
+        Spec.it s "CR 702.46a whole card: the dead Kami returns the one Spirit card its N reaches" $ do
+          (kamiId, (pikerId, shimatsuId, theirsId, mineId), gs) <- board
+          let (settled, after) = murderIt exercising gs
+          Spec.assertEqWith s "the dies trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertBool s (not (S.onBattlefield kamiId after)) "and the Kami is gone"
+          Spec.assertEqWith s "alice's hand holds the Ancestor" (S.countByName ancestorName S.alice after) 1
+          Spec.assertBool s (notElem mineId (graveyardOf S.alice after)) "the id it was targeted under has left her graveyard (CR 400.7)"
+          Spec.assertBool s (elem pikerId (graveyardOf S.alice after)) "the Piker stayed: not a Spirit"
+          Spec.assertBool s (elem shimatsuId (graveyardOf S.alice after)) "Shimatsu stayed: mana value 4 against soulshift 3"
+          Spec.assertBool s (elem theirsId (graveyardOf S.bob after)) "bob's identical Ancestor stayed: the wrong graveyard (CR 400.1)"
+          Spec.assertEqWith s "so does the dead Kami itself, a Spirit of mana value 4, beside the spent Murder" (length (graveyardOf S.alice after)) 4
+        -- CR 603.5's "may" is a real fork, and the control for the case above --
+        -- same board, same Murder, and the trigger still reaches the stack.
+        Spec.it s "CR 603.5 declining the may returns nothing" $ do
+          (_, (_, _, _, mineId), gs) <- board
+          let (settled, after) = murderIt S.identityAnswer gs
+          Spec.assertEqWith s "the trigger reached the stack all the same" (length (GameState.stack settled)) 1
+          Spec.assertEqWith s "but alice's hand is empty" (S.countByName ancestorName S.alice after) 0
+          Spec.assertBool s (elem mineId (graveyardOf S.alice after)) "and the Ancestor is where it was"
+        -- CR 702.46b: "if a permanent has multiple instances of soulshift, each
+        -- triggers separately". Asserted of the MINT, as afterlife's multiplicity
+        -- is: Forked-Branch Garami prints "soulshift 4, soulshift 4" and is not in
+        -- the pool.
+        Spec.it s "CR 702.46b each instance of soulshift is its own ability" $ do
+          Spec.assertEqWith s "soulshift 3 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Soulshift 3) 2)) [Keyword.soulshift 3, Keyword.soulshift 3]
+          Spec.assertEqWith s "and soulshift 4 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Soulshift 4) 1)) [Keyword.soulshift 4]
+          Spec.assertBool s (Keyword.soulshift 3 /= Keyword.soulshift 4) "and the N reaches the minted ability"
+
 -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. / {T}: Add
 -- {C}." A nonbasic land whose whole text box is one triggered ability and one
 -- activated one, which is what makes it the pool's witness for CR 305.7's
@@ -9026,6 +9115,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   counterLookBackSpec s registry
   undyingSpec s registry
   afterlifeSpec s registry
+  soulshiftSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
   bystanderZoneSpec s registry

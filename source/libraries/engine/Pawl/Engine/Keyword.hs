@@ -61,6 +61,7 @@ import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
+import qualified Pawl.Types.PlayerScope as PlayerScope
 import qualified Pawl.Types.Pool as Pool
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
@@ -149,6 +150,9 @@ abilitiesFor keyword count = case keyword of
   -- 702.45a's ability watches two events, and a TriggeredAbility carries one
   -- condition.
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
+  -- CR 702.46b says each instance triggers separately, so a permanent with
+  -- soulshift twice dies with two abilities and each chooses its own target.
+  Keyword.Soulshift n -> List.genericReplicate count (soulshift n)
   Keyword.SplitSecond -> []
   -- Another: rule 702.63a states three abilities, and the first of
   -- them is a replacement effect rather than a trigger, so two land here.
@@ -271,6 +275,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.Soulshift _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -406,6 +411,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.Soulshift _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -645,6 +651,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.Soulshift _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -959,6 +966,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.Soulshift _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1083,6 +1091,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
+  Keyword.Soulshift _ -> []
   Keyword.SplitSecond -> []
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
@@ -1144,6 +1153,7 @@ familyOf keyword = case keyword of
   Keyword.Morph _ _ -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
+  Keyword.Soulshift _ -> Just KeywordFamily.Soulshift
   Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
@@ -2162,6 +2172,70 @@ spiritToken =
               Face.specialActions = []
             }
     }
+
+-- CR 702.46a: soulshift N. "When this permanent is put into a graveyard from the
+-- battlefield, you may return target Spirit card with mana value N or less from
+-- your graveyard to your hand." Afterlife's condition with provoke's shape --
+-- the CR 700.4 dies event, one optional clause, one target slot.
+--
+-- The bearer never appears in the payload, so the CR 400.7 incarnation split
+-- undying and persist care about is inert here: the ability moves the card its
+-- TARGET names, which is chosen when the trigger is put on the stack (CR 603.3d)
+-- and long after the bearer's own trip to the graveyard.
+--
+-- Pool.CardsInGraveyard You is rule 702.46a's "your graveyard", read as CR
+-- 115.2's clause (a) -- Raise Dead's pool, and the reason the pool carries a
+-- PlayerScope rather than a Filter: CR 108.4 gives a card in a graveyard no
+-- controller at all.
+--
+-- The Filter is the rest of the printed phrase. Filter.ManaValueAtMost is CR
+-- 202.3's mana value, and the bound is the keyword's own N -- so a mint that
+-- dropped it would return Shimatsu the Bloodcloaked to a soulshift 3 trigger.
+-- Nothing excludes the bearer: rule 702.46a does not say "another", and its own
+-- graveyard incarnation is an ordinary candidate whenever it matches -- which no
+-- printing reaches, all 26 pairing an N below their own mana value.
+--
+-- No stated origin zone on the move, for the reason Pawl.Types.Effect's
+-- MoveToZone gives: "from your graveyard" is stated in the TARGET's pool, where
+-- choosing the target enforces it. The EntryRiders are inert for a hand
+-- destination and nothing later reads what arrived, so no slot is bound.
+--
+-- Single mode, ChooseExactly 1: the target and the "may" are all rule 702.46a
+-- leaves to choose.
+soulshift :: Natural -> TriggeredAbility Card
+soulshift n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfDies,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.singleton back))) (Map.singleton soulshiftTarget spec)))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    spec =
+      TargetSpec.MkTargetSpec
+        (Pool.CardsInGraveyard PlayerScope.You)
+        (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
+    back =
+      Effect.MoveToZone
+        (ObjectRef.InSlot soulshiftTarget)
+        Zone.Hand
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = False,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False
+          }
+        Nothing
+        Nothing
+        LibraryPlacement.defaultValue
+
+-- The slot rule 702.46a's one target is chosen into, declared by the ability that
+-- reads it for mentorTarget's reason.
+soulshiftTarget :: SlotName.SlotName
+soulshiftTarget = SlotName.MkSlotName (Text.pack "soulshifted")
 
 -- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
 -- first is mintedReplacementsFor's, so vanishing is the first keyword here whose

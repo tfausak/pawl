@@ -371,6 +371,18 @@ data Keyword
     -- 509.3c), because rule 702.45a prints one ability. The split into two
     -- TriggeredAbility values is Pawl.Engine.Keyword.bushido's problem.
     Bushido Natural.Natural
+  | -- | 702.46a: soulshift N, a TRIGGERED ability meaning "When this permanent is
+    -- put into a graveyard from the battlefield, you may return target Spirit card
+    -- with mana value N or less from your graveyard to your hand." Minted by
+    -- Pawl.Engine.Keyword.soulshift on afterlife's terms -- the same CR 700.4 dies
+    -- event, so the condition is TriggerCondition.SelfDies.
+    --
+    -- N rides the constructor, as Afterlife's does: it is the mana value bound the
+    -- rule's ability filters on, so `Soulshift 3` and `Soulshift 4` are distinct
+    -- keywords. CR 702.46b makes multiple instances trigger separately, so its
+    -- reader takes the per-keyword COUNT rather than membership -- Forked-Branch
+    -- Garami prints "soulshift 4, soulshift 4" and returns two cards.
+    Soulshift Natural.Natural
   | -- | 702.61a: split second. "As long as this spell is on the stack, players
     -- can't cast spells or activate abilities that aren't mana abilities."
     --

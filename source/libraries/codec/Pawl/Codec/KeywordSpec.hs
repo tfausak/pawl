@@ -431,6 +431,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Afterlife 2) /= Keyword.toJson (Keyword.Renown 2))
       "afterlife 2 is not renown 2"
+  -- CR 702.46a's N is written like the rest, and it is a MANA VALUE BOUND rather
+  -- than a count, so a collision with a same-numbered keyword would be a real
+  -- misread.
+  Spec.it s "Soulshift carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Soulshift 3)
+      """ {"type":"Soulshift","value":3} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Soulshift 3) /= Keyword.toJson (Keyword.Bushido 3))
+      "soulshift 3 is not bushido 3"
   -- CR 702.86a's N rides the constructor the same way poisonous' does, and the
   -- two must not share a tag either.
   Spec.it s "Annihilator carries its N" $ do

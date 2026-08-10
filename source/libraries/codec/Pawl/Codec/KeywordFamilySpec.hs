@@ -105,6 +105,14 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Afterlife
       """ {"type":"Afterlife"} """
 
+  Spec.it s "Soulshift" $
+    Common.assertJsonCodec
+      s
+      KeywordFamily.toJson
+      KeywordFamily.fromJson
+      KeywordFamily.Soulshift
+      """ {"type":"Soulshift"} """
+
   Spec.it s "Annihilator" $
     Common.assertJsonCodec
       s
