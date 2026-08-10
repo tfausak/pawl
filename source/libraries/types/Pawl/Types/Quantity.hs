@@ -285,7 +285,8 @@ data Quantity
     BlockersBeyondFirst
   | -- | Read the inner quantity against the OBJECT A SLOT NAMES rather than
     -- against the effect's source (CR 113.7) -- Soul's Majesty's "cards equal to
-    -- the power of target creature you control", where "its" is the target.
+    -- the power of target creature you control", where the power read is the
+    -- target's.
     --
     -- The one arm that MOVES the object every other object-reading arm (Power,
     -- ManaValue, ObjectCounters, IsRenowned, BlockersBeyondFirst) is aimed at.

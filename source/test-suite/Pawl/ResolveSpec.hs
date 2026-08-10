@@ -3565,13 +3565,13 @@ targetingCreature oid p = case p of
   _ -> S.identityAnswer p
 
 -- Soul's Majesty, the card that proves Quantity.AgainstSlot (#1171): "Draw cards
--- equal to the power of target creature you control." The "its" is the TARGET,
--- where every other object-reading quantity is aimed at the effect's SOURCE (CR
--- 113.7) -- here a sorcery, which has no power at all, so the source reading
--- answers Nothing and draws nothing.
+-- equal to the power of target creature you control." The power read is the
+-- TARGET's, where every other object-reading quantity is aimed at the effect's
+-- SOURCE (CR 113.7) -- here a sorcery, which has no power at all, so the source
+-- reading answers Nothing and draws nothing.
 --
 -- Alice's Thragtusk is 5/3 and her Giant Spider 2/4; bob's Panglacial Wurm is
--- 9/9. Targeting each of hers in turn separates the slot's power (5, then 2)
+-- 9/5. Targeting each of hers in turn separates the slot's power (5, then 2)
 -- from that creature's toughness (3, then 4), from the other creature's power
 -- (2, then 5), from the count of her creatures (2), from the greatest power in
 -- the game (9), and from the source's nothing (0).

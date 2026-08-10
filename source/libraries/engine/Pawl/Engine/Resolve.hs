@@ -1627,7 +1627,7 @@ installDamageRow controller source duration kind rewrite rider g recipient = cas
 -- The context every effect of a resolution evaluates its quantities in: CR
 -- 109.5's "you" is the resolving controller, the source frames CR 113.7, and
 -- the resolution's slot objects ride along so a Quantity.AgainstSlot can aim at
--- one -- Soul's Majesty reading the power of the creature its target names.
+-- one -- Soul's Majesty reading the power of the creature it targets.
 --
 -- Only LEGAL slots, and only OBJECT recipients. CR 608.2b's last sentences say a
 -- part of an effect requiring information about an illegal target fails to
