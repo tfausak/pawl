@@ -360,6 +360,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.IsMonarch _ -> []
   Quantity.Type.IsRenowned -> []
   Quantity.Type.IsMonstrous -> []
+  Quantity.Type.IsSuspected -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
@@ -583,6 +584,7 @@ effectCounts effect = case effect of
   Effect.BecomeRenowned _ -> []
   Effect.BecomeMonstrous _ -> []
   Effect.Suspect _ -> []
+  Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -824,6 +826,7 @@ effectReplacements effect = case effect of
   Effect.BecomeRenowned _ -> []
   Effect.BecomeMonstrous _ -> []
   Effect.Suspect _ -> []
+  Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -1307,6 +1310,7 @@ effectMintedFaces effect = case effect of
   Effect.BecomeRenowned _ -> []
   Effect.BecomeMonstrous _ -> []
   Effect.Suspect _ -> []
+  Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -2184,6 +2188,7 @@ effectFilters effect = case effect of
   Effect.BecomeRenowned _ -> []
   Effect.BecomeMonstrous _ -> []
   Effect.Suspect _ -> []
+  Effect.Unsuspect ref -> unframed (objectRefFilters ref)
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []

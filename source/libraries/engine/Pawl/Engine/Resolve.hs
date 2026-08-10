@@ -256,6 +256,9 @@ slotsOf effect = case effect of
   Effect.BecomeMonstrous slot -> Set.singleton slot
   -- A READ, BecomeRenowned's: CR 701.60a's "suspect a creature" names one.
   Effect.Suspect slot -> Set.singleton slot
+  -- A READ of whatever slot the ref names, Tap's arm: rule 701.60a's ending can
+  -- reach a set instead.
+  Effect.Unsuspect ref -> objectRefSlots ref
   -- A READ, BecomeRenowned's: the slot names the permanent rule 702.100a's
   -- counter goes on.
   Effect.Evolve slot -> Set.singleton slot
@@ -412,6 +415,7 @@ slotsAreExhaustive effect = case effect of
   Effect.BecomeRenowned _ -> True
   Effect.BecomeMonstrous _ -> True
   Effect.Suspect _ -> True
+  Effect.Unsuspect _ -> True
   Effect.Evolve _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
@@ -510,6 +514,7 @@ readsX = any effectReadsX
       Effect.BecomeRenowned _ -> False
       Effect.BecomeMonstrous _ -> False
       Effect.Suspect _ -> False
+      Effect.Unsuspect _ -> False
       Effect.Evolve _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
@@ -580,6 +585,7 @@ searchesLibrary effect = case effect of
   Effect.BecomeRenowned _ -> False
   Effect.BecomeMonstrous _ -> False
   Effect.Suspect _ -> False
+  Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
@@ -709,6 +715,7 @@ boundSlots effect = case effect of
   Effect.BecomeRenowned _ -> Set.empty
   Effect.BecomeMonstrous _ -> Set.empty
   Effect.Suspect _ -> Set.empty
+  Effect.Unsuspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
@@ -3042,6 +3049,23 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
           State.modify'
             (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.suspected = True}) target (GameState.objects g)})
       _ -> pure ()
+  -- CR 701.60a's other ending, "until a spell or ability causes it to no longer be
+  -- suspected". The write Suspect above makes, undone; nothing else has to be,
+  -- because CR 701.60c's menace and can't-block are read off this field live
+  -- rather than stamped when it was set.
+  --
+  -- Tap's arm structurally: the victims are enumerated ONCE through
+  -- objectRefObjects for CR 608.2f's simultaneity, and an illegal slot (CR
+  -- 608.2b), a player recipient and a set that matched nothing all arrive as the
+  -- empty list. Idempotent for Suspect's reason -- clearing a designation nothing
+  -- has leaves the permanent as it was.
+  Effect.Unsuspect ref ->
+    State.modify' $ \gs ->
+      let unsuspect o = o {Object.suspected = False}
+       in gs
+            { GameState.objects =
+                foldr (Map.adjust unsuspect) (GameState.objects gs) (objectRefObjects legality chosen resolving controller source gs ref)
+            }
   -- CR 702.100a's counter and CR 702.100b's marker, in that order and in one arm
   -- because the rule ties them: the creature evolves only if the placement
   -- actually put one or more counters on it, which is what Event.putCounters

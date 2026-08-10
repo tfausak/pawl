@@ -102,6 +102,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.BecomeRenowned _ -> Nothing
   Effect.BecomeMonstrous _ -> Nothing
   Effect.Suspect _ -> Nothing
+  Effect.Unsuspect _ -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing
