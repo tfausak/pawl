@@ -193,7 +193,12 @@ data View = MkView
     -- False for every candidate with no object to read it off: a printed card off
     -- the battlefield, a player, an event snapshot -- the vacuous posture `tapped`
     -- and `token` already take.
-    renowned :: Bool
+    renowned :: Bool,
+    -- CR 701.37b: does this candidate have the MONSTROUS designation? Read off
+    -- Object.monstrous, and False where there is no object to read it off, both
+    -- for `renowned` above's reasons -- the two rules word their designations
+    -- the same way.
+    monstrous :: Bool
   }
   deriving (Eq, Show)
 
@@ -249,7 +254,8 @@ playerView pid =
       ringBearerFor = Nothing,
       -- CR 702.112b: "only permanents can be or become renowned", and a player is
       -- not one.
-      renowned = False
+      renowned = False,
+      monstrous = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and

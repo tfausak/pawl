@@ -170,7 +170,8 @@ createCard pid printing = do
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
       gs3 =
         gs2

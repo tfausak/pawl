@@ -51,7 +51,8 @@ blackCreature =
       Filter.tapped = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
-      Filter.renowned = False
+      Filter.renowned = False,
+      Filter.monstrous = False
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -80,7 +81,8 @@ devoidBigCreature =
       Filter.tapped = False,
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
-      Filter.renowned = False
+      Filter.renowned = False,
+      Filter.monstrous = False
     }
 
 -- A creature whose only ability is the given keyword -- the toxic N and landwalk

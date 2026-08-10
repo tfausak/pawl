@@ -346,7 +346,8 @@ addCreature printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( oid,
         gs2
@@ -556,7 +557,8 @@ addToken card pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( oid,
         gs2
@@ -594,7 +596,8 @@ addLibraryCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( oid,
         gs2
@@ -636,7 +639,8 @@ addGraveyardCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( oid,
         gs2
@@ -681,7 +685,8 @@ addExiledCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( oid,
         gs2
@@ -733,7 +738,8 @@ addHandCard printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( oid,
         gs2
@@ -788,7 +794,8 @@ landsInPlay land n =
                   Object.ringBearerFor = Nothing,
                   Object.protector = Nothing,
                   Object.unlockedHalves = Set.empty,
-                  Object.renowned = False
+                  Object.renowned = False,
+                  Object.monstrous = False
                 }
          in gs2
               { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -825,7 +832,8 @@ handOne printing base =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( gs2
           { GameState.objects = Map.insert oid obj (GameState.objects gs2),
@@ -868,7 +876,8 @@ pikerInHand land piker n ph =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
       gs3 =
         gs2
@@ -1379,7 +1388,8 @@ oneMountainState mountain ph =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in GameState.MkGameState
         { GameState.objects = Map.singleton oid obj,
@@ -1534,7 +1544,8 @@ spellOnStack printing pid gs =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in ( oid,
         gs2
@@ -1603,7 +1614,8 @@ stubView table oid =
                 Filter.tapped = False,
                 Filter.counters = Map.empty,
                 Filter.ringBearerFor = Nothing,
-                Filter.renowned = False
+                Filter.renowned = False,
+                Filter.monstrous = False
               }
         [] -> Nothing
 
