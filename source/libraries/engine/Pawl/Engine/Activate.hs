@@ -63,8 +63,8 @@ sicknessOkGiven pcs pid srcId ability =
 --
 -- On the battlefield: the PROJECTION's, so Humility (layer 6) strips them. In a
 -- hand: the ones rule 702 mints for the card's printed keywords, which is
--- cycling (CR 702.29a) and nothing else today, read off the PRINTED card
--- because pawl's projection does not reach a hand (#160); CR 113.6b is the rule
+-- cycling (CR 702.29a) and reinforce (CR 702.77a) today, read off the PRINTED
+-- card because pawl's projection does not reach a hand (#160); CR 113.6b is the rule
 -- that lets an ability name its own zone. In a graveyard: the PRINTED abilities
 -- whose own cost or effect names the graveyard, per CR 113.6m -- see
 -- graveyardAbilitiesOf. Anywhere else: nothing -- flashback and rule 702's other
@@ -72,10 +72,11 @@ sicknessOkGiven pcs pid srcId ability =
 -- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fourth zone adds
 -- an arm here.
 --
--- CR 702.29b is why this gates ACTIVATION and not existence: a cycling ability
--- keeps existing in every zone, so an effect counting activated abilities sees
--- it. Nothing in the pool asks that second question yet; whatever does must ask
--- the CARD rather than this function, which answers a narrower one.
+-- CR 702.29b and CR 702.77b are why this gates ACTIVATION and not existence: a
+-- cycling or reinforce ability keeps existing in every zone, so an effect
+-- counting activated abilities sees it. Nothing in the pool asks that second
+-- question yet (#1207); whatever does must ask the CARD rather than this
+-- function, which answers a narrower one.
 --
 -- This is the LONE-QUERY convenience wrapper: it precomputes nothing, so it
 -- reaches Projection.project for itself, as do sicknessOk above and
@@ -421,10 +422,10 @@ activatableGiven grants pcs pid srcId ability gs =
 -- keeps them off the stack).
 --
 -- CR 701.20a's duration -- revealed until the ability leaves the stack -- is not
--- modeled, and is vacuous for every card in the pool: cycling discards the card
--- as a cost (CR 702.29a), so it is in a public graveyard a moment later. A
--- forecast ability (CR 702.57a) is the shape that would make the duration
--- observable; none is in the pool (#185, #282).
+-- modeled, and is vacuous for every card in the pool: cycling and reinforce both
+-- discard the card as a cost (CR 702.29a, CR 702.77a), so it is in a public
+-- graveyard a moment later. A forecast ability (CR 702.57a) is the shape that
+-- would make the duration observable; none is in the pool (#185, #282).
 revealIfHidden :: PlayerId -> ObjectId -> Game ()
 revealIfHidden pid srcId = do
   gs <- State.get

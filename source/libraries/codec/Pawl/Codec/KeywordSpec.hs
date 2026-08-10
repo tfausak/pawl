@@ -445,6 +445,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Soulshift 3) /= Keyword.toJson (Keyword.Bushido 3))
       "soulshift 3 is not bushido 3"
+  -- CR 702.77a writes BOTH an N and a cost, so the array carries two fields the
+  -- way cycling's and morph's do, and both must survive the round trip.
+  Spec.it s "Reinforce carries its N and its cost" $ do
+    let reinforce n g = Keyword.Reinforce n (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic g])) [])
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (reinforce 2 1)
+      """ {"type":"Reinforce","value":[2,{"mana":[{"type":"Generic","value":1}]}]} """
+    Spec.assertBool s (Keyword.toJson (reinforce 2 1) /= Keyword.toJson (reinforce 3 1)) "the N is part of the encoding"
+    Spec.assertBool s (Keyword.toJson (reinforce 2 1) /= Keyword.toJson (reinforce 2 4)) "the cost is part of the encoding"
   -- CR 702.86a's N rides the constructor the same way poisonous' does, and the
   -- two must not share a tag either.
   Spec.it s "Annihilator carries its N" $ do

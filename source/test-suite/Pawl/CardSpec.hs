@@ -1589,6 +1589,9 @@ keywordFilters keyword = case keyword of
   -- may do, and "mana ability" is CR 605.1a's classification rather than a
   -- Filter.
   Keyword.SplitSecond -> []
+  -- CR 702.77a's cost can carry one, as cycling's can; its N and "target
+  -- creature" are written into the ability Pawl.Engine.Keyword mints.
+  Keyword.Reinforce _ cost -> costFilters cost
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []

@@ -24,6 +24,7 @@ toJson f = Common.nullary $ case f of
   KeywordFamily.Soulshift -> "Soulshift"
   KeywordFamily.Vanishing -> "Vanishing"
   KeywordFamily.Poisonous -> "Poisonous"
+  KeywordFamily.Reinforce -> "Reinforce"
   KeywordFamily.Annihilator -> "Annihilator"
   KeywordFamily.Outlast -> "Outlast"
   KeywordFamily.Renown -> "Renown"
@@ -48,6 +49,7 @@ fromJson =
       ("Soulshift", KeywordFamily.Soulshift),
       ("Vanishing", KeywordFamily.Vanishing),
       ("Poisonous", KeywordFamily.Poisonous),
+      ("Reinforce", KeywordFamily.Reinforce),
       ("Annihilator", KeywordFamily.Annihilator),
       ("Outlast", KeywordFamily.Outlast),
       ("Renown", KeywordFamily.Renown),

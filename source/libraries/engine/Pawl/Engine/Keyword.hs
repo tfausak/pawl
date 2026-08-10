@@ -210,6 +210,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Infect -> []
   Keyword.Wither -> []
   Keyword.Changeling -> []
+  Keyword.Reinforce _ _ -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Riot -> []
@@ -226,14 +227,14 @@ abilitiesFor keyword count = case keyword of
 --
 -- Named for the ZONE rather than for cycling, because that is the classification
 -- its one reader wants: Pawl.Engine.Activate.abilitiesFor asks "what can be
--- activated from here" and never learns that rule 702.29 produced any of them.
--- Rule 702 has more hand abilities to come (forecast, CR 702.57, is the next),
+-- activated from here" and never learns that rule 702.29 or rule 702.77 produced
+-- any of them. Rule 702 has more hand abilities to come (forecast, CR 702.57),
 -- and each joins this list without its reader changing.
 --
 -- Printed keywords rather than a projection's post-layer ones, the same rules
 -- fact castingPermissionsOf records: CR 113.6b confines an ability to the zones
--- it states, and rule 702.29a states the hand -- which pawl's projection does not
--- reach (#160).
+-- it states, and rules 702.29a and 702.77a state the hand -- which pawl's
+-- projection does not reach (#160).
 handAbilitiesOf :: Set Keyword -> [ActivatedAbility Card]
 handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 
@@ -243,6 +244,7 @@ handAbilitiesOf = concatMap handAbilitiesFor . Set.toAscList
 handAbilitiesFor :: Keyword -> [ActivatedAbility Card]
 handAbilitiesFor keyword = case keyword of
   Keyword.Cycling cost searchFor -> [cycling cost searchFor]
+  Keyword.Reinforce n cost -> [reinforce n cost]
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
@@ -353,6 +355,48 @@ cycling cost searchFor =
       Nothing -> Effect.Draw (PlayerRef.Relative PlayerRelation.You) (Quantity.Literal 1)
       Just filter_ -> Effect.Search filter_ SearchDestination.RevealThenHand
 
+-- CR 702.77a: "reinforce N-[cost]" means "[cost], Discard this card: Put N +1/+1
+-- counters on target creature." Cycling's ability one clause over, and the first
+-- hand ability with a TARGET -- which costs nothing extra, because
+-- Pawl.Engine.Activate.activateAbility walks CR 601.2b-i for any ability from any
+-- zone: the target is chosen at CR 601.2c, before CR 601.2h pays and so before
+-- the discard, and the ability outlives the card it discards (CR 113.7a).
+--
+-- The discard is a COMPONENT of the activation cost for cycling's reasons, rule
+-- 702.77a putting it before the colon just as rule 702.29a does.
+--
+-- The target is Pool.Creatures unqualified: rule 702.77a prints "target
+-- creature" and no more, so the bearer's controller is no more required than the
+-- opponent is forbidden. Mandatory, because the rule states no "may".
+--
+-- Quantity.Literal and not a counter reading: N is written on the card, where
+-- modular's count is measured off the dying permanent.
+reinforce :: Natural -> Cost Keyword -> ActivatedAbility Card
+reinforce n cost =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.DiscardThis]},
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) (Map.singleton reinforceTarget spec)))
+          (ModeSelection.ChooseExactly 1),
+      -- CR 702.77a states no timing restriction, which leaves CR 117.1b's
+      -- default, and gives the ability outright with no "as long as".
+      ActivatedAbility.restrictions = [],
+      ActivatedAbility.condition = Nothing
+    }
+  where
+    spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing
+    effect =
+      Effect.PutCounters
+        CounterKind.PlusOnePlusOne
+        (Quantity.Literal (toInteger n))
+        (ObjectRef.InSlot reinforceTarget)
+
+-- The slot rule 702.77a's one target is chosen into, modularTarget's position and
+-- for its reason.
+reinforceTarget :: SlotName.SlotName
+reinforceTarget = SlotName.MkSlotName (Text.pack "reinforced")
+
 -- CR 602.1: the ACTIVATED abilities rule 702 gives a PERMANENT, handAbilitiesOf's
 -- sibling one zone over. Named for the zone for that function's reason, and read
 -- by Pawl.Engine.Projection.abilitiesGiven, which appends them to the projection's
@@ -426,6 +470,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
+  Keyword.Reinforce _ _ -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -666,6 +711,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
+  Keyword.Reinforce _ _ -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -981,6 +1027,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Changeling -> []
+  Keyword.Reinforce _ _ -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -1122,6 +1169,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Persist -> []
   Keyword.Undying -> []
   Keyword.Changeling -> []
+  Keyword.Reinforce _ _ -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when some base
@@ -1154,6 +1202,7 @@ familyOf keyword = case keyword of
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
   Keyword.Soulshift _ -> Just KeywordFamily.Soulshift
+  Keyword.Reinforce _ _ -> Just KeywordFamily.Reinforce
   Keyword.Modular _ -> Just KeywordFamily.Modular
   Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
