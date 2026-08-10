@@ -45,7 +45,9 @@
 -- which names the blocker, and CR 702.25 flanking, the sixth such keyword, with
 -- Benalish Cavalry -- `flankingSpec`. CR 702.130 afflict, the seventh, which
 -- puts CR 509.3c's event and CR 508.5's defending player in one sentence, with
--- Khenra Eternal at three seats -- `afflictSpec`. CR 509.3b's blocking-side form
+-- Khenra Eternal at three seats -- `afflictSpec`. CR 702.83 exalted, the eighth,
+-- whose ability watches a permanent that is not its bearer and pumps a third
+-- one, with Aven Squire -- `exaltedSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -359,7 +361,7 @@ scanSpec s registry =
     -- so "the first time" is "this is the only one so far".
     Spec.it s "SelfAttacks FirstTimeEachTurn matches only the first declaration" $ do
       let bearer = ObjectId.MkObjectId 1
-          declared = GameEvent.AttackerDeclared bearer S.bob
+          declared = GameEvent.AttackerDeclared bearer S.bob 1
           gsWith events = S.withEvents events (Setup.emptyGame S.bothPlayers)
           matches frequency events =
             Event.matchesTrigger (gsWith events) bearer S.alice (TriggerCondition.SelfAttacks frequency) declared
@@ -370,7 +372,7 @@ scanSpec s registry =
       Spec.assertBool s (matches TriggerFrequency.EveryTime [declared, declared]) "EveryTime matches the second too"
       -- The count is per bearer, not per turn: two creatures declared
       -- together are each attacking for the first time.
-      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2) S.bob, declared]) "another creature's declaration does not spend this one's first time"
+      Spec.assertBool s (matches TriggerFrequency.FirstTimeEachTurn [GameEvent.AttackerDeclared (ObjectId.MkObjectId 2) S.bob 1, declared]) "another creature's declaration does not spend this one's first time"
       -- CR 508.3a's last sentence, unchanged by the frequency: a
       -- non-declaration event never matches.
       Spec.assertBool s (not (Event.matchesTrigger (gsWith [declared]) bearer S.alice (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn) (GameEvent.StepBegan (Phase.Combat CombatStep.DeclareAttackers) S.alice))) "a step beginning is not an attack"
@@ -2173,7 +2175,7 @@ annihilatorSpec s registry =
         -- "defending player" reads. The falsifier is an arm that binds the
         -- attacking side instead.
         Spec.it s "CR 603.2 the defending player rides the declaration in the reserved slot" $ do
-          let bindings = Event.eventBindings (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (ObjectId.MkObjectId 7) S.carol)
+          let bindings = Event.eventBindings (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (ObjectId.MkObjectId 7) S.carol 1)
           Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.carol))
         -- CR 613.8's dependency, read off the projection before any attack: WHICH
         -- permanents actually carry the granted keyword. Without this the two
@@ -3295,6 +3297,113 @@ selfBecomesBlockedSpec s registry =
         Spec.it s "CR 509.3c blocking is not becoming blocked, so a blocking Sacred Prey gains nothing" $ do
           (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]
           Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs)) (Just 20)
+
+-- CR 702.83a's exalted, the EIGHTH keyword rule 702 states as a triggered
+-- ability, and with it CR 506.5 -- "attacks alone", the one attack-trigger form
+-- that is about the DECLARATION's size rather than about one creature.
+--
+-- Aven Squire {1}{W} Creature -- Bird Soldier 1/1 is the card: flying and
+-- exalted, and flying decides nothing on these boards (nobody blocks). Hill
+-- Giant 3/3 is the creature it pumps, chosen so no reading lands on the same
+-- pair -- 3/3 -> 4/4 is not 1/1 -> 2/2, and neither is +2/+2's 5/5.
+--
+-- Every reading is taken at the COMBAT DAMAGE step, before damage is dealt, so
+-- the pump is read directly rather than through what survives combat.
+exaltedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+exaltedSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- CR 508.1's declaration narrowed to one named creature. The whole point of
+      -- the group: S.aggressiveAnswer attacks with EVERYTHING, which is the
+      -- not-alone board rather than the alone one.
+      only :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      only oid p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (== oid) ids
+        _ -> S.aggressiveAnswer p
+      atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+   in Spec.describe s "Exalted" $ do
+        -- The proving test, and the one that pins WHICH object the payload moves.
+        -- alice's Aven Squire stays home while her Hill Giant attacks alone: the
+        -- GIANT is 4/4 and the Squire is untouched. A payload written as prowess'
+        -- Filter.IsSource would move the Squire's 1/1 and leave the Giant at 3/3,
+        -- and a self-scoped condition would not fire at all -- one assertion over
+        -- both, so neither can hide behind the other.
+        Spec.it s "CR 702.83a whole card: the Squire stays home and the lone attacker is 4/4" $ do
+          (gs, mine, _) <- board ["Aven Squire", "Hill Giant"] []
+          case mine of
+            [squire, giant] ->
+              Spec.assertEqWith
+                s
+                "the attacking Giant took the +1/+1 and the Squire took none"
+                (S.powerToughnessOf giant (atDamage (only giant) gs), S.powerToughnessOf squire (atDamage (only giant) gs))
+                (Just (4, 4), Just (1, 1))
+            _ -> Spec.assertFailure s "fixture should give alice a Squire and a Giant"
+        -- CR 506.5's "the ONLY creature declared as an attacker", which is the
+        -- count on GameEvent.AttackerDeclared. The SAME board as above, differing
+        -- only in the declaration: with the Squire attacking too, nobody is alone
+        -- and neither creature is pumped.
+        Spec.it s "CR 506.5 two attackers is nobody attacking alone" $ do
+          (gs, mine, _) <- board ["Aven Squire", "Hill Giant"] []
+          case mine of
+            [squire, giant] ->
+              Spec.assertEqWith
+                s
+                "both are at their printed sizes"
+                (S.powerToughnessOf giant (atDamage S.aggressiveAnswer gs), S.powerToughnessOf squire (atDamage S.aggressiveAnswer gs))
+                (Just (3, 3), Just (1, 1))
+            _ -> Spec.assertFailure s "fixture should give alice a Squire and a Giant"
+        -- "A creature you control" reaches the bearer as readily as anything else:
+        -- rule 702.83a excludes nothing, so an Aven Squire attacking by itself
+        -- pumps itself to 2/2.
+        Spec.it s "CR 702.83a the bearer attacking alone pumps itself" $ do
+          (gs, mine, _) <- board ["Aven Squire"] []
+          case mine of
+            [squire] -> Spec.assertEqWith s "1/1 became 2/2" (S.powerToughnessOf squire (atDamage S.aggressiveAnswer gs)) (Just (2, 2))
+            _ -> Spec.assertFailure s "fixture should give alice one Squire"
+        -- "YOU control", read against CR 109.5's "you" -- the ability's controller
+        -- (CR 603.3a). bob's Aven Squire watches alice's Giant attack alone and
+        -- stays silent. Same declaration as the proving test, same Giant, and the
+        -- only difference is which seat holds the Squire.
+        Spec.it s "CR 702.83a an opponent's Squire does not pump the attacker" $ do
+          (gs, mine, _) <- board ["Hill Giant"] ["Aven Squire"]
+          case mine of
+            [giant] -> Spec.assertEqWith s "the Giant is its printed 3/3" (S.powerToughnessOf giant (atDamage (only giant) gs)) (Just (3, 3))
+            _ -> Spec.assertFailure s "fixture should give alice one Giant"
+        -- Two exalted permanents are two abilities and two +1/+1s, which is CR
+        -- 603.2 rather than a clause of rule 702.83: unlike CR 702.28c's shadow,
+        -- rule 702.83 prints no "multiple instances are redundant" sentence.
+        Spec.it s "CR 603.2 two Squires make the lone attacker 5/5" $ do
+          (gs, mine, _) <- board ["Aven Squire", "Aven Squire", "Hill Giant"] []
+          case mine of
+            [_, _, giant] -> Spec.assertEqWith s "3/3 took both pumps" (S.powerToughnessOf giant (atDamage (only giant) gs)) (Just (5, 5))
+            _ -> Spec.assertFailure s "fixture should give alice two Squires and a Giant"
+        -- CR 508.1a's declaration is a SET, so a broken interpreter naming one
+        -- creature twice has still declared one attacker. Combat.declareAttackers
+        -- deduplicates before it counts; without that the count would be 2 and
+        -- the Giant would be attacking alone and unpumped.
+        Spec.it s "CR 508.1a a repeated id is still one attacker" $ do
+          (gs, mine, _) <- board ["Aven Squire", "Hill Giant"] []
+          case mine of
+            [_, giant] -> do
+              let twice :: Prompt.Prompt r -> r
+                  twice p = case p of
+                    Prompt.DeclareAttackers _ _ ids -> concatMap (\i -> if i == giant then [i, i] else []) ids
+                    _ -> S.aggressiveAnswer p
+              Spec.assertEqWith s "the Giant is 4/4 all the same" (S.powerToughnessOf giant (atDamage twice gs)) (Just (4, 4))
+            _ -> Spec.assertFailure s "fixture should give alice a Squire and a Giant"
+        -- The same multiplicity one permanent over, asserted of the MINT because
+        -- no printing in the pool carries exalted twice -- as flanking's, bushido's
+        -- and prowess' instance cases are.
+        Spec.it s "CR 603.2 two instances mint two abilities, both CR 506.5" $ do
+          let abilities = Keyword.abilitiesFor Keyword.Type.Exalted 2
+              expected =
+                TriggerCondition.CreatureAttacksAlone
+                  (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
+          Spec.assertEqWith s "two abilities" (length abilities) 2
+          Spec.assertEqWith s "each watching CR 506.5, filtered on the attacker's controller" (fmap TriggeredAbility.condition abilities) [expected, expected]
 
 -- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
@@ -4945,7 +5054,11 @@ representativeEvents cond =
         -- controller: eventBindings binds this field under `thatPlayer`, so an
         -- arm that bound the attacking side instead would still agree with
         -- eventBindingSlots here if the two coincided.
-        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
+        TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
+        -- The same declaration event, with the count that makes it CR 506.5's
+        -- alone -- and the ATTACKER is what this one binds, where SelfAttacks
+        -- above binds the defending player off the very same event.
+        TriggerCondition.CreatureAttacksAlone _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
         -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
         -- creature, whatever it was declared against.
         TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared departed 1)
@@ -5058,6 +5171,7 @@ everyTriggerCondition =
     TriggerCondition.SelfCycled,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+    TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
     TriggerCondition.SelfBlocksCreature,
@@ -7190,6 +7304,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   selfBecomesBlockedSpec s registry
   bushidoSpec s registry
   flankingSpec s registry
+  exaltedSpec s registry
   afflictSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry

@@ -103,13 +103,15 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.Revealed (PlayerId.MkPlayerId 0) ProjectedCharacteristicsSpec.testCharacteristics)
       ("{\"type\":\"Revealed\",\"value\":[0," <> ProjectedCharacteristicsSpec.testCharacteristicsJson <> "]}")
+  -- An object, a player and CR 506.5's declaration size. Three distinct numbers,
+  -- so a codec that permuted them would fail.
   Spec.it s "AttackerDeclared" $
     Common.assertJsonCodec
       s
       GameEvent.toJson
       GameEvent.fromJson
-      (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1))
-      """ {"type":"AttackerDeclared","value":[3,1]} """
+      (GameEvent.AttackerDeclared (ObjectId.MkObjectId 3) (PlayerId.MkPlayerId 1) 4)
+      """ {"type":"AttackerDeclared","value":[3,1,4]} """
   -- Two ObjectIds and not an object and a player, unlike the sibling above: CR
   -- 509.1a's declaration pairs a blocker with the creature it blocks. Distinct
   -- numbers, so a codec that swapped the pair would fail.

@@ -293,6 +293,31 @@ blockingCreature = SlotName.MkSlotName (Text.pack "thatBlocker")
 blockedCreature :: SlotName
 blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 
+-- CR 506.5: the reserved slot under which the creature that was declared as an
+-- attacker is bound -- rule 702.83a's "that creature", the one exalted pumps.
+-- Stamped by Pawl.Engine.Event.eventBindings off GameEvent.AttackerDeclared,
+-- alongside the CR 508.5 defending player that same event already supplies.
+--
+-- NOT `triggerSource` (CR 113.7a), and that is the whole reason it exists: rule
+-- 702.83a's condition is "a creature YOU CONTROL attacks alone", so the bearer
+-- watches the declaration and is routinely a different permanent from the
+-- attacker -- an untapped Aven Squire held back while another creature attacks
+-- is the ordinary case, not the corner one.
+--
+-- Distinct from `blockedCreature` even though both name an attacking creature:
+-- that one is the attacker a BLOCK named (CR 509.3b), read from the blocker's
+-- side, and a payload naming the wrong one would still typecheck. Two slots make
+-- the mismatch a dead name instead.
+--
+-- One object, never a group: the slot is stamped per declaration event, and the
+-- only condition that reads it is one that fires when the declaration named
+-- exactly one creature. Not a target (nothing was chosen), so the same CR 608.2b
+-- posture and the same "no card's targetSpecs may name it" sweep as
+-- `blockingCreature`; a dead id by resolution is the payload's problem, as it is
+-- there.
+attackingCreature :: SlotName
+attackingCreature = SlotName.MkSlotName (Text.pack "thatAttackingCreature")
+
 -- A binding that names one object and nothing else -- what a token bound by a
 -- Create (CR 603.7c) or a trigger's source slot holds.
 toObject :: ObjectId -> Binding
@@ -349,6 +374,10 @@ setBlockingCreature oid = Map.insert blockingCreature (toObject oid)
 -- Bind an object under the reserved blockedCreature slot (CR 509.3b).
 setBlockedCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
 setBlockedCreature oid = Map.insert blockedCreature (toObject oid)
+
+-- Bind an object under the reserved attackingCreature slot (CR 506.5).
+setAttackingCreature :: ObjectId -> Map SlotName Binding -> Map SlotName Binding
+setAttackingCreature oid = Map.insert attackingCreature (toObject oid)
 
 -- Bind a number under the reserved eventAmount slot (CR 603.2).
 setEventAmount :: Natural -> Map SlotName Binding -> Map SlotName Binding

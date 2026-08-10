@@ -241,7 +241,7 @@ snapshotView gs shape event = case event of
   GameEvent.Revealed _ _ -> Nothing
   -- The same reason, with no snapshot to offer either: no EventShape names an
   -- attacker being declared (CR 508.2b).
-  GameEvent.AttackerDeclared _ _ -> Nothing
+  GameEvent.AttackerDeclared {} -> Nothing
   GameEvent.BlockerDeclared _ _ -> Nothing
   GameEvent.BlocksDeclared _ _ -> Nothing
   GameEvent.AttackerBlocked _ _ -> Nothing
