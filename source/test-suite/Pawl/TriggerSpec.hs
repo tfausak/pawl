@@ -23,46 +23,47 @@
 -- CR 725.2 sourceless case (the monarch's inherent triggers ordered WITH the
 -- batch) -- `monarchOrderingSpec`. The CR 603.4 / 608.2a intervening "if" --
 -- `interveningSpec`. Also Pawl.Engine.Keyword: CR
--- 702.70 poisonous, the keyword whose rule text IS a triggered ability, and the
+-- 702.70 poisonous, the first keyword whose rule text IS a triggered ability,
+-- and the
 -- reserved "that player" slot the scan stamps for it -- `poisonousSpec`. CR
--- 702.86 annihilator, the second such keyword, whose "defending player" (CR
+-- 702.86 annihilator, whose "defending player" (CR
 -- 508.5) rides the declaration event through the same reserved slot, at three
 -- seats so that player is not the attacker's only opponent --
 -- `annihilatorSpec`. CR
--- 702.91 battle cry, the third such keyword, and with it the CR 603.3b
+-- 702.91 battle cry, and with it the CR 603.3b
 -- ordering payload's ability discriminator -- two DISTINCT abilities of one
 -- source, ordered both ways with different boards, and two triggers of the SAME
 -- ability staying indistinguishable, with Hero of Bladehold -- `battleCrySpec`.
--- CR 702.108 prowess, the fourth such keyword and the first whose event is not
+-- CR 702.108 prowess, the first such keyword whose event is not
 -- its bearer's combat -- CR 601.2i's cast, watched through the same
 -- TriggerCondition.SpellCast a card writes -- with Monastery Swiftspear --
 -- `prowessSpec`. CR 509.3a's blocking-side declaration trigger, the mirror of
 -- CR 508.3a's, with Pride Guardian -- `selfBlocksSpec`. CR 509.3c's attacking
 -- side of that same declaration, with Sacred Prey -- `selfBecomesBlockedSpec`.
--- CR 702.45 bushido, the fifth keyword whose rule text IS a triggered ability
--- and the only one to name both of those events, with Inner-Chamber Guard --
+-- CR 702.45 bushido, the one such keyword to name both of those events, with
+-- Inner-Chamber Guard --
 -- `bushidoSpec`. CR 509.3d's once-per-blocker form of the same declaration,
--- which names the blocker, and CR 702.25 flanking, the sixth such keyword, with
--- Benalish Cavalry -- `flankingSpec`. CR 702.130 afflict, the seventh, which
+-- which names the blocker, and CR 702.25 flanking, with
+-- Benalish Cavalry -- `flankingSpec`. CR 702.130 afflict, which
 -- puts CR 509.3c's event and CR 508.5's defending player in one sentence, with
--- Khenra Eternal at three seats -- `afflictSpec`. CR 702.83 exalted, the eighth,
+-- Khenra Eternal at three seats -- `afflictSpec`. CR 702.83 exalted,
 -- whose ability watches a permanent that is not its bearer and pumps a third
--- one, with Aven Squire -- `exaltedSpec`. CR 702.121 melee, the ninth, and the
+-- one, with Aven Squire -- `exaltedSpec`. CR 702.121 melee, the
 -- first keyword whose payload is a number read off game state -- CR 508.3b's
 -- record of who was declared attacked -- with Wings of the Guard at three seats
--- -- `meleeSpec`. CR 702.134 mentor, the tenth, and the first keyword whose
+-- -- `meleeSpec`. CR 702.134 mentor, the first keyword whose
 -- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
 -- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
--- CR 702.23 rampage, the eleventh, whose bonus multiplies a printed N by a number
+-- CR 702.23 rampage, whose bonus multiplies a printed N by a number
 -- read off the declaration, with Wolverine Pack and Horrible Hordes --
--- `rampageSpec`. CR 702.149 training, the twelfth, whose CONDITION reads the rest
+-- `rampageSpec`. CR 702.149 training, whose CONDITION reads the rest
 -- of the declaration for a bigger companion, with Apprentice Sharpshooter --
--- `trainingSpec`. CR 702.39 provoke, the thirteenth, and the first whose payload
+-- `trainingSpec`. CR 702.39 provoke, the first whose payload
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
--- `provokeSpec`. CR 702.112 renown, the fourteenth, and the first minted
+-- `provokeSpec`. CR 702.112 renown, the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
--- 702.63 vanishing, the sixteenth, and the first keyword whose rule text spans
+-- 702.63 vanishing, the first keyword whose rule text spans
 -- BOTH mints -- one CR 614.1c entry replacement and two triggers, one of them
 -- watching the counter removal the other performs -- with Waning Wurm --
 -- `vanishingSpec`. CR 702.43 modular, whose rule text spans both mints too and
@@ -2143,8 +2144,8 @@ poisonousSpec s registry =
 
 -- CR 702.86a: "Annihilator is a triggered ability. 'Annihilator N' means
 -- 'Whenever this creature attacks, defending player sacrifices N permanents.'"
--- The second keyword in this pool whose rule text IS a triggered ability, after
--- CR 702.70a's poisonous and before CR 702.91a's battle cry, so it is minted by
+-- Rule 702 states it as a triggered ability, like CR 702.70a's poisonous and CR
+-- 702.91a's battle cry, so it is minted by
 -- Pawl.Engine.Keyword and gathered by the same Pawl.Engine.Event.eventTriggers
 -- scan.
 --
@@ -2252,8 +2253,8 @@ annihilatorSpec s registry =
 
 -- CR 702.91a: "Battle cry is a triggered ability. 'Battle cry' means 'Whenever
 -- this creature attacks, each other attacking creature gets +1/+0 until end of
--- turn.'" The third keyword in this pool whose rule text IS a triggered
--- ability, after CR 702.70a's poisonous and CR 702.86a's annihilator, so it is
+-- turn.'" Rule 702 states it as a triggered
+-- ability, like CR 702.70a's poisonous and CR 702.86a's annihilator, so it is
 -- minted by Pawl.Engine.Keyword
 -- and gathered by the same Pawl.Engine.Event.eventTriggers scan.
 --
@@ -2393,8 +2394,8 @@ battleCrySpec s registry =
 
 -- CR 702.108a: "Prowess is a triggered ability. 'Prowess' means 'Whenever you
 -- cast a noncreature spell, this creature gets +1/+1 until end of turn.'" The
--- fourth keyword in this pool whose rule text IS a triggered ability, after CR
--- 702.70a, CR 702.86a and CR 702.91a, and the first of the four to watch
+-- rule text IS a triggered ability, like CR
+-- 702.70a's, CR 702.86a's and CR 702.91a's, and the first minted trigger to watch
 -- something other than its bearer's combat: the event is CR 601.2i's, so
 -- Pawl.Engine.Keyword.prowess mints TriggerCondition.SpellCast.
 --
@@ -3331,7 +3332,7 @@ selfBecomesBlockedSpec s registry =
           (gs, _, _) <- board ["Goblin Piker"] ["Sacred Prey"]
           Spec.assertEqWith s "bob gained nothing" (S.lifeOf S.bob (S.runCombat S.aggressiveAnswer gs)) (Just 20)
 
--- CR 702.83a's exalted, the EIGHTH keyword rule 702 states as a triggered
+-- CR 702.83a's exalted, which rule 702 states as a triggered
 -- ability, and with it CR 506.5 -- "attacks alone", the one attack-trigger form
 -- that is about the DECLARATION's size rather than about one creature.
 --
@@ -3439,7 +3440,7 @@ exaltedSpec s registry =
           Spec.assertEqWith s "two abilities" (length abilities) 2
           Spec.assertEqWith s "each watching CR 506.5, filtered on the attacker's controller" (fmap TriggeredAbility.condition abilities) [expected, expected]
 
--- CR 702.134a's mentor, the TENTH keyword rule 702 states as a triggered ability
+-- CR 702.134a's mentor, which rule 702 states as a triggered ability
 -- and the FIRST whose ability TARGETS -- so this is the group that runs a
 -- keyword-minted TargetSpec through CR 601.2c's choosing, and with it
 -- Filter.PowerLessThanSource, the one atom whose bound is the source's own power
@@ -3586,7 +3587,7 @@ mentorSpec s registry =
             [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
           Spec.assertEqWith s "each with rule 702.134a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
 
--- CR 702.149a's training, the TWELFTH keyword rule 702 states as a triggered
+-- CR 702.149a's training, which rule 702 states as a triggered
 -- ability -- and the first whose trigger CONDITION reads the rest of the
 -- declaration, through Filter.PowerGreaterThanSource and the source power
 -- TriggerCondition.SelfAttacksWithAnother supplies.
@@ -3691,7 +3692,7 @@ trainingSpec s registry =
             (fmap TriggeredAbility.condition abilities)
             [expected, expected]
 
--- CR 702.39a's provoke, the THIRTEENTH keyword rule 702 states as a triggered
+-- CR 702.39a's provoke, which rule 702 states as a triggered
 -- ability and the FIRST whose payload creates a CR 509.1c blocking REQUIREMENT
 -- -- so this is the group that runs a resolution-created requirement through the
 -- declare blockers step, and with it Filter.ControlledByDefendingPlayer.
@@ -3831,7 +3832,7 @@ provokeSpec s registry =
             [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
           Spec.assertEqWith s "each with rule 702.39a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
 
--- CR 702.112a's renown, the FOURTEENTH keyword rule 702 states as a triggered
+-- CR 702.112a's renown, which rule 702 states as a triggered
 -- ability -- and the first minted one carrying an intervening "if" (CR 603.4),
 -- which is the whole of why it fires once and not once per connection.
 --
@@ -3849,7 +3850,7 @@ provokeSpec s registry =
 -- directly, below. Pawl.SetupSpec's "no per-incarnation state survives" case does
 -- NOT cover it -- that case asks whether the forgetting is idempotent, which is
 -- blind to a field it never touches.
--- CR 702.100: evolve, the fifteenth keyword whose rule text IS a triggered
+-- CR 702.100: evolve, whose rule text IS a triggered
 -- ability, and the first whose intervening "if" is about the EVENT's object
 -- rather than its bearer -- so this is the group that runs a Condition reading
 -- another object through Quantity.AgainstSlot at Binding.became, and the first
@@ -4189,7 +4190,7 @@ renownSpec s registry =
           Spec.assertEqWith s "renown 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 2) 2)) [Keyword.renown 2, Keyword.renown 2]
           Spec.assertEqWith s "and renown 6 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 6) 1)) [Keyword.renown 6]
 
--- CR 702.63 vanishing, the sixteenth keyword rule 702 states as triggered
+-- CR 702.63 vanishing, which rule 702 states as triggered
 -- abilities -- and the first whose rule text spans BOTH mints, since rule
 -- 702.63a's three abilities are one CR 614.1c entry replacement
 -- (Keyword.mintedReplacementsFor, riot's position) and two triggers.
@@ -4300,7 +4301,7 @@ vanishingSpec s registry =
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
             (replicate 2 (ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Time 2)))
 
--- CR 702.43 modular, and the second keyword whose rule text spans BOTH of
+-- CR 702.43 modular, whose rule text also spans BOTH of
 -- Pawl.Engine.Keyword's mints -- one CR 614.1c entry replacement and one death
 -- trigger. What is new is the trigger's PAYLOAD: rule 702.43a
 -- counts "each +1/+1 counter on this permanent" at a moment when the permanent
@@ -4621,7 +4622,7 @@ aragornSpec s registry =
               Spec.assertEqWith s "and nothing reached bob" (S.lifeOf S.bob after) (Just 20)
             _ -> Spec.assertFailure s "fixture should give alice an Aragorn and a Piker, bob a Piker"
 
--- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
+-- CR 702.25a's flanking, which rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
 -- block-trigger form that fires once per BLOCKER and names it.
 --
@@ -4706,9 +4707,9 @@ flankingSpec s registry =
           Spec.assertEqWith s "each watching CR 509.3d, filtered on the blocker's own flanking" (fmap TriggeredAbility.condition abilities) [expected, expected]
 
 -- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
--- blocked, it gets +N/+N until end of turn.'" The fifth keyword in this pool
--- whose rule text IS a triggered ability, after CR 702.70a, CR 702.86a, CR
--- 702.91a and CR 702.108a, and the only one that names TWO events: "blocks" is
+-- blocked, it gets +N/+N until end of turn.'" Rule 702 states it as a triggered
+-- ability, as it does CR 702.70a, CR 702.86a, CR
+-- 702.91a and CR 702.108a, and it is the only one that names TWO events: "blocks" is
 -- CR 509.3a and "becomes blocked" is CR 509.3c, so Pawl.Engine.Keyword.bushido
 -- mints two abilities and the two cases below fire one each.
 --
@@ -4795,8 +4796,8 @@ bushidoSpec s registry =
           Spec.assertEqWith s "and held twice is four abilities" (length (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Bushido 2) 2))) 4
 
 -- CR 702.130a: "'Afflict N' means 'Whenever this creature becomes blocked,
--- defending player loses N life.'" The seventh keyword in this pool whose rule
--- text IS a triggered ability, and the first to put CR 509.3c's event and CR
+-- defending player loses N life.'" Rule 702 states it as a triggered ability,
+-- and it is the first to put CR 509.3c's event and CR
 -- 508.5's defending player in one sentence.
 --
 -- Khenra Eternal {1}{B} Creature -- Zombie Jackal Warrior 2/2 with afflict 1 and
@@ -4879,7 +4880,7 @@ afflictSpec s registry =
           Spec.assertEqWith s "and afflict 3 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afflict 3) 1)) [Keyword.afflict 3]
           Spec.assertBool s (Keyword.afflict 1 /= Keyword.afflict 3) "and the two differ, so N is in the ability"
 
--- CR 702.121 melee, the EIGHTH keyword whose rule text is a triggered ability,
+-- CR 702.121 melee, whose rule text is a triggered ability,
 -- and the first whose payload is a number read off game state rather than a
 -- literal, with Wings of the Guard ({1}{W} Creature -- Bird 1/1, flying and
 -- melee, and nothing else).
@@ -4989,7 +4990,7 @@ meleeSpec s registry =
           Spec.assertEqWith s "melee held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 2)) [Keyword.melee, Keyword.melee]
           Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 1)) [Keyword.melee]
 
--- CR 702.23 rampage, the ELEVENTH keyword whose rule text is a triggered ability,
+-- CR 702.23 rampage, whose rule text is a triggered ability,
 -- and the first whose bonus multiplies a printed N by a number read off the
 -- board.
 --

@@ -309,8 +309,8 @@ data Keyword
     Morph (Cost.Cost Keyword) MorphVariant.MorphVariant
   | -- | 702.39a: whenever this creature attacks, you may choose to have target
     -- creature defending player controls block this creature this combat if able;
-    -- if you do, untap that creature. The TWELFTH keyword rule 702 states as a
-    -- triggered ability, and the first whose payload creates a CR 509.1c BLOCKING
+    -- if you do, untap that creature. Rule 702 states it as a triggered ability,
+    -- and the first whose payload creates a CR 509.1c BLOCKING
     -- REQUIREMENT -- Pawl.Engine.Keyword.provoke mints it, slot and all.
     --
     -- Payload-free, so no Pawl.Types.KeywordFamily constructor is owed. Its reader
@@ -399,6 +399,19 @@ data Keyword
     -- triggers -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds
     -- from the projection's per-keyword count.
     Poisonous Natural.Natural
+  | -- | 702.73a: "This object is every creature type." A
+    -- CHARACTERISTIC-DEFINING ability (CR 604.3), so it defines a
+    -- characteristic rather than minting anything: it lands in CR 613.1d's
+    -- layer 4 through Pawl.Engine.Projection.applySubtypeDefining, and off the
+    -- battlefield through viewOfCard, exactly as CR 702.114a's devoid lands in
+    -- layer 5.
+    --
+    -- Nullary, because rule 702.73a takes no parameter, so no
+    -- Pawl.Types.KeywordFamily constructor is owed. Its reader takes
+    -- MEMBERSHIP rather than a count: a second instance defines the same set of
+    -- creature types, so it is the identity -- redundant by arithmetic, where
+    -- CR 702.80d's wither says so outright.
+    Changeling
   | -- | 702.79a: persist. "When this permanent is put into a graveyard from the
     -- battlefield, if it had no -1/-1 counters on it, return it to the
     -- battlefield under its owner's control with a -1/-1 counter on it" -- which
@@ -426,8 +439,8 @@ data Keyword
     -- alone, so wither damage to a player is ordinary life loss.
     Wither
   | -- | 702.83a: whenever a creature you control attacks alone, that creature
-    -- gets +1/+1 until end of turn. The EIGHTH keyword rule 702 states as a
-    -- triggered ability, and the first whose ability watches a permanent that is
+    -- gets +1/+1 until end of turn. Rule 702 states it as a triggered ability,
+    -- and the first whose ability watches a permanent that is
     -- not its bearer: "a creature you control" is every creature its controller
     -- has, so an untapped Aven Squire triggers off another creature's attack.
     -- Pawl.Engine.Keyword.exalted mints it, and
@@ -446,9 +459,9 @@ data Keyword
     -- ability for 2 -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf
     -- builds from the projection's per-keyword count.
     --
-    -- The SECOND keyword rule 702 states as a triggered ability, after poisonous
-    -- (702.70a) and before battle cry (702.91a), and minted the same way. What
-    -- it adds to those two is the PLAYER: rule 702.86a names the defending
+    -- Rule 702 states it as a triggered ability, and it is minted the way
+    -- poisonous (702.70a) and battle cry (702.91a) are. What it adds to those
+    -- two is the PLAYER: rule 702.86a names the defending
     -- player, whom CR 508.5 reads off what the creature is attacking -- so
     -- Pawl.Engine.Combat.declareAttackers computes it as the attack is declared
     -- and GameEvent.AttackerDeclared carries it, and the minted ability reads it
@@ -456,10 +469,9 @@ data Keyword
     Annihilator Natural.Natural
   | Infect -- 702.90
   | -- | 702.91a: whenever this creature attacks, each other attacking creature gets
-    -- +1/+0 until end of turn. The THIRD keyword rule 702 states as a triggered
-    -- ability, after poisonous (702.70a) and annihilator (702.86a) and before
-    -- prowess (702.108a), and so the third one
-    -- Pawl.Engine.Keyword MINTS rather than merely consults. Nullary, because rule
+    -- +1/+0 until end of turn. Rule 702 states it as a triggered ability, so
+    -- Pawl.Engine.Keyword MINTS it rather than merely consulting it, as it does
+    -- poisonous (702.70a) and annihilator (702.86a). Nullary, because rule
     -- 702.91a takes no parameter -- and unlike flying's or lifelink's nullary
     -- siblings, its reader takes the per-keyword count rather than membership,
     -- since CR 702.91b gives it the multiplicity CR 702.70b gives poisonous.
@@ -506,10 +518,10 @@ data Keyword
     -- reading rather than shadow's redundancy.
     Outlast (Cost.Cost Keyword)
   | -- | 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
-    -- until end of turn. The FOURTH keyword rule 702 states as a triggered
-    -- ability, after poisonous (702.70a), annihilator (702.86a) and battle cry
-    -- (702.91a), and minted the same way. What it adds to those three is the
-    -- WATCHED EVENT: the first of them to trigger on something other than its
+    -- until end of turn. Rule 702 states it as a triggered ability, minted the
+    -- way poisonous (702.70a), annihilator (702.86a) and battle cry (702.91a)
+    -- are. What it adds to those three is the WATCHED EVENT: the first minted
+    -- trigger on something other than its
     -- own bearer's combat, so the minted condition is CR 601.2i's
     -- TriggerCondition.SpellCast rather than a self-scoped one.
     --
@@ -624,14 +636,14 @@ data Keyword
     -- N life. N rides the constructor, as Poisonous' does, and for the same
     -- reason: CR 702.130b says each instance triggers separately.
     --
-    -- The SEVENTH keyword rule 702 states as a triggered ability. Its event is CR
+    -- Rule 702 states it as a triggered ability. Its event is CR
     -- 509.3c's, which Bushido above already watches, and its PLAYER is CR 508.5's,
     -- which Annihilator above already reads -- so Pawl.Engine.Keyword.afflict is
     -- the two put together and adds nothing of its own.
     Afflict Natural.Natural
   | -- | 702.134a: whenever this creature attacks, put a +1/+1 counter on target
-    -- attacking creature with power less than this creature's power. The TENTH
-    -- keyword rule 702 states as a triggered ability, and the first whose ability
+    -- attacking creature with power less than this creature's power. Rule 702
+    -- states it as a triggered ability, and the first whose ability
     -- TARGETS -- Pawl.Engine.Keyword.mentor mints it, slot and all.
     --
     -- Payload-free, because rule 702.134a takes no parameter, and its reader takes
@@ -713,7 +725,7 @@ data Keyword
     Nightbound
   | -- | 702.149a: whenever this creature and at least one other creature with power
     -- greater than this creature's power attack, put a +1/+1 counter on this
-    -- creature. The TWELFTH keyword rule 702 states as a triggered ability;
+    -- creature. Rule 702 states it as a triggered ability;
     -- Pawl.Engine.Keyword.training mints it.
     --
     -- Payload-free, because rule 702.149a takes no parameter, and its reader takes

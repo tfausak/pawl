@@ -1607,6 +1607,7 @@ keywordFilters keyword = case keyword of
   Keyword.Provoke -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
+  Keyword.Changeling -> []
   Keyword.Devoid -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
   -- ability is built with lives in Pawl.Engine.Keyword and is not card data.

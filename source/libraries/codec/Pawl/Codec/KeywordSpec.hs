@@ -399,8 +399,8 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Poisonous 3) /= Keyword.toJson (Keyword.Toxic 3))
       "poisonous 3 is not toxic 3"
-  -- CR 702.112a's N is a THIRD keyword's, and the tag has to keep it apart from
-  -- the other two: `Renown 2` and `Poisonous 2` differ only by tag on the wire.
+  -- CR 702.112a's N is written like every other keyword's, so the TAG is what
+  -- keeps them apart: `Renown 2` and `Poisonous 2` differ only by it on the wire.
   Spec.it s "Renown carries its N" $ do
     Common.assertJsonCodec
       s
@@ -412,7 +412,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Renown 2) /= Keyword.toJson (Keyword.Poisonous 2))
       "renown 2 is not poisonous 2"
-  -- CR 702.135a's N is a FOURTH keyword's, and it must not collide either.
+  -- CR 702.135a's N is written like the rest, so it must not collide either.
   Spec.it s "Afterlife carries its N" $ do
     Common.assertJsonCodec
       s
@@ -549,6 +549,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Menace
       """ {"type":"Menace"} """
+  Spec.it s "Changeling" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Changeling
+      """ {"type":"Changeling"} """
   Spec.it s "Devoid" $
     Common.assertJsonCodec
       s

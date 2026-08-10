@@ -556,4 +556,9 @@ data Subtype
     Undercity
   | -- CR 205.3q
     Siege
-  deriving (Eq, Ord, Show)
+  -- Enum and Bounded so a family can be enumerated rather than restated: CR
+  -- 702.73a's "every creature type" needs the whole of CR 205.3m, and
+  -- Pawl.Engine.Subtype.everyCreatureType sieves [minBound ..] through the
+  -- classification that already owns the list. A second hand-kept copy of CR
+  -- 205.3m would be free to drift from the first.
+  deriving (Bounded, Enum, Eq, Ord, Show)

@@ -8,6 +8,7 @@
 module Pawl.Engine.Subtype where
 
 import qualified Data.Maybe as Maybe
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
@@ -386,3 +387,13 @@ creatureTypeWord subtype = case subtype of
 -- | CR 205.3m
 isCreatureType :: Subtype.Subtype -> Bool
 isCreatureType = Maybe.isJust . creatureTypeWord
+
+-- | CR 205.3m's list as a SET -- what CR 702.73a's "every creature type" means.
+--
+-- Sieved out of the Subtype enumeration through isCreatureType rather than
+-- written out, so it cannot disagree with creatureTypeWord above; a subtype
+-- added there joins this set in the same edit. That is the opposite call from
+-- Pawl.Engine.Mana's five colours, and the reason is size: CR 105.1 names five,
+-- where CR 205.3m names hundreds and pawl already holds the list once.
+everyCreatureType :: Set.Set Subtype.Subtype
+everyCreatureType = Set.fromList (filter isCreatureType [minBound ..])

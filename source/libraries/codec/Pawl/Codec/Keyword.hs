@@ -75,6 +75,7 @@ toJson k = case k of
   Keyword.Prowess -> Common.nullary "Prowess"
   Keyword.Menace -> Common.nullary "Menace"
   Keyword.Renown n -> Common.tagged "Renown" . Just $ Common.encodeNatural n
+  Keyword.Changeling -> Common.nullary "Changeling"
   Keyword.Devoid -> Common.nullary "Devoid"
   Keyword.Skulk -> Common.nullary "Skulk"
   Keyword.Melee -> Common.nullary "Melee"
@@ -140,6 +141,7 @@ fromJson value = do
     ("Prowess", _) -> Right Keyword.Prowess
     ("Menace", _) -> Right Keyword.Menace
     ("Renown", Just v) -> Keyword.Renown <$> Common.decodeNatural v
+    ("Changeling", _) -> Right Keyword.Changeling
     ("Devoid", _) -> Right Keyword.Devoid
     ("Skulk", _) -> Right Keyword.Skulk
     ("Melee", _) -> Right Keyword.Melee
