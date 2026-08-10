@@ -2,10 +2,12 @@ module Pawl.Types.BlockPermission where
 
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.Condition as Condition
 
 -- | CR 509.1a: one printed BLOCKING PERMISSION -- an effect saying a creature
--- can block an additional creature. Foriysian Brigade and Lairwatch Giant print
--- it about themselves, High Ground about a whole team.
+-- can block more creatures than the rule's one. Foriysian Brigade and Lairwatch
+-- Giant print it about themselves, High Ground about a whole team, Palace Guard
+-- with no number at all.
 --
 -- The SEVENTH carrier of a printed static ability, alongside
 -- Pawl.Types.StaticAbility, Pawl.Types.PlayerStaticAbility,
@@ -27,10 +29,9 @@ import qualified Pawl.Types.Affected as Affected
 -- granted. CR 509.1b's note that an evasion ability gained after a legal block
 -- does not affect that block is the rules saying the same of the other side.
 --
--- Three printed shapes do not fit and are not carried: "any number of creatures"
--- (Guardian of the Gateless) has no number, a gated one (Entourage of Trest) has
--- no CR 604.2 "as long as" clause here, and a counted one (Kemba's Legion) would
--- need a Quantity where this holds a literal (#1153).
+-- One printed shape does not fit and is not carried: a COUNTED permission
+-- (Kemba's Legion's "for each Equipment attached to this creature") would need a
+-- Quantity where `additional` holds a literal (#1153).
 --
 -- Open-half card data, classified rather than identified:
 -- Pawl.Engine.BlockPermission is the only module that reads it, and it hands
@@ -43,6 +44,23 @@ data BlockPermission = MkBlockPermission
     affected :: Affected.Affected,
     -- | How many creatures BEYOND CR 509.1a's one this permission adds. One for
     -- "an additional creature", seven for Watcher in the Web.
-    additional :: Natural.Natural
+    --
+    -- NOTHING is "any number of creatures" (Palace Guard) -- no bound at all,
+    -- which is Pawl.Engine.CombatRestriction.blockLimit's spelling of the same
+    -- word and combines the same way: unbounded absorbs, since a creature that
+    -- may block any number still may after a second permission adds one.
+    -- Deliberately not a huge literal, which would be a number the card does not
+    -- print and would still refuse the board that exceeded it.
+    additional :: Maybe Natural.Natural,
+    -- | CR 604.2's "as long as" clause -- Entourage of Trest's "as long as
+    -- you're the monarch". Nothing is the ungated permission (Foriysian
+    -- Brigade).
+    --
+    -- The OPPOSITE polarity to Pawl.Types.CombatRestriction's gate, which is an
+    -- "unless": there a gate that HOLDS lifts the restriction, here one that
+    -- holds is what grants the permission. Same type, same CR 604.2 re-reading
+    -- on every look, and the "you" inside it is CR 109.5's -- the controller of
+    -- the permanent printing the sentence.
+    while :: Maybe Condition.Condition
   }
   deriving (Eq, Ord, Show)

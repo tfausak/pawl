@@ -5,12 +5,15 @@
 -- layer, and Pawl.Engine.Projection sees none of them.
 --
 -- The only reader of Pawl.Types.BlockPermission. Pawl.Engine.Combat asks for a
--- NUMBER per creature and never learns which card produced it.
+-- NUMBER per creature -- or for no bound at all -- and never learns which card
+-- produced it.
 module Pawl.Engine.BlockPermission where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Condition as Condition
+import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -28,11 +31,16 @@ import Pawl.Types.ObjectId (ObjectId)
 -- whole reason Pawl.Types.BlockPermission is not an arm of
 -- Pawl.Types.CombatRestriction.
 --
+-- Nothing is a card's "any number of creatures" (Palace Guard) -- no bound at
+-- all rather than a large one -- and it ABSORBS in the sum, which is what
+-- `(+) <$> _ <*> _` does: a creature that may block any number still may after a
+-- High Ground adds one.
+--
 -- A map and not a per-creature predicate, for the reason
 -- Pawl.Engine.CombatRestriction.restricted gives: the caller asks once per
 -- declaration pass and tests against the answer, where a function would walk the
 -- battlefield per candidate (#200).
-additionalBlocks :: [ObjectId] -> GameState -> Map.Map ObjectId Natural
+additionalBlocks :: [ObjectId] -> GameState -> Map.Map ObjectId (Maybe Natural)
 additionalBlocks candidates gs =
   let -- Hoisted out of the walk exactly as CombatRestriction.inForce hoists them,
       -- and unforced until some permanent actually prints a permission.
@@ -42,6 +50,19 @@ additionalBlocks candidates gs =
       -- against the FULL projection.
       named source affected creature =
         Projection.affects source creature affected (Projection.project creature gs) gs
+      -- CR 604.2's "as long as", read exactly as CombatRestriction.inForce reads
+      -- its "unless" and with the opposite polarity: a permission whose gate does
+      -- NOT hold grants nothing. Asked once per permission and not per candidate,
+      -- because CR 109.5 fixes the "you" inside it as the SOURCE's controller.
+      granted source changes permission = case BlockPermission.while permission of
+        Nothing -> True
+        Just condition ->
+          Condition.holds
+            (Projection.fullView gs)
+            (Filter.MkContext (Projection.controllerOf source gs) (Just source))
+            gs
+            source
+            (if null changes then condition else Projection.rewriteCondition changes condition)
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face -> case Face.blockPermissions face of
@@ -60,9 +81,10 @@ additionalBlocks candidates gs =
                 let changes = Projection.textChangesAffecting source gs
                  in [ (creature, BlockPermission.additional permission)
                     | permission <- permissions,
+                      granted source changes permission,
                       let affected = BlockPermission.affected permission,
                       creature <- candidates,
                       named source (if null changes then affected else Projection.rewriteAffected changes affected) creature
                     ]
               else []
-   in Map.fromListWith (+) (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
+   in Map.fromListWith (\a b -> (+) <$> a <*> b) (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
