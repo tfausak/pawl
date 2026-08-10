@@ -937,6 +937,51 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     Spec.assertEqWith s "the shadow creature lives" (S.creaturesInPlay S.alice after) 1
     Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
 
+  -- CR 702.31's three legality cases and its gameplay one, off a PRINTED keyword:
+  -- Shu Cavalry ({2}{W} Creature -- Human Soldier 2/2, horsemanship and nothing
+  -- else) has no other text for a case to pass on. Goblin Piker is the
+  -- non-horsemanship creature throughout.
+  Spec.it s "CR 702.31b a creature without horsemanship may not block a creature with horsemanship" $ do
+    shuCavalry <- S.printingOf s registry "Shu Cavalry"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [shuCavalry] [piker]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.31b a creature WITH horsemanship may block a creature without horsemanship" $ do
+    -- THE FALSIFIER, and what separates horsemanship from shadow: 702.31b's second
+    -- sentence says a horseman blocks with or without, so the board shadow's
+    -- equality makes illegal (see "a creature WITH shadow may not block a creature
+    -- without shadow" above) is legal here. Fails against any implementation that
+    -- reads the keyword off both creatures.
+    piker <- S.printingOf s registry "Goblin Piker"
+    shuCavalry <- S.printingOf s registry "Shu Cavalry"
+    let (gs, mine, theirs) = attacking [piker] [shuCavalry]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.31b a creature with horsemanship may block a creature with horsemanship" $ do
+    -- The exception 702.31b states, which keeps the illegal case above from
+    -- passing on a gate that simply forbids every block of a horseman.
+    shuCavalry <- S.printingOf s registry "Shu Cavalry"
+    let (gs, mine, theirs) = attacking [shuCavalry] [shuCavalry]
+    case (mine, theirs) of
+      (a : _, b : _) ->
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
+      _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
+  Spec.it s "CR 702.31b a horseman connects past an untapped ground creature, in a real combat" $ do
+    -- The gameplay-level case: bob takes 2, and the 2/2 Cavalry survives a 2/1
+    -- Piker that never got to block it.
+    shuCavalry <- S.printingOf s registry "Shu Cavalry"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, _, _) = S.combatBoardOf [shuCavalry] [piker]
+        after = S.settleSba (S.fightWith S.aggressiveAnswer gs)
+    Spec.assertEqWith s "bob took 2" (S.lifeOf S.bob after) (Just 18)
+    Spec.assertEqWith s "the horseman lives" (S.creaturesInPlay S.alice after) 1
+    Spec.assertEqWith s "the would-be blocker lives" (S.creaturesInPlay S.bob after) 1
+
   -- CR 702.118b, off a PRINTED keyword: Furtive Homunculus ({1}{U} Creature --
   -- Homunculus 2/1, skulk and nothing else) has no other text for a case to pass
   -- on. Its power 2 is the threshold every case here is measured against, and the

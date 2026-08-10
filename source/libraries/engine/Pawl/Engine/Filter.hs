@@ -556,6 +556,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Flanking -> keyword
   Keyword.Type.Phasing -> keyword
   Keyword.Type.Shadow -> keyword
+  Keyword.Type.Horsemanship -> keyword
   Keyword.Type.Skulk -> keyword
   Keyword.Type.Melee -> keyword
   -- CR 702.23a's N is a number and not a word, so CR 612.2 has nothing to swap.
