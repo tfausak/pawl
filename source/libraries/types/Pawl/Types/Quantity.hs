@@ -237,4 +237,31 @@ data Quantity
     --
     -- A LEAF, like LifeTotal, Speed and IsMonarch: it holds no Quantity.
     OpponentsAttacked PlayerRef.PlayerRef
+  | -- | CR 509.1h / 702.23a: how many creatures are blocking the object this
+    -- quantity is evaluated against, BEYOND THE FIRST -- rampage's "for each
+    -- creature blocking it beyond the first".
+    --
+    -- Power's and ObjectCounters' sibling in shape: it names no object and takes
+    -- the one the evaluation is aimed at. Unlike those two it is answered from
+    -- Pawl.Types.Combat.blockers rather than through the injected view, combat
+    -- being game state rather than a characteristic, so an object the view can no
+    -- longer describe still answers as long as the declaration stands.
+    --
+    -- "Beyond the first" is IN the constructor rather than left to arithmetic.
+    -- This type has Plus and no inverse, and a subtraction node written for it
+    -- would have to floor at zero anyway: an unblocked object is blocked by no
+    -- creatures, and rule 702.23a's phrase reads 0 there, not -1.
+    --
+    -- NOT a Count over the battlefield. A Count is scoped to a zone and matched
+    -- by a Filter (CR 400.1), and "blocking THIS object" is a relation between two
+    -- objects that no Filter atom states.
+    --
+    -- Unblocked reads 0 rather than Nothing, as PlayerCounters and ObjectCounters
+    -- read an absent kind: nobody blocking is a number. Nothing survives only for
+    -- an evaluation aimed at no object at all -- a member of an
+    -- Aggregation.Greatest over Scope.InHistory, which describes a past event
+    -- rather than anything in combat now.
+    --
+    -- A LEAF: it holds no Quantity.
+    BlockersBeyondFirst
   deriving (Eq, Ord, Show)

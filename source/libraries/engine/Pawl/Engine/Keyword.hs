@@ -61,12 +61,11 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108, 702.121 and
--- 702.130 do not: they spell flanking, bushido, poisonous, exalted, annihilator,
--- battle cry, prowess, melee and afflict out as TRIGGERED abilities, so those
--- have to be
--- MINTED and handed to the ordinary CR 603 machinery rather than merely
--- consulted.
+-- Rules 702.23, 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108, 702.121,
+-- 702.130 and 702.134 do not: they spell rampage, flanking, bushido, poisonous,
+-- exalted, annihilator, battle cry, prowess, melee, afflict and mentor out as
+-- TRIGGERED abilities, so those have to be MINTED and handed to the ordinary CR
+-- 603 machinery rather than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -92,10 +91,11 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- returns one ability PER INSTANCE -- `Poisonous 1` twice is two abilities and
 -- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
--- 702.25b says the same of flanking, CR 702.45b of bushido, CR 702.86b of
--- annihilator, CR 702.91b of battle cry, CR 702.108b of prowess, CR 702.121b of
--- melee and CR 702.130b of afflict, so the nine minting arms below are the same
--- shape -- bushido's `concat` aside, since its instance is two abilities.
+-- 702.23c says the same of rampage, CR 702.25b of flanking, CR 702.45b of
+-- bushido, CR 702.86b of annihilator, CR 702.91b of battle cry, CR 702.108b of
+-- prowess, CR 702.121b of melee, CR 702.130b of afflict and CR 702.134b of
+-- mentor, so the eleven minting arms below are the same shape -- bushido's
+-- `concat` aside, since its instance is two abilities.
 --
 -- Exalted is the one with no such clause of its own: rule 702.83 states only
 -- that exalted IS a triggered ability, and the "multiple instances are
@@ -124,6 +124,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
+  Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Training -> List.genericReplicate count training
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
@@ -227,6 +228,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
+  Keyword.Rampage _ -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -347,6 +349,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
+  Keyword.Rampage _ -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -535,6 +538,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
+  Keyword.Rampage _ -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -816,6 +820,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
+  Keyword.Rampage _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Training -> []
@@ -865,6 +870,7 @@ familyOf keyword = case keyword of
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
+  Keyword.Rampage _ -> Just KeywordFamily.Rampage
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
   Keyword.Deathtouch -> Nothing
@@ -1113,6 +1119,50 @@ melee =
         (Modification.ModifyPowerToughness bonus bonus)
         (ObjectRef.EachMatching Filter.IsSource)
 
+-- CR 702.23a: whenever this creature becomes blocked, it gets +N/+N until end of
+-- turn for each creature blocking it beyond the first. The ELEVENTH keyword rule
+-- 702 states as a triggered ability, minted here like the ten around it.
+--
+-- The condition is bushido's blocked half, TriggerCondition.SelfBecomesBlocked --
+-- CR 509.3c, which fires ONCE however many creatures blocked, where flanking's CR
+-- 509.3d fires once per blocker. Rule 702.23a's bonus already counts the blockers
+-- itself, so a per-blocker trigger would count them twice.
+--
+-- "IT" is the bearer, so the payload is melee's, Filter.IsSource -- a singleton
+-- CR 611.2c fixes as the effect begins.
+--
+-- The BONUS is "N times the number of creatures blocking it beyond the first",
+-- written as N COPIES of Quantity.BlockersBeyondFirst summed through
+-- Quantity.Plus. Pawl.Types.Quantity has no product node, and adding one for this
+-- would be a second way to write a number no other card needs; rampage 0 is not a
+-- printing, but the fold's Literal 0 base answers it rather than failing.
+--
+-- CR 702.23b -- "calculated only once per combat, when the triggered ability
+-- resolves" -- is CR 611.2d's freeze (Projection.freezeQuantities) and needs
+-- nothing of its own: the number is read as this resolves, and a blocker removed
+-- afterwards cannot move it.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- rule 702.23a leaves nothing to choose, and has no "if" clause, so
+-- intervening = Nothing.
+rampage :: Natural -> TriggeredAbility Card
+rampage n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfBecomesBlocked,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    bonus = foldr Quantity.Plus (Quantity.Literal 0) (List.genericReplicate n Quantity.BlockersBeyondFirst)
+    effect =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness bonus bonus)
+        (ObjectRef.EachMatching Filter.IsSource)
+
 -- CR 702.25a: whenever this creature becomes blocked by a creature without
 -- flanking, the blocking creature gets -1/-1 until end of turn. The sixth keyword
 -- rule 702 states as a triggered ability, minted here like the five above.
@@ -1346,8 +1396,8 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 
 -- CR 702.149a: whenever this creature and at least one other creature with power
 -- greater than this creature's power attack, put a +1/+1 counter on this
--- creature. The ELEVENTH keyword in this pool whose rule text IS a triggered
--- ability, minted here like the ten above.
+-- creature. The TWELFTH keyword in this pool whose rule text IS a triggered
+-- ability, minted here like the eleven above.
 --
 -- Mentor's clause with the comparison reversed and the target dropped, which is
 -- the whole of the difference: rule 702.149a pumps the BEARER, so there is

@@ -29,10 +29,10 @@ module Pawl.Types.KeywordFamily where
 -- parameter that CR 702.14c's landwalk filter and CR 702.37a's morph cost force
 -- on it. A family type that named Keyword instead would reopen that cycle.
 --
--- TWELVE is this pool's count, not Magic's. Rule 702 runs to 702.194 and so
+-- THIRTEEN is this pool's count, not Magic's. Rule 702 runs to 702.194 and so
 -- states 193 keywords past its own general 702.1, roughly a third of them written
--- with a cost or an N; Pawl.Types.Keyword models 42, of which these twelve carry a
--- payload. The set grows with that type -- ward N, rampage N and
+-- with a cost or an N; of the keywords Pawl.Types.Keyword models, these thirteen
+-- carry a payload. The set grows with that type -- ward N and
 -- the alternative-cost keywords all land here eventually -- so a constructor is
 -- owed whenever a payload-carrying Keyword constructor is added, not whenever a
 -- card first asks for one. Pawl.Engine.Keyword.familyOf is exhaustive and takes
@@ -42,6 +42,8 @@ data KeywordFamily
     Hexproof
   | -- | CR 702.14a: "[type]walk".
     Landwalk
+  | -- | CR 702.23a: rampage N.
+    Rampage
   | -- | CR 702.29a: cycling [cost], and CR 702.29e's typecycling.
     Cycling
   | -- | CR 702.34a: flashback [cost].

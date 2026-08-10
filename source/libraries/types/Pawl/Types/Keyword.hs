@@ -175,6 +175,20 @@ data Keyword
     -- "[quality] creature with 'bands with other [quality]'" clause both rules
     -- also cover would need one, and is part of the unmodeled half.
     Banding -- 702.22
+  | -- | 702.23a: rampage N, a TRIGGERED ability meaning "Whenever this creature
+    -- becomes blocked, it gets +N/+N until end of turn for each creature blocking
+    -- it beyond the first." Minted by Pawl.Engine.Keyword.rampage and handed to
+    -- the ordinary CR 603 machinery, as flanking and bushido are.
+    --
+    -- Carries its N, unlike flanking below: rule 702.23a takes a parameter, and
+    -- the bonus is N TIMES a number read off the board, so the two halves come
+    -- from different places -- N from the card, the multiplicand from
+    -- Pawl.Types.Quantity.BlockersBeyondFirst.
+    --
+    -- CR 702.23c makes multiple instances trigger separately, so its reader takes
+    -- the per-keyword COUNT the projection carries, exactly as flanking and
+    -- bushido do.
+    Rampage Natural.Natural
   | -- | 702.25a: "whenever this creature becomes blocked by a creature without
     -- flanking, the blocking creature gets -1/-1 until end of turn". A TRIGGERED
     -- ability, like rule 702.70's poisonous and rule 702.45's bushido, so
@@ -532,7 +546,7 @@ data Keyword
     Nightbound
   | -- | 702.149a: whenever this creature and at least one other creature with power
     -- greater than this creature's power attack, put a +1/+1 counter on this
-    -- creature. The ELEVENTH keyword rule 702 states as a triggered ability;
+    -- creature. The TWELFTH keyword rule 702 states as a triggered ability;
     -- Pawl.Engine.Keyword.training mints it.
     --
     -- Payload-free, because rule 702.149a takes no parameter, and its reader takes
