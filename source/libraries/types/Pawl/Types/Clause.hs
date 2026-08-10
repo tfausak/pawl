@@ -54,9 +54,11 @@ data Clause card = MkClause
     -- span is the carrier and an individual instruction is not -- nothing about
     -- one instruction distinguishes the two cases.
     optionality :: Optionality.Optionality,
-    -- | CR 118.12a's "unless [a player] pays", covering the same span: that rule
-    -- is a rewriting, so this clause's effects are its "if they don't" branch.
-    -- Nothing for every card that states no such cost.
+    -- | CR 118.12a's "unless [a player does something else]", covering the same
+    -- span: that rule is a rewriting, so this clause's effects are its "if they
+    -- don't" branch. Nothing for every card that states no such cost. The
+    -- something else need not be a payment of a resource -- CR 701.63a's endure
+    -- puts +1/+1 counters on instead (Fortress Kin-Guard).
     --
     -- The three riders are independent, and Pawl.Engine.Resolve asks them in
     -- printed order: `condition` first (CR 701.46a prints its "if" ahead of the

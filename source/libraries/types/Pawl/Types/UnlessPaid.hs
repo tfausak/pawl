@@ -10,7 +10,10 @@ import qualified Pawl.Types.SlotName as SlotName
 -- something] unless [a player does something else]' ... means the same thing as
 -- '[A player may do something else]. If [that player doesn't], [do something].'"
 -- So the clause's effect list is the "if they don't" branch, and this is the
--- offer that precedes it.
+-- offer that precedes it. The "something else" is a Cost but need not spend a
+-- resource: CR 701.63a's endure offers putting +1/+1 counters on the permanent
+-- (Fortress Kin-Guard), and CR 702.123a's fabricate prints the same offer with
+-- the rewriting already done.
 --
 -- CR 118.12 puts the payment at RESOLUTION -- "the action [do something] is a
 -- cost, paid when the spell or ability resolves" -- which is the whole reason
