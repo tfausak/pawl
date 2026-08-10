@@ -101,7 +101,7 @@ combatReplaySpec s =
         Spec.it s "attackers round-trip through the transcript" $
           Spec.assertEqWith s "round trip" (Replay.decode attackPrompt (Replay.encode attackPrompt [oid])) (Just [oid])
         Spec.it s "blockers round-trip through the transcript" $ do
-          let answer = Map.singleton oid oid
+          let answer = Map.singleton oid (Set.singleton oid)
           Spec.assertEqWith s "round trip" (Replay.decode blockPrompt (Replay.encode blockPrompt answer)) (Just answer)
         Spec.it s "a damage assignment round-trips through the transcript" $ do
           let answer :: Map.Map Recipient.Recipient Natural.Natural

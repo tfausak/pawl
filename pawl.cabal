@@ -84,6 +84,8 @@ library codec
     Pawl.Codec.BeginningStepSpec
     Pawl.Codec.Binding
     Pawl.Codec.BindingSpec
+    Pawl.Codec.BlockPermission
+    Pawl.Codec.BlockPermissionSpec
     Pawl.Codec.BlockRequirement
     Pawl.Codec.BlockRequirementSpec
     Pawl.Codec.Card
@@ -346,6 +348,7 @@ library engine
     Pawl.Engine.AttackRequirement
     Pawl.Engine.Battle
     Pawl.Engine.Binding
+    Pawl.Engine.BlockPermission
     Pawl.Engine.BlockRequirement
     Pawl.Engine.Card
     Pawl.Engine.Cast
@@ -539,6 +542,7 @@ library types
     Pawl.Types.AttackTarget
     Pawl.Types.BeginningStep
     Pawl.Types.Binding
+    Pawl.Types.BlockPermission
     Pawl.Types.BlockRequirement
     Pawl.Types.CandidateId
     Pawl.Types.Card

@@ -1526,6 +1526,7 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.SelfAttacks _ -> condition
   TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfBlocksCreature -> condition
+  TriggerCondition.SelfBlocksAtLeast _ -> condition
   TriggerCondition.SelfBecomesBlocked -> condition
   -- CR 509.3d's Filter is a predicate over the blocker, so a subtype rewrite
   -- reaches it exactly as it reaches SpellCast's above.

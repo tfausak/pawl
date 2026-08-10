@@ -17,6 +17,7 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CardName as CardName
@@ -116,6 +117,7 @@ baseFace =
       Face.delayedAbilities = Map.empty,
       Face.playerAbilities = [],
       Face.blockRequirements = [],
+      Face.blockPermissions = [],
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
@@ -158,6 +160,7 @@ minimalFace =
       Face.alternativeCosts = [],
       Face.playerAbilities = [],
       Face.blockRequirements = [],
+      Face.blockPermissions = [],
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
@@ -204,6 +207,7 @@ populatedFace =
       Face.delayedAbilities = Map.singleton (AbilityName.MkAbilityName (Text.pack "trigger")) minimalTriggeredAbility,
       Face.playerAbilities = [PlayerStaticAbility.MkPlayerStaticAbility PlayerScope.You PlayerEffect.CantCastSpells],
       Face.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached],
+      Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached 1],
       Face.attackRequirements = [AttackRequirement.MkAttackRequirement Affected.Attached],
       Face.combatRestrictions = [CombatRestriction.CantAttack Affected.Attached Nothing],
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
@@ -236,6 +240,7 @@ populatedFaceJson =
     <> "\"modal\":{\"modes\":[{}]}}}],"
     <> "\"playerAbilities\":[{\"scope\":{\"type\":\"You\"},\"effect\":{\"type\":\"CantCastSpells\"}}],"
     <> "\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}],"
+    <> "\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":1}],"
     <> "\"attackRequirements\":[{\"subject\":{\"type\":\"Attached\"}}],"
     <> "\"combatRestrictions\":[{\"type\":\"CantAttack\",\"value\":{\"affected\":{\"type\":\"Attached\"}}}],"
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
@@ -285,6 +290,9 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "blockRequirements (CR 509.1c) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.blockRequirements <$> decodeFace v) (Right [])
+    Spec.it s "blockPermissions (CR 509.1a) defaults to the empty list" $ do
+      v <- Common.assertJson s baseFaceJson
+      Spec.assertEq s (Face.blockPermissions <$> decodeFace v) (Right [])
     Spec.it s "attackRequirements (CR 508.1d) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.attackRequirements <$> decodeFace v) (Right [])
@@ -372,6 +380,13 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         decodeFace
         baseFace {Face.blockRequirements = [BlockRequirement.MkBlockRequirement Affected.Attached]}
         (init baseFaceJson <> ",\"blockRequirements\":[{\"attacker\":{\"type\":\"Attached\"}}]}")
+    Spec.it s "blockPermissions" $
+      Common.assertJsonCodec
+        s
+        encodeFace
+        decodeFace
+        baseFace {Face.blockPermissions = [BlockPermission.MkBlockPermission Affected.Attached 1]}
+        (init baseFaceJson <> ",\"blockPermissions\":[{\"affected\":{\"type\":\"Attached\"},\"additional\":1}]}")
     Spec.it s "attackRequirements" $
       Common.assertJsonCodec
         s

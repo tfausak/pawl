@@ -34,6 +34,7 @@ import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
+import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.Prevention as Prevention
 import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Recipient as Recipient
@@ -310,19 +311,7 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                       -- stands unqualified.
                       Just pid -> divide pid defenderEntries
               _ -> pure allToAttacked
-            -- CR 702.19b / CR 510.1e: ask the chooser to divide `power` over
-            -- `entries`, and keep the answer only if it is legal --
-            -- reject-not-repair (NOT the CR 733 human-error rewind). An illegal
-            -- answer assigns nothing.
-            divide chooser entries = do
-              let thresholds = Map.fromList entries
-              chosen <- Game.choose (Prompt.AssignCombatDamage (Decide.deciderFor chooser gs) chooser attacker thresholds power)
-              let toEvent (recipient, n) = damageEvent gs DamageKind.Combat attacker recipient n
-              pure
-                ( if legalAssignment thresholds power chosen
-                    then fmap toEvent (filter (\(_, n) -> n > 0) (Map.toList chosen))
-                    else []
-                )
+            divide = divideAssignment gs attacker power
         if not (Combat.isBlocked attacker gs)
           then -- CR 510.1b: never blocked, so it hits what it is attacking.
             toDefender
@@ -351,12 +340,8 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                 -- check and the reject-not-repair posture below are untouched.
                 --
                 -- CR 702.22k is the mirror, moving the division of a BLOCKING
-                -- creature's damage to the active player. It has no site here:
-                -- blockerAssignment never divides, because Combat.blockers is
-                -- keyed by attacker and a blocker in the pool blocks exactly one
-                -- creature, so there is nothing to divide among. It becomes
-                -- reachable with the first effect letting one creature block
-                -- several.
+                -- creature's damage to the active player. Its site is
+                -- blockerChooser, below.
                 --
                 -- The defending player falls back to the attacker's controller
                 -- rather than skipping the assignment. Unreachable: an attacker
@@ -372,6 +357,20 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
                     thresholdOf b = if trample then blockerThreshold gs attacker b else 0
                     blockerEntries = fmap (\b -> (Recipient.ToCreature b, thresholdOf b)) blockers
                 divide chooser (blockerEntries <> (if trample then defenderEntries else []))
+
+-- CR 702.22k: with a banding creature among the creatures it is blocking, the
+-- ACTIVE player rather than the blocking creature's controller divides its
+-- damage. Stated as an exception to CR 510.1d alone, so it moves WHO is asked and
+-- nothing else. CR 702.22j is the mirror, on the attacking side.
+--
+-- The "bands with other [quality]" half of the rule is not read, and is part of
+-- the unmodeled half Pawl.Types.Keyword's Banding note describes: no card in the
+-- pool prints it.
+blockerChooser :: GameState -> [ObjectId] -> PlayerId -> PlayerId
+blockerChooser gs attackers controller =
+  if any (\attacker -> Projection.hasKeyword Keyword.Banding attacker gs) attackers
+    then GameState.activePlayer gs
+    else controller
 
 -- CR 510.1d: a blocking creature assigns combat damage to the creatures it's
 -- blocking, and none at all if it isn't currently blocking any.
@@ -390,28 +389,73 @@ attackerAssignment gs (attacker, target) = case Projection.powerOf attacker gs o
 -- the battlefield: marking it is a no-op, but the event still enters the CR
 -- 608.2i history and still runs its own CR 616.1 replacement loop, where it
 -- could spend a one-shot shield on damage the rules say was never assigned.
-blockerAssignment :: GameState -> (ObjectId, Set.Set ObjectId) -> [DamageEvent.DamageEvent]
-blockerAssignment gs (attacker, blockers) =
-  let assign blocker = case Projection.powerOf blocker gs of
-        Just p ->
-          if p <= 0
-            then []
-            else [damageEvent gs DamageKind.Combat blocker (Recipient.ToCreature attacker) (Integer.toNaturalSaturating p)]
-        Nothing -> []
-   in if onBattlefield attacker gs
-        then concatMap assign (Set.toList blockers)
+--
+-- Keyed by the BLOCKER and not by the attacker, which is what rule 510.1d's third
+-- and fourth sentences need: one creature blocking two attackers assigns its
+-- damage divided among them, so the unit of assignment is the blocker. An action
+-- and not a list for that division alone -- with one attacker blocked the rule
+-- forces the whole assignment and asks nothing.
+blockerAssignment :: GameState -> (ObjectId, Set.Set ObjectId) -> Game [DamageEvent.DamageEvent]
+blockerAssignment gs (blocker, attackers) = case Projection.powerOf blocker gs of
+  Nothing -> pure []
+  Just p
+    | p <= 0 -> pure []
+    | otherwise ->
+        let power = Integer.toNaturalSaturating p
+         in case filter (\attacker -> onBattlefield attacker gs) (Set.toList attackers) of
+              [] -> pure []
+              [attacker] -> pure [damageEvent gs DamageKind.Combat blocker (Recipient.ToCreature attacker) power]
+              blocked -> case Projection.controllerOf blocker gs of
+                Nothing -> pure []
+                -- Every threshold is 0: CR 510.1d's division is unconstrained,
+                -- where CR 510.1c's has to clear lethal damage first. Trample is
+                -- an attacker's keyword (CR 702.19b) and reaches nothing here.
+                Just pid ->
+                  divideAssignment
+                    gs
+                    blocker
+                    power
+                    (blockerChooser gs blocked pid)
+                    (fmap (\attacker -> (Recipient.ToCreature attacker, 0)) blocked)
+
+-- CR 510.1e / 702.19b: ask `chooser` to divide `source`'s `power` over `entries`,
+-- and keep the answer only if it is legal -- reject-not-repair (NOT the CR 733
+-- human-error rewind). An illegal answer assigns nothing.
+--
+-- Shared by both assignment sides, so an attacker dividing among its blockers and
+-- a blocker dividing among the creatures it blocks cannot come to disagree about
+-- what an illegal answer does.
+divideAssignment :: GameState -> ObjectId -> Natural -> PlayerId -> [(Recipient.Recipient, Natural)] -> Game [DamageEvent.DamageEvent]
+divideAssignment gs source power chooser entries = do
+  let thresholds = Map.fromList entries
+  chosen <- Game.choose (Prompt.AssignCombatDamage (Decide.deciderFor chooser gs) chooser source thresholds power)
+  let toEvent (recipient, n) = damageEvent gs DamageKind.Combat source recipient n
+  pure
+    ( if legalAssignment thresholds power chosen
+        then fmap toEvent (filter (\(_, n) -> n > 0) (Map.toList chosen))
         else []
+    )
 
 -- CR 510.2: gather all combat damage before applying any of it (simultaneity).
+--
+-- The blocking side is INVERTED out of Combat.blockers, which is keyed by
+-- attacker: rule 510.1d assigns per blocking creature, and a blocker declared
+-- against two attackers appears under both keys.
 gatherCombatDamage :: (ObjectId -> Bool) -> Game [DamageEvent.DamageEvent]
 gatherCombatDamage assigns = do
   gs <- State.get
   let combat = GameState.combat gs
       attackers = filter (assigns . fst) (Map.toList (Combat.Type.attackers combat))
-      blockers = Map.toList (fmap (Set.filter assigns) (Combat.Type.blockers combat))
+      blocking =
+        Map.toList . Map.fromListWith Set.union $
+          [ (blocker, Set.singleton attacker)
+          | (attacker, blockers) <- Map.toList (Combat.Type.blockers combat),
+            blocker <- Set.toList blockers,
+            assigns blocker
+          ]
   parts <- Monad.mapM (attackerAssignment gs) attackers
-  let fromBlockers = concatMap (blockerAssignment gs) blockers
-  pure (concat parts <> fromBlockers)
+  fromBlockers <- Monad.mapM (blockerAssignment gs) blocking
+  pure (concat parts <> concat fromBlockers)
 
 -- CR 120.1a: damage can't be dealt to an object that's not a battle, a creature,
 -- or a planeswalker. Which of those a Recipient names is a question only a

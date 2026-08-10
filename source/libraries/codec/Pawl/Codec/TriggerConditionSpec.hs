@@ -139,6 +139,14 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfBlocksCreature
       """ {"type":"SelfBlocksCreature"} """
+  -- CR 509.3e, and NOT nullary: the floor is the card's own number.
+  Spec.it s "SelfBlocksAtLeast" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfBlocksAtLeast 2)
+      """ {"type":"SelfBlocksAtLeast","value":2} """
   -- CR 509.3c, nullary for the same reason, and a distinct tag from the sibling
   -- above: the two name opposite sides of one declaration.
   Spec.it s "SelfBecomesBlocked" $

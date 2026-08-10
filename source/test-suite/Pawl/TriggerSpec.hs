@@ -2998,9 +2998,50 @@ counterTriggerSpec s registry =
           Spec.assertEqWith s "four untapped permanents before" (untapped gs) 4
           Spec.assertEqWith s "two after, so only two Islands were tapped" (untapped cast) 2
 
+-- CR 509.3e: "Whenever [a creature] blocks two or more creatures, . . ." -- the
+-- form that reads HOW MANY, matched against the same grouped
+-- GameEvent.BlocksDeclared SelfBlocks reads.
+--
+-- Lairwatch Giant {5}{W} Creature -- Giant Warrior 5/3, "This creature can block
+-- an additional creature each combat / Whenever this creature blocks two or more
+-- creatures, it gains first strike until end of turn", is the card, and the only
+-- one that can reach the condition on its own text: the permission it prints is
+-- what lets the count get to two.
+selfBlocksAtLeastSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+selfBlocksAtLeastSpec s registry =
+  let blockEverything :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      blockEverything blocker p = case p of
+        Prompt.DeclareBlockers _ _ _ attackers -> Map.singleton blocker (Set.fromList attackers)
+        _ -> S.aggressiveAnswer p
+      blockOne :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      blockOne blocker p = case p of
+        Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
+          [] -> Map.empty
+          a : _ -> Map.singleton blocker (Set.singleton a)
+        _ -> S.aggressiveAnswer p
+   in Spec.describe s "SelfBlocksAtLeast" . Spec.it s "CR 509.3e blocking two grants first strike, blocking one does not" $ do
+        piker <- S.printingOf s registry "Goblin Piker"
+        giant <- S.printingOf s registry "Lairwatch Giant"
+        let (gs, _, theirs) = S.combatBoardOf [piker, piker] [giant]
+            atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState
+            atDamage answer = S.runToStep (Phase.Combat CombatStep.CombatDamage) answer gs
+        case theirs of
+          [oid] ->
+            -- Both legs are the same board and the same card, differing only in
+            -- how many attackers the declaration gave it -- which is rule
+            -- 509.3e's own variable.
+            Spec.assertEqWith
+              s
+              "two blocks grant it, one does not"
+              ( Projection.hasKeyword Keyword.Type.FirstStrike oid (atDamage (blockEverything oid)),
+                Projection.hasKeyword Keyword.Type.FirstStrike oid (atDamage (blockOne oid))
+              )
+              (True, False)
+          _ -> Spec.assertFailure s "fixture should give bob one Lairwatch Giant"
+
 -- CR 509.3a: "Whenever [a creature] blocks, . . ." -- the blocking side's
--- declaration trigger, matched against GameEvent.BlockerDeclared, which only
--- Pawl.Engine.Combat.declareBlockers appends.
+-- declaration trigger, matched against GameEvent.BlocksDeclared, which only
+-- Pawl.Engine.Combat.declareBlockers appends, once per blocking creature.
 --
 -- Pride Guardian {W} Creature -- Cat Monk 0/3, "Defender / Whenever this creature
 -- blocks, you gain 3 life", is the card. It is the cheapest producer in the pool:
@@ -3018,6 +3059,12 @@ selfBlocksSpec s registry =
       noBlocks :: Prompt.Prompt r -> r
       noBlocks p = case p of
         Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      -- Blocks EVERY attacker with `blocker` alone, which aggressiveAnswer
+      -- cannot express: it puts every blocker on the first attacker.
+      blockEverything :: ObjectId.ObjectId -> Prompt.Prompt r -> r
+      blockEverything blocker p = case p of
+        Prompt.DeclareBlockers _ _ _ attackers -> Map.singleton blocker (Set.fromList attackers)
         _ -> S.aggressiveAnswer p
       board mine theirs = do
         ours <- mapM (S.printingOf s registry) mine
@@ -3056,8 +3103,8 @@ selfBlocksSpec s registry =
           (gs, _, _) <- board ["Goblin Piker"] ["Pride Guardian", "Goblin Piker"]
           let after = S.runCombat S.aggressiveAnswer gs
           Spec.assertEqWith s "one gain of 3, not two" (S.lifeOf S.bob after) (Just 23)
-        -- CR 509.1a gives each blocker one creature to block, so a second
-        -- ATTACKER adds a declaration the Guardian is not in. alice attacks with
+        -- CR 509.1a gives each blocker one creature to block by default, so a
+        -- second ATTACKER adds a declaration the Guardian is not in. alice attacks with
         -- two Pikers and aggressiveAnswer blocks the first; the second's 2 gets
         -- through. 20 + 3 - 2 = 21. The falsifier is a condition that matched an
         -- attacker's declaration too -- three events rather than one, for 25.
@@ -3065,6 +3112,18 @@ selfBlocksSpec s registry =
           (gs, _, _) <- board ["Goblin Piker", "Goblin Piker"] ["Pride Guardian"]
           let after = S.runCombat S.aggressiveAnswer gs
           Spec.assertEqWith s "gained 3 once, then took 2 from the unblocked Piker" (S.lifeOf S.bob after) (Just 21)
+        -- Rule 509.3a's "even if it blocks multiple creatures", now that a
+        -- creature can. A High Ground gives bob's team the arity, the Guardian
+        -- blocks both Pikers, and the gain is 3 once rather than 3 twice. The
+        -- falsifier is a match on the PAIRWISE GameEvent.BlockerDeclared, which
+        -- fires per attacker blocked: 26.
+        Spec.it s "CR 509.3a blocking TWO creatures still gains 3 once" $ do
+          (gs, _, theirs) <- board ["Goblin Piker", "Goblin Piker"] ["Pride Guardian", "High Ground"]
+          case theirs of
+            [guardian, _] -> do
+              let after = S.runCombat (blockEverything guardian) gs
+              Spec.assertEqWith s "one gain of 3, not two" (S.lifeOf S.bob after) (Just 23)
+            _ -> Spec.assertFailure s "fixture should give bob a Guardian and a High Ground"
         -- The other side of the same coin, and CR 508.3a's own words: a creature
         -- that BLOCKS did not attack. Hanweir Garrison {2}{R} 2/3, "Whenever this
         -- creature attacks, create two 1/1 red Human creature tokens that are
@@ -3100,7 +3159,7 @@ selfBlocksCreatureSpec s registry =
       blockSecond :: Prompt.Prompt r -> r
       blockSecond p = case p of
         Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
-          _ : a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
+          _ : a : _ -> Map.fromList (fmap (\b -> (b, Set.singleton a)) mine)
           _ -> Map.empty
         _ -> S.aggressiveAnswer p
       board mine theirs = do
@@ -3216,9 +3275,6 @@ selfBecomesBlockedSpec s registry =
         -- GameEvent.BlockerDeclared are recorded and exactly one
         -- GameEvent.AttackerBlocked. The falsifier is a condition matched against
         -- the declaration's pairs instead: that fires twice, for 22.
-        --
-        -- Unlike CR 509.3a's once (#1145), this dedup is reachable: nothing stops
-        -- the defending player putting two blockers on one attacker.
         Spec.it s "CR 509.3c two blockers on one attacker still gain 1, not 2" $ do
           (gs, _, _) <- board ["Sacred Prey"] ["Goblin Piker", "Goblin Piker"]
           Spec.assertEqWith s "one gain of 1" (S.lifeOf S.alice (S.runCombat S.aggressiveAnswer gs)) (Just 21)
@@ -4889,9 +4945,13 @@ representativeEvents cond =
         -- arm that bound the attacking side instead would still agree with
         -- eventBindingSlots here if the two coincided.
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol)
-        TriggerCondition.SelfBlocks -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
-        -- The same event, same way round: CR 509.3b's bearer is the BLOCKER too,
-        -- and the attacker beside it is what this one binds.
+        -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
+        -- creature, whatever it was declared against.
+        TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared departed 1)
+        -- The same event with the count read, which is all CR 509.3e adds.
+        TriggerCondition.SelfBlocksAtLeast _ -> one (GameEvent.BlocksDeclared departed 2)
+        -- The PAIRWISE event instead: CR 509.3b's bearer is the BLOCKER too, and
+        -- the attacker beside it is what this one binds.
         TriggerCondition.SelfBlocksCreature -> one (GameEvent.BlockerDeclared departed (ObjectId.MkObjectId 41))
         -- CR 508.5's defending player again, and carol for SelfAttacks' reason
         -- above: eventBindings binds this field under `thatPlayer`.
@@ -4998,6 +5058,7 @@ everyTriggerCondition =
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfBlocks,
+    TriggerCondition.SelfBlocksAtLeast 2,
     TriggerCondition.SelfBlocksCreature,
     TriggerCondition.SelfBecomesBlocked,
     TriggerCondition.SelfBecomesBlockedBy (Filter.Type.And []),
@@ -7123,6 +7184,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   battleCrySpec s registry
   prowessSpec s registry
   selfBlocksSpec s registry
+  selfBlocksAtLeastSpec s registry
   selfBlocksCreatureSpec s registry
   selfBecomesBlockedSpec s registry
   bushidoSpec s registry

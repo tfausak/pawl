@@ -55,6 +55,7 @@ bareFace n =
       Face.alternativeCosts = [],
       Face.playerAbilities = [],
       Face.blockRequirements = [],
+      Face.blockPermissions = [],
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
