@@ -179,6 +179,23 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.ObjectCounters (CounterKind.Keyword Keyword.Flying))
       """ {"type":"ObjectCounters","value":{"type":"Keyword","value":{"type":"Flying"}}} """
+  -- CR 508.3b, with a PlayerRef and nothing else on the wire: what is counted is
+  -- the combat record. Rule 702.121a's melee is the Relative arm; the InSlot arm
+  -- beside it is the one a recursive decoder could lose a payload through, as
+  -- LifeTotal's and IsMonarch's are.
+  Spec.it s "OpponentsAttacked, relative and from a slot" $ do
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.OpponentsAttacked (PlayerRef.Relative PlayerRelation.You))
+      """ {"type":"OpponentsAttacked","value":{"type":"Relative","value":{"type":"You"}}} """
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.OpponentsAttacked (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"OpponentsAttacked","value":{"type":"InSlot","value":"target"}} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s

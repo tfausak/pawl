@@ -47,10 +47,13 @@
 -- puts CR 509.3c's event and CR 508.5's defending player in one sentence, with
 -- Khenra Eternal at three seats -- `afflictSpec`. CR 702.83 exalted, the eighth,
 -- whose ability watches a permanent that is not its bearer and pumps a third
--- one, with Aven Squire -- `exaltedSpec`. CR 702.134 mentor, the ninth, and the
--- first keyword whose minted ability TARGETS -- a slot chosen under CR 603.3d and
--- narrowed by a power comparison against its own source -- with Blade Instructor
--- -- `mentorSpec`. CR 509.3b's blocking-side form
+-- one, with Aven Squire -- `exaltedSpec`. CR 702.121 melee, the ninth, and the
+-- first keyword whose payload is a number read off game state -- CR 508.3b's
+-- record of who was declared attacked -- with Wings of the Guard at three seats
+-- -- `meleeSpec`. CR 702.134 mentor, the tenth, and the first keyword whose
+-- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
+-- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
+-- CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -160,11 +163,13 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition.Type
@@ -3409,7 +3414,7 @@ exaltedSpec s registry =
           Spec.assertEqWith s "two abilities" (length abilities) 2
           Spec.assertEqWith s "each watching CR 506.5, filtered on the attacker's controller" (fmap TriggeredAbility.condition abilities) [expected, expected]
 
--- CR 702.134a's mentor, the NINTH keyword rule 702 states as a triggered ability
+-- CR 702.134a's mentor, the TENTH keyword rule 702 states as a triggered ability
 -- and the FIRST whose ability TARGETS -- so this is the group that runs a
 -- keyword-minted TargetSpec through CR 601.2c's choosing, and with it
 -- Filter.PowerLessThanSource, the one atom whose bound is the source's own power
@@ -3813,6 +3818,116 @@ afflictSpec s registry =
           Spec.assertEqWith s "afflict 1 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afflict 1) 2)) [Keyword.afflict 1, Keyword.afflict 1]
           Spec.assertEqWith s "and afflict 3 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afflict 3) 1)) [Keyword.afflict 3]
           Spec.assertBool s (Keyword.afflict 1 /= Keyword.afflict 3) "and the two differ, so N is in the ability"
+
+-- CR 702.121 melee, the EIGHTH keyword whose rule text is a triggered ability,
+-- and the first whose payload is a number read off game state rather than a
+-- literal, with Wings of the Guard ({1}{W} Creature -- Bird 1/1, flying and
+-- melee, and nothing else).
+--
+-- THREE SEATS throughout, and here that is load-bearing rather than tidy: at two
+-- players "each opponent you attacked" and "each opponent" are the same number,
+-- so a bonus that ignored the combat record entirely would pass every case.
+--
+-- CR 802 is unavailable (#175), so one combat phase has ONE defending player and
+-- the bonus pawl can reach is 0 or 1. What separates the two is CR 506.3's other
+-- attackable permanents: a creature that attacked only a planeswalker attacked no
+-- opponent.
+meleeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+meleeSpec s registry =
+  let -- Attacks `who` with everything, aiming every attack at the player.
+      attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      attacking who p = case p of
+        Prompt.ChooseDefender {} -> who
+        _ -> S.aggressiveAnswer p
+      isPlaneswalker target = case target of
+        AttackTarget.OfPlaneswalker _ -> True
+        AttackTarget.OfPlayer _ -> False
+        AttackTarget.OfBattle _ -> False
+      -- The same, with `these` creatures aimed at a planeswalker instead (CR
+      -- 508.1b). Falls back to the head, so a board with no planeswalker offered
+      -- runs exactly as the answerer above.
+      aimingAtJace :: [ObjectId.ObjectId] -> PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimingAtJace these who p = case p of
+        Prompt.ChooseAttackTarget _ _ oid options
+          | elem oid these -> case filter isPlaneswalker (NonEmpty.toList options) of
+              target : _ -> target
+              [] -> NonEmpty.head options
+        _ -> attacking who p
+      -- alice fields the Bird (plus whatever else `mine` names); bob and carol
+      -- each field a Goblin Piker, so either is a legal defending player.
+      board mine = do
+        wings <- S.printingOf s registry "Wings of the Guard"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (S.threePlayerCombat (wings : mine) [piker] [piker])
+      -- The same, with bob fielding Jace Beleren at loyalty 3 as well -- the one
+      -- planeswalker in the pool, and the only way to attack something that is
+      -- not an opponent.
+      jaceBoard mine = do
+        wings <- S.printingOf s registry "Wings of the Guard"
+        piker <- S.printingOf s registry "Goblin Piker"
+        jace <- S.printingOf s registry "Jace Beleren"
+        pure $ case S.threePlayerCombat (wings : mine) [piker, jace] [piker] of
+          (gs, ours, theirs@(_ : jaceId : _), others) -> (S.addCounter CounterKind.Loyalty 3 jaceId gs, ours, theirs, others)
+          done -> done
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+   in Spec.describe s "Melee" $ do
+        -- The proving test. One opponent attacked, so +1/+1 on a 1/1. The
+        -- falsifier three seats buy: a bonus counting alice's OPPONENTS rather
+        -- than the ones she attacked reads 2 here and cannot pass.
+        Spec.it s "CR 702.121a whole card: Wings of the Guard attacking one of two opponents is 2/2" $ do
+          (gs, ours, _, _) <- board []
+          case ours of
+            [wings] -> Spec.assertEqWith s "1/1 plus one opponent attacked" (S.powerToughnessOf wings (atBlockers (attacking S.bob) gs)) (Just (2, 2))
+            _ -> Spec.assertFailure s "fixture should give alice one Bird"
+        -- Rule 702.121a counts OPPONENTS, not creatures: a second attacker at the
+        -- same seat adds nothing. The falsifier is a bonus read off the size of
+        -- the declaration, which reads 2 here and 1 above.
+        Spec.it s "CR 702.121a a second attacker at the same opponent does not raise the bonus" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          (gs, ours, _, _) <- board [piker]
+          case ours of
+            [wings, _] -> Spec.assertEqWith s "still one opponent attacked" (S.powerToughnessOf wings (atBlockers (attacking S.bob) gs)) (Just (2, 2))
+            _ -> Spec.assertFailure s "fixture should give alice a Bird and a Piker"
+        -- CR 508.4's sibling reading, from the other side: attacking an
+        -- opponent's PLANESWALKER is not attacking that opponent, so the bonus is
+        -- 0 and the Bird stays a 1/1. The attack record is asserted first, so a
+        -- run where the Bird failed to attack at all fails there rather than
+        -- passing this vacuously.
+        Spec.it s "CR 506.3 a creature that attacked only a planeswalker gets +0/+0" $ do
+          (gs, ours, theirs, _) <- jaceBoard []
+          case (ours, theirs) of
+            ([wings], [_, jaceId]) -> do
+              let after = atBlockers (aimingAtJace [wings] S.bob) gs
+              Spec.assertEqWith s "CR 508.1b the Bird really did attack Jace" (Map.lookup wings (Combat.Type.attackers (GameState.combat after))) (Just (AttackTarget.OfPlaneswalker jaceId))
+              Spec.assertEqWith s "and no opponent was attacked, so it is still a 1/1" (S.powerToughnessOf wings after) (Just (1, 1))
+            _ -> Spec.assertFailure s "fixture should give alice a Bird and bob a Jace"
+        -- Melee still TRIGGERS when its bearer attacks a planeswalker -- what the
+        -- planeswalker changes is the bonus. Same board as above plus a Piker
+        -- sent at bob, so the record holds one opponent and the Bird is pumped
+        -- although it attacked nobody.
+        Spec.it s "CR 702.121a the bearer's own attack need not be the one that counts" $ do
+          piker <- S.printingOf s registry "Goblin Piker"
+          (gs, ours, _, _) <- jaceBoard [piker]
+          case ours of
+            [wings, _] -> Spec.assertEqWith s "the Piker's attack on bob is the +1/+1" (S.powerToughnessOf wings (atBlockers (aimingAtJace [wings] S.bob) gs)) (Just (2, 2))
+            _ -> Spec.assertFailure s "fixture should give alice a Bird and a Piker"
+        -- CR 611.2d: the bonus is fixed as the ability resolves, and CR 511.3
+        -- clears the combat record at end of combat -- so a pump that re-read the
+        -- record live would shrink back to +0/+0 the moment combat ended, while
+        -- the printed duration runs to end of turn.
+        Spec.it s "CR 611.2d the +1/+1 outlives the combat record it was computed from" $ do
+          (gs, ours, _, _) <- board []
+          case ours of
+            [wings] -> do
+              let after = S.runToStep Phase.PostcombatMain (attacking S.bob) gs
+              Spec.assertEqWith s "CR 511.3 the record is cleared" (Combat.Type.declaredAttacked (GameState.combat after)) Set.empty
+              Spec.assertEqWith s "and the Bird is still a 2/2" (S.powerToughnessOf wings after) (Just (2, 2))
+            _ -> Spec.assertFailure s "fixture should give alice one Bird"
+        -- CR 702.121b: two instances are two abilities, so two triggers and two
+        -- bonuses. Asserted at the mint, no card in the pool having melee twice.
+        Spec.it s "CR 702.121b each instance triggers separately" $ do
+          Spec.assertEqWith s "melee held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 2)) [Keyword.melee, Keyword.melee]
+          Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 1)) [Keyword.melee]
 
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
@@ -7458,6 +7573,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   exaltedSpec s registry
   mentorSpec s registry
   afflictSpec s registry
+  meleeSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   graveyardEffectZoneTriggerSpec s registry

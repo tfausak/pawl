@@ -1623,6 +1623,9 @@ rewriteQuantity pairs quantity = case quantity of
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
   -- name no subtype word, not even the CR 122.1b keyword one.
   Quantity.Type.ObjectCounters _ -> quantity
+  -- And a leaf: CR 508.3b's record holds attack targets, which name players and
+  -- object ids rather than any word CR 612.1 could swap.
+  Quantity.Type.OpponentsAttacked _ -> quantity
 
 -- rewriteQuantity's other half: Greatest is the only Aggregation carrying a
 -- Quantity, and the set it aggregates over is the Count's own Filter.

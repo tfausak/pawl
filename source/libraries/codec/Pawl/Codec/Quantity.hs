@@ -34,6 +34,9 @@ toJson q = case q of
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
   Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ CounterKind.toJson k
+  -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
+  -- from the combat record rather than from anything the card names.
+  Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ PlayerRef.toJson p
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -52,6 +55,7 @@ fromJson value = do
     ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson v
+    ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)

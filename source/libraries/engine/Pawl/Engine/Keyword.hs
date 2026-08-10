@@ -61,9 +61,10 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108 and 702.130 do
--- not: they spell flanking, bushido, poisonous, exalted, annihilator, battle
--- cry, prowess and afflict out as TRIGGERED abilities, so those have to be
+-- Rules 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108, 702.121 and
+-- 702.130 do not: they spell flanking, bushido, poisonous, exalted, annihilator,
+-- battle cry, prowess, melee and afflict out as TRIGGERED abilities, so those
+-- have to be
 -- MINTED and handed to the ordinary CR 603 machinery rather than merely
 -- consulted.
 --
@@ -92,9 +93,9 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- two poison counters, not one ability for 2. (Contrast CR 702.164b, where
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
 -- 702.25b says the same of flanking, CR 702.45b of bushido, CR 702.86b of
--- annihilator, CR 702.91b of battle cry, CR 702.108b of prowess and CR 702.130b
--- of afflict, so the eight minting arms below are the same shape -- bushido's
--- `concat` aside, since its instance is two abilities.
+-- annihilator, CR 702.91b of battle cry, CR 702.108b of prowess, CR 702.121b of
+-- melee and CR 702.130b of afflict, so the nine minting arms below are the same
+-- shape -- bushido's `concat` aside, since its instance is two abilities.
 --
 -- Exalted is the one with no such clause of its own: rule 702.83 states only
 -- that exalted IS a triggered ability, and the "multiple instances are
@@ -121,6 +122,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Exalted -> List.genericReplicate count exalted
+  Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
@@ -223,6 +225,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
+  Keyword.Melee -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -341,6 +344,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
+  Keyword.Melee -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -527,6 +531,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
+  Keyword.Melee -> []
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
@@ -806,6 +811,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Mentor -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
+  Keyword.Melee -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -887,6 +893,8 @@ familyOf keyword = case keyword of
   Keyword.Menace -> Nothing
   Keyword.Devoid -> Nothing
   Keyword.Skulk -> Nothing
+  -- CR 702.121a takes no parameter, so there is no variant for a card to name.
+  Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing
   Keyword.Riot -> Nothing
   Keyword.Daybound -> Nothing
@@ -1052,6 +1060,50 @@ prowess =
       Effect.ModifyTarget
         Duration.UntilEndOfTurn
         (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+        (ObjectRef.EachMatching Filter.IsSource)
+
+-- CR 702.121a: whenever this creature attacks, it gets +1/+1 until end of turn
+-- for each opponent you attacked with a creature this combat. The NINTH keyword
+-- rule 702 states as a triggered ability, minted here like the eight around it.
+--
+-- The condition is battle cry's, TriggerCondition.SelfAttacks: rule 702.121a's
+-- event is the bearer's own declaration. Attacking a PLANESWALKER fires it just
+-- the same -- CR 508.1a chooses the attackers and CR 508.1b only then says what
+-- each attacks, so what the planeswalker changes is the bonus, not the trigger.
+--
+-- "IT" is the bearer, so the payload is prowess', Filter.IsSource -- a singleton
+-- CR 611.2c fixes as the effect begins.
+--
+-- The BONUS is the one payload in this module that is not a literal:
+-- Quantity.OpponentsAttacked reads CR 508.3b's record of who was declared
+-- attacked, against CR 109.5's "you" -- the ability's controller (CR 603.3a).
+-- Zero is an ordinary answer, not a failure: a creature that attacked only a
+-- planeswalker gets +0/+0.
+--
+-- CR 611.2d freezes that number as this resolves
+-- (Projection.freezeQuantities), which is what the printed duration needs -- the
+-- pump lasts until end of turn and CR 511.3 clears the record at end of combat,
+-- so a live re-read would shrink it to 0 the moment combat ended.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- rule 702.121a leaves nothing to choose, and has no "if" clause, so
+-- intervening = Nothing.
+melee :: TriggeredAbility Card
+melee =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    bonus = Quantity.OpponentsAttacked (PlayerRef.Relative PlayerRelation.You)
+    effect =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness bonus bonus)
         (ObjectRef.EachMatching Filter.IsSource)
 
 -- CR 702.25a: whenever this creature becomes blocked by a creature without
@@ -1230,7 +1282,7 @@ afflict n =
         (Quantity.Literal (toInteger n))
 
 -- CR 702.134a: whenever this creature attacks, put a +1/+1 counter on target
--- attacking creature with power less than this creature's power. The NINTH
+-- attacking creature with power less than this creature's power. The TENTH
 -- keyword in this pool whose rule text IS a triggered ability, and the first that
 -- TARGETS -- so it is the first to declare a target slot here rather than an
 -- empty Map.
