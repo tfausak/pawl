@@ -208,6 +208,25 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     ObjectCounters CounterKind.CounterKind
+  | -- | CR 702.112b: is the OBJECT this quantity is evaluated against renowned? 1
+    -- if so and 0 if not -- rule 702.112a's "if it isn't renowned", which CR 603.4
+    -- makes an intervening "if" and so a Pawl.Types.Condition.
+    --
+    -- IsMonarch's shape with the two sides swapped, and ObjectCounters' position:
+    -- a DESIGNATION read as a number, because Condition's vocabulary is numeric,
+    -- but one that rides an OBJECT rather than a player. So it takes no reference
+    -- at all -- like Power and ObjectCounters it reads the object the evaluation is
+    -- aimed at, through the same injected ViewOf, which is what lets CR 608.2h last
+    -- known information answer for a creature that is gone when the ability
+    -- resolves.
+    --
+    -- NOT a Filter atom, though CR 701.54b's Ring-bearer designation is one: rule
+    -- 702.112a asks about the ability's own bearer, which is Power's position and
+    -- not a candidate's. "A renowned creature you control" (Valeron Wardens) is the
+    -- Filter reading, and no card in the pool asks it yet (#1167).
+    --
+    -- A LEAF: it holds no Quantity.
+    IsRenowned
   | -- | CR 508.3b: how many of that player's opponents were DECLARED attacked
     -- this combat phase -- rule 702.121a's "for each opponent you attacked with a
     -- creature this combat".

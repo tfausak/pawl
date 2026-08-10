@@ -169,7 +169,8 @@ createCard pid printing = do
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
-            Object.unlockedHalves = Set.empty
+            Object.unlockedHalves = Set.empty,
+            Object.renowned = False
           }
       gs3 =
         gs2

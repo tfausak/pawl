@@ -708,6 +708,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.BecomeMonarch MonarchTarget.TheController)
       """ {"type":"BecomeMonarch","value":{"type":"TheController"}} """
+  Spec.it s "BecomeRenowned" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.BecomeRenowned (SlotName.MkSlotName (Text.pack "self")))
+      """ {"type":"BecomeRenowned","value":"self"} """
   Spec.it s "ItBecomes" $
     Common.assertJsonCodec
       s

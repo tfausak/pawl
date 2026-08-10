@@ -361,6 +361,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Poisonous 3) /= Keyword.toJson (Keyword.Toxic 3))
       "poisonous 3 is not toxic 3"
+  -- CR 702.112a's N is a THIRD keyword's, and the tag has to keep it apart from
+  -- the other two: `Renown 2` and `Poisonous 2` differ only by tag on the wire.
+  Spec.it s "Renown carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Renown 2)
+      """ {"type":"Renown","value":2} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Renown 2) /= Keyword.toJson (Keyword.Poisonous 2))
+      "renown 2 is not poisonous 2"
   -- CR 702.86a's N rides the constructor the same way poisonous' does, and the
   -- two must not share a tag either.
   Spec.it s "Annihilator carries its N" $ do

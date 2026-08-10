@@ -17,6 +17,8 @@ import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Comparison as Comparison
+import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
 import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
@@ -127,6 +129,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Training -> List.genericReplicate count training
+  Keyword.Renown n -> List.genericReplicate count (renown n)
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -217,6 +220,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
+  Keyword.Renown _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
@@ -340,6 +344,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   -- ability. Pawl.Engine.Keyword.morphCost serves that action instead.
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
+  Keyword.Renown _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
@@ -530,6 +535,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
+  Keyword.Renown _ -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
@@ -814,6 +820,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Morph _ MorphVariant.Mega ->
     List.genericReplicate count (ReplacementEffect.TurnUpR Filter.IsSource (TurnUpRewrite.WithCounters CounterKind.PlusOnePlusOne 1))
   Keyword.Menace -> []
+  Keyword.Renown _ -> []
   Keyword.Cycling _ _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
@@ -915,6 +922,7 @@ familyOf keyword = case keyword of
   Keyword.BattleCry -> Nothing
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
+  Keyword.Renown _ -> Just KeywordFamily.Renown
   Keyword.Devoid -> Nothing
   Keyword.Skulk -> Nothing
   -- CR 702.121a takes no parameter, so there is no variant for a card to name.
@@ -1508,3 +1516,48 @@ provoke =
 -- reads it for mentorTarget's reason.
 provokeTarget :: SlotName.SlotName
 provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
+
+-- CR 702.112a: when this creature deals combat damage to a player, if it isn't
+-- renowned, put N +1/+1 counters on it and it becomes renowned. The FOURTEENTH
+-- keyword in this pool whose rule text IS a triggered ability, minted here like
+-- the thirteen above.
+--
+-- Poisonous' condition with training's payload: rule 702.112a's event is the
+-- bearer's combat damage to a player (SelfDealsCombatDamageToPlayer, rule
+-- 702.70a's) and its counters go on the bearer (Effect.PutCounters against the
+-- reserved Binding.triggerSource slot, rule 702.149a's). Not mentor's target slot:
+-- rule 702.112a says "it", and CR 115.10a makes a named object not a target.
+--
+-- THE INTERVENING "IF" is what this row adds -- the first minted ability with one.
+-- CR 603.4 checks it as the ability would trigger AND CR 608.2a again as it
+-- resolves, which is exactly what CR 702.112c leans on: with two instances the
+-- first to resolve designates the creature, and the second finds it renowned and
+-- is removed from the stack. Pawl.Types.Clause's printed "may"/"if" (CR 608.2e)
+-- would check only on resolution and let the trigger onto the stack regardless,
+-- which rule 603.4 forbids.
+--
+-- Quantity.IsRenowned AtMost 0 is "isn't renowned": the designation read as a 0/1
+-- off the object the condition is evaluated against, which for a triggered ability
+-- is CR 113.7a's source (Pawl.Engine.Stack's OfTrigger arm).
+--
+-- ONE clause holding BOTH effects, in rule 702.112a's printed order and under one
+-- Optionality.Mandatory -- the rule prints one sentence and no "may". Nobody gets
+-- priority between them (CR 117.3b), and no CR 614.16 counter replacement in the
+-- pool reads the designation, so the order is unobservable today.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- rule 702.112a leaves nothing to choose.
+renown :: Natural -> TriggeredAbility Card
+renown n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfDealsCombatDamageToPlayer,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening =
+        Just (Condition.MkCondition Quantity.IsRenowned Comparison.AtMost (Quantity.Literal 0))
+    }
+  where
+    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) Binding.triggerSource
+    designate = Effect.BecomeRenowned Binding.triggerSource

@@ -59,7 +59,8 @@
 -- of the declaration for a bigger companion, with Apprentice Sharpshooter --
 -- `trainingSpec`. CR 702.39 provoke, the thirteenth, and the first whose payload
 -- creates a CR 509.1c blocking requirement, with Goblin Grappler --
--- `provokeSpec`. CR 509.3b's blocking-side form
+-- `provokeSpec`. CR 702.112 renown, the fourteenth, and the first minted
+-- ability with CR 603.4's intervening "if", with Rhox Maulers -- `renownSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -3811,6 +3812,120 @@ provokeSpec s registry =
             (fmap TriggeredAbility.condition abilities)
             [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
           Spec.assertEqWith s "each with rule 702.39a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
+
+-- CR 702.112a's renown, the FOURTEENTH keyword rule 702 states as a triggered
+-- ability -- and the first minted one carrying an intervening "if" (CR 603.4),
+-- which is the whole of why it fires once and not once per connection.
+--
+-- Rhox Maulers {4}{G} Creature -- Rhino Soldier 4/4 is the card: trample and
+-- renown 2. The 2 is what separates "N counters" from "a counter"; the trample is
+-- why the blocked case needs a blocker that absorbs all four damage (Apprentice
+-- Sharpshooter, 1/4), since a smaller one would let renown's own event through.
+--
+-- CR 702.112b's "until it leaves the battlefield" is not read here: the
+-- designation is per-incarnation state, and Pawl.SetupSpec's "no per-incarnation
+-- state survives" case is what proves Object.newIncarnation clears it.
+renownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+renownSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- CR 508.1's declaration narrowed to the named creatures, trainingSpec's
+      -- plan: S.aggressiveAnswer attacks with everything, so a case about who
+      -- attacks in which phase has to say so.
+      plan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      plan attackers p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        _ -> S.aggressiveAnswer p
+      -- CR 122.1: what is actually on the permanent, which a +2/+2 EFFECT would
+      -- leave empty while reading the same 6/6.
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+      -- CR 702.112b's designation itself, which no characteristic reports.
+      renownedness oid gs = fmap Object.renowned (Game.lookupObject oid gs)
+   in Spec.describe s "Renown" $ do
+        -- The proving test. CR 702.112a: two counters on the BEARER, and the
+        -- designation with them. The counter assertion is what separates rule
+        -- 702.112a's placement from a pump, and the 2 what separates N from 1.
+        Spec.it s "CR 702.112a whole card: Rhox Maulers connects and takes two +1/+1 counters" $ do
+          (gs, mine, _) <- board ["Rhox Maulers"] []
+          case mine of
+            [maulers] -> do
+              let after = S.runCombat S.aggressiveAnswer gs
+              Spec.assertEqWith s "bob took the printed four" (S.lifeOf S.bob after) (Just 16)
+              Spec.assertEqWith s "two counters, not one" (countersOn maulers after) (Map.singleton CounterKind.PlusOnePlusOne 2)
+              Spec.assertEqWith s "so it is a 6/6" (S.powerToughnessOf maulers after) (Just (6, 6))
+              Spec.assertEqWith s "and it is renowned" (renownedness maulers after) (Just True)
+            _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
+        -- CR 702.112a is scoped to combat damage dealt TO A PLAYER. The 1/4
+        -- absorbs all four (CR 702.19b leaves nothing to trample over), so the
+        -- event never happens and neither half of the ability runs.
+        Spec.it s "CR 702.112a a fully blocked Maulers is renowned by nobody" $ do
+          (gs, mine, _) <- board ["Rhox Maulers"] ["Apprentice Sharpshooter"]
+          case mine of
+            [maulers] -> do
+              let after = S.runCombat S.aggressiveAnswer gs
+              Spec.assertEqWith s "bob lost no life" (S.lifeOf S.bob after) (Just 20)
+              Spec.assertEqWith s "no counters" (countersOn maulers after) Map.empty
+              Spec.assertEqWith s "and no designation" (renownedness maulers after) (Just False)
+            _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
+        -- CR 603.4's intervening "if", at the board level: a second connection in
+        -- the same turn finds the creature already renowned, so nothing is added.
+        -- Aurelia, the Warleader is the pool's extra combat phase, and she untaps
+        -- the Maulers to attack again. The life drop is the discriminator -- it
+        -- proves the second combat really connected, so a green assertion cannot
+        -- mean the phase never ran.
+        Spec.it s "CR 702.112a a second connection adds nothing, the creature being renowned" $ do
+          (gs, mine, _) <- board ["Rhox Maulers", "Aurelia, the Warleader"] []
+          case mine of
+            [maulers, aurelia] -> do
+              let first = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (plan [maulers, aurelia]) gs
+                  second = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (plan [maulers]) first
+                  after = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (plan [maulers]) second
+              Spec.assertEqWith s "the first combat renowned it" (countersOn maulers first) (Map.singleton CounterKind.PlusOnePlusOne 2)
+              Spec.assertEqWith s "the second phase really ran a declaration" (GameState.phase second) (Phase.Combat CombatStep.DeclareAttackers)
+              Spec.assertEqWith s "and the second really connected, for six" (S.lifeOf S.bob after) (Just 7)
+              Spec.assertEqWith s "but added no third counter" (countersOn maulers after) (Map.singleton CounterKind.PlusOnePlusOne 2)
+            _ -> Spec.assertFailure s "fixture should give alice a Maulers and Aurelia"
+        -- What separates renown from a damage rider: it is a TRIGGERED ability, so
+        -- the counters arrive when it resolves, not as the damage is dealt.
+        -- S.fightWith deals combat damage without reaching a priority boundary,
+        -- so nothing has been gathered yet -- poisonous' case, read on an object.
+        Spec.it s "CR 702.112a the counters ride the stack, not the damage" $ do
+          (gs, mine, _) <- board ["Rhox Maulers"] []
+          case mine of
+            [maulers] -> do
+              let fought = S.fightWith S.aggressiveAnswer gs
+              Spec.assertEqWith s "damage is dealt" (S.lifeOf S.bob fought) (Just 16)
+              Spec.assertEqWith s "but no counters until the trigger resolves" (countersOn maulers fought) Map.empty
+              Spec.assertEqWith s "and no designation either" (renownedness maulers fought) (Just False)
+            _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
+        -- CR 702.112b's "it stays renowned UNTIL IT LEAVES THE BATTLEFIELD": the
+        -- designation is per-incarnation state, so CR 400.7's forgetting is what
+        -- ends it and a Maulers that dies and returns must connect again.
+        --
+        -- Asserted on Object.newIncarnation directly, as Pawl.RoomSpec's unlocked
+        -- designations are: nothing writes this field on an entry, so a bounce
+        -- would read the same forgetting through more machinery. Pawl.SetupSpec's
+        -- CR 400.7 case does NOT cover it -- `forgotten` asks whether the
+        -- forgetting is idempotent, which is blind to a field it never touches.
+        Spec.it s "CR 702.112b the designation does not survive CR 400.7" $ do
+          (gs, mine, _) <- board ["Rhox Maulers"] []
+          case mine of
+            [maulers] -> case Game.lookupObject maulers (S.runCombat S.aggressiveAnswer gs) of
+              Nothing -> Spec.assertFailure s "expected to find the Maulers"
+              Just obj -> do
+                Spec.assertEqWith s "the control: this incarnation is renowned" (Object.renowned obj) True
+                Spec.assertEqWith s "the next one is not" (Object.renowned (Object.newIncarnation obj)) False
+            _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
+        -- CR 702.112c: "if a creature has multiple instances of renown, each
+        -- triggers separately". Asserted of the MINT, as poisonous' multiplicity
+        -- is, no card in the pool printing renown twice. What rule 702.112c says
+        -- happens NEXT -- the second resolving to nothing -- is the intervening
+        -- "if" the gameplay case above reads.
+        Spec.it s "CR 702.112c each instance of renown is its own ability" $ do
+          Spec.assertEqWith s "renown 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 2) 2)) [Keyword.renown 2, Keyword.renown 2]
+          Spec.assertEqWith s "and renown 6 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 6) 1)) [Keyword.renown 6]
 
 -- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
@@ -7923,6 +8038,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   mentorSpec s registry
   trainingSpec s registry
   provokeSpec s registry
+  renownSpec s registry
   afflictSpec s registry
   meleeSpec s registry
   rampageSpec s registry

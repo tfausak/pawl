@@ -146,6 +146,16 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.IsMonarch (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"IsMonarch","value":{"type":"InSlot","value":"target"}} """
+  -- CR 702.112b, with NOTHING on the wire: the designation rides the object the
+  -- quantity is evaluated against, so this is Power's shape rather than
+  -- IsMonarch's, and a payload here would be a decoder inventing one.
+  Spec.it s "IsRenowned" $
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.IsRenowned
+      """ {"type":"IsRenowned"} """
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do

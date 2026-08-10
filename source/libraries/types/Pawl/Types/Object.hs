@@ -394,7 +394,25 @@ data Object = MkObject
     -- because CR 400.7 makes the moved object a new one -- and CR 709.5d is what
     -- re-decides it, from the half that was cast, every time the permanent
     -- enters.
-    unlockedHalves :: Set.Set CardName.CardName
+    unlockedHalves :: Set.Set CardName.CardName,
+    -- | CR 702.112b: the RENOWNED designation. "Renowned is a designation that has
+    -- no rules meaning other than to act as a marker that the renown ability and
+    -- other spells and abilities can identify."
+    --
+    -- A Bool where ringBearerFor above is a Maybe PlayerId, because rule 702.112b
+    -- names no player: it is a mark on the permanent alone, and nothing ends it on
+    -- a change of control the way CR 701.54a ends the Ring-bearer's.
+    --
+    -- STORED rather than projected, and rule 702.112b says why outright --
+    -- "neither an ability nor part of the permanent's copiable values". So no CR
+    -- 613 layer writes it, and a Clone of a renowned creature is not renowned, for
+    -- the reason ringBearerFor's note gives.
+    --
+    -- Per-incarnation state, like damage and counters: cleared by newIncarnation.
+    -- That IS rule 702.112b's "once a permanent becomes renowned, it stays renowned
+    -- until it leaves the battlefield" -- the designation ends with the
+    -- incarnation, so there is no sweep to run.
+    renowned :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -443,5 +461,6 @@ newIncarnation object =
       playableFromExile = Nothing,
       ringBearerFor = Nothing,
       protector = Nothing,
-      unlockedHalves = Set.empty
+      unlockedHalves = Set.empty,
+      renowned = False
     }

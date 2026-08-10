@@ -179,7 +179,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.playableFromExile = Nothing,
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
-              Object.unlockedHalves = Set.empty
+              Object.unlockedHalves = Set.empty,
+              Object.renowned = False
             }
       )
 
@@ -1684,7 +1685,8 @@ handBobBolt lightningBolt gs =
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
-            Object.unlockedHalves = Set.empty
+            Object.unlockedHalves = Set.empty,
+            Object.renowned = False
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1990,7 +1992,8 @@ restartOnStack mountain =
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
-            Object.unlockedHalves = Set.empty
+            Object.unlockedHalves = Set.empty,
+            Object.renowned = False
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

@@ -241,6 +241,10 @@ slotsOf effect = case effect of
   -- CR 725.1's crown names a target slot only in the InSlot arm (Denethor's
   -- "target player"); the other two derive their player and read nothing.
   Effect.BecomeMonarch target -> monarchTargetSlots target
+  -- A READ: the slot names the permanent gaining the designation. Reserved
+  -- rather than a target on every producer today (rule 702.112a's "it"), but
+  -- the lint's question is which slots the effect names, not which are targets.
+  Effect.BecomeRenowned slot -> Set.singleton slot
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch slot -> Set.singleton slot
   Effect.Attach slot -> Set.singleton slot
@@ -389,6 +393,7 @@ slotsAreExhaustive effect = case effect of
   -- which monarchTargetSlots reports as nothing.
   Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
+  Effect.BecomeRenowned _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
   Effect.Attach _ -> True
@@ -481,6 +486,7 @@ readsX = any effectReadsX
       Effect.RequireBlock {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
+      Effect.BecomeRenowned _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
       Effect.Attach _ -> False
@@ -546,6 +552,7 @@ searchesLibrary effect = case effect of
   Effect.RequireBlock {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
+  Effect.BecomeRenowned _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
   Effect.Attach _ -> False
@@ -669,6 +676,7 @@ boundSlots effect = case effect of
   Effect.RequireBlock {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
+  Effect.BecomeRenowned _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
   Effect.Attach _ -> Set.empty
@@ -2886,6 +2894,27 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
         -- overwritten (at most one at a time).
         State.modify' (\g -> g {GameState.monarch = Just p})
         State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
+  -- CR 702.112b: the slot's permanent gains the RENOWNED designation -- the
+  -- second half of rule 702.112a's ability, and a state write rather than a CR 613
+  -- modification, the rule making it "neither an ability nor part of the
+  -- permanent's copiable values".
+  --
+  -- PutCounters' slot read without the quantity: a player recipient takes no
+  -- designation (rule 702.112b: "only permanents can be or become renowned"), an
+  -- illegal slot at resolution is CR 608.2b's no-op, and an id naming no object --
+  -- the permanent has left the battlefield (CR 400.7) -- writes nothing, which
+  -- Map.adjust gives for free.
+  --
+  -- Emits no event, so "when this creature becomes renowned" (Relic Seeker) has
+  -- nothing to trigger on (#1168).
+  Effect.BecomeRenowned slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target ->
+          State.modify'
+            (\gs -> gs {GameState.objects = Map.adjust (\o -> o {Object.renowned = True}) target (GameState.objects gs)})
+      _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
   -- -- CR 731.1's at-most-one, and the CR 702.145c/f transforms it causes
   -- immediately -- is Pawl.Engine.Daytime's, so this arm names no field and asks

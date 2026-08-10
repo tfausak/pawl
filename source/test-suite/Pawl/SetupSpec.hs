@@ -251,7 +251,8 @@ dirtied pid object =
       Object.playableFromExile = Just (ExilePlayPermission.MkExilePlayPermission pid S.noSource Expiry.Never),
       Object.ringBearerFor = Just pid,
       Object.protector = Just pid,
-      Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna"))
+      Object.unlockedHalves = Set.singleton (CardName.MkCardName (Text.pack "Steaming Sauna")),
+      Object.renowned = True
     }
 
 -- CR 400.7: has this object no memory of a previous existence? Applying the

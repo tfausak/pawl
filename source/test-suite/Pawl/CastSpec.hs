@@ -653,7 +653,8 @@ handInPlay printing board =
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
-            Object.unlockedHalves = Set.empty
+            Object.unlockedHalves = Set.empty,
+            Object.renowned = False
           }
    in ( g2
           { GameState.objects = Map.insert oid obj (GameState.objects g2),

@@ -423,7 +423,8 @@ createEmblem pid card =
             Object.playableFromExile = Nothing,
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
-            Object.unlockedHalves = Set.empty
+            Object.unlockedHalves = Set.empty,
+            Object.renowned = False
           }
    in placeObject pid mkObj Zone.Command LibraryPosition.defaultValue
 
@@ -2398,7 +2399,8 @@ createTokens controller card n tapped = do
                     Object.playableFromExile = Nothing,
                     Object.ringBearerFor = Nothing,
                     Object.protector = Nothing,
-                    Object.unlockedHalves = Set.empty
+                    Object.unlockedHalves = Set.empty,
+                    Object.renowned = False
                   }
           ids <- Monad.replicateM (Natural.toIntSaturating count) (placeObject owner mkObj Zone.Battlefield LibraryPosition.defaultValue)
           Monad.mapM_ (runEntry (Set.fromList ids)) ids
