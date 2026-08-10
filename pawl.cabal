@@ -443,8 +443,8 @@ library extra
     Pawl.Extra.Semigroup
     Pawl.Extra.SemigroupSpec
 
--- RFC compliant JSON types, encoders, and decoders. Similar to aeson, but much
--- simpler.
+-- RFC 8259 compliant JSON types, encoders, and decoders. Similar to aeson, but
+-- much simpler.
 library json
   import: library
   build-depends:
@@ -474,6 +474,28 @@ library json
     Pawl.Json.StringSpec
     Pawl.Json.Value
     Pawl.Json.ValueSpec
+
+-- RFC 6901 compliant JSON pointer types and evaluator.
+library json-pointer
+  import: library
+  build-depends:
+    bytestring ^>=0.12.2,
+    parsec ^>=3.1.18,
+    pawl:decimal,
+    pawl:extra,
+    pawl:json,
+    pawl:spec,
+    text ^>=2.1.3,
+
+  hs-source-dirs: source/libraries/json-pointer
+  -- cabal-gild: discover source/libraries/json-pointer
+  exposed-modules:
+    Pawl.JsonPointer.Evaluate
+    Pawl.JsonPointer.EvaluateSpec
+    Pawl.JsonPointer.Pointer
+    Pawl.JsonPointer.PointerSpec
+    Pawl.JsonPointer.Token
+    Pawl.JsonPointer.TokenSpec
 
 -- The registry provides a way to load and cache card data from disk.
 library registry
@@ -735,6 +757,7 @@ test-suite pawl-test-suite
     pawl:exceptions,
     pawl:extra,
     pawl:json,
+    pawl:json-pointer,
     pawl:registry,
     pawl:slug,
     pawl:spec,
