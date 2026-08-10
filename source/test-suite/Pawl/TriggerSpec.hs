@@ -3151,8 +3151,9 @@ selfBlocksCreatureSpec s registry =
             _ -> Spec.assertFailure s "fixture should give alice two attackers and bob one blocker"
         -- CR 509.3b's bearer is the BLOCKER. The same card attacking and becoming
         -- blocked matches nothing, which is what pins the arm's `blocker ==
-        -- bearer` against reading the pair the other way round -- that reading
-        -- destroys the blocking Piker in the declare blockers step.
+        -- bearer` against reading the pair the other way round -- under that
+        -- reading the attacking Sentry triggers and destroys itself in the
+        -- declare blockers step.
         Spec.it s "CR 509.3b becoming blocked is not blocking" $ do
           (gs, mine, theirs) <- board ["Loyal Sentry"] ["Goblin Piker"]
           case (mine, theirs) of
