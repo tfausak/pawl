@@ -13,6 +13,7 @@ import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.CastingPermission (CastingPermission)
@@ -41,6 +42,7 @@ import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.Optionality as Optionality
+import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -64,11 +66,11 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.23, 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108, 702.121,
--- 702.130 and 702.134 do not: they spell rampage, flanking, bushido, poisonous,
--- exalted, annihilator, battle cry, prowess, melee, afflict and mentor out as
--- TRIGGERED abilities, so those have to be MINTED and handed to the ordinary CR
--- 603 machinery rather than merely consulted.
+-- Rules 702.23, 702.25, 702.45, 702.63, 702.70, 702.83, 702.86, 702.91, 702.108,
+-- 702.121, 702.130 and 702.134 do not: they spell rampage, flanking, bushido,
+-- vanishing, poisonous, exalted, annihilator, battle cry, prowess, melee, afflict
+-- and mentor out as TRIGGERED abilities, so those have to be MINTED and handed to
+-- the ordinary CR 603 machinery rather than merely consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -96,9 +98,10 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
 -- 702.23c says the same of rampage, CR 702.25b of flanking, CR 702.45b of
 -- bushido, CR 702.86b of annihilator, CR 702.91b of battle cry, CR 702.108b of
--- prowess, CR 702.121b of melee, CR 702.130b of afflict and CR 702.134b of
--- mentor, so the twelve minting arms below are the same shape -- bushido's
--- `concat` aside, since its instance is two abilities.
+-- prowess, CR 702.121b of melee, CR 702.130b of afflict, CR 702.134b of mentor
+-- and CR 702.63c of vanishing, so the thirteen minting arms below are the same
+-- shape -- bushido's and vanishing's `concat` aside, since each of those
+-- instances is two abilities.
 --
 -- Exalted is the one with no such clause of its own: rule 702.83 states only
 -- that exalted IS a triggered ability, and the "multiple instances are
@@ -119,6 +122,9 @@ abilitiesFor keyword count = case keyword of
   -- The one arm that yields TWO abilities per instance: rule 702.45a's ability
   -- watches two events, and a TriggeredAbility carries one condition.
   Keyword.Bushido n -> concat (List.genericReplicate count (bushido n))
+  -- The SECOND such arm: rule 702.63a states three abilities, and the first of
+  -- them is a replacement effect rather than a trigger, so two land here.
+  Keyword.Vanishing _ -> concat (List.genericReplicate count vanishing)
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
@@ -243,6 +249,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Training -> []
@@ -369,6 +376,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Training -> []
@@ -599,6 +607,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Training -> []
@@ -814,6 +823,15 @@ mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toA
 mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
 mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Riot)
+  -- CR 702.63a's FIRST ability: "this permanent enters with N time counters on
+  -- it", a CR 614.1c self-replacement in riot's exact position, down to
+  -- Filter.IsSource. Where riot's rewrite asks a question and this one does not,
+  -- so the count rides the rewrite rather than a prompt.
+  --
+  -- ONE ROW PER INSTANCE for riot's reason, and CR 702.63c makes the counters
+  -- add up: two instances of vanishing 2 enter the permanent with four time
+  -- counters, since each rewrite places its own N.
+  Keyword.Vanishing n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters CounterKind.Time n))
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -931,6 +949,7 @@ familyOf keyword = case keyword of
   Keyword.Morph _ _ -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine
   Keyword.Bushido _ -> Just KeywordFamily.Bushido
+  Keyword.Vanishing _ -> Just KeywordFamily.Vanishing
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
@@ -1678,3 +1697,79 @@ renown n =
   where
     grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource)
     designate = Effect.BecomeRenowned Binding.triggerSource
+
+-- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
+-- first is mintedReplacementsFor's, so vanishing is the first keyword here whose
+-- rule text spans both mints. Bushido's "one instance, two abilities" shape, and
+-- the second use of abilitiesFor's `concat`.
+--
+-- Ordered as rule 702.63a prints them, which is also the order they fire in: the
+-- upkeep removal is what takes the last counter off, and the sacrifice watches
+-- that removal.
+vanishing :: [TriggeredAbility Card]
+vanishing = [vanishingUpkeep, vanishingLastCounter]
+
+-- "At the beginning of your upkeep, if this permanent has a time counter on it,
+-- remove a time counter from it."
+--
+-- TurnScope.ControllersTurn is rule 702.63a's "YOUR upkeep": CR 603.3a makes the
+-- ability's controller the permanent's controller, so the scope reads off the
+-- same player the rule's "you" names, and an opponent's upkeep is not this
+-- trigger.
+--
+-- THE INTERVENING "IF" is renown's, one quantity over: rule 702.63a prints "if",
+-- so CR 603.4 keeps the ability off the stack on an upkeep where the counters
+-- are already gone. Quantity.ObjectCounters reads the object the condition is
+-- evaluated against, which for a triggered ability is CR 113.7a's source; AtLeast
+-- 1 is the rule's "has a time counter on it".
+--
+-- CR 608.2a's re-check comes with the clause and is unobservable here: an
+-- instance that resolved with the condition false would remove nothing, and
+-- Effect.RemoveCounters raises no event for a removal of nothing -- so no
+-- vanishing board tells the two readings apart.
+--
+-- Effect.RemoveCounters against Binding.triggerSource for renown's reason: rule
+-- 702.63a says "from it", and CR 115.10a makes a named object not a target.
+--
+-- ONE counter per instance, not per counter present: rule 702.63a removes a
+-- single one, and CR 702.63c is what makes a second instance remove a second.
+vanishingUpkeep :: TriggeredAbility Card
+vanishingUpkeep =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening =
+        Just (Condition.Compares (Quantity.ObjectCounters CounterKind.Time) Comparison.AtLeast (Quantity.Literal 1))
+    }
+  where
+    effect = Effect.RemoveCounters CounterKind.Time (Quantity.Literal 1) Binding.triggerSource
+
+-- "When the last time counter is removed from this permanent, sacrifice it."
+--
+-- Pawl.Engine.Battle.siegeDefeat's condition with a different kind and a
+-- different payload: CR 310.11b and rule 702.63a ask the same question of
+-- Object.counters, which is why TriggerCondition.SelfLastCounterRemoved needed no
+-- widening for this row.
+--
+-- Watches the REMOVAL and not the count, so a permanent whose time counters were
+-- all removed before it entered has nothing to trigger -- and an upkeep that
+-- removes nothing (the intervening "if" above being false) raises no
+-- GameEvent.CountersRemoved to match either.
+--
+-- Effect.Sacrifice, never Destroy: CR 701.21a says a sacrifice is not a
+-- destruction, so an indestructible permanent with vanishing still goes.
+vanishingLastCounter :: TriggeredAbility Card
+vanishingLastCounter =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfLastCounterRemoved CounterKind.Time,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect = Effect.Sacrifice Binding.triggerSource
