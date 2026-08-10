@@ -448,8 +448,8 @@ data GameEvent
   | -- | CR 702.112b: a permanent BECAME RENOWNED -- it was given the renowned
     -- designation. Emitted by Pawl.Engine.Resolve's Effect.BecomeRenowned arm, the
     -- one place the designation is written, and only on a TRANSITION: a permanent
-    -- already renowned does not become renowned again, which is the same gate
-    -- HalfUnlocked's emission applies to its own designation.
+    -- already renowned does not become renowned again. HalfUnlocked's emission
+    -- applies the same gate to its own designation.
     --
     -- The PERMANENT by id and nothing else, for TurnedFaceUp's reasons. No player:
     -- rule 702.112b names none, and CR 603.3a reads a watcher's controller off its

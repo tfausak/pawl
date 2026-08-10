@@ -3828,9 +3828,10 @@ provokeSpec s registry =
 -- you control becomes renowned, draw a card" (CR 702.112b's marker read by
 -- something other than renown itself).
 --
--- CR 702.112b's "until it leaves the battlefield" is not read here: the
--- designation is per-incarnation state, and Pawl.SetupSpec's "no per-incarnation
--- state survives" case is what proves Object.newIncarnation clears it.
+-- CR 702.112b's "until it leaves the battlefield" is read on Object.newIncarnation
+-- directly, below. Pawl.SetupSpec's "no per-incarnation state survives" case does
+-- NOT cover it -- that case asks whether the forgetting is idempotent, which is
+-- blind to a field it never touches.
 renownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 renownSpec s registry =
   let board mine theirs = do
@@ -3933,11 +3934,6 @@ renownSpec s registry =
                 Spec.assertEqWith s "the control: this incarnation is renowned" (Object.renowned obj) True
                 Spec.assertEqWith s "the next one is not" (Object.renowned (Object.newIncarnation obj)) False
             _ -> Spec.assertFailure s "fixture should give alice a Rhox Maulers"
-        -- CR 702.112c: "if a creature has multiple instances of renown, each
-        -- triggers separately". Asserted of the MINT, as poisonous' multiplicity
-        -- is, no card in the pool printing renown twice. What rule 702.112c says
-        -- happens NEXT -- the second resolving to nothing -- is the intervening
-        -- "if" the gameplay case above reads.
         -- CR 702.112b's designation read by a WATCHER, which is what the rule
         -- calls it a marker FOR: Valeron Wardens {2}{G} Creature -- Human Monk
         -- 1/3, renown 2 and "whenever a creature you control becomes renowned,
@@ -3991,6 +3987,11 @@ renownSpec s registry =
               Spec.assertEqWith s "she drew two" (length (Game.zoneMembers Zone.Hand S.alice after)) 2
               Spec.assertEqWith s "and he drew none" (length (Game.zoneMembers Zone.Hand S.bob after)) 0
             _ -> Spec.assertFailure s "fixture should give alice a Wardens and a Maulers, bob a Wardens"
+        -- CR 702.112c: "if a creature has multiple instances of renown, each
+        -- triggers separately". Asserted of the MINT, as poisonous' multiplicity
+        -- is, no card in the pool printing renown twice. What rule 702.112c says
+        -- happens NEXT -- the second resolving to nothing -- is the intervening
+        -- "if" the gameplay cases above read.
         Spec.it s "CR 702.112c each instance of renown is its own ability" $ do
           Spec.assertEqWith s "renown 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 2) 2)) [Keyword.renown 2, Keyword.renown 2]
           Spec.assertEqWith s "and renown 6 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 6) 1)) [Keyword.renown 6]
