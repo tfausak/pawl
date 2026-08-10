@@ -84,6 +84,7 @@ toJson k = case k of
   Keyword.Unleash -> Common.nullary "Unleash"
   Keyword.Daybound -> Common.nullary "Daybound"
   Keyword.Nightbound -> Common.nullary "Nightbound"
+  Keyword.Decayed -> Common.nullary "Decayed"
   Keyword.Training -> Common.nullary "Training"
   Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
   Keyword.StartYourEngines -> Common.nullary "StartYourEngines"
@@ -151,6 +152,7 @@ fromJson value = do
     ("Unleash", _) -> Right Keyword.Unleash
     ("Daybound", _) -> Right Keyword.Daybound
     ("Nightbound", _) -> Right Keyword.Nightbound
+    ("Decayed", _) -> Right Keyword.Decayed
     ("Training", _) -> Right Keyword.Training
     ("Toxic", Just v) -> Keyword.Toxic <$> Common.decodeNatural v
     ("StartYourEngines", _) -> Right Keyword.StartYourEngines

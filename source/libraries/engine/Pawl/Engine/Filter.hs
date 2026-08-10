@@ -669,6 +669,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Unleash -> keyword
   Keyword.Type.Daybound -> keyword
   Keyword.Type.Nightbound -> keyword
+  -- CR 702.147a names no word CR 612.2 can swap: "end of combat" is the rules'
+  -- own step and the ability it arms is written in Pawl.Engine.Keyword.
+  Keyword.Type.Decayed -> keyword
   Keyword.Type.Toxic _ -> keyword
   Keyword.Type.StartYourEngines -> keyword
   Keyword.Type.Persist -> keyword

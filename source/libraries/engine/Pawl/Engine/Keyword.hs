@@ -11,6 +11,8 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
+import Pawl.Types.AbilityName (AbilityName)
+import qualified Pawl.Types.AbilityName as AbilityName
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
@@ -25,6 +27,7 @@ import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
+import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -52,6 +55,7 @@ import qualified Pawl.Types.ModeSelection as ModeSelection
 import qualified Pawl.Types.Modification as Modification
 import qualified Pawl.Types.MorphVariant as MorphVariant
 import qualified Pawl.Types.ObjectRef as ObjectRef
+import qualified Pawl.Types.Onset as Onset
 import qualified Pawl.Types.Optionality as Optionality
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -207,6 +211,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Decayed -> List.genericReplicate count decayed
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 
@@ -288,6 +293,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
@@ -421,6 +427,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
@@ -658,6 +665,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
@@ -966,6 +974,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Rampage _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Decayed -> []
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
@@ -1087,6 +1096,11 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Rampage _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  -- CR 702.147a's static half: "This creature can't block." Unleash's row above
+  -- with the counter clause and nothing else removed -- rule 702.147a states the
+  -- restriction flat, so the affected set is the source alone and the CR 509.1b
+  -- "unless" gate is Nothing.
+  Keyword.Decayed -> [CombatRestriction.CantBlock (Affected.Matching Filter.IsSource) Nothing]
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
@@ -1179,6 +1193,7 @@ familyOf keyword = case keyword of
   Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
+  Keyword.Decayed -> Nothing
   -- CR 702.149a takes no parameter, so training has no family of its own.
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
@@ -1772,6 +1787,92 @@ training =
     }
   where
     effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource)
+
+-- CR 702.147a's TRIGGERED half: "When this creature attacks, sacrifice it at end
+-- of combat." CR 508.3a is what "attacks" means, so the condition is mentor's and
+-- provoke's -- SelfAttacks, EveryTime, rule 702.147a stating no once-a-turn
+-- narrowing.
+--
+-- The payload is not a sacrifice. "At end of combat" makes the sacrifice a CR
+-- 603.7 DELAYED triggered ability, created as this one resolves, so the effect is
+-- the arming opcode and `decayedSacrifice` is what it arms.
+--
+-- Onset.Immediately with no stated duration -- CR 603.7a's floor and CR 603.7b's
+-- default. Rule 702.147a gates neither end of the envelope, so the delayed
+-- ability watches from the moment it is armed and fires once.
+decayed :: TriggeredAbility Card
+decayed =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect = Effect.ArmDelayedTrigger decayedSacrificeName Onset.Immediately Nothing
+
+-- CR 603.7: the delayed triggered abilities RULE 702 declares, keyed by the name
+-- its own arming opcode names. Pawl.Engine.Resolve falls back to this map when a
+-- name is on no face's Face.delayedAbilities, which is every arm a MINTED ability
+-- performs: the join Pawl.Types.AbilityName describes runs from a card's text to
+-- that card's declarations, and a keyword has no card text to declare the far end
+-- in.
+--
+-- Read by NAME and never off the board, which is what CR 603.7 asks for: the
+-- ability that armed the delayed one is what defines it, so a source that has
+-- since lost the keyword -- or left the battlefield -- still sacrifices. Deriving
+-- the ability from the source's keywords instead would answer differently, and
+-- wrongly.
+--
+-- NOT a nested ability inside the opcode, which is the other way to say this.
+-- Pawl.Types.Effect is first-order and non-recursive on purpose; a
+-- TriggeredAbility payload would make it recursive and add a `card` parameter to
+-- every effect in the DSL, for one keyword.
+--
+-- The two ends cannot drift, `decayed` above arming the same constant this map is
+-- keyed by. What no type enforces is a LATER keyword whose arm is written and
+-- whose row here is forgotten: a dangling name is a silent no-op, caught by that
+-- keyword's own gameplay test rather than by the build. Pawl.CardSpec closes the
+-- other direction, keeping the two namespaces disjoint so no card's declaration
+-- can shadow a row here.
+mintedDelayedAbilities :: Map AbilityName (TriggeredAbility Card)
+mintedDelayedAbilities = Map.singleton decayedSacrificeName decayedSacrifice
+
+-- The lookup Pawl.Engine.Resolve does, which learns only that rule 702 declared
+-- an ability under this name and never which keyword did.
+mintedDelayedAbility :: AbilityName -> Maybe (TriggeredAbility Card)
+mintedDelayedAbility name = Map.lookup name mintedDelayedAbilities
+
+-- The name rule 702.147a's delayed ability is filed under. A card may not declare
+-- one under this name (Pawl.CardSpec), which is what makes the fallback order in
+-- Pawl.Engine.Resolve immaterial.
+decayedSacrificeName :: AbilityName
+decayedSacrificeName = AbilityName.MkAbilityName (Text.pack "decayed")
+
+-- CR 702.147a's "sacrifice it at end of combat", as CR 511.2 states the timing:
+-- abilities that trigger "at end of combat" trigger as the end of combat step
+-- begins. TurnScope.EachTurn, because rule 702.147a names no player's turn --
+-- the ability is armed during a combat and CR 603.7b spends it at that combat's
+-- own end of combat step, so the scope never has a second turn to admit.
+--
+-- Effect.Sacrifice against Binding.triggerSource, vanishing's payload exactly:
+-- rule 702.147a says "it", and CR 603.7c makes that the environment captured as
+-- the ability was armed rather than a fresh read. CR 701.21a keeps it a
+-- sacrifice and not a destruction, so an indestructible attacker still goes.
+decayedSacrifice :: TriggeredAbility Card
+decayedSacrifice =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.StepBegins (Phase.Combat CombatStep.EndOfCombat) TurnScope.EachTurn,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect = Effect.Sacrifice Binding.triggerSource
 
 -- CR 702.39a's provoke: whenever this creature attacks, you may choose to have
 -- target creature defending player controls block this creature this combat if
