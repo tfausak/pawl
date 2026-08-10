@@ -116,7 +116,7 @@ resolveTopWith runSubgame = do
                           -- that is Object.owner for every spell in the pool --
                           -- nothing here lets a player cast a card they do not
                           -- own, so the two readings coincide (#83).
-                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Nothing entering Facing.FaceUp
+                          carryOver oid =<< Event.changeZoneAttaching Nothing oid Zone.Battlefield LibraryPosition.defaultValue (enchantedBy oid gs) TapState.Untapped Map.empty Nothing entering Facing.FaceUp
         -- A token is never on the stack (created onto the battlefield, never
         -- cast).
         Source.OfToken _ -> State.put gs {GameState.stack = rest}

@@ -351,6 +351,23 @@ data Keyword
     -- triggers -- which is what Pawl.Engine.Keyword.triggeredAbilitiesOf builds
     -- from the projection's per-keyword count.
     Poisonous Natural.Natural
+  | -- | 702.79a: persist. "When this permanent is put into a graveyard from the
+    -- battlefield, if it had no -1/-1 counters on it, return it to the
+    -- battlefield under its owner's control with a -1/-1 counter on it" -- which
+    -- CR 700.4 is what makes that a dies trigger. A triggered ability rule 702
+    -- states in full, so
+    -- Pawl.Engine.Keyword.persist mints it and no card writes the sentence.
+    --
+    -- Undying's (702.93a) exact mirror, down to the "if" clause, and a separate
+    -- constructor rather than one keyword carrying a CounterKind: the two are two
+    -- rules with two names, and a card asking for "a creature with persist" is
+    -- asking about rule 702.79 rather than about a counter kind.
+    --
+    -- Nullary, because rule 702.79a takes no parameter, and its reader takes the
+    -- per-keyword COUNT: rule 702.79 states no redundancy clause, so CR 603.2's
+    -- general reading makes two instances two abilities -- two returns, the second
+    -- of which finds the permanent already back and does nothing.
+    Persist
   | -- | 702.80a: damage this source deals to a creature isn't marked on it;
     -- instead its controller puts that many -1/-1 counters on that creature.
     -- Nullary, because CR 702.80d makes multiple instances redundant -- so unlike
@@ -399,6 +416,14 @@ data Keyword
     -- siblings, its reader takes the per-keyword count rather than membership,
     -- since CR 702.91b gives it the multiplicity CR 702.70b gives poisonous.
     BattleCry
+  | -- | 702.93a: undying, rule 702.79a's sentence in the other counter kind --
+    -- "if it had no +1/+1 counters on it, return it to the battlefield under its
+    -- owner's control with a +1/+1 counter on it". Persist's mirror, and
+    -- minted by Pawl.Engine.Keyword.undying for that constructor's reasons,
+    -- including why the two are not one.
+    --
+    -- Nullary and count-read, for persist's reasons.
+    Undying
   | -- | 702.100a: whenever a creature you control enters, if that creature's power
     -- and/or toughness is greater than this creature's, put a +1/+1 counter on
     -- this creature. Minted by Pawl.Engine.Keyword.evolve like the triggered

@@ -1359,6 +1359,8 @@ rewriteEffect pairs effect = case effect of
   Effect.Sacrifice _ -> effect
   Effect.TurnFaceDown _ -> effect
   Effect.RemoveFromCombat _ -> effect
+  -- Not implemented: a CR 122.1b keyword counter named in the riders keeps its
+  -- printed keyword through the swap (#1190).
   Effect.MoveToZone ref zone riders mSlot mOrigin position -> Effect.MoveToZone (rewriteObjectRef pairs ref) zone riders mSlot mOrigin position
   Effect.Draw {} -> effect
   -- The tally's Filter is text like the Search arm's above (CR 612.1), so a

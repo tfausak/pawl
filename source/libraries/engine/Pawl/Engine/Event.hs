@@ -1662,9 +1662,14 @@ changeZoneEntering oid requestedDest position riders under = do
       -- other than the stack enters the battlefield with its front face up by
       -- default", which Object.face records as Nothing (CR 712.8a).
       shown = if onto then fmap Face.name mBack else Nothing
+      -- CR 110.2a: the effect states otherwise, so the player it instructed stops
+      -- being the answer and CR 110.2's default -- the owner, which is what
+      -- `Nothing` means to the funnel -- takes over. Undying and persist are what
+      -- print it (CR 702.93a, CR 702.79a).
+      under' = if EntryRiders.underOwner riders then Nothing else under
   if refused
     then pure Nothing
-    else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) under shown Facing.FaceUp
+    else changeZoneAttaching Nothing oid requestedDest position Nothing (EntryRiders.tapped riders) (EntryRiders.counters riders) under' shown Facing.FaceUp
 
 -- changeZoneReturning for a move that carries ONE NAMED HALF of the card into
 -- its destination: CR 709.3's choice of which half of a split card is being
@@ -1697,7 +1702,7 @@ changeZoneEntering oid requestedDest position riders under = do
 -- See the `face` note in changeZoneAttaching's mkObj, and Pawl.CastSpec's "a cast
 -- redirected off the stack keeps both halves" for the case that proves it.
 changeZoneShowing :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Nothing shown Facing.FaceUp
+changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceUp
 
 -- changeZoneShowing for a move that puts the object into its destination FACE
 -- DOWN -- the CR 110.5b "unless a spell or ability says otherwise" that morph is.
@@ -1722,7 +1727,7 @@ changeZoneShowing oid requestedDest shown = changeZoneAttaching Nothing oid requ
 -- than being stored. Turning the permanent face up is what makes it observable
 -- again (CR 708.8).
 changeZoneFaceDown :: ObjectId -> Zone -> Maybe CardName.CardName -> Game (Maybe ObjectId)
-changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Nothing shown Facing.FaceDown
+changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing shown Facing.FaceDown
 
 -- changeZone for one member of a batch of moves CR 608.2f or CR 704.3 processes
 -- SIMULTANEOUSLY. `asOf` is the board the batch began in -- or, for a batch inside
@@ -1732,14 +1737,14 @@ changeZoneFaceDown oid requestedDest shown = changeZoneAttaching Nothing oid req
 -- A separate door rather than a fourth parameter on changeZone: a batch is the
 -- rare case, and for a single move the board it begins on IS the live one.
 changeZoneInBatch :: GameState -> ObjectId -> Zone -> Game ()
-changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Nothing Nothing Facing.FaceUp)
+changeZoneInBatch asOf oid requestedDest = Monad.void (changeZoneAttaching (Just asOf) oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp)
 
 -- changeZoneReturning's body, returning the destination incarnation's id: Just
 -- newId on a completed move (CR 400.7 minted a fresh id), Nothing when the id is
 -- unknown or the CR 616.1 replacement loop cancelled the move (`resolved ==
 -- Nothing`). changeZoneReturning itself is the `seed = Nothing` case below.
 changeZoneReturning :: ObjectId -> Zone -> Game (Maybe ObjectId)
-changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Nothing Nothing Facing.FaceUp
+changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requestedDest LibraryPosition.defaultValue Nothing TapState.Untapped Map.empty Nothing Nothing Facing.FaceUp
 
 -- changeZoneReturning with an attachment seed. Per CR 303.4 attachment is a
 -- property of entering, not a step after it: the CR 614.1c entry replacement loop
@@ -1752,8 +1757,10 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- 704.5m -- where CR 303.4g says it should instead stay in its current zone (#188).
 --
 -- `asOf` is changeZoneInBatch's batch board, Nothing otherwise. `tapped` is CR
--- 110.5b's status, Untapped for every door but changeZoneEntering. `under` is CR
--- 110.2a's entry controller, Nothing for every door but changeZoneEntering --
+-- 110.5b's status, Untapped for every door but changeZoneEntering. `entering` is
+-- CR 122.6a's counters the object enters the battlefield with, empty for every
+-- door but that one and inert for every destination but the battlefield.
+-- `under` is CR 110.2a's entry controller, Nothing for every door but changeZoneEntering --
 -- and Nothing there too for a move whose effect names no player, which by CR
 -- 110.2 and CR 108.4a leaves the owner answering. `shown` is CR 709.3's chosen
 -- half or CR 712.13's carried face, Nothing for every door but
@@ -1766,8 +1773,8 @@ changeZoneReturning oid requestedDest = changeZoneAttaching Nothing oid requeste
 -- one drops it for free, and a redirect INTO one from a move that named no
 -- position carries the default -- which is the right answer, since nothing said
 -- top.
-changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
-changeZoneAttaching asOf oid requestedDest position seed tapped under shown facing = do
+changeZoneAttaching :: Maybe GameState -> ObjectId -> Zone -> LibraryPosition.LibraryPosition -> Maybe Recipient.Recipient -> TapState.TapState -> Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> Maybe PlayerId -> Maybe CardName.CardName -> Facing.Facing -> Game (Maybe ObjectId)
+changeZoneAttaching asOf oid requestedDest position seed tapped entering under shown facing = do
   gs <- State.get
   case Game.lookupObject oid gs of
     Nothing -> pure Nothing
@@ -2052,7 +2059,20 @@ changeZoneAttaching asOf oid requestedDest position seed tapped under shown faci
           -- expressed as call nesting rather than a field. A lone entry has no
           -- same-batch siblings (CR 614.12a; see applyReplacementsIn
           -- for why 614.12a and not 614.13a).
-          Monad.when (dest == Zone.Battlefield) (runEntry Set.empty newId)
+          Monad.when (dest == Zone.Battlefield) $ do
+            -- CR 122.6a: the counters the EFFECT says the object enters with --
+            -- undying's and persist's "with a +1/+1 counter on it". Inside the
+            -- move, before the entry loop and before the Moved event below, so
+            -- nothing can see the permanent without them (the tap state's reason,
+            -- one field over). Through putCounters, CR 122.6's funnel, so CR
+            -- 614.16 applies and Doubling Season sees them, exactly as the
+            -- EntryRewrite.WithCounters arm inside the loop does.
+            --
+            -- Before the loop rather than after it, which no card observes: no
+            -- entry replacement in the pool reads a counter the entering object
+            -- already has, and the two are simultaneous in the rules anyway.
+            Monad.mapM_ (\(kind, n) -> Monad.void (putCounters CounterCause.ByEffect newId kind n)) (Map.toAscList entering)
+            runEntry Set.empty newId
           -- CR 709.5h: an ability that triggers on a door opening fires "regardless
           -- of whether it was given that designation while entering the
           -- battlefield or after entering the battlefield", so the entry
