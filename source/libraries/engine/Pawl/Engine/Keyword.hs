@@ -12,6 +12,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.CastingPermission (CastingPermission)
@@ -121,6 +122,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
+  Keyword.Outlast _ -> []
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Flanking -> List.genericReplicate count flanking
   Keyword.Exalted -> List.genericReplicate count exalted
@@ -227,6 +229,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
@@ -351,6 +354,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Outlast cost -> List.genericReplicate count (outlast cost)
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
@@ -454,6 +458,42 @@ crew n =
         (Modification.AddCardType cardType)
         (ObjectRef.InSlot Binding.triggerSource)
 
+-- CR 702.107a: "Outlast [cost]" means "[Cost], {T}: Put a +1/+1 counter on this
+-- creature. Activate only as a sorcery." The card names the cost; every other
+-- word is the rule's, so the tap symbol, the counter and the timing clause are
+-- minted here rather than carried as card data.
+--
+-- THE COST is the printed one with CostComponent.TapThis APPENDED, which is what
+-- rule 702.107a's ", {T}" is. Unlike crew's cost the tap symbol is the
+-- permanent's own, so CR 302.6 does reach this ability -- Cost.requiresSicknessCheck
+-- tests for exactly this component, and a creature that arrived this turn cannot
+-- outlast. Appended rather than prepended because CR 601.2h pays a cost as a whole
+-- and the order is only what the rule prints.
+--
+-- THE EFFECT names the permanent through the engine-reserved
+-- Binding.triggerSource slot, so rule 702.107a's "this creature" is named and
+-- never TARGETED (CR 115.10a), crew's posture. One counter, always: rule 702.107a
+-- writes that number itself, where rule 702.112a leaves renown's to the card --
+-- so what this keyword's payload varies is the cost and never the count.
+--
+-- CR 602.5d is the timing clause, and it is the ONLY restriction -- rule 702.107a
+-- states no once-per-turn limit, so CR 117.1b's default stands for everything
+-- else. The condition is Nothing for cycling's reason: the ability is granted
+-- outright, with no "as long as".
+outlast :: Cost Keyword -> ActivatedAbility Card
+outlast cost =
+  ActivatedAbility.MkActivatedAbility
+    { ActivatedAbility.cost = cost {Cost.components = Cost.components cost <> [CostComponent.TapThis]},
+      ActivatedAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      ActivatedAbility.restrictions = [ActivationRestriction.SorcerySpeed],
+      ActivatedAbility.condition = Nothing
+    }
+  where
+    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) Binding.triggerSource
+
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions (Face.castingPermissions) are a separate,
 -- additive list; Pawl.Engine.Cast reads both.
@@ -543,6 +583,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
@@ -828,6 +869,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
@@ -920,6 +962,7 @@ familyOf keyword = case keyword of
   -- CR 702.39a takes no parameter either, so provoke has no family of its own.
   Keyword.Provoke -> Nothing
   Keyword.BattleCry -> Nothing
+  Keyword.Outlast _ -> Just KeywordFamily.Outlast
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
   Keyword.Renown _ -> Just KeywordFamily.Renown

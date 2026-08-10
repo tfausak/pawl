@@ -399,6 +399,24 @@ data Keyword
     -- siblings, its reader takes the per-keyword count rather than membership,
     -- since CR 702.91b gives it the multiplicity CR 702.70b gives poisonous.
     BattleCry
+  | -- | 702.107a: outlast [cost], an ACTIVATED ability meaning "[Cost], {T}: Put
+    -- a +1/+1 counter on this creature. Activate only as a sorcery."
+    -- Pawl.Engine.Keyword.outlast mints the whole ability from this one value, as
+    -- rule 702.122a's crew is minted from Crew -- both function on the
+    -- battlefield, where cycling's functions in a hand.
+    --
+    -- The cost rides the constructor, as Flashback's and Cycling's do, because
+    -- rule 702.107a states it as part of the keyword. What the card supplies is
+    -- only that cost: the tap symbol, the counter and the sorcery-speed clause
+    -- are the rule's own, so they are written into the minted ability rather
+    -- than into card data. That is also why this is a Cost and not Crew's bare
+    -- Natural -- rule 702.107a's "[cost]" is a cost the card names.
+    --
+    -- Rule 702.107 prints no multiplicity clause, and CR 702.107a states a whole
+    -- self-contained ability, so its reader takes the per-keyword COUNT the
+    -- projection carries: outlast twice is two activatable abilities, crew's
+    -- reading rather than shadow's redundancy.
+    Outlast (Cost.Cost Keyword)
   | -- | 702.108a: whenever you cast a noncreature spell, this creature gets +1/+1
     -- until end of turn. The FOURTH keyword rule 702 states as a triggered
     -- ability, after poisonous (702.70a), annihilator (702.86a) and battle cry
