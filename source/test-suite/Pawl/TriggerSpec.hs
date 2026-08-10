@@ -3491,10 +3491,11 @@ mentorSpec s registry =
                 (S.powerToughnessOf piker (atDamage (plan [instructor] piker) gs))
                 (Just (2, 1))
             _ -> Spec.assertFailure s "fixture should give alice an Instructor and a Piker"
-        -- CR 601.2c: with TWO smaller attackers the rules leave which one open,
+        -- CR 603.3d, which sends a trigger through CR 601.2c-d: with TWO smaller
+        -- attackers the rules leave which one open,
         -- so the controller is asked and the answer is honoured. More candidates
         -- than the slot needs, so the prompt cannot be short-circuited away.
-        Spec.it s "CR 601.2c the controller picks which smaller attacker is mentored" $ do
+        Spec.it s "CR 603.3d the controller picks which smaller attacker is mentored" $ do
           (gs, mine, _) <- board ["Blade Instructor", "Goblin Piker", "Icehide Golem"] []
           case mine of
             [instructor, piker, golem] -> do

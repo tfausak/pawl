@@ -123,10 +123,12 @@ data View = MkView
     -- permanent an Effect.AttachTarget is moving -- legally be attached to this
     -- candidate?
     --
-    -- The one field whose answer depends on something OTHER than the candidate,
-    -- which is why it lives here rather than in Context: Context carries no game
-    -- state, and this needs both the subject's enchant ability (CR 702.5a) and the
-    -- candidate's projected characteristics. Pawl.Engine.Attach.hostsFor is the only
+    -- The one field here whose answer depends on something other than the
+    -- candidate ALONE, which is why it lives in the per-candidate View rather than
+    -- in Context: it needs the subject's enchant ability (CR 702.5a) AND the
+    -- candidate's projected characteristics, so it has a different answer per
+    -- candidate. Context.sourcePower is the other half of that division -- one
+    -- reading of the source, the same for every candidate in the match. Pawl.Engine.Attach.hostsFor is the only
     -- site that fills it, from Attach.attachmentFor -- the same function that
     -- performs the move, so the offer and the move cannot disagree.
     --
