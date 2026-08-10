@@ -487,6 +487,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 702.149a's Filter holds no Count for PermanentEnters' reason.
   TriggerCondition.SelfAttacksWithAnother _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
+  -- CR 702.105a compares life totals rather than counting objects, so no Count.
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names the attacker without counting anything, so no Count either.
   TriggerCondition.SelfBlocksCreature -> []
@@ -1648,6 +1650,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.100a is payload-free: the Filter its minted ability carries -- the
   -- entering creature's -- is the ENGINE's, never a card's.
   Keyword.Evolve -> []
+  -- CR 702.105a is payload-free too, and names no quality at all: what its minted
+  -- ability compares is life totals, which no Filter reaches.
+  Keyword.Dethrone -> []
   Keyword.StartYourEngines -> []
   -- CR 702.43a names no quality: the +1/+1 counters and the "target artifact
   -- creature" are written into the replacement effect and the ability
@@ -1816,6 +1821,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 506.5's condition names a quality the ATTACKER must have, so it carries a
   -- Filter -- rule 702.83a's "a creature you control".
   TriggerCondition.CreatureAttacksAlone f -> [f]
+  -- CR 702.105a names no quality of the attacker, only a fact about whom it
+  -- attacked, so no Filter.
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> []
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names no quality the attacker must have: every printing of that
   -- form says "a creature" and stops there.

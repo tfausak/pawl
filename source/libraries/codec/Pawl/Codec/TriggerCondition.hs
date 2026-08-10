@@ -28,6 +28,7 @@ toJson c = case c of
   TriggerCondition.SelfAttacks f -> Common.tagged "SelfAttacks" . Just $ TriggerFrequency.toJson f
   TriggerCondition.SelfAttacksWithAnother f -> Common.tagged "SelfAttacksWithAnother" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.CreatureAttacksAlone f -> Common.tagged "CreatureAttacksAlone" . Just $ Filter.toJson Keyword.toJson f
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> Common.nullary "SelfAttacksPlayerWithMostLife"
   TriggerCondition.SelfBlocks -> Common.nullary "SelfBlocks"
   TriggerCondition.SelfBlocksCreature -> Common.nullary "SelfBlocksCreature"
   TriggerCondition.SelfBlocksAtLeast n -> Common.tagged "SelfBlocksAtLeast" . Just $ Common.encodeNatural n
@@ -76,6 +77,7 @@ fromJson value = do
     ("SelfAttacks", Just v) -> TriggerCondition.SelfAttacks <$> TriggerFrequency.fromJson v
     ("SelfAttacksWithAnother", Just v) -> TriggerCondition.SelfAttacksWithAnother <$> Filter.fromJson Keyword.fromJson v
     ("CreatureAttacksAlone", Just v) -> TriggerCondition.CreatureAttacksAlone <$> Filter.fromJson Keyword.fromJson v
+    ("SelfAttacksPlayerWithMostLife", _) -> Right TriggerCondition.SelfAttacksPlayerWithMostLife
     ("SelfBlocks", _) -> Right TriggerCondition.SelfBlocks
     ("SelfBlocksCreature", _) -> Right TriggerCondition.SelfBlocksCreature
     ("SelfBlocksAtLeast", Just v) -> TriggerCondition.SelfBlocksAtLeast <$> Common.decodeNatural v
