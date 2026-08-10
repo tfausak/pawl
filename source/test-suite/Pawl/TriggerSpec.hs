@@ -50,7 +50,9 @@
 -- one, with Aven Squire -- `exaltedSpec`. CR 702.121 melee, the ninth, and the
 -- first keyword whose payload is a number read off game state -- CR 508.3b's
 -- record of who was declared attacked -- with Wings of the Guard at three seats
--- -- `meleeSpec`. CR 509.3b's blocking-side form
+-- -- `meleeSpec`. CR 702.23 rampage, the tenth, whose bonus multiplies a printed
+-- N by a number read off the declaration, with Wolverine Pack and Horrible
+-- Hordes -- `rampageSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -3779,6 +3781,99 @@ meleeSpec s registry =
           Spec.assertEqWith s "melee held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 2)) [Keyword.melee, Keyword.melee]
           Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 1)) [Keyword.melee]
 
+-- CR 702.23 rampage, the TENTH keyword whose rule text is a triggered ability,
+-- and the first whose bonus multiplies a printed N by a number read off the
+-- board.
+--
+-- Wolverine Pack {2}{G}{G} Creature -- Wolverine 2/4 is the card: rampage 2 and
+-- nothing else. Its numbers are chosen so no two readings of rule 702.23a agree
+-- -- an asymmetric 2/4 base, and N = 2 rather than 1, so "+N per blocker" (6/8 at
+-- two blockers), "+1 per blocker beyond the first" (3/5) and the rule's own
+-- reading (4/6) are three different pairs.
+--
+-- Horrible Hordes {3} Artifact Creature -- Spirit 2/2, rampage 1, is the second
+-- producer and is what pins N: the same three blockers give it +2/+2 where the
+-- Pack gets +4/+4.
+--
+-- Every reading is taken at the COMBAT DAMAGE step, before damage is dealt -- CR
+-- 509.2a puts the trigger on the stack in the declare blockers step, so the bonus
+-- is already applied there.
+rampageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+rampageSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      noBlocks :: Prompt.Prompt r -> r
+      noBlocks p = case p of
+        Prompt.DeclareBlockers {} -> Map.empty
+        _ -> S.aggressiveAnswer p
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage) S.aggressiveAnswer
+   in Spec.describe s "Rampage" $ do
+        -- The proving test: two blockers is one beyond the first, so rampage 2 is
+        -- +2/+2 and the 2/4 Pack is a 4/6.
+        Spec.it s "CR 702.23a whole card: Wolverine Pack blocked by two creatures is 4/6" $ do
+          (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker", "Hill Giant"]
+          case mine of
+            [pack] -> Spec.assertEqWith s "2/4 plus one blocker beyond the first, twice" (S.powerToughnessOf pack (atDamage gs)) (Just (4, 6))
+            _ -> Spec.assertFailure s "fixture should give alice one Pack"
+        -- A THIRD blocker is a second creature beyond the first, so the bonus
+        -- doubles rather than growing by one. The falsifier is a bonus that
+        -- counts blockers without scaling, which reads 4/6 here too.
+        Spec.it s "CR 702.23a a third blocker is a second +2/+2" $ do
+          (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker", "Hill Giant", "Icehide Golem"]
+          case mine of
+            [pack] -> Spec.assertEqWith s "2/4 plus two beyond the first, twice" (S.powerToughnessOf pack (atDamage gs)) (Just (6, 8))
+            _ -> Spec.assertFailure s "fixture should give alice one Pack"
+        -- "BEYOND THE FIRST": one blocker is a trigger with a bonus of 0, not a
+        -- bonus of N. The falsifier is a bonus counting blockers outright, which
+        -- reads 4/6 here.
+        Spec.it s "CR 702.23a one blocker leaves the Pack a 2/4" $ do
+          (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker"]
+          case mine of
+            [pack] -> Spec.assertEqWith s "the first blocker is not beyond the first" (S.powerToughnessOf pack (atDamage gs)) (Just (2, 4))
+            _ -> Spec.assertFailure s "fixture should give alice one Pack"
+        -- CR 509.3c is the event, so an UNBLOCKED attacker never triggers at all.
+        -- Asserted on the LOG and not on power and toughness, which cannot tell
+        -- the two apart: a trigger that fired with no blockers would be +0/+0 and
+        -- leave the same 2/4. The blocked leg is the same board with the block
+        -- taken, so the pair differs in nothing but CR 509.1's declaration.
+        Spec.it s "CR 509.3c an unblocked Pack never triggers" $ do
+          (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker"]
+          case mine of
+            [pack] -> do
+              let fired after = elem (GameEvent.AbilityTriggered pack S.alice TriggerCondition.SelfBecomesBlocked) (S.eventsOf after)
+              Spec.assertBool s (not (fired (S.runToStep (Phase.Combat CombatStep.CombatDamage) noBlocks gs))) "nothing blocked, so nothing triggered"
+              Spec.assertBool s (fired (atDamage gs)) "and the same board with the block taken does trigger"
+            _ -> Spec.assertFailure s "fixture should give alice one Pack"
+        -- N is the card's, not the engine's: rampage 1 against the same three
+        -- blockers is +2/+2 where rampage 2 was +4/+4.
+        Spec.it s "CR 702.23a rampage 1 on the same board is half the bonus" $ do
+          (gs, mine, _) <- board ["Horrible Hordes"] ["Goblin Piker", "Hill Giant", "Icehide Golem"]
+          case mine of
+            [hordes] -> Spec.assertEqWith s "2/2 plus two beyond the first, once" (S.powerToughnessOf hordes (atDamage gs)) (Just (4, 4))
+            _ -> Spec.assertFailure s "fixture should give alice one Hordes"
+        -- CR 702.23b: the bonus is calculated as the ability RESOLVES and does not
+        -- move afterwards. CR 511.3 clears Combat.blockers at end of combat, so a
+        -- bonus that re-read the declaration live would fall back to +0/+0 the
+        -- moment combat ended, while the printed duration runs to end of turn. The
+        -- Pack is a 6/8 taking 7, so it survives to be read.
+        Spec.it s "CR 702.23b the bonus outlives the blockers it was counted from" $ do
+          (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker", "Hill Giant", "Icehide Golem"]
+          case mine of
+            [pack] -> do
+              let after = S.runToStep Phase.PostcombatMain S.aggressiveAnswer gs
+              Spec.assertEqWith s "CR 511.3 the declaration is cleared" (Combat.Type.blockers (GameState.combat after)) Map.empty
+              Spec.assertEqWith s "and the Pack is still a 6/8" (S.powerToughnessOf pack after) (Just (6, 8))
+            _ -> Spec.assertFailure s "fixture should give alice one Pack"
+        -- CR 702.23c: each instance triggers separately. Asserted at the MINT, no
+        -- printing in the pool carrying rampage twice, and the second assertion is
+        -- what puts N inside the ability rather than beside it.
+        Spec.it s "CR 702.23c each instance triggers separately" $ do
+          Spec.assertEqWith s "rampage 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Rampage 2) 2)) [Keyword.rampage 2, Keyword.rampage 2]
+          Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Rampage 2) 1)) [Keyword.rampage 2]
+          Spec.assertBool s (Keyword.rampage 1 /= Keyword.rampage 2) "and the two differ, so N is in the ability"
+
 -- CR 603.6a's SECOND written form -- "Whenever a [type] enters, . . ." -- and
 -- Soul Warden {W} Creature -- Human Cleric 1/1, "Whenever another creature
 -- enters, you gain 1 life", the card that proves it. Its effect names nothing
@@ -7423,6 +7518,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   exaltedSpec s registry
   afflictSpec s registry
   meleeSpec s registry
+  rampageSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry
   graveyardEffectZoneTriggerSpec s registry

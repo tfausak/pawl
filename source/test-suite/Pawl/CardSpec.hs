@@ -361,6 +361,9 @@ quantityCounts quantity = case quantity of
   -- CR 508.3b's combat record, read as a tally of players: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.OpponentsAttacked _ -> []
+  -- CR 509.1h's declaration, read against the object the quantity is evaluated
+  -- against: a nullary leaf, so no Count and no Filter here either.
+  Quantity.Type.BlockersBeyondFirst -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this
@@ -1467,6 +1470,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.121a names no quality: the bonus is computed from the combat record
   -- by the ability Pawl.Engine.Keyword mints, not from anything the card prints.
   Keyword.Melee -> []
+  -- CR 702.23a's payload is a NUMBER, not a quality: the Filter its minted
+  -- ability carries is the engine's, never a card's.
+  Keyword.Rampage _ -> []
   -- CR 702.25a is payload-free: the Filter its minted ability carries is the
   -- ENGINE's, never a card's.
   Keyword.Flanking -> []

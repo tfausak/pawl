@@ -37,6 +37,10 @@ toJson q = case q of
   -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
   -- from the combat record rather than from anything the card names.
   Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ PlayerRef.toJson p
+  -- CR 509.1h's declaration read against the object the quantity is aimed at, so
+  -- there is nothing on the wire at all -- Power's shape rather than
+  -- ObjectCounters'.
+  Quantity.BlockersBeyondFirst -> Common.nullary "BlockersBeyondFirst"
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -56,6 +60,7 @@ fromJson value = do
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson v
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
+    ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)
