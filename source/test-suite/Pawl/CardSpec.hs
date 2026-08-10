@@ -1601,6 +1601,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.134a is payload-free too: the Filter its minted ability carries -- the
   -- target slot's -- is the ENGINE's, never a card's.
   Keyword.Mentor -> []
+  -- CR 702.135a's payload is a count. The token its minted ability creates
+  -- carries no Filter either.
+  Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []

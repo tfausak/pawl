@@ -412,6 +412,18 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Renown 2) /= Keyword.toJson (Keyword.Poisonous 2))
       "renown 2 is not poisonous 2"
+  -- CR 702.135a's N is a FOURTH keyword's, and it must not collide either.
+  Spec.it s "Afterlife carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Afterlife 2)
+      """ {"type":"Afterlife","value":2} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Afterlife 2) /= Keyword.toJson (Keyword.Renown 2))
+      "afterlife 2 is not renown 2"
   -- CR 702.86a's N rides the constructor the same way poisonous' does, and the
   -- two must not share a tag either.
   Spec.it s "Annihilator carries its N" $ do
