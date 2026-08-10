@@ -286,6 +286,17 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       (flashback 1)
       """ {"type":"Flashback","value":{"mana":[{"type":"Generic","value":1}]}} """
     Spec.assertBool s (Keyword.toJson (flashback 1) /= Keyword.toJson (flashback 4)) "the cost is part of the encoding"
+  -- CR 702.107a's payload is a Cost too, Flashback's shape rather than Crew's
+  -- Natural.
+  Spec.it s "Outlast carries its cost" $ do
+    let outlast n = Keyword.Outlast (Cost.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic n])) [])
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (outlast 1)
+      """ {"type":"Outlast","value":{"mana":[{"type":"Generic","value":1}]}} """
+    Spec.assertBool s (Keyword.toJson (outlast 1) /= Keyword.toJson (outlast 4)) "the cost is part of the encoding"
   Spec.it s "Fear" $
     Common.assertJsonCodec
       s

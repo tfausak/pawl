@@ -625,6 +625,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Training -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Evolve -> keyword
+  Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword
   Keyword.Type.Devoid -> keyword
