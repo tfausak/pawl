@@ -473,7 +473,8 @@ activateAbility pid srcId ability = do
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
       onStack =
         gs2

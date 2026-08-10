@@ -615,7 +615,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g4 =
           g3
@@ -662,7 +663,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g3 =
           g2
@@ -711,7 +713,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g3 =
           g2
@@ -737,7 +740,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -750,7 +753,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -776,7 +779,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -800,7 +803,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -845,7 +848,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -909,7 +913,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
         resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
@@ -984,7 +989,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -1067,7 +1073,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1149,7 +1156,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.ringBearerFor = Nothing,
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
-              Object.renowned = False
+              Object.renowned = False,
+              Object.monstrous = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1359,7 +1367,8 @@ installControlBy mindslaver controller target gs0 =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
    in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)
@@ -1439,7 +1448,8 @@ twoBoltState piker mountain lightningBolt =
             Object.ringBearerFor = Nothing,
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
-            Object.renowned = False
+            Object.renowned = False,
+            Object.monstrous = False
           }
    in gs2
         { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),
@@ -1463,7 +1473,7 @@ cancelVictim island cancel victim =
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False
+      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -2542,7 +2552,7 @@ handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
   where
     addOne g =
       let (oid, g1) = Game.freshObjectId g
-          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False
+          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
        in g1
             { GameState.objects = Map.insert oid obj (GameState.objects g1),
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
@@ -3809,6 +3819,91 @@ sauroformHybridSpec s registry = Spec.describe s "SauroformHybrid" $ do
         Spec.assertEqWith s "but it was activated and paid for all the same" (S.tappedCount S.alice twice) 12
         Spec.assertEqWith s "and nothing is left on the stack" (length (GameState.stack twice)) 0
       abilities -> Spec.assertFailure s ("expected one adapt ability, got " <> show (length abilities))
+
+-- CR 701.37a: "'Monstrosity N' means 'If this permanent isn't monstrous, put N
+-- +1/+1 counters on it and it becomes monstrous.'" Nessian Asp prints monstrosity
+-- 4 and reach, so the SECOND activation isolates the gate the way Sauroform
+-- Hybrid's does above -- legal, paid for, resolves, does nothing.
+--
+-- What separates this from adapt is the second case. Adapt's gate reads
+-- COUNTERS; monstrosity's reads the DESIGNATION, and an Asp that was given a
+-- +1/+1 counter from elsewhere is still not monstrous, so it still becomes
+-- monstrous and still takes its four. An implementation that reused adapt's
+-- condition passes the first case and fails that one.
+--
+-- Sixteen Forests: two activations at {6}{G}, so a short board cannot be the
+-- reason the second one changes nothing.
+nessianAspSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+nessianAspSpec s registry = Spec.describe s "NessianAsp" $ do
+  let monstrousOf oid gs = fmap Object.monstrous (Game.lookupObject oid gs)
+      countersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+  Spec.it s "CR 701.37a whole card: monstrosity 4 marks the Asp, and a second monstrosity does nothing" $ do
+    forest <- S.printingOf s registry "Forest"
+    asp <- S.printingOf s registry "Nessian Asp"
+    let (aspId, placed) = S.addCreature asp S.alice (S.landsInPlay forest 16)
+        board = placed {GameState.priority = Just S.alice}
+        monstrosity gs ability = S.runPure S.identityAnswer gs $ do
+          Activate.activateAbility S.alice aspId ability
+          Stack.resolveTop
+    case Activate.abilitiesFor aspId board of
+      [ability] -> do
+        let once = monstrosity board ability
+            twice = monstrosity once ability
+        Spec.assertEqWith s "not monstrous to begin with" (monstrousOf aspId board) (Just False)
+        Spec.assertEqWith s "a 4/5 to begin with" (S.powerToughnessOf aspId board) (Just (4, 5))
+        Spec.assertEqWith s "the first monstrosity puts four counters on" (countersOn aspId once) (Just 4)
+        Spec.assertEqWith s "and marks it monstrous" (monstrousOf aspId once) (Just True)
+        Spec.assertEqWith s "and the projection reads 8/9" (S.powerToughnessOf aspId once) (Just (8, 9))
+        Spec.assertEqWith s "seven Forests paid for it" (S.tappedCount S.alice once) 7
+        Spec.assertEqWith s "the second monstrosity adds none" (countersOn aspId twice) (Just 4)
+        Spec.assertEqWith s "and it is still 8/9" (S.powerToughnessOf aspId twice) (Just (8, 9))
+        Spec.assertEqWith s "but it was activated and paid for all the same" (S.tappedCount S.alice twice) 14
+        Spec.assertEqWith s "and nothing is left on the stack" (length (GameState.stack twice)) 0
+      abilities -> Spec.assertFailure s ("expected one monstrosity ability, got " <> show (length abilities))
+  -- CR 701.37b's designation, not CR 701.46a's counter count: the two gates agree
+  -- on every board where the only counters are monstrosity's own, and this is the
+  -- board where they part.
+  Spec.it s "CR 701.37a the gate reads the designation, so counters from elsewhere do not stop it" $ do
+    forest <- S.printingOf s registry "Forest"
+    asp <- S.printingOf s registry "Nessian Asp"
+    let (aspId, placed) = S.addCreature asp S.alice (S.landsInPlay forest 16)
+        board = (S.addCounter CounterKind.PlusOnePlusOne 1 aspId placed) {GameState.priority = Just S.alice}
+    case Activate.abilitiesFor aspId board of
+      [ability] -> do
+        let after = S.runPure S.identityAnswer board $ do
+              Activate.activateAbility S.alice aspId ability
+              Stack.resolveTop
+        Spec.assertEqWith s "one counter on it, and not monstrous" (countersOn aspId board, monstrousOf aspId board) (Just 1, Just False)
+        Spec.assertEqWith s "monstrosity still puts its four on" (countersOn aspId after) (Just 5)
+        Spec.assertEqWith s "and still marks it monstrous" (monstrousOf aspId after) (Just True)
+        Spec.assertEqWith s "so it reads 9/10" (S.powerToughnessOf aspId after) (Just (9, 10))
+      abilities -> Spec.assertFailure s ("expected one monstrosity ability, got " <> show (length abilities))
+  -- CR 701.37b: "once a permanent becomes monstrous, it stays monstrous until it
+  -- leaves the battlefield". The designation is per-incarnation state, so CR
+  -- 400.7's new object has none -- the same reading Object.newIncarnation gives
+  -- counters, which the Unsummon case above proves for CR 122.2.
+  Spec.it s "CR 701.37b the designation leaves with the permanent" $ do
+    forest <- S.printingOf s registry "Forest"
+    island <- S.printingOf s registry "Island"
+    asp <- S.printingOf s registry "Nessian Asp"
+    unsummon <- S.printingOf s registry "Unsummon"
+    let (aspId, placed) = S.addCreature asp S.alice (S.landsInPlay forest 16)
+        (_, withIsland) = S.addCreature island S.alice placed
+        board = withIsland {GameState.priority = Just S.alice}
+    case Activate.abilitiesFor aspId board of
+      [ability] -> do
+        let once = S.runPure S.identityAnswer board $ do
+              Activate.activateAbility S.alice aspId ability
+              Stack.resolveTop
+            (withSpell, spellId) = S.handOne unsummon once
+            bounced = S.runPure S.identityAnswer withSpell $ do
+              S.cast S.alice spellId
+              Stack.resolveTop
+            -- Total (no `head`): the Asp is the only card that can be in hand.
+            inHand = fmap (\h -> maybe True Object.monstrous (Game.lookupObject h bounced)) (Game.zoneMembers Zone.Hand S.alice bounced)
+        Spec.assertEqWith s "monstrous on the battlefield" (monstrousOf aspId once) (Just True)
+        Spec.assertEqWith s "the bounced incarnation is not monstrous" inHand [False]
+      abilities -> Spec.assertFailure s ("expected one monstrosity ability, got " <> show (length abilities))
 
 untapSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
 untapSpec s registry = Spec.describe s "Untap" $ do
@@ -5637,6 +5732,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   stifleSpec s registry
   countersSpec s registry
   sauroformHybridSpec s registry
+  nessianAspSpec s registry
   untapSpec s registry
   gainControlSpec s registry
   gainPlayerCountersSpec s registry

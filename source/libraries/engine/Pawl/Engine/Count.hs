@@ -321,5 +321,6 @@ viewOfSnapshot mController isToken snapshot =
       -- an object, and "is your Ring-bearer" is a question about a permanent on the
       -- battlefield now (CR 701.54e), not about one at the moment of an event.
       Filter.ringBearerFor = Nothing,
-      Filter.renowned = False
+      Filter.renowned = False,
+      Filter.monstrous = False
     }

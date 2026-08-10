@@ -356,6 +356,7 @@ quantityCounts quantity = case quantity of
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.IsMonarch _ -> []
   Quantity.Type.IsRenowned -> []
+  Quantity.Type.IsMonstrous -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
@@ -575,6 +576,7 @@ effectCounts effect = case effect of
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.BecomeMonstrous _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -814,6 +816,7 @@ effectReplacements effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.BecomeMonstrous _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -1295,6 +1298,7 @@ effectMintedFaces effect = case effect of
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.BecomeMonstrous _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
@@ -2138,6 +2142,7 @@ effectFilters effect = case effect of
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
   Effect.BecomeRenowned _ -> []
+  Effect.BecomeMonstrous _ -> []
   Effect.Evolve _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []

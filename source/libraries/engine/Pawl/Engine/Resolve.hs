@@ -250,6 +250,8 @@ slotsOf effect = case effect of
   -- rather than a target on every producer today (rule 702.112a's "it"), but
   -- the lint's question is which slots the effect names, not which are targets.
   Effect.BecomeRenowned slot -> Set.singleton slot
+  -- A READ, BecomeRenowned's: CR 701.37a's "it" is the ability's own bearer.
+  Effect.BecomeMonstrous slot -> Set.singleton slot
   -- A READ, BecomeRenowned's: the slot names the permanent rule 702.100a's
   -- counter goes on.
   Effect.Evolve slot -> Set.singleton slot
@@ -404,6 +406,7 @@ slotsAreExhaustive effect = case effect of
   Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
   Effect.BecomeRenowned _ -> True
+  Effect.BecomeMonstrous _ -> True
   Effect.Evolve _ -> True
   Effect.ItBecomes _ -> True
   Effect.ExileUntilMonarch _ -> True
@@ -500,6 +503,7 @@ readsX = any effectReadsX
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
       Effect.BecomeRenowned _ -> False
+      Effect.BecomeMonstrous _ -> False
       Effect.Evolve _ -> False
       Effect.ItBecomes _ -> False
       Effect.ExileUntilMonarch _ -> False
@@ -568,6 +572,7 @@ searchesLibrary effect = case effect of
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
   Effect.BecomeRenowned _ -> False
+  Effect.BecomeMonstrous _ -> False
   Effect.Evolve _ -> False
   Effect.ItBecomes _ -> False
   Effect.ExileUntilMonarch _ -> False
@@ -695,6 +700,7 @@ boundSlots effect = case effect of
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
   Effect.BecomeRenowned _ -> Set.empty
+  Effect.BecomeMonstrous _ -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
   Effect.ExileUntilMonarch _ -> Set.empty
@@ -2987,6 +2993,22 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             State.modify'
               (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.renowned = True}) target (GameState.objects g)})
             State.modify' (Event.recordEvent (GameEvent.BecameRenowned target))
+      _ -> pure ()
+  -- CR 701.37a's "and it becomes monstrous", the second of the two instructions
+  -- a monstrosity ability's clause holds. No transition gate and no event, where
+  -- BecomeRenowned above has both: the write is idempotent, and nothing in the
+  -- pool triggers on becoming monstrous (#1194).
+  --
+  -- What keeps the SECOND monstrosity from putting counters on is not here: it
+  -- is the clause's own condition (CR 701.37a's "if this permanent isn't
+  -- monstrous"), read as Quantity.IsMonstrous before either effect runs.
+  Effect.BecomeMonstrous slot ->
+    case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
+      (Just recipient, True) -> case Recipient.objectOf recipient of
+        Nothing -> pure ()
+        Just target ->
+          State.modify'
+            (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.monstrous = True}) target (GameState.objects g)})
       _ -> pure ()
   -- CR 702.100a's counter and CR 702.100b's marker, in that order and in one arm
   -- because the rule ties them: the creature evolves only if the placement

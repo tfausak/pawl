@@ -413,7 +413,17 @@ data Object = MkObject
     -- That IS rule 702.112b's "once a permanent becomes renowned, it stays renowned
     -- until it leaves the battlefield" -- the designation ends with the
     -- incarnation, so there is no sweep to run.
-    renowned :: Bool
+    renowned :: Bool,
+    -- | CR 701.37b: the MONSTROUS designation, "a marker that the monstrosity
+    -- action and other spells and abilities can identify".
+    --
+    -- Everything renowned's note above says holds word for word here, because
+    -- rule 701.37b is worded the same: a Bool with no player, stored rather than
+    -- projected ("neither an ability nor part of the permanent's copiable
+    -- values"), and per-incarnation, which IS rule 701.37b's "it stays monstrous
+    -- until it leaves the battlefield". Two fields rather than one designation
+    -- set (#1193).
+    monstrous :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -463,5 +473,6 @@ newIncarnation object =
       ringBearerFor = Nothing,
       protector = Nothing,
       unlockedHalves = Set.empty,
-      renowned = False
+      renowned = False,
+      monstrous = False
     }
