@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -388,6 +389,13 @@ activatableGiven grants pcs pid srcId ability gs =
   activatorOfGiven grants srcId gs == Just pid
     && elem ability (abilitiesForGiven pcs srcId gs)
     && not (Mana.isManaAbility ability)
+    -- CR 702.61a's other limb -- "players can't ... activate abilities that
+    -- aren't mana abilities" -- and it sits AFTER the mana conjunct on purpose:
+    -- CR 702.61b's exemption for mana abilities is then the same fact CR 605.3b
+    -- already established here, rather than a second reading of the rule. The
+    -- windows that do serve a mana ability (Action.ActivateManaAbility,
+    -- Cost.payMana) never reach this function, so neither is gated.
+    && not (SplitSecond.inForce gs)
     && sicknessOkGiven pcs pid srcId ability gs
     && restrictionsOk pid ability gs
     && loyaltyOk pid srcId ability gs

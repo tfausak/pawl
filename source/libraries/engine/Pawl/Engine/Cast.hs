@@ -19,6 +19,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Extra.Natural as Natural
@@ -512,6 +513,11 @@ castable pid oid name facing gs =
         -- own name goes with it, since CR 601.3a's prohibitions name a quality of
         -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half.
         && not (PlayerEffect.prohibitsCasting pid proposedName proposed)
+        -- CR 601.3's prohibit half again, from a different CARRIER: a spell on
+        -- the stack (CR 702.61a) rather than a continuous effect on a player. It
+        -- names neither a player nor a quality of the spell, so it takes no
+        -- argument beyond the board.
+        && not (SplitSecond.inForce proposed)
         && printedRestrictionsOk pid oid name proposed
         && legendaryRestrictionOk pid oid name proposed
         && any (payableCost pid oid proposed) (Cost.costsFor name oid proposed)
@@ -664,6 +670,11 @@ castableWhenOffered pid oid name candidates proposed =
   -- CR 601.3's prohibit half, asked with the half's own name: a quality-bearing
   -- prohibition stops one card without stopping any other candidate.
   not (PlayerEffect.prohibitsCasting pid name proposed)
+    -- CR 702.61a stays too, for CR 601.3's own reason above: an offered cast is
+    -- still a cast. Reachable because CR 702.61b keeps triggered abilities going
+    -- on the stack, so one can resolve ABOVE the split-second spell and offer a
+    -- cast while it is still there.
+    && not (SplitSecond.inForce proposed)
     && any (payableCost pid oid proposed) candidates
     && printedRestrictionsOk pid oid name proposed
     && legendaryRestrictionOk pid oid name proposed

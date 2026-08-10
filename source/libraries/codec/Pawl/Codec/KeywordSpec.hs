@@ -386,6 +386,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Vanishing 3) /= Keyword.toJson (Keyword.Bushido 3))
       "vanishing 3 is not bushido 3"
+  Spec.it s "SplitSecond" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.SplitSecond
+      """ {"type":"SplitSecond"} """
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do

@@ -1585,6 +1585,10 @@ keywordFilters keyword = case keyword of
   -- CR 702.46a names no quality either: "Spirit card with mana value N or less"
   -- is written into the ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Soulshift _ -> []
+  -- CR 702.61a names no quality: the sentence speaks about what OTHER players
+  -- may do, and "mana ability" is CR 605.1a's classification rather than a
+  -- Filter.
+  Keyword.SplitSecond -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []
