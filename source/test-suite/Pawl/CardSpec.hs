@@ -623,6 +623,11 @@ combatRestrictionCounts restriction = case restriction of
   CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionCounts condition
   CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionCounts condition
 
+-- Every Count reachable from a blocking permission: only CR 604.2's "as long as"
+-- gate carries one, the subject beside it being an Affected.
+blockPermissionCounts :: BlockPermission.BlockPermission -> [Count.Type.Count Quantity.Type.Quantity]
+blockPermissionCounts = foldMap conditionCounts . BlockPermission.while
+
 -- Hand-maintained, with cardCounts' caveat: a NEW Face field holding effects
 -- must be added here too.
 cardResolutionEffects :: Face.Face Card.Type.Card -> [Effect.Effect Card.Type.Card]
@@ -644,6 +649,7 @@ cardCounts card =
     <> concatMap triggeredAbilityCounts (Face.triggeredAbilities card)
     <> concatMap triggeredAbilityCounts (Map.elems (Face.delayedAbilities card))
     <> concatMap combatRestrictionCounts (Face.combatRestrictions card)
+    <> concatMap blockPermissionCounts (Face.blockPermissions card)
 
 -- CR 400.1: "each player has their own library, hand, and graveyard. The
 -- other zones are shared by all players." Battlefield/Stack/Exile/Command are
@@ -1917,6 +1923,13 @@ combatRestrictionFilters restriction = case restriction of
   CombatRestriction.CantAttackMoreThan _ condition -> foldMap conditionFilters condition
   CombatRestriction.CantBlockMoreThan _ condition -> foldMap conditionFilters condition
 
+-- Both of a blocking permission's Filter positions: the subject it names and CR
+-- 604.2's "as long as" gate beside it (Entourage of Trest).
+blockPermissionFilters :: BlockPermission.BlockPermission -> [Filter.Type.Filter Keyword.Keyword]
+blockPermissionFilters permission =
+  affectedFilters (BlockPermission.affected permission)
+    <> foldMap conditionFilters (BlockPermission.while permission)
+
 -- Tag a Filter position as UNFRAMED -- one no attach supplies a subject for,
 -- which is every position in the type except the one below.
 unframed :: [Filter.Type.Filter Keyword.Keyword] -> [(Bool, Filter.Type.Filter Keyword.Keyword)]
@@ -2099,7 +2112,7 @@ cardFilters card =
         <> concatMap specialActionFilters (Face.specialActions card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)
-        <> concatMap (affectedFilters . BlockPermission.affected) (Face.blockPermissions card)
+        <> concatMap blockPermissionFilters (Face.blockPermissions card)
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)

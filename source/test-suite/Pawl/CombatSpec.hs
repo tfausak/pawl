@@ -49,6 +49,7 @@ import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.Expiry as Expiry
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.GameEvent as GameEvent
 import qualified Pawl.Types.GameState as GameState
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.Modification as Modification
@@ -1428,6 +1429,95 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           )
           (True, False, False)
       _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
+  Spec.it s "CR 509.1a a Palace Guard blocks every attacker, where a Brigade stops at two" $ do
+    -- Palace Guard {2}{W} 1/4, "This creature can block any number of creatures",
+    -- says nothing else at all. The Brigade beside it is the anti-vacuity control
+    -- and the discriminating one: THREE attackers is exactly where an unbounded
+    -- arity parts company with the largest one any card in the pool prints.
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    highGround <- S.printingOf s registry "High Ground"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker, piker] [palaceGuard, brigade]
+    case (mine, theirs) of
+      ([first, second, third], [guard, b]) ->
+        Spec.assertEqWith
+          s
+          "the Guard takes all three, the Brigade only two, and a High Ground beside the Guard changes nothing"
+          ( Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.fromList [first, second, third])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [first, second, third])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [first, second])) gs,
+            -- The last reading is the SUM's absorbing case: a second permission
+            -- must leave "any number" alone rather than collapse it to a count.
+            Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.fromList [first, second, third])) (snd (S.addCreature highGround S.bob gs))
+          )
+          (True, False, True, True)
+      _ -> Spec.assertFailure s "fixture should have three attackers and two blockers"
+  Spec.it s "CR 509.1h / 509.3e a real declare blockers step puts the Guard on all three attackers" $ do
+    -- Not a claim about legalBlockDeclaration alone: the step runs, and CR
+    -- 509.3e's count on the one BlocksDeclared event is three.
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker, piker] [palaceGuard]
+    case (mine, theirs) of
+      ([first, second, third], [guard]) -> do
+        let after = S.runPure (blockAll [first, second, third]) gs Combat.declareBlockers
+        Spec.assertEqWith
+          s
+          "one blocker, three blocked attackers"
+          ( Combat.blockersOf first after,
+            Combat.blockersOf second after,
+            Combat.blockersOf third after,
+            [n | GameEvent.BlocksDeclared b n <- S.eventsOf after, b == guard]
+          )
+          (Set.singleton guard, Set.singleton guard, Set.singleton guard, [3])
+      _ -> Spec.assertFailure s "fixture should have three attackers and one blocker"
+  Spec.it s "CR 509.1c the maximization enumerates an unbounded blocker's whole power set" $ do
+    -- The only path that reads choicesUpTo's unbounded case: blockCeiling's
+    -- search runs only with a requirement in force (#342). Three Lured attackers
+    -- and one blocker, so the maximum is three -- which the Guard can attain and
+    -- the Brigade, capped at two, cannot. Blocking two is legal for the Brigade
+    -- for exactly that reason, and illegal for the Guard, which is what a search
+    -- that stopped at two would get backwards.
+    lure <- S.printingOf s registry "Lure"
+    palaceGuard <- S.printingOf s registry "Palace Guard"
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = luringAll lure [piker, piker, piker] [palaceGuard]
+        (control, ours, yours) = luringAll lure [piker, piker, piker] [brigade]
+    case (mine, theirs, ours, yours) of
+      ([first, second, third], [guard], [a, b, _], [c]) ->
+        Spec.assertEqWith
+          s
+          "three is attainable for the Guard and not for the Brigade"
+          ( Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.fromList [first, second, third])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton guard (Set.fromList [first, second])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton c (Set.fromList [a, b])) control
+          )
+          (True, False, True)
+      _ -> Spec.assertFailure s "fixture should have three attackers and one blocker"
+  Spec.it s "CR 604.2 the Entourage's permission holds only while its controller is the monarch" $ do
+    -- Entourage of Trest {4}{G} 4/4, "As long as you're the monarch, this
+    -- creature can block an additional creature each combat". CR 109.5's "you" is
+    -- the Entourage's own controller, so the third reading is the one that makes
+    -- the gate observable: the designation sitting on ALICE grants nothing.
+    entourage <- S.printingOf s registry "Entourage of Trest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker] [entourage]
+    case (mine, theirs) of
+      ([first, second], [e]) -> do
+        let pair = Map.singleton e (Set.fromList [first, second])
+            one = Map.singleton e (Set.singleton first)
+        Spec.assertEqWith
+          s
+          "monarch bob blocks two; no monarch and monarch alice block one"
+          ( Combat.legalBlockDeclaration S.bob pair (S.withMonarch S.bob gs),
+            Combat.legalBlockDeclaration S.bob pair gs,
+            Combat.legalBlockDeclaration S.bob pair (S.withMonarch S.alice gs),
+            Combat.legalBlockDeclaration S.bob one gs
+          )
+          (True, False, False, True)
+      _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
   Spec.it s "CR 509.1b the restrictions are checked against EACH attacker blocked" $ do
     -- A Brigade has neither flying nor reach, so CR 702.9b refuses it the Bird
     -- Maiden however many creatures it may block. The pair is the whole point:
@@ -1537,6 +1627,15 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
       "banding inverts the chooser"
       (divisionChooser bandedAttackers banded, divisionChooser plainAttackers plain)
       ([S.alice], [S.bob])
+
+-- `luring`, but a Lure on EVERY attacker: one requirement instance per attacker,
+-- which is what makes CR 509.1c's maximum bigger than one blocker's ordinary
+-- arity.
+luringAll :: Printing.Printing -> [Printing.Printing] -> [Printing.Printing] -> (GameState.GameState, [ObjectId.ObjectId], [ObjectId.ObjectId])
+luringAll lure mine theirs =
+  let (gs, ours, yours) = attacking mine theirs
+      enchant g attacker = let (aura, withAura) = S.addCreature lure S.alice g in S.attach aura attacker withAura
+   in (List.foldl' enchant gs ours, ours, yours)
 
 -- Blocks every attacker in `attackers` with every creature offered, which is
 -- what aggressiveAnswer cannot do: it puts them all on the first attacker.

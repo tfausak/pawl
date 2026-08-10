@@ -3,23 +3,32 @@ module Pawl.Codec.BlockPermission where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Json.Value as Value
 import qualified Pawl.Types.BlockPermission as BlockPermission
 
--- | An object with two named keys, never a tagged sum: the type has one shape.
+-- | An object with named keys, never a tagged sum: the type has one shape.
 -- "additional" is REQUIRED rather than defaulted to one, because a permission
 -- that adds nothing is not a thing any card prints and a missing key is far
 -- likelier to be a typo than a deliberate zero.
+--
+-- Which is also why "any number of creatures" is written as an explicit NULL
+-- rather than by omitting the key: it is a positive statement the card makes,
+-- and the required key keeps it distinguishable from a typo. "while" is the
+-- ordinary optional field, omitted when the card states no gate, exactly as
+-- Pawl.Codec.CombatRestriction spells "unless".
 toJson :: BlockPermission.BlockPermission -> Value.Value
 toJson bp =
   Common.object
     ( Common.requiredPair "affected" Affected.toJson (BlockPermission.affected bp)
-        <> Common.requiredPair "additional" Common.encodeNatural (BlockPermission.additional bp)
+        <> Common.requiredPair "additional" (Common.encodeMaybe Common.encodeNatural) (BlockPermission.additional bp)
+        <> Common.optionalPair "while" Nothing (Common.encodeMaybe Condition.toJson) (BlockPermission.while bp)
     )
 
 fromJson :: Value.Value -> Either Text.Text BlockPermission.BlockPermission
 fromJson value = do
   ps <- Common.asObject value
   a <- Common.field "affected" ps >>= Affected.fromJson
-  n <- Common.field "additional" ps >>= Common.decodeNatural
-  pure (BlockPermission.MkBlockPermission a n)
+  n <- Common.field "additional" ps >>= Common.decodeMaybe Common.decodeNatural
+  c <- Common.defaultedField "while" Nothing (Common.decodeMaybe Condition.fromJson) ps
+  pure (BlockPermission.MkBlockPermission a n c)
