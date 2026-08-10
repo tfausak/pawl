@@ -925,14 +925,16 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- twin the way pairAllowed has one: both callers are already inside a hoisted
 -- pass. `limit` is hoisted by the callers for the same reason and is not read off
 -- `gs` here: it is a battlefield walk, and this is the exponential filter's body.
-blockDeclarationAllowed :: Maybe Natural -> (ObjectId -> Natural) -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId (Set ObjectId) -> GameState -> Bool
+blockDeclarationAllowed :: Maybe Natural -> (ObjectId -> Maybe Natural) -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId (Set ObjectId) -> GameState -> Bool
 blockDeclarationAllowed limit arity pcs able declaration gs =
   -- CR 509.1b restriction-checks every creature against every creature it is
   -- declared against, which is what "each creature" means once a blocker can be
   -- declared against more than one: a blocker may block a flier and a
   -- non-flier only if it could block each of them alone.
   all (\(blocker, attackers) -> all (able blocker) (Set.toList attackers)) (Map.toList declaration)
-    && all (\(blocker, attackers) -> toInteger (Set.size attackers) <= toInteger (arity blocker)) (Map.toList declaration)
+    -- withinLimit and not a bare comparison, so that Palace Guard's unbounded
+    -- arity is the same Nothing Silent Arbiter's absent bound already is.
+    && all (\(blocker, attackers) -> withinLimit (arity blocker) (Set.size attackers)) (Map.toList declaration)
     && menaceAllowsGiven pcs declaration gs
     -- Silent Arbiter's second sentence counts BLOCKING CREATURES, so an entry
     -- naming two attackers is still one creature blocking. The empty entries a
@@ -954,13 +956,16 @@ requirementsMet requirements declaration =
 -- EXPONENTIAL, and honestly so: O((attackers + 1) ^ blockers) at arity one, which
 -- is every board without a card like Foriysian Brigade -- one option per attacker
 -- plus declining, exactly as before arity existed. A blocker at arity k widens
--- ITS OWN factor to the subsets of size at most k, and nothing else's. Nothing
--- caps it and nothing samples it -- a cap would answer CR 509.1c's maximum with a
--- number that is not the maximum, which is worse than being slow. What keeps it
--- off the hot path is blockCeiling's guard: this is never called unless some
--- requirement is actually in force, which needs a card like Lure on the
--- battlefield (#342).
-candidateBlockDeclarations :: (ObjectId -> Natural) -> (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId (Set ObjectId)]
+-- ITS OWN factor to the subsets of size at most k, and nothing else's. An
+-- UNBOUNDED blocker (Palace Guard) widens its own factor to the full power set,
+-- 2 ^ attackers against (attackers + 1) -- still one factor, still finite, and
+-- bounded by the attackers on the board rather than by anything the card says.
+-- Nothing caps it and nothing samples it -- a cap would answer CR 509.1c's
+-- maximum with a number that is not the maximum, which is worse than being slow.
+-- What keeps it off the hot path is blockCeiling's guard: this is never called
+-- unless some requirement is actually in force, which needs a card like Lure on
+-- the battlefield (#342).
+candidateBlockDeclarations :: (ObjectId -> Maybe Natural) -> (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId (Set ObjectId)]
 candidateBlockDeclarations arity able candidates attackers =
   let extend acc blocker =
         let options = choicesUpTo (arity blocker) (filter (able blocker) attackers)
@@ -969,12 +974,13 @@ candidateBlockDeclarations arity able candidates attackers =
          in concatMap (\declaration -> fmap (apply declaration) options) acc
    in List.foldl' extend [Map.empty] candidates
 
--- Every subset of `attackers` of size at most `n`, the empty one first. Declining
--- to block is always among them, which is the seed blockCeiling's fold relies on.
-choicesUpTo :: Natural -> [ObjectId] -> [Set ObjectId]
+-- Every subset of `attackers` of size at most `n`, the empty one first, or every
+-- subset at all when `n` is Nothing. Declining to block is always among them,
+-- which is the seed blockCeiling's fold relies on.
+choicesUpTo :: Maybe Natural -> [ObjectId] -> [Set ObjectId]
 choicesUpTo n attackers =
   let extend acc attacker =
-        acc <> [Set.insert attacker chosen | chosen <- acc, toInteger (Set.size chosen) < toInteger n]
+        acc <> [Set.insert attacker chosen | chosen <- acc, withinLimit n (Set.size chosen + 1)]
    in List.foldl' extend [Set.empty] attackers
 
 -- CR 509.1c's two halves, computed together because neither is usable alone: the
@@ -1052,11 +1058,12 @@ legalBlockDeclaration pid declaration gs =
 
 -- CR 509.1a: how many attacking creatures each of `candidates` may be declared
 -- blocking -- the rule's one, plus whatever Pawl.Engine.BlockPermission adds.
--- The one place "one each" is written down.
-blockArityGiven :: [ObjectId] -> GameState -> ObjectId -> Natural
+-- The one place "one each" is written down. Nothing is a card's "any number of
+-- creatures" (Palace Guard), which no number could stand in for.
+blockArityGiven :: [ObjectId] -> GameState -> ObjectId -> Maybe Natural
 blockArityGiven candidates gs =
   let extra = BlockPermission.additionalBlocks candidates gs
-   in \blocker -> 1 + Map.findWithDefault 0 blocker extra
+   in \blocker -> fmap (1 +) (Map.findWithDefault (Just 0) blocker extra)
 
 -- A declaration that is always legal: one attaining CR 509.1c's maximum, which
 -- with no requirement in force is the empty one (declining to block). Not an
