@@ -11,7 +11,7 @@
 -- Pawl.Engine.Battle but is rule 310 all the same: CR 310.5's attackable battle
 -- (Combat.attackableBattles), CR 310.8b including its "notably, a Siege battle can
 -- be attacked by its own controller", CR 310.8c's blocking, and CR 310.8d with CR
--- 508.5 (Combat.defendingPlayerOf). Those are attackSpec below; Pawl.CombatSpec
+-- 508.5 (Defender.playerOf). Those are attackSpec below; Pawl.CombatSpec
 -- keeps rule 508's own cases.
 --
 -- Also the pieces rule 310 needed underneath it, exercised here because this is

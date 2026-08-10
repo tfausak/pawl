@@ -7,6 +7,7 @@ import qualified Data.Maybe as Maybe
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Numeric.Natural (Natural)
+import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -141,17 +142,22 @@ admittedGiven :: Map ObjectId PC.ProjectedCharacteristics -> [Projection.Control
 admittedGiven pcs grants perspective source spec gs =
   let pool = TargetSpec.pool spec
       narrowing = TargetSpec.filter spec
-      -- THE one site that fills Filter.sourcePower, because it is the one site
-      -- that matches a TARGET SLOT's Filter -- both of CR 115's moments (CR
-      -- 601.2c's choosing and CR 608.2b's re-check) reach the atom through here,
-      -- and CR 702.134a is the only clause that writes it. A thunk, like `pcs`
-      -- above it: a slot whose filter never names the atom pays for no projection
-      -- of the source.
+      -- THE one site that fills Filter.sourcePower and Filter.defendingPlayer,
+      -- because it is the one site that matches a TARGET SLOT's Filter -- both of
+      -- CR 115's moments (CR 601.2c's choosing and CR 608.2b's re-check) reach
+      -- those atoms through here, and CR 702.134a and CR 702.39a are the only
+      -- clauses that write them. Both are thunks, like `pcs` above: a slot whose
+      -- filter never names an atom pays for neither the source's projection nor
+      -- the combat lookup.
       context =
         Filter.MkContext
           { Filter.perspective = perspective,
             Filter.source = Just source,
-            Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs
+            Filter.sourcePower = Projection.powerWithLastKnownGiven pcs source gs,
+            -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
+            -- attacking creature, and `source` is the object CR 113.7 says the
+            -- ability came from.
+            Filter.defendingPlayer = Defender.playerOfAttacker grants source gs
           }
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate

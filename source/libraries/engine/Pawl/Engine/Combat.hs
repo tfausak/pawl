@@ -18,6 +18,7 @@ import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
 import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Decide as Decide
+import qualified Pawl.Engine.Defender as Defender
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
@@ -180,32 +181,6 @@ attackableBattles defender gs =
       isOne oid = Battle.isBattle (Projection.project oid gs)
    in filter (\oid -> protects oid && isOne oid) (Set.toAscList (GameState.battlefield gs))
 
--- CR 508.5: the defending player an attacking creature's ability refers to --
--- "the player that creature is attacking, the controller of the planeswalker that
--- creature is attacking, or the protector of the battle that creature is
--- attacking". One arm per AttackTarget arm, because that rule's case split IS this
--- type's.
---
--- CR 310.8d is the battle arm's other half, and it is wider than CR 508.5: while a
--- battle is being attacked, EVERY rule and effect that refers to the defending
--- player relative to it means the protector. Reading it off the protector here
--- rather than off Combat.defender is what makes that true of a battle whose
--- controller is the attacking player -- the case CR 310.8b's "notably" creates.
---
--- Nothing means the target names no player: a planeswalker or battle that has left
--- the battlefield, or a battle mid-repair with no designation (CR 310.10).
---
--- CR 508.5's second sentence -- the defending player of a creature that is no
--- longer attacking, read off what it WAS attacking before it left combat -- is last
--- known information, and this reads live instead. Unreachable in the pool, which
--- has no card that can remove an attacked permanent from combat and change who
--- defends through it (#537), and unobservable besides.
-defendingPlayerOf :: [Projection.ControlGrant] -> AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
-defendingPlayerOf grants target gs = case target of
-  AttackTarget.OfPlayer pid -> Just pid
-  AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
-  AttackTarget.OfBattle oid -> Battle.protectorOf oid gs
-
 -- "only if you've been attacked this step", asked of the player a printed clause
 -- says "you" about.
 --
@@ -247,7 +222,7 @@ attackedThisStep pid gs =
 -- way removeChanged samples its two clauses, and the difference is invisible: an
 -- attack target is read in exactly three places, and all three re-ask --
 -- Damage.combatRecipient at CR 510.1's assignment, whose own CR 510.1b is
--- phrased for precisely this case, defendingPlayerOf for CR 508.5's defending
+-- phrased for precisely this case, Defender.playerOf for CR 508.5's defending
 -- player, which reads the planeswalker's controller and never whether it is
 -- still attacked, and Battle.isBeingAttacked for CR 704.5w's rider, which asks
 -- only whether a battle is named at all.
@@ -840,14 +815,14 @@ landwalkAllowsGiven grants pcs attacker gs =
         Keyword.Landwalk criterion -> Just criterion
         _ -> Nothing
       walked = Maybe.mapMaybe landCriterionOf (Map.keys (Projection.keywordsGiven pcs attacker gs))
-      -- CR 508.5, in defendingPlayerOf above: landwalk is exactly an ability of an
+      -- CR 508.5, in Pawl.Engine.Defender: landwalk is exactly an ability of an
       -- attacking creature that refers to a defending player, so the player is
       -- read off the ATTACK rather than off the blocker's controller -- those two
       -- coincide only while there is exactly one defending player (CR 802, #175),
       -- and CR 310.8d breaks them apart at two seats as soon as a battle is
       -- attacked. Nothing means the object is not attacking, so no landwalk of its
       -- can restrict anything.
-      defendingPlayer = (\t -> defendingPlayerOf grants t gs) =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
+      defendingPlayer = Defender.playerOfAttacker grants attacker gs
       -- CR 702.14c's lands of the defending player. Lazy, and load-bearing: this
       -- walks the whole battlefield, and `any` below never forces it for an
       -- attacker without landwalk, which is every attacker in almost every combat
@@ -1536,7 +1511,7 @@ declareAttackers pid = do
               State.modify'
                 ( \g ->
                     let grants = Projection.controlGrants g
-                        defendingFor oid = Maybe.fromMaybe defender ((\t -> defendingPlayerOf grants t g) =<< Map.lookup oid recorded)
+                        defendingFor oid = Maybe.fromMaybe defender ((\t -> Defender.playerOf grants t g) =<< Map.lookup oid recorded)
                         declared = Natural.length attacking
                      in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid (defendingFor oid) declared) h) g attacking
                 )
@@ -1752,6 +1727,6 @@ declareBlockers = do
           State.modify'
             ( \g ->
                 let grants = Projection.controlGrants g
-                    defendingFor oid = Maybe.fromMaybe pid ((\t -> defendingPlayerOf grants t g) =<< Map.lookup oid (Combat.attackers (GameState.combat g)))
+                    defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker grants oid g)
                  in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked attacker (defendingFor attacker)) h) g (Set.toList becameBlocked)
             )

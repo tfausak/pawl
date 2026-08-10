@@ -662,6 +662,22 @@ data Effect card
     -- baked in -- the source may be in a graveyard by the time anyone asks), a
     -- fresh timestamp and Expiry.arm's answer.
     AffectPlayers Duration.Duration PlayerScope.PlayerScope PlayerEffect.PlayerEffect
+  | -- | CR 509.1c / 613.11: install a stored BLOCKING REQUIREMENT for a duration
+    -- -- "that creature blocks this creature this combat if able". Provoke (CR
+    -- 702.39a) is `RequireBlock UntilEndOfCombat (InSlot provokeTarget)
+    -- (EachMatching IsSource)`.
+    --
+    -- The block-axis sibling of AffectPlayers above, and it takes ObjectRefs
+    -- rather than a scope for the reason a requirement is not a PlayerEffect: rule
+    -- 509.1c's two axes are both OBJECTS -- which creature must block, and what it
+    -- must block. One requirement instance per (blocker, attacker) pair the two
+    -- refs name, which is how CR 509.1c counts them.
+    --
+    -- Resolve stores each pair into GameState.blockRequirements with this
+    -- effect's source, a fresh timestamp and Expiry.arm's answer. Only the
+    -- one-of-each shape has a producer; the refs are the vocabulary the pool
+    -- already uses to name "the target" and "this creature".
+    RequireBlock Duration.Duration ObjectRef.ObjectRef ObjectRef.ObjectRef
   | -- | CR 114.2: the resolving controller gets an emblem with the given abilities,
     -- put into the command zone. Targetless; the abilities ride a Card so the
     -- emblem reuses the whole ability pipeline, first-order and tied to Card by

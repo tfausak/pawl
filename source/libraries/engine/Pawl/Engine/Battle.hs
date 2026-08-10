@@ -24,7 +24,7 @@
 -- What a protector is FOR lives in Pawl.Engine.Combat, not here: CR 310.5's
 -- attackable battle (Combat.attackableBattles), CR 310.8b's "any attacking player
 -- for whom its protector is a defending player", and CR 310.8d with CR 508.5
--- (Combat.defendingPlayerOf). This module owns the designation; that one owns what
+-- (Defender.playerOf). This module owns the designation; that one owns what
 -- reads it.
 --
 -- CR 310.6's damage removing defense counters is NOT here: rule 120.3h is one arm

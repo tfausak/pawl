@@ -94,7 +94,7 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- 702.23c says the same of rampage, CR 702.25b of flanking, CR 702.45b of
 -- bushido, CR 702.86b of annihilator, CR 702.91b of battle cry, CR 702.108b of
 -- prowess, CR 702.121b of melee, CR 702.130b of afflict and CR 702.134b of
--- mentor, so the eleven minting arms below are the same shape -- bushido's
+-- mentor, so the twelve minting arms below are the same shape -- bushido's
 -- `concat` aside, since its instance is two abilities.
 --
 -- Exalted is the one with no such clause of its own: rule 702.83 states only
@@ -124,6 +124,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
+  Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Training -> List.genericReplicate count training
   Keyword.Crew _ -> []
@@ -227,6 +228,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -349,6 +351,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -539,6 +542,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -822,6 +826,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Melee -> []
@@ -905,6 +910,8 @@ familyOf keyword = case keyword of
   Keyword.Exalted -> Nothing
   -- CR 702.134a takes no parameter either, so mentor has no family of its own.
   Keyword.Mentor -> Nothing
+  -- CR 702.39a takes no parameter either, so provoke has no family of its own.
+  Keyword.Provoke -> Nothing
   Keyword.BattleCry -> Nothing
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
@@ -1441,3 +1448,63 @@ training =
     }
   where
     effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) Binding.triggerSource
+
+-- CR 702.39a's provoke: whenever this creature attacks, you may choose to have
+-- target creature defending player controls block this creature this combat if
+-- able; if you do, untap that creature. The THIRTEENTH keyword rule 702 states as a
+-- triggered ability, and the first whose payload creates a CR 509.1c blocking
+-- REQUIREMENT rather than changing a characteristic.
+--
+-- CR 508.3a is what "attacks" means, so the condition is mentor's -- SelfAttacks,
+-- EveryTime, rule 702.39a stating no once-a-turn narrowing.
+--
+-- The spec is Pool.Creatures ("creature", drawn from the battlefield by CR 109.2)
+-- narrowed by Filter.ControlledByDefendingPlayer ("defending player controls",
+-- CR 508.5). One atom rather than ControlledBy Opponent, which CR 506.2a makes
+-- too wide: with three seats only one opponent is the defending player, and CR
+-- 508.5a says an ability means that one.
+--
+-- ONE clause holding BOTH effects, under one Optionality.Optional. That is CR
+-- 608.2e's span: rule 702.39a prints one "may", and its "if you do" makes the
+-- untap conditional on the same answer -- so this is one question, not two.
+--
+-- The order is rule 702.39a's -- require, then untap -- and it is not observable
+-- either way: both apply while the ability resolves, and CR 509.1a reads the
+-- board only at the declare blockers step. The printed reminder text says
+-- "untap and block" for the same one instruction.
+--
+-- The requirement's ATTACKER is Binding.triggerSource and never a target: rule
+-- 702.39a says "this creature", and CR 115.10a makes a named object not a target
+-- (crew's argument). Its BLOCKER is the target slot, so a creature that has
+-- become an illegal target by resolution (CR 608.2b) leaves both effects with an
+-- empty set and provoke does nothing.
+--
+-- Duration.UntilEndOfCombat is "this combat" -- CR 500.5a puts the end at the end
+-- of the combat PHASE, which is where CR 509.1c's requirement stops mattering
+-- anyway.
+--
+-- Single mode, ChooseExactly 1, no intervening clause: the only things rule
+-- 702.39a leaves to choose are the target and the "may".
+provoke :: TriggeredAbility Card
+provoke =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Optional Nothing (Seq.fromList [requirement, untap]))) (Map.singleton provokeTarget spec)))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    spec = TargetSpec.MkTargetSpec Pool.Creatures (Just Filter.ControlledByDefendingPlayer)
+    requirement =
+      Effect.RequireBlock
+        Duration.UntilEndOfCombat
+        (ObjectRef.InSlot provokeTarget)
+        (ObjectRef.InSlot Binding.triggerSource)
+    untap = Effect.Untap (ObjectRef.InSlot provokeTarget)
+
+-- The slot rule 702.39a's one target is chosen into, declared by the ability that
+-- reads it for mentorTarget's reason.
+provokeTarget :: SlotName.SlotName
+provokeTarget = SlotName.MkSlotName (Text.pack "provoked")
