@@ -495,7 +495,7 @@ outlast cost =
       ActivatedAbility.condition = Nothing
     }
   where
-    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) Binding.triggerSource
+    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource)
 
 -- CR 601.3: the casting permissions rule 702 gives a card for holding a keyword.
 -- A card's own printed permissions (Face.castingPermissions) are a separate,
@@ -1164,11 +1164,15 @@ battleCry =
 -- unanswerable side is unanswerable, and Condition.holds reads an unanswerable
 -- side as False. So a bearer that has stopped being a creature never evolves.
 --
+-- THE COUNTER goes on through Effect.Evolve rather than Effect.PutCounters,
+-- which is rule 702.100b: the creature "evolves" when that placement puts one or
+-- more counters on it, and one opcode is what ties the marker to the placement.
+-- Renegade Krasis reads it.
+--
 -- Not implemented: an entrant that has LEFT the battlefield before the ability
 -- resolves is read as an object with no characteristics rather than through CR
 -- 608.2h last known information, so the re-check fails where the rules would put
--- the counter (#1178). Nor is rule 702.100b's "evolves" designation, which two
--- cards trigger off (#1179).
+-- the counter (#1178).
 evolve :: TriggeredAbility Card
 evolve =
   TriggeredAbility.MkTriggeredAbility
@@ -1182,7 +1186,7 @@ evolve =
       TriggeredAbility.intervening = Just (Condition.Any [entrantExceeds Quantity.Power, entrantExceeds Quantity.Toughness])
     }
   where
-    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) Binding.triggerSource
+    effect = Effect.Evolve Binding.triggerSource
     entrantExceeds quantity =
       Condition.Compares
         (Quantity.AgainstSlot Binding.became quantity)
@@ -1519,7 +1523,7 @@ mentor =
     }
   where
     spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
-    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) mentorTarget
+    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot mentorTarget)
 
 -- The slot rule 702.134a's one target is chosen into. Named here rather than in
 -- Pawl.Engine.Binding, which holds the RESERVED names a card may not use: this is
@@ -1568,7 +1572,7 @@ training =
       TriggeredAbility.intervening = Nothing
     }
   where
-    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) Binding.triggerSource
+    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource)
 
 -- CR 702.39a's provoke: whenever this creature attacks, you may choose to have
 -- target creature defending player controls block this creature this combat if
@@ -1672,5 +1676,5 @@ renown n =
         Just (Condition.Compares Quantity.IsRenowned Comparison.AtMost (Quantity.Literal 0))
     }
   where
-    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) Binding.triggerSource
+    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource)
     designate = Effect.BecomeRenowned Binding.triggerSource

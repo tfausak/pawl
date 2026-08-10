@@ -2,6 +2,7 @@ module Pawl.Types.Quantity where
 
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ManaCount as ManaCount
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
@@ -212,7 +213,7 @@ data Quantity
     -- view cannot describe at all.
     --
     -- A LEAF: it holds no Quantity.
-    ObjectCounters CounterKind.CounterKind
+    ObjectCounters (CounterKind.CounterKind Keyword.Keyword)
   | -- | CR 702.112b: is the OBJECT this quantity is evaluated against renowned? 1
     -- if so and 0 if not -- rule 702.112a's "if it isn't renowned", which CR 603.4
     -- makes an intervening "if" and so a Pawl.Types.Condition.

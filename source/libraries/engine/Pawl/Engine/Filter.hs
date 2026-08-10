@@ -171,7 +171,7 @@ data View = MkView
     --
     -- Empty for every candidate with no counters to read: a printed card off the
     -- battlefield, a player, an event snapshot.
-    counters :: Map.Map CounterKind.CounterKind Natural.Natural,
+    counters :: Map.Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural.Natural,
     -- CR 701.54a-b: which player this candidate is the Ring-bearer FOR, or Nothing
     -- for the overwhelming majority of permanents, which carry no such
     -- designation. Read straight off Object.ringBearerFor -- CR 701.54b makes it a
@@ -459,6 +459,10 @@ matches context view predicate = case predicate of
   -- incarnation simply arrives without it. Asks nothing of the perspective,
   -- unlike the arm above -- the designation belongs to no player.
   Filter.IsRenowned -> renowned view
+  -- CR 122.1, asked of the CANDIDATE: has it one or more counters of the kind?
+  -- IsRenowned's live read, of counters instead of a designation: CR 400.7's new
+  -- incarnation arrives with none, so nothing is stamped on the candidate.
+  Filter.HasCounters kind -> Map.findWithDefault 0 kind (counters view) > 0
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
   Filter.Not f -> not (matches context view f)
@@ -528,6 +532,16 @@ rewrite pairs predicate = case predicate of
   Filter.IsTapped -> predicate
   Filter.IsRingBearer -> predicate
   Filter.IsRenowned -> predicate
+  -- Rewritten THROUGH the kind: CR 122.1b's keyword counter carries a keyword,
+  -- and rule 612.1 reaches a word inside one exactly as it does in HasKeyword
+  -- above. Every other kind names no word to swap.
+  Filter.HasCounters kind -> Filter.HasCounters $ case kind of
+    CounterKind.Keyword k -> CounterKind.Keyword (rewriteKeyword pairs k)
+    CounterKind.PlusOnePlusOne -> kind
+    CounterKind.MinusOneMinusOne -> kind
+    CounterKind.Loyalty -> kind
+    CounterKind.Lore -> kind
+    CounterKind.Defense -> kind
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as

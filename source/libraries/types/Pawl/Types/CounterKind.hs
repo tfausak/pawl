@@ -1,7 +1,5 @@
 module Pawl.Types.CounterKind where
 
-import qualified Pawl.Types.Keyword as Keyword
-
 -- | CR 122.1: a marker that modifies characteristics or interacts with a rule.
 -- Its KIND is a closed-half classification, the same posture as Keyword: the
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
@@ -9,7 +7,12 @@ import qualified Pawl.Types.Keyword as Keyword
 -- loyalty, and rule 714 for lore -- which rule 122.1 never lists at all. The rest
 -- of CR 122.1c-i are future.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
-data CounterKind
+--
+-- PARAMETRIC in the keyword, for the reason Pawl.Types.Filter is and only that
+-- reason: CR 122.1b's arm below names a keyword, and Pawl.Types.Keyword already
+-- names Filter, which now names this type (Filter.HasCounters). Every module but
+-- Filter writes the single application `CounterKind Keyword`.
+data CounterKind keyword
   = PlusOnePlusOne -- CR 122.1a: +1/+1
   | MinusOneMinusOne -- CR 122.1a: -1/-1
   | -- | CR 122.1b: a keyword counter causes the object to gain that keyword.
@@ -23,7 +26,7 @@ data CounterKind
     --
     -- CR 613.1f is the layer: this grants an ability, so Projection gathers it at
     -- Layer.Ability, NOT at layer 7c where CR 122.1a's P/T counters land.
-    Keyword Keyword.Keyword
+    Keyword keyword
   | -- | CR 122.1e / 306.5c: a planeswalker's loyalty on the battlefield is this
     -- count, never a Pawl.Types.Loyalty -- that type carries only CR 306.5a's
     -- PRINTED number.

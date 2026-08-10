@@ -531,7 +531,7 @@ data TriggerCondition
     -- subtype's, and Pawl.Engine.Saga is where the Saga-only rules (CR 714.2d's
     -- final chapter number, CR 714.3c's turn-based action, CR 704.5s's state-based
     -- action) read the subtype.
-    SelfCountersReached CounterKind.CounterKind Natural.Natural
+    SelfCountersReached (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
   | -- | CR 310.11b, generalized over the kind of counter: "when the LAST [kind]
     -- counter is removed from this permanent". SelfCountersReached's mirror,
     -- matched against a GameEvent.CountersRemoved whose before/after pair went from
@@ -552,7 +552,7 @@ data TriggerCondition
     -- Not restricted to battles and not restricted to defense counters, for
     -- SelfCountersReached's reason: the shape is the counter kind's, and
     -- Pawl.Engine.Battle is where rule 310's battle-only reading lives.
-    SelfLastCounterRemoved CounterKind.CounterKind
+    SelfLastCounterRemoved (CounterKind.CounterKind Keyword.Keyword)
   | -- | CR 601.2i: "whenever you cast a [type] spell" -- Young Pyromancer's
     -- "whenever you cast an instant or sorcery spell". That rule's second
     -- sentence is the trigger event in as many words: "any abilities that
@@ -754,6 +754,16 @@ data TriggerCondition
     -- is a zone change, so CR 603.10a's look-back does not reach it and the
     -- designation is written while the permanent is still on the battlefield.
     PermanentBecomesRenowned (Filter.Filter Keyword.Keyword)
+  | -- | CR 702.100b: the BEARER evolved -- Renegade Krasis' "whenever this
+    -- creature evolves". Matched against GameEvent.Evolved by an id comparison,
+    -- SelfEnters' shape.
+    --
+    -- Self-scoped and NOT PermanentBecomesRenowned's filtered shape, and the pool
+    -- is why: both printings that read rule 702.100b's marker say "this creature",
+    -- where renown has Valeron Wardens printing the filtered form. A Filter
+    -- payload here would be a width no card asks for; the card that prints
+    -- "whenever a creature you control evolves" earns it.
+    SelfEvolves
   | -- | CR 603.10a: "whenever a player sacrifices a permanent". One of the four
     -- look-back families that rule names, and the second pawl builds.
     --

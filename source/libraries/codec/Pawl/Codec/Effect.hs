@@ -127,8 +127,8 @@ toJson codec e = case e of
         <> [Common.encodeSeq (toJson codec) rider | not (Seq.null rider)]
   Effect.PreventAllDamage d r -> Common.tagged "PreventAllDamage" (Just (Common.array [Duration.toJson d, ObjectRef.toJson r]))
   Effect.RedirectDamage d k f t -> Common.tagged "RedirectDamage" (Just (Common.array [Duration.toJson d, Common.encodeMaybe DamageKind.toJson k, ObjectRef.toJson f, ObjectRef.toJson t]))
-  Effect.PutCounters k q s -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
-  Effect.RemoveCounters k q s -> Common.tagged "RemoveCounters" (Just (Common.array [CounterKind.toJson k, Quantity.toJson q, SlotName.toJson s]))
+  Effect.PutCounters k q r -> Common.tagged "PutCounters" (Just (Common.array [CounterKind.toJson Keyword.toJson k, Quantity.toJson q, ObjectRef.toJson r]))
+  Effect.RemoveCounters k q s -> Common.tagged "RemoveCounters" (Just (Common.array [CounterKind.toJson Keyword.toJson k, Quantity.toJson q, SlotName.toJson s]))
   Effect.GainPlayerCounters r k q -> Common.tagged "GainPlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.RemovePlayerCounters r k q -> Common.tagged "RemovePlayerCounters" (Just (Common.array [PlayerRef.toJson r, PlayerCounterKind.toJson k, Quantity.toJson q]))
   Effect.Tap r -> Common.tagged "Tap" (Just (ObjectRef.toJson r))
@@ -151,6 +151,7 @@ toJson codec e = case e of
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
   Effect.BecomeRenowned s -> Common.tagged "BecomeRenowned" (Just (SlotName.toJson s))
+  Effect.Evolve s -> Common.tagged "Evolve" (Just (SlotName.toJson s))
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Daytime.toJson d))
   Effect.ExileUntilMonarch s -> Common.tagged "ExileUntilMonarch" (Just (SlotName.toJson s))
   Effect.Attach s -> Common.tagged "Attach" (Just (SlotName.toJson s))
@@ -322,10 +323,10 @@ fromJson decode value = do
       Just (Value.Array (Array.MkArray [d, k, from, to])) -> Effect.RedirectDamage <$> Duration.fromJson d <*> Common.decodeMaybe DamageKind.fromJson k <*> ObjectRef.fromJson from <*> ObjectRef.fromJson to
       _ -> Left . Text.pack $ "RedirectDamage expects [Duration, Maybe DamageKind, ObjectRef, ObjectRef]"
     "PutCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.PutCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
-      _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, slot]"
+      Just (Value.Array (Array.MkArray [k, q, r])) -> Effect.PutCounters <$> CounterKind.fromJson Keyword.fromJson k <*> Quantity.fromJson q <*> ObjectRef.fromJson r
+      _ -> Left . Text.pack $ "PutCounters expects [counterKind, quantity, objectRef]"
     "RemoveCounters" -> case mv of
-      Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.RemoveCounters <$> CounterKind.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
+      Just (Value.Array (Array.MkArray [k, q, s])) -> Effect.RemoveCounters <$> CounterKind.fromJson Keyword.fromJson k <*> Quantity.fromJson q <*> SlotName.fromJson s
       _ -> Left . Text.pack $ "RemoveCounters expects [counterKind, quantity, slot]"
     "GainPlayerCounters" -> case mv of
       Just (Value.Array (Array.MkArray [r, k, q])) -> Effect.GainPlayerCounters <$> PlayerRef.fromJson r <*> PlayerCounterKind.fromJson k <*> Quantity.fromJson q
@@ -351,6 +352,7 @@ fromJson decode value = do
     "CreateEmblem" -> Common.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Common.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
     "BecomeRenowned" -> Common.withValue mv (fmap Effect.BecomeRenowned . SlotName.fromJson)
+    "Evolve" -> Common.withValue mv (fmap Effect.Evolve . SlotName.fromJson)
     "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Daytime.fromJson)
     "ExileUntilMonarch" -> Common.withValue mv (fmap Effect.ExileUntilMonarch . SlotName.fromJson)
     "Attach" -> Common.withValue mv (fmap Effect.Attach . SlotName.fromJson)

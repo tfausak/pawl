@@ -9,6 +9,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Facing as Facing
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Sickness as Sickness
@@ -101,7 +102,7 @@ data Object = MkObject
     -- because CR 122.2 makes counters cease to exist when an object changes
     -- zones. A +1/+1 or -1/-1 count feeds P/T via the projection (CR 122.1a /
     -- 613.4c); both kinds present trigger the CR 704.5q annihilation SBA.
-    counters :: Map.Map CounterKind.CounterKind Natural.Natural,
+    counters :: Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural,
     -- | The object OR PLAYER this permanent is attached to -- what CR 303.4b calls
     -- "enchanted" for an Aura and CR 301.5a calls "equipped" for an Equipment.
     -- One field for both, because attachment is one relation: CR 701.3's Attach

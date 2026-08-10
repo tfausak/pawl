@@ -461,7 +461,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
           Duration.UntilEndOfTurn
           (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))
           (Quantity.Literal 3)
-          (Seq.singleton (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (SlotName.MkSlotName (Text.pack "target"))))
+          (Seq.singleton (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.InSlot (SlotName.MkSlotName (Text.pack "thatMuch"))) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target")))))
       )
       """ {"type":"PreventNextDamage","value":[{"type":"UntilEndOfTurn"},"target",{"type":"Literal","value":3},[{"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"InSlot","value":"thatMuch"},"target"]}]]} """
   -- CR 615.1: the same shield with no amount to spend (Selfless Squire).
@@ -504,8 +504,17 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (SlotName.MkSlotName (Text.pack "creature")))
+      (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "creature"))))
       """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},"creature"]} """
+  -- The ObjectRef's other arm: a Filter is an object where a slot is a string, so
+  -- the widening left every card's spelling alone (Pawl.Codec.ObjectRef).
+  Spec.it s "PutCounters over a swept set" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.EachMatching Filter.IsRenowned))
+      """ {"type":"PutCounters","value":[{"type":"PlusOnePlusOne"},{"type":"Literal","value":1},{"type":"IsRenowned"}]} """
   -- CR 122: PutCounters' mirror, and a distinct tag -- a signed amount under one
   -- tag would make the two indistinguishable in a card file.
   Spec.it s "RemoveCounters" $
@@ -715,6 +724,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.BecomeRenowned (SlotName.MkSlotName (Text.pack "self")))
       """ {"type":"BecomeRenowned","value":"self"} """
+  Spec.it s "Evolve" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Evolve (SlotName.MkSlotName (Text.pack "self")))
+      """ {"type":"Evolve","value":"self"} """
   Spec.it s "ItBecomes" $
     Common.assertJsonCodec
       s

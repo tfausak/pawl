@@ -6,6 +6,7 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Countering as Countering
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DiscardCause as DiscardCause
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -373,7 +374,7 @@ data GameEvent
     -- before > after pair here. CR 122.6 is about putting counters on and every
     -- rule reading this constructor is phrased that way, so widening the pair
     -- would make every such reader ask which direction it went.
-    CountersPut ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
+    CountersPut ObjectId.ObjectId (CounterKind.CounterKind Keyword.Keyword) Natural.Natural Natural.Natural
   | -- | Counters were REMOVED from an object -- the object, the kind, and the
     -- counts of that kind on it BEFORE and AFTER. CountersPut's mirror, and shaped
     -- the same way for the same reason: CR 310.11b's Siege ability asks whether the
@@ -390,7 +391,7 @@ data GameEvent
     -- cost, CR 306.8's damage to a planeswalker, CR 704.5q's annihilation -- stay
     -- direct writes and emit nothing, so a card triggering off one of those would
     -- not see it (#900).
-    CountersRemoved ObjectId.ObjectId CounterKind.CounterKind Natural.Natural Natural.Natural
+    CountersRemoved ObjectId.ObjectId (CounterKind.CounterKind Keyword.Keyword) Natural.Natural Natural.Natural
   | -- | CR 709.5c: a permanent was given an UNLOCKED DESIGNATION -- the permanent,
     -- and the half the designation names. Emitted by Pawl.Engine.Event.unlockHalf,
     -- the one place a designation is given, and only when the permanent did not
@@ -459,6 +460,20 @@ data GameEvent
     -- "it stays renowned until it leaves the battlefield" leaves nothing to undo,
     -- and CR 400.7's new object is not a permanent losing a designation.
     BecameRenowned ObjectId.ObjectId
+  | -- | CR 702.100b: a creature EVOLVED -- "one or more +1/+1 counters are put on
+    -- it as a result of its evolve ability resolving". Emitted by
+    -- Pawl.Engine.Resolve's Effect.Evolve arm, the one place that ability's
+    -- counters are placed, and only when the placement actually landed some.
+    --
+    -- BecameRenowned's shape and its reasons: the permanent by id, no player, one
+    -- direction. Unlike that one it marks no lasting designation -- rule 702.100b
+    -- describes a moment rather than a state, so nothing on Pawl.Types.Object
+    -- pairs with it and this event IS the whole record.
+    --
+    -- Distinct from the CountersPut event the same placement records: that one
+    -- says +1/+1 counters arrived, this one says the evolve ability put them.
+    -- Renegade Krasis reads the difference.
+    Evolved ObjectId.ObjectId
   | -- | CR 701.21a: a permanent was SACRIFICED, and by whom. Emitted by
     -- Pawl.Engine.Event.sacrifice, the one funnel every sacrifice in the engine
     -- goes through -- a cost payment, Effect.Sacrifice, Effect.PlayerSacrifices

@@ -3,6 +3,7 @@ module Pawl.Types.LastKnown where
 import qualified Data.Map.Strict as Map
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.ProjectedCharacteristics as ProjectedCharacteristics
 import qualified Pawl.Types.Source as Source
@@ -51,6 +52,6 @@ data LastKnown = MkLastKnown
     -- Counters are not characteristics -- CR 109.3's list has none -- so this
     -- sits beside the projection for the reason `controller` does rather than
     -- inside it.
-    counters :: !(Map.Map CounterKind.CounterKind Natural.Natural)
+    counters :: !(Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
   }
   deriving (Eq, Show)
