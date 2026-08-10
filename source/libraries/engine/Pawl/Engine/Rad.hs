@@ -96,11 +96,10 @@ nonland = Filter.Not (Filter.HasCardType CardType.Land)
 -- ability's controller, so PlayerRelation.You resolves it.
 hasRadCounters :: Condition.Condition
 hasRadCounters =
-  Condition.MkCondition
-    { Condition.measured = Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad,
-      Condition.comparison = Comparison.AtLeast,
-      Condition.threshold = Quantity.Literal 1
-    }
+  Condition.Compares
+    (Quantity.PlayerCounters (PlayerRef.Relative PlayerRelation.You) PlayerCounterKind.Rad)
+    Comparison.AtLeast
+    (Quantity.Literal 1)
 
 -- | CR 728.1, in full: "At the beginning of each player's precombat main phase,
 -- if that player has one or more rad counters, that player mills a number of

@@ -96,7 +96,7 @@ spec s = Spec.describe s "Pawl.Codec.CombatRestriction" $ do
 -- Pawl.Codec.FilterSpec covers that conjunct.
 anotherGiant :: Condition.Condition
 anotherGiant =
-  Condition.MkCondition
+  Condition.Compares
     ( Quantity.Count
         ( Count.MkCount
             (Scope.InZone Zone.Battlefield PlayerRef.EachPlayer)

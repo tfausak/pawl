@@ -22,9 +22,9 @@ import qualified Pawl.Types.Supertype as Supertype
 -- The characteristics a Filter atom consults. Supplied by the projection on the
 -- battlefield/stack and by the printed card off the battlefield (both builders
 -- live in Pawl.Engine.Projection), or by `playerView` below when the candidate is a
--- player rather than an object. `power` and `controller` are Nothing off the
--- battlefield -- a card in a library has neither under the rules that matter here
--- -- so PowerAtLeast / ControlledBy are vacuously False there, which no search
+-- player rather than an object. `controller` is Nothing off the
+-- battlefield -- a card in a library has none under the rules that matter here
+-- -- so ControlledBy is vacuously False there, which no search
 -- filter uses. `owner` and `manaValue` are the two axes that do NOT go vacuous
 -- with the zone, since CR 108.3 and CR 202.3 both name facts a card carries
 -- everywhere; each field says so.
@@ -41,6 +41,13 @@ data View = MkView
     -- a Humility'd one (CR 613.1f) does not.
     keywords :: Set.Set Keyword.Type.Keyword,
     power :: Maybe Integer,
+    -- CR 208.1: the candidate's toughness, read exactly as `power` above is and
+    -- Nothing in exactly the same places -- a permanent with no toughness box, a
+    -- player, a card outside the battlefield. No Filter atom consults it: it is
+    -- here for Pawl.Engine.Quantity's Toughness arm, which reads a View like
+    -- every other characteristic-reading quantity, and CR 702.100a's evolve is
+    -- the pool's one reader.
+    toughness :: Maybe Integer,
     -- CR 202.3: the candidate's mana value (CR 202.3a gives a costless object
     -- 0). On the battlefield it comes off the CR 613 projection, so CR 707.2's
     -- copiable mana cost is honoured -- a Clone reports what it copied. Off the
@@ -204,6 +211,7 @@ playerView pid =
       -- list of what an object is has no player in it.
       keywords = Set.empty,
       power = Nothing,
+      toughness = Nothing,
       -- CR 202.3 reads a mana cost, which is printed on an OBJECT (CR 202.1); a
       -- player has none.
       manaValue = Nothing,
@@ -616,6 +624,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Provoke -> keyword
   Keyword.Type.Training -> keyword
   Keyword.Type.BattleCry -> keyword
+  Keyword.Type.Evolve -> keyword
   Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword

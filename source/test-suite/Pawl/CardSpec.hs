@@ -335,6 +335,7 @@ quantityCounts quantity = case quantity of
   Quantity.Type.Literal _ -> []
   Quantity.Type.ManaValue -> []
   Quantity.Type.Power -> []
+  Quantity.Type.Toughness -> []
   -- A slot read, not a fold over game state: the value was bound by an earlier
   -- effect of the same resolution and there is no Count inside it.
   Quantity.Type.InSlot _ -> []
@@ -379,12 +380,14 @@ countCounts count = case Count.Type.aggregation count of
   Aggregation.DistinctCardTypes -> []
   Aggregation.Greatest quantity -> quantityCounts quantity
 
--- Every Count reachable from a Condition: both sides are Quantities, and either
--- may embed one (Pawl.Types.Condition).
+-- Every Count reachable from a Condition: both sides of a comparison are
+-- Quantities and either may embed one, and a disjunction holds more conditions
+-- (Pawl.Types.Condition).
 conditionCounts :: Condition.Type.Condition -> [Count.Type.Count Quantity.Type.Quantity]
-conditionCounts condition =
-  quantityCounts (Condition.Type.measured condition)
-    <> quantityCounts (Condition.Type.threshold condition)
+conditionCounts condition = case condition of
+  Condition.Type.Compares measured _ threshold ->
+    quantityCounts measured <> quantityCounts threshold
+  Condition.Type.Any conditions -> concatMap conditionCounts conditions
 
 -- CR 701.46a's per-clause gate. Mode.allEffects and Modal.allEffects drop clause
 -- boundaries by design, so every lint that reaches a card through them needs
@@ -1572,6 +1575,9 @@ keywordFilters keyword = case keyword of
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Training -> []
+  -- CR 702.100a is payload-free: the Filter its minted ability carries -- the
+  -- entering creature's -- is the ENGINE's, never a card's.
+  Keyword.Evolve -> []
   Keyword.StartYourEngines -> []
   Keyword.Toxic _ -> []
 
@@ -3492,7 +3498,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   -- The REJECTING direction, against hand-built offenders rather than card files,
   -- as the repeated-face-name lint above does it.
   Spec.it s "the lint itself catches a state trigger and a nested AnyOf inside an AnyOf" $ do
-    let never = Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 1)
+    let never = Condition.Type.Compares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 1)
         fine = TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.RoomFullyUnlocked PlayerRelation.You]
     Spec.assertBool s (not (anyOfOffends fine)) "the control: two event triggers side by side are fine"
     Spec.assertBool s (anyOfOffends (TriggerCondition.AnyOf [TriggerCondition.SelfEnters, TriggerCondition.StateIs never])) "a CR 603.8 state trigger inside an AnyOf is rejected"

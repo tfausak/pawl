@@ -136,9 +136,13 @@ resolveTopWith runSubgame = do
           -- as an object with no characteristics. The two checks must read
           -- alike, or a trigger that passed the gather would be removed here
           -- for no reason.
+          --
+          -- The ability's own bindings supply the context's slot objects, as
+          -- Event.interveningHolds supplies the pending trigger's: rule 702.100a's
+          -- "that creature" is the entrant at Binding.became, not the source.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnown srcId gs) (Filter.contextFor (Just (Object.owner obj)) (Just srcId)) gs srcId cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnown srcId gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just srcId) (Binding.objectSlots (Object.bindings obj))) gs srcId cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -173,7 +177,7 @@ resolveTopWith runSubgame = do
           -- none to read.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnown oid gs) (Filter.contextFor (Just (Object.owner obj)) (Just oid)) gs oid cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnown oid gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just oid) (Binding.objectSlots (Object.bindings obj))) gs oid cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)

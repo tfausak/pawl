@@ -5670,6 +5670,13 @@ reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events 
 -- with no characteristics, quietly answering False to every clause. Stack's CR
 -- 608.2a re-check reads the same way, and the two must agree or a trigger would be
 -- placed and then removed for disagreeing with itself.
+--
+-- The trigger's own bindings ride in as the context's slot objects, which is
+-- what lets CR 702.100a's "if THAT CREATURE's power is greater" read the
+-- entrant through Quantity.AgainstSlot rather than the bearer: an intervening
+-- "if" may be about the event's object and not only about the source. Stack's
+-- re-check reads the same slots off the placed ability, for the reason the view
+-- above must match.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of
@@ -5678,7 +5685,7 @@ interveningHolds gs pending =
     (Just cond, TriggerSource.OfObject oid) ->
       Condition.holds
         (Projection.viewWithLastKnown oid gs)
-        (Filter.contextFor (Just (PendingTrigger.controller pending)) (Just oid))
+        (Filter.contextWithSlots (Just (PendingTrigger.controller pending)) (Just oid) (Binding.objectSlots (PendingTrigger.bindings pending)))
         gs
         oid
         cond

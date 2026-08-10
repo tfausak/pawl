@@ -67,7 +67,7 @@ check swamp n comparison threshold =
         context
         gs
         (ObjectId.MkObjectId 0)
-        (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
+        (Condition.Type.Compares (Quantity.Type.Count everyPermanent) comparison (Quantity.Type.Literal threshold))
 
 -- Queen Marchesa's upkeep trigger: "if an opponent is the monarch" is
 -- Quantity.IsMonarch (Relative Opponent), which names EVERY opponent -- one
@@ -177,7 +177,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
               (Filter.contextFor Nothing Nothing)
               gs
               (ObjectId.MkObjectId 0)
-              (Condition.Type.MkCondition (Quantity.Type.Count count) Comparison.Exactly (Quantity.Type.Literal 0))
+              (Condition.Type.Compares (Quantity.Type.Count count) Comparison.Exactly (Quantity.Type.Literal 0))
         )
         "false"
 
@@ -193,7 +193,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Condition" $ do
               context
               gs
               (ObjectId.MkObjectId 0)
-              (Condition.Type.MkCondition (Quantity.Type.Count everyPermanent) Comparison.Exactly (Quantity.Type.InSlot Binding.variableX))
+              (Condition.Type.Compares (Quantity.Type.Count everyPermanent) Comparison.Exactly (Quantity.Type.InSlot Binding.variableX))
         )
         "false"
 

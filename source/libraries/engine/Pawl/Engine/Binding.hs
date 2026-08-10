@@ -424,6 +424,17 @@ modesOf m = Maybe.fromMaybe Seq.empty (Binding.modes =<< Map.lookup chosenModes 
 targetsOf :: Map SlotName Binding -> Map SlotName Recipient
 targetsOf = Map.mapMaybe Binding.target
 
+-- The OBJECTS a binding environment names, one slot at a time: targetsOf with
+-- the player recipients dropped, which is what Pawl.Engine.Filter.Context's
+-- slotObjects holds so a Quantity.AgainstSlot can aim at one.
+--
+-- No CR 608.2b legality filter, unlike Pawl.Engine.Resolve.effectContext's
+-- version: the callers here are CR 603.4's two intervening-"if" checks, and what
+-- they aim at is a slot the EVENT bound (Binding.became), which was never chosen
+-- and so was never a target to become illegal.
+objectSlots :: Map SlotName Binding -> Map SlotName ObjectId
+objectSlots = Map.mapMaybe Recipient.objectOf . targetsOf
+
 -- The amount (X) bound at a slot, if any.
 amountOf :: SlotName -> Map SlotName Binding -> Maybe Natural
 amountOf slot m = Binding.amount =<< Map.lookup slot m

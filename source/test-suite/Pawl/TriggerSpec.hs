@@ -3836,6 +3836,104 @@ provokeSpec s registry =
 -- directly, below. Pawl.SetupSpec's "no per-incarnation state survives" case does
 -- NOT cover it -- that case asks whether the forgetting is idempotent, which is
 -- blind to a field it never touches.
+-- CR 702.100: evolve, the fifteenth keyword whose rule text IS a triggered
+-- ability, and the first whose intervening "if" is about the EVENT's object
+-- rather than its bearer -- so this is the group that runs a Condition reading
+-- another object through Quantity.AgainstSlot at Binding.became, and the first
+-- disjunction (Condition.Any) in the pool.
+--
+-- Cloudfin Raptor {U} Creature -- Bird Mutant 0/1 is the card: flying and evolve,
+-- so every counter below is the keyword's. Its 0/1 body is what makes the two
+-- halves of rule 702.100a's "and/or" separable at all, and each entrant is chosen
+-- to satisfy exactly one of them:
+--
+--   * Goblin Piker 2/1 -- power only (2 > 0, and 1 is not > 1).
+--   * Llanowar Augur 0/3 -- toughness only (0 is not > 0, and 3 > 1).
+--   * Birds of Paradise 0/1 -- neither, which is what makes "greater" strict.
+--
+-- A test whose entrant beat the Raptor on both axes would pass whichever half
+-- were implemented, and would not be a test of the disjunction at all.
+evolveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+evolveSpec s registry =
+  let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- CR 122.1: what is on the permanent, which a +1/+1 EFFECT would leave
+      -- empty while reading the same size.
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+      -- A Raptor under alice, then one creature entering under `pid` with CR
+      -- 603.6a's event, so the scan has something to match.
+      board raptor printing pid =
+        let (raptorId, gs1) = S.addCreature raptor S.alice (Setup.emptyGame S.bothPlayers)
+            (enteringId, gs2) = S.entersWithTrigger printing pid gs1
+         in (raptorId, enteringId, gs2)
+      evolvesAgainst raptor printing = do
+        entrant <- S.printingOf s registry printing
+        let (raptorId, _, gs) = board raptor entrant S.alice
+        pure (raptorId, resolveAll (settle gs))
+   in Spec.describe s "Evolve" $ do
+        -- The proving test, and rule 702.100a's POWER half alone: the Piker's 1
+        -- toughness does not beat the Raptor's 1, so an implementation that read
+        -- only toughness leaves this board untouched.
+        Spec.it s "CR 702.100a whole card: a 2/1 entering beats the Raptor's power and evolves it" $ do
+          raptor <- S.printingOf s registry "Cloudfin Raptor"
+          (raptorId, after) <- evolvesAgainst raptor "Goblin Piker"
+          Spec.assertEqWith s "one counter" (countersOn raptorId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+          Spec.assertEqWith s "so it is a 1/2" (S.powerToughnessOf raptorId after) (Just (1, 2))
+        -- Rule 702.100a's TOUGHNESS half alone, and the mirror of the case above:
+        -- the Augur's 0 power does not beat the Raptor's 0, so an implementation
+        -- that read only power leaves this board untouched.
+        Spec.it s "CR 702.100a a 0/3 entering beats only the toughness, and evolves it all the same" $ do
+          raptor <- S.printingOf s registry "Cloudfin Raptor"
+          (raptorId, after) <- evolvesAgainst raptor "Llanowar Augur"
+          Spec.assertEqWith s "one counter" (countersOn raptorId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+          Spec.assertEqWith s "so it is a 1/2" (S.powerToughnessOf raptorId after) (Just (1, 2))
+        -- "GREATER" is strict on both axes: a 0/1 entering ties the Raptor twice
+        -- and evolves nothing. The falsifier for a comparison written as "at
+        -- least".
+        Spec.it s "CR 702.100a a 0/1 entering ties both axes and evolves nothing" $ do
+          raptor <- S.printingOf s registry "Cloudfin Raptor"
+          (raptorId, after) <- evolvesAgainst raptor "Birds of Paradise"
+          Spec.assertEqWith s "no counters" (countersOn raptorId after) Map.empty
+          Spec.assertEqWith s "it is its printed 0/1" (S.powerToughnessOf raptorId after) (Just (0, 1))
+        -- "A creature YOU CONTROL": the same Piker that evolves the Raptor from
+        -- alice's side does nothing from bob's, and nothing reaches the stack --
+        -- CR 603.4 says an ability whose "if" is false does not trigger, but here
+        -- it is the CONDITION that rejects the event.
+        Spec.it s "CR 702.100a an opponent's creature entering is not a trigger at all" $ do
+          raptor <- S.printingOf s registry "Cloudfin Raptor"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (raptorId, _, gs) = board raptor piker S.bob
+              settled = settle gs
+          Spec.assertEqWith s "nothing on the stack" (GameState.stack settled) []
+          Spec.assertEqWith s "and no counters" (countersOn raptorId (resolveAll settled)) Map.empty
+        -- CR 608.2a, the case that makes rule 702.100a's "if" an intervening one
+        -- rather than part of the event: the trigger is on the stack legitimately,
+        -- and a pump on the BEARER in response makes it resolve doing nothing. The
+        -- proving test above is the control -- same board, same Piker.
+        Spec.it s "CR 608.2a pumping the Raptor in response takes the counter away" $ do
+          raptor <- S.printingOf s registry "Cloudfin Raptor"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (raptorId, _, gs) = board raptor piker S.alice
+              onStack = settle gs
+              responded = S.withEffect raptorId (Modification.ModifyPowerToughness (Quantity.Type.Literal 2) (Quantity.Type.Literal 2)) onStack
+              after = resolveAll responded
+          Spec.assertBool s (not (null (GameState.stack onStack))) "the trigger really was on the stack"
+          Spec.assertEqWith s "the Raptor is a 2/3, which the Piker beats on neither axis" (S.powerToughnessOf raptorId responded) (Just (2, 3))
+          Spec.assertEqWith s "so no counter on resolution" (countersOn raptorId after) Map.empty
+        -- CR 702.100d: each instance triggers separately, asserted of the MINT as
+        -- prowess' and training's are, no printing carrying evolve twice.
+        Spec.it s "CR 702.100d two instances mint two abilities" $ do
+          let abilities = Keyword.abilitiesFor Keyword.Type.Evolve 2
+              expected =
+                TriggerCondition.PermanentEnters
+                  (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.ControlledBy PlayerRelation.You])
+          Spec.assertEqWith s "two abilities" (length abilities) 2
+          Spec.assertEqWith
+            s
+            "each watching CR 603.6a's entry"
+            (fmap TriggeredAbility.condition abilities)
+            [expected, expected]
+
 renownSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 renownSpec s registry =
   let board mine theirs = do
@@ -6137,7 +6235,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentEnters Filter.Type.IsSource,
     TriggerCondition.PermanentDies Filter.Type.IsSource,
     TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.EachTurn,
-    TriggerCondition.StateIs (Condition.Type.MkCondition (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
+    TriggerCondition.StateIs (Condition.Type.Compares (Quantity.Type.Literal 0) Comparison.Exactly (Quantity.Type.Literal 0)),
     TriggerCondition.SelfDealsCombatDamageToPlayer,
     TriggerCondition.PermanentDealsCombatDamageToPlayer (Filter.Type.And []),
     TriggerCondition.CreatureDealtCombatDamageToMonarch,
@@ -8284,6 +8382,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   mentorSpec s registry
   trainingSpec s registry
   provokeSpec s registry
+  evolveSpec s registry
   renownSpec s registry
   tovolarSpec s registry
   aragornSpec s registry

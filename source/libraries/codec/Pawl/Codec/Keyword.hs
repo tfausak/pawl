@@ -65,6 +65,7 @@ toJson k = case k of
   Keyword.Mentor -> Common.nullary "Mentor"
   Keyword.Provoke -> Common.nullary "Provoke"
   Keyword.BattleCry -> Common.nullary "BattleCry"
+  Keyword.Evolve -> Common.nullary "Evolve"
   Keyword.Outlast cost -> Common.tagged "Outlast" . Just $ Cost.toJson toJson cost
   Keyword.Prowess -> Common.nullary "Prowess"
   Keyword.Menace -> Common.nullary "Menace"
@@ -124,6 +125,7 @@ fromJson value = do
     ("Mentor", _) -> Right Keyword.Mentor
     ("Provoke", _) -> Right Keyword.Provoke
     ("BattleCry", _) -> Right Keyword.BattleCry
+    ("Evolve", _) -> Right Keyword.Evolve
     ("Outlast", Just v) -> Keyword.Outlast <$> Cost.fromJson fromJson v
     ("Prowess", _) -> Right Keyword.Prowess
     ("Menace", _) -> Right Keyword.Menace

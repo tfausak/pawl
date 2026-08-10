@@ -122,6 +122,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Annihilator n -> List.genericReplicate count (annihilator n)
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
+  Keyword.Evolve -> List.genericReplicate count evolve
   Keyword.Outlast _ -> []
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Flanking -> List.genericReplicate count flanking
@@ -229,6 +230,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Evolve -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -354,6 +356,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Evolve -> []
   Keyword.Outlast cost -> List.genericReplicate count (outlast cost)
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -583,6 +586,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Evolve -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -869,6 +873,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Poisonous _ -> []
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
+  Keyword.Evolve -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -962,6 +967,8 @@ familyOf keyword = case keyword of
   -- CR 702.39a takes no parameter either, so provoke has no family of its own.
   Keyword.Provoke -> Nothing
   Keyword.BattleCry -> Nothing
+  -- CR 702.100a takes no parameter either, so evolve has no family of its own.
+  Keyword.Evolve -> Nothing
   Keyword.Outlast _ -> Just KeywordFamily.Outlast
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
@@ -1119,6 +1126,69 @@ battleCry =
 -- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
 -- is placed -- rule 702.108a leaves nothing to choose, and has no "if" clause,
 -- so intervening = Nothing.
+-- CR 702.100a: whenever a creature you control enters, if that creature's power
+-- and/or toughness is greater than this creature's, put a +1/+1 counter on this
+-- creature. Minted here like the triggered keywords around it, per instance --
+-- CR 702.100d says each triggers separately.
+--
+-- The condition is CR 603.6a's other written form,
+-- TriggerCondition.PermanentEnters: the event is somebody ELSE entering, so the
+-- Filter is the rule's two printed words, "creature" and "you control". The
+-- bearer is NOT excluded, and that is the rule rather than an omission -- rule
+-- 702.100a says "a creature", and a creature entering compares itself against
+-- itself, which no comparison below can answer true.
+--
+-- The comparison rides the intervening "if" (CR 603.4) and not the condition's
+-- Filter, which is where training's lives, because rule 702.100a prints "if":
+-- CR 608.2a re-checks it as the ability resolves, so pumping the bearer in
+-- response takes the counter away, and the two spellings are told apart on
+-- exactly that board.
+--
+-- "THAT CREATURE" is the entrant, which is neither the bearer nor a target, so
+-- the condition reaches it through Quantity.AgainstSlot at the entrant's own
+-- reserved slot (Binding.became, stamped by Event.eventBindings). Both
+-- intervening checks fill Filter.Context's slotObjects from the trigger's
+-- bindings, which is what makes that read answerable.
+--
+-- Condition.Any because rule 702.100a's "and/or" compares two DIFFERENT
+-- characteristics; no single Compares states it, since one comparison reads one
+-- pair of quantities.
+--
+-- STRICTLY greater, spelled as "at least one more" for the reason
+-- Pawl.Engine.Speed.belowMaxSpeed spells its bound the other way: CR 208.1's
+-- power and toughness are whole numbers and Pawl.Types.Comparison has no strict
+-- arm, so the two state the same set.
+--
+-- CR 702.100c falls out rather than being written: a permanent that is not a
+-- creature has no power or toughness (CR 208.3), Quantity.Plus of an
+-- unanswerable side is unanswerable, and Condition.holds reads an unanswerable
+-- side as False. So a bearer that has stopped being a creature never evolves.
+--
+-- Not implemented: an entrant that has LEFT the battlefield before the ability
+-- resolves is read as an object with no characteristics rather than through CR
+-- 608.2h last known information, so the re-check fails where the rules would put
+-- the counter (#1178). Nor is rule 702.100b's "evolves" designation, which two
+-- cards trigger off (#1179).
+evolve :: TriggeredAbility Card
+evolve =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition =
+        TriggerCondition.PermanentEnters
+          (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Just (Condition.Any [entrantExceeds Quantity.Power, entrantExceeds Quantity.Toughness])
+    }
+  where
+    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) Binding.triggerSource
+    entrantExceeds quantity =
+      Condition.Compares
+        (Quantity.AgainstSlot Binding.became quantity)
+        Comparison.AtLeast
+        (Quantity.Plus quantity (Quantity.Literal 1))
+
 prowess :: TriggeredAbility Card
 prowess =
   TriggeredAbility.MkTriggeredAbility
@@ -1599,7 +1669,7 @@ renown n =
           (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [grow, designate]))) Map.empty))
           (ModeSelection.ChooseExactly 1),
       TriggeredAbility.intervening =
-        Just (Condition.MkCondition Quantity.IsRenowned Comparison.AtMost (Quantity.Literal 0))
+        Just (Condition.Compares Quantity.IsRenowned Comparison.AtMost (Quantity.Literal 0))
     }
   where
     grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) Binding.triggerSource

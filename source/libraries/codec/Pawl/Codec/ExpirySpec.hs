@@ -38,7 +38,7 @@ spec s = Spec.describe s "Pawl.Codec.Expiry" $ do
       s
       Expiry.toJson
       Expiry.fromJson
-      (Expiry.While (PlayerId.MkPlayerId 0) (Condition.MkCondition (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
+      (Expiry.While (PlayerId.MkPlayerId 0) (Condition.Compares (Quantity.Literal 0) Comparison.Exactly (Quantity.Literal 0)))
       """ {"type":"While","value":[0,{"measured":{"type":"Literal","value":0},"comparison":{"type":"Exactly"},"threshold":{"type":"Literal","value":0}}]} """
   -- CR 611.2a, as a concrete player.
   Spec.it s "AtTurnOf carries its player" $
