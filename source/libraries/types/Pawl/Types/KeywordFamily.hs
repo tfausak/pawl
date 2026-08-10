@@ -61,6 +61,8 @@ data KeywordFamily
     Poisonous
   | -- | CR 702.86a: annihilator N.
     Annihilator
+  | -- | CR 702.107a: outlast [cost].
+    Outlast
   | -- | CR 702.112a: renown N.
     Renown
   | -- | CR 702.122a: crew N.

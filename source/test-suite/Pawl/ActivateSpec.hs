@@ -31,16 +31,19 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
 import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.ActiveReplacement as ActiveReplacement
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
 import qualified Pawl.Types.CostComponent as CostComponent
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.Face as Face
@@ -49,6 +52,7 @@ import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.LastKnown as LastKnown
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
+import qualified Pawl.Types.ManaType as ManaType
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
 import qualified Pawl.Types.ModeSelection as ModeSelection
@@ -114,6 +118,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
   textChangedTargetSpec s registry
   graveyardEffectZoneSpec s registry
   twoSacrificeComponentSpec s registry
+  outlastSpec s registry
 
   Spec.it s "CR 602 activating Prodigal Sorcerer's {T} puts an ability on the stack and taps it" $ do
     prodigalSorcerer <- S.printingOf s registry "Prodigal Sorcerer"
@@ -2004,3 +2009,108 @@ twoSacrificeComponentSpec s registry = Spec.describe s "TwoSacrificeComponents" 
         Spec.assertEqWith s "both lands paid the cost" (length (GameState.battlefield after)) 0
         Spec.assertEqWith s "and both are in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 2
       abilities -> Spec.assertEqWith s "exactly one ability to activate" (length abilities) 1
+
+-- CR 702.107: outlast, an activated ability rule 702 states in full and
+-- Pawl.Engine.Keyword.outlast mints. Disowned Ancestor is the fixture: a {B} 0/4
+-- Spirit Warrior whose ENTIRE printed text is "Outlast {1}{B}", so nothing else
+-- it prints can make a case pass, and whose 0/4 makes the counter observable as
+-- 1/5 -- a pair of numbers no other reading of the board produces.
+--
+-- Three of the rule's clauses are the engine's rather than the card's, and each
+-- has its own case below: the {T} in the cost (so CR 302.6 reaches it), the
+-- counter, and CR 602.5d's sorcery-speed window.
+outlastBoard :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> Int -> m (ObjectId.ObjectId, GameState.GameState)
+outlastBoard s registry lands = do
+  ancestor <- S.printingOf s registry "Disowned Ancestor"
+  swamp <- S.printingOf s registry "Swamp"
+  let (oid, g0) = S.addCreature ancestor S.alice (S.landsInPlay swamp lands)
+  pure (oid, g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain})
+
+-- The +1/+1 counters on a permanent, 0 if it has none.
+plusOnesOn :: ObjectId.ObjectId -> GameState.GameState -> Natural
+plusOnesOn oid gs = case Game.lookupObject oid gs of
+  Nothing -> 0
+  Just o -> Map.findWithDefault 0 CounterKind.PlusOnePlusOne (Object.counters o)
+
+outlastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+outlastSpec s registry = Spec.describe s "Outlast" $ do
+  -- The ability rule 702.107a MEANS, rather than any the card prints: the
+  -- Ancestor's own activatedAbilities list is empty, and what is offered is the
+  -- printed {1}{B} with the rule's {T} appended and the rule's timing clause on
+  -- it.
+  Spec.it s "CR 702.107a the minted ability is '{1}{B}, {T}:' at sorcery speed" $ do
+    ancestor <- S.printingOf s registry "Disowned Ancestor"
+    (oid, gs) <- outlastBoard s registry 2
+    Spec.assertEqWith s "the card itself prints no activated ability" (Face.activatedAbilities (S.combinedFace ancestor)) []
+    case Activate.abilitiesFor oid gs of
+      [ability] -> do
+        Spec.assertEqWith
+          s
+          "the printed {1}{B} plus rule 702.107a's tap symbol"
+          (ActivatedAbility.cost ability)
+          (Cost.Type.MkCost (Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, ManaSymbol.OfType (ManaType.Colored Color.Black)])) [CostComponent.TapThis])
+        Spec.assertEqWith
+          s
+          "CR 602.5d's clause and nothing else"
+          (ActivatedAbility.restrictions ability)
+          [ActivationRestriction.SorcerySpeed]
+      abilities -> Spec.assertFailure s ("expected exactly one ability, got " <> show (length abilities))
+
+  -- The whole card. 0/4 with one +1/+1 counter is 1/5 (CR 122.1a / 613.4c), which
+  -- is neither the printed pair nor any other counter count.
+  Spec.it s "CR 702.107a whole card: outlast taps the Ancestor and grows it to 1/5" $ do
+    (oid, gs) <- outlastBoard s registry 2
+    case Activate.abilitiesFor oid gs of
+      [ability] -> do
+        let activated = S.runPure S.identityAnswer gs (Activate.activateAbility S.alice oid ability)
+            resolved = S.runPure S.identityAnswer activated Stack.resolveTop
+            tapped g = length (filter (\o -> Object.tapped o == TapState.Tapped) (Maybe.mapMaybe (\o -> Game.lookupObject o g) (Set.toList (GameState.battlefield g))))
+        Spec.assertEqWith s "0/4 before" (S.powerToughnessOf oid gs) (Just (0, 4))
+        Spec.assertEqWith s "the ability is on the stack" (length (GameState.stack activated)) 1
+        Spec.assertEqWith s "the Ancestor tapped itself as the cost was paid" (fmap Object.tapped (Game.lookupObject oid activated)) (Just TapState.Tapped)
+        Spec.assertEqWith s "and no counter yet -- it is in the EFFECT, not the cost" (plusOnesOn oid activated) 0
+        Spec.assertEqWith s "the Ancestor and both Swamps are tapped" (tapped activated) 3
+        Spec.assertEqWith s "one +1/+1 counter once it resolves" (plusOnesOn oid resolved) 1
+        Spec.assertEqWith s "so 1/5" (S.powerToughnessOf oid resolved) (Just (1, 5))
+      abilities -> Spec.assertFailure s ("expected exactly one ability, got " <> show (length abilities))
+
+  -- CR 602.5d, through CR 307.5's three conjuncts. One board with the mana for
+  -- the cost, varied in nothing but the window, so a negative cannot be the cost
+  -- gate refusing instead.
+  Spec.it s "CR 602.5d outlast is offered only in your own main phase with an empty stack" $ do
+    piker <- S.printingOf s registry "Goblin Piker"
+    (oid, gs) <- outlastBoard s registry 2
+    let (spellId, withSpell) = S.spellOnStack piker S.alice gs
+    Spec.assertBool s (not (null (activationsOf oid (Action.legalActions S.alice gs)))) "offered in her precombat main phase"
+    Spec.assertEqWith s "not during combat" (activationsOf oid (Action.legalActions S.alice gs {GameState.phase = Phase.Combat CombatStep.DeclareBlockers})) []
+    Spec.assertEqWith s "not on bob's turn" (activationsOf oid (Action.legalActions S.alice gs {GameState.activePlayer = S.bob})) []
+    Spec.assertBool s (elem spellId (GameState.stack withSpell)) "the stack really is occupied"
+    Spec.assertEqWith s "not with a spell on the stack" (activationsOf oid (Action.legalActions S.alice withSpell)) []
+
+  -- CR 302.6 reaches this ability and not crew's, because rule 702.107a puts the
+  -- tap symbol in the cost of the creature's OWN ability. The control is the same
+  -- board with the same two Swamps, settled.
+  Spec.it s "CR 302.6 an Ancestor that arrived this turn cannot outlast" $ do
+    (oid, gs) <- outlastBoard s registry 2
+    let sick = gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Sick}) oid (GameState.objects gs)}
+    Spec.assertEqWith s "the ability is minted all the same" (length (Activate.abilitiesFor oid sick)) 1
+    Spec.assertEqWith s "but not offered" (activationsOf oid (Action.legalActions S.alice sick)) []
+    Spec.assertBool s (not (null (activationsOf oid (Action.legalActions S.alice gs)))) "and offered once it has settled"
+
+  -- CR 118.3: the printed half of the cost still has to be payable. One Swamp is
+  -- not {1}{B}.
+  Spec.it s "CR 118.3 outlast is not offered without the mana" $ do
+    (oneId, one) <- outlastBoard s registry 1
+    (twoId, two) <- outlastBoard s registry 2
+    Spec.assertEqWith s "one Swamp cannot pay {1}{B}" (activationsOf oneId (Action.legalActions S.alice one)) []
+    Spec.assertBool s (not (null (activationsOf twoId (Action.legalActions S.alice two)))) "two can"
+
+  -- CR 113.6: rule 702.107a's ability functions on the battlefield, cycling's one
+  -- zone over. A card in hand offers nothing.
+  Spec.it s "CR 702.107a outlast is NOT offered from the hand" $ do
+    ancestor <- S.printingOf s registry "Disowned Ancestor"
+    swamp <- S.printingOf s registry "Swamp"
+    let (g0, oid) = S.handOne ancestor (S.landsInPlay swamp 2)
+        gs = g0 {GameState.priority = Just S.alice, GameState.phase = Phase.PrecombatMain}
+    Spec.assertEqWith s "no ability in a hand" (Activate.abilitiesFor oid gs) []
+    Spec.assertEqWith s "and no activation offered" (activationsOf oid (Action.legalActions S.alice gs)) []
