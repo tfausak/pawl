@@ -3766,13 +3766,14 @@ decayedSpec s registry =
             [zombie] -> do
               let after = atMain S.aggressiveAnswer (settled zombie made)
               Spec.assertBool s (not (S.onBattlefield zombie after)) "the token is gone"
-              Spec.assertBool s (S.onBattlefield bird after) "the Falcon that attacked beside it is not"
+              Spec.assertBool s (S.onBattlefield bird after) "while the Falcon that attacked beside it is still there"
               Spec.assertEqWith s "and the delayed ability is spent" (Seq.length (GameState.delayedTriggers after)) 0
             other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
         -- THE PAIR THAT MAKES THE TRIGGER REAL. Same board, same fixture, and
         -- only the declaration different: rule 702.147a sacrifices a creature
         -- that ATTACKED, so a decayed creature held back survives its own end of
-        -- combat.
+        -- combat. CR 508.8 skips the declare blockers and combat damage steps on
+        -- this run, which the end of combat step is not among.
         Spec.it s "CR 702.147a a decayed creature that did not attack is not sacrificed" $ do
           (_, made, tokens) <- board
           case tokens of
