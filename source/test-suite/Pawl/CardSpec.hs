@@ -1452,6 +1452,7 @@ canHostSubjects predicate = case predicate of
     CounterKind.Loyalty -> 0
     CounterKind.Lore -> 0
     CounterKind.Defense -> 0
+    CounterKind.Time -> 0
   -- Zero and not a descent, unlike the atom above: a family is payload-free, so
   -- there is no Filter position inside it for a card author to reach.
   Filter.Type.HasKeywordFamily _ -> 0
@@ -1599,6 +1600,10 @@ keywordFilters keyword = case keyword of
   -- entering creature's -- is the ENGINE's, never a card's.
   Keyword.Evolve -> []
   Keyword.StartYourEngines -> []
+  -- CR 702.63a names no quality: the time counters and the upkeep are written
+  -- into the replacement effect and the two abilities Pawl.Engine.Keyword mints,
+  -- not into the keyword.
+  Keyword.Vanishing _ -> []
   Keyword.Toxic _ -> []
 
 -- CR 118.1: a cost's Filters are its components'; the mana part holds none.
