@@ -473,8 +473,8 @@ crew n =
 -- THE EFFECT names the permanent through the engine-reserved
 -- Binding.triggerSource slot, so rule 702.107a's "this creature" is named and
 -- never TARGETED (CR 115.10a), crew's posture. One counter, always: rule 702.107a
--- writes the number, not the card, which is why this keyword carries a Cost where
--- Renown carries an N.
+-- writes that number itself, where rule 702.112a leaves renown's to the card --
+-- so what this keyword's payload varies is the cost and never the count.
 --
 -- CR 602.5d is the timing clause, and it is the ONLY restriction -- rule 702.107a
 -- states no once-per-turn limit, so CR 117.1b's default stands for everything
