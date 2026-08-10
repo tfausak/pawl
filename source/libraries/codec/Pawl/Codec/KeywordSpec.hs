@@ -444,6 +444,13 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Skulk
       """ {"type":"Skulk"} """
+  Spec.it s "Melee" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Melee
+      """ {"type":"Melee"} """
   -- CR 702.122a's N rides the constructor, so crew 1 and crew 6 are distinct
   -- keywords and must encode distinguishably.
   Spec.it s "Crew carries its N" $ do

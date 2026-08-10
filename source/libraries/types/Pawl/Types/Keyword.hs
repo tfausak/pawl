@@ -399,6 +399,20 @@ data Keyword
     -- makes multiple instances redundant -- so its reader takes membership rather
     -- than the per-keyword count the projection carries.
     Skulk
+  | -- | 702.121a: melee, a TRIGGERED ability meaning "Whenever this creature
+    -- attacks, it gets +1/+1 until end of turn for each opponent you attacked
+    -- with a creature this combat." Minted by Pawl.Engine.Keyword.melee and
+    -- handed to the ordinary CR 603 machinery, as battle cry and prowess are.
+    --
+    -- Payload-free: rule 702.121a takes no parameter. What varies is the BONUS,
+    -- which the rule computes from the combat record rather than from anything
+    -- the card prints -- Pawl.Types.Quantity.OpponentsAttacked is that reading,
+    -- and it is why this keyword needs no N where poisonous and afflict do.
+    --
+    -- CR 702.121b makes multiple instances trigger separately, so its reader
+    -- takes the per-keyword COUNT the projection carries, exactly as flanking and
+    -- bushido do, and not membership as skulk above does.
+    Melee
   | -- | 702.122a: crew N, an ACTIVATED ability meaning "Tap any number of other
     -- untapped creatures you control with total power N or greater: This
     -- permanent becomes an artifact creature until end of turn."

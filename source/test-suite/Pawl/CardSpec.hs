@@ -358,6 +358,9 @@ quantityCounts quantity = case quantity of
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
   -- against: a bare CounterKind with no Count and no Filter beside it.
   Quantity.Type.ObjectCounters _ -> []
+  -- CR 508.3b's combat record, read as a tally of players: a PlayerRef and
+  -- nothing else, so no Count and no Filter here either.
+  Quantity.Type.OpponentsAttacked _ -> []
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this
@@ -1461,6 +1464,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.118b names no quality either: the comparison is against the skulking
   -- creature's own power, written into the rule rather than into the keyword.
   Keyword.Skulk -> []
+  -- CR 702.121a names no quality: the bonus is computed from the combat record
+  -- by the ability Pawl.Engine.Keyword mints, not from anything the card prints.
+  Keyword.Melee -> []
   -- CR 702.25a is payload-free: the Filter its minted ability carries is the
   -- ENGINE's, never a card's.
   Keyword.Flanking -> []
