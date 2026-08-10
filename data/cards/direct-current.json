@@ -1,0 +1,75 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "JumpStart"
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        },
+        {
+          "type": "OfType",
+          "value": {
+            "type": "Colored",
+            "value": {
+              "type": "Red"
+            }
+          }
+        }
+      ],
+      "name": "Direct Current",
+      "spell": {
+        "modes": [
+          {
+            "clauses": [
+              {
+                "effects": [
+                  {
+                    "type": "DealDamage",
+                    "value": [
+                      "target",
+                      {
+                        "type": "Literal",
+                        "value": 2
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "targetSpecs": [
+              {
+                "slot": "target",
+                "spec": {
+                  "pool": {
+                    "type": "AnyTarget"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "typeLine": {
+        "types": [
+          {
+            "type": "Sorcery"
+          }
+        ]
+      }
+    }
+  ]
+}

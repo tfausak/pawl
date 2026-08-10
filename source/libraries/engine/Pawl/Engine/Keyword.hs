@@ -106,8 +106,9 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 --
 -- Rule 702.34a's flashback shows how wide this voice is: ONE keyword becomes a
 -- cost (flashbackCost), a casting permission (castingPermissionsOf) and a
--- replacement effect (flashbackExile). Those three readers get ordinary rules
--- objects and never learn that flashback produced them. All three are derived
+-- replacement effect (castFromGraveyardExile). Those three readers get ordinary
+-- rules objects and never learn that flashback produced them. All three are
+-- derived
 -- from a card's PRINTED keywords rather than a projection's post-layer ones,
 -- because all three function in the graveyard or on the stack (CR 113.6),
 -- neither of which pawl's projection reaches (#160). entwineCost is read the
@@ -200,6 +201,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Shadow -> []
   Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
+  Keyword.JumpStart -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
@@ -269,6 +271,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Shadow -> []
   Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
+  Keyword.JumpStart -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
   Keyword.Morph _ _ -> []
@@ -443,6 +446,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Shadow -> []
   Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
+  Keyword.JumpStart -> []
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
@@ -686,6 +690,15 @@ permissionsFor cardTypes keyword = case keyword of
   -- graveyard", is not a permission and is not here: a prohibition is
   -- Pawl.Engine.Cast's to apply, at its Zone.Hand arm.
   Keyword.Aftermath -> [CastingPermission.CastFromGraveyard]
+  -- CR 702.133a's FIRST static ability, gated exactly as flashback's arm above:
+  -- rule 702.133a prints flashback's "if the resulting spell is an instant or
+  -- sorcery spell" word for word. What the two rules do NOT share is the cost --
+  -- flashback replaces the mana cost and this one adds a discard to it -- and that
+  -- half is Pawl.Engine.Cost.costsFor's, the same split flashback takes.
+  Keyword.JumpStart
+    | Set.member CardType.Instant cardTypes || Set.member CardType.Sorcery cardTypes ->
+        [CastingPermission.CastFromGraveyard]
+    | otherwise -> []
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
@@ -788,6 +801,22 @@ hasAftermath = Set.member Keyword.Aftermath
 hasFlash :: Set Keyword -> Bool
 hasFlash = Set.member Keyword.Flash
 
+-- | CR 702.133a's ADDITIONAL cost, "discarding a card": whether this card's
+-- keywords add one to a cast from a graveyard. Read by
+-- Pawl.Engine.Cost.costsFor, which -- as it does for flashback and aftermath --
+-- consults it only while the object is in a graveyard, the zone half of the same
+-- sentence.
+--
+-- A Bool rather than flashbackCost's Maybe Cost: rule 702.133a states the cost
+-- itself, so there is nothing to read off the card, and the CostComponent it
+-- turns into is costsFor's to name.
+--
+-- Membership rather than a count: rule 702.133a takes no parameter, and pawl has
+-- no printing with two jump-start abilities to say whether a second would add a
+-- second discard.
+hasJumpStart :: Set Keyword -> Bool
+hasJumpStart = Set.member Keyword.JumpStart
+
 -- CR 702.34a: the cost this card may be cast from the graveyard for, or Nothing
 -- when it has no flashback. Read by Pawl.Engine.Cost.costsFor, which offers it
 -- ONLY while the object is in a graveyard -- the zone half of the same sentence.
@@ -858,8 +887,10 @@ entwineCost keywords =
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
--- CR 702.34a's SECOND static ability, the one functioning while the card is on
--- the stack: exile it instead of putting it anywhere else as it leaves.
+-- The one exile CR 702.34a, CR 702.127a and CR 702.133a all print, in the same
+-- words: the ability functioning while the card is on the stack, exiling it
+-- instead of putting it anywhere else as it leaves.
+--
 -- Filter.IsSource, because the rule says "this card" -- the spell itself and no
 -- other object. Evaluated against the spell's own projected view, which exists
 -- for as long as the spell does; Pawl.Engine.Event proposes the move before it
@@ -870,25 +901,34 @@ entwineCost keywords =
 -- only place a spell leaves the stack for in this pool (CR 608.2n, the CR 608.2b
 -- fizzle, CR 701.6a's counter) (#293).
 --
--- Not gated on rule 702.34a's "if the flashback cost was paid": nothing here can
--- see which cost was paid (#101). Pawl.Engine.Cast installs this only for a
--- spell cast FROM THE GRAVEYARD, where the two coincide.
+-- Not gated on the clause each of the three rules puts in front of it -- rule
+-- 702.34a's "if the flashback cost was paid", rule 702.133a's "if this spell was
+-- cast using its jump-start ability": nothing here can see which cost was paid
+-- (#101). Pawl.Engine.Cast installs this only for a spell cast FROM THE
+-- GRAVEYARD, where the two coincide.
 --
 -- The door Pawl.Engine.Cast uses, so that module installs a REPLACEMENT EFFECT
--- it never inspects rather than asking whether a card has flashback.
+-- it never inspects rather than asking which of the three keywords a card has.
 castFromGraveyardReplacementsOf :: Set Keyword -> [ReplacementEffect]
 castFromGraveyardReplacementsOf keywords =
-  [flashbackExile | Maybe.isJust (flashbackCost keywords)]
+  [castFromGraveyardExile | Maybe.isJust (flashbackCost keywords)]
     -- CR 702.127a's THIRD static ability: "if this spell was cast from a
     -- graveyard, exile it instead of putting it anywhere else any time it would
     -- leave the stack" -- word for word CR 702.34a's second ability, so it is the
     -- same effect and not a sibling. Both are installed by Pawl.Engine.Cast on the
     -- stack incarnation, and only when the cast really came from a graveyard,
     -- which is the "if this spell was cast from a graveyard" condition.
-    <> [flashbackExile | Set.member Keyword.Aftermath keywords]
+    <> [castFromGraveyardExile | Set.member Keyword.Aftermath keywords]
+    -- CR 702.133a's SECOND static ability, "if this spell was cast using its
+    -- jump-start ability, exile this card instead of putting it anywhere else any
+    -- time it would leave the stack" -- the third rule to print that sentence, so
+    -- the third to share the one effect. Its "using its jump-start ability" is
+    -- flashback's "if the flashback cost was paid" under another name and carries
+    -- flashback's gap (#101) with it.
+    <> [castFromGraveyardExile | hasJumpStart keywords]
 
-flashbackExile :: ReplacementEffect
-flashbackExile =
+castFromGraveyardExile :: ReplacementEffect
+castFromGraveyardExile =
   ReplacementEffect.ZoneChangeR
     ZoneChangePattern.MkZoneChangePattern
       { ZoneChangePattern.whenDestination = Zone.Graveyard,
@@ -905,8 +945,8 @@ flashbackExile =
 -- keyword, the rule says what it means.
 --
 -- The FIRST minted replacement that functions on the battlefield, where
--- flashbackExile's is installed by Pawl.Engine.Cast on a spell -- which is why
--- this one is gathered by the projection and that one is not.
+-- castFromGraveyardExile's is installed by Pawl.Engine.Cast on a spell -- which
+-- is why this one is gathered by the projection and that one is not.
 --
 -- POST-LAYER keyword COUNTS, like triggeredAbilitiesOf and unlike
 -- handAbilitiesOf's printed set -- rule 702.136a functions on the battlefield, so
@@ -979,6 +1019,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Shadow -> []
   Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
+  Keyword.JumpStart -> []
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
@@ -1128,6 +1169,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Shadow -> []
   Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
+  Keyword.JumpStart -> []
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
@@ -1255,6 +1297,7 @@ familyOf keyword = case keyword of
   -- CR 702.121a takes no parameter, so there is no variant for a card to name.
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing
+  Keyword.JumpStart -> Nothing
   Keyword.Riot -> Nothing
   Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing

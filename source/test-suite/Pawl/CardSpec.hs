@@ -1546,6 +1546,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.127a names no quality: which zone an aftermath half may be cast from is
   -- written into the rule, not into the keyword.
   Keyword.Aftermath -> []
+  -- CR 702.133a names no quality either: both the zone and the discard are the
+  -- rule's own words, so the card supplies nothing to filter over.
+  Keyword.JumpStart -> []
   -- CR 702.130a names no quality either: "defending player loses N life" is
   -- written into the ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Afflict _ -> []

@@ -709,6 +709,24 @@ data Keyword
     -- which Annihilator above already reads -- so Pawl.Engine.Keyword.afflict is
     -- the two put together and adds nothing of its own.
     Afflict Natural.Natural
+  | -- | 702.133a: two static abilities -- "you may cast this card from your
+    -- graveyard if the resulting spell is an instant or sorcery spell by
+    -- discarding a card as an additional cost to cast it", and "if this spell was
+    -- cast using its jump-start ability, exile this card instead of putting it
+    -- anywhere else any time it would leave the stack".
+    --
+    -- Flashback's other near-twin, beside Aftermath, and a third constructor
+    -- rather than either of those two because the COST is a third shape: rule
+    -- 702.34a replaces the mana cost, rule 702.127a replaces nothing, and this one
+    -- ADDS to it (CR 601.2b/601.2f-h, additional rather than alternative). Its
+    -- instant-or-sorcery gate is flashback's word for word and aftermath has
+    -- none; its exile is word for word both of theirs, so
+    -- Pawl.Engine.Keyword.castFromGraveyardExile is shared rather than copied.
+    --
+    -- Payload-free: rule 702.133a names the discard itself, so the card supplies
+    -- nothing -- which is why no Pawl.Types.KeywordFamily constructor is owed
+    -- here, where flashback's cost owes one.
+    JumpStart
   | -- | 702.134a: whenever this creature attacks, put a +1/+1 counter on target
     -- attacking creature with power less than this creature's power. Rule 702
     -- states it as a triggered ability, and the first whose ability
