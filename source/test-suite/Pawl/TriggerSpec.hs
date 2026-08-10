@@ -4096,11 +4096,14 @@ tovolarSpec s registry =
 --
 -- Aurelia, the Warleader supplies the second combat phase, as she does in
 -- renownSpec: the doubling needs a creature that was ALREADY renowned when it
--- connected, and CR 603.4's intervening "if" means renown itself cannot renown a
--- creature and be doubled in one event. Aragorn arrives BETWEEN the two combats
--- so the Maulers takes its two counters from printed renown 2 alone -- with him
--- out on the first swing the Maulers would hold renown 2 and a granted renown 1
--- at once, and CR 702.112c leaves which resolves first to its controller.
+-- connected, and CR 603.2 checks this condition against the damage event itself,
+-- where renown's own counters arrive only as ITS trigger resolves -- so one
+-- connection can never both renown a creature and double it.
+--
+-- Aragorn arrives BETWEEN the two combats so the Maulers takes its two counters
+-- from printed renown 2 alone: with him out on the first swing the Maulers would
+-- hold renown 2 and a granted renown 1 at once, and CR 702.112c leaves which
+-- resolves first to its controller.
 aragornSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 aragornSpec s registry =
   let board mine theirs = do
