@@ -126,6 +126,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
+  Keyword.Training -> List.genericReplicate count training
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -233,6 +234,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 
@@ -354,6 +356,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 
@@ -543,6 +546,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 
@@ -824,6 +828,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Rampage _ -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
 
@@ -912,6 +917,8 @@ familyOf keyword = case keyword of
   Keyword.Riot -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
+  -- CR 702.149a takes no parameter, so training has no family of its own.
+  Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
@@ -1394,9 +1401,51 @@ mentor =
 mentorTarget :: SlotName.SlotName
 mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 
+-- CR 702.149a: whenever this creature and at least one other creature with power
+-- greater than this creature's power attack, put a +1/+1 counter on this
+-- creature. The TWELFTH keyword in this pool whose rule text IS a triggered
+-- ability, minted here like the eleven above.
+--
+-- Mentor's clause with the comparison reversed and the target dropped, which is
+-- the whole of the difference: rule 702.149a pumps the BEARER, so there is
+-- nothing to choose and no slot -- Filter.IsSource, prowess' payload, rather than
+-- mentor's Binding.
+--
+-- The comparison therefore rides the CONDITION. CR 702.149a's companion is part
+-- of the trigger event ("this creature AND at least one other ... attack"), not
+-- an intervening-if clause, so it is checked once as the attackers are declared
+-- and never again on resolution -- a bigger co-attacker that dies in response
+-- still leaves the counter. TriggerCondition.SelfAttacksWithAnother is where that
+-- lands; intervening = Nothing for that reason as much as for the usual one.
+--
+-- The Filter is the rule's printed words: the card type conjunct is "creature",
+-- which CR 508.1a narrows to nothing today, and Filter.PowerGreaterThanSource is
+-- "with power greater than this creature's power". "Other" is the condition's own
+-- -- an identity check the Filter has no atom for, since Filter.IsSource is the
+-- one it would need negated and the condition already excludes the bearer. No
+-- controller conjunct, for mentor's reason: CR 508.1 makes every attacker the
+-- active player's.
+--
+-- Effect.PutCounters and not ModifyTarget, again for mentor's reasons -- CR
+-- 122.6's funnel, and CR 613.4c's reading every projection.
+training :: TriggeredAbility Card
+training =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition =
+        TriggerCondition.SelfAttacksWithAnother
+          (Filter.And [Filter.HasCardType CardType.Creature, Filter.PowerGreaterThanSource]),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) Binding.triggerSource
+
 -- CR 702.39a's provoke: whenever this creature attacks, you may choose to have
 -- target creature defending player controls block this creature this combat if
--- able; if you do, untap that creature. The TWELFTH keyword rule 702 states as a
+-- able; if you do, untap that creature. The THIRTEENTH keyword rule 702 states as a
 -- triggered ability, and the first whose payload creates a CR 509.1c blocking
 -- REQUIREMENT rather than changing a characteristic.
 --

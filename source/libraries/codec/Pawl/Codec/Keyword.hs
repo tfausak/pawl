@@ -73,6 +73,7 @@ toJson k = case k of
   Keyword.Riot -> Common.nullary "Riot"
   Keyword.Daybound -> Common.nullary "Daybound"
   Keyword.Nightbound -> Common.nullary "Nightbound"
+  Keyword.Training -> Common.nullary "Training"
   Keyword.Toxic n -> Common.tagged "Toxic" . Just $ Common.encodeNatural n
   Keyword.StartYourEngines -> Common.nullary "StartYourEngines"
 
@@ -128,6 +129,7 @@ fromJson value = do
     ("Riot", _) -> Right Keyword.Riot
     ("Daybound", _) -> Right Keyword.Daybound
     ("Nightbound", _) -> Right Keyword.Nightbound
+    ("Training", _) -> Right Keyword.Training
     ("Toxic", Just v) -> Keyword.Toxic <$> Common.decodeNatural v
     ("StartYourEngines", _) -> Right Keyword.StartYourEngines
     _ -> Left . Text.pack $ "unknown Keyword: " <> t

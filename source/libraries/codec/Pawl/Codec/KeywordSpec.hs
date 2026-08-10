@@ -425,6 +425,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Mentor
       """ {"type":"Mentor"} """
+  -- CR 702.149a is nullary and CR 702.149b separate, so mentor's shape exactly.
+  Spec.it s "Training" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Training
+      """ {"type":"Training"} """
   -- CR 702.39a takes no parameter either, and CR 702.39b makes the instances
   -- separate -- so a bare tag over a count, as mentor is.
   Spec.it s "Provoke" $

@@ -216,6 +216,29 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     Spec.it s "is False for a player" $ do
       Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.PowerLessThanSource)) "player"
 
+  -- CR 702.149a's comparison, the same Context field read the other way -- and NOT
+  -- the negation of its sibling, which is why it is a separate atom: equal power
+  -- and an absent power both answer False here and True to `Not
+  -- PowerLessThanSource`.
+  Spec.describe s "PowerGreaterThanSource" $ do
+    let sourced n = self {Filter.sourcePower = Just n}
+    Spec.it s "holds above the source's power and fails below it" $ do
+      Spec.assertBool s (Filter.matches (sourced 3) devoidBigCreature Filter.Type.PowerGreaterThanSource) "5 > 3"
+      Spec.assertBool s (not (Filter.matches (sourced 3) blackCreature Filter.Type.PowerGreaterThanSource)) "2 is not > 3"
+
+    -- STRICTLY greater, which is what keeps a training creature from counting a
+    -- companion its own size: rule 702.149a says "greater", not "no less".
+    Spec.it s "is False at equal power, where the negation of its sibling is True" $ do
+      Spec.assertBool s (not (Filter.matches (sourced 2) blackCreature Filter.Type.PowerGreaterThanSource)) "2 is not > 2"
+      Spec.assertBool s (Filter.matches (sourced 2) blackCreature (Filter.Type.Not Filter.Type.PowerLessThanSource)) "where the negation admits it"
+
+    Spec.it s "is False when either power is absent" $ do
+      let noPower = blackCreature {Filter.power = Nothing}
+      Spec.assertBool s (not (Filter.matches (sourced 3) noPower Filter.Type.PowerGreaterThanSource)) "no candidate power"
+      Spec.assertBool s (not (Filter.matches self devoidBigCreature Filter.Type.PowerGreaterThanSource)) "no source power"
+
+    Spec.it s "is False for a player" $ do
+      Spec.assertBool s (not (Filter.matches (sourced 3) aPlayer Filter.Type.PowerGreaterThanSource)) "player"
   -- CR 702.39a's "defending player controls", whose player comes from the
   -- Context rather than from the perspective. blackCreature is controlled by
   -- player 0 and OWNED by player 1, so a reading that consulted the wrong field
