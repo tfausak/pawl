@@ -1185,9 +1185,10 @@ canPayComponent pid oid component gs = case component of
   -- only reason CR 701.63a's and CR 702.123a's rulings name ("if you can't put
   -- +1/+1 counters on the creature for any reason, for example if it's no longer
   -- on the battlefield, you'll just create a Spirit token"). Deliberately NOT
-  -- gated on control, unlike the two loyalty arms above: the payer is the
-  -- ability's controller (CR 118.12), and CR 122.6 lets counters go onto a
-  -- permanent whoever controls it by the time the ability resolves.
+  -- gated on control, unlike the two loyalty arms above: CR 701.63a fixes the
+  -- payer as the permanent's controller when the ability triggers, and CR 122.6
+  -- lets counters go onto a permanent whoever controls it by the time that
+  -- ability resolves.
   CostComponent.PutPlusOneCountersOnThis _ -> Set.member oid (GameState.battlefield gs)
 
 -- CR 601.2g then 601.2h: the mana window first, then the payment. Components are

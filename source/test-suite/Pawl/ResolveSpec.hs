@@ -1929,8 +1929,8 @@ circlingVulturesSpec s registry = Spec.describe s "CirclingVultures" $ do
     Spec.assertEqWith s "and the Piker under it is still in the graveyard" (namesIn Zone.Graveyard S.alice after) [Just (S.printingName piker)]
     Spec.assertEqWith s "with two candidates, alice was still never asked which" (filter isExileResponse transcript) []
 
--- The battlefield objects whose sole face carries this name. Used instead of an
--- id taken before the cast, since CR 400.7 mints a new object on the way in.
+-- The battlefield objects whose current face carries this name. Used instead of
+-- an id taken before the cast, since CR 400.7 mints a new object on the way in.
 byNameOnBattlefield :: String -> GameState.GameState -> [ObjectId.ObjectId]
 byNameOnBattlefield name gs =
   [ oid
