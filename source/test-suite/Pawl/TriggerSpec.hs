@@ -3945,9 +3945,9 @@ meleeSpec s registry =
 -- producer and is what pins N: the same three blockers give it +2/+2 where the
 -- Pack gets +4/+4.
 --
--- Every reading is taken at the COMBAT DAMAGE step, before damage is dealt -- CR
--- 509.2a puts the trigger on the stack in the declare blockers step, so the bonus
--- is already applied there.
+-- Every reading but the last is taken at the COMBAT DAMAGE step, before damage is
+-- dealt -- CR 509.2a puts the trigger on the stack in the declare blockers step,
+-- so the bonus is already applied there.
 rampageSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 rampageSpec s registry =
   let board mine theirs = do
@@ -3968,8 +3968,8 @@ rampageSpec s registry =
             [pack] -> Spec.assertEqWith s "2/4 plus one blocker beyond the first, twice" (S.powerToughnessOf pack (atDamage gs)) (Just (4, 6))
             _ -> Spec.assertFailure s "fixture should give alice one Pack"
         -- A THIRD blocker is a second creature beyond the first, so the bonus
-        -- doubles rather than growing by one. The falsifier is a bonus that
-        -- counts blockers without scaling, which reads 4/6 here too.
+        -- doubles rather than growing by one. The falsifier is a bonus that adds 1
+        -- per creature beyond the first instead of N, which reads 4/6 here.
         Spec.it s "CR 702.23a a third blocker is a second +2/+2" $ do
           (gs, mine, _) <- board ["Wolverine Pack"] ["Goblin Piker", "Hill Giant", "Icehide Golem"]
           case mine of
