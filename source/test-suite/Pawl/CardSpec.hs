@@ -1453,6 +1453,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.127a names no quality: which zone an aftermath half may be cast from is
   -- written into the rule, not into the keyword.
   Keyword.Aftermath -> []
+  -- CR 702.130a names no quality either: "defending player loses N life" is
+  -- written into the ability Pawl.Engine.Keyword mints, not into the keyword.
+  Keyword.Afflict _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []

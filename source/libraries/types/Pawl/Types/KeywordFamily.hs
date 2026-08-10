@@ -29,9 +29,9 @@ module Pawl.Types.KeywordFamily where
 -- parameter that CR 702.14c's landwalk filter and CR 702.37a's morph cost force
 -- on it. A family type that named Keyword instead would reopen that cycle.
 --
--- ELEVEN is this pool's count, not Magic's. Rule 702 runs to 702.194 and so
+-- TWELVE is this pool's count, not Magic's. Rule 702 runs to 702.194 and so
 -- states 193 keywords past its own general 702.1, roughly a third of them written
--- with a cost or an N; Pawl.Types.Keyword models 41, of which these eleven carry a
+-- with a cost or an N; Pawl.Types.Keyword models 42, of which these twelve carry a
 -- payload. The set grows with that type -- ward N, rampage N and
 -- the alternative-cost keywords all land here eventually -- so a constructor is
 -- owed whenever a payload-carrying Keyword constructor is added, not whenever a
@@ -61,6 +61,8 @@ data KeywordFamily
     Annihilator
   | -- | CR 702.122a: crew N.
     Crew
+  | -- | CR 702.130a: afflict N.
+    Afflict
   | -- | CR 702.164a: toxic N. The family Flensing Raptor's "another target
     -- creature you control with toxic" names.
     Toxic

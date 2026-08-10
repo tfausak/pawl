@@ -1608,6 +1608,22 @@ declareBlockers = do
           -- denies that creature having "blocked", not the attacker -- and this
           -- misses it. So does the effect-blocks-it case. Neither has a producer
           -- in the pool (#1146).
+          --
+          -- The defending player rides the event as it rides AttackerDeclared,
+          -- computed the same way and for the same reason: CR 508.5 resolves the
+          -- phrase through what the creature is attacking, and both the planeswalker
+          -- and the battle forms need the board. CR 702.130a's afflict is the
+          -- reader. `pid` is the fallback: attackTargets offered this player
+          -- themselves, their planeswalkers and the battles they protect, so every
+          -- attacked target's defending player IS this player. The window it covers
+          -- is wider than declareAttackers' -- a whole step, in which the attacked
+          -- permanent can leave -- and CR 508.5's second sentence is what makes the
+          -- answer the same either way.
           let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs1))
               becameBlocked = Set.difference (Set.fromList (Map.elems declaration)) wasBlocked
-          State.modify' $ \g -> List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked attacker) h) g (Set.toList becameBlocked)
+          State.modify'
+            ( \g ->
+                let grants = Projection.controlGrants g
+                    defendingFor oid = Maybe.fromMaybe pid ((\t -> defendingPlayerOf grants t g) =<< Map.lookup oid (Combat.attackers (GameState.combat g)))
+                 in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked attacker (defendingFor attacker)) h) g (Set.toList becameBlocked)
+            )

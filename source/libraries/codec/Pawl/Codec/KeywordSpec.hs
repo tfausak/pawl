@@ -365,6 +365,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Annihilator 3) /= Keyword.toJson (Keyword.Poisonous 3))
       "annihilator 3 is not poisonous 3"
+  -- CR 702.130a's N rides the constructor the same way, and must not share a tag
+  -- with the other payloaded keywords either.
+  Spec.it s "Afflict carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Afflict 2)
+      """ {"type":"Afflict","value":2} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Afflict 3) /= Keyword.toJson (Keyword.Annihilator 3))
+      "afflict 3 is not annihilator 3"
   Spec.it s "Infect" $
     Common.assertJsonCodec
       s

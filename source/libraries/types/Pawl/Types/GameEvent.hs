@@ -196,7 +196,14 @@ data GameEvent
     -- or when its only blocker is one put onto the battlefield (CR 509.4 denies
     -- that creature having "blocked", but says nothing about the attacker).
     -- Neither producer exists in the pool (#1146).
-    AttackerBlocked ObjectId.ObjectId
+    --
+    -- The PlayerId is CR 508.5's defending player for this attacker, exactly as
+    -- AttackerDeclared above carries it and computed the same way, by
+    -- Pawl.Engine.Combat.declareBlockers off what the creature is attacking. CR
+    -- 702.130a's afflict is what reads it. Carried rather than derived for
+    -- AttackerDeclared's reason: Pawl.Engine.Event.eventBindings takes no game
+    -- state, and the planeswalker and battle forms of CR 508.5 need the board.
+    AttackerBlocked ObjectId.ObjectId PlayerId.PlayerId
   | -- | CR 701.20a: a player revealed a card.
     --
     -- A reveal is the one game action whose entire content is INFORMATION, so
