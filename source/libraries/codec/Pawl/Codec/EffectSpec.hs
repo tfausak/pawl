@@ -403,6 +403,20 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.Create (Quantity.Literal 1) card attacking (Just slot))
       """ {"type":"Create","value":[{"type":"Literal","value":1},"Goblin Piker",{"tapped":{"type":"Tapped"},"attacking":true},"token"]} """
+  -- CreateCopy's ObjectRef is untagged, so both arms have to survive.
+  Spec.it s "CreateCopy round-trips both ObjectRef arms" $ do
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.CreateCopy (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"CreateCopy","value":"target"} """
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.CreateCopy (ObjectRef.EachMatching (Filter.HasKeyword Keyword.Flying)))
+      """ {"type":"CreateCopy","value":{"type":"HasKeyword","value":{"type":"Flying"}}} """
   Spec.it s "Replace" $
     Common.assertJsonCodec
       s

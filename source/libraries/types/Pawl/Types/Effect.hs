@@ -362,6 +362,23 @@ data Effect card
     -- resolveModes re-read before each effect. Harried Dronesmith's "It gains
     -- haste until end of turn" is the singular case, on a triggered ability.
     Create Quantity.Quantity card EntryRiders.EntryRiders (Maybe SlotName.SlotName)
+  | -- | CR 707.1 / 111.3: create one token that's a copy of each object the
+    -- ObjectRef names -- Cackling Counterpart's "create a token that's a copy of
+    -- target creature you control". Create's sibling and not a case of it: the
+    -- token's text is DERIVED from a permanent on the battlefield (its copiable
+    -- values, CR 707.2) rather than given as a literal card, so no `card` the
+    -- effect could embed says it.
+    --
+    -- ObjectRef rather than a bare SlotName, for the reason Destroy's comment
+    -- gives: the same opcode reads a target slot and would read a swept set, and
+    -- only InSlot is ever a target (CR 115.10a). Every producer in the pool is
+    -- InSlot.
+    --
+    -- No Quantity, no EntryRiders and no bound slot, unlike Create. Each has a
+    -- real printing behind it -- Rite of Replication's five (#73), Kiki-Jiki's
+    -- haste-and-sacrifice -- and none is in the pool, so each is owed to the
+    -- first card that asks rather than to the opcode.
+    CreateCopy ObjectRef.ObjectRef
   | -- | CR 614.3 / 615.3: install a floating replacement effect for a duration,
     -- with a use count, an origin and an optional condition. Fog and Drudge
     -- Skeletons' regeneration are both this opcode, differing only in the

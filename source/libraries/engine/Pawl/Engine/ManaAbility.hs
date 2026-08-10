@@ -52,6 +52,7 @@ manaProduced effect = case effect of
   Effect.ExchangeLifeTotals _ -> Nothing
   Effect.IncreaseSpeed {} -> Nothing
   Effect.Create {} -> Nothing
+  Effect.CreateCopy _ -> Nothing
   Effect.Replace {} -> Nothing
   Effect.SkipNextPhase {} -> Nothing
   -- CR 615.5's rider is not descended into, the same stop Effect.Create makes at

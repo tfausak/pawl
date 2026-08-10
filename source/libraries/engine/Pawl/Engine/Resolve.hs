@@ -194,6 +194,9 @@ slotsOf effect = case effect of
   -- Create's slot is a DEFINITION, not a read: it is not a target, so the D4
   -- lint must not see it here. Its Quantity is a read like every other.
   Effect.Create quantity _ _ _ -> Quantity.slots quantity
+  -- A READ, unlike Create's slot: the ref names the permanent being copied,
+  -- which on every producer in the pool is a target (CR 115.10a).
+  Effect.CreateCopy ref -> objectRefSlots ref
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
@@ -353,6 +356,8 @@ slotsAreExhaustive effect = case effect of
   -- The embedded card is literal text, not a read: CR 111.1's token is minted
   -- with its own empty bindings, so nothing in it sees this environment.
   Effect.Create quantity _ _ _ -> Quantity.slotsAreExhaustive quantity
+  -- The ObjectRef is the whole of it, and slotsOf reports it.
+  Effect.CreateCopy _ -> True
   -- The ReplacementEffect holds no Quantity and no reference, so slotsOf's two
   -- unions are the whole of it once their quantities check out.
   Effect.Replace duration _ _ condition _ ->
@@ -464,6 +469,7 @@ readsX = any effectReadsX
       Effect.ExchangeLifeTotals _ -> False
       Effect.IncreaseSpeed _ quantity -> Quantity.readsX quantity
       Effect.Create quantity _ _ _ -> Quantity.readsX quantity
+      Effect.CreateCopy _ -> False
       Effect.Replace {} -> False
       Effect.SkipNextPhase {} -> False
       -- CR 601.2b's X reaches the rider too, an X-cost shield's rider being
@@ -528,6 +534,7 @@ searchesLibrary effect = case effect of
   Effect.ExchangeLifeTotals _ -> False
   Effect.IncreaseSpeed {} -> False
   Effect.Create {} -> False
+  Effect.CreateCopy _ -> False
   Effect.Replace {} -> False
   Effect.SkipNextPhase {} -> False
   -- Not descended into for CR 615.5's rider, because this classification is
@@ -625,6 +632,8 @@ boundSlots effect = case effect of
   -- back to them -- CR 603.7c's delayed trigger "that refers to a particular
   -- object" is the case that needs the name to survive the resolution.
   Effect.Create _ _ _ mSlot -> foldMap Set.singleton mSlot
+  -- Binds nothing: no card in the pool names the token copy it minted.
+  Effect.CreateCopy _ -> Set.empty
   -- CR 729.1b: the subgame's loser, derived rather than chosen.
   Effect.PlaySubgame slot -> Set.singleton slot
   -- How many permanents this destruction ACTUALLY destroyed, for a later "for
@@ -2565,7 +2574,7 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
             -- 614's token replacements (Doubling Season) get their opportunity.
             -- CR 110.5b: the funnel is handed the entry's tap state, so a token
             -- the effect says is tapped is never untapped for an instant.
-            minted <- Event.createTokens controller (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) (Integer.toNaturalSaturating n) (EntryRiders.tapped entry)
+            minted <- Event.createTokens controller (bakeTokenCharacteristics (Quantity.evaluateFor viewOf context gs resolving source) card) Nothing (Integer.toNaturalSaturating n) (EntryRiders.tapped entry)
             -- CR 508.4: "if a creature is put onto the battlefield attacking, its
             -- controller chooses which defending player ... it's attacking". The
             -- rules for that live in Pawl.Engine.Combat, which is also what keeps this
@@ -2615,6 +2624,28 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
                 let named = if List.elem answer (NonEmpty.toList candidates) then answer else first
                 State.modify' (bindSlot resolving slot named)
       _ -> pure ()
+  Effect.CreateCopy ref -> do
+    gs <- State.get
+    -- CR 707.2 / 111.3: one token per named permanent, minted through the same
+    -- CR 111.2 funnel a given-text token uses, carrying the copied permanent's
+    -- COPIABLE values (Event.copiedSnapshot) rather than its projection -- CR
+    -- 707.2 copies neither counters nor other effects. All of it read off ONE `gs`,
+    -- which is CR 608.2f: whichever permanents the ref names are snapshotted
+    -- before any token exists to disturb them.
+    --
+    -- The token's own card is the copied permanent's, so that a reader going
+    -- past the projection to Game.faceOf sees the same text the snapshot does.
+    -- It is not what the token's characteristics come FROM: the snapshot is
+    -- layer 1 (CR 613.1a), and Projection.copiableCharacteristics stops there.
+    --
+    -- Not implemented: CR 608.2h's last known information. An `ObjectRef` naming
+    -- a permanent that has already left the battlefield yields no card here and
+    -- so creates nothing, where the rule would have the token copy what the
+    -- permanent last was (#1183).
+    let sources = objectRefObjects legality chosen resolving controller source gs ref
+    Monad.forM_ sources $ \src ->
+      Monad.forM_ (Game.cardOf src gs) $ \card ->
+        Monad.void (Event.createTokens controller card (Just (Event.copiedSnapshot src gs)) 1 TapState.Untapped)
   Effect.ArmDelayedTrigger name onset duration -> do
     gs <- State.get
     -- CR 608.2h's last-known fallback, and NOT belt and braces: the source can
