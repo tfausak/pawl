@@ -5913,6 +5913,79 @@ personOfInterestSpec s registry = Spec.describe s "PersonOfInterest" $ do
         Spec.assertEqWith s "so only the Detective blocks" (Combat.blockersOf attackerId after) (Set.singleton tokenId)
       other -> Spec.assertFailure s ("expected one token and one attacker, got " <> show other)
 
+-- CR 701.60a's second ending, "until a spell or ability causes it to no longer be
+-- suspected", proved by Eliminate the Impossible {1}{U} Instant, "Investigate.
+-- Creatures your opponents control get -2/-0 until end of turn. If any of them
+-- are suspected, they're no longer suspected."
+--
+-- One board carries the whole case: bob's Person of Interest is suspected and his
+-- Detective is not, so the -2/-0 lands on both while only one designation ends.
+-- The two things rule 701.60c hangs off the designation are then asserted gone at
+-- gameplay level, each through its own subsystem -- menace through the layer-6
+-- grant, "can't block" through the combat restriction.
+eliminateTheImpossibleSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+eliminateTheImpossibleSpec s registry = Spec.describe s "EliminateTheImpossible" $ do
+  Spec.it s "CR 701.60a a spell ends the designation, and CR 701.60c's menace and can't-block end with it" $ do
+    poi <- S.printingOf s registry "Person of Interest"
+    piker <- S.printingOf s registry "Goblin Piker"
+    island <- S.printingOf s registry "Island"
+    eliminate <- S.printingOf s registry "Eliminate the Impossible"
+    let (gs0, attackers, _) = S.combatBoardOf [piker] []
+        (poiId, gs1) = S.entersWithTrigger poi S.bob gs0
+        entered = S.runPure S.identityAnswer gs1 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+        -- S.addCreature places any permanent; these two are the {1}{U}.
+        (_, gs2) = S.addCreature island S.alice entered
+        (_, gs3) = S.addCreature island S.alice gs2
+        (spellId, gs4) = S.addHandCard eliminate S.alice gs3
+        declared = S.runPure S.aggressiveAnswer gs4 (Combat.declareAttackers S.alice)
+    case (S.tokensOf declared, attackers) of
+      ([detectiveId], [attackerId]) -> do
+        let after = S.runPure S.identityAnswer declared (S.cast S.alice spellId >> Stack.resolveTop >> Engine.settleForPriority)
+            suspectedOf oid gs = fmap Object.suspected (Game.lookupObject oid gs)
+        -- The before half, on the very board the spell is cast from: without it
+        -- every "after" assertion could be passing because the fixture never
+        -- suspected anything.
+        Spec.assertEqWith s "before: the Person is suspected and the Detective is not" (suspectedOf poiId declared, suspectedOf detectiveId declared) (Just True, Just False)
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton poiId (Set.singleton attackerId)) declared)) "before: the Person cannot block"
+        Spec.assertEqWith s "after: neither is suspected" (suspectedOf poiId after, suspectedOf detectiveId after) (Just False, Just False)
+        Spec.assertEqWith s "CR 701.60c: and the menace it had is gone" (Projection.hasKeyword Keyword.Menace poiId after, Projection.hasKeyword Keyword.Menace detectiveId after) (False, False)
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton poiId (Set.singleton attackerId)) after) "CR 701.60c: so the Person can block"
+        let blocked = S.runPure S.aggressiveAnswer after Combat.declareBlockers
+        Spec.assertBool s (Set.member poiId (Combat.blockersOf attackerId blocked)) "and it does block"
+        -- The two clauses either side of the ending, so a card file that dropped
+        -- one fails here: the -2/-0 reaches both of bob's creatures, and the
+        -- Clue is alice's.
+        Spec.assertEqWith s "both of bob's creatures took -2/-0" (S.powerToughnessOf poiId after, S.powerToughnessOf detectiveId after) (Just (0, 2), Just (0, 2))
+        Spec.assertEqWith s "and alice's own attacker did not, so the sweep is opponents-only" (S.powerToughnessOf attackerId after) (Just (2, 1))
+        Spec.assertEqWith s "and alice investigated" (fmap (`S.soleFaceName` after) (filter (/= detectiveId) (S.tokensOf after))) [CardName.MkCardName $ Text.pack "Clue Token"]
+      other -> Spec.assertFailure s ("expected one token and one attacker, got " <> show other)
+
+-- CR 701.60b read as a number, proved by Repeat Offender {1}{B} Creature -- Human
+-- Assassin 2/1, "{2}{B}: If this creature is suspected, put a +1/+1 counter on
+-- it. Otherwise, suspect it."
+--
+-- The card is its own pair: the same activation on the same board takes the other
+-- branch once the designation is there, so the two clause conditions are the only
+-- thing that can separate the two outcomes.
+repeatOffenderSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
+repeatOffenderSpec s registry = Spec.describe s "RepeatOffender" $ do
+  Spec.it s "CR 701.60b the first activation suspects and the second adds a counter" $ do
+    swamp <- S.printingOf s registry "Swamp"
+    offender <- S.printingOf s registry "Repeat Offender"
+    let (offenderId, board) = S.addCreature offender S.alice (S.landsInPlay swamp 6)
+        activate gs = case Activate.abilitiesFor offenderId gs of
+          [ability] -> Right (S.runPure S.identityAnswer gs (Activate.activateAbility S.alice offenderId ability >> Stack.resolveTop >> Engine.settleForPriority))
+          other -> Left (length other)
+        state gs = (fmap Object.suspected (Game.lookupObject offenderId gs), S.counterOf CounterKind.PlusOnePlusOne offenderId gs, S.powerToughnessOf offenderId gs)
+    case activate board of
+      Left n -> Spec.assertFailure s ("expected exactly one activated ability, got " <> show n)
+      Right once -> do
+        Spec.assertEqWith s "it starts unsuspected, with no counter" (state board) (Just False, 0, Just (2, 1))
+        Spec.assertEqWith s "the first activation suspects it and places NOTHING" (state once) (Just True, 0, Just (2, 1))
+        case activate once of
+          Left n -> Spec.assertFailure s ("expected exactly one activated ability, got " <> show n)
+          Right twice -> Spec.assertEqWith s "the second finds it suspected and places a counter" (state twice) (Just True, 1, Just (3, 2))
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
@@ -5920,6 +5993,8 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   corrosiveGaleSpec s registry
   investigateSpec s registry
   personOfInterestSpec s registry
+  eliminateTheImpossibleSpec s registry
+  repeatOffenderSpec s registry
   resolveSpec s registry
   fizzleSpec s registry
   indestructibleSpec s registry

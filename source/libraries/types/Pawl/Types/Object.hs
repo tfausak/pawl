@@ -434,10 +434,8 @@ data Object = MkObject
     -- suspected. Both are read off this field live rather than stamped when it is
     -- set -- Pawl.Engine.Projection.designationGathered for the keyword and
     -- Pawl.Engine.CombatRestriction.inForce for the restriction -- so nothing has
-    -- to be unwound if it ends.
-    --
-    -- Not implemented: rule 701.60a's other ending, "until a spell or ability
-    -- causes it to no longer be suspected" (#1214).
+    -- to be unwound if it ends. Rule 701.60a's other ending, "until a spell or
+    -- ability causes it to no longer be suspected", is Effect.Unsuspect.
     suspected :: Bool
   }
   deriving (Eq, Ord, Show)
