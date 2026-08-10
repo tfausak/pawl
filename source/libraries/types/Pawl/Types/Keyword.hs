@@ -260,6 +260,20 @@ data Keyword
     -- because rule 702.29e's "[type]" may be any combination of card type, subtype
     -- and supertype.
     Cycling (Cost.Cost Keyword) (Maybe (Filter.Filter Keyword))
+  | -- | 702.31b: a creature with horsemanship can't be blocked by creatures
+    -- without horsemanship.
+    --
+    -- Shadow's FIRST SENTENCE and nothing else, which is why it is its own
+    -- constructor rather than a flag on that one: rule 702.31b's second sentence
+    -- says a creature with horsemanship can block a creature with OR WITHOUT it,
+    -- so horsemanship keeps the asymmetry flying, fear, intimidate and skulk have
+    -- and shadow gives up. Pawl.Engine.Combat.horsemanshipAllows reads it off the
+    -- ATTACKER first for exactly that reason.
+    --
+    -- Payload-free, because rule 702.31b takes no parameter, and CR 702.31c makes
+    -- multiple instances redundant -- so its reader takes membership rather than
+    -- the per-keyword count the projection carries.
+    Horsemanship
   | -- | 702.34a: this card may be cast from its owner's graveyard for the given
     -- cost, and is exiled instead of going anywhere else as it leaves the stack.
     --
