@@ -11,7 +11,7 @@ import qualified Pawl.Types.Keyword as Keyword
 -- filter matching every permanent). `whichKind = Nothing` means ANY kind, never
 -- "no kind" -- the two cards differ by data, and neither is a constructor.
 data CounterPattern = MkCounterPattern
-  { whichKind :: Maybe CounterKind.CounterKind,
+  { whichKind :: Maybe (CounterKind.CounterKind Keyword.Keyword),
     whose :: ControllerRelation.ControllerRelation,
     onWhat :: Filter.Filter Keyword.Keyword
   }

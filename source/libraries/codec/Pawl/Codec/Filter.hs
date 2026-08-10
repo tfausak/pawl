@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.Common as Common
+import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.Subtype as Subtype
@@ -55,6 +56,7 @@ toJson encode filter_ = case filter_ of
   Filter.IsTapped -> Common.nullary "IsTapped"
   Filter.IsRingBearer -> Common.nullary "IsRingBearer"
   Filter.IsRenowned -> Common.nullary "IsRenowned"
+  Filter.HasCounters k -> Common.tagged "HasCounters" . Just $ CounterKind.toJson encode k
   Filter.And fs -> Common.tagged "And" . Just . Common.array $ fmap (toJson encode) fs
   Filter.Or fs -> Common.tagged "Or" . Just . Common.array $ fmap (toJson encode) fs
   Filter.Not f -> Common.tagged "Not" . Just $ toJson encode f
@@ -89,6 +91,7 @@ fromJson decode value = do
     ("IsTapped", _) -> Right Filter.IsTapped
     ("IsRingBearer", _) -> Right Filter.IsRingBearer
     ("IsRenowned", _) -> Right Filter.IsRenowned
+    ("HasCounters", Just v) -> Filter.HasCounters <$> CounterKind.fromJson decode v
     ("And", Just (Value.Array (Array.MkArray vs))) -> Filter.And <$> traverse (fromJson decode) vs
     ("Or", Just (Value.Array (Array.MkArray vs))) -> Filter.Or <$> traverse (fromJson decode) vs
     ("Not", Just v) -> Filter.Not <$> fromJson decode v

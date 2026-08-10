@@ -4,6 +4,7 @@ import qualified Numeric.Natural as Natural
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.DamageEvent as DamageEvent
+import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -50,7 +51,7 @@ data ProposedEvent
     -- regeneration shield may be applied to THIS destruction, which is where
     -- Terror's "It can't be regenerated" lives.
     WouldBeDestroyed ObjectId.ObjectId Regenerability.Regenerability
-  | WouldPutCounters ObjectId.ObjectId CounterKind.CounterKind Natural.Natural
+  | WouldPutCounters ObjectId.ObjectId (CounterKind.CounterKind Keyword.Keyword) Natural.Natural
   | WouldCreateTokens PlayerId.PlayerId Card.Card Natural.Natural
   | -- | CR 500.11 / 614.10: a step or phase would begin, on this player's turn.
     -- Raised by Engine.runStep before anything about the step is observable, so

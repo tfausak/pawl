@@ -2,6 +2,7 @@ module Pawl.Types.Filter where
 
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Subtype as Subtype
@@ -339,6 +340,20 @@ data Filter keyword
     -- 613 layer writes it and Pawl.Engine.Projection.filterReads declares it as
     -- reading nothing.
     IsRenowned
+  | -- | CR 122.1: does the CANDIDATE have one or more counters of this kind on it?
+    -- Renegade Krasis' "each other creature you control with a +1/+1 counter on
+    -- it".
+    --
+    -- "One or more" and not a count: every printing that asks reads presence, and
+    -- a threshold would have to say which comparison it meant. The KIND is a
+    -- payload because CR 122.1 makes each kind its own marker.
+    --
+    -- Uncharacteristic, for IsRenowned's reason: CR 109.3's list has no counters
+    -- in it, so no CR 613 layer writes them and
+    -- Pawl.Engine.Projection.filterReads declares this as reading nothing. The P/T
+    -- a +1/+1 counter grants is CR 613.4c's, which the projection applies over the
+    -- top of what this atom reads.
+    HasCounters (CounterKind.CounterKind keyword)
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

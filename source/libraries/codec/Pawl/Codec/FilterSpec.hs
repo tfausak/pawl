@@ -10,6 +10,7 @@ import qualified Pawl.Json.Value as Value
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
@@ -219,6 +220,14 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsRenowned
       """ {"type":"IsRenowned"} """
+  -- CR 122.1's presence read, the one Filter atom with a CounterKind payload.
+  Spec.it s "HasCounters" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Filter.HasCounters CounterKind.PlusOnePlusOne)
+      """ {"type":"HasCounters","value":{"type":"PlusOnePlusOne"}} """
   Spec.it s "And" $
     Common.assertJsonCodec
       s

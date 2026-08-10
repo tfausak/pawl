@@ -1246,7 +1246,7 @@ asDestruction event = case event of
   ProposedEvent.WouldBeginPhase {} -> Nothing
   ProposedEvent.WouldTurnFaceUp {} -> Nothing
 
-asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind, Natural)
+asCounters :: ProposedEvent -> Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural)
 asCounters event = case event of
   ProposedEvent.WouldPutCounters oid kind n -> Just (oid, kind, n)
   ProposedEvent.WouldChangeZone _ -> Nothing

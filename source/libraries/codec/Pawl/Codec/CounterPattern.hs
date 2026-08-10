@@ -18,7 +18,7 @@ defaultWhose = ControllerRelation.Anyones
 toJson :: CounterPattern.CounterPattern -> Value.Value
 toJson p =
   Common.object
-    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe CounterKind.toJson) (CounterPattern.whichKind p)
+    ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (CounterKind.toJson Keyword.toJson)) (CounterPattern.whichKind p)
         <> Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (CounterPattern.whose p)
         <> Common.requiredPair "onWhat" (Filter.toJson Keyword.toJson) (CounterPattern.onWhat p)
     )
@@ -26,7 +26,7 @@ toJson p =
 fromJson :: Value.Value -> Either Text.Text CounterPattern.CounterPattern
 fromJson value = do
   ps <- Common.asObject value
-  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe CounterKind.fromJson) ps
+  k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (CounterKind.fromJson Keyword.fromJson)) ps
   w <- Common.defaultedField "whose" defaultWhose ControllerRelation.fromJson ps
   o <- Common.field "onWhat" ps >>= Filter.fromJson Keyword.fromJson
   pure

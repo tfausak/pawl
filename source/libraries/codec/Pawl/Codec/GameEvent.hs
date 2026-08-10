@@ -7,6 +7,7 @@ import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Countering as Countering
 import qualified Pawl.Codec.DamageEvent as DamageEvent
 import qualified Pawl.Codec.DiscardCause as DiscardCause
+import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerId as PlayerId
@@ -38,12 +39,13 @@ toJson e = case e of
   GameEvent.LifeGained p n -> Common.tagged "LifeGained" . Just $ Common.array [PlayerId.toJson p, Common.encodeNatural n]
   GameEvent.LoyaltyAbilityActivated oid -> Common.tagged "LoyaltyAbilityActivated" . Just $ ObjectId.toJson oid
   GameEvent.CountersPut oid kind before after ->
-    Common.tagged "CountersPut" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
+    Common.tagged "CountersPut" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.CountersRemoved oid kind before after ->
-    Common.tagged "CountersRemoved" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
+    Common.tagged "CountersRemoved" . Just . Common.array $ [ObjectId.toJson oid, CounterKind.toJson Keyword.toJson kind, Common.encodeNatural before, Common.encodeNatural after]
   GameEvent.HalfUnlocked oid name fully -> Common.tagged "HalfUnlocked" . Just . Common.array $ [ObjectId.toJson oid, CardName.toJson name, Common.boolean fully]
   GameEvent.TurnedFaceUp oid -> Common.tagged "TurnedFaceUp" . Just $ ObjectId.toJson oid
   GameEvent.BecameRenowned oid -> Common.tagged "BecameRenowned" . Just $ ObjectId.toJson oid
+  GameEvent.Evolved oid -> Common.tagged "Evolved" . Just $ ObjectId.toJson oid
   GameEvent.PermanentSacrificed pid oid -> Common.tagged "PermanentSacrificed" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid]
   GameEvent.AbilityTriggered oid pid cond ->
     Common.tagged "AbilityTriggered" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson pid, TriggerCondition.toJson cond]
@@ -70,12 +72,13 @@ fromJson value = do
     ("LifeGained", Just (Value.Array (Array.MkArray [p, n]))) -> GameEvent.LifeGained <$> PlayerId.fromJson p <*> Common.decodeNatural n
     ("LoyaltyAbilityActivated", Just v) -> GameEvent.LoyaltyAbilityActivated <$> ObjectId.fromJson v
     ("CountersPut", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
-      GameEvent.CountersPut <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
+      GameEvent.CountersPut <$> ObjectId.fromJson oid <*> CounterKind.fromJson Keyword.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     ("CountersRemoved", Just (Value.Array (Array.MkArray [oid, kind, before, after]))) ->
-      GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> CounterKind.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
+      GameEvent.CountersRemoved <$> ObjectId.fromJson oid <*> CounterKind.fromJson Keyword.fromJson kind <*> Common.decodeNatural before <*> Common.decodeNatural after
     ("HalfUnlocked", Just (Value.Array (Array.MkArray [oid, name, fully]))) -> GameEvent.HalfUnlocked <$> ObjectId.fromJson oid <*> CardName.fromJson name <*> Common.asBoolean fully
     ("TurnedFaceUp", Just v) -> GameEvent.TurnedFaceUp <$> ObjectId.fromJson v
     ("BecameRenowned", Just v) -> GameEvent.BecameRenowned <$> ObjectId.fromJson v
+    ("Evolved", Just v) -> GameEvent.Evolved <$> ObjectId.fromJson v
     ("PermanentSacrificed", Just (Value.Array (Array.MkArray [pid, oid]))) -> GameEvent.PermanentSacrificed <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid
     ("AbilityTriggered", Just (Value.Array (Array.MkArray [oid, pid, cond]))) ->
       GameEvent.AbilityTriggered <$> ObjectId.fromJson oid <*> PlayerId.fromJson pid <*> TriggerCondition.fromJson cond

@@ -693,7 +693,7 @@ declaredIt oid event = case event of
 -- counters themselves are gone from that record. The caller has to say what was
 -- on the object, and only the caller knows whether it is reading a live one or CR
 -- 608.2h's record of one that is not.
-viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map CounterKind.CounterKind Natural -> GameState -> Filter.View
+viewOfCharacteristics :: ObjectId -> ProjectedCharacteristics -> Maybe PlayerId.PlayerId -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural -> GameState -> Filter.View
 viewOfCharacteristics oid pc controller counters gs =
   Filter.MkView
     { Filter.cardTypes = PC.cardTypes pc,
@@ -783,7 +783,7 @@ viewOfCharacteristics oid pc controller counters gs =
 -- CR 122.1: the counters on an object right now, and none for an id that names
 -- nothing. The LIVE half of the pair whose other half is LastKnown.counters --
 -- every viewOfCharacteristics caller but viewWithLastKnown passes this.
-countersOf :: ObjectId -> GameState -> Map CounterKind.CounterKind Natural
+countersOf :: ObjectId -> GameState -> Map (CounterKind.CounterKind Keyword.Type.Keyword) Natural
 countersOf oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
 
 -- CR 707.2 / 613.1a: an object's layer-1 (copy) result, the value the layer fold
@@ -1405,6 +1405,7 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateEmblem {} -> effect
   Effect.BecomeMonarch {} -> effect
   Effect.BecomeRenowned _ -> effect
+  Effect.Evolve _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
@@ -1626,6 +1627,7 @@ rewriteTriggerCondition pairs condition = case condition of
   -- The same, one condition over: Valeron Wardens' "a creature you control" is a
   -- Filter, so CR 612.1 reaches it too.
   TriggerCondition.PermanentBecomesRenowned f -> TriggerCondition.PermanentBecomesRenowned (Filter.rewrite pairs f)
+  TriggerCondition.SelfEvolves -> condition
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
   TriggerCondition.PermanentSacrificed -> condition
@@ -2326,6 +2328,11 @@ filterReads f = case f of
   -- so no Modification writes Object.renowned and no CR 613 layer can move a set
   -- this atom selects.
   Filter.Type.IsRenowned -> Set.empty
+  -- Reads nothing: CR 109.3's characteristics do not include counters, so no
+  -- Modification writes Object.counters and no CR 613 layer can move a set this
+  -- atom selects. The P/T a +1/+1 counter grants is CR 613.4c's, applied over the
+  -- top of the set rather than deciding it.
+  Filter.Type.HasCounters _ -> Set.empty
   -- CR 202.3 reads the printed mana cost, and no Modification writes one -- there
   -- is no mana-cost Aspect for this to name, because nothing could change it.
   Filter.Type.ManaValueAtMost _ -> Set.empty
