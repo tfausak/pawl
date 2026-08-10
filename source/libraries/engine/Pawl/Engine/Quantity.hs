@@ -256,6 +256,23 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.OpponentsAttacked ref -> case Count.playersFor context gs ref of
     Just [pid] -> Just (toInteger (length (filter (attackedOpponent pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
     _ -> Nothing
+  -- CR 509.1h's declaration, counted beyond the first: how many creatures are
+  -- blocking the object this evaluation is aimed at, less one, floored at 0 for
+  -- rule 702.23a's "beyond the first".
+  --
+  -- Read LIVE off Combat.blockers rather than through the injected view, combat
+  -- being game state rather than a characteristic -- so an object CR 608.2h would
+  -- answer for still answers here while the declaration stands. What fixes the
+  -- number in time is the CALLER: Projection.freezeQuantities evaluates this as
+  -- the ability resolves, which is CR 702.23b's "calculated only once per combat".
+  --
+  -- Nothing only for an evaluation aimed at no object -- a member of an
+  -- Aggregation.Greatest over Scope.InHistory. An object nobody blocked is in no
+  -- entry of the map and answers 0, which is a number and not a failure.
+  Quantity.BlockersBeyondFirst ->
+    fmap
+      (\oid -> toInteger (max 0 (Set.size (Map.findWithDefault Set.empty oid (Combat.blockers (GameState.combat gs))) - 1)))
+      mOid
   where
     recur = evaluateAgainst viewOf context gs announcedOn mOid mView
 
@@ -314,6 +331,7 @@ substituteStar star quantity = case quantity of
   Quantity.PlayerCounters _ _ -> quantity
   Quantity.ObjectCounters _ -> quantity
   Quantity.OpponentsAttacked _ -> quantity
+  Quantity.BlockersBeyondFirst -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -359,6 +377,9 @@ slots quantity = case quantity of
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
+  -- And a nullary arm, which names nothing at all: CR 509.1h's declaration is
+  -- read against the object the evaluation is aimed at, as ObjectCounters is.
+  Quantity.BlockersBeyondFirst -> Set.empty
 
 -- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
 -- off the resolving object's bindings? It is not wherever a PlayerRef is nested
@@ -389,6 +410,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.PlayerCounters ref _ -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
+  Quantity.BlockersBeyondFirst -> True
 
 -- Only InSlot names a slot; the other two are answered from the evaluation
 -- context alone (Resolve.playerRefSlots says the same thing as a set).
@@ -443,6 +465,7 @@ readsX quantity = case quantity of
   Quantity.PlayerCounters _ _ -> False
   Quantity.ObjectCounters _ -> False
   Quantity.OpponentsAttacked _ -> False
+  Quantity.BlockersBeyondFirst -> False
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A

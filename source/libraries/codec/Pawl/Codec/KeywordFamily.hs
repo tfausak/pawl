@@ -14,6 +14,7 @@ toJson :: KeywordFamily.KeywordFamily -> Value.Value
 toJson f = Common.nullary $ case f of
   KeywordFamily.Hexproof -> "Hexproof"
   KeywordFamily.Landwalk -> "Landwalk"
+  KeywordFamily.Rampage -> "Rampage"
   KeywordFamily.Cycling -> "Cycling"
   KeywordFamily.Flashback -> "Flashback"
   KeywordFamily.Morph -> "Morph"
@@ -31,6 +32,7 @@ fromJson =
     "KeywordFamily"
     [ ("Hexproof", KeywordFamily.Hexproof),
       ("Landwalk", KeywordFamily.Landwalk),
+      ("Rampage", KeywordFamily.Rampage),
       ("Cycling", KeywordFamily.Cycling),
       ("Flashback", KeywordFamily.Flashback),
       ("Morph", KeywordFamily.Morph),

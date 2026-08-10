@@ -41,6 +41,7 @@ toJson k = case k of
   Keyword.TrampleOverPlaneswalkers -> Common.nullary "TrampleOverPlaneswalkers"
   Keyword.Vigilance -> Common.nullary "Vigilance"
   Keyword.Banding -> Common.nullary "Banding"
+  Keyword.Rampage n -> Common.tagged "Rampage" . Just $ Common.encodeNatural n
   Keyword.Flanking -> Common.nullary "Flanking"
   Keyword.Phasing -> Common.nullary "Phasing"
   Keyword.Shadow -> Common.nullary "Shadow"
@@ -96,6 +97,7 @@ fromJson value = do
     ("TrampleOverPlaneswalkers", _) -> Right Keyword.TrampleOverPlaneswalkers
     ("Vigilance", _) -> Right Keyword.Vigilance
     ("Banding", _) -> Right Keyword.Banding
+    ("Rampage", Just v) -> Keyword.Rampage <$> Common.decodeNatural v
     ("Flanking", _) -> Right Keyword.Flanking
     ("Phasing", _) -> Right Keyword.Phasing
     ("Shadow", _) -> Right Keyword.Shadow

@@ -196,6 +196,15 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.OpponentsAttacked (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"OpponentsAttacked","value":{"type":"InSlot","value":"target"}} """
+  -- CR 509.1h with NOTHING on the wire: the object is the one the quantity is
+  -- evaluated against, so this is a bare tag like Power and ManaValue.
+  Spec.it s "BlockersBeyondFirst is nullary" $
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.BlockersBeyondFirst
+      """ {"type":"BlockersBeyondFirst"} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s
