@@ -409,6 +409,24 @@ data Keyword
     -- Pawl.Engine.Combat.menaceAllowsGiven -- a whole-declaration function --
     -- rather than beside the other three in pairAllowedGiven.
     Menace
+  | -- | 702.112a: renown N, a TRIGGERED ability meaning "When this creature deals
+    -- combat damage to a player, if it isn't renowned, put N +1/+1 counters on it
+    -- and it becomes renowned." Minted by Pawl.Engine.Keyword.renown and handed to
+    -- the ordinary CR 603 machinery, as poisonous (702.70a) and training (702.149a)
+    -- are. The first minted ability with an intervening "if" -- rule 702.112a
+    -- prints one, and CR 603.4 puts it on TriggeredAbility.intervening.
+    --
+    -- N rides the constructor, as Poisonous' does, and for the same reason: it is
+    -- how many counters the rule's ability places, so `Renown 1` and `Renown 2` are
+    -- distinct keywords. CR 702.112c makes multiple instances trigger separately,
+    -- so its reader takes the per-keyword COUNT the projection carries rather than
+    -- membership.
+    --
+    -- RENOWNED is not here, and rule 702.112b is why: it is a designation on the
+    -- permanent rather than an ability, and "neither an ability nor part of the
+    -- permanent's copiable values". It rides Pawl.Types.Object.renowned, beside the
+    -- Ring-bearer designation and a battle's protector.
+    Renown Natural.Natural
   | Devoid -- 702.114
   | -- | 702.118b: a creature with skulk can't be blocked by creatures with greater
     -- power.

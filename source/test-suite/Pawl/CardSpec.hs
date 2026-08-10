@@ -353,6 +353,7 @@ quantityCounts quantity = case quantity of
   -- CR 725.1's game-wide player designation, read as a 0/1: a PlayerRef and
   -- nothing else, so no Count and no Filter here either.
   Quantity.Type.IsMonarch _ -> []
+  Quantity.Type.IsRenowned -> []
   -- CR 122.1's per-player counter tally, another such scalar.
   Quantity.Type.PlayerCounters _ _ -> []
   -- CR 122.1's per-OBJECT tally, read off the object the quantity is evaluated
@@ -559,6 +560,7 @@ effectCounts effect = case effect of
   Effect.RequireBlock duration _ _ -> durationCounts duration
   Effect.CreateEmblem card -> overFaces cardCounts card
   Effect.BecomeMonarch _ -> []
+  Effect.BecomeRenowned _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -795,6 +797,7 @@ effectReplacements effect = case effect of
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
+  Effect.BecomeRenowned _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1271,6 +1274,7 @@ effectMintedFaces effect = case effect of
   Effect.AffectPlayers {} -> []
   Effect.RequireBlock {} -> []
   Effect.BecomeMonarch _ -> []
+  Effect.BecomeRenowned _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1545,6 +1549,7 @@ keywordFilters keyword = case keyword of
   Keyword.Mentor -> []
   Keyword.Provoke -> []
   Keyword.Menace -> []
+  Keyword.Renown _ -> []
   Keyword.Devoid -> []
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
   -- ability is built with lives in Pawl.Engine.Keyword and is not card data.
@@ -2048,6 +2053,7 @@ effectFilters effect = case effect of
   -- CR 114.2's emblem is a whole card too.
   Effect.CreateEmblem card -> overFaces cardFilters card
   Effect.BecomeMonarch _ -> []
+  Effect.BecomeRenowned _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and

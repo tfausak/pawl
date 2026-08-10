@@ -34,6 +34,10 @@ toJson q = case q of
   -- CR 122.1's OBJECT reading: only a kind on the wire, since the object is
   -- whichever one the quantity is evaluated against (Pawl.Types.Quantity).
   Quantity.ObjectCounters k -> Common.tagged "ObjectCounters" . Just $ CounterKind.toJson k
+  -- CR 702.112b's designation, with nothing on the wire: the object is whichever
+  -- one the quantity is evaluated against, and the answer is a 0/1 rather than a
+  -- stored number, so there is neither a reference nor a payload.
+  Quantity.IsRenowned -> Common.nullary "IsRenowned"
   -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
   -- from the combat record rather than from anything the card names.
   Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ PlayerRef.toJson p
@@ -59,6 +63,7 @@ fromJson value = do
     ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson v
+    ("IsRenowned", _) -> Right Quantity.IsRenowned
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
     ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
     _ -> Left . Text.pack $ "unknown Quantity: " <> t

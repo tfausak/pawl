@@ -234,6 +234,14 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- means the VIEW could not describe the object -- it is gone and nothing was
   -- filed under its id.
   Quantity.ObjectCounters kind -> fmap (toInteger . Map.findWithDefault 0 kind . Filter.counters) mView
+  -- CR 702.112b's designation as a 0/1, off the same view ObjectCounters reads --
+  -- so CR 608.2h's last known information answers for an object that is gone,
+  -- which is what rule 702.112a's intervening "if" needs on resolution.
+  --
+  -- Nothing only where the view cannot describe the object at all, exactly as
+  -- Power and ObjectCounters have it: an object nobody designated is not renowned,
+  -- which is an answer.
+  Quantity.IsRenowned -> fmap (\view -> if Filter.renowned view then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
   -- through the same Count.playersFor, and Nothing for a reference naming
@@ -330,6 +338,7 @@ substituteStar star quantity = case quantity of
   Quantity.IsMonarch _ -> quantity
   Quantity.PlayerCounters _ _ -> quantity
   Quantity.ObjectCounters _ -> quantity
+  Quantity.IsRenowned -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.BlockersBeyondFirst -> quantity
 
@@ -374,6 +383,9 @@ slots quantity = case quantity of
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
   Quantity.ObjectCounters _ -> Set.empty
+  -- CR 702.112b's designation, which carries no reference either -- ObjectCounters'
+  -- position without even the kind beside it.
+  Quantity.IsRenowned -> Set.empty
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -409,6 +421,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.IsMonarch ref -> playerRefIsSlotless ref
   Quantity.PlayerCounters ref _ -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
+  Quantity.IsRenowned -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.BlockersBeyondFirst -> True
 
@@ -464,6 +477,7 @@ readsX quantity = case quantity of
   Quantity.IsMonarch _ -> False
   Quantity.PlayerCounters _ _ -> False
   Quantity.ObjectCounters _ -> False
+  Quantity.IsRenowned -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.BlockersBeyondFirst -> False
 

@@ -689,6 +689,22 @@ data Effect card
     -- monarch" -- a target slot, which is the one arm that makes this opcode
     -- target. Emits GameEvent.BecameMonarch.
     BecomeMonarch MonarchTarget.MonarchTarget
+  | -- | CR 702.112b: the permanent in the slot GAINS THE RENOWNED DESIGNATION --
+    -- rule 702.112a's "and it becomes renowned", the second half of the ability
+    -- Pawl.Engine.Keyword.renown mints.
+    --
+    -- A SlotName and not an ObjectRef, so that it names the same permanent the
+    -- PutCounters beside it in the clause does: both read Binding.triggerSource,
+    -- and rule 702.112a's "it" is one object mentioned twice.
+    --
+    -- Writes Object.renowned, which is a DESIGNATION rather than a characteristic
+    -- (rule 702.112b), so this is a state write and not a
+    -- ModifyTarget/Modification -- nothing in CR 613 could carry it.
+    --
+    -- Idempotent by construction: a permanent already renowned stays renowned, and
+    -- CR 702.112c leans on that -- the second renown ability to resolve "will have
+    -- no effect", which its intervening "if" already stops before reaching here.
+    BecomeRenowned SlotName.SlotName
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that
     -- designation. Tovolar, Dire Overlord's upkeep trigger is `ItBecomes Night`.
     --

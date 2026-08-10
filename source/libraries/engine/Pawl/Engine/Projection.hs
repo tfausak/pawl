@@ -567,7 +567,11 @@ viewOfCard face =
           -- and this builder describes a printed face. Nothing is not a lost
           -- distinction either: CR 701.54a designates a creature its controller
           -- controls, so only a battlefield permanent ever carries one.
-          Filter.ringBearerFor = Nothing
+          Filter.ringBearerFor = Nothing,
+          -- CR 702.112b: the designation rides an OBJECT (Object.renowned), and
+          -- this builder describes a printed face. Not a lost distinction either:
+          -- rule 702.112b gives one only to a permanent.
+          Filter.renowned = False
         }
 
 -- viewOfCard for a card that IS an object in some zone, so a
@@ -740,7 +744,12 @@ viewOfCharacteristics oid pc controller counters gs =
       -- `token` already take. Nothing for an id naming no object, which is what
       -- viewWithLastKnown's CR 608.2h path hands this function: a designation dies
       -- with the permanent (CR 400.7), and no last-known record keeps one.
-      Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor
+      Filter.ringBearerFor = Game.lookupObject oid gs >>= Object.ringBearerFor,
+      -- CR 702.112b: a designation rather than a characteristic, so it comes off
+      -- Object.renowned -- ringBearerFor's posture just above, including for the
+      -- CR 608.2h path: an id naming no object answers False, a designation dying
+      -- with the permanent (CR 400.7) and no last-known record keeping one.
+      Filter.renowned = maybe False Object.renowned (Game.lookupObject oid gs)
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id that names
@@ -1367,6 +1376,7 @@ rewriteEffect pairs effect = case effect of
   -- is its abilities, which nothing here walks (#643).
   Effect.CreateEmblem {} -> effect
   Effect.BecomeMonarch {} -> effect
+  Effect.BecomeRenowned _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
@@ -1626,6 +1636,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.LifeTotal _ -> quantity
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
+  Quantity.Type.IsRenowned -> quantity
   Quantity.Type.PlayerCounters _ _ -> quantity
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
   -- name no subtype word, not even the CR 122.1b keyword one.

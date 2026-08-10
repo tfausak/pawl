@@ -150,6 +150,7 @@ toJson codec e = case e of
   Effect.RequireBlock d b a -> Common.tagged "RequireBlock" (Just (Common.array [Duration.toJson d, ObjectRef.toJson b, ObjectRef.toJson a]))
   Effect.CreateEmblem c -> Common.tagged "CreateEmblem" (Just (codec c))
   Effect.BecomeMonarch t -> Common.tagged "BecomeMonarch" (Just (MonarchTarget.toJson t))
+  Effect.BecomeRenowned s -> Common.tagged "BecomeRenowned" (Just (SlotName.toJson s))
   Effect.ItBecomes d -> Common.tagged "ItBecomes" (Just (Daytime.toJson d))
   Effect.ExileUntilMonarch s -> Common.tagged "ExileUntilMonarch" (Just (SlotName.toJson s))
   Effect.Attach s -> Common.tagged "Attach" (Just (SlotName.toJson s))
@@ -349,6 +350,7 @@ fromJson decode value = do
       _ -> Left . Text.pack $ "RequireBlock expects [Duration, ObjectRef, ObjectRef]"
     "CreateEmblem" -> Common.withValue mv (fmap Effect.CreateEmblem . decode)
     "BecomeMonarch" -> Common.withValue mv (fmap Effect.BecomeMonarch . MonarchTarget.fromJson)
+    "BecomeRenowned" -> Common.withValue mv (fmap Effect.BecomeRenowned . SlotName.fromJson)
     "ItBecomes" -> Common.withValue mv (fmap Effect.ItBecomes . Daytime.fromJson)
     "ExileUntilMonarch" -> Common.withValue mv (fmap Effect.ExileUntilMonarch . SlotName.fromJson)
     "Attach" -> Common.withValue mv (fmap Effect.Attach . SlotName.fromJson)

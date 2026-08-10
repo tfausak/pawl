@@ -175,7 +175,17 @@ data View = MkView
     -- Nothing for every candidate with no object to read it off: a printed card
     -- off the battlefield, a player, an event snapshot -- the vacuous posture
     -- power and controller already take.
-    ringBearerFor :: Maybe PlayerId.PlayerId
+    ringBearerFor :: Maybe PlayerId.PlayerId,
+    -- CR 702.112b: does this candidate have the RENOWNED designation? Read
+    -- straight off Object.renowned, for ringBearerFor's reason -- rule 702.112b
+    -- makes it a designation rather than a characteristic, so no projection
+    -- writes it -- and a Bool rather than a Maybe because the rule names no
+    -- player.
+    --
+    -- False for every candidate with no object to read it off: a printed card off
+    -- the battlefield, a player, an event snapshot -- the vacuous posture `tapped`
+    -- and `token` already take.
+    renowned :: Bool
   }
   deriving (Eq, Show)
 
@@ -227,7 +237,10 @@ playerView pid =
       -- CR 701.54b: Ring-bearer is a designation A PERMANENT can have, and a
       -- player is not one -- the same shape CR 725.1's monarch has with the two
       -- sides swapped.
-      ringBearerFor = Nothing
+      ringBearerFor = Nothing,
+      -- CR 702.112b: "only permanents can be or become renowned", and a player is
+      -- not one.
+      renowned = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -569,6 +582,7 @@ rewriteKeyword pairs keyword = case keyword of
   -- CR 702.45a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Bushido _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
+  Keyword.Type.Renown _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Annihilator _ -> keyword
   Keyword.Type.Infect -> keyword
