@@ -693,6 +693,21 @@ data Keyword
     -- cost is not a Cost the card names, it is a SHAPE the rule states, and the
     -- only thing the card supplies is the threshold.
     Crew Natural.Natural
+  | -- | 702.123a: fabricate N, a TRIGGERED ability meaning "When this permanent
+    -- enters, you may put N +1/+1 counters on it. If you don't, create N 1/1
+    -- colorless Servo artifact creature tokens." Minted by
+    -- Pawl.Engine.Keyword.fabricate, as rule 702.135a's afterlife is.
+    --
+    -- Rule 702.123a prints CR 118.12a's rewriting already done, which is why the
+    -- minted clause is an ordinary Pawl.Types.UnlessPaid over
+    -- Pawl.Types.CostComponent.PutPlusOneCountersOnThis and needs no branching
+    -- opcode: the counters are the cost, the tokens the "if you don't" branch.
+    --
+    -- N rides the constructor, as Afterlife's does: it is both how many counters
+    -- and how many tokens, so `Fabricate 1` and `Fabricate 2` are distinct
+    -- keywords. CR 702.123b makes multiple instances trigger separately, so its
+    -- reader takes the per-keyword COUNT rather than membership.
+    Fabricate Natural.Natural
   | -- | 702.127a: an ability found on some split cards, and THREE static abilities
     -- in one word -- "you may cast this half of this split card from your
     -- graveyard", "this half of this split card can't be cast from any zone other

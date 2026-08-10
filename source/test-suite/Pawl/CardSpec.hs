@@ -1630,6 +1630,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.122a's payload is a threshold, not a Filter: the criterion the crew
   -- ability is built with lives in Pawl.Engine.Keyword and is not card data.
   Keyword.Crew _ -> []
+  -- CR 702.123a's payload is a count. Neither the counters its minted ability
+  -- puts on nor the Servo token it creates carries a Filter.
+  Keyword.Fabricate _ -> []
   Keyword.Riot -> []
   -- CR 702.98a names no quality either: the +1/+1 counter its minted replacement
   -- places and the Filter its minted combat restriction carries are written in
