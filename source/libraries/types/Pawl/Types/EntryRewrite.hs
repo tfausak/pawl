@@ -146,6 +146,22 @@ data EntryRewrite
     -- end means -- neither value is copiable (CR 707.2), so neither may be
     -- written into the snapshot AsCopy and ChoiceOf use.
     Riot
+  | -- | CR 702.98a via CR 614.1c: unleash's FIRST static ability. "You may have
+    -- this permanent enter with an additional +1/+1 counter on it."
+    --
+    -- Riot's arm with the declining half deleted -- rule 702.98a states no
+    -- consequence for declining, where rule 702.136a grants haste -- so this is
+    -- not Riot with a flag and not WithCounters with a "may": the first would
+    -- make one arm answer two rules, and the second would put an optionality
+    -- field on an arm CR 306.5b's loyalty must never make optional.
+    --
+    -- NOT written by a card, and NULLARY, for Riot's two reasons: it is minted
+    -- from the finished projection by Pawl.Engine.Keyword.mintedReplacementsOf,
+    -- and rule 702.98a fixes the kind and the count.
+    --
+    -- The counter goes through Pawl.Engine.Event.putCounters, CR 122.6's funnel,
+    -- as riot's does, so CR 614.16 applies to it.
+    Unleash
   | -- | CR 614.1d: "This permanent enters tapped" (Zof Bloodbog's land half,
     -- Headless Skaab's creature). The one arm a permanent's OWN printed text
     -- writes about the STATUS it enters with, where every other writer of an

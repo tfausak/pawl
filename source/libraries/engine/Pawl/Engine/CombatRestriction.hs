@@ -4,9 +4,10 @@
 -- Pawl.Engine.AttackRequirement). None is a layer, and Pawl.Engine.Projection
 -- sees none of them.
 --
--- The only reader of Pawl.Types.CombatRestriction, and the only module that may
--- case on it. Pawl.Engine.Combat asks for a SET OF IDS, or for a NUMBER, and
--- never learns which card produced either.
+-- The only module that may CASE on Pawl.Types.CombatRestriction.
+-- Pawl.Engine.Keyword constructs one -- rule 702.98a's unleash -- and reads none.
+-- Pawl.Engine.Combat asks for a SET OF IDS, or for a NUMBER, and never learns
+-- which card, or which keyword, produced either.
 module Pawl.Engine.CombatRestriction where
 
 import qualified Data.List as List
@@ -17,6 +18,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Condition as Condition
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
@@ -25,6 +27,7 @@ import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
+import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
 
 -- CR 508.1c: which of `candidates` an effect in force right now says CAN'T
@@ -169,37 +172,78 @@ inForce gs =
             gs
             source
             (if null changes then condition else Projection.rewriteCondition changes condition)
+      -- CR 702: the restrictions rule 702 gives a permanent for HOLDING A
+      -- KEYWORD, which until unleash (CR 702.98a) nothing produced -- every row
+      -- here was printed card data. Pawl.Engine.Keyword.mintedCombatRestrictionsOf
+      -- is the mint, beside the one that gives riot its replacement effect.
+      --
+      -- Read off the PROJECTION rather than the printed face, so a granted or
+      -- removed keyword is seen (CR 613.1f). That is also why these rows skip the
+      -- two ability gates the printed ones below pass: the projection has already
+      -- applied both, in layer order, where `removed` asked here would drop a
+      -- keyword a later-timestamped grant restored.
+      --
+      -- No CR 612.1 word swap either, and none is owed: what a keyword MEANS is
+      -- rule 702's text, and CR 612.2 reaches words printed on the card.
+      --
+      -- Through the same "unless" gate the printed rows pass, with an empty text
+      -- change: unleash's row is ungated, so this filter keeps nothing out today
+      -- and is here so the next minted restriction that IS gated cannot slip past
+      -- CR 508.1c's second clause.
+      mintedRows source =
+        [ (source, [], restriction)
+        | anyMinted,
+          restriction <- Keyword.mintedCombatRestrictionsOf (Projection.keywordsOf source gs),
+          not (lifted source [] restriction)
+        ]
+      -- The short-circuit Pawl.Engine.Projection.replacementsAffecting takes, for
+      -- its reason: projecting every permanent on every declaration would cost
+      -- every board a walk that almost no board needs. One shared thunk, so the
+      -- battlefield is scanned once per read rather than once per permanent.
+      --
+      -- Reading BASE faces is enough for the reason given there -- a keyword
+      -- reaches a permanent either from its own base face or from a grant whose
+      -- granting permanent is on the battlefield -- and it inherits the same hole:
+      -- a minting keyword arriving through a stored continuous effect or a keyword
+      -- counter is on no base face (#833).
+      anyMinted = any baseCouldMint (Set.toList (GameState.battlefield gs))
+      baseCouldMint oid = case Game.faceOf oid gs of
+        Nothing -> False
+        Just face ->
+          any Keyword.mintsCombatRestriction (Face.keywords face)
+            || any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Face.staticAbilities face)
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
-        Just face -> case Face.combatRestrictions face of
-          -- Every permanent in almost every game.
-          [] -> []
-          restrictions ->
-            -- The same two ability losses AttackRequirement.instances asks
-            -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
-            -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
-            -- restriction that has started to apply is argued in
-            -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
-            -- 305.7 gate be liveAfterLayers rather than liveGiven.
-            if (null setEffs || Projection.liveAfterLayers setEffs source gs)
-              && not (removed source)
-              then
-                -- CR 612.1's word swap over the source's own text, computed HERE
-                -- rather than hoisted beside setEffs: textChangesAffecting folds
-                -- the whole continuous-effect list, and the empty case above
-                -- already turned away every permanent that prints no restriction,
-                -- so the fold runs once per restriction-bearing permanent instead
-                -- of once per permanent on the battlefield.
-                --
-                -- The SOURCE's changes and not the restricted creature's: CR
-                -- 612.1 changes the words printed on THAT object, and the gate
-                -- is printed on the card stating the restriction.
-                let changes = Projection.textChangesAffecting source gs
-                 in [ (source, changes, restriction)
-                    | restriction <- restrictions,
-                      not (lifted source changes restriction)
-                    ]
-              else []
+        Just face ->
+          mintedRows source <> case Face.combatRestrictions face of
+            -- Every permanent in almost every game.
+            [] -> []
+            restrictions ->
+              -- The same two ability losses AttackRequirement.instances asks
+              -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
+              -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
+              -- restriction that has started to apply is argued in
+              -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
+              -- 305.7 gate be liveAfterLayers rather than liveGiven.
+              if (null setEffs || Projection.liveAfterLayers setEffs source gs)
+                && not (removed source)
+                then
+                  -- CR 612.1's word swap over the source's own text, computed HERE
+                  -- rather than hoisted beside setEffs: textChangesAffecting folds
+                  -- the whole continuous-effect list, and the empty case above
+                  -- already turned away every permanent that prints no restriction,
+                  -- so the fold runs once per restriction-bearing permanent instead
+                  -- of once per permanent on the battlefield.
+                  --
+                  -- The SOURCE's changes and not the restricted creature's: CR
+                  -- 612.1 changes the words printed on THAT object, and the gate
+                  -- is printed on the card stating the restriction.
+                  let changes = Projection.textChangesAffecting source gs
+                   in [ (source, changes, restriction)
+                      | restriction <- restrictions,
+                        not (lifted source changes restriction)
+                      ]
+                else []
    in concatMap fromPermanent (Set.toList (GameState.battlefield gs))
 
 -- The shared walk behind the three SUBJECT-CARRYING questions above, over the

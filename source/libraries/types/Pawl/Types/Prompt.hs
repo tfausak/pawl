@@ -453,6 +453,18 @@ data Prompt r where
   -- one. Pawl.Engine.Event's arm has an unreachable no-controller fallback beside
   -- it, the same shape ChooseEntryOption's carries; see there.
   ChooseRiot :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
+  -- | CR 702.98a / 614.1c: as a permanent with unleash enters, its controller
+  -- decides whether to have it enter with an additional +1/+1 counter. The
+  -- ObjectId is the entering object.
+  --
+  -- An OptionalDecision for ChooseRiot's reason, and DISTINCT from it for
+  -- ChoosePayLifeOnEntry's: a transcript that answered one as-enters "may" must
+  -- not silently answer a different one. Exercises takes the counter.
+  --
+  -- NEVER ELIDED. Declining leaves a creature that can block where taking the
+  -- counter leaves a bigger one that cannot, which is the whole trade rule
+  -- 702.98a prints.
+  ChooseUnleash :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Prompt OptionalDecision.OptionalDecision
   -- | CR 614.1c with CR 119.4: as a permanent whose text reads "As [this
   -- permanent] enters, you may pay N life. If you don't, it enters tapped"
   -- enters, its controller decides whether to pay (Razorgrass Field). The

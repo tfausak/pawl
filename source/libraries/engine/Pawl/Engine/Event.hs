@@ -974,6 +974,30 @@ apply batch candidate event =
                               }
                        in gs3 {GameState.continuousEffects = eff : GameState.continuousEffects gs3}
             pure (Just event)
+      -- CR 702.98a / 614.1c: unleash. "You may have this permanent enter with an
+      -- additional +1/+1 counter on it." Riot's arm with the declining half
+      -- deleted: rule 702.98a states no consequence for declining, so Declines
+      -- writes nothing.
+      --
+      -- NEVER ELIDED, for riot's reason: the counter is what turns rule 702.98a's
+      -- second static ability on, so the two answers are a bigger creature that
+      -- cannot block against a smaller one that can.
+      --
+      -- Through putCounters, CR 122.6's funnel, exactly as riot's is, so CR 614.16
+      -- applies and Doubling Season sees unleash's counter.
+      EntryRewrite.Unleash -> do
+        Replacement.consume (ReplacementCandidate.identity candidate)
+        gs <- State.get
+        case Projection.controllerOf oid gs of
+          -- Unreachable, and defensive for the reason riot's arm gives above.
+          Nothing -> pure (Just event)
+          Just controller -> do
+            let decider = Decide.deciderFor controller gs
+            answer <- Game.choose (Prompt.ChooseUnleash decider controller oid)
+            case answer of
+              OptionalDecision.Exercises -> Monad.void (putCounters CounterCause.ByEffect oid CounterKind.PlusOnePlusOne 1)
+              OptionalDecision.Declines -> pure ()
+            pure (Just event)
       -- CR 614.1d / 110.5b: "This permanent enters tapped" (Zof Bloodbog's land,
       -- Headless Skaab's creature -- the arm gates on no card type). CR 110.5b
       -- has a permanent enter untapped "unless a spell or ability says otherwise",

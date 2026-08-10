@@ -2349,6 +2349,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   gatherSpecimensSpec s registry
   shimatsuSpec s registry
   riotSpec s registry
+  unleashSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
 
@@ -3105,7 +3106,7 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
   -- is an enchantment whose whole riot contribution is "nontoken creatures you
   -- control have riot", so it is the case Spider-Punk cannot make -- the
   -- entering creature's base face prints no riot AND the granting permanent's
-  -- prints none either, which is what Projection.grantsMintingKeyword is for.
+  -- prints none either, which is what Projection.grantsKeywordWhere is for.
   Spec.it s "CR 702.136a Rhythm of the Wild gives an entering creature riot" $ do
     mountain <- S.printingOf s registry "Mountain"
     forest <- S.printingOf s registry "Forest"
@@ -3199,6 +3200,120 @@ riotSpec s registry = Spec.describe s "Riot (CR 702.136)" $ do
                 Spec.assertBool s (Maybe.isNothing desync) "the transcript answered every prompt"
                 Spec.assertEqWith s "the exercised instance's counter" (countersOn CounterKind.PlusOnePlusOne goblin after) 1
                 Spec.assertBool s (Projection.hasKeyword Keyword.Haste goblin after) "and the declined instance's haste"
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+
+-- Answer unleash's "may" one way, and everything else the way S.aggressiveAnswer
+-- does -- riotChoosing's shape, one keyword over.
+unleashChoosing :: OptionalDecision.OptionalDecision -> Prompt.Prompt r -> r
+unleashChoosing choice p = case p of
+  Prompt.ChooseUnleash {} -> choice
+  _ -> S.aggressiveAnswer p
+
+-- How many times unleash's "may" was put to a player.
+unleashAsks :: [Response.Response] -> Int
+unleashAsks responses =
+  let isUnleash r = case r of
+        Response.ChoseUnleash _ -> True
+        _ -> False
+   in length (filter isUnleash responses)
+
+-- CR 702.98a's two static abilities, on Gore-House Chainwalker ({1}{R} 2/1 with
+-- unleash) -- the first keyword in pawl to mint a COMBAT RESTRICTION, where riot
+-- above mints only a replacement effect.
+--
+-- Gameplay-level throughout: every case casts the card and answers the prompt, so
+-- the counter and the restriction are both reached the way a game reaches them.
+-- The two answers are asserted against each other on boards differing in nothing
+-- but the answer, which is what keeps `canBlock` answering False for the reason
+-- under test rather than for a tapped or missing creature.
+unleashSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+unleashSpec s registry = Spec.describe s "Unleash (CR 702.98)" $ do
+  Spec.it s "CR 702.98a taking the counter makes it bigger and stops it blocking" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    chainwalker <- S.printingOf s registry "Gore-House Chainwalker"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (gs0, held) = riotBoard mountain 2 forest 0 [chainwalker]
+        -- A second creature on the SAME board, so a blanket "nobody may block"
+        -- bug cannot pass: the minted restriction has to be narrow to the
+        -- permanent holding the keyword. Giant Spider rather than a second
+        -- Chainwalker, and 2/1 against 2/5, so no reading of the board confuses
+        -- the two.
+        (bystander, gs) = S.addCreature spider S.alice gs0
+        answer = unleashChoosing OptionalDecision.Exercises
+    case held of
+      card : _ ->
+        let play = S.cast S.alice card >> Stack.resolveTop
+            after = S.runPure answer gs play
+         in case newestNamed (CardName.MkCardName $ Text.pack "Gore-House Chainwalker") after of
+              Nothing -> Spec.assertFailure s "Gore-House Chainwalker did not reach the battlefield"
+              Just walker -> do
+                Spec.assertEqWith s "one ChooseUnleash was raised" (unleashAsks (answersFor answer gs play)) 1
+                Spec.assertEqWith s "one +1/+1 counter" (countersOn CounterKind.PlusOnePlusOne walker after) 1
+                -- Printed 2/1, so the counter shows in the projection (CR 613.4c,
+                -- layer 7c).
+                Spec.assertEqWith s "power" (Projection.powerOf walker after) (Just 3)
+                Spec.assertEqWith s "toughness" (Projection.toughnessOf walker after) (Just 2)
+                -- CR 509.1b through rule 702.98a's second static ability.
+                Spec.assertBool s (not (Combat.canBlock S.alice walker after)) "it cannot block"
+                Spec.assertBool s (Combat.canBlock S.alice bystander after) "the Spider beside it can"
+                Spec.assertEqWith s "and only the Spider is offered" (Combat.legalBlockers S.alice after) [bystander]
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- THE PAIR THAT MAKES THE RESTRICTION REAL. Same board, same fixture, opposite
+  -- answer: rule 702.98a's second ability keys on the counter, so declining puts
+  -- the creature back among the legal blockers.
+  Spec.it s "CR 702.98a declining leaves a 2/1 that can block" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    chainwalker <- S.printingOf s registry "Gore-House Chainwalker"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (gs0, held) = riotBoard mountain 2 forest 0 [chainwalker]
+        (bystander, gs) = S.addCreature spider S.alice gs0
+        answer = unleashChoosing OptionalDecision.Declines
+    case held of
+      card : _ ->
+        let after = S.runPure answer gs (S.cast S.alice card >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Gore-House Chainwalker") after of
+              Nothing -> Spec.assertFailure s "Gore-House Chainwalker did not reach the battlefield"
+              Just walker -> do
+                Spec.assertEqWith s "no counters" (countersOn CounterKind.PlusOnePlusOne walker after) 0
+                Spec.assertEqWith s "power" (Projection.powerOf walker after) (Just 2)
+                Spec.assertEqWith s "toughness" (Projection.toughnessOf walker after) (Just 1)
+                -- Rule 702.98a states no consequence for declining, where riot
+                -- grants haste, so the board holds nothing but a 2/1.
+                Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste walker after)) "no haste"
+                Spec.assertBool s (Combat.canBlock S.alice walker after) "it can block"
+                Spec.assertEqWith s "and both creatures are offered" (List.sort (Combat.legalBlockers S.alice after)) (List.sort [bystander, walker])
+      _ -> Spec.assertFailure s "fixture did not deal a card"
+  -- CR 702.98a says "a +1/+1 counter", not "that counter", so the restriction is
+  -- not a fact about how the permanent entered. A counter arriving later shuts
+  -- blocking off on a board where the controller DECLINED, which no reading tied
+  -- to the entry replacement can produce.
+  Spec.it s "CR 702.98a a +1/+1 counter arriving later shuts blocking off too" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    chainwalker <- S.printingOf s registry "Gore-House Chainwalker"
+    spider <- S.printingOf s registry "Giant Spider"
+    let (gs0, held) = riotBoard mountain 2 forest 0 [chainwalker]
+        (bystander, gs) = S.addCreature spider S.alice gs0
+        answer = unleashChoosing OptionalDecision.Declines
+    case held of
+      card : _ ->
+        let after = S.runPure answer gs (S.cast S.alice card >> Stack.resolveTop)
+         in case newestNamed (CardName.MkCardName $ Text.pack "Gore-House Chainwalker") after of
+              Nothing -> Spec.assertFailure s "Gore-House Chainwalker did not reach the battlefield"
+              Just walker -> do
+                -- A STATE fixture for the counters, S.addCounter's documented use:
+                -- nothing in the pool puts a +1/+1 counter on each of two
+                -- creatures at a moment this board can reach.
+                let counted = S.addCounter CounterKind.PlusOnePlusOne 1 bystander (S.addCounter CounterKind.PlusOnePlusOne 1 walker after)
+                Spec.assertBool s (Combat.canBlock S.alice walker after) "without the counter it blocks"
+                Spec.assertBool s (not (Combat.canBlock S.alice walker counted)) "with one it cannot"
+                -- THE COUNTER IS NOT THE WHOLE CONDITION. The Spider carries the
+                -- same counter and no unleash, so the restriction has to name its
+                -- own source (CR 109.5) rather than every counter-bearing
+                -- creature on the board.
+                Spec.assertBool s (Combat.canBlock S.alice bystander counted) "the Spider with the same counter still blocks"
       _ -> Spec.assertFailure s "fixture did not deal a card"
 
 -- The tap state of a permanent, which is what CR 502.3's untap step writes -- and

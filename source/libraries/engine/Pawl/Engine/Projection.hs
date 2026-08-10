@@ -3049,28 +3049,30 @@ replacementsAffecting gs =
             -- 310.4b's intrinsic replacement.
             || Set.member CardType.Battle (TypeLine.types (Face.typeLine face))
             || any Keyword.mintsReplacement (Face.keywords face)
-            || any (any grantsMintingKeyword . StaticAbility.modifications) (Face.staticAbilities face)
+            || any (any (grantsKeywordWhere Keyword.mintsReplacement) . StaticAbility.modifications) (Face.staticAbilities face)
       forOne oid = fmap (\re -> (oid, re)) (replacementsOf oid gs)
    in if not (any baseHas onBattlefield)
         then []
         else concatMap forOne onBattlefield
 
--- Does this modification hand its affected objects a keyword the RULES turn into
--- a replacement effect (rule 702.136a's riot)? Read only by the short-circuit
--- above, off a BASE face, to answer "could anything on this board have a
--- replacement effect".
+-- Does this modification hand its affected objects a keyword satisfying `p`? Read
+-- only by short-circuits over BASE faces, to answer "could anything on this board
+-- have the thing rule 702 mints from that keyword" -- `Keyword.mintsReplacement`
+-- for the gather above (rule 702.136a's riot), and
+-- `Keyword.mintsCombatRestriction` for Pawl.Engine.CombatRestriction's (rule
+-- 702.98a's unleash).
 --
 -- A CLASSIFICATION of a modification's shape, not a case on an effect's identity:
--- what it asks is "does this grant a keyword, and does rule 702 make that keyword
--- mint a row", and both halves are the rulebook's.
+-- what it asks is "does this grant a keyword", and the predicate the caller
+-- passes is the rulebook's.
 --
 -- Exhaustive rather than a catch-all, for the reason `layer` gives above: a
 -- modification added later that also hands out abilities would otherwise answer
 -- False here and take its grantee out of the gathered set, which is a MISSING
--- replacement rather than a build failure.
-grantsMintingKeyword :: Modification.Modification -> Bool
-grantsMintingKeyword m = case m of
-  Modification.GainKeyword k -> Keyword.mintsReplacement k
+-- row rather than a build failure.
+grantsKeywordWhere :: (Keyword -> Bool) -> Modification.Modification -> Bool
+grantsKeywordWhere p m = case m of
+  Modification.GainKeyword k -> p k
   Modification.LoseAllAbilities -> False
   Modification.SetBasePowerToughness _ _ -> False
   Modification.ModifyPowerToughness _ _ -> False

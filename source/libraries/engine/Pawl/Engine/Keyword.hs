@@ -14,6 +14,7 @@ import qualified Pawl.Engine.Binding as Binding
 import Pawl.Types.ActivatedAbility (ActivatedAbility)
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
+import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
 import qualified Pawl.Types.Card as Card
@@ -23,6 +24,7 @@ import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Clause as Clause
 import qualified Pawl.Types.Color as Color
+import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -194,6 +196,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Riot -> []
+  Keyword.Unleash -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Toxic _ -> []
@@ -271,6 +274,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
@@ -402,6 +406,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
@@ -637,6 +642,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Melee -> []
   Keyword.Rampage _ -> []
   Keyword.Riot -> []
+  Keyword.Unleash -> []
   Keyword.Modular _ -> []
   Keyword.Vanishing _ -> []
   Keyword.Daybound -> []
@@ -856,6 +862,11 @@ mintedReplacementsOf counts = concatMap (uncurry mintedReplacementsFor) (Map.toA
 mintedReplacementsFor :: Keyword -> Natural -> [ReplacementEffect]
 mintedReplacementsFor keyword count = case keyword of
   Keyword.Riot -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Riot)
+  -- CR 702.98a's FIRST static ability, riot's row with the declining half
+  -- deleted: "You may have this permanent enter with an additional +1/+1
+  -- counter on it." Filter.IsSource for riot's reason, and ONE ROW PER INSTANCE
+  -- -- two instances are two abilities, so two counters are offered.
+  Keyword.Unleash -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource EntryRewrite.Unleash)
   -- CR 702.63a's FIRST ability: "this permanent enters with N time counters on
   -- it", a CR 614.1c self-replacement in riot's exact position, down to
   -- Filter.IsSource. Where riot's rewrite asks a question and this one does not,
@@ -965,6 +976,117 @@ mintedReplacementsFor keyword count = case keyword of
 mintsReplacement :: Keyword -> Bool
 mintsReplacement keyword = not (null (mintedReplacementsFor keyword 1))
 
+-- CR 508.1c / CR 509.1b: every combat restriction rule 702 gives an object for
+-- holding a keyword. Pawl.Engine.CombatRestriction.inForce adds these to the ones
+-- a face PRINTS, which until unleash were the only ones there were.
+--
+-- The FOURTH mint point, beside `abilitiesFor`, `battlefieldAbilitiesFor` and
+-- `mintedReplacementsFor`, rather than an arm of one of those: a combat
+-- restriction is not an ability object at all -- nothing puts it on the stack and
+-- nothing activates it -- and it is not a replacement, since it rewrites no
+-- event. It is a fact CR 613.11 has a reader ask about, which is what the three
+-- printed-restriction siblings are too.
+--
+-- MEMBERSHIP and not the per-keyword count `mintedReplacementsOf` takes: a
+-- restriction is read by asking whether the creature is in the forbidden set, so
+-- a second copy of "can't block" forbids nothing further.
+mintedCombatRestrictionsOf :: Map Keyword Natural -> [CombatRestriction.CombatRestriction]
+mintedCombatRestrictionsOf = concatMap mintedCombatRestrictionsFor . Map.keys
+
+-- Exhaustive for `abilitiesFor`'s reason: rule 702 keeps adding abilities that
+-- forbid an attack or a block, and the next one must break this build rather than
+-- silently forbid nothing.
+mintedCombatRestrictionsFor :: Keyword -> [CombatRestriction.CombatRestriction]
+mintedCombatRestrictionsFor keyword = case keyword of
+  -- CR 702.98a's SECOND static ability: "This permanent can't block as long as it
+  -- has a +1/+1 counter on it."
+  --
+  -- The counter clause rides the AFFECTED SET rather than the gate beside it,
+  -- because the two have opposite polarity: CR 509.1b's gate is the condition a
+  -- creature can't block UNLESS, and this is a condition it can't block WHILE. An
+  -- affected set is re-derived every read (Pawl.Types.Affected), so a counter
+  -- arriving or leaving is seen at the next declaration with nothing to unwind --
+  -- which is also rule 702.98a's "as long as".
+  --
+  -- ANY +1/+1 counter, not the one unleash's own entry replacement may have
+  -- placed: rule 702.98a says "a +1/+1 counter", so a counter from anywhere shuts
+  -- blocking off.
+  --
+  -- CR 702.3b's defender is the keyword that does NOT come through here, and the
+  -- difference is the gate: "a creature with defender can't attack" is
+  -- unconditional, so Pawl.Engine.Combat reads the keyword directly and needs no
+  -- carrier.
+  Keyword.Unleash ->
+    [ CombatRestriction.CantBlock
+        (Affected.Matching (Filter.And [Filter.IsSource, Filter.HasCounters CounterKind.PlusOnePlusOne]))
+        Nothing
+    ]
+  Keyword.Riot -> []
+  Keyword.Vanishing _ -> []
+  Keyword.Modular _ -> []
+  Keyword.Crew _ -> []
+  Keyword.Deathtouch -> []
+  Keyword.Defender -> []
+  Keyword.DoubleStrike -> []
+  Keyword.FirstStrike -> []
+  Keyword.Flash -> []
+  Keyword.Flying -> []
+  Keyword.Haste -> []
+  Keyword.Hexproof _ -> []
+  Keyword.Indestructible -> []
+  Keyword.Landwalk _ -> []
+  Keyword.Lifelink -> []
+  Keyword.Reach -> []
+  Keyword.Shroud -> []
+  Keyword.Trample -> []
+  Keyword.TrampleOverPlaneswalkers -> []
+  Keyword.Vigilance -> []
+  Keyword.Banding -> []
+  Keyword.Flanking -> []
+  Keyword.Phasing -> []
+  Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
+  Keyword.Aftermath -> []
+  Keyword.Afflict _ -> []
+  Keyword.Fear -> []
+  Keyword.Intimidate -> []
+  Keyword.Morph _ _ -> []
+  Keyword.Menace -> []
+  Keyword.Renown _ -> []
+  Keyword.Cycling _ _ -> []
+  Keyword.Flashback _ -> []
+  Keyword.Entwine _ -> []
+  Keyword.Bushido _ -> []
+  Keyword.Poisonous _ -> []
+  Keyword.Annihilator _ -> []
+  Keyword.BattleCry -> []
+  Keyword.Evolve -> []
+  Keyword.Outlast _ -> []
+  Keyword.Prowess -> []
+  Keyword.Infect -> []
+  Keyword.Wither -> []
+  Keyword.Exalted -> []
+  Keyword.Mentor -> []
+  Keyword.Afterlife _ -> []
+  Keyword.Provoke -> []
+  Keyword.Devoid -> []
+  Keyword.Skulk -> []
+  Keyword.Melee -> []
+  Keyword.Rampage _ -> []
+  Keyword.Daybound -> []
+  Keyword.Nightbound -> []
+  Keyword.Training -> []
+  Keyword.Toxic _ -> []
+  Keyword.StartYourEngines -> []
+  Keyword.Persist -> []
+  Keyword.Undying -> []
+
+-- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
+-- Pawl.Engine.CombatRestriction.inForce projects a permanent only when some base
+-- face on the battlefield could put a restriction-minting keyword on one.
+mintsCombatRestriction :: Keyword -> Bool
+mintsCombatRestriction = not . null . mintedCombatRestrictionsFor
+
 -- CR 702: WHICH KEYWORD this is, with its payload dropped -- the classification
 -- Filter.HasKeywordFamily matches on, so that Flensing Raptor's "creature you
 -- control with toxic" reaches toxic 1 and toxic 3 alike (CR 702.164a).
@@ -1040,6 +1162,7 @@ familyOf keyword = case keyword of
   Keyword.Melee -> Nothing
   Keyword.Aftermath -> Nothing
   Keyword.Riot -> Nothing
+  Keyword.Unleash -> Nothing
   Keyword.Daybound -> Nothing
   Keyword.Nightbound -> Nothing
   -- CR 702.149a takes no parameter, so training has no family of its own.

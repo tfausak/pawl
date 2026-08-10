@@ -72,6 +72,7 @@ encode p answer = case p of
   Prompt.ChooseCopyTarget {} -> Response.ChoseCopyTarget answer
   Prompt.ChooseEntryOption {} -> Response.ChoseEntryOption answer
   Prompt.ChooseRiot {} -> Response.ChoseRiot answer
+  Prompt.ChooseUnleash {} -> Response.ChoseUnleash answer
   Prompt.ChoosePayLifeOnEntry {} -> Response.ChosePayLifeOnEntry answer
   Prompt.ChooseColor {} -> Response.ChoseColor answer
   Prompt.ChooseCardName {} -> Response.ChoseCardName answer
@@ -188,6 +189,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseRiot {} -> case response of
     Response.ChoseRiot d -> Just d
+    _ -> Nothing
+  Prompt.ChooseUnleash {} -> case response of
+    Response.ChoseUnleash d -> Just d
     _ -> Nothing
   Prompt.ChoosePayLifeOnEntry {} -> case response of
     Response.ChosePayLifeOnEntry d -> Just d
@@ -393,6 +397,9 @@ defaultAnswer p = case p of
   -- the board, which keeps a short transcript from conjuring a bigger creature
   -- than the game had.
   Prompt.ChooseRiot {} -> OptionalDecision.Declines
+  -- CR 702.98a: declining, for ChooseRiot's reason -- it is the half that puts no
+  -- counter on the board.
+  Prompt.ChooseUnleash {} -> OptionalDecision.Declines
   -- CR 614.1c: declining, for ChooseRiot's reason above and one more. Declining
   -- is the branch the card itself states as the default -- "if you don't, it
   -- enters tapped" -- and it is the half that spends nothing, so a transcript

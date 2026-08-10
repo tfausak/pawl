@@ -105,6 +105,11 @@ data Response
     -- ChoseOptional, which records CR 603.5's "may" during a RESOLUTION: this one
     -- is answered inside a zone change, as the permanent enters.
     ChoseRiot OptionalDecision.OptionalDecision
+  | -- | CR 702.98a: whether an unleash permanent's controller took the additional
+    -- +1/+1 counter (Exercises) or entered without one (Declines). Distinct from
+    -- ChoseRiot and ChosePayLifeOnEntry for their reason: a transcript that
+    -- answered one as-enters "may" must not silently answer a different one.
+    ChoseUnleash OptionalDecision.OptionalDecision
   | -- | CR 614.1c / 119.4: whether a permanent's controller paid the life its
     -- "as this enters, you may pay N life" ability asked for (Exercises) or let
     -- it enter tapped (Declines). Distinct from ChoseRiot for the reason

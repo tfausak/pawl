@@ -610,8 +610,8 @@ canBlockGiven grants pcs restricted pid oid gs = case Game.lookupObject oid gs o
       && Set.member oid (GameState.battlefield gs)
       && Object.tapped obj == TapState.Untapped
       && isCreatureObjectGiven pcs oid gs
-      -- CR 509.1b: every PRINTED per-creature blocking restriction in force
-      -- (Pacifism).
+      -- CR 509.1b: every per-creature blocking restriction in force -- printed
+      -- (Pacifism) or minted by rule 702 from a keyword (unleash, CR 702.98a).
       && not (Set.member oid restricted)
 
 legalBlockers :: PlayerId -> GameState -> [ObjectId]
