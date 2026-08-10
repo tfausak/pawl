@@ -344,6 +344,27 @@ data Keyword
     -- 509.3c), because rule 702.45a prints one ability. The split into two
     -- TriggeredAbility values is Pawl.Engine.Keyword.bushido's problem.
     Bushido Natural.Natural
+  | -- | 702.63a: vanishing N, which is THREE abilities -- "this permanent enters
+    -- with N time counters on it", "at the beginning of your upkeep, if this
+    -- permanent has a time counter on it, remove a time counter from it", and
+    -- "when the last time counter is removed from this permanent, sacrifice it".
+    -- Pawl.Engine.Keyword mints all three: the first as a CR 614.1c entry
+    -- replacement (mintedReplacementsFor, riot's position), the other two as
+    -- ordinary triggered abilities.
+    --
+    -- N rides the constructor, as Bushido's does, and CR 702.63c says each
+    -- instance works separately -- so its readers take the per-keyword COUNT,
+    -- and a permanent with vanishing twice enters with both lots of counters
+    -- and counts them down twice.
+    --
+    -- NOT a permanent-type-specific keyword: rule 702.63a says "permanent", and
+    -- Reality Acid (an Aura) and Four Knocks (an enchantment) print it, so
+    -- nothing here or in the mint asks whether the bearer is a creature.
+    --
+    -- Not implemented: CR 702.63b's vanishing WITHOUT a number, which is the
+    -- last two abilities and no entry rewrite -- the payload would have to be a
+    -- Maybe (#1186).
+    Vanishing Natural.Natural
   | -- | 702.70a: whenever this creature deals combat damage to a player, that
     -- player gets N poison counters. N rides the constructor, as Toxic's does.
     -- Unlike toxic, the N values are NOT summed: CR 702.70b says each instance

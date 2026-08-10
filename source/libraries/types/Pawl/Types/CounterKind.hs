@@ -4,8 +4,8 @@ module Pawl.Types.CounterKind where
 -- Its KIND is a closed-half classification, the same posture as Keyword: the
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
--- loyalty, and rule 714 for lore -- which rule 122.1 never lists at all. The rest
--- of CR 122.1c-i are future.
+-- loyalty, rule 714 for lore and CR 702.63 for time -- neither of which rule
+-- 122.1 lists at all. The rest of CR 122.1c-i are future.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
 -- PARAMETRIC in the keyword, for the reason Pawl.Types.Filter is and only that
@@ -61,4 +61,13 @@ data CounterKind keyword
     -- battle sitting at 0 that owes no ability. All three count Object.counters
     -- directly, as loyalty's and lore's readers do.
     Defense
+  | -- | CR 702.63a: the counters vanishing counts down. Rule 122.1 gives time
+    -- counters no lettered clause either -- 122.1a-i never name them -- so rule
+    -- 702.63 is the whole citation, exactly as rule 714 is Lore's.
+    --
+    -- Contributes nothing to the CR 613 layer system, so
+    -- Pawl.Engine.Projection.counterGathered grants nothing for this kind. Its
+    -- readers are vanishing's own three abilities, minted by
+    -- Pawl.Engine.Keyword, which count Object.counters directly.
+    Time
   deriving (Eq, Ord, Show)

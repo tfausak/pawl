@@ -359,6 +359,20 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Bushido 3) /= Keyword.toJson (Keyword.Poisonous 3))
       "bushido 3 is not poisonous 3"
+  -- CR 702.63a's N is a COUNT OF COUNTERS rather than a size or a threshold, and
+  -- the wire cannot tell those apart -- so the tag is all that keeps vanishing 2
+  -- from bushido 2.
+  Spec.it s "Vanishing carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Vanishing 2)
+      """ {"type":"Vanishing","value":2} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Vanishing 3) /= Keyword.toJson (Keyword.Bushido 3))
+      "vanishing 3 is not bushido 3"
   -- CR 702.70a's N rides the constructor the same way, and the two payloaded
   -- keywords must not share a tag.
   Spec.it s "Poisonous carries its N" $ do

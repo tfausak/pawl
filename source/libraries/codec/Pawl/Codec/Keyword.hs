@@ -57,6 +57,7 @@ toJson k = case k of
   Keyword.Morph cost variant -> Common.tagged "Morph" . Just . Common.array $ [Cost.toJson toJson cost, MorphVariant.toJson variant]
   Keyword.Entwine cost -> Common.tagged "Entwine" . Just $ Cost.toJson toJson cost
   Keyword.Bushido n -> Common.tagged "Bushido" . Just $ Common.encodeNatural n
+  Keyword.Vanishing n -> Common.tagged "Vanishing" . Just $ Common.encodeNatural n
   Keyword.Poisonous n -> Common.tagged "Poisonous" . Just $ Common.encodeNatural n
   Keyword.Annihilator n -> Common.tagged "Annihilator" . Just $ Common.encodeNatural n
   Keyword.Persist -> Common.nullary "Persist"
@@ -119,6 +120,7 @@ fromJson value = do
     ("Morph", Just (Value.Array (Array.MkArray [c, v]))) -> Keyword.Morph <$> Cost.fromJson fromJson c <*> MorphVariant.fromJson v
     ("Entwine", Just v) -> Keyword.Entwine <$> Cost.fromJson fromJson v
     ("Bushido", Just v) -> Keyword.Bushido <$> Common.decodeNatural v
+    ("Vanishing", Just v) -> Keyword.Vanishing <$> Common.decodeNatural v
     ("Poisonous", Just v) -> Keyword.Poisonous <$> Common.decodeNatural v
     ("Annihilator", Just v) -> Keyword.Annihilator <$> Common.decodeNatural v
     ("Persist", _) -> Right Keyword.Persist

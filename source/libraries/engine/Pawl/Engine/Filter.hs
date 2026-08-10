@@ -542,6 +542,7 @@ rewrite pairs predicate = case predicate of
     CounterKind.Loyalty -> kind
     CounterKind.Lore -> kind
     CounterKind.Defense -> kind
+    CounterKind.Time -> kind
 
 -- CR 612.1's word swap INSIDE a keyword. Rule 702 spells some keywords with a
 -- word in them: CR 702.14a has landwalk "appear within an object's rules text as
@@ -627,6 +628,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Entwine cost -> Keyword.Type.Entwine (rewriteCost pairs cost)
   -- CR 702.45a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Bushido _ -> keyword
+  -- CR 702.63a's N is a number and not a word, so CR 612.2 has nothing to swap;
+  -- "time counter" is the rule's own noun and no card prints it.
+  Keyword.Type.Vanishing _ -> keyword
   Keyword.Type.Poisonous _ -> keyword
   Keyword.Type.Renown _ -> keyword
   -- CR 702.86a's N is a number and not a word, so CR 612.2 has nothing to swap.

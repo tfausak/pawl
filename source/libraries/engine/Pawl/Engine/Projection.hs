@@ -2202,6 +2202,9 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- 310.11b's trigger and CR 704.5v's state-based action all count
               -- Object.counters directly, exactly as those two do.
               CounterKind.Defense -> []
+              -- Nor a time counter (CR 702.63a): vanishing's three minted
+              -- abilities count Object.counters directly, as those three do.
+              CounterKind.Time -> []
          in pt <> concatMap grantOf (Map.toList cs)
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency

@@ -62,6 +62,10 @@
 -- `provokeSpec`. CR 702.112 renown, the fourteenth, and the first minted
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
+-- 702.63 vanishing, the sixteenth, and the first keyword whose rule text spans
+-- BOTH mints -- one CR 614.1c entry replacement and two triggers, one of them
+-- watching the counter removal the other performs -- with Waning Wurm --
+-- `vanishingSpec`. CR
 -- 510.2's combat damage watched by a bystander rather than by the creature that
 -- dealt it, with Tovolar, Dire Overlord -- `tovolarSpec`. The same condition's
 -- damager slot, read by a payload that aims at it, with Aragorn, Hornburg Hero --
@@ -197,6 +201,7 @@ import qualified Pawl.Types.Departure as Departure.Type
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EndingStep as EndingStep
+import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EventGroup as EventGroup
 import qualified Pawl.Types.Expiry as Expiry.Type
 import qualified Pawl.Types.Face as Face
@@ -227,6 +232,7 @@ import qualified Pawl.Types.Prompt as Prompt
 import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
+import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
@@ -4177,6 +4183,117 @@ renownSpec s registry =
         Spec.it s "CR 702.112c each instance of renown is its own ability" $ do
           Spec.assertEqWith s "renown 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 2) 2)) [Keyword.renown 2, Keyword.renown 2]
           Spec.assertEqWith s "and renown 6 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Renown 6) 1)) [Keyword.renown 6]
+
+-- CR 702.63 vanishing, the sixteenth keyword rule 702 states as triggered
+-- abilities -- and the first whose rule text spans BOTH mints, since rule
+-- 702.63a's three abilities are one CR 614.1c entry replacement
+-- (Keyword.mintedReplacementsFor, riot's position) and two triggers.
+--
+-- Waning Wurm {3}{B} Creature -- Zombie Wurm 7/6 is the card, and it is nothing
+-- but the keyword: no second ability can put a counter on it, take one off, or
+-- keep it alive, so every number below is vanishing's own.
+--
+-- Vanishing 2 rather than a larger printing (Calciderm's 4) because two is the
+-- smallest N that tells the two triggers apart: the first upkeep must remove one
+-- and NOT sacrifice, the second must do both.
+vanishingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+vanishingSpec s registry =
+  let upkeep = Phase.Beginning BeginningStep.Upkeep
+      -- One upkeep for `pid`, run to the end of the priority loop, so the
+      -- trigger is gathered (CR 603.3) and resolved.
+      upkeepOf pid gs =
+        let began = Event.recordEvent (GameEvent.StepBegan upkeep pid) (gs {GameState.phase = upkeep, GameState.activePlayer = pid})
+            settled = snd (Engine.runGamePure S.identityAnswer began Engine.settleForPriority)
+         in (settled, snd (Engine.runGamePure S.identityAnswer settled Engine.priorityLoop))
+      after pid gs = snd (upkeepOf pid gs)
+      times = S.counterOf CounterKind.Time
+      -- The wurm CAST rather than placed, because rule 702.63a's first ability is
+      -- a replacement on the entry -- S.addCreature builds the object directly and
+      -- so reaches no CR 616.1 loop, which is what the counterless case below
+      -- turns on.
+      castWurm = do
+        swamp <- S.printingOf s registry "Swamp"
+        wurm <- S.printingOf s registry "Waning Wurm"
+        let base = S.landsInPlay swamp 4
+            (held, gs0) = S.addHandCard wurm S.alice base
+            gs =
+              gs0
+                { GameState.phase = Phase.PrecombatMain,
+                  GameState.activePlayer = S.alice,
+                  GameState.priority = Just S.alice
+                }
+            entered = S.runPure S.identityAnswer gs (S.cast S.alice held >> Stack.resolveTop)
+        pure (wurmOn entered, entered)
+      wurmOn gs =
+        let named oid = fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Waning Wurm"))
+         in List.find named (Set.toList (GameState.battlefield gs))
+   in Spec.describe s "Vanishing" $ do
+        -- The proving test, and all three of rule 702.63a's abilities in one
+        -- board: two counters on the entry, one removed at each of alice's
+        -- upkeeps, and the sacrifice when the last one goes.
+        Spec.it s "CR 702.63a whole card: the Wurm enters with two time counters and counts them down" $ do
+          (found, entered) <- castWurm
+          case found of
+            Nothing -> Spec.assertFailure s "Waning Wurm did not reach the battlefield"
+            Just wurm -> do
+              Spec.assertEqWith s "two time counters on the entry" (times wurm entered) 2
+              let first = after S.alice entered
+              Spec.assertEqWith s "one after the first upkeep" (times wurm first) 1
+              Spec.assertBool s (S.onBattlefield wurm first) "and it is still on the battlefield"
+              let second = after S.alice first
+              Spec.assertEqWith s "none after the second" (times wurm second) 0
+              Spec.assertBool s (not (S.onBattlefield wurm second)) "so the last removal sacrificed it"
+              -- CR 701.21a: a sacrifice is a move to the OWNER's graveyard, and
+              -- not a destruction -- so this is the zone the wurm is in.
+              Spec.assertEqWith s "in alice's graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice second)) 1
+        -- Rule 702.63a says "YOUR upkeep", which is TurnScope.ControllersTurn: an
+        -- opponent's upkeep is not this trigger, and an arm reading EachTurn would
+        -- count the wurm down twice as fast.
+        Spec.it s "CR 702.63a bob's upkeep removes nothing" $ do
+          (found, entered) <- castWurm
+          case found of
+            Nothing -> Spec.assertFailure s "Waning Wurm did not reach the battlefield"
+            Just wurm -> do
+              let (settled, resolved) = upkeepOf S.bob entered
+              Spec.assertEqWith s "nothing was even put on the stack" (GameState.stack settled) []
+              Spec.assertEqWith s "so both counters are still there" (times wurm resolved) 2
+              Spec.assertBool s (S.onBattlefield wurm resolved) "and the wurm is untouched"
+        -- CR 603.4's intervening "if": rule 702.63a's second ability does not
+        -- trigger AT ALL on an upkeep where the permanent has no time counter, so
+        -- nothing reaches the stack. S.addCreature is what reaches this board --
+        -- it places the wurm without running rule 702.63a's entry replacement, the
+        -- position a card that lost its counters some other way would be in.
+        --
+        -- It also pins rule 702.63a's THIRD ability to the REMOVAL rather than to
+        -- the count: a wurm sitting at zero is not sacrificed, because no last
+        -- counter came off.
+        Spec.it s "CR 603.4 a wurm with no time counters neither triggers nor is sacrificed" $ do
+          wurm <- S.printingOf s registry "Waning Wurm"
+          let (oid, gs) = S.addCreature wurm S.alice (Setup.emptyGame S.bothPlayers)
+              (settled, resolved) = upkeepOf S.alice gs
+          Spec.assertEqWith s "it really has none" (times oid gs) 0
+          Spec.assertEqWith s "nothing on the stack" (GameState.stack settled) []
+          Spec.assertBool s (S.onBattlefield oid resolved) "and it survives its own upkeep"
+        -- CR 702.63c: "if a permanent has multiple instances of vanishing, each
+        -- works separately". Asserted of BOTH mints, as renown's multiplicity is
+        -- asserted of one, no card in the pool printing vanishing twice.
+        --
+        -- Spelled out rather than compared against Keyword.vanishing itself: an
+        -- assertion written that way says only that two copies are two copies,
+        -- and a mint that dropped one of the pair would repair it silently.
+        Spec.it s "CR 702.63c each instance is its own three abilities" $ do
+          let counted = TriggerCondition.StepBegins (Phase.Beginning BeginningStep.Upkeep) TurnScope.ControllersTurn
+              emptied = TriggerCondition.SelfLastCounterRemoved CounterKind.Time
+          Spec.assertEqWith
+            s
+            "vanishing 2 held twice mints four triggers, two of each kind"
+            (fmap TriggeredAbility.condition (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Vanishing 2) 2)))
+            [counted, emptied, counted, emptied]
+          Spec.assertEqWith
+            s
+            "and two entry rewrites of two time counters each, which is what makes them add up"
+            (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
+            (replicate 2 (ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Time 2)))
 
 -- CR 510.1b / 510.2's combat damage watched by a BYSTANDER rather than by the
 -- creature that dealt it -- TriggerCondition.PermanentDealsCombatDamageToPlayer,
@@ -8557,6 +8674,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   evolveSpec s registry
   krasisSpec s registry
   renownSpec s registry
+  vanishingSpec s registry
   tovolarSpec s registry
   aragornSpec s registry
   afflictSpec s registry
