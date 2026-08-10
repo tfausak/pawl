@@ -13,18 +13,19 @@ import qualified Pawl.Types.Source as Source
 -- as the object ceases, from the same pre-move state the GameEvent.Moved
 -- snapshot is taken against.
 --
--- Four things rather than the characteristics alone, because three of the
--- questions CR 608.2h is asked have no home in ProjectedCharacteristics. Control
--- is not a characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
+-- Five things rather than the characteristics alone, because the other four
+-- questions CR 608.2h is asked have no home in that fold. Control is not a
+-- characteristic (CR 109.3), yet "who controlled it" is what CR 603.3a
 -- asks of a triggered ability whose source is gone. Neither is the object's
 -- SOURCE: the projection folds characteristics, and CR 603.7's delayed-ability
 -- declarations are read straight from the card, so an ArmDelayedTrigger whose
 -- source has just exiled itself has nowhere else to find the ability it names.
 -- Nor are COUNTERS -- CR 109.3's list has none -- and unlike the other two the
 -- projection actively CONSUMES them (CR 613.4c), so the record has to be taken
--- beside it rather than out of it.
+-- beside it rather than out of it. The COPIABLE values are the fourth, for the
+-- reason its own field gives.
 --
--- All four fields STRICT (!): entries are keyed by an id that no longer exists
+-- All five fields STRICT (!): entries are keyed by an id that no longer exists
 -- and are never pruned, so an unforced field would be a thunk retaining the whole
 -- pre-move GameState for the rest of the game.
 data LastKnown = MkLastKnown
@@ -52,6 +53,19 @@ data LastKnown = MkLastKnown
     -- Counters are not characteristics -- CR 109.3's list has none -- so this
     -- sits beside the projection for the reason `controller` does rather than
     -- inside it.
-    counters :: !(Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural)
+    counters :: !(Map.Map (CounterKind.CounterKind Keyword.Keyword) Natural.Natural),
+    -- | CR 707.2: the COPIABLE values as the object left -- layer 1 alone, where
+    -- `characteristics` above is the whole fold. What CR 608.2h hands a copy
+    -- effect that names a permanent already gone (Watchful Radstag's "create a
+    -- token that's a copy of it", the Radstag killed in response to its own
+    -- trigger).
+    --
+    -- Beside the projection rather than derived from it, for `counters`' reason
+    -- turned around: the fold is lossy in the other direction too, and a +1/+1
+    -- counter or a live pump is exactly what CR 707.2 does not copy. Nor is it
+    -- recoverable from `source`, which knows the card but not which face was up
+    -- and not whether the object was ITSELF a copy (CR 707.2's "as modified by
+    -- other copy effects").
+    copiable :: !ProjectedCharacteristics.ProjectedCharacteristics
   }
   deriving (Eq, Show)
