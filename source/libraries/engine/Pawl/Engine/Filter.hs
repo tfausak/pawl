@@ -659,6 +659,9 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Outlast cost -> Keyword.Type.Outlast (rewriteCost pairs cost)
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword
+  -- CR 702.73a names no word either: "every creature type" is CR 205.3m's
+  -- whole family, so a CR 612.2 swap inside it has nothing to rewrite.
+  Keyword.Type.Changeling -> keyword
   Keyword.Type.Devoid -> keyword
   -- CR 702.122a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Crew _ -> keyword
