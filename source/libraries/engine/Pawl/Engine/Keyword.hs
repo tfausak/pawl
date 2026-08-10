@@ -1092,6 +1092,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.StartYourEngines -> []
   Keyword.Persist -> []
   Keyword.Undying -> []
+  Keyword.Changeling -> []
 
 -- `mintsReplacement`'s twin, and read by the same kind of short-circuit:
 -- Pawl.Engine.CombatRestriction.inForce projects a permanent only when some base

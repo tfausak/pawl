@@ -484,6 +484,29 @@ data Keyword
     --
     -- Nullary and count-read, for persist's reasons.
     Undying
+  | -- | 702.98a: unleash. TWO static abilities, as rule 702.98a bundles them:
+    -- "You may have this permanent enter with an additional +1/+1 counter on it"
+    -- and "This permanent can't block as long as it has a +1/+1 counter on it."
+    --
+    -- The first is riot's first half exactly, so it is a CR 614.1c as-enters
+    -- replacement minted by Pawl.Engine.Keyword.mintedReplacementsOf. The second
+    -- is a CR 509.1b combat restriction, minted by
+    -- Pawl.Engine.Keyword.mintedCombatRestrictionsOf -- the first keyword to mint
+    -- one, where defender (CR 702.3b) is read as a keyword inside
+    -- Pawl.Engine.Combat because its restriction has no gate to carry.
+    --
+    -- The second half is NOT conditional on the first: the rule says "a +1/+1
+    -- counter", not "that counter", so a counter arriving any other way shuts
+    -- blocking off just as well, and removing the counter turns it back on.
+    --
+    -- Nullary, because rule 702.98a takes no parameter, and its two readers
+    -- differ. Two instances are two of EACH static ability -- rule 702.98a has no
+    -- "each instance" sentence of riot's (CR 702.136b), but two copies of an
+    -- ability is what two instances of a keyword representing them are. So the
+    -- entry half takes the per-keyword COUNT, offering two counters, while the
+    -- restriction half is MEMBERSHIP: two copies of "can't block" forbid the same
+    -- block once.
+    Unleash
   | -- | 702.100a: whenever a creature you control enters, if that creature's power
     -- and/or toughness is greater than this creature's, put a +1/+1 counter on
     -- this creature. Minted by Pawl.Engine.Keyword.evolve like the triggered
@@ -691,29 +714,6 @@ data Keyword
     -- is a copiable value, which is what rules out reusing
     -- Pawl.Types.EntryOption's keyword set (CR 707.2).
     Riot
-  | -- | 702.98a: unleash. TWO static abilities, as rule 702.98a bundles them:
-    -- "You may have this permanent enter with an additional +1/+1 counter on it"
-    -- and "This permanent can't block as long as it has a +1/+1 counter on it."
-    --
-    -- The first is riot's first half exactly, so it is a CR 614.1c as-enters
-    -- replacement minted by Pawl.Engine.Keyword.mintedReplacementsOf. The second
-    -- is a CR 509.1b combat restriction, minted by
-    -- Pawl.Engine.Keyword.mintedCombatRestrictionsOf -- the first keyword to mint
-    -- one, where defender (CR 702.3b) is read as a keyword inside
-    -- Pawl.Engine.Combat because its restriction has no gate to carry.
-    --
-    -- The second half is NOT conditional on the first: the rule says "a +1/+1
-    -- counter", not "that counter", so a counter arriving any other way shuts
-    -- blocking off just as well, and removing the counter turns it back on.
-    --
-    -- Nullary, because rule 702.98a takes no parameter, and its two readers
-    -- differ. Two instances are two of EACH static ability -- rule 702.98a has no
-    -- "each instance" sentence of riot's (CR 702.136b), but two copies of an
-    -- ability is what two instances of a keyword representing them are. So the
-    -- entry half takes the per-keyword COUNT, offering two counters, while the
-    -- restriction half is MEMBERSHIP: two copies of "can't block" forbid the same
-    -- block once.
-    Unleash
   | -- | 702.145b: daybound, the front-face half of the pair rule 702.145 states.
     -- Three static abilities in one keyword, exactly as the rule bundles them:
     -- "if it is night and this permanent is represented by a double-faced card,
