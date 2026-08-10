@@ -208,4 +208,33 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     ObjectCounters CounterKind.CounterKind
+  | -- | CR 508.3b: how many of that player's opponents were DECLARED attacked
+    -- this combat phase -- rule 702.121a's "for each opponent you attacked with a
+    -- creature this combat".
+    --
+    -- LifeTotal's and Speed's sibling in shape: one number attached to a player,
+    -- so it is not a Count -- CR 400.1 scopes a Count over a zone, and the combat
+    -- record is not one. What it reads is Pawl.Types.Combat.declaredAttacked,
+    -- which is exactly the rule's question already: that field exists because CR
+    -- 508.4 says a creature put onto the battlefield attacking never "attacked",
+    -- and melee's own ruling repeats it.
+    --
+    -- DECLARED targets rather than live attackers, and the same field rather than
+    -- Combat.attacked, is what makes the three printed readings come out right: a
+    -- creature that has left combat still counts, a creature that entered
+    -- attacking never does, and an opponent who has since left the game counts
+    -- too -- nothing here asks who is still playing.
+    --
+    -- Only OfPlayer entries count. CR 506.3 lets a creature attack a planeswalker
+    -- or a battle, and rule 702.121a counts OPPONENTS, so attacking an opponent's
+    -- planeswalker and nothing else is a bonus of 0.
+    --
+    -- The PlayerRef says whose opponents, CR 109.5's "you" being
+    -- PlayerRef.Relative PlayerRelation.You. WHO attacked is not recorded and does
+    -- not need to be: CR 506.2 makes the attacking player the active player, so
+    -- one combat phase's record can only be that player's attacks (#175 is where
+    -- CR 802 would break that).
+    --
+    -- A LEAF, like LifeTotal, Speed and IsMonarch: it holds no Quantity.
+    OpponentsAttacked PlayerRef.PlayerRef
   deriving (Eq, Ord, Show)

@@ -10,7 +10,9 @@ import qualified Pawl.Engine.Count as Count
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.ManaCount as ManaCount
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.Combat as Combat
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
@@ -21,6 +23,7 @@ import qualified Pawl.Types.ManaSymbol as ManaSymbol
 import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import Pawl.Types.Quantity (Quantity)
 import qualified Pawl.Types.Quantity as Quantity
@@ -231,8 +234,44 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   -- means the VIEW could not describe the object -- it is gone and nothing was
   -- filed under its id.
   Quantity.ObjectCounters kind -> fmap (toInteger . Map.findWithDefault 0 kind . Filter.counters) mView
+  -- CR 508.3b: how many of that player's opponents were declared attacked this
+  -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
+  -- through the same Count.playersFor, and Nothing for a reference naming
+  -- anything but exactly one player, since "whose opponents?" has no sum.
+  --
+  -- Read off Combat.declaredAttacked and NOT Combat.attacked, which is that
+  -- field's whole reason for existing: CR 508.4 says a creature put onto the
+  -- battlefield attacking never "attacked", for trigger events AND effects, and
+  -- rule 702.121a's is an effect.
+  --
+  -- NO liveness test on the players counted, deliberately: the record is what the
+  -- rule asks about, so an opponent who has since left the game (CR 800.4) still
+  -- counts, as does one whose attacker is no longer in combat. That is why this
+  -- does not go through Count.playersFor's Opponent arm, which folds only
+  -- Game.stillPlaying.
+  --
+  -- An EMPTY record answers 0 rather than Nothing: no attack declared is an
+  -- answered question, and outside a combat phase the cleared record (CR 511.3)
+  -- says the same thing. What is unanswered is only the reference.
+  Quantity.OpponentsAttacked ref -> case Count.playersFor context gs ref of
+    Just [pid] -> Just (toInteger (length (filter (attackedOpponent pid) (Set.toList (Combat.declaredAttacked (GameState.combat gs))))))
+    _ -> Nothing
   where
     recur = evaluateAgainst viewOf context gs announcedOn mOid mView
+
+-- Is this declared attack an attack on one of that player's OPPONENTS? CR 506.3
+-- gives three things a creature can attack and rule 702.121a counts only the
+-- first: attacking an opponent's planeswalker or a battle they protect is not
+-- attacking that opponent, which melee's own ruling states outright.
+--
+-- Every other player is an opponent (CR 102.2, CR 806.1), the reading
+-- Pawl.Types.PlayerScope.Opponents and Count.playersFor already share; CR 102.3's
+-- teammates are the one case it is wrong for, and pawl has no teams (#175).
+attackedOpponent :: PlayerId.PlayerId -> AttackTarget.AttackTarget -> Bool
+attackedOpponent pid target = case target of
+  AttackTarget.OfPlayer other -> other /= pid
+  AttackTarget.OfPlaneswalker _ -> False
+  AttackTarget.OfBattle _ -> False
 
 -- CR 208.2a, last sentence: an undeterminable number is 0, including inside a
 -- calculation. TOTAL where evaluate is partial -- an Integer, never a Maybe.
@@ -274,6 +313,7 @@ substituteStar star quantity = case quantity of
   Quantity.IsMonarch _ -> quantity
   Quantity.PlayerCounters _ _ -> quantity
   Quantity.ObjectCounters _ -> quantity
+  Quantity.OpponentsAttacked _ -> quantity
 
 -- The binding slots a quantity READS. The read half of the dataflow lint whose
 -- write half is Resolve.definedSlots -- so a card whose "for each ... destroyed
@@ -316,6 +356,9 @@ slots quantity = case quantity of
   -- A bare CounterKind, which names no slot at all -- this arm carries no
   -- reference of any sort, the object being the one the evaluation is aimed at.
   Quantity.ObjectCounters _ -> Set.empty
+  -- And a seventh PlayerRef in that same position, CR 508.3b's record having
+  -- nothing else on it.
+  Quantity.OpponentsAttacked _ -> Set.empty
 
 -- CR 603.3b: is `slots` above the WHOLE of what evaluating this quantity reads
 -- off the resolving object's bindings? It is not wherever a PlayerRef is nested
@@ -345,6 +388,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.IsMonarch ref -> playerRefIsSlotless ref
   Quantity.PlayerCounters ref _ -> playerRefIsSlotless ref
   Quantity.ObjectCounters _ -> True
+  Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
 
 -- Only InSlot names a slot; the other two are answered from the evaluation
 -- context alone (Resolve.playerRefSlots says the same thing as a set).
@@ -398,6 +442,7 @@ readsX quantity = case quantity of
   Quantity.IsMonarch _ -> False
   Quantity.PlayerCounters _ _ -> False
   Quantity.ObjectCounters _ -> False
+  Quantity.OpponentsAttacked _ -> False
 
 -- CR 202.3: each generic symbol contributes its number, each colored or
 -- colorless symbol one, and each hybrid symbol its largest half (CR 202.3f). A
