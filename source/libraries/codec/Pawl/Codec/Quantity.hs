@@ -45,6 +45,9 @@ toJson q = case q of
   -- there is nothing on the wire at all -- Power's shape rather than
   -- ObjectCounters'.
   Quantity.BlockersBeyondFirst -> Common.nullary "BlockersBeyondFirst"
+  -- A slot and a whole Quantity, in that order: which object to aim at, then what
+  -- to read off it.
+  Quantity.AgainstSlot s q_ -> Common.tagged "AgainstSlot" . Just . Common.array $ [SlotName.toJson s, toJson q_]
 
 fromJson :: Value.Value -> Either Text.Text Quantity.Quantity
 fromJson value = do
@@ -66,6 +69,7 @@ fromJson value = do
     ("IsRenowned", _) -> Right Quantity.IsRenowned
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
     ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
+    ("AgainstSlot", Just (Value.Array (Array.MkArray [s, q]))) -> Quantity.AgainstSlot <$> SlotName.fromJson s <*> fromJson q
     _ -> Left . Text.pack $ "unknown Quantity: " <> t
 
 fromJsonPair :: Value.Value -> Either Text.Text (Quantity.Quantity, Quantity.Quantity)

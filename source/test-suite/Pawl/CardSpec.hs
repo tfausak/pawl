@@ -365,6 +365,9 @@ quantityCounts quantity = case quantity of
   -- CR 509.1h's declaration, read against the object the quantity is evaluated
   -- against: a nullary leaf, so no Count and no Filter here either.
   Quantity.Type.BlockersBeyondFirst -> []
+  -- Not a leaf: aiming the evaluation at another object does not stop the payload
+  -- from being a Count, so the Filter lints must reach through it.
+  Quantity.Type.AgainstSlot _ inner -> quantityCounts inner
 
 -- Every Count nested inside another Count's AGGREGATION: only Greatest carries
 -- a per-member Quantity, and that Quantity may itself be a Count. Without this

@@ -215,6 +215,23 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       Quantity.BlockersBeyondFirst
       """ {"type":"BlockersBeyondFirst"} """
+  -- A slot and a payload on the wire. Nested once, since a recursive decoder is
+  -- where a payload gets lost -- and the inner arm is one whose OWN answer the
+  -- slot moves, which is the whole point of the constructor.
+  Spec.it s "AgainstSlot, bare and nested" $ do
+    let slot = SlotName.MkSlotName (Text.pack "creature")
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.AgainstSlot slot Quantity.Power)
+      """ {"type":"AgainstSlot","value":["creature",{"type":"Power"}]} """
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.Plus (Quantity.Literal 1) (Quantity.AgainstSlot slot (Quantity.ObjectCounters CounterKind.PlusOnePlusOne)))
+      """ {"type":"Plus","value":[{"type":"Literal","value":1},{"type":"AgainstSlot","value":["creature",{"type":"ObjectCounters","value":{"type":"PlusOnePlusOne"}}]}]} """
   Spec.describe s "fromJsonPair" . Spec.it s "the [power, toughness] characteristicPT pair" $
     Common.assertFromJson
       s

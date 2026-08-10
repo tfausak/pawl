@@ -157,7 +157,11 @@ admittedGiven pcs grants perspective source spec gs =
             -- CR 508.5, asked of the SOURCE: rule 702.39a's clause is on an
             -- attacking creature, and `source` is the object CR 113.7 says the
             -- ability came from.
-            Filter.defendingPlayer = Defender.playerOfAttacker grants source gs
+            Filter.defendingPlayer = Defender.playerOfAttacker grants source gs,
+            -- Empty: no Filter atom reads it, and a slot's own filter is matched
+            -- while the slots are still being CHOSEN (CR 601.2c), so there is no
+            -- resolution's slot map to hand over yet.
+            Filter.slotObjects = Map.empty
           }
       -- ONE whole-board projection and ONE control-grant walk for the whole
       -- slot: both the base pool's creature test and the Filter's per-candidate
