@@ -19,8 +19,8 @@ import qualified Pawl.Types.TapState as TapState
 -- Meaningful only for a BATTLEFIELD entry (CR 110.5d, CR 712.14a); a MoveToZone
 -- naming any other zone carries the default and no rider is applied to it.
 --
--- Independent riders, not one flag, because the rules make them
--- independent. Tapped is CR 110.5's status category, defaulted by CR 110.5b.
+-- Independent riders, not one flag, because the rules make them independent.
+-- Tapped is CR 110.5's status category, defaulted by CR 110.5b.
 -- Attacking is not a status at all but combat state (CR 506.3, CR 508.4), and a
 -- creature put onto the battlefield attacking is NOT tapped by that fact -- CR
 -- 508.1f taps only creatures declared as attackers, and CR 508.4c exempts these
@@ -68,9 +68,7 @@ import qualified Pawl.Types.TapState as TapState
 -- object's controller -- is what putCounters already uses.
 --
 -- Not implemented: an Effect.Create does not read this field, so a token minted
--- with counters on it would arrive bare (#1189). `underOwner` under a Create
--- needs nothing: CR 111.2 makes a token's owner the player who created it, which
--- is who CR 110.2a hands it to anyway.
+-- with counters on it would arrive bare (#1189).
 --
 -- `underOwner` is CR 110.2a's "unless the effect states otherwise". Undying and
 -- persist return the permanent "under its OWNER's control", where CR 110.2a
@@ -78,7 +76,9 @@ import qualified Pawl.Types.TapState as TapState
 -- controller, which for a dies trigger is whoever controlled the permanent as it
 -- left (CR 603.3a) and need not be the owner. A Bool and not a PlayerId, because
 -- the two readings are "the effect's controller" and "the owner", both of which
--- the funnel already knows; a card cannot write a PlayerId anyway.
+-- the funnel already knows; a card cannot write a PlayerId anyway. Inert under a
+-- Create, and correctly so: CR 111.2 makes a token's owner the player who created
+-- it, which is who CR 110.2a hands it to regardless.
 data EntryRiders = MkEntryRiders
   { tapped :: TapState.TapState,
     attacking :: Bool,

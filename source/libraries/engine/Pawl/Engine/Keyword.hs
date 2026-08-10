@@ -1755,9 +1755,10 @@ undying = returns CounterKind.PlusOnePlusOne
 -- layer 2 dies under the thief's control (CR 603.3a hands them the trigger) and
 -- still comes back to its owner.
 --
--- No stated origin zone and no bound destination slot: the ability functions from
--- the graveyard the card is already in, and nothing later in the resolution names
--- what arrived.
+-- No stated origin zone and no bound destination slot: neither rule says where
+-- the card is returned FROM -- which is what the CR 113.6m field records, and
+-- this is a battlefield ability whatever it moves -- and nothing later in the
+-- resolution names what arrived.
 --
 -- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
 -- placed -- neither rule leaves anything to choose.
