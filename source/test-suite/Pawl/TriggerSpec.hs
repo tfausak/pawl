@@ -63,7 +63,9 @@
 -- ability with CR 603.4's intervening "if", with Rhox Maulers, plus CR 702.112b's
 -- designation watched from outside, with Valeron Wardens -- `renownSpec`. CR
 -- 510.2's combat damage watched by a bystander rather than by the creature that
--- dealt it, with Tovolar, Dire Overlord -- `tovolarSpec`. CR 509.3b's blocking-side form
+-- dealt it, with Tovolar, Dire Overlord -- `tovolarSpec`. The same condition's
+-- damager slot, read by a payload that aims at it, with Aragorn, Hornburg Hero --
+-- `aragornSpec`. CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
 -- `selfBlocksAtLeastSpec`. CR
@@ -4078,6 +4080,87 @@ tovolarSpec s registry =
               Spec.assertEqWith s "she drew two" (handSize S.alice after) 2
               Spec.assertEqWith s "and he drew none" (handSize S.bob after) 0
             _ -> Spec.assertFailure s "fixture should give alice a Tovolar and a Wolves, bob a Tovolar"
+
+-- What the filtered condition is FOR: a payload that aims at the creature that
+-- dealt the damage (Pawl.Engine.Binding.combatDamager) rather than at the bearer
+-- -- Aragorn, Hornburg Hero {1}{R}{G}{W} Legendary Creature -- Human Soldier 4/4,
+-- "attacking creatures you control have first strike and renown 1" and "whenever
+-- a renowned creature you control deals combat damage to a player, double the
+-- number of +1/+1 counters on it".
+--
+-- Three capabilities meet here, and each has a way to fail that the counts below
+-- tell apart: the slot naming the damager (aim it at the source and Aragorn takes
+-- the counters), Quantity.AgainstSlot reading the damager's counters (read the
+-- source's and the number is 0), and Filter.IsRenowned rejecting a candidate that
+-- is not renowned yet (drop it and the Piker doubles too).
+--
+-- Aurelia, the Warleader supplies the second combat phase, as she does in
+-- renownSpec: the doubling needs a creature that was ALREADY renowned when it
+-- connected, and CR 603.4's intervening "if" means renown itself cannot renown a
+-- creature and be doubled in one event. Aragorn arrives BETWEEN the two combats
+-- so the Maulers takes its two counters from printed renown 2 alone -- with him
+-- out on the first swing the Maulers would hold renown 2 and a granted renown 1
+-- at once, and CR 702.112c leaves which resolves first to its controller.
+aragornSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+aragornSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      plan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      plan attackers p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        _ -> S.aggressiveAnswer p
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+      renownedness oid gs = fmap Object.renowned (Game.lookupObject oid gs)
+   in Spec.describe s "Doubling a damager's counters" $ do
+        -- The proving test. 2 -> 4 rather than 2 -> 3, which is what separates
+        -- "double" from "add one", and 4 rather than 2, which is what separates
+        -- reading the damager's counters from reading the bearer's.
+        Spec.it s "CR 702.112b whole card: a renowned creature's counters double when it connects" $ do
+          (gs, mine, _) <- board ["Rhox Maulers", "Aurelia, the Warleader", "Goblin Piker"] []
+          aragorn <- S.printingOf s registry "Aragorn, Hornburg Hero"
+          case mine of
+            [maulers, aurelia, piker] -> do
+              let first = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (plan [maulers, aurelia]) gs
+                  (hero, staged) = S.addCreature aragorn S.alice first
+                  loaded = S.addCounter CounterKind.PlusOnePlusOne 3 piker staged
+                  second = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (plan [maulers, piker]) loaded
+                  after = S.runToStep (Phase.Combat CombatStep.EndOfCombat) (plan [maulers, piker]) second
+              Spec.assertEqWith s "the first combat connected for seven" (S.lifeOf S.bob first) (Just 13)
+              Spec.assertEqWith s "renown 2 alone renowned the Maulers" (countersOn maulers first) (Map.singleton CounterKind.PlusOnePlusOne 2)
+              Spec.assertEqWith s "the second phase really ran a declaration" (GameState.phase second) (Phase.Combat CombatStep.DeclareAttackers)
+              Spec.assertEqWith s "and the second combat connected for eleven" (S.lifeOf S.bob after) (Just 2)
+              Spec.assertEqWith s "so the Maulers doubled to four, not three" (countersOn maulers after) (Map.singleton CounterKind.PlusOnePlusOne 4)
+              Spec.assertEqWith s "making it an 8/8" (S.powerToughnessOf maulers after) (Just (8, 8))
+              -- CR 702.112b's designation read of a CANDIDATE: the Piker carries
+              -- three counters from outside renown and was NOT renowned when it
+              -- dealt its damage, so Aragorn's ability never triggered for it. The
+              -- fourth counter is the renown 1 he granted it, which becomes
+              -- renowned only as that trigger resolves -- 4 rather than the 7 a
+              -- filter without the designation conjunct would leave.
+              Spec.assertEqWith s "the Piker was renowned by that same damage" (renownedness piker after) (Just True)
+              Spec.assertEqWith s "but took one counter rather than doubling" (countersOn piker after) (Map.singleton CounterKind.PlusOnePlusOne 4)
+              -- The slot: had the payload aimed at CR 113.7a's source, these
+              -- counters would be here instead.
+              Spec.assertEqWith s "and Aragorn himself took none" (countersOn hero after) Map.empty
+            _ -> Spec.assertFailure s "fixture should give alice a Maulers, an Aurelia and a Piker"
+        -- The other half of the same static ability, which the case above only
+        -- passes through: CR 702.7b's first strike, granted to an ATTACKING
+        -- creature. Two identical 2/1s meet, and only the attacker's controller
+        -- has an Aragorn -- so the blocker is dead before it assigns (CR 510.4),
+        -- where without the grant both would die.
+        Spec.it s "CR 702.7b the same static grants first strike to attackers" $ do
+          (gs, mine, theirs) <- board ["Aragorn, Hornburg Hero", "Goblin Piker"] ["Goblin Piker"]
+          case (mine, theirs) of
+            ([_, piker], [blocker]) -> do
+              let after = S.runCombat (plan [piker]) gs
+              Spec.assertEqWith s "the blocker is dead" (Game.lookupObject blocker after) Nothing
+              Spec.assertEqWith s "the attacker survived, unrenowned" (renownedness piker after) (Just False)
+              Spec.assertEqWith s "alice keeps both creatures" (S.creaturesInPlay S.alice after) 2
+              Spec.assertEqWith s "bob none" (S.creaturesInPlay S.bob after) 0
+              Spec.assertEqWith s "and nothing reached bob" (S.lifeOf S.bob after) (Just 20)
+            _ -> Spec.assertFailure s "fixture should give alice an Aragorn and a Piker, bob a Piker"
 
 -- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
@@ -8200,6 +8283,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   provokeSpec s registry
   renownSpec s registry
   tovolarSpec s registry
+  aragornSpec s registry
   afflictSpec s registry
   meleeSpec s registry
   rampageSpec s registry

@@ -318,6 +318,27 @@ data Filter keyword
     -- it is uncharacteristic AND unwritable by any CR 613 layer, which is what
     -- lets Pawl.Engine.Projection.filterReads declare it as reading nothing.
     IsRingBearer
+  | -- | CR 702.112b: does the CANDIDATE have the renowned designation? Aragorn,
+    -- Hornburg Hero's "whenever a renowned creature you control deals combat
+    -- damage to a player".
+    --
+    -- IsRingBearer's shape, and for the same rule-shaped reason: rule 702.112b
+    -- makes renowned "a designation that has no rules meaning other than to act as
+    -- a marker that ... other spells and abilities can identify", which is what a
+    -- Filter atom is for. Unlike that one it asks nothing of the perspective --
+    -- rule 702.112b's designation belongs to no player, so "you control" is a
+    -- ControlledBy conjunct beside this atom rather than something inside it.
+    --
+    -- NOT Pawl.Types.Quantity.IsRenowned, which asks the same designation of the
+    -- object an evaluation is AIMED at (Power's position) for rule 702.112a's
+    -- intervening "if". Two readings of one designation, kept apart the way CR
+    -- 701.54b's is: a candidate side and a self side.
+    --
+    -- Uncharacteristic, for IsRingBearer's reason: rule 702.112b says renowned is
+    -- "neither an ability nor part of the permanent's copiable values", so no CR
+    -- 613 layer writes it and Pawl.Engine.Projection.filterReads declares it as
+    -- reading nothing.
+    IsRenowned
   | And [Filter keyword]
   | Or [Filter keyword]
   | Not (Filter keyword)

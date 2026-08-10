@@ -1197,7 +1197,8 @@ reservedSlots =
       Binding.castSpell,
       Binding.blockingCreature,
       Binding.blockedCreature,
-      Binding.attackingCreature
+      Binding.attackingCreature,
+      Binding.combatDamager
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -1455,6 +1456,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.IsToken -> 0
   Filter.Type.IsTapped -> 0
   Filter.Type.IsRingBearer -> 0
+  Filter.Type.IsRenowned -> 0
 
 -- Every Filter a keyword carries: CR 702.29e's typecycling predicate, CR
 -- 702.14c's landwalk criterion, plus the components of any Cost a keyword names
