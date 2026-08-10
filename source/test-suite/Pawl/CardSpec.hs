@@ -1616,6 +1616,10 @@ keywordFilters keyword = case keyword of
   -- entering creature's -- is the ENGINE's, never a card's.
   Keyword.Evolve -> []
   Keyword.StartYourEngines -> []
+  -- CR 702.43a names no quality: the +1/+1 counters and the "target artifact
+  -- creature" are written into the replacement effect and the ability
+  -- Pawl.Engine.Keyword mints, not into the keyword.
+  Keyword.Modular _ -> []
   -- CR 702.79a and CR 702.93a name no quality either: the counter kind and the
   -- "if" clause are written into the abilities Pawl.Engine.Keyword mints.
   Keyword.Persist -> []

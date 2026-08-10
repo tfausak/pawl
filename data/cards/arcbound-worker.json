@@ -1,0 +1,42 @@
+{
+  "faces": [
+    {
+      "keywords": [
+        {
+          "type": "Modular",
+          "value": 1
+        }
+      ],
+      "manaCost": [
+        {
+          "type": "Generic",
+          "value": 1
+        }
+      ],
+      "name": "Arcbound Worker",
+      "power": {
+        "type": "Literal",
+        "value": 0
+      },
+      "toughness": {
+        "type": "Literal",
+        "value": 0
+      },
+      "typeLine": {
+        "subtypes": [
+          {
+            "type": "Construct"
+          }
+        ],
+        "types": [
+          {
+            "type": "Artifact"
+          },
+          {
+            "type": "Creature"
+          }
+        ]
+      }
+    }
+  ]
+}
