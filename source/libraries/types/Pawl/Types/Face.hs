@@ -18,6 +18,7 @@ import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CastingPermission as CastingPermission
@@ -236,6 +237,15 @@ data Face card = MkFace
     -- by Pawl.Engine.Projection, since CR 613.11 applies these after the layer
     -- system rather than inside it.
     blockRequirements :: [BlockRequirement.BlockRequirement],
+    -- | CR 604.1/604.2 / 509.1a: this face's printed BLOCKING PERMISSIONS --
+    -- "this creature can block an additional creature each combat" (Foriysian
+    -- Brigade); read by Pawl.Engine.BlockPermission, never by
+    -- Pawl.Engine.Projection, for blockRequirements' CR 613.11 reason.
+    --
+    -- Its own field rather than an arm of combatRestrictions below, because
+    -- these ADD where a restriction BINDS: Pawl.Types.BlockPermission's header
+    -- works that out.
+    blockPermissions :: [BlockPermission.BlockPermission],
     -- | CR 604.1/604.2 / 508.1d: this face's printed ATTACKING REQUIREMENTS --
     -- "creatures enchanted player controls attack each combat if able" (Curse of
     -- the Nightly Hunt). The twin of blockRequirements on the other side of the

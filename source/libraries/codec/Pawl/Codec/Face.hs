@@ -17,6 +17,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Codec.AttackCost as AttackCost
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
+import qualified Pawl.Codec.BlockPermission as BlockPermission
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
 import qualified Pawl.Codec.CardName as CardName
 import qualified Pawl.Codec.CastingPermission as CastingPermission
@@ -74,6 +75,7 @@ toJson encodeCard f =
       Common.optionalPair "castingRestrictions" [] (Common.encodeList CastingRestriction.toJson) (Face.castingRestrictions f),
       Common.optionalPair "playerAbilities" [] (Common.encodeList PlayerStaticAbility.toJson) (Face.playerAbilities f),
       Common.optionalPair "blockRequirements" [] (Common.encodeList BlockRequirement.toJson) (Face.blockRequirements f),
+      Common.optionalPair "blockPermissions" [] (Common.encodeList BlockPermission.toJson) (Face.blockPermissions f),
       Common.optionalPair "attackRequirements" [] (Common.encodeList AttackRequirement.toJson) (Face.attackRequirements f),
       Common.optionalPair "combatRestrictions" [] (Common.encodeList CombatRestriction.toJson) (Face.combatRestrictions f),
       Common.optionalPair "sacrificeRestrictions" [] (Common.encodeList SacrificeRestriction.toJson) (Face.sacrificeRestrictions f),
@@ -114,6 +116,7 @@ fromJson decodeCard value = do
   delayed <- Common.defaultedField "delayedAbilities" Map.empty (TriggeredAbility.fromJsonDelayed decodeCard) ps
   playerAbilities <- Common.defaultedField "playerAbilities" [] (Common.decodeList PlayerStaticAbility.fromJson) ps
   blockRequirements <- Common.defaultedField "blockRequirements" [] (Common.decodeList BlockRequirement.fromJson) ps
+  blockPermissions <- Common.defaultedField "blockPermissions" [] (Common.decodeList BlockPermission.fromJson) ps
   attackRequirements <- Common.defaultedField "attackRequirements" [] (Common.decodeList AttackRequirement.fromJson) ps
   combatRestrictions <- Common.defaultedField "combatRestrictions" [] (Common.decodeList CombatRestriction.fromJson) ps
   sacrificeRestrictions <- Common.defaultedField "sacrificeRestrictions" [] (Common.decodeList SacrificeRestriction.fromJson) ps
@@ -147,6 +150,7 @@ fromJson decodeCard value = do
         Face.delayedAbilities = delayed,
         Face.playerAbilities = playerAbilities,
         Face.blockRequirements = blockRequirements,
+        Face.blockPermissions = blockPermissions,
         Face.attackRequirements = attackRequirements,
         Face.combatRestrictions = combatRestrictions,
         Face.sacrificeRestrictions = sacrificeRestrictions,

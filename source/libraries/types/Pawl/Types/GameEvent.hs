@@ -157,7 +157,7 @@ data GameEvent
     -- which need trigger conditions no card in the pool declares (#538).
     AttackerDeclared ObjectId.ObjectId PlayerId.PlayerId
   | -- | CR 509.1i: a blocker was DECLARED -- one entry per creature the defending
-    -- player chose in CR 509.1's turn-based action, naming the blocker and the
+    -- player chose in CR 509.1's turn-based action, naming the blocker and one
     -- attacking creature chosen for it (CR 509.1a). AttackerDeclared's mirror,
     -- and appended by Pawl.Engine.Combat.declareBlockers alone.
     --
@@ -165,11 +165,10 @@ data GameEvent
     -- a creature put onto the battlefield blocking is "blocking" but never
     -- "blocked", and Combat.blockers cannot tell the two apart.
     --
-    -- ONE event per blocker rather than per blocked creature. That is CR 509.1a's
-    -- own shape -- one creature chosen for each blocker to block -- but only
-    -- because nothing can widen it here: an effect MAY let a creature block
-    -- several, and pawl's declaration has nowhere to put the second attacker
-    -- (#1145). While that holds, one blocker is one event.
+    -- ONE event per PAIR, which is CR 509.3b's arity ("once for each attacking
+    -- creature the creature blocks"). CR 509.3a's once-per-blocker arity is
+    -- BlocksDeclared below; the two differ exactly as BlockerDeclared and
+    -- AttackerBlocked do on the attacking side.
     --
     -- The ATTACKER is the payload CR 509.3b's "blocks a creature" and CR 509.3d's
     -- "becomes blocked by a creature" need -- the first binds it, the second
@@ -204,6 +203,27 @@ data GameEvent
     -- AttackerDeclared's reason: Pawl.Engine.Event.eventBindings takes no game
     -- state, and the planeswalker and battle forms of CR 508.5 need the board.
     AttackerBlocked ObjectId.ObjectId PlayerId.PlayerId
+  | -- | CR 509.1i: a creature was declared BLOCKING -- one event per blocking
+    -- creature the CR 509.1 declaration named, appended by
+    -- Pawl.Engine.Combat.declareBlockers alone.
+    --
+    -- BlockerDeclared's grouped twin, and AttackerBlocked's mirror: that pair
+    -- splits an attacker's declaration by CR 509.3c against CR 509.3d, this one
+    -- splits a blocker's by CR 509.3a against CR 509.3b. Grouping is the whole
+    -- difference, and Pawl.Engine.Event.matchesTrigger sees one event at a time
+    -- and so cannot do it.
+    --
+    -- The Natural is HOW MANY attacking creatures it was declared against, which
+    -- is CR 509.3e's number ("blocks two or more creatures"). Never zero: a
+    -- creature that blocks nothing is not in the declaration. Carried rather than
+    -- derived for AttackerBlocked's reason -- eventBindings takes no game state --
+    -- and the attackers themselves are not, since the condition that names one
+    -- reads BlockerDeclared's pair.
+    --
+    -- A DECLARATION is the only producer, which is STRICTER than rule 509.3a's
+    -- second sentence: an effect that causes a creature to block also triggers
+    -- it. No such effect is in the pool (#1146).
+    BlocksDeclared ObjectId.ObjectId Natural.Natural
   | -- | CR 701.20a: a player revealed a card.
     --
     -- A reveal is the one game action whose entire content is INFORMATION, so

@@ -347,7 +347,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
           "and it really is attacking the battle"
           (Map.lookup wraith (Combat.Type.attackers (GameState.combat after)))
           (Just (AttackTarget.OfBattle battle))
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker wraith) after)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after)) "illegal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
   Spec.it s "CR 702.14c the same attack is blocked normally when the protector's land is an Island" $ do
     -- THE FALSIFIER for the case above: the same board with the wrong land, so a
@@ -356,7 +356,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     case (mine, hers) of
       ([wraith], blocker : _) -> do
         let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
-        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker wraith) after) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
   Spec.it s "CR 310.8d the battle's CONTROLLER's lands are not the ones read" $ do
     -- THE FALSIFIER for reading CR 508.5's defending player off the battle's
@@ -369,7 +369,7 @@ attackSpec s registry = Spec.describe s "Attacking" $ do
     case (mine, hers) of
       (wraith : _, blocker : _) -> do
         let after = S.runPure (attackTheBattle battle) gs (Combat.declareAttackers S.alice)
-        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker wraith) after) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.carol (Map.singleton blocker (Set.singleton wraith)) after) "legal"
       _ -> Spec.assertFailure s "fixture should have a Wraith and a blocker"
 
   Spec.it s "CR 310.8c a creature the protector does not control can't block the battle's attacker" $ do

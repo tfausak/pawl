@@ -17,6 +17,7 @@ import qualified Pawl.Codec.AttackCostSpec
 import qualified Pawl.Codec.AttackRequirementSpec
 import qualified Pawl.Codec.BeginningStepSpec
 import qualified Pawl.Codec.BindingSpec
+import qualified Pawl.Codec.BlockPermissionSpec
 import qualified Pawl.Codec.BlockRequirementSpec
 import qualified Pawl.Codec.CardSpec
 import qualified Pawl.Codec.CardTypeSpec
@@ -267,6 +268,7 @@ spec s registry = do
   Pawl.Codec.AttackRequirementSpec.spec s
   Pawl.Codec.BeginningStepSpec.spec s
   Pawl.Codec.BindingSpec.spec s
+  Pawl.Codec.BlockPermissionSpec.spec s
   Pawl.Codec.BlockRequirementSpec.spec s
   Pawl.Codec.CardSpec.spec s
   Pawl.Codec.CardTypeSpec.spec s

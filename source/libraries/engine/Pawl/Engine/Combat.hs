@@ -13,6 +13,7 @@ import Numeric.Natural (Natural)
 import qualified Pawl.Engine.AttackCost as AttackCost
 import qualified Pawl.Engine.AttackRequirement as AttackRequirement
 import qualified Pawl.Engine.Battle as Battle
+import qualified Pawl.Engine.BlockPermission as BlockPermission
 import qualified Pawl.Engine.BlockRequirement as BlockRequirement
 import qualified Pawl.Engine.CombatRestriction as CombatRestriction
 import qualified Pawl.Engine.Cost as Cost
@@ -23,6 +24,7 @@ import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Summoning as Summoning
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
@@ -845,14 +847,16 @@ landwalkAllowsGiven grants pcs attacker gs =
 -- Membership rather than the projection's per-keyword count, on
 -- landwalkAllowsGiven's terms: CR 702.111c makes multiple instances redundant, so
 -- a creature with two of them still needs two blockers rather than four.
-menaceAllows :: Map ObjectId ObjectId -> GameState -> Bool
+menaceAllows :: Map ObjectId (Set ObjectId) -> GameState -> Bool
 menaceAllows = menaceAllowsGiven Map.empty
 
-menaceAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> Map ObjectId ObjectId -> GameState -> Bool
+menaceAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> Map ObjectId (Set ObjectId) -> GameState -> Bool
 menaceAllowsGiven pcs declaration gs =
-  let -- blocker -> attacker inverted into attacker -> how many blockers, which is
-      -- the only reading of a declaration 702.111b cares about.
-      blockerCounts = Map.fromListWith (+) (fmap (\attacker -> (attacker, 1 :: Int)) (Map.elems declaration))
+  let -- blocker -> attackers inverted into attacker -> how many blockers, which is
+      -- the only reading of a declaration 702.111b cares about. One blocker
+      -- declared against two attackers counts once for each of them, and never
+      -- twice for either -- CR 702.111b counts CREATURES blocking, not blocks.
+      blockerCounts = Map.fromListWith (+) (fmap (\attacker -> (attacker, 1 :: Int)) (concatMap Set.toList (Map.elems declaration)))
       -- The count first, so an attacker that is comfortably blocked never pays
       -- for a keyword read (#200's posture, in the one place a declaration check
       -- sits inside candidateBlockDeclarations' exponential filter).
@@ -907,8 +911,13 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- So the three shapes of restriction are all asked here, one conjunct each:
 -- pairAllowed over the pairs, menaceAllows over the creatures blocking each
 -- attacker, and the bound over the declaration's SIZE (Silent Arbiter's second
--- sentence). This is also the seam blockCeiling's enumeration is filtered
--- through, so CR 509.1c's maximum is taken over declarations all three allow.
+-- sentence). CR 509.1a's per-creature ARITY is a fourth conjunct beside them --
+-- not a restriction at all, but a fact about the declaration and so checked in
+-- the same place, and asked of the declaration rather than of the candidate list
+-- for CantAttackAlone's reason: a creature over its arity is in plenty of legal
+-- declarations, just not this one. This is also the seam blockCeiling's
+-- enumeration is filtered through, so CR 509.1c's maximum is taken over
+-- declarations all four allow.
 --
 -- Takes the projected board rather than projecting per read, because the
 -- set-shaped conjunct reads a keyword and this sits inside
@@ -916,38 +925,57 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- twin the way pairAllowed has one: both callers are already inside a hoisted
 -- pass. `limit` is hoisted by the callers for the same reason and is not read off
 -- `gs` here: it is a battlefield walk, and this is the exponential filter's body.
-blockDeclarationAllowed :: Maybe Natural -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId ObjectId -> GameState -> Bool
-blockDeclarationAllowed limit pcs able declaration gs =
-  all (uncurry able) (Map.toList declaration)
+blockDeclarationAllowed :: Maybe Natural -> (ObjectId -> Natural) -> Map ObjectId PC.ProjectedCharacteristics -> (ObjectId -> ObjectId -> Bool) -> Map ObjectId (Set ObjectId) -> GameState -> Bool
+blockDeclarationAllowed limit arity pcs able declaration gs =
+  -- CR 509.1b restriction-checks every creature against every creature it is
+  -- declared against, which is what "each creature" means once a blocker can be
+  -- declared against more than one: a blocker may block a flier and a
+  -- non-flier only if it could block each of them alone.
+  all (\(blocker, attackers) -> all (able blocker) (Set.toList attackers)) (Map.toList declaration)
+    && all (\(blocker, attackers) -> toInteger (Set.size attackers) <= toInteger (arity blocker)) (Map.toList declaration)
     && menaceAllowsGiven pcs declaration gs
-    && withinLimit limit (Map.size declaration)
+    -- Silent Arbiter's second sentence counts BLOCKING CREATURES, so an entry
+    -- naming two attackers is still one creature blocking. The empty entries a
+    -- hostile interpreter can send are dropped rather than counted, since a
+    -- creature blocking nothing is not blocking.
+    && withinLimit limit (Map.size (Map.filter (not . Set.null) declaration))
 
 -- How many of `requirements` this declaration obeys (CR 509.1c): a requirement
 -- instance is obeyed exactly when the declaration has its blocker blocking its
 -- attacker.
-requirementsMet :: Set (ObjectId, ObjectId) -> Map ObjectId ObjectId -> Int
+requirementsMet :: Set (ObjectId, ObjectId) -> Map ObjectId (Set ObjectId) -> Int
 requirementsMet requirements declaration =
-  Set.size (Set.filter (\(blocker, attacker) -> Map.lookup blocker declaration == Just attacker) requirements)
+  Set.size (Set.filter (\(blocker, attacker) -> Set.member attacker (Map.findWithDefault Set.empty blocker declaration)) requirements)
 
 -- Every declaration CR 509.1a lets the defending player write down, given the
--- pairs CR 509.1b allows: each candidate blocker independently either blocks
--- nothing or blocks one attacker it may block.
+-- pairs CR 509.1b allows: each candidate blocker independently blocks nothing, or
+-- blocks up to its own arity's worth of attackers it may block.
 --
--- EXPONENTIAL, and honestly so: O((attackers + 1) ^ blockers) in the worst case.
--- Nothing caps it and nothing samples it -- a cap would answer CR 509.1c's
--- maximum with a number that is not the maximum, which is worse than being slow.
--- What keeps it off the hot path is blockCeiling's guard: this is never called
--- unless some requirement is actually in force, which needs a card like Lure on
--- the battlefield (#342).
-candidateBlockDeclarations :: (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId ObjectId]
-candidateBlockDeclarations able candidates attackers =
+-- EXPONENTIAL, and honestly so: O((attackers + 1) ^ blockers) at arity one, which
+-- is every board without a card like Foriysian Brigade -- one option per attacker
+-- plus declining, exactly as before arity existed. A blocker at arity k widens
+-- ITS OWN factor to the subsets of size at most k, and nothing else's. Nothing
+-- caps it and nothing samples it -- a cap would answer CR 509.1c's maximum with a
+-- number that is not the maximum, which is worse than being slow. What keeps it
+-- off the hot path is blockCeiling's guard: this is never called unless some
+-- requirement is actually in force, which needs a card like Lure on the
+-- battlefield (#342).
+candidateBlockDeclarations :: (ObjectId -> Natural) -> (ObjectId -> ObjectId -> Bool) -> [ObjectId] -> [ObjectId] -> [Map ObjectId (Set ObjectId)]
+candidateBlockDeclarations arity able candidates attackers =
   let extend acc blocker =
-        let options = Nothing : fmap Just (filter (\attacker -> able blocker attacker) attackers)
-            apply declaration option = case option of
-              Nothing -> declaration
-              Just attacker -> Map.insert blocker attacker declaration
+        let options = choicesUpTo (arity blocker) (filter (able blocker) attackers)
+            apply declaration chosen =
+              if Set.null chosen then declaration else Map.insert blocker chosen declaration
          in concatMap (\declaration -> fmap (apply declaration) options) acc
    in List.foldl' extend [Map.empty] candidates
+
+-- Every subset of `attackers` of size at most `n`, the empty one first. Declining
+-- to block is always among them, which is the seed blockCeiling's fold relies on.
+choicesUpTo :: Natural -> [ObjectId] -> [Set ObjectId]
+choicesUpTo n attackers =
+  let extend acc attacker =
+        acc <> [Set.insert attacker chosen | chosen <- acc, toInteger (Set.size chosen) < toInteger n]
+   in List.foldl' extend [Set.empty] attackers
 
 -- CR 509.1c's two halves, computed together because neither is usable alone: the
 -- requirement instances in force, and a declaration obeying the maximum number of
@@ -976,21 +1004,22 @@ candidateBlockDeclarations able candidates attackers =
 -- and Projection.projectGiven). blockCeilingGiven is the half
 -- legalBlockDeclaration reaches, so that the two of them share one board rather
 -- than taking one apiece.
-blockCeiling :: PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId ObjectId)
+blockCeiling :: PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
 blockCeiling pid gs = blockCeilingGiven (Projection.controlGrants gs) (Projection.projectAll gs) pid gs
 
-blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId ObjectId)
+blockCeilingGiven :: [Projection.ControlGrant] -> Map ObjectId PC.ProjectedCharacteristics -> PlayerId -> GameState -> (Set (ObjectId, ObjectId), Map ObjectId (Set ObjectId))
 blockCeilingGiven grants pcs pid gs =
   let attackers = Map.keys (Combat.attackers (GameState.combat gs))
       candidates = legalBlockersGiven grants pcs pid gs
       able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
       limit = CombatRestriction.blockLimit gs
+      arity = blockArityGiven candidates gs
       requirements = BlockRequirement.instances able candidates attackers gs
       better best declaration =
         if requirementsMet requirements declaration > requirementsMet requirements best
           then declaration
           else best
-      legal = filter (\declaration -> blockDeclarationAllowed limit pcs able declaration gs) (candidateBlockDeclarations able candidates attackers)
+      legal = filter (\declaration -> blockDeclarationAllowed limit arity pcs able declaration gs) (candidateBlockDeclarations arity able candidates attackers)
    in ( requirements,
         if Set.null requirements
           then Map.empty
@@ -1007,7 +1036,7 @@ blockCeilingGiven grants pcs pid gs =
 --
 -- CR 509.1c's cost clause and CR 509.1d's cost locking are not implemented: no
 -- card in the pool makes blocking cost anything (#343).
-legalBlockDeclaration :: PlayerId -> Map ObjectId ObjectId -> GameState -> Bool
+legalBlockDeclaration :: PlayerId -> Map ObjectId (Set ObjectId) -> GameState -> Bool
 legalBlockDeclaration pid declaration gs =
   -- Hoisted exactly as blockCeiling hoists, and for the same reason.
   let grants = Projection.controlGrants gs
@@ -1016,16 +1045,25 @@ legalBlockDeclaration pid declaration gs =
       candidates = legalBlockersGiven grants pcs pid gs
       able blocker attacker = pairAllowedGiven grants pcs candidates attackers blocker attacker gs
       limit = CombatRestriction.blockLimit gs
+      arity = blockArityGiven candidates gs
       (requirements, best) = blockCeilingGiven grants pcs pid gs
-   in blockDeclarationAllowed limit pcs able declaration gs
+   in blockDeclarationAllowed limit arity pcs able declaration gs
         && requirementsMet requirements declaration >= requirementsMet requirements best
+
+-- CR 509.1a: how many attacking creatures each of `candidates` may be declared
+-- blocking -- the rule's one, plus whatever Pawl.Engine.BlockPermission adds.
+-- The one place "one each" is written down.
+blockArityGiven :: [ObjectId] -> GameState -> ObjectId -> Natural
+blockArityGiven candidates gs =
+  let extra = BlockPermission.additionalBlocks candidates gs
+   in \blocker -> 1 + Map.findWithDefault 0 blocker extra
 
 -- A declaration that is always legal: one attaining CR 509.1c's maximum, which
 -- with no requirement in force is the empty one (declining to block). Not an
 -- answer the engine ever prefers to the defending player's own -- declareBlockers
 -- reaches for it only when an interpreter hands back a declaration the rules
 -- forbid.
-forcedBlockDeclaration :: PlayerId -> GameState -> Map ObjectId ObjectId
+forcedBlockDeclaration :: PlayerId -> GameState -> Map ObjectId (Set ObjectId)
 forcedBlockDeclaration pid gs = snd (blockCeiling pid gs)
 
 -- Who is CURRENTLY blocking this attacker -- not whether it is blocked. The two
@@ -1560,16 +1598,19 @@ declareBlockers = do
         -- too, so the two cannot disagree about what an illegal answer becomes.
         gs1 <- State.get
         let declaration = if legalBlockDeclaration pid chosen gs1 then chosen else forcedBlockDeclaration pid gs1
-        Monad.unless (Map.null declaration) $ do
+        -- The pairs the declaration states, blocker-major, which is the order
+        -- CR 509.1a writes it in and the order the events below are recorded in.
+        let pairs = [(blocker, attacker) | (blocker, attackers) <- Map.toList declaration, attacker <- Set.toList attackers]
+        Monad.unless (null pairs) $ do
           let add m (b, a) = Map.insertWith Set.union a (Set.singleton b) m
-              merged = List.foldl' add (Combat.blockers (GameState.combat gs1)) (Map.toList declaration)
+              merged = List.foldl' add (Combat.blockers (GameState.combat gs1)) pairs
               -- CR 506.4's comparand for the blockers, alongside the attackers'
               -- (declareAttackers). `pid` for the same reason it is there: every
               -- blocker here is one legalBlockers offered, which is
               -- controllerOf == Just pid (CR 509.1a) on both the accepted and the
               -- forced path. Unioned rather than replacing, since the attackers'
               -- entries are already in this map.
-              joined = Map.union (Map.fromList (fmap (\b -> (b, pid)) (Map.keys declaration))) (Combat.joinedUnder (GameState.combat gs1))
+              joined = Map.union (Map.fromList (fmap (\(b, _) -> (b, pid)) pairs)) (Combat.joinedUnder (GameState.combat gs1))
           State.modify' $ \g -> g {GameState.combat = (GameState.combat g) {Combat.blockers = merged, Combat.joinedUnder = joined}}
           -- CR 509.1i: the declaration is a trigger event, and CR 509.2a puts
           -- what it fires onto the stack before the active player gets priority
@@ -1585,14 +1626,24 @@ declareBlockers = do
           -- blocking without having been declared -- one put onto the battlefield
           -- blocking -- never "blocked", and `merged` cannot tell it from one
           -- that was.
-          State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared blocker attacker) h) g (Map.toList declaration)
+          --
+          -- TWO events per declaration, and the split is CR 509.3a against CR
+          -- 509.3b: one BlockerDeclared per PAIR, which is 509.3b's "once for each
+          -- attacking creature the creature blocks", and one BlocksDeclared per
+          -- BLOCKING CREATURE, which is 509.3a's "only once each combat for that
+          -- creature, even if it blocks multiple creatures". Exactly the split
+          -- AttackerBlocked already makes on the other side of the same
+          -- declaration. The count it carries is CR 509.3e's.
+          State.modify' $ \g -> List.foldl' (\h (blocker, attacker) -> Event.recordEvent (GameEvent.BlockerDeclared blocker attacker) h) g pairs
+          State.modify' $ \g -> List.foldl' (\h (blocker, attackers) -> Event.recordEvent (GameEvent.BlocksDeclared blocker (Natural.length attackers)) h) g (filter (not . Set.null . snd) (Map.toList declaration))
           -- CR 509.1h: and the same declaration makes each attacker it named a
           -- BLOCKED creature. One event per attacker rather than per pair, which
           -- is what makes CR 509.3c's "only once each combat for that creature,
           -- even if it's blocked by multiple creatures" hold -- the defending
           -- player really can put two blockers on one attacker, so this is a
-          -- dedup and not an arity that happens to be one (contrast CR 509.3a's,
-          -- which is #1145's missing capability).
+          -- dedup and not an arity that happens to be one. CR 509.3a's dedup is
+          -- BlocksDeclared above, and is now a dedup for the same reason: a
+          -- blocker really can be declared against two attackers.
           --
           -- CR 509.3c's "only if the attacking creature was an unblocked creature
           -- at that time" is the difference: an attacker already in
@@ -1620,7 +1671,7 @@ declareBlockers = do
           -- permanent can leave -- and CR 508.5's second sentence is what makes the
           -- answer the same either way.
           let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs1))
-              becameBlocked = Set.difference (Set.fromList (Map.elems declaration)) wasBlocked
+              becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
           State.modify'
             ( \g ->
                 let grants = Projection.controlGrants g

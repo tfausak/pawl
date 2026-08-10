@@ -53,6 +53,7 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
+import qualified Pawl.Types.BlockPermission as BlockPermission
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Card as Card.Type
 import qualified Pawl.Types.CardName as CardName
@@ -161,6 +162,7 @@ vanillaFace name typeLine =
       Face.characteristicPT = Nothing,
       Face.playerAbilities = [],
       Face.blockRequirements = [],
+      Face.blockPermissions = [],
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
@@ -462,6 +464,7 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names the attacker without counting anything, so no Count either.
   TriggerCondition.SelfBlocksCreature -> []
+  TriggerCondition.SelfBlocksAtLeast _ -> []
   TriggerCondition.SelfBecomesBlocked -> []
   -- CR 509.3d's Filter is a predicate over the blocker, and holds no Count for
   -- PermanentEnters' reason.
@@ -1658,6 +1661,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 509.3b names no quality the attacker must have: every printing of that
   -- form says "a creature" and stops there.
   TriggerCondition.SelfBlocksCreature -> []
+  TriggerCondition.SelfBlocksAtLeast _ -> []
   TriggerCondition.SelfBecomesBlocked -> []
   -- CR 509.3d names a quality the blocker must have, so this one DOES carry a
   -- Filter -- rule 702.25a's "without flanking".
@@ -2092,6 +2096,7 @@ cardFilters card =
         <> concatMap specialActionFilters (Face.specialActions card)
         <> concatMap (playerEffectFilters . PlayerStaticAbility.effect) (Face.playerAbilities card)
         <> concatMap (affectedFilters . BlockRequirement.attacker) (Face.blockRequirements card)
+        <> concatMap (affectedFilters . BlockPermission.affected) (Face.blockPermissions card)
         <> concatMap (affectedFilters . AttackRequirement.subject) (Face.attackRequirements card)
         <> concatMap (affectedFilters . AttackCost.subject) (Face.attackCosts card)
         <> concatMap combatRestrictionFilters (Face.combatRestrictions card)

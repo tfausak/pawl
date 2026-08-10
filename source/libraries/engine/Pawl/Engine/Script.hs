@@ -96,5 +96,5 @@ fighting p = case p of
   Prompt.DeclareAttackers _ _ ids -> ids
   Prompt.DeclareBlockers _ _ mine attackers -> case attackers of
     [] -> Map.empty
-    a : _ -> Map.fromList (fmap (\b -> (b, a)) mine)
+    a : _ -> Map.fromList (fmap (\b -> (b, Set.singleton a)) mine)
   _ -> casting p

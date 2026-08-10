@@ -120,6 +120,16 @@ spec s = Spec.describe s "Pawl.Codec.GameEvent" $ do
       GameEvent.fromJson
       (GameEvent.BlockerDeclared (ObjectId.MkObjectId 6) (ObjectId.MkObjectId 7))
       """ {"type":"BlockerDeclared","value":[6,7]} """
+  -- An object and a COUNT: CR 509.3a's event is per blocking creature, and the
+  -- number beside it is how many attackers it took (CR 509.3e). Distinct
+  -- numbers again, so a codec that swapped them would fail.
+  Spec.it s "BlocksDeclared" $
+    Common.assertJsonCodec
+      s
+      GameEvent.toJson
+      GameEvent.fromJson
+      (GameEvent.BlocksDeclared (ObjectId.MkObjectId 9) 2)
+      """ {"type":"BlocksDeclared","value":[9,2]} """
   -- An object and a player, AttackerDeclared's shape rather than the sibling
   -- above's two objects: CR 509.3c's event is per blocked ATTACKER, so the
   -- blockers are not in it, and CR 508.5's defending player is.

@@ -68,7 +68,7 @@ data Response
   | -- | CR 508.1b / CR 508.4: what one attacking creature was announced as
     -- attacking. Unlike ChoseDefender, this may name a permanent.
     ChoseAttackTarget AttackTarget.AttackTarget
-  | DeclaredBlockers (Map.Map ObjectId.ObjectId ObjectId.ObjectId)
+  | DeclaredBlockers (Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId))
   | AssignedCombatDamage (Map.Map Recipient.Recipient Natural.Natural)
   | ChoseTargets (Map.Map SlotName.SlotName Recipient.Recipient)
   | -- | CR 612: the (from, to) basic land types a text-changer's caster chose.

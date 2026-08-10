@@ -103,12 +103,11 @@ data TriggerCondition
     -- says a creature put onto the battlefield blocking never "blocked", so this
     -- matches GameEvent.BlockerDeclared and never Combat.blockers.
     --
-    -- No TriggerFrequency, and no dedup either, though rule 509.3a says "generally
-    -- triggers only once each combat for that creature, even if it blocks multiple
-    -- creatures". One declaration is one GameEvent.BlockerDeclared, so matching
-    -- once IS the rule -- and what makes that hold is a capability pawl lacks
-    -- rather than anything in the CR: no effect can give a blocker a second
-    -- attacker (#1145). The rule's "even if" has no case in reach until it can.
+    -- No TriggerFrequency: rule 509.3a's "only once each combat for that
+    -- creature, even if it blocks multiple creatures" is the GROUPING of
+    -- GameEvent.BlocksDeclared, which Pawl.Engine.Combat.declareBlockers records
+    -- once per blocking creature however many attackers it took. A real dedup,
+    -- since Foriysian Brigade blocks two.
     --
     -- The ATTACKER the event also carries is not compared here, and not bound:
     -- CR 509.3b's "blocks a creature" is the form that names it, and that is
@@ -120,12 +119,11 @@ data TriggerCondition
     -- SelfBlocks with the attacker named, self-scoped and DECLARED for the same
     -- reasons, and matched against the same GameEvent.BlockerDeclared.
     --
-    -- The whole difference from SelfBlocks is the BINDING: the attacker goes into
-    -- Pawl.Engine.Binding.blockedCreature for the payload's "that creature" to
-    -- read. Rule 509.3b's other difference, "once for each attacking creature the
-    -- creature with the ability blocks", is not one pawl can show -- a blocker
-    -- gets exactly one attacker (#1145), so one declaration is one event here as
-    -- it is for SelfBlocks.
+    -- The whole difference from SelfBlocks is the EVENT and the BINDING: this
+    -- reads the per-pair GameEvent.BlockerDeclared, which is rule 509.3b's "once
+    -- for each attacking creature the creature with the ability blocks", and puts
+    -- the attacker into Pawl.Engine.Binding.blockedCreature for the payload's
+    -- "that creature" to read.
     --
     -- No Filter over the attacker, unlike SelfBecomesBlockedBy: every printing of
     -- this form says "a creature" and nothing more.
@@ -135,15 +133,26 @@ data TriggerCondition
     -- put onto the battlefield blocking is excluded by the rule itself, and by
     -- the same construction that excludes it from SelfBlocks.
     SelfBlocksCreature
+  | -- | CR 509.3e: "whenever [a creature] blocks two or more creatures" --
+    -- Lairwatch Giant's. SelfBlocks with a floor on the number, matched against
+    -- the same grouped GameEvent.BlocksDeclared and self-scoped the same way.
+    --
+    -- AT LEAST, never exactly: rule 509.3e's last sentence says the form covers
+    -- "at least a certain number", and every printing states it as "two or more".
+    -- An exactly-N printing would be a second arm rather than a reading of this
+    -- one.
+    --
+    -- The Natural is the floor. Two on every card in the pool; carried because
+    -- the rule is written about a number rather than about two.
+    SelfBlocksAtLeast Natural.Natural
   | -- | CR 509.3c: "whenever [a creature] becomes blocked" -- Sacred Prey's. The
     -- ATTACKING side of SelfBlocks, and self-scoped the same way.
     --
     -- Matched against GameEvent.AttackerBlocked, which CR 509.1's declaration
     -- produces one of per attacker that got at least one blocker. That grouping
     -- is rule 509.3c's "only once each combat for that creature, even if it's
-    -- blocked by multiple creatures" -- and unlike SelfBlocks' once, it is a real
-    -- dedup rather than an arity pawl happens to be stuck with, since nothing
-    -- stops the defending player assigning two blockers to one attacker.
+    -- blocked by multiple creatures" -- the same grouping SelfBlocks reads on the
+    -- blocking side.
     --
     -- Only a DECLARATION makes the event, so rule 509.3c's other two producers --
     -- an effect, and a creature put onto the battlefield as a blocker (CR 509.4)

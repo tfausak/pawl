@@ -6,8 +6,9 @@
 -- Also Pawl.Engine.BlockRequirement, whose only consumer is Pawl.Engine.Combat's CR 509.1c
 -- check, Pawl.Engine.AttackRequirement, whose only consumer is its CR 508.1d
 -- check, Pawl.Engine.CombatRestriction, whose only consumer is that module's CR
--- 508.1c and CR 509.1b checks, and Pawl.Engine.AttackCost, whose only consumer is
--- its CR 508.1d cost clause and CR 508.1h total.
+-- 508.1c and CR 509.1b checks, Pawl.Engine.AttackCost, whose only consumer is
+-- its CR 508.1d cost clause and CR 508.1h total, and Pawl.Engine.BlockPermission,
+-- whose only consumer is its CR 509.1a arity.
 module Pawl.CombatSpec where
 
 import qualified Control.Monad.Trans.State.Strict as State
@@ -19,6 +20,7 @@ import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Numeric.Natural (Natural)
 import qualified Pawl.Engine.Combat as Combat
+import qualified Pawl.Engine.Damage as Damage
 import qualified Pawl.Engine.Departure as Departure
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
@@ -294,7 +296,7 @@ recordingBlockers p = case p of
     State.modify' (\(asks, offers) -> (asks <> [pid], offers <> candidates))
     pure $ case attackers of
       [] -> Map.empty
-      a : _ -> Map.fromList (fmap (\b -> (b, a)) candidates)
+      a : _ -> Map.fromList (fmap (\b -> (b, Set.singleton a)) candidates)
   _ -> pure (S.identityAnswer p)
 
 -- Run Combat.declareBlockers under recordingBlockers. State.runState (State s a)
@@ -682,7 +684,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [birdMaiden] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.17b a reach creature may block a flier" $ do
     -- THE FALSIFIER. Fails against any implementation that asks "does the
@@ -692,7 +694,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [birdMaiden] [nimbleBirdsticker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.9b a flier may block a ground creature" $ do
     -- The asymmetry: 702.9b's second sentence. Fails if flying is implemented
@@ -702,14 +704,14 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [piker] [birdMaiden]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.9b a flier may block a flier" $ do
     birdMaiden <- S.printingOf s registry "Bird Maiden"
     let (gs, mine, theirs) = attacking [birdMaiden] [birdMaiden]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 509.1a a ground creature is still a legal blocker while a flier attacks" $ do
     -- 509.1a is about the blocker ALONE: it can block SOMETHING. This test
@@ -778,7 +780,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0))) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withFear a gs0))) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.36b a black creature may block a creature with fear" $ do
     piker <- S.printingOf s registry "Goblin Piker"
@@ -786,7 +788,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [piker] [typhoidRats]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0)) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withFear a gs0)) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.36b an ARTIFACT creature may block a creature with fear" $ do
     -- THE FALSIFIER for reading 702.36b as a colour test alone: Darksteel Myr
@@ -796,7 +798,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [piker] [darksteelMyr]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0)) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withFear a gs0)) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.36b a devoid creature with a black mana cost may not block a creature with fear" $ do
     -- THE FALSIFIER for reading the blocker's PRINTED colour: Slaughter
@@ -809,7 +811,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [piker] [slaughterDrone]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear a gs0))) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withFear a gs0))) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.36b fear restricts being blocked, never blocking" $ do
     -- The 702.9b asymmetry, restated for fear: a fear creature blocking a
@@ -818,7 +820,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withFear b gs0)) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withFear b gs0)) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   -- CR 702.13's five cases. Unlike fear's above, these run off a PRINTED
@@ -832,7 +834,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [highbornGhoul] [prowlingSerpopard]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.13b a black creature may block a creature with intimidate" $ do
     -- The sibling of the case above, identical but for the blocker's colour:
@@ -844,7 +846,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [highbornGhoul] [typhoidRats]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.13b an ARTIFACT creature may block a creature with intimidate" $ do
     -- THE FALSIFIER for reading 702.13b as a colour test alone: Darksteel Myr
@@ -855,7 +857,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [highbornGhoul] [darksteelMyr]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.13b a COLOURLESS creature with intimidate may be blocked only by artifact creatures" $ do
     -- THE FALSIFIER that separates intimidate from fear, and the only assertion
@@ -874,8 +876,8 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         let gs = S.withEffect a (Modification.SetColor Set.empty) gs0
          in do
               Spec.assertBool s (Set.null (Projection.colorsOf a gs)) "the attacker is colourless"
-              Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton black a) gs)) "the black creature may not block"
-              Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton artifact a) gs) "the artifact creature may"
+              Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton black (Set.singleton a)) gs)) "the black creature may not block"
+              Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton artifact (Set.singleton a)) gs) "the artifact creature may"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
   Spec.it s "CR 702.13b intimidate restricts being blocked, never blocking" $ do
     -- The 702.9b asymmetry, restated for intimidate: the Ghoul blocking a red
@@ -885,7 +887,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [piker] [highbornGhoul]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   -- CR 702.28's four cases, off a PRINTED keyword: Soltari Foot Soldier ({W}
@@ -898,7 +900,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [footSoldier] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.28b a creature WITH shadow may not block a creature without shadow" $ do
     -- THE FALSIFIER, and the case no other evasion ability in the pool has:
@@ -911,7 +913,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [piker] [footSoldier]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.28b a creature with shadow may block a creature with shadow" $ do
     -- Both halves of 702.28b are satisfied at once, which is what keeps the two
@@ -920,7 +922,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs, mine, theirs) = attacking [footSoldier] [footSoldier]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.28b a shadow creature connects past an untapped ground creature, in a real combat" $ do
     -- The gameplay-level case, flying's above with shadow in place of flying and
@@ -943,7 +945,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [bogWraith] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [swamp] gs0))) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withLands [swamp] gs0))) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   Spec.it s "CR 702.14c a swampwalker is blocked normally when the defending player's land is an Island" $ do
@@ -957,7 +959,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         gs = withLands [island] gs0
     case (mine, theirs) of
       (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
         let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
@@ -977,7 +979,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         gs = snd (S.addCreature urborg S.alice (withLands [island] gs0))
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   -- CR 702.14c's FOURTH clause: "with both the specified type or supertype and
@@ -991,7 +993,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [legions] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [snowSwamp] gs0))) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withLands [snowSwamp] gs0))) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   Spec.it s "CR 702.14c a snow swampwalker does NOT walk on an ordinary Swamp" $ do
@@ -1006,7 +1008,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         gs = withLands [swamp] gs0
     case (mine, theirs) of
       (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
         let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
@@ -1024,7 +1026,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         gs = withLands [snowMountain] gs0
     case (mine, theirs) of
       (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
         let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
@@ -1043,7 +1045,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
     let (gs0, mine, theirs) = attacking [dryad] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) (withLands [ashBarrens] gs0))) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) (withLands [ashBarrens] gs0))) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   Spec.it s "CR 702.14c a nonbasic landwalker is blocked normally when every land is basic" $ do
@@ -1064,7 +1066,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         gs = withLands [swamp] gs0
     case (mine, theirs) of
       (a : _, b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
         let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
@@ -1085,11 +1087,11 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         let (glovesId, equipped) = S.addCreature gloves S.alice (withLands [seat] gs0)
             armed = S.attach glovesId a equipped
         -- The premise: the Gloves really grant it, and the Piker prints none.
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) armed)) "illegal while equipped"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) armed)) "illegal while equipped"
         -- THE FALSIFIER, and what makes this a granted-keyword test rather than
         -- a repeat of the printed ones: the SAME board with the Gloves
         -- unattached. A bare Piker has no landwalk, so the block is legal.
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) equipped) "legal once nothing is equipped"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) equipped) "legal once nothing is equipped"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
 
   Spec.it s "CR 702.14c an artifact landwalker does NOT walk on a plain land" $ do
@@ -1104,7 +1106,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
       (a : _, b : _) -> do
         let (glovesId, board) = S.addCreature gloves S.alice (withLands [swamp] gs0)
             armed = S.attach glovesId a board
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) armed) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) armed) "legal"
         let after = S.runPure S.aggressiveAnswer armed Combat.declareBlockers
         Spec.assertEqWith s "the block sticks" (Combat.blockersOf a after) (Set.singleton b)
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
@@ -1121,7 +1123,7 @@ evasionSpec s registry = Spec.describe s "Evasion" $ do
         gs = withLands [swamp] gs0
     case (mine, theirs) of
       (a : _, b : _) -> do
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
         let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
         Spec.assertEqWith s "nobody blocks" (Combat.blockersOf a after) Set.empty
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
@@ -1222,24 +1224,24 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     -- the Lord's text as printed, bob's Island stops the block and his Swamp
     -- does not.
     (onIsland, warrior, blocker) <- lordBoard False "Island"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland)) "an Island stops the block"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton warrior)) onIsland)) "an Island stops the block"
     -- The Lord's OTHER modification, which the swap must leave alone: a Tidal
     -- Warrior is a printed 1/1, so a 2/2 is the +1/+1 half still applying.
     Spec.assertEqWith s "and the Warrior is a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
     (onSwamp, warrior', blocker') <- lordBoard False "Swamp"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp) "a Swamp does not"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton warrior')) onSwamp) "a Swamp does not"
   Spec.it s "CR 612.1 a hacked Lord of Atlantis grants SWAMPwalk instead" $ do
     -- THE CASE. Island -> Swamp on the Lord, and bob's board never moves: the
     -- Island that used to stop the block no longer does, and the Swamp that
     -- used to allow it no longer does either. Both halves fail against a
     -- rewrite that walks past a Modification.GainKeyword.
     (onIsland, warrior, blocker) <- lordBoard True "Island"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland) "an Island no longer stops the block"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton warrior)) onIsland) "an Island no longer stops the block"
     let after = S.runPure S.aggressiveAnswer onIsland Combat.declareBlockers
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf warrior after) (Set.singleton blocker)
     Spec.assertEqWith s "the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
     (onSwamp, warrior', blocker') <- lordBoard True "Swamp"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp)) "a Swamp stops it now"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton warrior')) onSwamp)) "a Swamp stops it now"
   Spec.it s "CR 612.3 a Hack on the creature that RECEIVED islandwalk moves nothing" $ do
     -- CR 612.3 itself, and the case the two above are read against a THIRD
     -- time: the same Island -> Swamp swap, aimed at the WARRIOR. Its islandwalk
@@ -1255,12 +1257,12 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
     -- also holds of a Hack that was never cast at all. This one says the swap
     -- really did land, and on the Warrior.
     Spec.assertEqWith s "the Hack resolved onto the Warrior" (Projection.textChangesAffecting warrior onIsland) [(Subtype.Island, Subtype.Swamp)]
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker warrior) onIsland)) "an Island still stops the block"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton warrior)) onIsland)) "an Island still stops the block"
     Spec.assertEqWith s "and the Warrior is still a 2/2" (Projection.powerOf warrior onIsland) (Just 2)
     -- The half that keeps this from passing by the landwalk simply vanishing: a
     -- Warrior that had wrongly picked up swampwalk would make this one illegal.
     (onSwamp, warrior', blocker') <- lordBoardAt theWarrior True "Swamp"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' warrior') onSwamp) "and a Swamp still does not"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton warrior')) onSwamp) "and a Swamp still does not"
     let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
     Spec.assertEqWith s "the block sticks" (Combat.blockersOf warrior' after) (Set.singleton blocker')
   -- The PRINTED half, one carrier over: Bog Wraith ("Creature -- Wraith 3/3,
@@ -1274,16 +1276,16 @@ textChangedLandwalkSpec s registry = Spec.describe s "TextChangedLandwalk" $ do
         hackedLandwalkBoard s registry [bogWraith] Maybe.listToMaybe hacked Subtype.Swamp Subtype.Island landP
   Spec.it s "CR 702.14c an unhacked Bog Wraith walks on SWAMPS" $ do
     (onSwamp, wraith, blocker) <- wraithBoard False "Swamp"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker wraith) onSwamp)) "a Swamp stops the block"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton wraith)) onSwamp)) "a Swamp stops the block"
     (onIsland, wraith', blocker') <- wraithBoard False "Island"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' wraith') onIsland) "an Island does not"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton wraith')) onIsland) "an Island does not"
   Spec.it s "CR 612.1 a hacked Bog Wraith walks on ISLANDS" $ do
     (onSwamp, wraith, blocker) <- wraithBoard True "Swamp"
-    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker wraith) onSwamp) "a Swamp no longer stops the block"
+    Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton wraith)) onSwamp) "a Swamp no longer stops the block"
     let after = S.runPure S.aggressiveAnswer onSwamp Combat.declareBlockers
     Spec.assertEqWith s "and the block sticks" (Combat.blockersOf wraith after) (Set.singleton blocker)
     (onIsland, wraith', blocker') <- wraithBoard True "Island"
-    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' wraith') onIsland)) "an Island stops it now"
+    Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton blocker' (Set.singleton wraith')) onIsland)) "an Island stops it now"
 
 -- CR 702.111: grant menace to `oid` with a stored continuous effect, withFear's
 -- twin. Used only by the CR 509.1b "after a legal block has been declared" case
@@ -1301,6 +1303,197 @@ withMenace oid gs =
             ContinuousEffect.affected = Affected.TheseObjects (Set.singleton oid)
           }
    in gs1 {GameState.continuousEffects = eff : GameState.continuousEffects gs1}
+
+-- CR 509.1a: the defending player chooses ONE creature for each blocker to
+-- block, and an effect can raise that number. Foriysian Brigade {3}{W} 2/4,
+-- "This creature can block an additional creature each combat", is the pool's
+-- plainest printing -- it says nothing else at all, so these cases read the
+-- arity and nothing beside it. High Ground {W} says the same sentence about a
+-- whole team.
+--
+-- Every case here blocks with BOB's creatures, CR 509.1 giving the declaration
+-- to the defending player.
+blockPermissionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
+  Spec.it s "CR 509.1a a Brigade blocks two attackers where a Piker blocks one" $ do
+    -- The anti-vacuity control is the PIKER on the same board: it is offered as
+    -- a blocker, it may block either attacker alone, and the pair is refused --
+    -- so the Brigade's extra is the permission talking and not the fixture.
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker] [brigade, piker]
+    case (mine, theirs) of
+      ([first, second], [b, plain]) ->
+        Spec.assertEqWith
+          s
+          "the Brigade takes both, the Piker only one"
+          ( Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [first, second])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton first)) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton plain (Set.fromList [first, second])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton plain (Set.singleton first)) gs
+          )
+          (True, True, False, True)
+      _ -> Spec.assertFailure s "fixture should have two attackers and two blockers"
+  Spec.it s "CR 509.1a High Ground gives the arity to the whole team" $ do
+    -- The Affected arm the Brigade cannot exercise: an enchantment naming
+    -- creatures its controller controls. alice's Piker is not helped by bob's
+    -- High Ground, which is what makes the ControlledBy half of the filter
+    -- observable -- the third reading below is alice's own creature.
+    highGround <- S.printingOf s registry "High Ground"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker] [piker]
+        (control, _, plain) = attacking [piker, piker] [piker]
+    case (mine, theirs, plain) of
+      ([first, second], [b], [other]) -> do
+        let enchanted = snd (S.addCreature highGround S.bob gs)
+        Spec.assertEqWith
+          s
+          "with the enchantment two, without it one"
+          ( Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [first, second])) enchanted,
+            Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [first, second])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.fromList [first, second])) control
+          )
+          (True, False, False)
+      _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
+  Spec.it s "CR 509.1b the restrictions are checked against EACH attacker blocked" $ do
+    -- A Brigade has neither flying nor reach, so CR 702.9b refuses it the Bird
+    -- Maiden however many creatures it may block. The pair is the whole point:
+    -- an arity check that stopped at the count would admit the flier alongside
+    -- the ground attacker.
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    birdMaiden <- S.printingOf s registry "Bird Maiden"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [birdMaiden, piker] [brigade]
+    case (mine, theirs) of
+      ([flier, ground], [b]) ->
+        Spec.assertEqWith
+          s
+          "the flier is out either way"
+          ( Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [flier, ground])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton flier)) gs,
+            Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton ground)) gs
+          )
+          (False, False, True)
+      _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
+  Spec.it s "CR 702.111b menace counts CREATURES blocking each attacker, not blocks" $ do
+    -- Two menace attackers need two blockers EACH. The Brigade covering both by
+    -- itself is one creature apiece and illegal; the same Brigade plus a Piker on
+    -- each Brute is two apiece and legal. A count that read the declaration's
+    -- blockers rather than the pairs would call the first one legal.
+    boggartBrute <- S.printingOf s registry "Boggart Brute"
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [boggartBrute, boggartBrute] [brigade, piker, piker]
+    case (mine, theirs) of
+      ([first, second], [b, x, y]) ->
+        Spec.assertEqWith
+          s
+          "one creature apiece is not two"
+          ( Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.fromList [first, second])) gs,
+            Combat.legalBlockDeclaration S.bob (Map.fromList [(b, Set.fromList [first, second]), (x, Set.singleton first), (y, Set.singleton second)]) gs
+          )
+          (False, True)
+      _ -> Spec.assertFailure s "fixture should have two attackers and three blockers"
+  Spec.it s "CR 509.1h a real declare blockers step blocks both attackers with the one Brigade" $ do
+    -- Not a claim about legalBlockDeclaration alone: the step itself runs, and
+    -- both attackers come out of it blocked by the same creature.
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, theirs) = attacking [piker, piker] [brigade]
+    case (mine, theirs) of
+      ([first, second], [b]) -> do
+        let after = S.runPure (blockAll [first, second]) gs Combat.declareBlockers
+        Spec.assertEqWith
+          s
+          "one blocker, two blocked attackers"
+          (Combat.blockersOf first after, Combat.blockersOf second after, Combat.isBlocked first after, Combat.isBlocked second after)
+          (Set.singleton b, Set.singleton b, True, True)
+      _ -> Spec.assertFailure s "fixture should have two attackers and one blocker"
+  Spec.it s "CR 510.1d the Brigade divides its 2 among the creatures it blocks" $ do
+    -- 2 power over two 2/1 Pikers: one each kills both, all on one kills only
+    -- that one. Distinct counts, so the two divisions cannot be confused -- and
+    -- an UNDIVIDED reading, 2 to each Piker, kills both on either leg.
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker, piker] [brigade]
+        dump :: Prompt.Prompt r -> r
+        dump p = case p of
+          Prompt.AssignCombatDamage _ _ _ thresholds n ->
+            case filter S.isCreatureRecipient (Map.keys thresholds) of
+              r : _ -> Map.singleton r n
+              [] -> Map.empty
+          _ -> blockAll mine p
+        split :: Prompt.Prompt r -> r
+        split p = case p of
+          Prompt.AssignCombatDamage _ _ _ thresholds _ -> Map.fromList (fmap (\r -> (r, 1)) (filter S.isCreatureRecipient (Map.keys thresholds)))
+          _ -> blockAll mine p
+    Spec.assertEqWith
+      s
+      "all on one kills one; one each kills both"
+      ( S.creaturesInPlay S.alice (S.settleSba (S.fightWith dump gs)),
+        S.creaturesInPlay S.alice (S.settleSba (S.fightWith split gs))
+      )
+      (1, 0)
+  Spec.it s "CR 510.1d blocking ONE creature is forced, and unprompted" $ do
+    -- The same interpreter that would answer an illegal empty division, which
+    -- assigns nothing: the Piker takes 2 anyway, so no prompt was raised.
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (gs, mine, _) = S.combatBoardOf [piker] [brigade]
+        noAssign :: Prompt.Prompt r -> r
+        noAssign p = case p of
+          Prompt.AssignCombatDamage {} -> Map.empty
+          _ -> S.aggressiveAnswer p
+    case mine of
+      [a] -> Spec.assertEqWith s "the attacker took the whole 2" (S.damageOf a (S.fightWith noAssign gs)) (Just 2)
+      _ -> Spec.assertFailure s "fixture should have one attacker"
+  Spec.it s "CR 702.22k a banding attacker moves the blocker's division to the ACTIVE player" $ do
+    -- Benalish Hero {W} 1/1 has printed banding. With it among the creatures the
+    -- Brigade blocks, CR 702.22k hands alice the division that CR 510.1d would
+    -- have given bob; with two plain Pikers instead, bob keeps it. Three seats
+    -- are not needed here -- the two players are already on opposite sides of
+    -- the declaration -- but the control board is, since both readings answer
+    -- with a PlayerId either way.
+    brigade <- S.printingOf s registry "Foriysian Brigade"
+    benalishHero <- S.printingOf s registry "Benalish Hero"
+    piker <- S.printingOf s registry "Goblin Piker"
+    let (banded, bandedAttackers, _) = S.combatBoardOf [benalishHero, piker] [brigade]
+        (plain, plainAttackers, _) = S.combatBoardOf [piker, piker] [brigade]
+    Spec.assertEqWith
+      s
+      "banding inverts the chooser"
+      (divisionChooser bandedAttackers banded, divisionChooser plainAttackers plain)
+      ([S.alice], [S.bob])
+
+-- Blocks every attacker in `attackers` with every creature offered, which is
+-- what aggressiveAnswer cannot do: it puts them all on the first attacker.
+blockAll :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+blockAll attackers p = case p of
+  Prompt.DeclareBlockers _ _ mine _ -> Map.fromList (fmap (\b -> (b, Set.fromList attackers)) mine)
+  _ -> S.aggressiveAnswer p
+
+-- Whom CR 510.1d's division was asked of, in order. A list rather than a Maybe
+-- so a case that raised no prompt at all is told from one that raised it of the
+-- wrong player.
+divisionChooser :: [ObjectId.ObjectId] -> GameState.GameState -> [PlayerId.PlayerId]
+divisionChooser attackers gs =
+  let record :: Prompt.Prompt r -> State.State [PlayerId.PlayerId] r
+      record p = case p of
+        Prompt.AssignCombatDamage _ pid _ thresholds n -> do
+          State.modify' (<> [pid])
+          pure $ case filter S.isCreatureRecipient (Map.keys thresholds) of
+            r : _ -> Map.singleton r n
+            [] -> Map.empty
+        _ -> pure (blockAll attackers p)
+   in snd
+        ( State.runState
+            ( fmap snd . Engine.runGame record gs $ do
+                Combat.declareAttackers S.alice
+                Combat.declareBlockers
+                Damage.dealCombatDamage
+            )
+            []
+        )
 
 -- CR 702.111b, proved by Boggart Brute ("Creature -- Goblin Warrior 3/2,
 -- Menace") -- the blocking side's SET-SHAPED combat restriction, and the first
@@ -1323,7 +1516,7 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     let (gs, mine, theirs) = attacking [boggartBrute] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "illegal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 702.111b a declaration in which TWO creatures block a menace attacker is legal" $ do
     -- THE FALSIFIER for reading 702.111b as "can't be blocked": the same
@@ -1335,7 +1528,7 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     let (gs, mine, theirs) = attacking [boggartBrute] [piker, piker]
     case (mine, theirs) of
       (a : _, [b, c]) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(b, a), (c, a)]) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(b, Set.singleton a), (c, Set.singleton a)]) gs) "legal"
         let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
         Spec.assertEqWith s "both block" (Combat.blockersOf a after) (Set.fromList [b, c])
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
@@ -1351,7 +1544,7 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     case (mine, theirs) of
       (a : _, b : _) -> do
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "declining is legal"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "one blocker is not"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "one blocker is not"
         -- And the engine reaches that legal answer for itself: S.aggressiveAnswer
         -- blocks with everything, which here is the illegal single block, so
         -- declareBlockers falls back to the forced declaration -- which is the
@@ -1389,8 +1582,8 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     let (gs, mine, theirs) = attacking [boggartBrute, piker] [piker]
     case (mine, theirs) of
       ([brute, plain], b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b plain) gs) "one blocker on the plain attacker is legal"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b brute) gs)) "one blocker on the menace attacker is not"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton plain)) gs) "one blocker on the plain attacker is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton brute)) gs)) "one blocker on the menace attacker is not"
       _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
   Spec.it s "CR 509.1b menace and fear are cumulative: two blockers, and both must pass fear" $ do
     -- "Different evasion abilities are cumulative." A Boggart Brute granted
@@ -1409,9 +1602,9 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     case (mine, theirs) of
       (a : _, [rats, myr, plain]) -> do
         let gs = withFear a gs0
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(rats, a), (myr, a)]) gs) "two fear-legal blockers"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(rats, a), (plain, a)]) gs)) "two blockers, one of which fear forbids"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton rats a) gs)) "one fear-legal blocker is still one blocker"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(rats, Set.singleton a), (myr, Set.singleton a)]) gs) "two fear-legal blockers"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(rats, Set.singleton a), (plain, Set.singleton a)]) gs)) "two blockers, one of which fear forbids"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton rats (Set.singleton a)) gs)) "one fear-legal blocker is still one blocker"
       _ -> Spec.assertFailure s "fixture should have an attacker and three blockers"
   Spec.it s "CR 702.111b menace restricts being blocked, never attacking or blocking" $ do
     -- The asymmetry every evasion gate here has (see evasionAllows), stated for
@@ -1428,12 +1621,12 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
       (a : _, b : _) -> do
         Spec.assertBool s (Combat.canAttack S.alice a before) "a menace creature may attack"
         Spec.assertEqWith s "and it does" (Map.keys (Combat.Type.attackers (GameState.combat gs))) [a]
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "but one creature may not block it"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "but one creature may not block it"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
     let (gs2, mine2, theirs2) = attacking [piker] [boggartBrute]
     case (mine2, theirs2) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs2) "a menace creature blocking alone is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs2) "a menace creature blocking alone is legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 509.1c a Lured menace attacker must be blocked by BOTH creatures or by neither" $ do
     -- CR 509.1c's own worked example, in the pool's cards: "A player controls
@@ -1453,8 +1646,8 @@ menaceSpec s registry = Spec.describe s "Menace" $ do
     case (mine, theirs) of
       (a : _, [b, c]) -> do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "neither blocking is illegal"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs)) "one blocking is illegal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(b, a), (c, a)]) gs) "both blocking is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs)) "one blocking is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(b, Set.singleton a), (c, Set.singleton a)]) gs) "both blocking is legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
   Spec.it s "CR 509.1c a Lured menace attacker with only ONE creature to block it may go unblocked" $ do
     -- CR 509.1c maximizes over the requirements "that could be obeyed WITHOUT
@@ -1535,7 +1728,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     let (gs, mine, theirs) = luring lure [piker] [piker]
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 509.1c a creature that CANNOT block the Lured attacker is not required to" $ do
     -- Lure's "able to block" doing its work: the Bird Maiden has flying (CR
@@ -1573,8 +1766,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     case (mine, theirs) of
       (a : _, [ground, reacher]) -> do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "no blocks is illegal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton reacher a) gs) "the reach creature blocking is legal"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton ground a) gs)) "the ground creature blocking is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton reacher (Set.singleton a)) gs) "the reach creature blocking is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton ground (Set.singleton a)) gs)) "the ground creature blocking is illegal"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
   Spec.it s "CR 509.1c with two able creatures BOTH are required to block" $ do
     -- One Lure over two creatures is TWO requirements, not one -- CR 509.1c
@@ -1585,8 +1778,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     let (gs, mine, theirs) = luring lure [piker] [piker, piker]
     case (mine, theirs) of
       (a : _, [first, second]) -> do
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton first a) gs)) "one blocker is not enough"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, a), (second, a)]) gs) "both blockers is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton first (Set.singleton a)) gs)) "one blocker is not enough"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, Set.singleton a), (second, Set.singleton a)]) gs) "both blockers is legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
   Spec.it s "CR 509.1c whole cards: a Lure forces a block through a real declare blockers step" $ do
     -- The gameplay-level case, run through Combat.declareBlockers with an
@@ -1626,7 +1819,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "no blocks is illegal"
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) gs) "blocking the Unicorn is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) gs) "blocking the Unicorn is legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 509.1c a Prized Unicorn does not lure the OTHER attacker alongside it" $ do
     -- IsSource is an identity test, not "every attacker this permanent
@@ -1639,8 +1832,8 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     let (gs, mine, theirs) = attacking [prizedUnicorn, piker] [piker]
     case (mine, theirs) of
       ([unicorn, other], b : _) -> do
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b unicorn) gs) "blocking the Unicorn is legal"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b other) gs)) "blocking the other attacker instead is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton unicorn)) gs) "blocking the Unicorn is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton other)) gs)) "blocking the other attacker instead is illegal"
       _ -> Spec.assertFailure s "fixture should have two attackers and a blocker"
   Spec.it s "CR 604.2 Humility strips a Prized Unicorn's block requirement, so declining becomes legal" $ do
     -- CR 604.2: a static ability's continuous effect is active only while the
@@ -1664,7 +1857,7 @@ blockRequirementSpec s registry = Spec.describe s "BlockRequirements" $ do
     Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty underHumility) "under Humility, no blocks is legal"
     case (mine, theirs) of
       (a : _, b : _) ->
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b a) underHumility) "and blocking is still legal, so the combat is still live"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton b (Set.singleton a)) underHumility) "and blocking is still legal, so the combat is still live"
       _ -> Spec.assertFailure s "fixture should have an attacker and a blocker"
   Spec.it s "CR 303.4m a Lure that is not attached to anything requires nothing" $ do
     -- CR 303.4m reads the SOURCE's attachment, so an unattached Lure names no
@@ -1885,8 +2078,8 @@ combatRestrictionSpec s registry = Spec.describe s "CombatRestrictions" $ do
         Spec.assertBool s (not (Combat.canBlock S.bob pacified board)) "the enchanted creature cannot block"
         Spec.assertBool s (Combat.canBlock S.bob other board) "the one beside it can"
         Spec.assertEqWith s "and only that one is offered" (Combat.legalBlockers S.bob board) [other]
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton pacified a) board)) "blocking with the enchanted creature is illegal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other a) board) "blocking with the other one is legal"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton pacified (Set.singleton a)) board)) "blocking with the enchanted creature is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton other (Set.singleton a)) board) "blocking with the other one is legal"
       _ -> Spec.assertFailure s "fixture should have an attacker and two blockers"
   Spec.it s "CR 604.2 the restriction lifts the moment the Aura leaves the battlefield" $ do
     -- A restriction is gathered LIVE from the battlefield and never captured, the
@@ -2363,7 +2556,7 @@ textChangedCombatAffectedSpec s registry = Spec.describe s "TextChangedCombatAff
         Spec.assertEqWith s "the animated Swamp is the attacker in both worlds" (S.attackerDeclarationsOf hacked) [swampId]
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty printed) "under the printed Frenzy declining to block is legal"
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty hacked)) "under the hacked one it is illegal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker swampId) hacked) "and blocking is the legal answer"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton blocker (Set.singleton swampId)) hacked) "and blocking is the legal answer"
       _ -> Spec.assertFailure s "fixture should have one blocker"
   Spec.it s "CR 612.1 whole cards: the rewritten affected sets decide a real combat phase" $ do
     -- The gameplay-level case, run through CR 703.4i's turn-based action and the
@@ -2600,11 +2793,11 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
     case (mine, theirs, plain, others) of
       ([a], [arbiter, first, second], [b], [x, y]) -> do
         Spec.assertEqWith s "all three of bob's are offered" (Combat.legalBlockers S.bob gs) [arbiter, first, second]
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first a) gs) "one blocker is legal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton second a) gs) "either one of them"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, a), (second, a)]) gs)) "two are not"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first (Set.singleton a)) gs) "one blocker is legal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton second (Set.singleton a)) gs) "either one of them"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, Set.singleton a), (second, Set.singleton a)]) gs)) "two are not"
         Spec.assertBool s (Combat.legalBlockDeclaration S.bob Map.empty gs) "and declining stays legal"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(x, b), (y, b)]) control) "two Pikers double block without the Arbiter"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(x, Set.singleton b), (y, Set.singleton b)]) control) "two Pikers double block without the Arbiter"
       _ -> Spec.assertFailure s "fixture should have one attacker and bob's blockers"
   Spec.it s "CR 508.1d's own Example: the required creature attacks, and nothing else does" $ do
     -- Verbatim: "A player controls two creatures: one that 'attacks if able' and
@@ -2674,10 +2867,10 @@ boundedDeclarationSpec s registry = Spec.describe s "BoundedDeclaration" $ do
     case (mine, theirs, plain, others) of
       ([a], [_, first, second], [b], [x, y]) -> do
         Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob Map.empty gs)) "declining is illegal under the Lure"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first a) gs) "one blocker attains the maximum"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, a), (second, a)]) gs)) "two are over the bound"
-        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton x b) control)) "without the Arbiter one blocker no longer attains it"
-        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(x, b), (y, b)]) control) "and both blocking does"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton first (Set.singleton a)) gs) "one blocker attains the maximum"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, Set.singleton a), (second, Set.singleton a)]) gs)) "two are over the bound"
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton x (Set.singleton b)) control)) "without the Arbiter one blocker no longer attains it"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(x, Set.singleton b), (y, Set.singleton b)]) control) "and both blocking does"
       _ -> Spec.assertFailure s "fixture should have one attacker and bob's blockers"
   Spec.it s "CR 508.1c whole cards: an over-large attack is refused in a real declare attackers step" $ do
     -- The gameplay-level attacking case, through the priority loop and CR 703.4i's
@@ -3461,7 +3654,7 @@ attackOnly attacker p = case p of
 blockOnly :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 blockOnly blocker p = case p of
   Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
-    a : _ -> Map.singleton blocker a
+    a : _ -> Map.singleton blocker (Set.singleton a)
     [] -> Map.empty
   _ -> S.aggressiveAnswer p
 
@@ -3475,7 +3668,7 @@ unblock blocker victim p = case p of
   Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature victim)) sets
   Prompt.ChooseAction {} -> S.castAnswer p
   Prompt.DeclareBlockers _ _ _ attackers -> case attackers of
-    a : _ -> Map.singleton blocker a
+    a : _ -> Map.singleton blocker (Set.singleton a)
     [] -> Map.empty
   _ -> S.aggressiveAnswer p
 
@@ -4374,6 +4567,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Combat" $ do
   evasionSpec s registry
   textChangedLandwalkSpec s registry
   menaceSpec s registry
+  blockPermissionSpec s registry
   blockRequirementSpec s registry
   attackRequirementSpec s registry
   combatRestrictionSpec s registry

@@ -208,13 +208,28 @@ data Prompt r where
   -- calls for no announcement.
   ChooseAttackTarget :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> NonEmpty.NonEmpty AttackTarget.AttackTarget -> Prompt AttackTarget.AttackTarget
   -- | CR 509.1. The legal blockers, then the attackers they may block. The answer
-  -- maps each blocking creature to the attacker it blocks.
-  DeclareBlockers :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [ObjectId.ObjectId] -> Prompt (Map.Map ObjectId.ObjectId ObjectId.ObjectId)
-  -- | CR 510.1 / 702.19b: the attacker divides its power among the legal recipients.
+  -- maps each blocking creature to the attackers it blocks.
+  --
+  -- A SET per blocker, and never a single attacker: CR 509.1a gives a creature one
+  -- attacker to block, but a permission can raise that (Foriysian Brigade), and
+  -- fixed arity is the recurring root cause (design doc §2.11). A blocker that
+  -- blocks nothing is absent rather than mapped to the empty set.
+  --
+  -- WHICH attackers each blocker may take is not offered per blocker: the
+  -- restrictions are pairwise (CR 509.1b) and the arity is per creature, so the
+  -- prompt hands over both lists and Pawl.Engine.Combat.legalBlockDeclaration
+  -- judges the answer.
+  DeclareBlockers :: Decider.Decider -> PlayerId.PlayerId -> [ObjectId.ObjectId] -> [ObjectId.ObjectId] -> Prompt (Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId))
+  -- | CR 510.1 / 702.19b: a combatant divides its power among the legal
+  -- recipients. The ObjectId is the assigning creature -- an ATTACKER under CR
+  -- 510.1c, dividing among the creatures blocking it, or a BLOCKER under CR
+  -- 510.1d, dividing among the creatures it blocks.
+  --
   -- The Map is recipient -> lethal threshold (blockers -> lethal, the defender ->
   -- 0); trample-ness is entirely in whether the defender is a key and what the
-  -- thresholds are. Not asked when the division is forced (single blocker, no
-  -- excess). Validation is Damage.legalAssignment. See the M2c spec, section 4.
+  -- thresholds are. Every threshold is 0 on the blocking side, CR 510.1d imposing
+  -- no minimum. Not asked when the division is forced (one recipient, no excess).
+  -- Validation is Damage.legalAssignment. See the M2c spec, section 4.
   AssignCombatDamage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Prompt (Map.Map Recipient.Recipient Natural.Natural)
   -- | CR 601.2c. One legal-recipient set per named slot of the spell being cast
   -- (the ObjectId); the answer fills every slot. Slots agree by NAME, never by
