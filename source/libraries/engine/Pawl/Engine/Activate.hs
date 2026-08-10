@@ -20,6 +20,7 @@ import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Engine.SplitSecond as SplitSecond
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
@@ -62,8 +63,8 @@ sicknessOkGiven pcs pid srcId ability =
 --
 -- On the battlefield: the PROJECTION's, so Humility (layer 6) strips them. In a
 -- hand: the ones rule 702 mints for the card's printed keywords, which is
--- cycling (CR 702.29a) and nothing else today, read off the PRINTED card
--- because pawl's projection does not reach a hand (#160); CR 113.6b is the rule
+-- cycling (CR 702.29a) and reinforce (CR 702.77a) today, read off the PRINTED
+-- card because pawl's projection does not reach a hand (#160); CR 113.6b is the rule
 -- that lets an ability name its own zone. In a graveyard: the PRINTED abilities
 -- whose own cost or effect names the graveyard, per CR 113.6m -- see
 -- graveyardAbilitiesOf. Anywhere else: nothing -- flashback and rule 702's other
@@ -71,10 +72,11 @@ sicknessOkGiven pcs pid srcId ability =
 -- Pawl.Engine.Cast instead. The first ability ACTIVATED from a fourth zone adds
 -- an arm here.
 --
--- CR 702.29b is why this gates ACTIVATION and not existence: a cycling ability
--- keeps existing in every zone, so an effect counting activated abilities sees
--- it. Nothing in the pool asks that second question yet; whatever does must ask
--- the CARD rather than this function, which answers a narrower one.
+-- CR 702.29b and CR 702.77b are why this gates ACTIVATION and not existence: a
+-- cycling or reinforce ability keeps existing in every zone, so an effect
+-- counting activated abilities sees it. Nothing in the pool asks that second
+-- question yet (#1207); whatever does must ask the CARD rather than this
+-- function, which answers a narrower one.
 --
 -- This is the LONE-QUERY convenience wrapper: it precomputes nothing, so it
 -- reaches Projection.project for itself, as do sicknessOk above and
@@ -388,6 +390,13 @@ activatableGiven grants pcs pid srcId ability gs =
   activatorOfGiven grants srcId gs == Just pid
     && elem ability (abilitiesForGiven pcs srcId gs)
     && not (Mana.isManaAbility ability)
+    -- CR 702.61a's other limb -- "players can't ... activate abilities that
+    -- aren't mana abilities" -- and it sits AFTER the mana conjunct on purpose:
+    -- CR 702.61b's exemption for mana abilities is then the same fact CR 605.3b
+    -- already established here, rather than a second reading of the rule. The
+    -- windows that do serve a mana ability (Action.ActivateManaAbility,
+    -- Cost.payMana) never reach this function, so neither is gated.
+    && not (SplitSecond.inForce gs)
     && sicknessOkGiven pcs pid srcId ability gs
     && restrictionsOk pid ability gs
     && loyaltyOk pid srcId ability gs

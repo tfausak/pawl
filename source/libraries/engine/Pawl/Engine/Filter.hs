@@ -638,6 +638,9 @@ rewriteKeyword pairs keyword = case keyword of
   -- HERE. "Spirit" is a word CR 612.2a does reach, but it is in the ability
   -- Pawl.Engine.Keyword.soulshift mints rather than in this value (#1197).
   Keyword.Type.Soulshift _ -> keyword
+  -- CR 702.61a names no word CR 612.2 can swap: "mana ability" is CR 605.1a's
+  -- own classification and "the stack" is a zone.
+  Keyword.Type.SplitSecond -> keyword
   -- CR 702.77a states a cost, so rewriteCost reaches it as flashback's does. The
   -- N is a number and not a word, and "+1/+1 counter" is in the ability
   -- Pawl.Engine.Keyword.reinforce mints rather than in this value.

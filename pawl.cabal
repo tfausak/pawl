@@ -396,6 +396,7 @@ library engine
     Pawl.Engine.Script
     Pawl.Engine.Setup
     Pawl.Engine.Speed
+    Pawl.Engine.SplitSecond
     Pawl.Engine.Stack
     Pawl.Engine.Subtype
     Pawl.Engine.Summoning
@@ -822,6 +823,7 @@ test-suite pawl-test-suite
     Pawl.SetupSpec
     Pawl.SpecialActionSpec
     Pawl.SpeedSpec
+    Pawl.SplitSecondSpec
     Pawl.Support
     Pawl.TargetSpec
     Pawl.TransformSpec

@@ -197,6 +197,7 @@ import qualified Pawl.SlugSpec
 import qualified Pawl.Spec as Spec
 import qualified Pawl.SpecialActionSpec
 import qualified Pawl.SpeedSpec
+import qualified Pawl.SplitSecondSpec
 import qualified Pawl.TargetSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
@@ -447,6 +448,7 @@ spec s registry = do
   Pawl.SagaSpec.spec s registry
   Pawl.SpecialActionSpec.spec s registry
   Pawl.SpeedSpec.spec s registry
+  Pawl.SplitSecondSpec.spec s registry
   Pawl.TargetSpec.spec s registry
   Pawl.TransformSpec.spec s registry
   Pawl.TriggerSpec.spec s registry
