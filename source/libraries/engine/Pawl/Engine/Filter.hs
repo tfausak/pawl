@@ -501,6 +501,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Annihilator _ -> keyword
   Keyword.Type.Infect -> keyword
   Keyword.Type.Wither -> keyword
+  Keyword.Type.Exalted -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword

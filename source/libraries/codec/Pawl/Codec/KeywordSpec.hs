@@ -394,6 +394,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Wither
       """ {"type":"Wither"} """
+  -- CR 702.83a takes no parameter either, so exalted is a bare tag. What is
+  -- multiple is the COUNT the projection keeps -- rule 702.83 prints no
+  -- redundancy clause, unlike wither's above.
+  Spec.it s "Exalted" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Exalted
+      """ {"type":"Exalted"} """
   -- CR 702.91a's battle cry takes no parameter, so it encodes as a bare tag.
   -- What CR 702.91b makes multiple is the COUNT the projection keeps, never the
   -- value.

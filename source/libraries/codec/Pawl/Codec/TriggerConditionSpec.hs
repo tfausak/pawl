@@ -121,6 +121,16 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn)
       """ {"type":"SelfAttacks","value":{"type":"FirstTimeEachTurn"}} """
+  -- CR 506.5. A Filter over the ATTACKER where the sibling above takes a
+  -- frequency: "alone" is the constructor's own, so it has no encoding of its
+  -- own here.
+  Spec.it s "CreatureAttacksAlone" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.CreatureAttacksAlone (Filter.ControlledBy PlayerRelation.You))
+      """ {"type":"CreatureAttacksAlone","value":{"type":"ControlledBy","value":{"type":"You"}}} """
   -- CR 509.3a, and nullary where its mirror is not: rule 509.3a's
   -- once-each-combat is not a frequency a card chooses.
   Spec.it s "SelfBlocks" $

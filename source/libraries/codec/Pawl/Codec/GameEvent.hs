@@ -29,7 +29,7 @@ toJson e = case e of
   GameEvent.Discarded pid oid cause ->
     Common.tagged "Discarded" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid, DiscardCause.toJson cause]
   GameEvent.Revealed pid pc -> Common.tagged "Revealed" . Just . Common.array $ [PlayerId.toJson pid, ProjectedCharacteristics.toJson pc]
-  GameEvent.AttackerDeclared oid pid -> Common.tagged "AttackerDeclared" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson pid]
+  GameEvent.AttackerDeclared oid pid count -> Common.tagged "AttackerDeclared" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson pid, Common.encodeNatural count]
   GameEvent.BlockerDeclared blocker attacker -> Common.tagged "BlockerDeclared" . Just . Common.array $ [ObjectId.toJson blocker, ObjectId.toJson attacker]
   GameEvent.BlocksDeclared blocker count -> Common.tagged "BlocksDeclared" . Just . Common.array $ [ObjectId.toJson blocker, Common.encodeNatural count]
   GameEvent.AttackerBlocked oid pid -> Common.tagged "AttackerBlocked" . Just . Common.array $ [ObjectId.toJson oid, PlayerId.toJson pid]
@@ -60,7 +60,7 @@ fromJson value = do
     ("Discarded", Just (Value.Array (Array.MkArray [pid, oid, cause]))) ->
       GameEvent.Discarded <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid <*> DiscardCause.fromJson cause
     ("Revealed", Just (Value.Array (Array.MkArray [pid, pc]))) -> GameEvent.Revealed <$> PlayerId.fromJson pid <*> ProjectedCharacteristics.fromJson pc
-    ("AttackerDeclared", Just (Value.Array (Array.MkArray [oid, pid]))) -> GameEvent.AttackerDeclared <$> ObjectId.fromJson oid <*> PlayerId.fromJson pid
+    ("AttackerDeclared", Just (Value.Array (Array.MkArray [oid, pid, count]))) -> GameEvent.AttackerDeclared <$> ObjectId.fromJson oid <*> PlayerId.fromJson pid <*> Common.decodeNatural count
     ("BlockerDeclared", Just (Value.Array (Array.MkArray [blocker, attacker]))) -> GameEvent.BlockerDeclared <$> ObjectId.fromJson blocker <*> ObjectId.fromJson attacker
     ("BlocksDeclared", Just (Value.Array (Array.MkArray [blocker, count]))) -> GameEvent.BlocksDeclared <$> ObjectId.fromJson blocker <*> Common.decodeNatural count
     ("AttackerBlocked", Just (Value.Array (Array.MkArray [oid, pid]))) -> GameEvent.AttackerBlocked <$> ObjectId.fromJson oid <*> PlayerId.fromJson pid

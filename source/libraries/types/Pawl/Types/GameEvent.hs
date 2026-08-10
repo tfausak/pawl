@@ -152,10 +152,22 @@ data GameEvent
     -- individually per attacking creature -- which is exactly one field per
     -- declared attacker.
     --
+    -- The Natural is HOW MANY creatures the SAME declaration named, which is CR
+    -- 506.5's "the only creature declared as an attacker" -- 1 means the creature
+    -- attacks alone, and CR 702.83a's exalted is what reads it. Never zero: a
+    -- declaration naming nobody records no event. Every event from one
+    -- declaration carries the same number, since the fact is about the
+    -- declaration rather than about the creature.
+    --
+    -- Carried rather than derived, for BlocksDeclared's reason plus one of its
+    -- own: CR 702.83b scopes "alone" to "a given combat phase", and the event log
+    -- is cleared per TURN, so counting declarations in it would call a creature
+    -- in the second combat phase of an extra-combat turn not alone.
+    --
     -- NOT the AttackTarget itself. That is a wider payload for a different
     -- question -- CR 508.3a's attacks-a-permanent form, CR 508.3b and CR 508.3e,
     -- which need trigger conditions no card in the pool declares (#538).
-    AttackerDeclared ObjectId.ObjectId PlayerId.PlayerId
+    AttackerDeclared ObjectId.ObjectId PlayerId.PlayerId Natural.Natural
   | -- | CR 509.1i: a blocker was DECLARED -- one entry per creature the defending
     -- player chose in CR 509.1's turn-based action, naming the blocker and one
     -- attacking creature chosen for it (CR 509.1a). AttackerDeclared's mirror,

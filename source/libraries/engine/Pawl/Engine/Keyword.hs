@@ -57,10 +57,11 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- matter -- Projection.hasKeyword for an evasion or combat bit,
 -- Pawl.Engine.Damage for infect's and toxic's damage riders -- because the rule
 -- states them as static abilities some rules-core reader already asks about.
--- Rules 702.25, 702.45, 702.70, 702.86, 702.91, 702.108 and 702.130 do not: they
--- spell flanking, bushido, poisonous, annihilator, battle cry, prowess and
--- afflict out as TRIGGERED abilities, so those have to be MINTED and handed to
--- the ordinary CR 603 machinery rather than merely consulted.
+-- Rules 702.25, 702.45, 702.70, 702.83, 702.86, 702.91, 702.108 and 702.130 do
+-- not: they spell flanking, bushido, poisonous, exalted, annihilator, battle
+-- cry, prowess and afflict out as TRIGGERED abilities, so those have to be
+-- MINTED and handed to the ordinary CR 603 machinery rather than merely
+-- consulted.
 --
 -- Casing on Keyword here is legitimate for the reason Pawl.Types.Keyword's own
 -- comment gives: a keyword is a numbered rule, not an effect's identity. What
@@ -88,8 +89,14 @@ import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 -- toxic's N values are SUMMED into a single rider -- Projection.totalToxic.) CR
 -- 702.25b says the same of flanking, CR 702.45b of bushido, CR 702.86b of
 -- annihilator, CR 702.91b of battle cry, CR 702.108b of prowess and CR 702.130b
--- of afflict, so the seven minting arms below are the same shape -- bushido's
+-- of afflict, so the eight minting arms below are the same shape -- bushido's
 -- `concat` aside, since its instance is two abilities.
+--
+-- Exalted is the one with no such clause of its own: rule 702.83 states only
+-- that exalted IS a triggered ability, and the "multiple instances are
+-- redundant" sentence that would collapse it (CR 702.28c's, for shadow) is
+-- absent -- so two instances are two abilities here for the general reason CR
+-- 603.2 gives, rather than because the keyword's own rule says so.
 --
 -- Order is the Map's, which is Keyword's Ord -- rule-number order, and stable.
 -- The CR 603.3b ordering prompt indexes into the scan's canonical order, so this
@@ -109,6 +116,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Flanking -> List.genericReplicate count flanking
+  Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -206,6 +214,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Exalted -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Riot -> []
@@ -322,6 +331,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Exalted -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Riot -> []
@@ -506,6 +516,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Exalted -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Riot -> []
@@ -783,6 +794,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Prowess -> []
   Keyword.Infect -> []
   Keyword.Wither -> []
+  Keyword.Exalted -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
   Keyword.Daybound -> []
@@ -857,6 +869,8 @@ familyOf keyword = case keyword of
   Keyword.Intimidate -> Nothing
   Keyword.Infect -> Nothing
   Keyword.Wither -> Nothing
+  -- CR 702.83a takes no parameter, so there is no variant for a card to name.
+  Keyword.Exalted -> Nothing
   Keyword.BattleCry -> Nothing
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
@@ -1076,6 +1090,51 @@ flankingEffect =
     Duration.UntilEndOfTurn
     (Modification.ModifyPowerToughness (Quantity.Literal (-1)) (Quantity.Literal (-1)))
     (ObjectRef.InSlot Binding.blockingCreature)
+
+-- CR 702.83a: whenever a creature you control attacks alone, that creature gets
+-- +1/+1 until end of turn. The EIGHTH keyword rule 702 states as a triggered
+-- ability, minted here like the five above and the two below.
+--
+-- The first whose ability is borne by a BYSTANDER on both sides at once. Battle
+-- cry's condition is the bearer's own attack and prowess' payload is the bearer
+-- itself; here the condition watches somebody else's declaration AND the payload
+-- pumps somebody else, so the bearer appears in neither. It supplies only CR
+-- 109.5's "you" -- the ability's controller (CR 603.3a) -- which is what
+-- Filter.ControlledBy You is read against, and the Filter context's source.
+--
+-- ALONE is TriggerCondition.CreatureAttacksAlone's own, not a Filter conjunct:
+-- CR 506.5 makes it a fact about the declaration rather than a characteristic
+-- (that constructor's Haddock argues it). What is left for the Filter is the
+-- printed "a creature you control" -- the card type, which CR 508.1a narrows to
+-- nothing today, and the relation, which does the work.
+--
+-- "THAT CREATURE" is the creature the event named, read out of the reserved
+-- Binding.attackingCreature slot -- NOT Filter.IsSource, which is prowess'
+-- payload and would pump the wrong permanent whenever a card other than the
+-- exalted bearer attacks. ObjectRef.InSlot for flanking's reason: rule 702.83a
+-- names the one creature whose declaration fired this.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- rule 702.83a leaves nothing to choose, and has no "if" clause, so
+-- intervening = Nothing.
+exalted :: TriggeredAbility Card
+exalted =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition =
+        TriggerCondition.CreatureAttacksAlone
+          (Filter.And [Filter.HasCardType CardType.Creature, Filter.ControlledBy PlayerRelation.You]),
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton effect))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    effect =
+      Effect.ModifyTarget
+        Duration.UntilEndOfTurn
+        (Modification.ModifyPowerToughness (Quantity.Literal 1) (Quantity.Literal 1))
+        (ObjectRef.InSlot Binding.attackingCreature)
 
 -- CR 702.45a: "'Bushido N' means 'Whenever this creature blocks or becomes
 -- blocked, it gets +N/+N until end of turn.'" The fifth keyword in this pool

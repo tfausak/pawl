@@ -639,7 +639,7 @@ printedPower face = case Face.characteristicPT face of
 -- out of the answer.
 declaredIt :: ObjectId -> GameEvent.GameEvent -> Bool
 declaredIt oid event = case event of
-  GameEvent.AttackerDeclared declared _ -> declared == oid
+  GameEvent.AttackerDeclared declared _ _ -> declared == oid
   _ -> False
 
 -- Shared assembly: fill a View from a projection's characteristics, a supplied
@@ -1524,6 +1524,9 @@ rewriteTriggerCondition pairs condition = case condition of
   TriggerCondition.PlayerDiscards _ -> condition
   TriggerCondition.PlayerBecomesMonarch _ -> condition
   TriggerCondition.SelfAttacks _ -> condition
+  -- CR 506.5's Filter is a predicate over the ATTACKER, so a subtype rewrite
+  -- reaches it as it reaches SelfBecomesBlockedBy's below.
+  TriggerCondition.CreatureAttacksAlone f -> TriggerCondition.CreatureAttacksAlone (Filter.rewrite pairs f)
   TriggerCondition.SelfBlocks -> condition
   TriggerCondition.SelfBlocksCreature -> condition
   TriggerCondition.SelfBlocksAtLeast _ -> condition
