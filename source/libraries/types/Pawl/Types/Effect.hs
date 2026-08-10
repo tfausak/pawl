@@ -737,6 +737,20 @@ data Effect card
     -- CR 702.112c leans on that -- the second renown ability to resolve "will have
     -- no effect", which its intervening "if" already stops before reaching here.
     BecomeRenowned SlotName.SlotName
+  | -- | CR 701.37b: the permanent in the slot GAINS THE MONSTROUS DESIGNATION --
+    -- the second half of CR 701.37a's "put N +1/+1 counters on it and it becomes
+    -- monstrous", authored beside a PutCounters in one clause whose condition is
+    -- rule 701.37a's "if this permanent isn't monstrous".
+    --
+    -- A SlotName, a state write rather than a Modification, and idempotent, all
+    -- for BecomeRenowned's reasons above -- rule 701.37b words the designation
+    -- the way rule 702.112b words renowned, down to "neither an ability nor part
+    -- of the permanent's copiable values".
+    --
+    -- A SECOND designation opcode rather than one parameterised over which
+    -- designation, which is the shape this pair will want once a third arrives
+    -- (#1193). Emits no event, so nothing can trigger on it (#1194).
+    BecomeMonstrous SlotName.SlotName
   | -- | CR 702.100a and CR 702.100b together: put a +1/+1 counter on the slot's
     -- permanent, and if one or more actually land, that permanent EVOLVES --
     -- rule 702.100b's marker, which Renegade Krasis' "whenever this creature

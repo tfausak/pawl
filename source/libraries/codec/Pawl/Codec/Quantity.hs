@@ -40,6 +40,7 @@ toJson q = case q of
   -- one the quantity is evaluated against, and the answer is a 0/1 rather than a
   -- stored number, so there is neither a reference nor a payload.
   Quantity.IsRenowned -> Common.nullary "IsRenowned"
+  Quantity.IsMonstrous -> Common.nullary "IsMonstrous"
   -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
   -- from the combat record rather than from anything the card names.
   Quantity.OpponentsAttacked p -> Common.tagged "OpponentsAttacked" . Just $ PlayerRef.toJson p
@@ -70,6 +71,7 @@ fromJson value = do
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson Keyword.fromJson v
     ("IsRenowned", _) -> Right Quantity.IsRenowned
+    ("IsMonstrous", _) -> Right Quantity.IsMonstrous
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
     ("BlockersBeyondFirst", _) -> Right Quantity.BlockersBeyondFirst
     ("AgainstSlot", Just (Value.Array (Array.MkArray [s, q]))) -> Quantity.AgainstSlot <$> SlotName.fromJson s <*> fromJson q

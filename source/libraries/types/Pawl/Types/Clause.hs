@@ -27,9 +27,11 @@ import qualified Pawl.Types.UnlessPaid as UnlessPaid
 data Clause card = MkClause
   { -- | CR 701.46a's "if this permanent has no +1/+1 counters on it" -- a gate on
     -- THIS clause's effects rather than on the whole ability, which is why the
-    -- rider rides the same carrier CR 603.5's "may" does. CR 701.37a prints the
-    -- other shape, gating a proper prefix of a longer ability; no card in the
-    -- pool reaches it, so the clause-vs-mode scope is unproven (#1085, #1086).
+    -- rider rides the same carrier CR 603.5's "may" does. CR 701.37a's
+    -- monstrosity (Nessian Asp) is two instructions rather than adapt's one, but
+    -- its gate still covers the whole ability; CR 701.47a's amass prints the
+    -- other shape, gating a proper prefix, and no card in the pool reaches it, so
+    -- the clause-vs-mode scope is unproven (#1086).
     --
     -- Read as this clause is APPLIED (CR 608.2c's "in the order written"), not
     -- once at CR 601.2b -- so an earlier clause's effects can flip it. Nothing

@@ -234,6 +234,18 @@ data Quantity
     --
     -- A LEAF: it holds no Quantity.
     IsRenowned
+  | -- | CR 701.37b: is the OBJECT this quantity is evaluated against monstrous? 1
+    -- if so and 0 if not -- CR 701.37a's "if this permanent isn't monstrous",
+    -- which a monstrosity ability carries as its clause's condition rather than
+    -- as an intervening "if" (the ability is activated, not triggered).
+    --
+    -- IsRenowned in every structural respect above, for the reason its note
+    -- gives: rule 701.37b words the designation the way rule 702.112b does. No
+    -- Filter atom beside it, because no card in the pool asks the candidate
+    -- question "a monstrous creature" (#1194).
+    --
+    -- A LEAF: it holds no Quantity.
+    IsMonstrous
   | -- | CR 508.3b: how many of that player's opponents were DECLARED attacked
     -- this combat phase -- rule 702.121a's "for each opponent you attacked with a
     -- creature this combat".
@@ -296,7 +308,8 @@ data Quantity
     -- target's.
     --
     -- The one arm that MOVES the object every other object-reading arm (Power,
-    -- ManaValue, ObjectCounters, IsRenowned, BlockersBeyondFirst) is aimed at.
+    -- ManaValue, ObjectCounters, IsRenowned, IsMonstrous, BlockersBeyondFirst) is
+    -- aimed at.
     -- Those arms deliberately name no object, so this is the only way a card can
     -- say which one; without it a payload can read only its own source.
     --

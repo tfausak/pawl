@@ -100,6 +100,7 @@ zoneFunctionedFrom effect = case effect of
   Effect.CreateEmblem {} -> Nothing
   Effect.BecomeMonarch {} -> Nothing
   Effect.BecomeRenowned _ -> Nothing
+  Effect.BecomeMonstrous _ -> Nothing
   Effect.Evolve _ -> Nothing
   Effect.ItBecomes _ -> Nothing
   Effect.ExileUntilMonarch _ -> Nothing

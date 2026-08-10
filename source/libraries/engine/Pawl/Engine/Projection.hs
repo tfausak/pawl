@@ -574,7 +574,8 @@ viewOfCard face =
           -- CR 702.112b: the designation rides an OBJECT (Object.renowned), and
           -- this builder describes a printed face. Not a lost distinction either:
           -- rule 702.112b gives one only to a permanent.
-          Filter.renowned = False
+          Filter.renowned = False,
+          Filter.monstrous = False
         }
 
 -- viewOfCard for a card that IS an object in some zone, so a
@@ -777,7 +778,10 @@ viewOfCharacteristics oid pc controller counters gs =
       -- Object.renowned -- ringBearerFor's posture just above, including for the
       -- CR 608.2h path: an id naming no object answers False, a designation dying
       -- with the permanent (CR 400.7) and no last-known record keeping one.
-      Filter.renowned = maybe False Object.renowned (Game.lookupObject oid gs)
+      Filter.renowned = maybe False Object.renowned (Game.lookupObject oid gs),
+      -- CR 701.37b: `renowned` above in every respect, the two rules wording
+      -- their designations the same way.
+      Filter.monstrous = maybe False Object.monstrous (Game.lookupObject oid gs)
     }
 
 -- CR 122.1: the counters on an object right now, and none for an id that names
@@ -1412,6 +1416,7 @@ rewriteEffect pairs effect = case effect of
   Effect.CreateEmblem {} -> effect
   Effect.BecomeMonarch {} -> effect
   Effect.BecomeRenowned _ -> effect
+  Effect.BecomeMonstrous _ -> effect
   Effect.Evolve _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
@@ -1681,6 +1686,7 @@ rewriteQuantity pairs quantity = case quantity of
   Quantity.Type.Speed _ -> quantity
   Quantity.Type.IsMonarch _ -> quantity
   Quantity.Type.IsRenowned -> quantity
+  Quantity.Type.IsMonstrous -> quantity
   Quantity.Type.PlayerCounters _ _ -> quantity
   -- A leaf too: CR 122.1's counter kinds are their own closed enumeration and
   -- name no subtype word, not even the CR 122.1b keyword one.
