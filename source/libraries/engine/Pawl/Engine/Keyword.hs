@@ -80,6 +80,7 @@ import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
 import qualified Pawl.Types.TypeLine as TypeLine
+import qualified Pawl.Types.UnlessPaid as UnlessPaid
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -173,6 +174,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
   Keyword.Afterlife n -> List.genericReplicate count (afterlife n)
+  -- CR 702.123b says each instance triggers separately, so a permanent with
+  -- fabricate twice enters with two abilities and each is answered on its own.
+  Keyword.Fabricate n -> List.genericReplicate count (fabricate n)
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Training -> List.genericReplicate count training
@@ -249,6 +253,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Reinforce n cost -> [reinforce n cost]
   Keyword.Afflict _ -> []
   Keyword.Crew _ -> []
+  Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -423,6 +428,7 @@ battlefieldAbilitiesOf counts = concatMap (uncurry battlefieldAbilitiesFor) (Map
 battlefieldAbilitiesFor :: Keyword -> Natural -> [ActivatedAbility Card]
 battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Crew n -> List.genericReplicate count (crew n)
+  Keyword.Fabricate _ -> []
   Keyword.Cycling _ _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -654,6 +660,7 @@ permissionsFor cardTypes keyword = case keyword of
   -- CR 702.122a is an activated ability too, and one that functions on the
   -- battlefield -- see battlefieldAbilitiesOf above.
   Keyword.Crew _ -> []
+  Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -997,6 +1004,7 @@ mintedReplacementsFor keyword count = case keyword of
   -- for the same reason, and CR 702.43b makes them add up.
   Keyword.Modular n -> List.genericReplicate count (ReplacementEffect.EntryR Filter.IsSource (EntryRewrite.WithCounters CounterKind.PlusOnePlusOne n))
   Keyword.Crew _ -> []
+  Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -1147,6 +1155,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Vanishing _ -> []
   Keyword.Modular _ -> []
   Keyword.Crew _ -> []
+  Keyword.Fabricate _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
   Keyword.DoubleStrike -> []
@@ -1250,6 +1259,7 @@ familyOf keyword = case keyword of
   Keyword.Poisonous _ -> Just KeywordFamily.Poisonous
   Keyword.Annihilator _ -> Just KeywordFamily.Annihilator
   Keyword.Crew _ -> Just KeywordFamily.Crew
+  Keyword.Fabricate _ -> Just KeywordFamily.Fabricate
   Keyword.Rampage _ -> Just KeywordFamily.Rampage
   Keyword.Afflict _ -> Just KeywordFamily.Afflict
   Keyword.Toxic _ -> Just KeywordFamily.Toxic
@@ -2239,6 +2249,118 @@ spiritToken =
               Face.defense = Nothing,
               Face.keywords = Set.singleton Keyword.Flying,
               Face.colorIndicator = Set.fromList [Color.White, Color.Black],
+              Face.characteristicPT = Nothing,
+              Face.staticAbilities = [],
+              Face.spell = Face.defaultSpell,
+              Face.activatedAbilities = [],
+              Face.replacementEffects = [],
+              Face.triggeredAbilities = [],
+              Face.delayedAbilities = Map.empty,
+              Face.castingPermissions = [],
+              Face.castingRestrictions = [],
+              Face.enchant = [],
+              Face.counterability = Counterability.Counterable,
+              Face.additionalCosts = [],
+              Face.alternativeCosts = [],
+              Face.playerAbilities = [],
+              Face.blockRequirements = [],
+              Face.blockPermissions = [],
+              Face.attackRequirements = [],
+              Face.combatRestrictions = [],
+              Face.sacrificeRestrictions = [],
+              Face.attackCosts = [],
+              Face.mulliganActions = [],
+              Face.openingHandActions = [],
+              Face.specialActions = []
+            }
+    }
+
+-- CR 702.123a: fabricate N. "When this permanent enters, you may put N +1/+1
+-- counters on it. If you don't, create N 1/1 colorless Servo artifact creature
+-- tokens." Afterlife's mint over CR 603.6a's entry event, so the condition is
+-- TriggerCondition.SelfEnters; Glint-Sleeve Artisan is the printing.
+--
+-- ONE CLAUSE and not two, and no branching opcode: rule 702.123a prints CR
+-- 118.12a's rewriting already performed, so CR 118.12 makes the counters a COST
+-- paid as the ability resolves (Pawl.Types.UnlessPaid, over
+-- CostComponent.PutPlusOneCountersOnThis) and the clause's own effects are its
+-- "if you don't" branch. The counters go on the ability's SOURCE (CR 113.7a),
+-- which is what rule 702.123a's "it" names, so no slot is needed for them.
+--
+-- Optionality.Mandatory, because the printed "you may" IS the gate's offer.
+-- Marking the clause optional as well would ask twice and let a player decline
+-- both halves, which rule 702.123a does not allow.
+--
+-- Binding.you is CR 109.5's answer for a triggered ability -- "the controller of
+-- the object when the ability triggered" -- and CR 111.2 gives that same player
+-- the tokens.
+--
+-- THE TOKEN IS MINTED HERE for afterlife's reason: rule 702.123a prints its
+-- characteristics, so they are the rulebook's rather than the card's. #1197
+-- reaches this token too -- a CR 612.2a text change of the word "Servo" never
+-- arrives.
+--
+-- Single mode, no targets, ChooseExactly 1: pay or not is the only choice.
+fabricate :: Natural -> TriggeredAbility Card
+fabricate n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfEnters,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton clause) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    clause = Clause.MkClause Nothing Optionality.Mandatory (Just gate) (Seq.singleton spawn)
+    gate =
+      UnlessPaid.MkUnlessPaid
+        { UnlessPaid.payer = Binding.you,
+          UnlessPaid.cost =
+            Cost.MkCost
+              { -- CR 118.5, crew's note above: no mana part is `Just` an empty
+                -- one, never the Nothing that means unpayable.
+                Cost.mana = Just (ManaCost.MkManaCost []),
+                Cost.components = [CostComponent.PutPlusOneCountersOnThis n]
+              }
+        }
+    spawn =
+      Effect.Create
+        (Quantity.Literal (toInteger n))
+        servoToken
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = False,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False
+          }
+        Nothing
+
+-- | CR 702.123a's token: 1/1 colorless Servo artifact creature. Colorless is the
+-- ABSENCE of a colorIndicator (CR 105.2, CR 202.2e) rather than a colour, which
+-- is the one way this differs in shape from afterlife's Spirit; CR 111.4 supplies
+-- the name.
+servoToken :: Card
+servoToken =
+  Card.MkCard
+    { Card.layout = Layout.Normal,
+      Card.faces =
+        NonEmpty.singleton
+          Face.MkFace
+            { Face.name = CardName.MkCardName (Text.pack "Servo Token"),
+              Face.manaCost = Nothing,
+              Face.typeLine =
+                TypeLine.MkTypeLine
+                  Set.empty
+                  (Set.fromList [CardType.Artifact, CardType.Creature])
+                  (Set.singleton Subtype.Servo),
+              Face.power = Just (Power.MkPower (Quantity.Literal 1)),
+              Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
+              Face.loyalty = Nothing,
+              Face.defense = Nothing,
+              Face.keywords = Set.empty,
+              Face.colorIndicator = Set.empty,
               Face.characteristicPT = Nothing,
               Face.staticAbilities = [],
               Face.spell = Face.defaultSpell,
