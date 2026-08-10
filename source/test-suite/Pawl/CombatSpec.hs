@@ -1380,7 +1380,7 @@ blockPermissionSpec s registry = Spec.describe s "BlockPermission" $ do
           )
           (True, False, True, True)
       _ -> Spec.assertFailure s "fixture should have three attackers and two blockers"
-  Spec.it s "CR 509.1h a real declare blockers step puts the Guard on all three attackers" $ do
+  Spec.it s "CR 509.1h / 509.3e a real declare blockers step puts the Guard on all three attackers" $ do
     -- Not a claim about legalBlockDeclaration alone: the step runs, and CR
     -- 509.3e's count on the one BlocksDeclared event is three.
     palaceGuard <- S.printingOf s registry "Palace Guard"
