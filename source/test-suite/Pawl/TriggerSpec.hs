@@ -51,7 +51,10 @@
 -- one, with Aven Squire -- `exaltedSpec`. CR 702.121 melee, the
 -- first keyword whose payload is a number read off game state -- CR 508.3b's
 -- record of who was declared attacked -- with Wings of the Guard at three seats
--- -- `meleeSpec`. CR 702.134 mentor, the first keyword whose
+-- -- `meleeSpec`. CR 702.105 dethrone, the first whose whole content is its
+-- CONDITION -- a comparison of every player's life total, not a fact about the
+-- declaration -- with Enraged Revolutionary at three seats -- `dethroneSpec`.
+-- CR 702.134 mentor, the first keyword whose
 -- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
 -- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
 -- CR 702.23 rampage, whose bonus multiplies a printed N by a number
@@ -235,6 +238,7 @@ import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.PaymentDecision as PaymentDecision
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.Player as Player
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
@@ -5091,6 +5095,107 @@ meleeSpec s registry =
           Spec.assertEqWith s "melee held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 2)) [Keyword.melee, Keyword.melee]
           Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Melee 1)) [Keyword.melee]
 
+-- CR 702.105 dethrone, whose CONDITION is the whole keyword -- the first minted
+-- trigger narrowed by a fact about the game rather than about the declaration --
+-- with Enraged Revolutionary ({2}{R} Creature -- Human Warrior 2/1, dethrone and
+-- nothing else). The counter is read as power and toughness, so 2/1 is "did not
+-- trigger" and 3/2 is "did".
+--
+-- THREE SEATS throughout, and load-bearing twice over: at two players "the player
+-- with the most life" and "the defending player" coincide whenever the attacker's
+-- controller is behind, and there is no second opponent to be the wrong one.
+--
+-- Life totals are all distinct except where a tie is the point, so no reading of
+-- the rule produces the same board twice.
+dethroneSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+dethroneSpec s registry =
+  let at pid n gs = gs {GameState.players = Map.adjust (\pl -> pl {Player.life = n}) pid (GameState.players gs)}
+      lives a b c gs = at S.alice a (at S.bob b (at S.carol c gs))
+      -- alice fields the Revolutionary; bob and carol each field a Piker, so
+      -- either is a legal defending player.
+      board = do
+        rev <- S.printingOf s registry "Enraged Revolutionary"
+        piker <- S.printingOf s registry "Goblin Piker"
+        pure (S.threePlayerCombat [rev] [piker] [piker])
+      -- The same with bob fielding Jace Beleren at loyalty 3, the pool's one
+      -- planeswalker and so the only attackable permanent that is not a player.
+      jaceBoard = do
+        rev <- S.printingOf s registry "Enraged Revolutionary"
+        piker <- S.printingOf s registry "Goblin Piker"
+        jace <- S.printingOf s registry "Jace Beleren"
+        pure $ case S.threePlayerCombat [rev] [piker, jace] [piker] of
+          (gs, ours, theirs@(_ : jaceId : _), others) -> (S.addCounter CounterKind.Loyalty 3 jaceId gs, ours, theirs, others)
+          done -> done
+      isPlaneswalker target = case target of
+        AttackTarget.OfPlaneswalker _ -> True
+        AttackTarget.OfPlayer _ -> False
+        AttackTarget.OfBattle _ -> False
+      aimingAtJace :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      aimingAtJace who p = case p of
+        Prompt.ChooseAttackTarget _ _ _ options -> case filter isPlaneswalker (NonEmpty.toList options) of
+          target : _ -> target
+          [] -> NonEmpty.head options
+        _ -> attacking who p
+      attacking :: PlayerId.PlayerId -> Prompt.Prompt r -> r
+      attacking who p = case p of
+        Prompt.ChooseDefender {} -> who
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+   in Spec.describe s "Dethrone" $ do
+        -- The proving test. bob is on 20 against alice's 15 and carol's 10, so the
+        -- creature grows.
+        Spec.it s "CR 702.105a whole card: attacking the player with the most life is a +1/+1 counter" $ do
+          (gs, ours, _, _) <- board
+          case ours of
+            [rev] -> Spec.assertEqWith s "2/1 plus one counter" (S.powerToughnessOf rev (atBlockers (attacking S.bob) (lives 15 20 10 gs))) (Just (3, 2))
+            _ -> Spec.assertFailure s "fixture should give alice one Revolutionary"
+        -- The same board attacked the other way. carol is the LOWEST, so nothing
+        -- triggers -- the falsifier for a condition that fired on any attack.
+        Spec.it s "CR 702.105a attacking a player who is not on the most life does nothing" $ do
+          (gs, ours, _, _) <- board
+          case ours of
+            [rev] -> do
+              let after = atBlockers (attacking S.carol) (lives 15 20 10 gs)
+              Spec.assertEqWith s "CR 508.1b the Revolutionary really did attack carol" (Map.lookup rev (Combat.Type.attackers (GameState.combat after))) (Just (AttackTarget.OfPlayer S.carol))
+              Spec.assertEqWith s "and it is still a 2/1" (S.powerToughnessOf rev after) (Just (2, 1))
+            _ -> Spec.assertFailure s "fixture should give alice one Revolutionary"
+        -- Rule 702.105a says "the player with the most life", not "the opponent
+        -- with the most life", so the attacker's OWN controller is compared too:
+        -- alice on 25 makes bob's 20 not the most, and the same attack that grew
+        -- the creature above now does nothing.
+        Spec.it s "CR 702.105a the attacking creature's controller counts as a player" $ do
+          (gs, ours, _, _) <- board
+          case ours of
+            [rev] -> do
+              let after = atBlockers (attacking S.bob) (lives 25 20 10 gs)
+              Spec.assertEqWith s "CR 508.1b the Revolutionary really did attack bob" (Map.lookup rev (Combat.Type.attackers (GameState.combat after))) (Just (AttackTarget.OfPlayer S.bob))
+              Spec.assertEqWith s "and alice is ahead, so it is still a 2/1" (S.powerToughnessOf rev after) (Just (2, 1))
+            _ -> Spec.assertFailure s "fixture should give alice one Revolutionary"
+        -- "Or tied for most life": bob and carol both on 20, and attacking either
+        -- triggers. The falsifier is a strict comparison, which fires on neither.
+        Spec.it s "CR 702.105a a tie for most life still triggers" $ do
+          (gs, ours, _, _) <- board
+          case ours of
+            [rev] -> Spec.assertEqWith s "tied at 20 against alice's 15" (S.powerToughnessOf rev (atBlockers (attacking S.carol) (lives 15 20 20 gs))) (Just (3, 2))
+            _ -> Spec.assertFailure s "fixture should give alice one Revolutionary"
+        -- CR 702.105a names THE PLAYER, and CR 508.1b lets a creature attack a
+        -- planeswalker instead. The defending player is bob either way, so this is
+        -- the case that separates reading Combat.attackers from reading the
+        -- declaration event's CR 508.5 field.
+        Spec.it s "CR 508.1b attacking the leader's planeswalker is not attacking the leader" $ do
+          (gs, ours, theirs, _) <- jaceBoard
+          case (ours, theirs) of
+            ([rev], [_, jaceId]) -> do
+              let after = atBlockers (aimingAtJace S.bob) (lives 15 20 10 gs)
+              Spec.assertEqWith s "CR 508.1b the Revolutionary really did attack Jace" (Map.lookup rev (Combat.Type.attackers (GameState.combat after))) (Just (AttackTarget.OfPlaneswalker jaceId))
+              Spec.assertEqWith s "and no player was attacked, so it is still a 2/1" (S.powerToughnessOf rev after) (Just (2, 1))
+            _ -> Spec.assertFailure s "fixture should give alice a Revolutionary and bob a Jace"
+        -- CR 702.105b: two instances are two abilities, so two triggers and two
+        -- counters. Asserted at the mint, no card in the pool having dethrone twice.
+        Spec.it s "CR 702.105b each instance triggers separately" $ do
+          Spec.assertEqWith s "dethrone held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Dethrone 2)) [Keyword.dethrone, Keyword.dethrone]
+          Spec.assertEqWith s "and once is one" (Keyword.triggeredAbilitiesOf (Map.singleton Keyword.Type.Dethrone 1)) [Keyword.dethrone]
+
 -- CR 702.23 rampage, whose rule text is a triggered ability,
 -- and the first whose bonus multiplies a printed N by a number read off the
 -- board.
@@ -6587,6 +6692,10 @@ representativeEvents cond =
         -- alone -- and the ATTACKER is what this one binds, where SelfAttacks
         -- above binds the defending player off the very same event.
         TriggerCondition.CreatureAttacksAlone _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
+        -- The same declaration event once more. Rule 702.105a binds NOTHING off
+        -- it, SelfAttacksWithAnother's case: the player it compares is read from
+        -- Combat.attackers and then never named again.
+        TriggerCondition.SelfAttacksPlayerWithMostLife -> one (GameEvent.AttackerDeclared departed S.carol 1)
         -- The GROUPED blocking event, which is CR 509.3a's arity: one per blocking
         -- creature, whatever it was declared against.
         TriggerCondition.SelfBlocks -> one (GameEvent.BlocksDeclared departed 1)
@@ -6710,6 +6819,7 @@ everyTriggerCondition =
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
     TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
+    TriggerCondition.SelfAttacksPlayerWithMostLife,
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
     TriggerCondition.SelfBlocksCreature,
@@ -9259,6 +9369,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   aragornSpec s registry
   afflictSpec s registry
   meleeSpec s registry
+  dethroneSpec s registry
   rampageSpec s registry
   cyclingTriggerSpec s registry
   graveyardTriggerSpec s registry

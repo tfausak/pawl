@@ -149,6 +149,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.CreatureAttacksAlone (Filter.ControlledBy PlayerRelation.You))
       """ {"type":"CreatureAttacksAlone","value":{"type":"ControlledBy","value":{"type":"You"}}} """
+  -- CR 702.105a, nullary: the comparison is over life totals, so there is nothing
+  -- for a card to parameterize.
+  Spec.it s "SelfAttacksPlayerWithMostLife" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfAttacksPlayerWithMostLife
+      """ {"type":"SelfAttacksPlayerWithMostLife"} """
   -- CR 509.3a, and nullary where its mirror is not: rule 509.3a's
   -- once-each-combat is not a frequency a card chooses.
   Spec.it s "SelfBlocks" $

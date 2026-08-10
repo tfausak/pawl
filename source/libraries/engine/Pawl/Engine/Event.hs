@@ -48,6 +48,7 @@ import qualified Pawl.Engine.SacrificeRestriction as SacrificeRestriction
 import qualified Pawl.Engine.Saga as Saga
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AttackTarget as AttackTarget
 import Pawl.Types.Binding (Binding)
 import Pawl.Types.CandidateId (CandidateId)
 import Pawl.Types.Card (Card)
@@ -3036,6 +3037,52 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+  -- CR 702.105a: the bearer was declared attacking A PLAYER, and no player still in
+  -- the game has more life than that one. SelfAttacks' event and its identity
+  -- check, with the comparison added.
+  --
+  -- Whom the bearer attacked comes from Combat.attackers rather than from the
+  -- event, which carries CR 508.5's DEFENDING player instead -- the same id for an
+  -- attacked planeswalker or battle, where rule 702.105a names the player. Reading
+  -- the record here is exact for SelfAttacksWithAnother's reason.
+  --
+  -- Non-strict, which is rule 702.105a's "or tied for most life", and over
+  -- Game.stillPlaying rather than every seat the game began with: a player who has
+  -- left (CR 800.4a) has no life total left to be beaten.
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> case event of
+    GameEvent.AttackerDeclared oid _ _
+      | oid == bearer ->
+          case Map.lookup bearer (Combat.attackers (GameState.combat gs)) of
+            Just (AttackTarget.OfPlayer attacked) ->
+              let lifeOf pid = fmap Player.life (Map.lookup pid (GameState.players gs))
+               in case lifeOf attacked of
+                    Nothing -> False
+                    Just theirs -> all (\pid -> maybe True (<= theirs) (lifeOf pid)) (Game.stillPlaying gs)
+            _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameRenowned _ -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
   -- CR 509.3a: the bearer was DECLARED as a blocker. SelfAttacks' mirror, and
   -- matched against the declaration event for that arm's reason -- CR 509.4's
   -- creature put onto the battlefield blocking is in Combat.blockers and has no
@@ -4163,6 +4210,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
@@ -4527,6 +4575,10 @@ eventBindingSlots cond = case cond of
   -- carries an ObjectId, and matchesTrigger has already required the count to be
   -- one.
   TriggerCondition.CreatureAttacksAlone _ -> Set.singleton Binding.attackingCreature
+  -- NOTHING, for SelfAttacksWithAnother's reason: rule 702.105a's payload names
+  -- only "this creature", so the attacked player is compared and then never
+  -- pointed at. That is also why this condition needs no arm in eventBindings.
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> Set.empty
   -- Nothing, unlike SelfAttacks above: the blocker is the bearer, already bound
   -- as CR 113.7a's source, and the attacker the event also carries is what CR
   -- 509.3b's condition names rather than this one, below. CR 509.1a makes the
@@ -4794,6 +4846,7 @@ looksBack condition = case condition of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
@@ -5336,6 +5389,7 @@ zoneTriggeredFrom cond = case cond of
   TriggerCondition.SelfAttacks _ -> Nothing
   TriggerCondition.SelfAttacksWithAnother _ -> Nothing
   TriggerCondition.CreatureAttacksAlone _ -> Nothing
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> Nothing
   TriggerCondition.SelfBlocks -> Nothing
   TriggerCondition.SelfBlocksCreature -> Nothing
   TriggerCondition.SelfBlocksAtLeast _ -> Nothing
@@ -5479,6 +5533,7 @@ controllerTurnScoped cond = case cond of
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfAttacksWithAnother _ -> False
   TriggerCondition.CreatureAttacksAlone _ -> False
+  TriggerCondition.SelfAttacksPlayerWithMostLife -> False
   TriggerCondition.SelfBlocks -> False
   TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBlocksAtLeast _ -> False
@@ -5601,6 +5656,7 @@ stateTriggers gs
               TriggerCondition.SelfAttacks _ -> False
               TriggerCondition.SelfAttacksWithAnother _ -> False
               TriggerCondition.CreatureAttacksAlone _ -> False
+              TriggerCondition.SelfAttacksPlayerWithMostLife -> False
               TriggerCondition.SelfBlocks -> False
               TriggerCondition.SelfBlocksCreature -> False
               TriggerCondition.SelfBlocksAtLeast _ -> False

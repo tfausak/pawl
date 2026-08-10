@@ -103,8 +103,10 @@ data TriggerCondition
     -- "attacking": CR 508.3a exempts a creature put onto the battlefield
     -- attacking, and CR 508.4 says such a creature never attacked. So this matches
     -- GameEvent.AttackerDeclared, which only the declaration appends, and never
-    -- the combat record. No attack TARGET is compared against; CR 508.3a's second
-    -- sentence is a different condition no card in the pool has (#538). What the
+    -- the combat record. No attack TARGET is compared against by THIS arm; CR
+    -- 508.3a's second sentence, which names one, is still a condition no card in
+    -- the pool has (#538) -- SelfAttacksPlayerWithMostLife below reads the target
+    -- for rule 702.105a's own comparison and is not that general form. What the
     -- event does carry alongside the attacker is CR 508.5's defending player, whom
     -- Pawl.Engine.Event.eventBindings binds under
     -- Pawl.Engine.Binding.triggerPlayer for CR 702.86a's annihilator to read --
@@ -169,6 +171,32 @@ data TriggerCondition
     -- 702.83a's "that creature" to read -- a different object from the bearer, as
     -- SelfBecomesBlockedBy's blocker is.
     CreatureAttacksAlone (Filter.Filter Keyword.Keyword)
+  | -- | CR 702.105a: "whenever this creature attacks the player with the most life
+    -- or tied for most life" -- dethrone's. SelfAttacks narrowed by a fact about
+    -- WHOM the bearer attacked, matched against the same
+    -- GameEvent.AttackerDeclared and self-scoped the same way.
+    --
+    -- The attacked player comes from Combat.attackers rather than from the event,
+    -- and that is the whole content of the narrowing: the event carries CR 508.5's
+    -- DEFENDING player, who is also the controller of an attacked planeswalker or
+    -- the protector of an attacked battle, where rule 702.105a says "attacks THE
+    -- PLAYER". Only AttackTarget.OfPlayer satisfies it. Reading the record at this
+    -- moment is exact for SelfAttacksWithAnother's reason: CR 508.2b puts these
+    -- triggers on the stack before any player gets priority.
+    --
+    -- MOST LIFE is compared across every player still in the game (CR 800.4a), the
+    -- bearer's controller included -- attacking an opponent on 20 does not trigger
+    -- while you sit on 25. "Or tied for most life" is what makes the comparison
+    -- non-strict, so the arm needs no payload to tell the two readings apart.
+    --
+    -- Read off the game state as the trigger is matched, not through
+    -- Pawl.Types.Condition: an intervening "if" (CR 603.4) would be checked AGAIN
+    -- on resolution (CR 608.2a), and rule 702.105a states no "if" -- a life gain in
+    -- response must not stop the counter.
+    --
+    -- No payload and no Filter: rule 702.105a states one comparison and names no
+    -- characteristic of the attacker.
+    SelfAttacksPlayerWithMostLife
   | -- | CR 509.3a: "whenever [a creature] blocks" -- Pride Guardian's.
     -- SelfAttacks' mirror, self-scoped like SelfEnters.
     --

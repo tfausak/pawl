@@ -167,6 +167,9 @@ abilitiesFor keyword count = case keyword of
   Keyword.Afflict n -> List.genericReplicate count (afflict n)
   Keyword.BattleCry -> List.genericReplicate count battleCry
   Keyword.Evolve -> List.genericReplicate count evolve
+  -- CR 702.105b says each instance triggers separately, so two instances put two
+  -- counters on -- prowess' multiplicity rather than shadow's redundancy.
+  Keyword.Dethrone -> List.genericReplicate count dethrone
   Keyword.Outlast _ -> []
   Keyword.Prowess -> List.genericReplicate count prowess
   Keyword.Flanking -> List.genericReplicate count flanking
@@ -291,6 +294,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Dethrone -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -471,6 +475,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Dethrone -> []
   Keyword.Outlast cost -> List.genericReplicate count (outlast cost)
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -722,6 +727,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Dethrone -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -1067,6 +1073,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Dethrone -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -1195,6 +1202,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Annihilator _ -> []
   Keyword.BattleCry -> []
   Keyword.Evolve -> []
+  Keyword.Dethrone -> []
   Keyword.Outlast _ -> []
   Keyword.Prowess -> []
   Keyword.Infect -> []
@@ -1296,6 +1304,8 @@ familyOf keyword = case keyword of
   Keyword.BattleCry -> Nothing
   -- CR 702.100a takes no parameter either, so evolve has no family of its own.
   Keyword.Evolve -> Nothing
+  -- CR 702.105a takes no parameter either, so dethrone has no family of its own.
+  Keyword.Dethrone -> Nothing
   Keyword.Outlast _ -> Just KeywordFamily.Outlast
   Keyword.Prowess -> Nothing
   Keyword.Menace -> Nothing
@@ -2096,6 +2106,39 @@ renown n =
   where
     grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource)
     designate = Effect.BecomeRenowned Binding.triggerSource
+
+-- CR 702.105a: whenever this creature attacks the player with the most life or
+-- tied for most life, put a +1/+1 counter on it. Rule 702 states it as a
+-- triggered ability, minted like the rest of this roster.
+--
+-- The whole of the keyword is in the CONDITION, which is why the payload below is
+-- renown's first effect with no second: rule 702.105a's "the player with the most
+-- life or tied for most life" is a fact about the BOARD read against the
+-- declaration, and TriggerCondition.SelfAttacksPlayerWithMostLife carries it.
+--
+-- NOT an intervening "if" (CR 603.4), which is where renown puts its comparison:
+-- rule 702.105a prints no "if", and CR 608.2a would re-check an intervening one on
+-- resolution -- so an opponent gaining life in response would wrongly remove the
+-- ability from the stack.
+--
+-- "It" is the bearer, CR 113.7a's source, already reserved in
+-- Binding.triggerSource -- so nothing is bound off the event and this ability
+-- needs no opcode of its own.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- rule 702.105a leaves nothing to choose.
+dethrone :: TriggeredAbility Card
+dethrone =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfAttacksPlayerWithMostLife,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton grow))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot Binding.triggerSource)
 
 -- CR 702.79a: persist. "When this permanent is put into a graveyard from the
 -- battlefield, if it had no -1/-1 counters on it, return it to the battlefield
