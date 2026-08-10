@@ -2113,8 +2113,8 @@ renown n =
 --
 -- The whole of the keyword is in the CONDITION, which is why the payload below is
 -- renown's first effect with no second: rule 702.105a's "the player with the most
--- life or tied for most life" is a fact about the declaration, and
--- TriggerCondition.SelfAttacksPlayerWithMostLife carries it.
+-- life or tied for most life" is a fact about the BOARD read against the
+-- declaration, and TriggerCondition.SelfAttacksPlayerWithMostLife carries it.
 --
 -- NOT an intervening "if" (CR 603.4), which is where renown puts its comparison:
 -- rule 702.105a prints no "if", and CR 608.2a would re-check an intervening one on
