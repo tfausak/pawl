@@ -18,7 +18,7 @@ data AttackTarget
   | -- | CR 310.5. Named by id for OfPlaneswalker's reason, and the id is the
     -- battle's rather than its protector's: CR 310.8f lets the designation move
     -- while the attack stands, so who is being attacked THROUGH is re-read from
-    -- the battle at every use (Pawl.Engine.Combat.defendingPlayerOf, CR 310.8d).
+    -- the battle at every use (Pawl.Engine.Defender.playerOf, CR 310.8d).
     --
     -- Unlike OfPlaneswalker, this arm does NOT imply the target belongs to the
     -- defending player: CR 310.8b makes a battle attackable by anyone for whom

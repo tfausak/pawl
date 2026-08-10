@@ -293,6 +293,22 @@ data Keyword
     -- Pawl.Types.MorphVariant for what the variant adds and for what a sibling
     -- constructor would have cost.
     Morph (Cost.Cost Keyword) MorphVariant.MorphVariant
+  | -- | 702.39a: whenever this creature attacks, you may choose to have target
+    -- creature defending player controls block this creature this combat if able;
+    -- if you do, untap that creature. The TWELFTH keyword rule 702 states as a
+    -- triggered ability, and the first whose payload creates a CR 509.1c BLOCKING
+    -- REQUIREMENT -- Pawl.Engine.Keyword.provoke mints it, slot and all.
+    --
+    -- Payload-free, so no Pawl.Types.KeywordFamily constructor is owed. Its reader
+    -- takes the per-keyword COUNT rather than membership: CR 702.39b says each
+    -- instance triggers separately, so a creature with provoke twice puts two
+    -- abilities on the stack and each chooses its own target.
+    --
+    -- "DEFENDING PLAYER CONTROLS" rides the ability's target slot as mentor's
+    -- power comparison does, and for the same reason: it is a fact about the pair.
+    -- Filter.ControlledByDefendingPlayer is the atom, and NOT ControlledBy
+    -- Opponent, which CR 506.2 makes too wide on a board with three seats.
+    Provoke
   | -- | 702.42a: you may choose all modes of this modal spell (rule 700.2) instead
     -- of the number specified, paying an additional cost if you do.
     --

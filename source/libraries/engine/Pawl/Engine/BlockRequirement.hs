@@ -3,15 +3,18 @@
 -- Pawl.Engine.PlayerEffect (which answers rules questions about a PLAYER).
 -- Neither is a layer, and Pawl.Engine.Projection sees neither.
 --
--- The only reader of Pawl.Types.BlockRequirement. Pawl.Engine.Combat asks for
+-- The only reader of Pawl.Types.BlockRequirement and of
+-- Pawl.Types.ActiveBlockRequirement -- the printed carrier and the stored one,
+-- as Pawl.Engine.PlayerEffect reads its own pair. Pawl.Engine.Combat asks for
 -- requirement INSTANCES -- bare (blocker, attacker) pairs -- and never learns
--- which card produced one.
+-- which card produced one, nor which carrier.
 module Pawl.Engine.BlockRequirement where
 
 import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Projection as Projection
+import qualified Pawl.Types.ActiveBlockRequirement as ActiveBlockRequirement
 import qualified Pawl.Types.BlockRequirement as BlockRequirement
 import qualified Pawl.Types.Face as Face
 import Pawl.Types.GameState (GameState)
@@ -106,4 +109,25 @@ instances able candidates attackers gs =
             rewritten = if null changes then clause else Projection.rewriteAffected changes clause
             pairsFor attacker = fmap (\blocker -> (blocker, attacker)) (filter (\blocker -> able blocker attacker) candidates)
          in concatMap pairsFor (filter (named source rewritten) attackers)
-   in Set.fromList (concatMap fromPermanent (Set.toList (GameState.battlefield gs)))
+      -- CR 509.1c again, off the STORED carrier. No CR 305.7 or CR 604.2 gate and
+      -- no CR 612.1 rewrite, which is the posture PlayerEffect.applying takes for
+      -- its stored rows: those three ask what a permanent's TEXT still says, and a
+      -- resolution-created requirement has outlived its source's text (CR 611.2 --
+      -- the effect exists on its own once the ability has resolved).
+      --
+      -- Pruned by `able` and by membership exactly as the printed pairs are: a
+      -- provoked creature that has since left the battlefield, or that the
+      -- defending player no longer controls, is not among `candidates`, and its
+      -- attacker may have left combat.
+      fromStored active =
+        let blocker = ActiveBlockRequirement.blocker active
+            attacker = ActiveBlockRequirement.attacker active
+         in [ (blocker, attacker)
+            | blocker `elem` candidates,
+              attacker `elem` attackers,
+              able blocker attacker
+            ]
+   in Set.fromList
+        ( concatMap fromPermanent (Set.toList (GameState.battlefield gs))
+            <> concatMap fromStored (GameState.blockRequirements gs)
+        )

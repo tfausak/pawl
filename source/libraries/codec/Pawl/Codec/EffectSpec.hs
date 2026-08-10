@@ -678,6 +678,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.AffectPlayers Duration.UntilEndOfTurn PlayerScope.Opponents PlayerEffect.CantCastSpells)
       """ {"type":"AffectPlayers","value":[{"type":"UntilEndOfTurn"},{"type":"Opponents"},{"type":"CantCastSpells"}]} """
+  Spec.it s "RequireBlock" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.RequireBlock Duration.UntilEndOfCombat (ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))) (ObjectRef.EachMatching (Filter.HasCardType CardType.Creature)))
+      """ {"type":"RequireBlock","value":[{"type":"UntilEndOfCombat"},"target",{"type":"HasCardType","value":{"type":"Creature"}}]} """
   Spec.it s "CreateEmblem" $
     Common.assertJsonCodec
       s

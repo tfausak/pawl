@@ -38,6 +38,7 @@ toJson encode filter_ = case filter_ of
   Filter.PowerAtLeast n -> Common.tagged "PowerAtLeast" . Just $ Common.integer n
   Filter.PowerAtMost n -> Common.tagged "PowerAtMost" . Just $ Common.integer n
   Filter.PowerLessThanSource -> Common.nullary "PowerLessThanSource"
+  Filter.ControlledByDefendingPlayer -> Common.nullary "ControlledByDefendingPlayer"
   Filter.ManaValueAtMost n -> Common.tagged "ManaValueAtMost" . Just $ Common.integer n
   Filter.ControlledBy r -> Common.tagged "ControlledBy" . Just $ PlayerRelation.toJson r
   Filter.OwnedBy r -> Common.tagged "OwnedBy" . Just $ PlayerRelation.toJson r
@@ -69,6 +70,7 @@ fromJson decode value = do
     ("PowerAtLeast", Just v) -> Filter.PowerAtLeast <$> Common.asInteger v
     ("PowerAtMost", Just v) -> Filter.PowerAtMost <$> Common.asInteger v
     ("PowerLessThanSource", _) -> Right Filter.PowerLessThanSource
+    ("ControlledByDefendingPlayer", _) -> Right Filter.ControlledByDefendingPlayer
     ("ManaValueAtMost", Just v) -> Filter.ManaValueAtMost <$> Common.asInteger v
     ("ControlledBy", Just v) -> Filter.ControlledBy <$> PlayerRelation.fromJson v
     ("OwnedBy", Just v) -> Filter.OwnedBy <$> PlayerRelation.fromJson v

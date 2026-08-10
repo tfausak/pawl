@@ -248,16 +248,25 @@ data Context = MkContext
     --
     -- Nothing wherever the atom cannot appear, which `contextFor` below is the
     -- spelling of.
-    sourcePower :: Maybe Integer
+    sourcePower :: Maybe Integer,
+    -- CR 508.5: the DEFENDING PLAYER for the source, for the one atom that asks
+    -- (ControlledByDefendingPlayer, CR 702.39a). Supplied by the caller for
+    -- sourcePower's reason -- this module holds no game state and cannot read the
+    -- combat record -- and by the same caller, Pawl.Engine.Target.admittedGiven.
+    --
+    -- LAZY like sourcePower, and load-bearingly so: filling it costs a
+    -- control-grant walk, and no filter that omits the atom ever forces it.
+    defendingPlayer :: Maybe PlayerId.PlayerId
   }
   deriving (Eq, Show)
 
--- A Context for every match whose Filter cannot name PowerLessThanSource -- that
--- is, every match but a target slot's. The atom reaches a card only through
--- Pawl.Engine.Keyword.mentor's own TargetSpec, and Pawl.CardSpec's lint keeps it
--- out of card data, so no other position can read the Nothing this leaves.
+-- A Context for every match whose Filter cannot name PowerLessThanSource or
+-- ControlledByDefendingPlayer -- that is, every match but a target slot's. Both
+-- atoms reach a card only through Pawl.Engine.Keyword's own TargetSpecs (mentor,
+-- provoke), and Pawl.CardSpec's lint keeps them out of card data, so no other
+-- position can read the Nothings this leaves.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
-contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing}
+contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing, defendingPlayer = Nothing}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -318,6 +327,14 @@ matches context view predicate = case predicate of
     (Just c, Just p) -> case relation of
       PlayerRelation.You -> c == p
       PlayerRelation.Opponent -> c /= p
+    _ -> False
+  -- CR 508.5 / 702.39a: the candidate's controller IS the defending player, which
+  -- the Context supplies because it is a fact about the combat record rather than
+  -- about the candidate. False unless both are readable, the posture
+  -- PowerLessThanSource takes: a candidate with no controller and a source with no
+  -- defending player each leave nothing to compare.
+  Filter.ControlledByDefendingPlayer -> case (controller view, defendingPlayer context) of
+    (Just c, Just d) -> c == d
     _ -> False
   -- CR 108.3 / 110.2: the same comparison ControlledBy makes, against the other
   -- player -- so Garland's "creatures you control but don't own" is the two atoms
@@ -435,6 +452,8 @@ rewrite pairs predicate = case predicate of
   Filter.PowerLessThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
+  -- Untouched for ControlledBy's reason.
+  Filter.ControlledByDefendingPlayer -> predicate
   -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
   -- this atom names a player relation rather than a subtype.
   Filter.OwnedBy _ -> predicate
@@ -540,6 +559,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Wither -> keyword
   Keyword.Type.Exalted -> keyword
   Keyword.Type.Mentor -> keyword
+  Keyword.Type.Provoke -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword

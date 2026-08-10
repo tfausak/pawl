@@ -116,6 +116,24 @@ data Filter keyword
     -- cost, so there is nothing projected to read instead.
     ManaValueAtMost Integer
   | ControlledBy PlayerRelation.PlayerRelation -- CR 109.5 / 102.2: controller relates thus to the perspective.
+  | -- | CR 508.5: the candidate's controller is the DEFENDING PLAYER for the
+    -- object the evaluation comes from -- CR 702.39a's "target creature defending
+    -- player controls", which Pawl.Engine.Keyword.provoke is the only site to
+    -- write. Kept out of card data by Pawl.CardSpec's lint, as PowerLessThanSource
+    -- is and for the same reason.
+    --
+    -- NOT ControlledBy Opponent, and the difference is a wrong answer rather than
+    -- a nicety: CR 506.2 makes exactly one opponent the defending player, so on a
+    -- board with three seats that filter admits a creature controlled by an
+    -- opponent who is not being attacked at all.
+    --
+    -- Context-relative like PowerLessThanSource, and the same machinery: the
+    -- answer depends on the combat record rather than on the candidate, so
+    -- Pawl.Engine.Filter.Context's defendingPlayer is where it arrives, filled by
+    -- Pawl.Engine.Target.admittedGiven and Nothing everywhere else. Vacuously
+    -- False when either player is absent -- a source that is not attacking has no
+    -- defending player.
+    ControlledByDefendingPlayer
   | -- | CR 108.3 / 110.2: the candidate's OWNER relates thus to the perspective --
     -- Garland, Royal Kidnapper's "creatures you control but don't own", which is
     -- `And [ControlledBy You, Not (OwnedBy You)]`.
