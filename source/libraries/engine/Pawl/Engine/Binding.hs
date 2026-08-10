@@ -295,8 +295,10 @@ blockedCreature = SlotName.MkSlotName (Text.pack "thatAttacker")
 
 -- CR 506.5: the reserved slot under which the creature that was declared as an
 -- attacker is bound -- rule 702.83a's "that creature", the one exalted pumps.
--- Stamped by Pawl.Engine.Event.eventBindings off GameEvent.AttackerDeclared,
--- alongside the CR 508.5 defending player that same event already supplies.
+-- Stamped by Pawl.Engine.Event.eventBindings off GameEvent.AttackerDeclared --
+-- the same event whose CR 508.5 defending player annihilator reads through
+-- `triggerPlayer`, though this condition binds only the creature: rule 702.83a
+-- names no player.
 --
 -- NOT `triggerSource` (CR 113.7a), and that is the whole reason it exists: rule
 -- 702.83a's condition is "a creature YOU CONTROL attacks alone", so the bearer

@@ -3303,9 +3303,10 @@ selfBecomesBlockedSpec s registry =
 -- that is about the DECLARATION's size rather than about one creature.
 --
 -- Aven Squire {1}{W} Creature -- Bird Soldier 1/1 is the card: flying and
--- exalted, and flying decides nothing on these boards (nobody blocks). Hill
--- Giant 3/3 is the creature it pumps, chosen so no reading lands on the same
--- pair -- 3/3 -> 4/4 is not 1/1 -> 2/2, and neither is +2/+2's 5/5.
+-- exalted, and flying decides nothing here, since every reading is taken before
+-- damage whoever blocked. Hill Giant 3/3 is the creature it pumps, chosen so no
+-- reading lands on the same pair -- 3/3 -> 4/4 is not 1/1 -> 2/2, and neither is
+-- +2/+2's 5/5.
 --
 -- Every reading is taken at the COMBAT DAMAGE step, before damage is dealt, so
 -- the pump is read directly rather than through what survives combat.
@@ -3382,8 +3383,8 @@ exaltedSpec s registry =
             _ -> Spec.assertFailure s "fixture should give alice two Squires and a Giant"
         -- CR 508.1a's declaration is a SET, so a broken interpreter naming one
         -- creature twice has still declared one attacker. Combat.declareAttackers
-        -- deduplicates before it counts; without that the count would be 2 and
-        -- the Giant would be attacking alone and unpumped.
+        -- deduplicates before it counts; without that the count would be 2, so
+        -- the Giant would not be attacking alone and would go unpumped.
         Spec.it s "CR 508.1a a repeated id is still one attacker" $ do
           (gs, mine, _) <- board ["Aven Squire", "Hill Giant"] []
           case mine of
