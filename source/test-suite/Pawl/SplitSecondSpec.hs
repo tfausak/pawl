@@ -167,8 +167,8 @@ castSpec s registry =
 
     -- CR 608.2g's offered cast is a cast too, which is the other gate
     -- (Cast.castableWhenOffered). Seven Forests pay Panglacial Wurm's {5}{G}{G},
-    -- and the spell on the stack is placed rather than cast so the board is the
-    -- Rule of Law fixture's shape with one conjunct changed.
+    -- and the spell is PLACED on the stack rather than cast, so the two boards
+    -- differ in the placed card and in nothing else at all.
     Spec.it s "CR 702.61a it also stops a Panglacial Wurm cast from the library" $ do
       forest <- S.printingOf s registry "Forest"
       suddenShock <- S.printingOf s registry "Sudden Shock"

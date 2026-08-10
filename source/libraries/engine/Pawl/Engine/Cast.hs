@@ -513,8 +513,8 @@ castable pid oid name facing gs =
         -- own name goes with it, since CR 601.3a's prohibitions name a quality of
         -- the spell (Null Chamber) and CR 709.3a evaluates only the chosen half.
         && not (PlayerEffect.prohibitsCasting pid proposedName proposed)
-        -- CR 702.61a, the same rule's prohibit half from a different carrier: a
-        -- spell on the stack rather than a continuous effect on a player. It
+        -- CR 601.3's prohibit half again, from a different CARRIER: a spell on
+        -- the stack (CR 702.61a) rather than a continuous effect on a player. It
         -- names neither a player nor a quality of the spell, so it takes no
         -- argument beyond the board.
         && not (SplitSecond.inForce proposed)
