@@ -66,6 +66,7 @@ toJson k = case k of
   Keyword.Wither -> Common.nullary "Wither"
   Keyword.Exalted -> Common.nullary "Exalted"
   Keyword.Mentor -> Common.nullary "Mentor"
+  Keyword.Afterlife n -> Common.tagged "Afterlife" . Just $ Common.encodeNatural n
   Keyword.Provoke -> Common.nullary "Provoke"
   Keyword.BattleCry -> Common.nullary "BattleCry"
   Keyword.Undying -> Common.nullary "Undying"
@@ -130,6 +131,7 @@ fromJson value = do
     ("Wither", _) -> Right Keyword.Wither
     ("Exalted", _) -> Right Keyword.Exalted
     ("Mentor", _) -> Right Keyword.Mentor
+    ("Afterlife", Just v) -> Keyword.Afterlife <$> Common.decodeNatural v
     ("Provoke", _) -> Right Keyword.Provoke
     ("BattleCry", _) -> Right Keyword.BattleCry
     ("Undying", _) -> Right Keyword.Undying
