@@ -45,6 +45,7 @@ toJson k = case k of
   Keyword.Flanking -> Common.nullary "Flanking"
   Keyword.Phasing -> Common.nullary "Phasing"
   Keyword.Shadow -> Common.nullary "Shadow"
+  Keyword.Horsemanship -> Common.nullary "Horsemanship"
   Keyword.Aftermath -> Common.nullary "Aftermath"
   Keyword.Afflict n -> Common.tagged "Afflict" . Just $ Common.encodeNatural n
   Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
@@ -102,6 +103,7 @@ fromJson value = do
     ("Flanking", _) -> Right Keyword.Flanking
     ("Phasing", _) -> Right Keyword.Phasing
     ("Shadow", _) -> Right Keyword.Shadow
+    ("Horsemanship", _) -> Right Keyword.Horsemanship
     ("Aftermath", _) -> Right Keyword.Aftermath
     ("Afflict", Just v) -> Keyword.Afflict <$> Common.decodeNatural v
     ("Cycling", Just (Value.Array (Array.MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson fromJson c <*> Filter.optional fromJson f

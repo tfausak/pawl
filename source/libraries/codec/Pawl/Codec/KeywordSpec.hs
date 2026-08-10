@@ -241,6 +241,15 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Shadow
       """ {"type":"Shadow"} """
+  -- CR 702.31b: nullary, because the rule takes no parameter -- the only thing it
+  -- asks about a blocker is whether it has horsemanship too.
+  Spec.it s "Horsemanship" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Horsemanship
+      """ {"type":"Horsemanship"} """
   -- CR 702.127a: nullary, because what an aftermath half costs is its own printed
   -- mana cost -- unlike flashback, whose alternative cost rides the constructor.
   Spec.it s "Aftermath" $

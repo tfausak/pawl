@@ -751,6 +751,27 @@ shadowAllowsGiven pcs blocker attacker gs =
   Projection.hasKeywordGiven pcs Keyword.Shadow attacker gs
     == Projection.hasKeywordGiven pcs Keyword.Shadow blocker gs
 
+-- CR 702.31b: a creature with horsemanship can't be blocked by creatures without
+-- horsemanship.
+--
+-- Shadow's first sentence with shadow's second dropped, and the drop is the
+-- rule's own: 702.31b's second sentence says a creature with horsemanship can
+-- block a creature with OR WITHOUT it. So this is the asymmetry evasionAllows
+-- describes -- the keyword is read off the ATTACKER first -- and the equality
+-- shadowAllowsGiven writes would be wrong here, barring a horseman from blocking
+-- a groundling. That case is the falsifier in Pawl.CombatSpec.
+--
+-- Keyword MEMBERSHIP and never a count, because CR 702.31c makes multiple
+-- instances redundant -- landwalkAllowsGiven's posture, for CR 702.14e's matching
+-- reason.
+horsemanshipAllows :: ObjectId -> ObjectId -> GameState -> Bool
+horsemanshipAllows = horsemanshipAllowsGiven Map.empty
+
+horsemanshipAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+horsemanshipAllowsGiven pcs blocker attacker gs =
+  not (Projection.hasKeywordGiven pcs Keyword.Horsemanship attacker gs)
+    || Projection.hasKeywordGiven pcs Keyword.Horsemanship blocker gs
+
 -- CR 702.118b: a creature with skulk can't be blocked by creatures with GREATER
 -- POWER.
 --
@@ -930,6 +951,7 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
     && fearAllowsGiven pcs blocker attacker gs
     && intimidateAllowsGiven pcs blocker attacker gs
     && shadowAllowsGiven pcs blocker attacker gs
+    && horsemanshipAllowsGiven pcs blocker attacker gs
     && skulkAllowsGiven pcs blocker attacker gs
     && landwalkAllowsGiven grants pcs attacker gs
 
@@ -939,8 +961,9 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- The unit of legality is the whole declaration, not the pair, and that is not a
 -- stylistic choice: menace (CR 702.111b) constrains the SET blocking an attacker,
 -- which no per-pair predicate can express. Every other evasion ability the pool
--- has -- flying, reach, fear, intimidate, shadow, skulk, landwalk -- is pairwise
--- or narrower; designing to them would be designing to the case that misleads.
+-- has -- flying, reach, fear, intimidate, shadow, horsemanship, skulk, landwalk --
+-- is pairwise or narrower; designing to them would be designing to the case that
+-- misleads.
 --
 -- So the three shapes of restriction are all asked here, one conjunct each:
 -- pairAllowed over the pairs, menaceAllows over the creatures blocking each

@@ -146,6 +146,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Banding -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
@@ -209,6 +210,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
   Keyword.Fear -> []
   Keyword.Intimidate -> []
@@ -326,6 +328,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
@@ -509,6 +512,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
   -- CR 702.127a's FIRST static ability: "you may cast this half of this split card
   -- from your graveyard". Ungated, unlike flashback's arm above -- rule 702.127a
   -- carries no instant-or-sorcery clause, because rule 702.127a's own first
@@ -776,6 +780,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Flanking -> []
   Keyword.Phasing -> []
   Keyword.Shadow -> []
+  Keyword.Horsemanship -> []
   Keyword.Aftermath -> []
   Keyword.Afflict _ -> []
   Keyword.Fear -> []
@@ -891,6 +896,7 @@ familyOf keyword = case keyword of
   Keyword.Flanking -> Nothing
   Keyword.Phasing -> Nothing
   Keyword.Shadow -> Nothing
+  Keyword.Horsemanship -> Nothing
   Keyword.Fear -> Nothing
   Keyword.Intimidate -> Nothing
   Keyword.Infect -> Nothing
