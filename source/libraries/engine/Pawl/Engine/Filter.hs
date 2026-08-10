@@ -22,9 +22,9 @@ import qualified Pawl.Types.Supertype as Supertype
 -- The characteristics a Filter atom consults. Supplied by the projection on the
 -- battlefield/stack and by the printed card off the battlefield (both builders
 -- live in Pawl.Engine.Projection), or by `playerView` below when the candidate is a
--- player rather than an object. `power` and `controller` are Nothing off the
--- battlefield -- a card in a library has neither under the rules that matter here
--- -- so PowerAtLeast / ControlledBy are vacuously False there, which no search
+-- player rather than an object. `controller` is Nothing off the
+-- battlefield -- a card in a library has none under the rules that matter here
+-- -- so ControlledBy is vacuously False there, which no search
 -- filter uses. `owner` and `manaValue` are the two axes that do NOT go vacuous
 -- with the zone, since CR 108.3 and CR 202.3 both name facts a card carries
 -- everywhere; each field says so.
