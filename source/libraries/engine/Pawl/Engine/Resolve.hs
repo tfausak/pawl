@@ -1,5 +1,6 @@
 module Pawl.Engine.Resolve where
 
+import Control.Applicative ((<|>))
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Trans.State.Strict as State
 import qualified Data.Foldable as Foldable
@@ -25,6 +26,7 @@ import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Expiry as Expiry
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
 import qualified Pawl.Engine.Modal as Modal
 import qualified Pawl.Engine.Mulligan as Mulligan
 import qualified Pawl.Engine.PlayerEffect as PlayerEffect
@@ -2674,9 +2676,17 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
     -- have left the battlefield an opcode earlier in this same list -- Meandering
     -- Towershell's "exile it. Return it ..." -- and CR 400.7 has already deleted
     -- the id `source` names by the time this runs.
-    case Game.faceOfWithLastKnown source gs >>= (Map.lookup name . Face.delayedAbilities) of
-      -- The dataflow lint makes a dangling name a failing test, never a silent
-      -- no-op; this arm only keeps the executor total.
+    -- CR 603.7 again, from the other kind of arming ability: a rule 702 keyword
+    -- has no card text to declare the far end in, so a name a minted ability arms
+    -- is on no face and resolves against rule 702's own roster instead
+    -- (Keyword.mintedDelayedAbilities, decayed). Card data first, and the two
+    -- namespaces are kept disjoint by Pawl.CardSpec, so the order is immaterial.
+    case (Game.faceOfWithLastKnown source gs >>= (Map.lookup name . Face.delayedAbilities)) <|> Keyword.mintedDelayedAbility name of
+      -- For a CARD's name the dataflow lint makes a dangling one a failing test,
+      -- never a silent no-op, and this arm only keeps the executor total. A
+      -- MINTED name has no such lint -- nothing enumerates rule 702's arms -- so
+      -- a keyword whose roster row was forgotten lands here and does nothing,
+      -- which is what that keyword's own gameplay test is for.
       Nothing -> pure ()
       Just ability ->
         -- CR 603.7d-f: the controller is the player who controlled the spell or

@@ -18,6 +18,9 @@ import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Card as Card
 import qualified Pawl.Engine.Event as Event
+-- Dotted, because Pawl.Types.Keyword already holds the short alias here (the
+-- reverse of TriggerSpec's split).
+import qualified Pawl.Engine.Keyword as Keyword.Engine
 -- The logic module, alongside Pawl.Types.Modal below: unambiguous under one
 -- alias because the two modules export disjoint names (TriggerSpec's
 -- precedent), and Modal.allEffects is how this lint reaches an activated or
@@ -1620,6 +1623,9 @@ keywordFilters keyword = case keyword of
   -- places and the Filter its minted combat restriction carries are written in
   -- Pawl.Engine.Keyword, not into the keyword.
   Keyword.Unleash -> []
+  -- CR 702.147a names no quality either: the Filter its minted combat
+  -- restriction carries is written in Pawl.Engine.Keyword, not into the keyword.
+  Keyword.Decayed -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
   Keyword.Training -> []
@@ -2859,6 +2865,17 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           Resolve.armedAbilities (cardResolutionEffects card) /= Map.keysSet (Face.delayedAbilities card)
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling or unused delayed abilities" (fmap (S.nameOf . Printing.card) offenders) []
+  -- The lint above joins names WITHIN a card; this one keeps that namespace clear
+  -- of rule 702's. Pawl.Engine.Keyword.mintedDelayedAbilities declares decayed's
+  -- "sacrifice it at end of combat" under a name of its own, and
+  -- Pawl.Engine.Resolve looks a card's declarations up first -- so a card printing
+  -- the same name would shadow the rule for any of its permanents holding the
+  -- keyword.
+  Spec.it s "CR 603.7 no card declares a delayed ability rule 702 already names" $ do
+    ps <- S.allPrintings s
+    let cardOffends card = not (Map.null (Map.restrictKeys (Face.delayedAbilities card) (Map.keysSet Keyword.Engine.mintedDelayedAbilities)))
+        offenders = filter (anyFace cardOffends . Printing.card) ps
+    Spec.assertEqWith s "no card shadows a minted delayed ability" (fmap (S.nameOf . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
   -- the reserved trigger-source slot, a token bound by a Create, or the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's

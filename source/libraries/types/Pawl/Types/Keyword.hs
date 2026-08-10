@@ -758,6 +758,24 @@ data Keyword
     -- where nightbound's makes it night only if no permanent with daybound is on
     -- the battlefield.
     Nightbound
+  | -- | 702.147a: decayed. A static ability and a triggered ability: "This
+    -- creature can't block" and "When this creature attacks, sacrifice it at end
+    -- of combat."
+    --
+    -- The first is a CR 509.1b combat restriction, unleash's carrier
+    -- (Pawl.Engine.Keyword.mintedCombatRestrictionsFor) with no gate and no
+    -- counter clause -- rule 702.147a states it flat. The second is
+    -- Pawl.Engine.Keyword.decayed, and is the first minted ability to ARM a CR
+    -- 603.7 delayed one: what it arms is Pawl.Engine.Keyword.mintedDelayedAbilities,
+    -- rule 702's own declaration, where every other Effect.ArmDelayedTrigger names
+    -- a Face.delayedAbilities entry the card printed.
+    --
+    -- Nullary, because rule 702.147a takes no parameter. Rule 702.147 states no
+    -- "each instance" sentence, so the restriction half is MEMBERSHIP -- a second
+    -- "can't block" forbids the same block once -- while the trigger half takes
+    -- the per-keyword count for CR 603.2's general reason, two copies of an
+    -- ability being two abilities.
+    Decayed
   | -- | 702.149a: whenever this creature and at least one other creature with power
     -- greater than this creature's power attack, put a +1/+1 counter on this
     -- creature. Rule 702 states it as a triggered ability;
