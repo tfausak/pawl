@@ -239,6 +239,7 @@ import qualified Pawl.Types.Quantity as Quantity.Type
 import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.Regenerability as Regenerability
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
+import qualified Pawl.Types.Sickness as Sickness
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Subtype as Subtype
@@ -3691,6 +3692,96 @@ trainingSpec s registry =
             "each watching CR 702.149a's declaration"
             (fmap TriggeredAbility.condition abilities)
             [expected, expected]
+
+-- CR 702.147a's decayed: a combat restriction and a triggered ability that arms
+-- a CR 603.7 DELAYED one -- the first minted ability to arm anything, and so the
+-- first Effect.ArmDelayedTrigger whose name is on no face
+-- (Keyword.mintedDelayedAbilities).
+--
+-- Falcon Abomination {2}{U} Creature -- Zombie Bird 2/2 is the producer: flying,
+-- and "when this creature enters, create a 2/2 black Zombie creature token with
+-- decayed". Decayed is printed on tokens far more often than on cards, so the
+-- keyword arrives here through the card's own Create -- codec-parsed card data,
+-- never a hand-built face -- and the Falcon beside it is the control, a creature
+-- of the same size and controller with no decayed.
+--
+-- bob defends with NOTHING, deliberately: a blocked 2/2 token would die to CR
+-- 704.5g whether or not rule 702.147a did anything, so the sacrifice assertion
+-- would pass for the wrong reason.
+decayedSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+decayedSpec s registry =
+  let settleFor gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
+      resolveAll gs = snd (Engine.runGamePure S.identityAnswer gs Engine.priorityLoop)
+      -- CR 302.6: the token is minted this turn and so is summoning sick, and
+      -- nothing in the pool gives a decayed token haste -- so this is the state a
+      -- turn later would reach, and the one fixture step below that is not the
+      -- card's own doing.
+      settled oid gs =
+        gs {GameState.objects = Map.adjust (\o -> o {Object.sickness = Sickness.Settled S.alice}) oid (GameState.objects gs)}
+      -- alice's Falcon Abomination, entered and its trigger resolved, with the
+      -- Zombie token settled beside it.
+      board = do
+        falcon <- S.printingOf s registry "Falcon Abomination"
+        let (gs0, _, _) = S.combatBoardOf [] []
+            (bird, gs1) = S.entersWithTrigger falcon S.alice gs0
+            made = resolveAll (settleFor gs1)
+        pure (bird, made, S.tokensOf made)
+      noAttacks :: Prompt.Prompt r -> r
+      noAttacks p = case p of
+        Prompt.DeclareAttackers {} -> []
+        _ -> S.aggressiveAnswer p
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      atMain = S.runToStep Phase.PostcombatMain
+   in Spec.describe s "Decayed (CR 702.147)" $ do
+        -- CR 509.1b through rule 702.147a's static half, unleash's carrier with
+        -- no gate. The Falcon is on the same board with the same controller, so a
+        -- restriction that stopped every creature blocking cannot pass.
+        Spec.it s "CR 702.147a the token enters with decayed and cannot block" $ do
+          (bird, made, tokens) <- board
+          case tokens of
+            [zombie] -> do
+              Spec.assertBool s (Projection.hasKeyword Keyword.Type.Decayed zombie made) "the token has decayed"
+              Spec.assertBool s (not (Combat.canBlock S.alice zombie made)) "so it cannot block"
+              Spec.assertBool s (Combat.canBlock S.alice bird made) "while the Falcon that made it can"
+              Spec.assertEqWith s "and only the Falcon is offered" (Combat.legalBlockers S.alice made) [bird]
+            other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+        -- CR 508.3a's declaration puts the minted trigger on the stack, and its
+        -- resolution arms rule 702's own delayed ability -- the only armed entry
+        -- on the board, since no card here declares one.
+        Spec.it s "CR 702.147a attacking arms one delayed ability" $ do
+          (_, made, tokens) <- board
+          case tokens of
+            [zombie] -> do
+              let after = atBlockers S.aggressiveAnswer (settled zombie made)
+              Spec.assertBool s (elem zombie (S.attackerDeclarationsOf after)) "the token really attacked"
+              Spec.assertEqWith s "one delayed ability waiting" (Seq.length (GameState.delayedTriggers after)) 1
+              Spec.assertBool s (S.onBattlefield zombie after) "and it is still there at declare blockers"
+            other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+        -- CR 511.2: an ability that triggers "at end of combat" triggers as the
+        -- end of combat step begins. The Falcon attacked too and survives, so
+        -- "everything alice attacked with died" cannot pass this.
+        Spec.it s "CR 511.2 the delayed ability sacrifices it at end of combat" $ do
+          (bird, made, tokens) <- board
+          case tokens of
+            [zombie] -> do
+              let after = atMain S.aggressiveAnswer (settled zombie made)
+              Spec.assertBool s (not (S.onBattlefield zombie after)) "the token is gone"
+              Spec.assertBool s (S.onBattlefield bird after) "the Falcon that attacked beside it is not"
+              Spec.assertEqWith s "and the delayed ability is spent" (Seq.length (GameState.delayedTriggers after)) 0
+            other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+        -- THE PAIR THAT MAKES THE TRIGGER REAL. Same board, same fixture, and
+        -- only the declaration different: rule 702.147a sacrifices a creature
+        -- that ATTACKED, so a decayed creature held back survives its own end of
+        -- combat.
+        Spec.it s "CR 702.147a a decayed creature that did not attack is not sacrificed" $ do
+          (_, made, tokens) <- board
+          case tokens of
+            [zombie] -> do
+              let after = atMain noAttacks (settled zombie made)
+              Spec.assertEqWith s "nothing was declared" (S.attackerDeclarationsOf after) []
+              Spec.assertEqWith s "so nothing was armed" (Seq.length (GameState.delayedTriggers after)) 0
+              Spec.assertBool s (S.onBattlefield zombie after) "and the token is still there"
+            other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
 
 -- CR 702.39a's provoke, which rule 702 states as a triggered
 -- ability and the FIRST whose payload creates a CR 509.1c blocking REQUIREMENT
@@ -8909,6 +9000,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   exaltedSpec s registry
   mentorSpec s registry
   trainingSpec s registry
+  decayedSpec s registry
   provokeSpec s registry
   evolveSpec s registry
   krasisSpec s registry
