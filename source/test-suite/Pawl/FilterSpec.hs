@@ -8,6 +8,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
+import qualified Pawl.Types.CounterKind as CounterKind
 -- Aliased Filter.Type, not Type, because the evaluator module Pawl.Engine.Filter
 -- already claims the alias Filter (a documented exception to alias-to-last-
 -- component, per the M4.5 P9 plan's global constraints).
@@ -97,6 +98,14 @@ ringBearer = blackCreature {Filter.ringBearerFor = Just (PlayerId.MkPlayerId 0)}
 -- above there is no second view for "somebody else's".
 renownedCreature :: Filter.View
 renownedCreature = blackCreature {Filter.renowned = True}
+
+-- CR 122.1's markers, two kinds at once so an atom that read the map's emptiness
+-- rather than its key would pass the positive and fail nothing.
+counteredCreature :: Filter.View
+counteredCreature =
+  blackCreature
+    { Filter.counters = Map.fromList [(CounterKind.PlusOnePlusOne, 1), (CounterKind.Lore, 2)]
+    }
 
 self :: Filter.Context
 self = Filter.contextFor (Just (PlayerId.MkPlayerId 0)) Nothing
@@ -657,3 +666,19 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
     -- CR 702.112b: "only permanents can be or become renowned".
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.IsRenowned)) "player"
+
+  -- CR 122.1's presence read, per KIND. Perspective-free for IsRenowned's reason:
+  -- a counter belongs to no player.
+  Spec.describe s "HasCounters" $ do
+    Spec.it s "matches a permanent bearing that kind" $ do
+      Spec.assertBool s (Filter.matches self counteredCreature (Filter.Type.HasCounters CounterKind.PlusOnePlusOne)) "+1/+1"
+
+    -- The kind is not decoration: the same view bears lore counters and no -1/-1.
+    Spec.it s "does not match on a kind it does not bear" $ do
+      Spec.assertBool s (not (Filter.matches self counteredCreature (Filter.Type.HasCounters CounterKind.MinusOneMinusOne))) "-1/-1"
+
+    Spec.it s "does not match a permanent with no counters at all" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature (Filter.Type.HasCounters CounterKind.PlusOnePlusOne))) "none"
+
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.HasCounters CounterKind.PlusOnePlusOne))) "player"

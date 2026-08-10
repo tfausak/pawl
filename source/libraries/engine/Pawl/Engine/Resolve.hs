@@ -2957,8 +2957,8 @@ applyEffectWith runSubgame resolving source controller legality chosen effect = 
   -- The gate is a FENCE rather than a tested branch: no pooled board reaches a
   -- resolution here with nothing to place. Rule 702.100a's intervening "if" (CR
   -- 608.2a) already removes the ability when the bearer has left or stopped being
-  -- a creature, and no counter replacement in the pool can reduce a placement to
-  -- zero (#847).
+  -- a creature, and every CR 614.16 replacement in the pool only increases a
+  -- placement.
   Effect.Evolve slot ->
     case (Map.lookup slot chosen, Map.findWithDefault False slot legality) of
       (Just recipient, True) -> case Recipient.objectOf recipient of

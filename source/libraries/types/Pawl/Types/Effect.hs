@@ -530,6 +530,10 @@ data Effect card
     --
     -- The P/T consequence is the projection's (CR 122.1a / 613.4c), not this
     -- opcode's, exactly as PutCounters' haddock says of the other direction.
+    --
+    -- Still a bare SLOT where PutCounters now takes an ObjectRef: no printing in
+    -- the pool takes counters off a swept set, so the widening was owed on one
+    -- side only.
     RemoveCounters (CounterKind.CounterKind Keyword.Keyword) Quantity.Quantity SlotName.SlotName
   | -- | CR 122 / 107.14: the players the PlayerRef names each get N counters of a
     -- player-counter kind. Subsumes any self-scoped player counter (energy,

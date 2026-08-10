@@ -758,12 +758,11 @@ data TriggerCondition
     -- creature evolves". Matched against GameEvent.Evolved by an id comparison,
     -- SelfEnters' shape.
     --
-    -- Self-scoped and NOT PermanentBecomesRenowned's filtered shape, which is the
-    -- opposite call from #1170's and the pool is why: both printings that read
-    -- rule 702.100b's marker say "this creature", where renown had Valeron Wardens
-    -- printing the filtered form. A Filter payload here would be a width no card
-    -- asks for; the card that prints "whenever a creature you control evolves"
-    -- earns it.
+    -- Self-scoped and NOT PermanentBecomesRenowned's filtered shape, and the pool
+    -- is why: both printings that read rule 702.100b's marker say "this creature",
+    -- where renown has Valeron Wardens printing the filtered form. A Filter
+    -- payload here would be a width no card asks for; the card that prints
+    -- "whenever a creature you control evolves" earns it.
     SelfEvolves
   | -- | CR 603.10a: "whenever a player sacrifices a permanent". One of the four
     -- look-back families that rule names, and the second pawl builds.

@@ -460,9 +460,8 @@ matches context view predicate = case predicate of
   -- unlike the arm above -- the designation belongs to no player.
   Filter.IsRenowned -> renowned view
   -- CR 122.1, asked of the CANDIDATE: has it one or more counters of the kind?
-  -- IsRenowned's live read, of counters instead of a designation -- CR 122.3 takes
-  -- them off as the permanent leaves, and CR 400.7's new incarnation arrives with
-  -- none.
+  -- IsRenowned's live read, of counters instead of a designation: CR 400.7's new
+  -- incarnation arrives with none, so nothing is stamped on the candidate.
   Filter.HasCounters kind -> Map.findWithDefault 0 kind (counters view) > 0
   Filter.And fs -> all (matches context view) fs
   Filter.Or fs -> any (matches context view) fs
