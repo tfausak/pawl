@@ -2779,12 +2779,41 @@ matchesTrigger gs bearer you cond event = case cond of
   -- creature put onto the battlefield blocking is in Combat.blockers and has no
   -- event here.
   --
-  -- The attacking creature the event also carries is not compared: this condition
-  -- is CR 509.3a's, which names none (#1146).
+  -- The attacking creature the event also carries is neither compared nor bound:
+  -- this condition is CR 509.3a's, which names none. SelfBlocksCreature's arm
+  -- below is rule 509.3b's, which does.
   TriggerCondition.SelfBlocks -> case event of
     GameEvent.BlockerDeclared blocker _ -> blocker == bearer
     -- The bearer BECOMING blocked is the other side of the same declaration and
     -- not this condition: CR 509.3a's creature is the one doing the blocking.
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.AttackerDeclared _ _ -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.CountersRemoved {} -> False
+  -- CR 509.3b: the same match SelfBlocks makes, on the same event. The two differ
+  -- only in what eventBindings stamps -- rule 509.3b's "a creature" is the
+  -- attacker, bound under Binding.blockedCreature -- which is why this arm is
+  -- deliberately identical to that one rather than sharing it.
+  TriggerCondition.SelfBlocksCreature -> case event of
+    GameEvent.BlockerDeclared blocker _ -> blocker == bearer
+    -- CR 509.3c's grouped event is the bearer BECOMING blocked, which is not a
+    -- block by it.
     GameEvent.AttackerBlocked _ _ -> False
     GameEvent.AttackerDeclared _ _ -> False
     GameEvent.Moved _ _ -> False
@@ -3702,6 +3731,7 @@ reactsToAbilityTriggering cond = case cond of
   TriggerCondition.PlayerBecomesMonarch _ -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfBlocks -> False
+  TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
@@ -3933,6 +3963,12 @@ eventBindings cond event = case (cond, event) of
   -- source, so it gets no second name.
   (TriggerCondition.SelfBecomesBlockedBy _, GameEvent.BlockerDeclared blocker _) ->
     Binding.setBlockingCreature blocker Map.empty
+  -- CR 509.3b's "that creature": the ATTACKER on the very same declaration, which
+  -- Loyal Sentry's payload destroys. The mirror of the arm above, and
+  -- unconditional for the same reason; here it is the BLOCKER that is the bearer
+  -- and so gets no second name.
+  (TriggerCondition.SelfBlocksCreature, GameEvent.BlockerDeclared _ attacker) ->
+    Binding.setBlockedCreature attacker Map.empty
   -- CR 603.1b's multi-condition ability reaches this fallthrough and stamps
   -- nothing, which agrees with eventBindingSlots' intersection for the pool's one
   -- AnyOf and is pinned by Pawl.TriggerSpec against every event either branch
@@ -4016,10 +4052,15 @@ eventBindingSlots cond = case cond of
   TriggerCondition.SelfAttacks _ -> Set.singleton Binding.triggerPlayer
   -- Nothing, unlike SelfAttacks above: the blocker is the bearer, already bound
   -- as CR 113.7a's source, and the attacker the event also carries is what CR
-  -- 509.3b's condition would name rather than this one (#1146). CR 509.1a makes
-  -- the blocker's controller the defending player, whom CR 109.5's `you` already
+  -- 509.3b's condition names rather than this one, below. CR 509.1a makes the
+  -- blocker's controller the defending player, whom CR 109.5's `you` already
   -- names.
   TriggerCondition.SelfBlocks -> Set.empty
+  -- CR 509.3b's form is the one that DOES name the attacker, off the same event.
+  -- Guaranteed rather than conditional, as SelfBecomesBlockedBy's is: every
+  -- declaration carries both ids, and matchesTrigger has already pinned the
+  -- blocker to the bearer.
+  TriggerCondition.SelfBlocksCreature -> Set.singleton Binding.blockedCreature
   -- CR 508.5's defending player, which the becomes-blocked event carries for
   -- SelfAttacks' reason -- rule 702.130a's afflict is the reader. No BLOCKER: CR
   -- 509.3c names none, so GameEvent.AttackerBlocked carries none, and CR 509.3d's
@@ -4260,6 +4301,7 @@ looksBack condition = case condition of
   TriggerCondition.PlayerDiscards _ -> False
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfBlocks -> False
+  TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SpellOrAbilityCounters _ -> False
@@ -4782,6 +4824,7 @@ zoneTriggeredFrom cond = case cond of
   -- attacker, so CR 113.6k never reaches this.
   TriggerCondition.SelfAttacks _ -> Nothing
   TriggerCondition.SelfBlocks -> Nothing
+  TriggerCondition.SelfBlocksCreature -> Nothing
   TriggerCondition.SelfBecomesBlocked -> Nothing
   TriggerCondition.SelfBecomesBlockedBy _ -> Nothing
   -- CR 702.29c: a cycling ability triggers from whatever zone the card winds up
@@ -4915,6 +4958,7 @@ controllerTurnScoped cond = case cond of
   -- its thief's turn.
   TriggerCondition.SelfAttacks _ -> False
   TriggerCondition.SelfBlocks -> False
+  TriggerCondition.SelfBlocksCreature -> False
   TriggerCondition.SelfBecomesBlocked -> False
   TriggerCondition.SelfBecomesBlockedBy _ -> False
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> False
@@ -5032,6 +5076,7 @@ stateTriggers gs
               TriggerCondition.OpponentLostLifeDuringYourTurn -> False
               TriggerCondition.SelfAttacks _ -> False
               TriggerCondition.SelfBlocks -> False
+              TriggerCondition.SelfBlocksCreature -> False
               TriggerCondition.SelfBecomesBlocked -> False
               TriggerCondition.SelfBecomesBlockedBy _ -> False
               TriggerCondition.SelfCycled -> False

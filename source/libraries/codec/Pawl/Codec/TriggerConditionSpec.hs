@@ -130,6 +130,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       TriggerCondition.SelfBlocks
       """ {"type":"SelfBlocks"} """
+  -- CR 509.3b, nullary too: the attacker it names is a BINDING rather than a
+  -- payload on the condition, so a distinct tag is the whole encoding.
+  Spec.it s "SelfBlocksCreature" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      TriggerCondition.SelfBlocksCreature
+      """ {"type":"SelfBlocksCreature"} """
   -- CR 509.3c, nullary for the same reason, and a distinct tag from the sibling
   -- above: the two name opposite sides of one declaration.
   Spec.it s "SelfBecomesBlocked" $

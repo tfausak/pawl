@@ -171,10 +171,10 @@ data GameEvent
     -- several, and pawl's declaration has nowhere to put the second attacker
     -- (#1145). While that holds, one blocker is one event.
     --
-    -- The ATTACKER is carried and read by nothing today, the payload CR 509.3b's
-    -- "blocks a creature" and CR 509.3d's "becomes blocked by a creature" need --
-    -- and it cannot be derived later, since a blocker removed from combat (CR
-    -- 506.4) leaves no record of what it was declared against.
+    -- The ATTACKER is the payload CR 509.3b's "blocks a creature" and CR 509.3d's
+    -- "becomes blocked by a creature" need -- the first binds it, the second
+    -- matches on it -- and it cannot be derived later, since a blocker removed
+    -- from combat (CR 506.4) leaves no record of what it was declared against.
     BlockerDeclared ObjectId.ObjectId ObjectId.ObjectId
   | -- | CR 509.1h: an attacking creature BECAME a blocked creature -- one event
     -- per attacker the CR 509.1 declaration gave at least one blocker, appended
