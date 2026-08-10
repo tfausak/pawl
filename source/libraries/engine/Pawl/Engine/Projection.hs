@@ -1454,6 +1454,7 @@ rewriteEffect pairs effect = case effect of
   Effect.BecomeMonarch {} -> effect
   Effect.BecomeRenowned _ -> effect
   Effect.BecomeMonstrous _ -> effect
+  Effect.Suspect _ -> effect
   Effect.Evolve _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
@@ -1867,7 +1868,8 @@ gatherGiven stripped functioning gs =
             concat (zipWith (gatherStatic (functioning emblemId) emblemId (Object.timestamp emblemObj) [] False) [0 ..] (Face.staticAbilities face))
       emblems = concatMap fromEmblem (Set.toList (GameState.command gs))
       counters = counterGathered gs
-   in stored <> static <> emblems <> counters
+      designations = designationGathered gs
+   in stored <> static <> emblems <> counters <> designations
 
 -- ONE battlefield permanent's static-ability parts, each tagged with the index
 -- of the ability it came from -- gatherStatic's `n`, and so the key half CR
@@ -2249,6 +2251,39 @@ counterGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs)
               -- abilities count Object.counters directly, as those three do.
               CounterKind.Time -> []
          in pt <> concatMap grantOf (Map.toList cs)
+
+-- CR 701.60c / 613.1f: a SUSPECTED permanent has menace, so the designation is
+-- emitted as a layer-6 grant on the permanent itself. counterGathered's shape and
+-- its reasons -- rule 701.60c is rulebook text rather than a card's ability, as
+-- CR 122.1b's keyword counter is, and neither is a case on an effect's identity.
+--
+-- Read off Object.suspected on every projection rather than stamped when the
+-- designation is set, which IS rule 701.60c's "for as long as it's suspected": a
+-- permanent that stops being suspected loses the keyword with nothing to unwind.
+-- Rule 701.60c's other half, "this creature can't block", is a combat restriction
+-- rather than a characteristic, and lives in Pawl.Engine.CombatRestriction.
+--
+-- The permanent's own timestamp, counterGathered's choice: the grant has no
+-- source of its own to take one from. It is load-bearing only against a CR 613.1f
+-- removal, layer-6 grants being commutative among themselves.
+designationGathered :: GameState -> [Gathered]
+designationGathered gs = concatMap fromObject (Set.toList (GameState.battlefield gs))
+  where
+    fromObject oid = case Game.lookupObject oid gs of
+      Nothing -> []
+      Just obj
+        | Object.suspected obj ->
+            [ MkGathered
+                { gEffect = Nothing,
+                  gSource = oid,
+                  gAffected = Affected.TheseObjects (Set.singleton oid),
+                  gLayer = Layer.Ability,
+                  gLowest = Layer.Ability,
+                  gTimestamp = Object.timestamp obj,
+                  gModification = Modification.GainKeyword Keyword.Type.Menace
+                }
+            ]
+        | otherwise -> []
 
 -- A characteristic a projection holds, at the coarseness CR 613.8a's dependency
 -- question needs: applying one effect can only change what another applies to if

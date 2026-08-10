@@ -746,6 +746,13 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       fromJson
       (Effect.BecomeMonstrous (SlotName.MkSlotName (Text.pack "self")))
       """ {"type":"BecomeMonstrous","value":"self"} """
+  Spec.it s "Suspect" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.Suspect (SlotName.MkSlotName (Text.pack "self")))
+      """ {"type":"Suspect","value":"self"} """
   Spec.it s "Evolve" $
     Common.assertJsonCodec
       s

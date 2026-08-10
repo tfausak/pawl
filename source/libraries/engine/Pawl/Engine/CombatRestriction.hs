@@ -24,8 +24,10 @@ import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
 import qualified Pawl.Types.Face as Face
+import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
 import qualified Pawl.Types.GameState as GameState
+import qualified Pawl.Types.Object as Object
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.StaticAbility as StaticAbility
 import qualified Pawl.Types.Subtype as Subtype
@@ -212,21 +214,43 @@ inForce gs =
         Just face ->
           any Keyword.mintsCombatRestriction (Face.keywords face)
             || any (any (Projection.grantsKeywordWhere Keyword.mintsCombatRestriction) . StaticAbility.modifications) (Face.staticAbilities face)
+      -- CR 701.60c: "a suspected permanent has menace and 'This creature can't
+      -- block' for as long as it's suspected". Decayed's row (CR 702.147a) with
+      -- the keyword swapped for the designation -- aimed at the source alone,
+      -- with no CR 509.1b "unless" gate -- and read off Object.suspected rather than stamped
+      -- when the designation was set, so it ends when the designation does. The
+      -- menace half is a characteristic, and lives in
+      -- Pawl.Engine.Projection.designationGathered.
+      --
+      -- Outside `anyMinted`, which asks about keywords, but INSIDE `keepsAbilities`
+      -- below: rule 701.60c states the restriction as quoted text, so what the
+      -- designation gives the permanent is an ABILITY, and CR 305.7's strip and a
+      -- CR 613.1f layer-6 removal both reach it.
+      --
+      -- Not implemented: CR 613.1f's ordering between the two. A removal with an
+      -- EARLIER timestamp than the permanent's own leaves the ability in place,
+      -- and this gate drops it anyway (#1216). The menace half has no such hole,
+      -- going through the layer fold itself.
+      designationRows source = case Game.lookupObject source gs of
+        Just obj | Object.suspected obj -> [(source, [], CombatRestriction.CantBlock (Affected.Matching Filter.Type.IsSource) Nothing)]
+        _ -> []
+      -- The two ability losses the printed rows below check for, named because the
+      -- designation row above asks the same question: CR 305.7's basic-land
+      -- subtype set, and CR 604.2 against a CR 613.1f layer-6 removal.
+      keepsAbilities source = (null setEffs || Projection.liveAfterLayers setEffs source gs) && not (removed source)
       fromPermanent source = case Game.faceOf source gs of
         Nothing -> []
         Just face ->
-          mintedRows source <> case Face.combatRestrictions face of
+          (if keepsAbilities source then designationRows source else []) <> mintedRows source <> case Face.combatRestrictions face of
             -- Every permanent in almost every game.
             [] -> []
             restrictions ->
               -- The same two ability losses AttackRequirement.instances asks
-              -- about: CR 305.7's basic-land subtype set, and CR 604.2 against a
-              -- CR 613.1f layer-6 removal. Why CR 613.6 cannot rescue a
+              -- about, as `keepsAbilities` above. Why CR 613.6 cannot rescue a
               -- restriction that has started to apply is argued in
               -- BlockRequirement.instances, as is why CR 613.11 also lets the CR
               -- 305.7 gate be liveAfterLayers rather than liveGiven.
-              if (null setEffs || Projection.liveAfterLayers setEffs source gs)
-                && not (removed source)
+              if keepsAbilities source
                 then
                   -- CR 612.1's word swap over the source's own text, computed HERE
                   -- rather than hoisted beside setEffs: textChangesAffecting folds

@@ -483,7 +483,8 @@ activateAbility pid srcId ability = do
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
       onStack =
         gs2

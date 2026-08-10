@@ -181,7 +181,8 @@ gameSpec s registry = Spec.describe s "Game" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
       )
 
@@ -1688,7 +1689,8 @@ handBobBolt lightningBolt gs =
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
    in (oid, gs2 {GameState.objects = Map.insert oid obj (GameState.objects gs2), GameState.hand = Map.insert S.bob (Seq.singleton oid) (GameState.hand gs2)})
 
@@ -1996,7 +1998,8 @@ restartOnStack mountain =
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
    in g4
         { GameState.objects = Map.insert abilId abilObj (GameState.objects g4),

@@ -616,7 +616,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g4 =
           g3
@@ -664,7 +665,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g3 =
           g2
@@ -714,7 +716,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g3 =
           g2
@@ -740,7 +743,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "one permanent on the battlefield" (length (Game.zoneMembers Zone.Battlefield S.alice resolved)) 1
@@ -753,7 +756,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         ability = ActivatedAbility.MkActivatedAbility (Cost.Type.MkCost (Just (ManaCost.MkManaCost [])) []) (Modal.MkModal (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.fromList [Effect.Search basicLandFilter SearchDestination.BattlefieldTapped]))) Map.empty)) (ModeSelection.ChooseExactly 1)) [] Nothing
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
-        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
+        abilObj = Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findNothing g4 Stack.resolveTop)
     Spec.assertEqWith s "nothing entered the battlefield" (GameState.battlefield resolved) Set.empty
@@ -779,7 +782,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure findFirst g4 Stack.resolveTop)
     Spec.assertEqWith s "the basic land is offered and fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Mountain") S.alice resolved) 1
@@ -803,7 +806,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
         (abilId, g2) = Game.freshObjectId g1
         (ts, g3) = Game.freshTimestamp g2
         abilObj =
-          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
+          Object.MkObject S.alice Nothing (Source.OfAbility (ObjectId.MkObjectId 0) ability) Zone.Stack TapState.Untapped Facing.FaceUp 0 (Sickness.Settled S.alice) (Binding.fromChoices Map.empty Nothing (Seq.singleton (ModeIndex.MkModeIndex 0))) Map.empty Nothing Nothing Nothing Set.empty ts Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = [abilId]}
         resolved = snd (Engine.runGamePure (findForbidden pikerId) g4 Stack.resolveTop)
     Spec.assertEqWith s "the Piker was NOT fetched to the battlefield" (S.countOnBattlefieldByName (CardName.MkCardName $ Text.pack "Goblin Piker") S.alice resolved) 0
@@ -849,7 +852,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         resolved = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -914,7 +918,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g4 = g3 {GameState.objects = Map.insert abilId abilObj (GameState.objects g3), GameState.stack = abilId : GameState.stack g3}
         resolved = snd (Engine.runGamePure S.identityAnswer g4 Stack.resolveTop)
@@ -990,7 +995,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g6 = g5 {GameState.objects = Map.insert abilId abilObj (GameState.objects g5), GameState.stack = abilId : GameState.stack g5}
         after = snd (Engine.runGamePure S.identityAnswer g6 Stack.resolveTop)
@@ -1074,7 +1080,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1157,7 +1164,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.protector = Nothing,
               Object.unlockedHalves = Set.empty,
               Object.renowned = False,
-              Object.monstrous = False
+              Object.monstrous = False,
+              Object.suspected = False
             }
         g3 = g2 {GameState.objects = Map.insert spellId spellObj (GameState.objects g2), GameState.stack = spellId : GameState.stack g2}
         after = snd (Engine.runGamePure S.identityAnswer g3 (Resolve.resolveSpellWith stubRunner spellId))
@@ -1368,7 +1376,8 @@ installControlBy mindslaver controller target gs0 =
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
       gs4 = gs3 {GameState.objects = Map.insert abilId abilObj (GameState.objects gs3), GameState.stack = abilId : GameState.stack gs3}
    in snd (Engine.runGamePure S.identityAnswer gs4 Stack.resolveTop)
@@ -1449,7 +1458,8 @@ twoBoltState piker mountain lightningBolt =
             Object.protector = Nothing,
             Object.unlockedHalves = Set.empty,
             Object.renowned = False,
-            Object.monstrous = False
+            Object.monstrous = False,
+            Object.suspected = False
           }
    in gs2
         { GameState.objects = Map.insert oid2 obj (GameState.objects gs2),
@@ -1473,7 +1483,7 @@ cancelVictim island cancel victim =
 handAppend :: Printing.Printing -> PlayerId.PlayerId -> GameState.GameState -> (ObjectId.ObjectId, GameState.GameState)
 handAppend printing pid gs =
   let (oid, gs1) = Game.freshObjectId gs
-      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
+      obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
    in ( oid,
         gs1
           { GameState.objects = Map.insert oid obj (GameState.objects gs1),
@@ -2671,7 +2681,7 @@ handCards printing pid k gs = List.foldl' (\g _ -> addOne g) gs [1 .. k]
   where
     addOne g =
       let (oid, g1) = Game.freshObjectId g
-          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False
+          obj = Object.MkObject pid Nothing (Source.OfCard printing) Zone.Hand TapState.Untapped Facing.FaceUp 0 (Sickness.Settled pid) Map.empty Map.empty Nothing Nothing Nothing Set.empty (Timestamp.MkTimestamp 0) Nothing Nothing Nothing Nothing Nothing Nothing Set.empty False False False
        in g1
             { GameState.objects = Map.insert oid obj (GameState.objects g1),
               GameState.hand = Map.insertWith (Seq.><) pid (Seq.singleton oid) (GameState.hand g1)
@@ -5825,12 +5835,91 @@ investigateSpec s registry = Spec.describe s "Investigate" $ do
           Spec.assertEqWith s "three Plains are now tapped: the {W} and the {2}" (S.tappedCount S.alice after) 3
         other -> Spec.assertFailure s ("expected exactly one activated ability on the Clue, got " <> show (length other))
 
+-- CR 701.60, proved by Person of Interest {3}{R} Creature -- Human Rogue 2/2,
+-- "When this creature enters, suspect it. Create a 2/2 white and blue Detective
+-- creature token."
+--
+-- The Detective is what makes every case below a PAIR on one board: it is
+-- alice's (or bob's) other creature, created by the same resolution, and the only
+-- thing that differs between the two is the designation. A fixture that read the
+-- card wrong, or a menace grant aimed at the wrong object, fails the second half
+-- of each assertion rather than passing for a board-shaped reason.
+--
+-- CR 701.60c has two halves in two different subsystems, so both are asserted at
+-- gameplay level: menace goes through Pawl.Engine.Projection's layer-6 grant and
+-- is read by a block declaration, "can't block" goes through
+-- Pawl.Engine.CombatRestriction and is read by another.
+personOfInterestSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+personOfInterestSpec s registry = Spec.describe s "PersonOfInterest" $ do
+  let -- The board after the CR 603.6a enters trigger has resolved: `pid` gets the
+      -- Person of Interest and its Detective, and the Pikers fill out whichever
+      -- side the case needs. S.entersWithTrigger rather than a cast, because
+      -- S.combatBoardOf starts in the declare attackers step, where no spell can
+      -- be cast.
+      board mine theirs pid = do
+        poi <- S.printingOf s registry "Person of Interest"
+        piker <- S.printingOf s registry "Goblin Piker"
+        let (gs0, ours, yours) = S.combatBoardOf (replicate mine piker) (replicate theirs piker)
+            (poiId, gs1) = S.entersWithTrigger poi pid gs0
+            settled = S.runPure S.identityAnswer gs1 (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+        pure (settled, poiId, ours, yours)
+      suspectedOf oid gs = fmap Object.suspected (Game.lookupObject oid gs)
+  Spec.it s "CR 701.60a the enters trigger suspects the Person and not the Detective it makes" $ do
+    (gs, poiId, _, _) <- board 0 0 S.alice
+    case S.tokensOf gs of
+      [tokenId] -> do
+        Spec.assertEqWith s "the Person is suspected, the Detective is not" (suspectedOf poiId gs, suspectedOf tokenId gs) (Just True, Just False)
+        Spec.assertEqWith s "the token is a 2/2" (S.powerToughnessOf tokenId gs) (Just (2, 2))
+        Spec.assertEqWith s "a Detective creature" (Projection.cardTypesOf tokenId gs, Projection.subtypesOf tokenId gs) (Set.singleton CardType.Creature, Set.singleton Subtype.Detective)
+        Spec.assertEqWith s "white and blue" (Projection.colorsOf tokenId gs) (Set.fromList [Color.White, Color.Blue])
+        Spec.assertEqWith s "CR 111.2: alice created it, so alice controls it" (Projection.controllerOf tokenId gs) (Just S.alice)
+      other -> Spec.assertFailure s ("expected exactly one token, got " <> show (length other))
+  -- CR 701.60a's "until it leaves the battlefield", asserted on
+  -- Object.newIncarnation directly for the reason Pawl.TriggerSpec's renown case
+  -- gives: nothing writes the field on an entry, and Pawl.SetupSpec's CR 400.7
+  -- case is blind to a field the forgetting never touches.
+  Spec.it s "CR 701.60a the designation does not survive CR 400.7" $ do
+    (gs, poiId, _, _) <- board 0 0 S.alice
+    case Game.lookupObject poiId gs of
+      Nothing -> Spec.assertFailure s "expected to find the Person"
+      Just obj -> Spec.assertEqWith s "this incarnation is suspected, the next one is not" (Object.suspected obj, Object.suspected (Object.newIncarnation obj)) (True, False)
+  Spec.it s "CR 701.60c a suspected creature has menace, so one blocker cannot block it" $ do
+    -- bob's two Pikers are the falsifier for reading rule 701.60c as "can't be
+    -- blocked": the very creature that cannot block the Person alone can block it
+    -- alongside the other, and the block survives a real declare blockers step.
+    (entered, poiId, _, blockers) <- board 0 2 S.alice
+    let gs = S.runPure S.aggressiveAnswer entered (Combat.declareAttackers S.alice)
+    case (S.tokensOf gs, blockers) of
+      ([tokenId], [first, second]) -> do
+        Spec.assertEqWith s "the Person has menace and the Detective does not" (Projection.hasKeyword Keyword.Menace poiId gs, Projection.hasKeyword Keyword.Menace tokenId gs) (True, False)
+        Spec.assertEqWith s "the Person is attacking" (S.attackerDeclarationsOf gs) [poiId]
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton first (Set.singleton poiId)) gs)) "one blocker is illegal"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.fromList [(first, Set.singleton poiId), (second, Set.singleton poiId)]) gs) "two are legal"
+        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        Spec.assertEqWith s "and both block" (Combat.blockersOf poiId after) (Set.fromList [first, second])
+      other -> Spec.assertFailure s ("expected one token and two blockers, got " <> show other)
+  Spec.it s "CR 701.60c a suspected creature can't block, where the Detective beside it can" $ do
+    -- The designation on the DEFENDING side, so rule 701.60c's second half is the
+    -- only thing separating the two creatures bob could block with. Both are his,
+    -- both entered this turn, and only one is suspected.
+    (entered, poiId, attackers, _) <- board 1 0 S.bob
+    let gs = S.runPure S.aggressiveAnswer entered (Combat.declareAttackers S.alice)
+    case (S.tokensOf gs, attackers) of
+      ([tokenId], [attackerId]) -> do
+        Spec.assertEqWith s "alice's Piker is attacking" (S.attackerDeclarationsOf gs) [attackerId]
+        Spec.assertBool s (not (Combat.legalBlockDeclaration S.bob (Map.singleton poiId (Set.singleton attackerId)) gs)) "the Person cannot block"
+        Spec.assertBool s (Combat.legalBlockDeclaration S.bob (Map.singleton tokenId (Set.singleton attackerId)) gs) "the Detective can"
+        let after = S.runPure S.aggressiveAnswer gs Combat.declareBlockers
+        Spec.assertEqWith s "so only the Detective blocks" (Combat.blockersOf attackerId after) (Set.singleton tokenId)
+      other -> Spec.assertFailure s ("expected one token and one attacker, got " <> show other)
+
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   targetSpec s registry
   plummetSpec s registry
   corrosiveGaleSpec s registry
   investigateSpec s registry
+  personOfInterestSpec s registry
   resolveSpec s registry
   fizzleSpec s registry
   indestructibleSpec s registry
