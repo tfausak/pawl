@@ -26,6 +26,7 @@ import qualified Pawl.Engine.Cost as Cost
 import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword.Engine
 import qualified Pawl.Engine.Mana as Mana
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Quantity as Quantity
@@ -40,10 +41,13 @@ import qualified Pawl.Types.Action as A
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CardName as CardName
+import qualified Pawl.Types.CardType as CardType
+import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Combat as Combat.Type
 import qualified Pawl.Types.CombatStep as CombatStep
 import qualified Pawl.Types.Cost as Cost.Type
+import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EndingStep as EndingStep
 import qualified Pawl.Types.EntwineDecision as EntwineDecision
@@ -1399,6 +1403,94 @@ flashbackCardTypeSpec s registry = Spec.describe s "FlashbackCardType" $ do
     Spec.assertBool s (S.castable S.alice inGraveyard gs) "castable from the graveyard"
     Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice gs)) "and offered"
 
+-- CR 702.133a's two static abilities, on Direct Current {1}{R}{R} Sorcery,
+-- "Direct Current deals 2 damage to any target." plus jump-start.
+--
+-- Firebolt's twin by design: the same 2 damage from a graveyard, differing only
+-- in how the cast is paid for. That is what these cases are about -- rule
+-- 702.133a's cost is ADDITIONAL where rule 702.34a's is alternative, so the
+-- printed {1}{R}{R} is still owed and a card leaves the hand on top of it.
+--
+-- EVERY BOARD BELOW CARRIES THREE MOUNTAINS, positives and negatives alike, so
+-- the only thing a negative can be turning on is the discard.
+jumpStartSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+jumpStartSpec s registry = Spec.describe s "JumpStart" $ do
+  -- The whole card end to end. The hand shrinking and the sorcery landing in
+  -- EXILE are the two discriminating readings: a cast that skipped the
+  -- additional cost leaves two cards in hand, and one that skipped rule
+  -- 702.133a's second ability leaves the sorcery in the graveyard to be cast
+  -- again.
+  --
+  -- What this case does NOT prove is the PERMISSION: S.cast goes straight to
+  -- Cast.castSpell, so deleting rule 702.133a's permission leaves it green. The
+  -- next case is where the permission is asked.
+  Spec.it s "CR 702.133a cast from the graveyard for {1}{R}{R} plus a discard, then exiled" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    directCurrent <- S.printingOf s registry "Direct Current"
+    let (inGraveyard, board) = inGraveyardWith mountain directCurrent 3
+        (_, oneInHand) = S.addHandCard piker S.alice board
+        -- TWO cards in hand, not one: the payment prompt short-circuits when the
+        -- candidates equal the count, so a one-card hand would prove the discard
+        -- happened without proving anybody was asked which card.
+        (_, gs) = S.addHandCard piker S.alice oneInHand
+        cast = S.runPure S.identityAnswer gs (S.cast S.alice inGraveyard)
+        resolved = S.runPure S.identityAnswer cast Stack.resolveTop
+    Spec.assertEqWith s "two cards in hand before" (length (Game.zoneMembers Zone.Hand S.alice gs)) 2
+    Spec.assertEqWith s "it dealt 2 (identityAnswer targets the lowest recipient)" (S.lifeOf S.alice resolved) (Just 18)
+    Spec.assertEqWith s "one card left in hand, so the discard was paid" (length (Game.zoneMembers Zone.Hand S.alice resolved)) 1
+    Spec.assertEqWith s "the graveyard holds the discarded card alone" (length (Game.zoneMembers Zone.Graveyard S.alice resolved)) 1
+    Spec.assertEqWith s "and the sorcery was exiled" (length (Game.zoneMembers Zone.Exile S.alice resolved)) 1
+  -- The negative and its control, one card apart. Both boards afford the mana,
+  -- both hold the same sorcery in the same graveyard; only the hand differs.
+  Spec.it s "CR 702.133a an empty hand cannot pay the additional cost" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    directCurrent <- S.printingOf s registry "Direct Current"
+    let (inGraveyard, emptyHand) = inGraveyardWith mountain directCurrent 3
+        (_, oneInHand) = S.addHandCard piker S.alice emptyHand
+    Spec.assertBool s (not (S.castable S.alice inGraveyard emptyHand)) "not castable with an empty hand"
+    Spec.assertBool s (not (any (S.isCastOf inGraveyard) (Action.legalActions S.alice emptyHand))) "and not offered"
+    Spec.assertBool s (S.castable S.alice inGraveyard oneInHand) "castable once there is a card to discard"
+    Spec.assertBool s (any (S.isCastOf inGraveyard) (Action.legalActions S.alice oneInHand)) "and offered"
+  -- Crux: ADDITIONAL, not alternative. The mana part is the printed cost in both
+  -- zones -- unlike flashback, which replaces it -- and the discard rides only
+  -- the graveyard candidate.
+  Spec.it s "CR 702.133a the discard is an additional cost, and only from the graveyard" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    directCurrent <- S.printingOf s registry "Direct Current"
+    let (fromHand, handBoard) = inHandWith mountain directCurrent 3
+        (fromGraveyard, graveyardBoard) = inGraveyardWith mountain directCurrent 3
+        costsOf oid gs = fmap (\c -> (Cost.Type.mana c, Cost.Type.components c)) (Cost.costsFor (S.printingName directCurrent) oid gs)
+        printed = Just (ManaCost.MkManaCost [ManaSymbol.Generic 1, theRed, theRed])
+    Spec.assertEqWith s "from hand, the printed {1}{R}{R} and no components" (costsOf fromHand handBoard) [(printed, [])]
+    Spec.assertEqWith
+      s
+      "from the graveyard, the same {1}{R}{R} plus one discard"
+      (costsOf fromGraveyard graveyardBoard)
+      [(printed, [CostComponent.DiscardCards 1])]
+  -- Rule 702.133a's "if the resulting spell is an instant or sorcery spell",
+  -- flashback's clause word for word. No printing can reach the failing side --
+  -- jump-start appears only on instants and sorceries -- so this is asserted at
+  -- the function rather than over a board, and is a regression fence rather than
+  -- a card's behaviour.
+  Spec.it s "CR 702.133a the permission is gated on the card's types" $ do
+    Spec.assertEqWith
+      s
+      "a sorcery gets the permission"
+      (Keyword.Engine.permissionsFor (Set.singleton CardType.Sorcery) Keyword.JumpStart)
+      [CastingPermission.CastFromGraveyard]
+    Spec.assertEqWith
+      s
+      "an instant does too"
+      (Keyword.Engine.permissionsFor (Set.singleton CardType.Instant) Keyword.JumpStart)
+      [CastingPermission.CastFromGraveyard]
+    Spec.assertEqWith
+      s
+      "a creature does not"
+      (Keyword.Engine.permissionsFor (Set.singleton CardType.Creature) Keyword.JumpStart)
+      []
+
 -- CR 205.4e: "A player can't cast a legendary instant or sorcery spell unless
 -- that player controls a legendary creature or a legendary planeswalker." The
 -- OTHER half of what the legendary supertype means -- CR 205.4d's legend rule
@@ -2171,6 +2263,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   auraTargetSpec s registry
   fireboltSpec s registry
   flashbackCardTypeSpec s registry
+  jumpStartSpec s registry
   legendarySpellSpec s registry
   printedCastingRestrictionSpec s registry
   flashSpec s registry
