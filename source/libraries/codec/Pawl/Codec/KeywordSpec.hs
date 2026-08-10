@@ -213,6 +213,16 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Banding
       """ {"type":"Banding"} """
+  -- CR 702.25a: nullary, because the rule takes no parameter -- its "without
+  -- flanking" is a Filter over the blocker in the ability this mints, not a
+  -- payload.
+  Spec.it s "Flanking" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Flanking
+      """ {"type":"Flanking"} """
   -- CR 702.26a: nullary, because the rule takes no parameter -- what a phasing
   -- permanent does is entirely the untap step's business.
   Spec.it s "Phasing" $
