@@ -65,6 +65,14 @@ spec s = Spec.describe s "Pawl.Codec.KeywordFamily" $ do
       KeywordFamily.Bushido
       """ {"type":"Bushido"} """
 
+  Spec.it s "Modular" $
+    Common.assertJsonCodec
+      s
+      KeywordFamily.toJson
+      KeywordFamily.fromJson
+      KeywordFamily.Modular
+      """ {"type":"Modular"} """
+
   Spec.it s "Vanishing" $
     Common.assertJsonCodec
       s

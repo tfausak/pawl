@@ -359,6 +359,19 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       s
       (Keyword.toJson (Keyword.Bushido 3) /= Keyword.toJson (Keyword.Poisonous 3))
       "bushido 3 is not poisonous 3"
+  -- CR 702.43a's N is a COUNT OF COUNTERS too, so the tag is again the only thing
+  -- separating modular 2 from bushido 2 on the wire.
+  Spec.it s "Modular carries its N" $ do
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      (Keyword.Modular 2)
+      """ {"type":"Modular","value":2} """
+    Spec.assertBool
+      s
+      (Keyword.toJson (Keyword.Modular 3) /= Keyword.toJson (Keyword.Bushido 3))
+      "modular 3 is not bushido 3"
   -- CR 702.63a's N is a COUNT OF COUNTERS rather than a size or a threshold, and
   -- the wire cannot tell those apart -- so the tag is all that keeps vanishing 2
   -- from bushido 2.
