@@ -1582,6 +1582,9 @@ keywordFilters keyword = case keyword of
   -- are written into the abilities Pawl.Engine.Keyword mints, not into the
   -- keyword.
   Keyword.Bushido _ -> []
+  -- CR 702.46a names no quality either: "Spirit card with mana value N or less"
+  -- is written into the ability Pawl.Engine.Keyword mints, not into the keyword.
+  Keyword.Soulshift _ -> []
   -- CR 702.86a names no quality either: "N permanents" is written into the
   -- ability Pawl.Engine.Keyword mints, not into the keyword.
   Keyword.Annihilator _ -> []

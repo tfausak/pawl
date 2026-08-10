@@ -634,6 +634,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Entwine cost -> Keyword.Type.Entwine (rewriteCost pairs cost)
   -- CR 702.45a's N is a number and not a word, so CR 612.2 has nothing to swap.
   Keyword.Type.Bushido _ -> keyword
+  -- CR 702.46a's N is a number and not a word, so CR 612.2 has nothing to swap
+  -- HERE. "Spirit" is a word CR 612.2a does reach, but it is in the ability
+  -- Pawl.Engine.Keyword.soulshift mints rather than in this value (#1197).
+  Keyword.Type.Soulshift _ -> keyword
   -- CR 702.43a's N is a number and not a word, so CR 612.2 has nothing to swap;
   -- "+1/+1 counter" is the rule's own noun and no card prints it.
   Keyword.Type.Modular _ -> keyword
