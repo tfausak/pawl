@@ -464,6 +464,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
+  -- CR 702.149a's Filter holds no Count for PermanentEnters' reason.
+  TriggerCondition.SelfAttacksWithAnother _ -> []
   TriggerCondition.CreatureAttacksAlone _ -> []
   TriggerCondition.SelfBlocks -> []
   -- CR 509.3b names the attacker without counting anything, so no Count either.
@@ -1419,6 +1421,7 @@ canHostSubjects predicate = case predicate of
   Filter.Type.PowerAtLeast _ -> 0
   Filter.Type.PowerAtMost _ -> 0
   Filter.Type.PowerLessThanSource -> 0
+  Filter.Type.PowerGreaterThanSource -> 0
   Filter.Type.ManaValueAtMost _ -> 0
   Filter.Type.ControlledBy _ -> 0
   -- Zero for ControlledBy's reason: CR 108.3's owner atom carries a
@@ -1538,6 +1541,7 @@ keywordFilters keyword = case keyword of
   Keyword.Riot -> []
   Keyword.Daybound -> []
   Keyword.Nightbound -> []
+  Keyword.Training -> []
   Keyword.StartYourEngines -> []
   Keyword.Toxic _ -> []
 
@@ -1681,6 +1685,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.CreatureDealtCombatDamageToMonarch -> []
   TriggerCondition.OpponentLostLifeDuringYourTurn -> []
   TriggerCondition.SelfAttacks _ -> []
+  -- CR 702.149a names a quality the OTHER attackers must have, so this one DOES
+  -- carry a Filter -- "power greater than this creature's power".
+  TriggerCondition.SelfAttacksWithAnother f -> [f]
   -- CR 506.5's condition names a quality the ATTACKER must have, so it carries a
   -- Filter -- rule 702.83a's "a creature you control".
   TriggerCondition.CreatureAttacksAlone f -> [f]
@@ -3500,16 +3507,19 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           (cardFilters (S.combinedFace barrens))
       )
       "CR 702.29e landcycling's filter is a position the sweep walks"
-  -- CR 702.134a's comparison is answerable only where a TARGET SLOT frames the
-  -- match: Filter.Context.sourcePower is filled by Pawl.Engine.Target.admittedGiven
-  -- and is Nothing everywhere else, so the atom in a card's affected set, Count
-  -- filter or search filter would be a silent False. Only
-  -- Pawl.Engine.Keyword.mentor writes it, and this is what keeps that true.
-  Spec.it s "CR 702.134a no card writes PowerLessThanSource" $ do
+  -- The two source-power comparisons are answerable only where the CONTEXT
+  -- supplies a source power: Filter.Context.sourcePower is filled by
+  -- Pawl.Engine.Target.admittedGiven for a target slot (CR 702.134a) and by
+  -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's condition, and is Nothing
+  -- everywhere else -- so either atom in a card's affected set, Count filter or
+  -- search filter would be a silent False. Only Pawl.Engine.Keyword's mentor and
+  -- training write them, and this is what keeps that true.
+  Spec.it s "CR 702.134a / CR 702.149a no card writes a source-power comparison" $ do
     ps <- S.allPrintings s
     let atoms c = jsonAtoms (Text.pack "PowerLessThanSource") (Face.Codec.toJson Card.toJson c)
-        offenders = filter (anyFace ((/= 0) . atoms) . Printing.card) ps
-    Spec.assertEqWith s "the atom is the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
+        greater c = jsonAtoms (Text.pack "PowerGreaterThanSource") (Face.Codec.toJson Card.toJson c)
+        offenders = filter (anyFace (\c -> atoms c /= 0 || greater c /= 0) . Printing.card) ps
+    Spec.assertEqWith s "the atoms are the engine's alone" (fmap (S.nameOf . Printing.card) offenders) []
     -- NOT vacuous, the way the sweep above would be on its own: the same counter
     -- over a hand-built face that DOES carry the atom -- buried under all three
     -- combinators, in a target spec, the one position a card author would reach
@@ -3525,6 +3535,15 @@ lintSpec s registry = Spec.describe s "Lint" $ do
                   (ModeSelection.ChooseExactly 1)
             }
     Spec.assertEqWith s "a planted atom is seen" (atoms planted) 1
+    let buriedGreater = Filter.Type.And [Filter.Type.Or [Filter.Type.HasCardType CardType.Creature, Filter.Type.Not Filter.Type.PowerGreaterThanSource]]
+        plantedGreater =
+          planted
+            { Face.spell =
+                Modal.MkModal
+                  (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing Seq.empty)) (Map.singleton (SlotName.MkSlotName (Text.pack "target")) (TargetSpec.MkTargetSpec Pool.Creatures (Just buriedGreater)))))
+                  (ModeSelection.ChooseExactly 1)
+            }
+    Spec.assertEqWith s "and so is its sibling" (greater plantedGreater) 1
   -- The sweep above passes VACUOUSLY for every card but Aura Graft, and Aura
   -- Graft only exercises the ACCEPTING direction, so the rejecting direction is
   -- proven here instead -- hand-built, never a card file, because a card that

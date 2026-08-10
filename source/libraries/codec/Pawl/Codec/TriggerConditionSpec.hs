@@ -121,6 +121,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.SelfAttacks TriggerFrequency.FirstTimeEachTurn)
       """ {"type":"SelfAttacks","value":{"type":"FirstTimeEachTurn"}} """
+  -- CR 702.149a. A Filter over the OTHER attackers, where the sibling above takes
+  -- a frequency and the one below counts the declaration.
+  Spec.it s "SelfAttacksWithAnother" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.SelfAttacksWithAnother Filter.PowerGreaterThanSource)
+      """ {"type":"SelfAttacksWithAnother","value":{"type":"PowerGreaterThanSource"}} """
   -- CR 506.5. A Filter over the ATTACKER where the sibling above takes a
   -- frequency: "alone" is the constructor's own, so it has no encoding of its
   -- own here.

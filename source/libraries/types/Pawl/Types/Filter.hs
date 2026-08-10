@@ -95,12 +95,29 @@ data Filter keyword
     -- source's power is when the match is made. Pawl.Engine.Filter.Context's
     -- sourcePower is where that arrives, filled by Pawl.Engine.Target.admittedGiven
     -- -- the one site that evaluates a target slot's Filter, at both of CR 115's
-    -- moments -- and Nothing everywhere else, where this atom cannot appear.
+    -- moments -- and Nothing wherever neither this atom nor
+    -- PowerGreaterThanSource below can appear.
     --
     -- STRICTLY less, and vacuously False when either power is absent: an object
     -- with no power is not "a creature with lesser power", the posture PowerAtMost
     -- takes for the same reason.
     PowerLessThanSource
+  | -- | CR 208.1 compared against the SOURCE the other way: the object's power is
+    -- GREATER than the power of the object the evaluation comes from. CR 702.149a's
+    -- "another creature with power greater than this creature's power" is the one
+    -- clause that asks, and Pawl.Engine.Keyword.training is the only site that
+    -- writes it -- Pawl.CardSpec's lint keeps it out of card data alongside its
+    -- sibling.
+    --
+    -- A SIBLING of PowerLessThanSource rather than `Not PowerLessThanSource`: the
+    -- negation admits equal power, and admits a candidate with no power at all,
+    -- since that arm is vacuously False. Rule 702.149a's "greater" is strict and
+    -- wants neither.
+    --
+    -- Context-relative for that atom's reason, and reading the same
+    -- Pawl.Engine.Filter.Context sourcePower -- which this atom is the first to
+    -- want at a TRIGGER match rather than a target slot's.
+    PowerGreaterThanSource
   | -- | CR 202.3: the object's mana value is <= this literal -- Ojutai's
     -- Command's "creature card with mana value 2 or less".
     --

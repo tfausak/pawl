@@ -236,11 +236,12 @@ playerView pid =
 data Context = MkContext
   { perspective :: Maybe PlayerId.PlayerId,
     source :: Maybe ObjectId.ObjectId,
-    -- CR 208.1: the SOURCE's power, for the one atom that compares a candidate
-    -- against it (PowerLessThanSource, CR 702.134a). Not derivable from `source`
-    -- here -- this module holds no game state and cannot project -- so the caller
-    -- that has the board supplies it, which is Pawl.Engine.Target.admittedGiven
-    -- and nothing else.
+    -- CR 208.1: the SOURCE's power, for the two atoms that compare a candidate
+    -- against it (PowerLessThanSource, CR 702.134a; PowerGreaterThanSource, CR
+    -- 702.149a). Not derivable from `source` here -- this module holds no game
+    -- state and cannot project -- so the caller that has the board supplies it:
+    -- Pawl.Engine.Target.admittedGiven for a target slot, and
+    -- Pawl.Engine.Event.matchesTrigger for CR 702.149a's trigger condition.
     --
     -- LAZY, and load-bearingly so: filling it costs a projection of the source,
     -- and no filter that omits the atom ever forces it. That is the posture
@@ -252,12 +253,18 @@ data Context = MkContext
   }
   deriving (Eq, Show)
 
--- A Context for every match whose Filter cannot name PowerLessThanSource -- that
--- is, every match but a target slot's. The atom reaches a card only through
--- Pawl.Engine.Keyword.mentor's own TargetSpec, and Pawl.CardSpec's lint keeps it
--- out of card data, so no other position can read the Nothing this leaves.
+-- A Context for every match whose Filter cannot name either source-power atom --
+-- that is, every match but a target slot's and CR 702.149a's trigger condition.
+-- The atoms reach a card only through Pawl.Engine.Keyword's own mentor and
+-- training, and Pawl.CardSpec's lint keeps them out of card data, so no other
+-- position can read the Nothing this leaves.
 contextFor :: Maybe PlayerId.PlayerId -> Maybe ObjectId.ObjectId -> Context
 contextFor p s = MkContext {perspective = p, source = s, sourcePower = Nothing}
+
+-- contextFor with the source's power supplied. Kept lazy at the call site, since
+-- the field is: a Filter that never names the atom pays for no projection.
+contextComparingPower :: Maybe PlayerId.PlayerId -> ObjectId.ObjectId -> Maybe Integer -> Context
+contextComparingPower p s n = MkContext {perspective = p, source = Just s, sourcePower = n}
 
 -- The one generic matcher. A pure fold over the Filter tree; it never inspects
 -- which effect produced the Filter. Identity checks like IsSource consult the
@@ -301,6 +308,11 @@ matches context view predicate = case predicate of
   -- be less than.
   Filter.PowerLessThanSource -> case (power view, sourcePower context) of
     (Just p, Just s) -> p < s
+    _ -> False
+  -- CR 702.149a's "power greater than this creature's power", the same comparison
+  -- reversed, and False on an absent power at either end for the same reason.
+  Filter.PowerGreaterThanSource -> case (power view, sourcePower context) of
+    (Just p, Just s) -> p > s
     _ -> False
   -- CR 202.3, and answerable in every zone -- see the View field's own note.
   -- Vacuously False for a player, which has no mana value to compare.
@@ -433,6 +445,7 @@ rewrite pairs predicate = case predicate of
   -- Untouched for the two above's reason: the atom names a comparison, and CR
   -- 612.1 finds no word in it to swap.
   Filter.PowerLessThanSource -> predicate
+  Filter.PowerGreaterThanSource -> predicate
   Filter.ManaValueAtMost _ -> predicate
   Filter.ControlledBy _ -> predicate
   -- Untouched for ControlledBy's reason: CR 612.1 swaps a WORD in the text, and
@@ -538,6 +551,7 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Wither -> keyword
   Keyword.Type.Exalted -> keyword
   Keyword.Type.Mentor -> keyword
+  Keyword.Type.Training -> keyword
   Keyword.Type.BattleCry -> keyword
   Keyword.Type.Prowess -> keyword
   Keyword.Type.Menace -> keyword

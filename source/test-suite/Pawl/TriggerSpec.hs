@@ -53,6 +53,9 @@
 -- -- `meleeSpec`. CR 702.134 mentor, the tenth, and the first keyword whose
 -- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
 -- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
+-- CR 702.149 training, the eleventh, whose CONDITION reads the rest of the
+-- declaration for a bigger companion, with Apprentice Sharpshooter --
+-- `trainingSpec`.
 -- CR 509.3b's blocking-side form
 -- that names the ATTACKER, with Loyal Sentry -- `selfBlocksCreatureSpec`.
 -- CR 509.3e's form that counts them, with Lairwatch Giant --
@@ -3561,6 +3564,111 @@ mentorSpec s registry =
             [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
           Spec.assertEqWith s "each with rule 702.134a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
 
+-- CR 702.149a's training, the ELEVENTH keyword rule 702 states as a triggered
+-- ability -- and the first whose trigger CONDITION reads the rest of the
+-- declaration, through Filter.PowerGreaterThanSource and the source power
+-- TriggerCondition.SelfAttacksWithAnother supplies.
+--
+-- Apprentice Sharpshooter {2}{G} Creature -- Human Archer 1/4 is the card: reach
+-- and training, and reach touches nothing here, so every number below is the
+-- keyword's. Its 1 power is what the companions are measured against -- Goblin
+-- Piker's 2 clears it, a second Sharpshooter's 1 does not.
+--
+-- Readings are taken at the DECLARE BLOCKERS step, one step after the trigger
+-- resolves, so the counter is read before combat damage can move anything.
+trainingSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+trainingSpec s registry =
+  let board mine theirs = do
+        ours <- mapM (S.printingOf s registry) mine
+        yours <- mapM (S.printingOf s registry) theirs
+        pure (S.combatBoardOf ours yours)
+      -- CR 508.1's declaration narrowed to the named creatures. S.aggressiveAnswer
+      -- attacks with everything, so a case about WHO attacks has to say it.
+      plan :: [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+      plan attackers p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        _ -> S.aggressiveAnswer p
+      atBlockers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atBlockers = S.runToStep (Phase.Combat CombatStep.DeclareBlockers)
+      -- CR 122.1: what is actually on the permanent, which a +1/+1 EFFECT would
+      -- leave empty while reading the same 2/5.
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+   in Spec.describe s "Training" $ do
+        -- The proving test. Both attack, the Piker's 2 beats the Sharpshooter's 1,
+        -- and the assertion covers all three things at once: the counter lands on
+        -- the BEARER, the companion takes none, and what landed is a CR 122.1a
+        -- counter rather than a pump.
+        Spec.it s "CR 702.149a whole card: attacking beside a bigger creature trains" $ do
+          (gs, mine, _) <- board ["Apprentice Sharpshooter", "Goblin Piker"] []
+          case mine of
+            [sharpshooter, piker] -> do
+              let after = atBlockers (plan [sharpshooter, piker]) gs
+              Spec.assertEqWith
+                s
+                "the Sharpshooter is 2/5 and the Piker is untouched"
+                (S.powerToughnessOf sharpshooter after, S.powerToughnessOf piker after)
+                (Just (2, 5), Just (2, 1))
+              Spec.assertEqWith s "and it is a counter" (countersOn sharpshooter after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+            _ -> Spec.assertFailure s "fixture should give alice a Sharpshooter and a Piker"
+        -- "POWER GREATER THAN this creature's power" is strict, so two 1-power
+        -- Sharpshooters attacking together train neither. Same declaration shape
+        -- as the proving test; only the companion's power differs.
+        Spec.it s "CR 702.149a a companion whose power is only equal trains nobody" $ do
+          (gs, mine, _) <- board ["Apprentice Sharpshooter", "Apprentice Sharpshooter"] []
+          case mine of
+            [first, second] -> do
+              let after = atBlockers (plan [first, second]) gs
+              Spec.assertEqWith
+                s
+                "both are at their printed size"
+                (S.powerToughnessOf first after, S.powerToughnessOf second after)
+                (Just (1, 4), Just (1, 4))
+            _ -> Spec.assertFailure s "fixture should give alice two Sharpshooters"
+        -- CR 508.3a's "attack": the Hill Giant is bigger and on the same side, and
+        -- it trains nothing while it stays home. The falsifier for a condition that
+        -- swept the battlefield instead of the declaration.
+        Spec.it s "CR 508.3a a bigger creature that stayed home is no companion" $ do
+          (gs, mine, _) <- board ["Apprentice Sharpshooter", "Hill Giant"] []
+          case mine of
+            [sharpshooter, _] ->
+              Spec.assertEqWith
+                s
+                "the Sharpshooter is its printed 1/4"
+                (S.powerToughnessOf sharpshooter (atBlockers (plan [sharpshooter]) gs))
+                (Just (1, 4))
+            _ -> Spec.assertFailure s "fixture should give alice a Sharpshooter and a Giant"
+        -- Two combat phases in one turn, which is what makes the COMBAT RECORD the
+        -- right source and the event log the wrong one: the log keeps the whole
+        -- turn's declarations, so a log-fold would find Aurelia in the
+        -- second declaration she is not part of and train the Sharpshooter twice.
+        -- Aurelia, the Warleader {2}{R}{R}{W}{W} 3/4 is the pool's extra-combat
+        -- attacker, and her 3 power clears the Sharpshooter's 1 in the first phase.
+        Spec.it s "CR 702.149a the added combat phase counts only its own declaration" $ do
+          (gs, mine, _) <- board ["Apprentice Sharpshooter", "Aurelia, the Warleader"] []
+          case mine of
+            [sharpshooter, aurelia] -> do
+              let first = atBlockers (plan [sharpshooter, aurelia]) gs
+                  second = S.runToStep (Phase.Combat CombatStep.DeclareAttackers) (plan [sharpshooter]) first
+                  after = atBlockers (plan [sharpshooter]) second
+              Spec.assertEqWith s "one counter from the first declaration" (S.powerToughnessOf sharpshooter first) (Just (2, 5))
+              Spec.assertEqWith s "the second phase really ran a declaration" (GameState.phase second) (Phase.Combat CombatStep.DeclareAttackers)
+              Spec.assertEqWith s "and it added no second counter" (countersOn sharpshooter after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+            _ -> Spec.assertFailure s "fixture should give alice a Sharpshooter and Aurelia"
+        -- The same multiplicity asserted of the MINT, as mentor's and flanking's
+        -- instance cases are: CR 702.149b says each instance triggers separately,
+        -- and no card in the pool prints training twice.
+        Spec.it s "CR 702.149b two instances mint two abilities" $ do
+          let abilities = Keyword.abilitiesFor Keyword.Type.Training 2
+              expected =
+                TriggerCondition.SelfAttacksWithAnother
+                  (Filter.Type.And [Filter.Type.HasCardType CardType.Creature, Filter.Type.PowerGreaterThanSource])
+          Spec.assertEqWith s "two abilities" (length abilities) 2
+          Spec.assertEqWith
+            s
+            "each watching CR 702.149a's declaration"
+            (fmap TriggeredAbility.condition abilities)
+            [expected, expected]
+
 -- CR 702.25a's flanking, the SIXTH keyword rule 702 states as a triggered
 -- ability, and with it CR 509.3d -- "becomes blocked by a creature", the one
 -- block-trigger form that fires once per BLOCKER and names it.
@@ -5321,6 +5429,10 @@ representativeEvents cond =
         -- arm that bound the attacking side instead would still agree with
         -- eventBindingSlots here if the two coincided.
         TriggerCondition.SelfAttacks _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
+        -- The same declaration event. This one binds NOTHING off it, which is
+        -- what eventBindingSlots claims and what the pin here checks -- the
+        -- defending player the event carries is not rule 702.149a's to read.
+        TriggerCondition.SelfAttacksWithAnother _ -> one (GameEvent.AttackerDeclared departed S.carol 1)
         -- The same declaration event, with the count that makes it CR 506.5's
         -- alone -- and the ATTACKER is what this one binds, where SelfAttacks
         -- above binds the defending player off the very same event.
@@ -5437,6 +5549,7 @@ everyTriggerCondition =
     TriggerCondition.SelfCycled,
     TriggerCondition.PlayerDiscards PlayerRelation.Opponent,
     TriggerCondition.SelfAttacks TriggerFrequency.EveryTime,
+    TriggerCondition.SelfAttacksWithAnother (Filter.Type.And []),
     TriggerCondition.CreatureAttacksAlone (Filter.Type.And []),
     TriggerCondition.SelfBlocks,
     TriggerCondition.SelfBlocksAtLeast 2,
@@ -7572,6 +7685,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   flankingSpec s registry
   exaltedSpec s registry
   mentorSpec s registry
+  trainingSpec s registry
   afflictSpec s registry
   meleeSpec s registry
   cyclingTriggerSpec s registry

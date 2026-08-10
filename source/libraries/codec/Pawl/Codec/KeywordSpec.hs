@@ -413,6 +413,14 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.fromJson
       Keyword.Mentor
       """ {"type":"Mentor"} """
+  -- CR 702.149a is nullary and CR 702.149b separate, so mentor's shape exactly.
+  Spec.it s "Training" $
+    Common.assertJsonCodec
+      s
+      Keyword.toJson
+      Keyword.fromJson
+      Keyword.Training
+      """ {"type":"Training"} """
   -- CR 702.91a's battle cry takes no parameter, so it encodes as a bare tag.
   -- What CR 702.91b makes multiple is the COUNT the projection keeps, never the
   -- value.
