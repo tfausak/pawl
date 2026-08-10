@@ -617,6 +617,7 @@ castOf event = case event of
   GameEvent.SpellCast pid _ _ -> Just pid
   GameEvent.HalfUnlocked {} -> Nothing
   GameEvent.TurnedFaceUp _ -> Nothing
+  GameEvent.BecameRenowned _ -> Nothing
   GameEvent.PermanentSacrificed {} -> Nothing
   GameEvent.AbilityTriggered {} -> Nothing
   GameEvent.Moved _ _ -> Nothing

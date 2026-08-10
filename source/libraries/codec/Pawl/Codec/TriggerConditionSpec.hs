@@ -402,6 +402,15 @@ spec s = Spec.describe s "Pawl.Codec.TriggerCondition" $ do
       TriggerCondition.fromJson
       (TriggerCondition.PermanentTurnedFaceUp (Filter.ControlledBy PlayerRelation.You))
       """ {"type":"PermanentTurnedFaceUp","value":{"type":"ControlledBy","value":{"type":"You"}}} """
+  -- CR 702.112b's designation, carrying Valeron Wardens' own narrowing: the Filter
+  -- is the whole payload, so it has to survive both directions.
+  Spec.it s "PermanentBecomesRenowned round-trips with its Filter" $
+    Common.assertJsonCodec
+      s
+      TriggerCondition.toJson
+      TriggerCondition.fromJson
+      (TriggerCondition.PermanentBecomesRenowned (Filter.ControlledBy PlayerRelation.You))
+      """ {"type":"PermanentBecomesRenowned","value":{"type":"ControlledBy","value":{"type":"You"}}} """
   -- CR 603.10a's sacrifice family. Nullary: "a player" is neither PlayerRelation
   -- arm and "a permanent" names no Filter, so there is nothing to encode.
   Spec.it s "PermanentSacrificed" $

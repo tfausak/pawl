@@ -54,6 +54,7 @@ toJson c = case c of
   TriggerCondition.AnyOf cs -> Common.tagged "AnyOf" . Just . Common.array $ fmap toJson cs
   TriggerCondition.SelfTurnedFaceUp -> Common.nullary "SelfTurnedFaceUp"
   TriggerCondition.PermanentTurnedFaceUp f -> Common.tagged "PermanentTurnedFaceUp" . Just $ Filter.toJson Keyword.toJson f
+  TriggerCondition.PermanentBecomesRenowned f -> Common.tagged "PermanentBecomesRenowned" . Just $ Filter.toJson Keyword.toJson f
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerBecomesMonarch r -> Common.tagged "PlayerBecomesMonarch" . Just $ PlayerRelation.toJson r
@@ -97,6 +98,7 @@ fromJson value = do
     ("AnyOf", Just (Value.Array (Array.MkArray cs))) -> TriggerCondition.AnyOf <$> traverse fromJson cs
     ("SelfTurnedFaceUp", _) -> Right TriggerCondition.SelfTurnedFaceUp
     ("PermanentTurnedFaceUp", Just v) -> TriggerCondition.PermanentTurnedFaceUp <$> Filter.fromJson Keyword.fromJson v
+    ("PermanentBecomesRenowned", Just v) -> TriggerCondition.PermanentBecomesRenowned <$> Filter.fromJson Keyword.fromJson v
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
     ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> PlayerRelation.fromJson v
     ("PlayerBecomesMonarch", Just v) -> TriggerCondition.PlayerBecomesMonarch <$> PlayerRelation.fromJson v
