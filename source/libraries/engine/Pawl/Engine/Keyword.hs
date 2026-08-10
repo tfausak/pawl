@@ -1025,7 +1025,7 @@ familyOf keyword = case keyword of
   -- CR 702.134a takes no parameter either, so mentor has no family of its own.
   Keyword.Mentor -> Nothing
   Keyword.Afterlife _ -> Just KeywordFamily.Afterlife
-  -- CR 702.39a takes no parameter either, so provoke has no family of its own.
+  -- CR 702.39a takes no parameter, so provoke has no family of its own.
   Keyword.Provoke -> Nothing
   Keyword.BattleCry -> Nothing
   -- CR 702.100a takes no parameter either, so evolve has no family of its own.

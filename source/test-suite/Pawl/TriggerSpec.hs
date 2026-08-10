@@ -7117,9 +7117,10 @@ undyingSpec s registry =
 
 -- CR 702.135a afterlife N: "When this permanent is put into a graveyard from the
 -- battlefield, create N 1/1 white and black Spirit creature tokens with flying."
--- Minted by Pawl.Engine.Keyword.afterlife on `returns` above's dies condition,
--- and the FIRST minted keyword ability that creates a token -- so what is under
--- test is a whole card, minted here rather than read from card data.
+-- Minted by Pawl.Engine.Keyword.afterlife on the same TriggerCondition.SelfDies
+-- undying and persist take, and the FIRST minted keyword ability that creates a
+-- token -- so what is under test is a whole card, minted in the engine rather
+-- than read from card data.
 --
 -- Ministrant of Obligation, {2}{W} Creature -- Human Cleric 2/1, whose entire
 -- text box is "Afterlife 2". Nothing else printed on it can be making tokens,
@@ -7127,9 +7128,10 @@ undyingSpec s registry =
 -- created one token would fail.
 --
 -- Every characteristic rule 702.135a states is asserted, because the mint writes
--- each of them out and a wrong one compiles: 1/1, both colours, the Spirit
--- creature type and flying. Both colours is what makes the fixture discriminate
--- against Doomed Traveler's hand-written token, which is white alone.
+-- each of them out by hand and a wrong one compiles: 1/1, both colours, the
+-- Spirit creature type and flying. Both colours matter most -- the pool's other
+-- Spirit token, Doomed Traveler's, is white alone, so a mint copied from it
+-- would pass everything else.
 afterlifeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 afterlifeSpec s registry =
   let spiritsAfterKilling name = do
