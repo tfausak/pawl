@@ -1458,6 +1458,9 @@ keywordFilters keyword = case keyword of
   -- CR 702.28b names no quality: the only thing it asks about a blocker is
   -- whether it has shadow too.
   Keyword.Shadow -> []
+  -- CR 702.118b names no quality either: the comparison is against the skulking
+  -- creature's own power, written into the rule rather than into the keyword.
+  Keyword.Skulk -> []
   -- CR 702.25a is payload-free: the Filter its minted ability carries is the
   -- ENGINE's, never a card's.
   Keyword.Flanking -> []

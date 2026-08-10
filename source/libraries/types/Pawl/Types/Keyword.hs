@@ -380,6 +380,25 @@ data Keyword
     -- rather than beside the other three in pairAllowedGiven.
     Menace
   | Devoid -- 702.114
+  | -- | 702.118b: a creature with skulk can't be blocked by creatures with greater
+    -- power.
+    --
+    -- Asymmetric, the shape flying, fear, intimidate, landwalk and menace share
+    -- and shadow does not: 702.118b restricts being BLOCKED and says nothing
+    -- about blocking. What it adds to them is the EXCEPTION -- a comparison
+    -- between the two creatures rather than a property of the blocker alone.
+    -- Intimidate (702.13b) is the other gate written that way, over colours
+    -- instead of power, so neither can be expressed as the other. Read by
+    -- Pawl.Engine.Combat.skulkAllowsGiven.
+    --
+    -- Both powers come off the PROJECTION, never the printed box: CR 509.1b is
+    -- checked as blockers are declared, so what counts is the power CR 613 gives
+    -- each creature at that moment.
+    --
+    -- Payload-free, because rule 702.118b takes no parameter, and CR 702.118c
+    -- makes multiple instances redundant -- so its reader takes membership rather
+    -- than the per-keyword count the projection carries.
+    Skulk
   | -- | 702.122a: crew N, an ACTIVATED ability meaning "Tap any number of other
     -- untapped creatures you control with total power N or greater: This
     -- permanent becomes an artifact creature until end of turn."
