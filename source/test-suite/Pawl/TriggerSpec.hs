@@ -94,6 +94,8 @@
 -- is taken -- with Promising Duskmage -- `counterLookBackSpec`. CR 702.93
 -- undying and CR 702.79 persist, the pair of keywords that return their bearer
 -- with a counter on it, with Young Wolf and Putrid Goblin -- `undyingSpec`.
+-- CR 702.135 afterlife, the first minted keyword ability that CREATES a token,
+-- with Ministrant of Obligation -- `afterlifeSpec`.
 -- CR 603.10's first sentence for a BYSTANDER -- a
 -- permanent that was on the battlefield when some OTHER event in the same batch
 -- happened and is gone by the CR 117.5 boundary -- with Lightning Skelemental
@@ -7113,6 +7115,83 @@ undyingSpec s registry =
               Spec.assertEqWith s "with its +1/+1 counter" (countersOn backId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
             other -> Spec.assertFailure s ("expected the Wolf back on the battlefield, got " <> show other)
 
+-- CR 702.135a afterlife N: "When this permanent is put into a graveyard from the
+-- battlefield, create N 1/1 white and black Spirit creature tokens with flying."
+-- Minted by Pawl.Engine.Keyword.afterlife on the same TriggerCondition.SelfDies
+-- undying and persist take, and the FIRST minted keyword ability that creates a
+-- token -- so what is under test is a whole card, minted in the engine rather
+-- than read from card data.
+--
+-- Ministrant of Obligation, {2}{W} Creature -- Human Cleric 2/1, whose entire
+-- text box is "Afterlife 2". Nothing else printed on it can be making tokens,
+-- and N is 2 rather than 1 so a mint that ignored the keyword's payload and
+-- created one token would fail.
+--
+-- Every characteristic rule 702.135a states is asserted, because the mint writes
+-- each of them out by hand and a wrong one compiles: 1/1, both colours, the
+-- Spirit creature type and flying. Both colours matter most -- the pool's other
+-- Spirit token, Doomed Traveler's, is white alone, so a mint copied from it
+-- would pass everything else.
+afterlifeSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+afterlifeSpec s registry =
+  let spiritsAfterKilling name = do
+        swamp <- S.printingOf s registry "Swamp"
+        murder <- S.printingOf s registry "Murder"
+        creature <- S.printingOf s registry name
+        let (oid, withCreature) = S.addCreature creature S.alice (S.landsInPlay swamp 3)
+            (gs, spellId) = S.handOne murder withCreature
+            cast = S.runPure S.identityAnswer gs (S.cast S.alice spellId)
+            destroyed = S.runPure S.identityAnswer cast Stack.resolveTop
+            settled = S.runPure S.identityAnswer destroyed Engine.settleForPriority
+        pure (oid, settled, S.runPure S.identityAnswer settled Stack.resolveTop)
+      spirits gs =
+        filter
+          (\oid -> fmap Face.name (Game.faceOf oid gs) == Just (CardName.MkCardName (Text.pack "Spirit Token")))
+          (Set.toList (GameState.battlefield gs))
+   in Spec.describe s "CR 702.135 afterlife" $ do
+        Spec.it s "CR 702.135a a dying Ministrant of Obligation leaves two 1/1 white and black flying Spirits" $ do
+          (ministrantId, settled, after) <- spiritsAfterKilling "Ministrant of Obligation"
+          Spec.assertEqWith s "the dies trigger reached the stack" (length (GameState.stack settled)) 1
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject ministrantId after)) "CR 400.7: the permanent that died is a spent id"
+          case spirits after of
+            [first, second] -> do
+              let describes oid =
+                    ( Projection.powerOf oid after,
+                      Projection.toughnessOf oid after,
+                      Projection.colorsOf oid after,
+                      Projection.subtypesOf oid after,
+                      Projection.cardTypesOf oid after,
+                      Projection.hasKeyword Keyword.Type.Flying oid after,
+                      Projection.controllerOf oid after
+                    )
+                  expected =
+                    ( Just (1 :: Integer),
+                      Just (1 :: Integer),
+                      Set.fromList [Color.White, Color.Black],
+                      Set.singleton Subtype.Spirit,
+                      Set.singleton CardType.Creature,
+                      True,
+                      Just S.alice
+                    )
+              Spec.assertEqWith s "the first is rule 702.135a's token exactly" (describes first) expected
+              Spec.assertEqWith s "and so is the second" (describes second) expected
+            other -> Spec.assertFailure s ("expected exactly two Spirit tokens, got " <> show other)
+        -- The other half of the same board: a creature WITHOUT afterlife dying to
+        -- the same Murder leaves nothing behind, so the tokens above are the
+        -- keyword's doing and not the fixture's.
+        Spec.it s "CR 702.135a a dying creature without afterlife leaves none" $ do
+          (pikerId, settled, after) <- spiritsAfterKilling "Goblin Piker"
+          Spec.assertBool s (Maybe.isNothing (Game.lookupObject pikerId after)) "the Piker died to the same Murder"
+          Spec.assertEqWith s "but nothing triggered" (GameState.stack settled) []
+          Spec.assertEqWith s "and no tokens were created" (spirits after) []
+        -- CR 702.135b: "if a permanent has multiple instances of afterlife, each
+        -- triggers separately". Asserted of the MINT, as renown's multiplicity
+        -- is, no card in the pool printing afterlife twice.
+        Spec.it s "CR 702.135b each instance of afterlife is its own ability" $ do
+          Spec.assertEqWith s "afterlife 2 held twice is two abilities" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afterlife 2) 2)) [Keyword.afterlife 2, Keyword.afterlife 2]
+          Spec.assertEqWith s "and afterlife 3 once is one" (Keyword.triggeredAbilitiesOf (Map.singleton (Keyword.Type.Afterlife 3) 1)) [Keyword.afterlife 3]
+          Spec.assertBool s (Keyword.afterlife 2 /= Keyword.afterlife 3) "and the N reaches the minted ability"
+
 -- Radiant Fountain, a Land: "When this land enters, you gain 2 life. / {T}: Add
 -- {C}." A nonbasic land whose whole text box is one triggered ability and one
 -- activated one, which is what makes it the pool's witness for CR 305.7's
@@ -8852,6 +8931,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   lookBackInterveningSpec s registry
   counterLookBackSpec s registry
   undyingSpec s registry
+  afterlifeSpec s registry
   strippedTriggerSpec s registry
   bystanderSpec s registry
   bystanderZoneSpec s registry

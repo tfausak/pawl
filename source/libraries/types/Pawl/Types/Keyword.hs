@@ -648,6 +648,19 @@ data Keyword
     -- creature" -- is a trigger condition no card in pawl's pool prints, so nothing
     -- watches for it (#1159).
     Mentor
+  | -- | 702.135a: afterlife N, a TRIGGERED ability meaning "When this permanent is
+    -- put into a graveyard from the battlefield, create N 1/1 white and black
+    -- Spirit creature tokens with flying." Minted by
+    -- Pawl.Engine.Keyword.afterlife on undying's and persist's terms -- rule
+    -- 702.135a states the same dies event those two do (CR 700.4), so the
+    -- condition is TriggerCondition.SelfDies.
+    --
+    -- N rides the constructor, as Poisonous' does: it is how many tokens the
+    -- rule's ability creates, so `Afterlife 1` and `Afterlife 2` are distinct
+    -- keywords. CR 702.135b makes multiple instances trigger separately, so its
+    -- reader takes the per-keyword COUNT the projection carries rather than
+    -- membership.
+    Afterlife Natural.Natural
   | -- | 702.136a: riot. A STATIC ability meaning "You may have this permanent
     -- enter with an additional +1/+1 counter on it. If you don't, it gains
     -- haste." -- so what it creates is a CR 614.1c as-enters replacement effect,

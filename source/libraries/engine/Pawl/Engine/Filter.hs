@@ -648,6 +648,10 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Wither -> keyword
   Keyword.Type.Exalted -> keyword
   Keyword.Type.Mentor -> keyword
+  -- CR 702.135a's N is a number and not a word, so CR 612.2 has nothing to swap
+  -- HERE. "Spirit" is a word CR 612.2a does reach, but it is in the ability
+  -- Pawl.Engine.Keyword.afterlife mints rather than in this value (#1197).
+  Keyword.Type.Afterlife _ -> keyword
   Keyword.Type.Provoke -> keyword
   Keyword.Type.Training -> keyword
   Keyword.Type.BattleCry -> keyword

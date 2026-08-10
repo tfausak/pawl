@@ -1,6 +1,7 @@
 module Pawl.Engine.Keyword where
 
 import qualified Data.List as List
+import qualified Data.List.NonEmpty as NonEmpty
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
@@ -15,10 +16,13 @@ import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import Pawl.Types.Card (Card)
+import qualified Pawl.Types.Card as Card
+import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.CardType as CardType
 import Pawl.Types.CastingPermission (CastingPermission)
 import qualified Pawl.Types.CastingPermission as CastingPermission
 import qualified Pawl.Types.Clause as Clause
+import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Comparison as Comparison
 import qualified Pawl.Types.Condition as Condition
 import qualified Pawl.Types.ControllerRelation as ControllerRelation
@@ -26,15 +30,18 @@ import Pawl.Types.Cost (Cost)
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Counterability as Counterability
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.Face as Face
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.Layout as Layout
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
@@ -49,19 +56,23 @@ import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerRef as PlayerRef
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import qualified Pawl.Types.Pool as Pool
+import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity
 import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
+import qualified Pawl.Types.Toughness as Toughness
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
 import Pawl.Types.TriggeredAbility (TriggeredAbility)
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Types.TurnScope as TurnScope
 import qualified Pawl.Types.TurnUpRewrite as TurnUpRewrite
+import qualified Pawl.Types.TypeLine as TypeLine
 import qualified Pawl.Types.Zone as Zone
 import qualified Pawl.Types.ZoneChangePattern as ZoneChangePattern
 
@@ -142,6 +153,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Exalted -> List.genericReplicate count exalted
   Keyword.Melee -> List.genericReplicate count melee
   Keyword.Mentor -> List.genericReplicate count mentor
+  Keyword.Afterlife n -> List.genericReplicate count (afterlife n)
   Keyword.Provoke -> List.genericReplicate count provoke
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Training -> List.genericReplicate count training
@@ -252,6 +264,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
@@ -382,6 +395,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
@@ -616,6 +630,7 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
@@ -920,6 +935,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Wither -> []
   Keyword.Exalted -> []
   Keyword.Mentor -> []
+  Keyword.Afterlife _ -> []
   Keyword.Provoke -> []
   Keyword.Devoid -> []
   Keyword.Skulk -> []
@@ -1008,7 +1024,8 @@ familyOf keyword = case keyword of
   Keyword.Exalted -> Nothing
   -- CR 702.134a takes no parameter either, so mentor has no family of its own.
   Keyword.Mentor -> Nothing
-  -- CR 702.39a takes no parameter either, so provoke has no family of its own.
+  Keyword.Afterlife _ -> Just KeywordFamily.Afterlife
+  -- CR 702.39a takes no parameter, so provoke has no family of its own.
   Keyword.Provoke -> Nothing
   Keyword.BattleCry -> Nothing
   -- CR 702.100a takes no parameter either, so evolve has no family of its own.
@@ -1800,6 +1817,109 @@ returns kind =
         Nothing
         Nothing
         LibraryPlacement.defaultValue
+
+-- CR 702.135a: afterlife N. "When this permanent is put into a graveyard from
+-- the battlefield, create N 1/1 white and black Spirit creature tokens with
+-- flying." The same CR 700.4 dies event `returns` above watches, so the
+-- condition is TriggerCondition.SelfDies.
+--
+-- No intervening "if" and nothing bound: rule 702.135a states one sentence with
+-- no condition, and unlike undying and persist it never touches the permanent
+-- that died -- so neither Binding.triggerSource nor Binding.became appears, and
+-- the ability is indifferent to the CR 400.7 incarnation split.
+--
+-- CR 111.2 gives the tokens to the ability's controller, which for a dies
+-- trigger is whoever controlled the permanent as it left (CR 603.3a). That is
+-- rule 111.2 rather than the rider undying and persist need:
+-- EntryRiders.underOwner is inert under a Create, since a token's owner and its
+-- controller are the same player by that rule.
+--
+-- THE TOKEN IS MINTED HERE, not carried in card data, on Pawl.Engine.Ring's
+-- terms: its characteristics are printed in the comprehensive rules rather than
+-- on Ministrant of Obligation. CR 111.3 is what makes rule 702.135a's own
+-- adjectives the token's whole text; both colours ride the colorIndicator,
+-- since rule 702.135a says "white and black" and a token has no mana cost to
+-- read a colour off (CR 105.2).
+--
+-- Not implemented: CR 612.2a lets a text-changing effect swap the "Spirit" a
+-- token-creating ability names, but the CR 613 layer fold rewrites PC.keywords
+-- before this mint runs, so the swap never reaches the minted token (#1197).
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability
+-- is placed -- rule 702.135a leaves nothing to choose.
+afterlife :: Natural -> TriggeredAbility Card
+afterlife n =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfDies,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton spawn))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening = Nothing
+    }
+  where
+    spawn =
+      Effect.Create
+        (Quantity.Literal (toInteger n))
+        spiritToken
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = False,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.empty,
+            EntryRiders.underOwner = False
+          }
+        Nothing
+
+-- | CR 702.135a's token: 1/1 white and black Spirit creature with flying. Rule
+-- 702.135a names no name, so CR 111.4 supplies one -- "its subtype(s) plus the
+-- word 'Token'" -- which is the shape Doomed Traveler's hand-written Spirit
+-- token already takes.
+spiritToken :: Card
+spiritToken =
+  Card.MkCard
+    { Card.layout = Layout.Normal,
+      Card.faces =
+        NonEmpty.singleton
+          Face.MkFace
+            { Face.name = CardName.MkCardName (Text.pack "Spirit Token"),
+              Face.manaCost = Nothing,
+              Face.typeLine =
+                TypeLine.MkTypeLine
+                  Set.empty
+                  (Set.singleton CardType.Creature)
+                  (Set.singleton Subtype.Spirit),
+              Face.power = Just (Power.MkPower (Quantity.Literal 1)),
+              Face.toughness = Just (Toughness.MkToughness (Quantity.Literal 1)),
+              Face.loyalty = Nothing,
+              Face.defense = Nothing,
+              Face.keywords = Set.singleton Keyword.Flying,
+              Face.colorIndicator = Set.fromList [Color.White, Color.Black],
+              Face.characteristicPT = Nothing,
+              Face.staticAbilities = [],
+              Face.spell = Face.defaultSpell,
+              Face.activatedAbilities = [],
+              Face.replacementEffects = [],
+              Face.triggeredAbilities = [],
+              Face.delayedAbilities = Map.empty,
+              Face.castingPermissions = [],
+              Face.castingRestrictions = [],
+              Face.enchant = [],
+              Face.counterability = Counterability.Counterable,
+              Face.additionalCosts = [],
+              Face.alternativeCosts = [],
+              Face.playerAbilities = [],
+              Face.blockRequirements = [],
+              Face.blockPermissions = [],
+              Face.attackRequirements = [],
+              Face.combatRestrictions = [],
+              Face.sacrificeRestrictions = [],
+              Face.attackCosts = [],
+              Face.mulliganActions = [],
+              Face.openingHandActions = [],
+              Face.specialActions = []
+            }
+    }
 
 -- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
 -- first is mintedReplacementsFor's, so vanishing is the first keyword here whose
