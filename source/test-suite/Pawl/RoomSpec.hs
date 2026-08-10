@@ -28,6 +28,7 @@
 module Pawl.RoomSpec where
 
 import qualified Data.List as List
+import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Action as Action
@@ -146,7 +147,7 @@ roomPermanent gs =
 -- for: CR 110.5b's untapped, no CR 508.1 attacking entry, and CR 712.14's
 -- untransformed default.
 plainEntry :: EntryRiders.EntryRiders
-plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False}
+plainEntry = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Untapped, EntryRiders.attacking = False, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False}
 
 -- Every unlock this player is offered right now, as CR 709.5e's pair.
 unlocksOffered :: GameState.GameState -> [(ObjectId.ObjectId, CardName.CardName)]

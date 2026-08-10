@@ -1492,6 +1492,18 @@ canHostSubjects predicate = case predicate of
 -- silently and drops it -- which is exactly what happened when landwalk's
 -- Subtype became a Filter (#499). A new Filter-bearing keyword needs its arm
 -- added here by hand.
+-- CR 122.1b: the one counter kind with a Filter under it, since it carries a
+-- whole Keyword. Exhaustive so a new kind with a payload breaks this build.
+counterKindFilters :: CounterKind.CounterKind Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
+counterKindFilters kind = case kind of
+  CounterKind.Keyword keyword -> keywordFilters keyword
+  CounterKind.PlusOnePlusOne -> []
+  CounterKind.MinusOneMinusOne -> []
+  CounterKind.Loyalty -> []
+  CounterKind.Lore -> []
+  CounterKind.Defense -> []
+  CounterKind.Time -> []
+
 keywordFilters :: Keyword.Keyword -> [Filter.Type.Filter Keyword.Keyword]
 keywordFilters keyword = case keyword of
   Keyword.Cycling cost mFilter -> costFilters cost <> Maybe.maybeToList mFilter
@@ -1600,6 +1612,10 @@ keywordFilters keyword = case keyword of
   -- entering creature's -- is the ENGINE's, never a card's.
   Keyword.Evolve -> []
   Keyword.StartYourEngines -> []
+  -- CR 702.79a and CR 702.93a name no quality either: the counter kind and the
+  -- "if" clause are written into the abilities Pawl.Engine.Keyword mints.
+  Keyword.Persist -> []
+  Keyword.Undying -> []
   -- CR 702.63a names no quality: the time counters and the upkeep are written
   -- into the replacement effect and the two abilities Pawl.Engine.Keyword mints,
   -- not into the keyword.
@@ -2062,7 +2078,12 @@ effectFilters effect = case effect of
   Effect.ControlPlayerNextTurn _ -> []
   Effect.Destroy ref _ _ -> unframed (objectRefFilters ref)
   Effect.Sacrifice _ -> []
-  Effect.MoveToZone ref _ _ _ _ _ -> unframed (objectRefFilters ref)
+  -- The riders reach a Filter one level further down than the ObjectRef: CR
+  -- 122.6a's counters are keyed by CounterKind, and CR 122.1b's keyword counter
+  -- carries a whole Keyword. Swept for the reason canHostSubjects sweeps the
+  -- same shape -- the lint is about the positions a card author can write, not
+  -- about which of them the pool has used.
+  Effect.MoveToZone ref _ riders _ _ _ -> unframed (objectRefFilters ref <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders)))
   Effect.Draw _ quantity -> unframed (quantityFilters quantity)
   -- The tally's Filter is a position a card author writes, so the lint reaches
   -- it: rule 728.1's "nonland card" is one of these.
@@ -2074,7 +2095,7 @@ effectFilters effect = case effect of
   Effect.IncreaseSpeed _ quantity -> unframed (quantityFilters quantity)
   -- CR 111.1's token is a whole card, and every Filter position it has is one a
   -- card author can write -- the same nesting Pawl.Codec's round trip walks.
-  Effect.Create quantity card _ _ -> unframed (quantityFilters quantity) <> overFaces cardFilters card
+  Effect.Create quantity card riders _ -> unframed (quantityFilters quantity <> concatMap counterKindFilters (Map.keys (EntryRiders.counters riders))) <> overFaces cardFilters card
   -- An EachMatching ref's Filter is card text like RequireBlock's below.
   Effect.CreateCopy ref -> unframed (objectRefFilters ref)
   Effect.Replace duration _ _ condition replacement -> unframed (durationFilters duration <> foldMap conditionFilters condition <> replacementEffectFilters replacement)

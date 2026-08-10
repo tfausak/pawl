@@ -2,6 +2,7 @@
 
 module Pawl.Codec.EffectSpec where
 
+import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -228,7 +229,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
     let slot = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "target"))
         bound = ObjectRef.InSlot (SlotName.MkSlotName (Text.pack "exiled"))
         boundSlot = SlotName.MkSlotName (Text.pack "exiled")
-        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False}
+        attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False}
     Common.assertJsonCodec
       s
       toJson
@@ -375,7 +376,7 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
   -- default, exactly like MoveToZone above: four emitted forms, the middle two
   -- told apart at decode by JSON TYPE.
   Spec.it s "Create round-trips all four shapes, and elides the defaults" $ do
-    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False}
+    let attacking = EntryRiders.MkEntryRiders {EntryRiders.tapped = TapState.Tapped, EntryRiders.attacking = True, EntryRiders.transformed = False, EntryRiders.counters = Map.empty, EntryRiders.underOwner = False}
         plain = EntryRiders.defaultValue
         slot = SlotName.MkSlotName (Text.pack "token")
         card = Text.pack "Goblin Piker"

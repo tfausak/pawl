@@ -29,11 +29,13 @@ import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
+import qualified Pawl.Types.EntryRiders as EntryRiders
 import Pawl.Types.Filter (Filter)
 import qualified Pawl.Types.Filter as Filter
 import Pawl.Types.Keyword (Keyword)
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
+import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.ManaCost as ManaCost
 import qualified Pawl.Types.Modal as Modal
 import qualified Pawl.Types.Mode as Mode
@@ -52,6 +54,7 @@ import Pawl.Types.ReplacementEffect (ReplacementEffect)
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.SlotName as SlotName
+import qualified Pawl.Types.TapState as TapState
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 import qualified Pawl.Types.TriggerFrequency as TriggerFrequency
@@ -139,6 +142,8 @@ abilitiesFor keyword count = case keyword of
   Keyword.Rampage n -> List.genericReplicate count (rampage n)
   Keyword.Training -> List.genericReplicate count training
   Keyword.Renown n -> List.genericReplicate count (renown n)
+  Keyword.Persist -> List.genericReplicate count persist
+  Keyword.Undying -> List.genericReplicate count undying
   Keyword.Crew _ -> []
   Keyword.Deathtouch -> []
   Keyword.Defender -> []
@@ -255,6 +260,8 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Persist -> []
+  Keyword.Undying -> []
 
 -- CR 702.29a: cycling means paying its cost and discarding the card to draw a
 -- card. The whole ability, minted from the one cost the keyword carries.
@@ -382,6 +389,8 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Persist -> []
+  Keyword.Undying -> []
 
 -- CR 702.122a: "Crew N" means "Tap any number of other untapped creatures you
 -- control with total power N or greater: This permanent becomes an artifact
@@ -613,6 +622,8 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Persist -> []
+  Keyword.Undying -> []
 
 -- CR 702.8a: does this card's keyword set let it be played any time its
 -- controller could cast an instant? Its one reader is
@@ -908,6 +919,8 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Training -> []
   Keyword.Toxic _ -> []
   Keyword.StartYourEngines -> []
+  Keyword.Persist -> []
+  Keyword.Undying -> []
 
 -- CR 702.136a again, in the SHORT-CIRCUIT's voice:
 -- Pawl.Engine.Projection.replacementsAffecting skips the whole board when no
@@ -1003,6 +1016,9 @@ familyOf keyword = case keyword of
   -- CR 702.149a takes no parameter, so training has no family of its own.
   Keyword.Training -> Nothing
   Keyword.StartYourEngines -> Nothing
+  -- CR 702.79a and CR 702.93a take no parameter, so neither has a family.
+  Keyword.Persist -> Nothing
+  Keyword.Undying -> Nothing
 
 -- CR 702.70a: a creature with poisonous N gives a player it deals combat damage
 -- to that many poison counters.
@@ -1697,6 +1713,81 @@ renown n =
   where
     grow = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal (toInteger n)) (ObjectRef.InSlot Binding.triggerSource)
     designate = Effect.BecomeRenowned Binding.triggerSource
+
+-- CR 702.79a: persist. "When this permanent is put into a graveyard from the
+-- battlefield, if it had no -1/-1 counters on it, return it to the battlefield
+-- under its owner's control with a -1/-1 counter on it" -- CR 700.4's dies, which
+-- is why the condition below is SelfDies.
+persist :: TriggeredAbility Card
+persist = returns CounterKind.MinusOneMinusOne
+
+-- CR 702.93a: undying, persist's mirror -- rule 702.79a's sentence in +1/+1
+-- counters.
+undying :: TriggeredAbility Card
+undying = returns CounterKind.PlusOnePlusOne
+
+-- The sentence both keywords state, in the counter kind that tells them apart.
+-- ONE body rather than two, because rules 702.79a and 702.93a differ in nothing
+-- else: the kind decides which counter the permanent comes back with AND which
+-- one the "if" clause looks for, and it is the same kind in both places.
+--
+-- TWO INCARNATIONS, and the split is the whole reason this works: CR 400.7 mints
+-- a fresh object when the permanent dies, so the ability's SOURCE (CR 113.7a, the
+-- permanent as it was on the battlefield) and the CARD IT MOVES (the graveyard
+-- incarnation) are different ids. The intervening "if" is evaluated against the
+-- source, read from CR 608.2h last known information -- which is what "it HAD no
+-- counters on it" asks for -- while the move names Binding.became, the arriving
+-- incarnation CR 400.7e binds. Endless Cockroaches proves the second half and
+-- Promising Duskmage the first.
+--
+-- CR 603.4's intervening "if" and not a Clause condition: the ability must not
+-- trigger at all when the permanent died with a counter on it, and it is checked
+-- AGAIN on resolution (CR 608.2a). AtMost 0 is "had no counters", the shape
+-- renown's clause takes.
+--
+-- The counter rides the ENTRY (EntryRiders.counters, CR 122.6a) rather than
+-- following as a second effect, so the permanent is never on the battlefield
+-- without it -- which for persist is the difference between a 2/2 coming back as
+-- a 1/1 and a 2/2 that briefly was not.
+--
+-- `underOwner` is rule 702.79a's "under its owner's control", which CR 110.2a
+-- otherwise answers with the ability's controller: a permanent stolen by CR 613's
+-- layer 2 dies under the thief's control (CR 603.3a hands them the trigger) and
+-- still comes back to its owner.
+--
+-- No stated origin zone and no bound destination slot: neither rule says where
+-- the card is returned FROM -- which is what the CR 113.6m field records, and
+-- this is a battlefield ability whatever it moves -- and nothing later in the
+-- resolution names what arrived.
+--
+-- Single mode, no targets, ChooseExactly 1, so nothing is asked as the ability is
+-- placed -- neither rule leaves anything to choose.
+returns :: CounterKind.CounterKind Keyword.Keyword -> TriggeredAbility Card
+returns kind =
+  TriggeredAbility.MkTriggeredAbility
+    { TriggeredAbility.condition = TriggerCondition.SelfDies,
+      TriggeredAbility.modal =
+        Modal.MkModal
+          (Seq.singleton (Mode.MkMode (Seq.singleton (Clause.MkClause Nothing Optionality.Mandatory Nothing (Seq.singleton back))) Map.empty))
+          (ModeSelection.ChooseExactly 1),
+      TriggeredAbility.intervening =
+        Just (Condition.Compares (Quantity.ObjectCounters kind) Comparison.AtMost (Quantity.Literal 0))
+    }
+  where
+    back =
+      Effect.MoveToZone
+        (ObjectRef.InSlot Binding.became)
+        Zone.Battlefield
+        EntryRiders.MkEntryRiders
+          { EntryRiders.tapped = TapState.Untapped,
+            EntryRiders.attacking = False,
+            EntryRiders.transformed = False,
+            EntryRiders.counters = Map.singleton kind 1,
+            EntryRiders.underOwner = True
+          }
+        Nothing
+        Nothing
+        LibraryPlacement.defaultValue
 
 -- CR 702.63a's SECOND and THIRD abilities. Rule 702.63a states three and the
 -- first is mintedReplacementsFor's, so vanishing is the first keyword here whose

@@ -654,6 +654,8 @@ rewriteKeyword pairs keyword = case keyword of
   Keyword.Type.Nightbound -> keyword
   Keyword.Type.Toxic _ -> keyword
   Keyword.Type.StartYourEngines -> keyword
+  Keyword.Type.Persist -> keyword
+  Keyword.Type.Undying -> keyword
 
 -- CR 612.1's word swap inside a COST. CR 118.1 makes a cost "an action or payment
 -- necessary to take another action", and the one on an activated ability is
