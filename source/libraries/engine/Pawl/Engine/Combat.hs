@@ -751,6 +751,39 @@ shadowAllowsGiven pcs blocker attacker gs =
   Projection.hasKeywordGiven pcs Keyword.Shadow attacker gs
     == Projection.hasKeywordGiven pcs Keyword.Shadow blocker gs
 
+-- CR 702.118b: a creature with skulk can't be blocked by creatures with GREATER
+-- POWER.
+--
+-- The asymmetry flying, fear and intimidate have and shadow does not (see
+-- evasionAllows): 702.118b restricts being blocked, never blocking, so the
+-- keyword is read off the ATTACKER first. Intimidate is its closest sibling:
+-- both state the exception as a COMPARISON between the two creatures rather than
+-- as a property of the blocker alone, over power here and over colour there.
+--
+-- Both powers come off the PROJECTION rather than the printed box, so a blocker
+-- grown by a +1/+1 counter or a pump (CR 613.4c layer 7c takes both) can be
+-- barred and a shrunk one admitted. CR 509.1b is checked as the declaration is
+-- made, so that is the power at declaration time; nothing re-checks it
+-- afterwards, and CR 509.1h keeps the attacker blocked whatever happens to the
+-- blocker later.
+--
+-- Keyword MEMBERSHIP and never a count, because CR 702.118c makes multiple
+-- instances redundant -- landwalkAllowsGiven's posture, for CR 702.14e's matching
+-- reason.
+skulkAllows :: ObjectId -> ObjectId -> GameState -> Bool
+skulkAllows = skulkAllowsGiven Map.empty
+
+skulkAllowsGiven :: Map ObjectId PC.ProjectedCharacteristics -> ObjectId -> ObjectId -> GameState -> Bool
+skulkAllowsGiven pcs blocker attacker gs =
+  not (Projection.hasKeywordGiven pcs Keyword.Skulk attacker gs)
+    || case (Projection.powerGiven pcs blocker gs, Projection.powerGiven pcs attacker gs) of
+      (Just b, Just a) -> b <= a
+      -- Unreachable rather than a rule: CR 208.5 leaves every creature with a
+      -- power, and both arguments are creatures by the time pairAllowedGiven asks
+      -- (canBlockGiven, legalAttackers). Permissive, because a restriction that
+      -- cannot be evaluated forbids nothing.
+      _ -> True
+
 -- CR 702.14c: a creature with landwalk can't be blocked as long as the defending
 -- player controls at least one land matching the specified criterion.
 --
@@ -761,7 +794,7 @@ shadowAllowsGiven pcs blocker attacker gs =
 -- never a comparison between the two creatures -- unlike protection -- so a
 -- signature that could read the blocker could answer 702.14d wrong.
 --
--- The same asymmetry as flying, fear and intimidate (see evasionAllows):
+-- The same asymmetry as flying, fear, intimidate and skulk (see evasionAllows):
 -- landwalk restricts being BLOCKED, so the question is asked of the ATTACKER.
 -- Shadow is the pool's one gate where that does not hold.
 --
@@ -897,6 +930,7 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
     && fearAllowsGiven pcs blocker attacker gs
     && intimidateAllowsGiven pcs blocker attacker gs
     && shadowAllowsGiven pcs blocker attacker gs
+    && skulkAllowsGiven pcs blocker attacker gs
     && landwalkAllowsGiven grants pcs attacker gs
 
 -- CR 509.1b: the defending player checks each creature for RESTRICTIONS, and if
@@ -905,8 +939,8 @@ pairAllowedGiven grants pcs candidates attackers blocker attacker gs =
 -- The unit of legality is the whole declaration, not the pair, and that is not a
 -- stylistic choice: menace (CR 702.111b) constrains the SET blocking an attacker,
 -- which no per-pair predicate can express. Every other evasion ability the pool
--- has -- flying, reach, fear, intimidate, shadow, landwalk -- is pairwise or
--- narrower; designing to them would be designing to the case that misleads.
+-- has -- flying, reach, fear, intimidate, shadow, skulk, landwalk -- is pairwise
+-- or narrower; designing to them would be designing to the case that misleads.
 --
 -- So the three shapes of restriction are all asked here, one conjunct each:
 -- pairAllowed over the pairs, menaceAllows over the creatures blocking each

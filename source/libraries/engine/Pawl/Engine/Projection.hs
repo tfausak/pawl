@@ -2757,7 +2757,10 @@ projectGiven pcs oid gs =
         Nothing -> project oid gs
 
 powerOf :: ObjectId -> GameState -> Maybe Integer
-powerOf oid gs = PC.power (project oid gs)
+powerOf = powerGiven Map.empty
+
+powerGiven :: Map ObjectId ProjectedCharacteristics -> ObjectId -> GameState -> Maybe Integer
+powerGiven pcs oid gs = PC.power (projectGiven pcs oid gs)
 
 toughnessOf :: ObjectId -> GameState -> Maybe Integer
 toughnessOf oid gs = PC.toughness (project oid gs)
