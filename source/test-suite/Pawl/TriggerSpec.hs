@@ -65,10 +65,10 @@
 -- 702.63 vanishing, the sixteenth, and the first keyword whose rule text spans
 -- BOTH mints -- one CR 614.1c entry replacement and two triggers, one of them
 -- watching the counter removal the other performs -- with Waning Wurm --
--- `vanishingSpec`. CR 702.43 modular, the seventeenth, whose rule text spans both
--- mints too and whose trigger PAYLOAD counts the dead permanent's own +1/+1
--- counters out of CR 608.2h last known information, with Arcbound Hybrid and
--- Arcbound Worker -- `modularSpec`. CR
+-- `vanishingSpec`. CR 702.43 modular, whose rule text spans both mints too and
+-- whose trigger PAYLOAD counts the dead permanent's own +1/+1 counters out of
+-- CR 608.2h last known information, with Arcbound Hybrid and Arcbound Worker --
+-- `modularSpec`. CR
 -- 510.2's combat damage watched by a bystander rather than by the creature that
 -- dealt it, with Tovolar, Dire Overlord -- `tovolarSpec`. The same condition's
 -- damager slot, read by a payload that aims at it, with Aragorn, Hornburg Hero --
@@ -4298,9 +4298,9 @@ vanishingSpec s registry =
             (Keyword.mintedReplacementsFor (Keyword.Type.Vanishing 2) 2)
             (replicate 2 (ReplacementEffect.EntryR Filter.Type.IsSource (EntryRewrite.WithCounters CounterKind.Time 2)))
 
--- CR 702.43 modular, the seventeenth keyword rule 702 states as abilities, and
--- the second whose rule text spans BOTH mints -- one CR 614.1c entry replacement
--- and one death trigger. What is new is the trigger's PAYLOAD: rule 702.43a
+-- CR 702.43 modular, and the second keyword whose rule text spans BOTH of
+-- Pawl.Engine.Keyword's mints -- one CR 614.1c entry replacement and one death
+-- trigger. What is new is the trigger's PAYLOAD: rule 702.43a
 -- counts "each +1/+1 counter on this permanent" at a moment when the permanent
 -- is in a graveyard, so the number comes from CR 608.2h last known information.
 -- counterLookBackSpec above proves the same record answering an intervening "if";
