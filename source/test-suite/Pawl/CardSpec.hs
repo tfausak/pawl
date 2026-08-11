@@ -912,16 +912,17 @@ phasePatternOffends replacement = case replacement of
   ReplacementEffect.TokenR _ _ -> False
   ReplacementEffect.TurnUpR _ _ -> False
 
--- The third baked field the codec accepts and no card may author, and the third
--- for the same reason phasePatternOffends gives: a card cannot name an ObjectId
--- or a PlayerId, so the recipient a shield covers -- CR 615.7's, and CR 615.3's
--- unbounded one -- is for Resolve's prevention arms to write. CR 615.7's
--- remaining amount rides the same carrier and is equally engine-only, so both
--- halves of a shield are checked here at once.
+-- Every replacement shape the codec accepts and no card may author, for
+-- phasePatternOffends' reason and one more. A card cannot name an ObjectId or a
+-- PlayerId, so the recipient a shield covers -- CR 615.7's, and CR 615.3's
+-- unbounded one -- is for Resolve's prevention arms to write, and CR 615.7's
+-- remaining amount rides the same carrier. CR 122.1c's pair is engine-only for a
+-- different reason: a RULE creates it off a permanent's counters, so a card
+-- printing either half would be claiming an ability no rule gives it.
 --
 -- Exhaustive rather than a wildcard, this file's discipline for a sum.
-damagePatternOffends :: ReplacementEffect.ReplacementEffect -> Bool
-damagePatternOffends replacement = case replacement of
+engineOnlyOffends :: ReplacementEffect.ReplacementEffect -> Bool
+engineOnlyOffends replacement = case replacement of
   ReplacementEffect.DamageR damagePattern rewrite ->
     Maybe.isJust (DamagePattern.whichRecipient damagePattern) || engineMintedDamage rewrite
   -- CR 122.1c's destruction half is engine-minted for the same reason its damage
@@ -970,7 +971,7 @@ isPhaseR replacement = case replacement of
   ReplacementEffect.PhaseR _ -> True
   _ -> False
 
--- The non-vacuity half of damagePatternOffends' lint, isPhaseR's shape.
+-- The non-vacuity half of engineOnlyOffends' lint, isPhaseR's shape.
 isDamageR :: ReplacementEffect.ReplacementEffect -> Bool
 isDamageR replacement = case replacement of
   ReplacementEffect.DamageR _ _ -> True
@@ -2053,7 +2054,7 @@ unpreventableScopeOffends scope playerEffect = case playerEffect of
 -- The OTHER half of the same carrier, now that CR 615.12's narrowing rides in a
 -- DamagePattern: does this card author a field of that pattern the engine bakes?
 --
--- `whichRecipient` is the one, and for damagePatternOffends' reason -- a card
+-- `whichRecipient` is the one, and for engineOnlyOffends' reason -- a card
 -- cannot name an ObjectId or a PlayerId. Whippoorwill's "damage that would be
 -- dealt to THAT CREATURE" does name a recipient, but the creature is the one its
 -- resolution chose, so the pattern is the engine's to bake and never the card
@@ -3561,10 +3562,10 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (any phasePatternOffends (cardReplacementEffects baked)) "and the same card naming a seat is rejected"
   -- The same lint one event class over, for the OTHER fields the codec accepts and
   -- only the engine writes: CR 615.7's shielded recipient and its remaining amount,
-  -- plus CR 122.1c's minted pair. See damagePatternOffends.
+  -- plus CR 122.1c's minted pair. See engineOnlyOffends.
   Spec.it s "no card authors a recipient-scoped damage pattern or an engine-minted shield" $ do
     ps <- S.allPrintings s
-    let offenders = filter (anyFace (any damagePatternOffends . cardReplacementEffects) . Printing.card) ps
+    let offenders = filter (anyFace (any engineOnlyOffends . cardReplacementEffects) . Printing.card) ps
     -- Guards against a vacuous sweep: Fog is the card that prints a DamageR.
     Spec.assertBool s (any (anyFace (any isDamageR . cardReplacementEffects) . Printing.card) ps) "the pool has a card printing a damage replacement"
     Spec.assertEqWith s "a shield is baked by the engine, never authored" (fmap (S.nameOf . Printing.card) offenders) []
@@ -3590,13 +3591,13 @@ lintSpec s registry = Spec.describe s "Lint" $ do
           ReplacementEffect.DamageR damagePattern _ -> ReplacementEffect.DamageR damagePattern DamageRewrite.PreventRemovingShieldCounter
           other -> other
     Spec.assertBool s (any isDamageR printed) "setup: Fog prints a damage replacement to bake"
-    Spec.assertBool s (not (any damagePatternOffends printed)) "the real Fog names no recipient and counts nothing"
-    Spec.assertBool s (any (damagePatternOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
-    Spec.assertBool s (any (damagePatternOffends . bakeShield) printed) "and so is one counting a shield down"
+    Spec.assertBool s (not (any engineOnlyOffends printed)) "the real Fog names no recipient and counts nothing"
+    Spec.assertBool s (any (engineOnlyOffends . bakeRecipient) printed) "the same effect naming a shielded player is rejected"
+    Spec.assertBool s (any (engineOnlyOffends . bakeShield) printed) "and so is one counting a shield down"
     -- CR 122.1c's prevention, which only Projection.shieldOf may mint.
-    Spec.assertBool s (any (damagePatternOffends . bakeCounterShield) printed) "and so is one removing a shield counter"
-    Spec.assertBool s (damagePatternOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
-    Spec.assertBool s (not (damagePatternOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
+    Spec.assertBool s (any (engineOnlyOffends . bakeCounterShield) printed) "and so is one removing a shield counter"
+    Spec.assertBool s (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.RemoveShieldCounter)) "and so is CR 122.1c's destruction half"
+    Spec.assertBool s (not (engineOnlyOffends (ReplacementEffect.DestructionR DestructionRewrite.Regenerate))) "while CR 701.19a's printed regeneration is accepted"
   -- The same shape one axis over, and the thing that makes
   -- Pawl.Engine.PlayerEffect.unpreventable's board fold EXACT rather than
   -- approximate. See unpreventableScopeOffends.
@@ -3645,7 +3646,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
     Spec.assertBool s (not (offends silenced)) "the real Silence, whose stored effect is scoped to its opponents, is accepted"
     Spec.assertBool s (offends (overSpell unpreventable silenced)) "a stored CR 615.12 effect scoped to opponents is rejected"
     Spec.assertBool s (not (offends (overSpell (widen . unpreventable) silenced))) "and the same stored effect scoped to every player is accepted"
-  -- The pattern axis of the same carrier, and damagePatternOffends' twin: a card
+  -- The pattern axis of the same carrier, and engineOnlyOffends' twin: a card
   -- may narrow CR 615.12 by kind or by source, and may not name the RECIPIENT,
   -- which only Resolve can bake. See unpreventablePatternOffends.
   Spec.it s "no card authors a recipient into CR 615.12's damage pattern" $ do

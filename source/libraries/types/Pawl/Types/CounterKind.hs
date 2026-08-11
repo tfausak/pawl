@@ -5,8 +5,10 @@ module Pawl.Types.CounterKind where
 -- rules core reads counts by kind (CR 613.4c, the CR 704.5q SBA) and never cases
 -- on a card. CR 122.1a for the P/T kinds, CR 122.1b for keyword, CR 122.1e for
 -- loyalty, rule 714 for lore and CR 702.63 for time -- neither of which rule
--- 122.1 lists at all, and CR 122.1c for shield. The rest of CR 122.1d-i are
--- future.
+-- 122.1 lists at all, and CR 122.1c for shield. What rule 122.1 names and this
+-- type does not are CR 122.1d's stun counter and CR 122.1h's finality counter;
+-- 122.1f's poison and 122.1i's rad are a PLAYER's and live in
+-- Pawl.Types.PlayerCounterKind.
 -- Ord is load-bearing: CounterKind is a Map key on Object.counters.
 --
 -- PARAMETRIC in the keyword, for the reason Pawl.Types.Filter is and only that

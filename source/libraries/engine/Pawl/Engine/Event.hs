@@ -1087,7 +1087,7 @@ apply batch candidate event =
       -- the same object.
       --
       -- NOT `consume`, for the reason `collect` gives: a permanent's candidate has
-      -- no use to spend. The removal below is what spends this one, since
+      -- no use to spend. The removal is what spends this one instead, since
       -- Projection.shieldOf mints the pair only while a counter is there and CR
       -- 616.1f re-collects.
       DamageRewrite.PreventRemovingShieldCounter -> do
@@ -2303,11 +2303,11 @@ destroyInBatch asOf cause regenerability oids = Monad.void (destroyIn (Just asOf
 --      regeneration shield may be offered one. The reachable shape is an Aura
 --      named by CR 704.5m and CR 704.5g in the same pass.
 --
--- The destruction loop observes (1) through CR 122.1c: a shield counter's
--- replacement is minted from a permanent (Projection.shieldOf), so the frozen board
--- is where it is found -- and it is found there even when the same batch is burying
--- the permanent that put the counter on. Every OTHER DestructionR in the pool is a
--- regeneration shield in the floating store, which the frozen board does not hold.
+-- CR 122.1c is the first DestructionR for which (1) is not vacuous: a shield
+-- counter's replacement is minted from the permanent holding the counter
+-- (Projection.shieldOf), so the destruction loop finds it on the FROZEN board rather
+-- than on the live one. Every other DestructionR in the pool is a regeneration
+-- shield in the floating store, which the frozen board does not hold at all.
 --
 -- The whole body is ONE event, which is what `simultaneously` stamps on
 -- everything it records: CR 608.2f makes an action taken on multiple objects

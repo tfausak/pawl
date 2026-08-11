@@ -4114,12 +4114,12 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         Spec.assertBool s (not (Set.member oid (GameState.battlefield thrice))) "so the third kills it"
   -- CR 122.1c's "as the result of an EFFECT", as a pair of boards differing in
   -- nothing but the destruction's cause. Through the two doors rather than through
-  -- gameplay, because no board in the pool reaches the rules' own destruction of a
-  -- SHIELDED permanent: CR 704.5g needs marked damage equal to its toughness, and
-  -- the prevention half stops damage being marked for as long as a counter is
-  -- there. It becomes reachable the moment a card puts a counter on an already
-  -- damaged permanent, which every producer in `data/cards` is an entry replacement
-  -- rather than.
+  -- gameplay because that is the only way to hold everything else equal: reaching CR
+  -- 704.5g against a SHIELDED permanent needs marked damage equal to its toughness,
+  -- and the prevention half stops damage being marked for as long as a counter is
+  -- there, so the gameplay route has to break the prevention half first. The
+  -- Spider-Punk case below is that route, and it proves the same gate a second time
+  -- at gameplay level.
   Spec.it s "CR 122.1c the counter does not save the bird from a rule's destruction" $ do
     (bird, entered) <- board [] Nothing
     case bird of
@@ -4171,3 +4171,53 @@ shieldCounterSpec s registry = Spec.describe s "Shield counters (CR 122.1c)" $ d
         after = S.settleSba (castAt pikerId doomBlade shielded)
     Spec.assertBool s (Set.member pikerId (GameState.battlefield after)) "the Piker survived the Doom Blade"
     Spec.assertEqWith s "spending the counter" (shields pikerId after) 0
+  -- CR 122.1c's "to THIS permanent": the pair protects the permanent its counters
+  -- are on and no other recipient. Two Bolts off one board, one at bob and one at
+  -- bob's Piker, so both shapes a wrongly scoped shield would reach are covered -- a
+  -- damage event naming a PLAYER, whose recipient is no object at all, and one
+  -- naming another creature.
+  Spec.it s "CR 122.1c the shield covers its own permanent and no other recipient" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    (bird, entered) <- board ["Mountain", "Mountain"] Nothing
+    case bird of
+      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
+      Just oid -> do
+        let (pikerId, staged) = S.addCreature pikerPrinting S.bob entered
+            castAtBob gs =
+              let (held, g1) = S.addHandCard bolt S.alice gs
+               in S.runPure (aimPlayer S.bob) g1 (S.cast S.alice held >> Stack.resolveTop)
+            hitBob = S.settleSba (castAtBob staged)
+            hitPiker = S.settleSba (castAt pikerId bolt hitBob)
+        Spec.assertEqWith s "bob took the Bolt" (S.lifeOf S.bob hitBob) (fmap (subtract 3) (S.lifeOf S.bob staged))
+        Spec.assertEqWith s "and the bird's counter is untouched" (shields oid hitBob) 1
+        Spec.assertBool s (not (Set.member pikerId (GameState.battlefield hitPiker))) "the second Bolt killed bob's Piker"
+        Spec.assertEqWith s "and the counter is still untouched" (shields oid hitPiker) 1
+        Spec.assertBool s (Set.member oid (GameState.battlefield hitPiker)) "setup: the bird sat there through both"
+  -- CR 615.12 with CR 122.1c: the pair's prevention half says "prevent", so CR 615.1a
+  -- makes it a prevention effect and unpreventable damage is still MET by it and
+  -- still prevented none of -- the Bolt lands in full and kills the 2/1. The
+  -- discriminating twin is the first Bolt case above: same bird, same Bolt, and the
+  -- only difference is Spider-Punk on the board.
+  --
+  -- It is also the pool's one GAMEPLAY route to CR 122.1c's "as the result of an
+  -- effect": the Bolt lands with the counter still on the bird, so CR 704.5g's
+  -- state-based action destroys a shielded permanent -- and the shield must not
+  -- replace that. Mutating Replacement.admits' cause test reddens this case as well
+  -- as the door-pair one above.
+  --
+  -- Not implemented: the rule's middle clause takes the counter off anyway ("if a
+  -- permanent with a shield counter is dealt unpreventable damage, that damage will
+  -- be dealt and a shield counter will still be removed"), which the CR 615.12
+  -- short-circuit runs before (#1106). That divergence is what leaves the counter on
+  -- the bird for CR 704.5g to find here; with the clause implemented this board
+  -- reaches the same place with the counter gone.
+  Spec.it s "CR 615.12 an unpreventable Bolt kills the shielded bird" $ do
+    bolt <- S.printingOf s registry "Lightning Bolt"
+    (bird, entered) <- board ["Mountain"] (Just ("Spider-Punk", S.bob))
+    case bird of
+      Nothing -> Spec.assertFailure s "the bird did not reach the battlefield"
+      Just oid -> do
+        let once = S.settleSba (castAt oid bolt entered)
+        Spec.assertEqWith s "setup: the bird still entered with its counter" (shields oid entered) 1
+        Spec.assertBool s (not (Set.member oid (GameState.battlefield once))) "and the Bolt killed it through the shield"
