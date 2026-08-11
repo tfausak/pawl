@@ -7,7 +7,12 @@ import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CostComponent as CostComponent
 
--- | The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
+-- | Tagged rather than bare-nullary from the start: this family grows
+-- payload-carrying constructors (PayLife, Sacrifice), so it is built from
+-- 'Arm.tagged' rather than delegated to a nullary-table helper, and a new
+-- arm needs only another entry in the list below.
+--
+-- The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
 codec :: (Typeable.Typeable keyword) => Codec.Codec keyword -> Codec.Codec (CostComponent.CostComponent keyword)
 codec keywordCodec =
   Arm.tagged

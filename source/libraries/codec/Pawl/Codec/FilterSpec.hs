@@ -278,7 +278,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             auraGraftTarget,
             auraGraftDestination
           ]
-  Spec.describe s "optional (P9)" $ do
+  Spec.describe s "Common.maybe codec (P9)" $ do
     Spec.it s "CR 702.29e's typecycling filter, present" $
       Common.assertFromJson s (Codec.decode (Common.maybe codec)) "{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}" (Just (Filter.HasCardType CardType.Creature))
     Spec.it s "absent (JSON null)" $

@@ -17,98 +17,88 @@ import qualified Pawl.Types.Keyword as Keyword
 -- re-entrant calls inside 'Filter.codec' and 'Cost.codec' find it already
 -- registered and return a @$ref@ instead of recursing forever.
 --
--- 'Keyword.Hexproof' is the one arm 'Arm.tagged' cannot derive whole: CR
--- 702.11b's bare hexproof has NO "value" key at all
--- (@{"type":"Hexproof"}@), where every other payload arm always writes one.
--- 'Arm.tagged'\'s generic decode fails a known tag with an absent value
--- ("missing tagged value"), so the "Just" case is an ordinary payload arm and
--- the "Nothing" case is special-cased in 'decode' below, ahead of the
--- Arm-derived path. The schema this produces still claims "value" is always
--- required for Hexproof, which is imprecise for the Nothing case in the same
--- spirit as 'Pawl.Codec.TypeLine'\'s CR 205.1 check being invisible to its
--- schema -- schema content is not asserted anywhere yet (#1264).
+-- 'Keyword.Hexproof' is 'Arm.optionalPayload'\'s first caller: CR 702.11b's
+-- bare hexproof has no "value" key at all (@{"type":"Hexproof"}@) where CR
+-- 702.11d's "hexproof from [quality]" does, both under the one constructor.
 codec :: Codec.Codec Keyword.Keyword
-codec = base {Codec.decode = decode}
+codec =
+  Arm.tagged
+    encode
+    [ Arm.nullary "Deathtouch" Keyword.Deathtouch,
+      Arm.nullary "Defender" Keyword.Defender,
+      Arm.nullary "DoubleStrike" Keyword.DoubleStrike,
+      Arm.nullary "FirstStrike" Keyword.FirstStrike,
+      Arm.nullary "Flash" Keyword.Flash,
+      Arm.nullary "Flying" Keyword.Flying,
+      Arm.nullary "Haste" Keyword.Haste,
+      Arm.optionalPayload "Hexproof" (Filter.codec codec) Keyword.Hexproof,
+      Arm.nullary "Indestructible" Keyword.Indestructible,
+      Arm.payload "Landwalk" (Filter.codec codec) Keyword.Landwalk,
+      Arm.nullary "Lifelink" Keyword.Lifelink,
+      Arm.nullary "Reach" Keyword.Reach,
+      Arm.nullary "Shroud" Keyword.Shroud,
+      Arm.nullary "Trample" Keyword.Trample,
+      Arm.nullary "TrampleOverPlaneswalkers" Keyword.TrampleOverPlaneswalkers,
+      Arm.nullary "Vigilance" Keyword.Vigilance,
+      Arm.nullary "Banding" Keyword.Banding,
+      Arm.payload "Rampage" Common.natural Keyword.Rampage,
+      Arm.nullary "Flanking" Keyword.Flanking,
+      Arm.nullary "Phasing" Keyword.Phasing,
+      Arm.nullary "Shadow" Keyword.Shadow,
+      Arm.nullary "Horsemanship" Keyword.Horsemanship,
+      Arm.nullary "Aftermath" Keyword.Aftermath,
+      Arm.nullary "JumpStart" Keyword.JumpStart,
+      Arm.payload "Afflict" Common.natural Keyword.Afflict,
+      -- CR 702.29e's typecycling filter, absent for plain cycling: 'Common.maybe'
+      -- writes JSON null rather than omitting a key, which is right here because
+      -- this rides inside a POSITIONAL pair (the tuple's second slot) rather than
+      -- a named field an absent key could skip.
+      Arm.payload "Cycling" (Common.tuple (Cost.codec codec) (Common.maybe (Filter.codec codec))) (uncurry Keyword.Cycling),
+      Arm.payload "Kicker" (Cost.codec codec) Keyword.Kicker,
+      Arm.payload "Flashback" (Cost.codec codec) Keyword.Flashback,
+      Arm.nullary "Fear" Keyword.Fear,
+      Arm.nullary "Intimidate" Keyword.Intimidate,
+      Arm.payload "Morph" (Common.tuple (Cost.codec codec) MorphVariant.codec) (uncurry Keyword.Morph),
+      Arm.payload "Entwine" (Cost.codec codec) Keyword.Entwine,
+      Arm.payload "Modular" Common.natural Keyword.Modular,
+      Arm.payload "Bushido" Common.natural Keyword.Bushido,
+      Arm.payload "Soulshift" Common.natural Keyword.Soulshift,
+      Arm.nullary "SplitSecond" Keyword.SplitSecond,
+      Arm.payload "Vanishing" Common.natural Keyword.Vanishing,
+      Arm.payload "Poisonous" Common.natural Keyword.Poisonous,
+      Arm.payload "Annihilator" Common.natural Keyword.Annihilator,
+      Arm.payload "Reinforce" (Common.tuple Common.natural (Cost.codec codec)) (uncurry Keyword.Reinforce),
+      Arm.nullary "Persist" Keyword.Persist,
+      Arm.nullary "Infect" Keyword.Infect,
+      Arm.nullary "Wither" Keyword.Wither,
+      Arm.nullary "Exalted" Keyword.Exalted,
+      Arm.nullary "Mentor" Keyword.Mentor,
+      Arm.payload "Afterlife" Common.natural Keyword.Afterlife,
+      Arm.nullary "Provoke" Keyword.Provoke,
+      Arm.nullary "BattleCry" Keyword.BattleCry,
+      Arm.nullary "Undying" Keyword.Undying,
+      Arm.nullary "Evolve" Keyword.Evolve,
+      Arm.nullary "Dethrone" Keyword.Dethrone,
+      Arm.payload "Outlast" (Cost.codec codec) Keyword.Outlast,
+      Arm.nullary "Prowess" Keyword.Prowess,
+      Arm.nullary "Menace" Keyword.Menace,
+      Arm.payload "Renown" Common.natural Keyword.Renown,
+      Arm.nullary "Changeling" Keyword.Changeling,
+      Arm.nullary "Devoid" Keyword.Devoid,
+      Arm.nullary "Skulk" Keyword.Skulk,
+      Arm.nullary "Melee" Keyword.Melee,
+      Arm.payload "Crew" Common.natural Keyword.Crew,
+      Arm.payload "Fabricate" Common.natural Keyword.Fabricate,
+      Arm.nullary "Riot" Keyword.Riot,
+      Arm.nullary "Unleash" Keyword.Unleash,
+      Arm.nullary "Daybound" Keyword.Daybound,
+      Arm.nullary "Nightbound" Keyword.Nightbound,
+      Arm.nullary "Decayed" Keyword.Decayed,
+      Arm.nullary "Training" Keyword.Training,
+      Arm.payload "Toxic" Common.natural Keyword.Toxic,
+      Arm.nullary "StartYourEngines" Keyword.StartYourEngines
+    ]
   where
-    base =
-      Arm.tagged
-        encode
-        [ Arm.nullary "Deathtouch" Keyword.Deathtouch,
-          Arm.nullary "Defender" Keyword.Defender,
-          Arm.nullary "DoubleStrike" Keyword.DoubleStrike,
-          Arm.nullary "FirstStrike" Keyword.FirstStrike,
-          Arm.nullary "Flash" Keyword.Flash,
-          Arm.nullary "Flying" Keyword.Flying,
-          Arm.nullary "Haste" Keyword.Haste,
-          Arm.payload "Hexproof" (Filter.codec codec) (Keyword.Hexproof . Just),
-          Arm.nullary "Indestructible" Keyword.Indestructible,
-          Arm.payload "Landwalk" (Filter.codec codec) Keyword.Landwalk,
-          Arm.nullary "Lifelink" Keyword.Lifelink,
-          Arm.nullary "Reach" Keyword.Reach,
-          Arm.nullary "Shroud" Keyword.Shroud,
-          Arm.nullary "Trample" Keyword.Trample,
-          Arm.nullary "TrampleOverPlaneswalkers" Keyword.TrampleOverPlaneswalkers,
-          Arm.nullary "Vigilance" Keyword.Vigilance,
-          Arm.nullary "Banding" Keyword.Banding,
-          Arm.payload "Rampage" Common.natural Keyword.Rampage,
-          Arm.nullary "Flanking" Keyword.Flanking,
-          Arm.nullary "Phasing" Keyword.Phasing,
-          Arm.nullary "Shadow" Keyword.Shadow,
-          Arm.nullary "Horsemanship" Keyword.Horsemanship,
-          Arm.nullary "Aftermath" Keyword.Aftermath,
-          Arm.nullary "JumpStart" Keyword.JumpStart,
-          Arm.payload "Afflict" Common.natural Keyword.Afflict,
-          Arm.payload "Cycling" (Common.tuple (Cost.codec codec) (Common.maybe (Filter.codec codec))) (uncurry Keyword.Cycling),
-          Arm.payload "Kicker" (Cost.codec codec) Keyword.Kicker,
-          Arm.payload "Flashback" (Cost.codec codec) Keyword.Flashback,
-          Arm.nullary "Fear" Keyword.Fear,
-          Arm.nullary "Intimidate" Keyword.Intimidate,
-          Arm.payload "Morph" (Common.tuple (Cost.codec codec) MorphVariant.codec) (uncurry Keyword.Morph),
-          Arm.payload "Entwine" (Cost.codec codec) Keyword.Entwine,
-          Arm.payload "Modular" Common.natural Keyword.Modular,
-          Arm.payload "Bushido" Common.natural Keyword.Bushido,
-          Arm.payload "Soulshift" Common.natural Keyword.Soulshift,
-          Arm.nullary "SplitSecond" Keyword.SplitSecond,
-          Arm.payload "Vanishing" Common.natural Keyword.Vanishing,
-          Arm.payload "Poisonous" Common.natural Keyword.Poisonous,
-          Arm.payload "Annihilator" Common.natural Keyword.Annihilator,
-          Arm.payload "Reinforce" (Common.tuple Common.natural (Cost.codec codec)) (uncurry Keyword.Reinforce),
-          Arm.nullary "Persist" Keyword.Persist,
-          Arm.nullary "Infect" Keyword.Infect,
-          Arm.nullary "Wither" Keyword.Wither,
-          Arm.nullary "Exalted" Keyword.Exalted,
-          Arm.nullary "Mentor" Keyword.Mentor,
-          Arm.payload "Afterlife" Common.natural Keyword.Afterlife,
-          Arm.nullary "Provoke" Keyword.Provoke,
-          Arm.nullary "BattleCry" Keyword.BattleCry,
-          Arm.nullary "Undying" Keyword.Undying,
-          Arm.nullary "Evolve" Keyword.Evolve,
-          Arm.nullary "Dethrone" Keyword.Dethrone,
-          Arm.payload "Outlast" (Cost.codec codec) Keyword.Outlast,
-          Arm.nullary "Prowess" Keyword.Prowess,
-          Arm.nullary "Menace" Keyword.Menace,
-          Arm.payload "Renown" Common.natural Keyword.Renown,
-          Arm.nullary "Changeling" Keyword.Changeling,
-          Arm.nullary "Devoid" Keyword.Devoid,
-          Arm.nullary "Skulk" Keyword.Skulk,
-          Arm.nullary "Melee" Keyword.Melee,
-          Arm.payload "Crew" Common.natural Keyword.Crew,
-          Arm.payload "Fabricate" Common.natural Keyword.Fabricate,
-          Arm.nullary "Riot" Keyword.Riot,
-          Arm.nullary "Unleash" Keyword.Unleash,
-          Arm.nullary "Daybound" Keyword.Daybound,
-          Arm.nullary "Nightbound" Keyword.Nightbound,
-          Arm.nullary "Decayed" Keyword.Decayed,
-          Arm.nullary "Training" Keyword.Training,
-          Arm.payload "Toxic" Common.natural Keyword.Toxic,
-          Arm.nullary "StartYourEngines" Keyword.StartYourEngines
-        ]
-    -- 'Hexproof Nothing' is the one value 'base's Arm-derived decode cannot
-    -- recover -- see the module header -- so it is special-cased here, ahead
-    -- of the generic path.
-    decode value = case Common.asTagged value of
-      Right ("Hexproof", Nothing) -> Right (Keyword.Hexproof Nothing)
-      _ -> Codec.decode base value
     encode k = case k of
       Keyword.Deathtouch -> Common.nullary "Deathtouch"
       Keyword.Defender -> Common.nullary "Defender"

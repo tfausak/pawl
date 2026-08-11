@@ -12,6 +12,7 @@ import qualified Pawl.Spec as Spec
 data Example
   = Plain
   | Sized Integer
+  | Loose (Maybe Integer)
   deriving (Eq, Show)
 
 size :: Codec.Codec Integer
@@ -22,12 +23,15 @@ codec =
   Arm.tagged
     encode
     [ Arm.nullary "Plain" Plain,
-      Arm.payload "Sized" size Sized
+      Arm.payload "Sized" size Sized,
+      Arm.optionalPayload "Loose" size Loose
     ]
   where
     encode x = case x of
       Plain -> Common.nullary "Plain"
       Sized n -> Common.tagged "Sized" . Just $ Codec.encode size n
+      Loose Nothing -> Common.nullary "Loose"
+      Loose (Just n) -> Common.tagged "Loose" . Just $ Codec.encode size n
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
@@ -48,6 +52,12 @@ spec s = Spec.describe s "Pawl.JsonCodec.Arm" $ do
       s
       (Either.isLeft (Common.parse (Text.pack """ {"type":"Sized"} """) >>= Codec.decode codec))
       "expected a decode failure"
+
+  -- The shape 'Arm.optionalPayload' exists for: BOTH forms decode under one
+  -- tag, unlike 'payload', which rejects the value-absent one.
+  Spec.it s "round trips an optional-payload arm with and without a value" $ do
+    Common.assertCodec s codec (Loose (Just 2)) """ {"type":"Loose","value":2} """
+    Common.assertCodec s codec (Loose Nothing) """ {"type":"Loose"} """
 
   Spec.it s "has a schema" $
     Common.assertHasSchema s codec

@@ -69,8 +69,8 @@ codec keywordCodec =
     ]
   where
     -- Unnamed, mirroring 'Common.natural': a bare 'Integer' earns no $defs
-    -- entry, and CR 208.1's power/mana-value comparisons are the only atoms
-    -- here that carry one.
+    -- entry, and CR 208.1's power comparisons and CR 202.3's mana-value one
+    -- are the only atoms here that carry one.
     integerCodec :: Codec.Codec Integer
     integerCodec =
       Codec.MkCodec

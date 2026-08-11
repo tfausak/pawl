@@ -8,7 +8,9 @@ import qualified Pawl.Types.CounterKind as CounterKind
 
 -- | PARAMETRIC for Pawl.Types.CounterKind's reason: the keyword codec is
 -- threaded through rather than closed over, so 'Keyword' below never names
--- 'Pawl.Codec.Keyword' directly.
+-- 'Pawl.Codec.Keyword' directly. CR 122.1b's keyword counter carries the
+-- keyword it grants, which is why that arm has a payload at all rather than
+-- being another bare tag.
 codec :: (Typeable.Typeable keyword) => Codec.Codec keyword -> Codec.Codec (CounterKind.CounterKind keyword)
 codec keywordCodec =
   Arm.tagged
