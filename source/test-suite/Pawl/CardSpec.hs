@@ -475,6 +475,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   -- CR 702.112b's condition carries a Filter for the same reason, and no Count.
   TriggerCondition.PermanentBecomesDesignated _ _ -> []
   TriggerCondition.SelfEvolves -> []
+  -- CR 702.134c's is nullary too, so it holds no Quantity.
+  TriggerCondition.AttachedCreatureMentors -> []
   -- CR 701.21a's is nullary too, so it holds no Quantity either.
   TriggerCondition.PermanentSacrificed -> []
   -- CR 603.3b's carries a PlayerRelation, which holds no Count.
@@ -596,6 +598,7 @@ effectCounts effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -858,6 +861,7 @@ effectReplacements effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1270,7 +1274,8 @@ reservedSlots =
       Binding.blockingCreature,
       Binding.blockedCreature,
       Binding.attackingCreature,
-      Binding.combatDamager
+      Binding.combatDamager,
+      Binding.mentoredCreature
     ]
 
 -- The binding slots a card's power, toughness and characteristic-defining P/T
@@ -1359,6 +1364,7 @@ effectMintedFaces effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect _ -> []
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   Effect.Attach _ -> []
@@ -1886,6 +1892,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesDesignated _ f -> [f]
   TriggerCondition.SelfEvolves -> []
+  -- CR 702.134c's carries none either: "equipped creature" is CR 301.5c's one
+  -- permanent rather than a class of them, and "a creature" narrows by nothing.
+  TriggerCondition.AttachedCreatureMentors -> []
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
   -- PermanentDies below there is no Filter to sweep.
   TriggerCondition.PermanentSacrificed -> []
@@ -2307,6 +2316,7 @@ effectFilters effect = case effect of
   Effect.Designate _ _ -> []
   Effect.Unsuspect ref -> unframed (objectRefFilters ref)
   Effect.Evolve _ -> []
+  Effect.Mentor _ -> []
   Effect.ItBecomes _ -> []
   Effect.ExileUntilMonarch _ -> []
   -- CR 701.3's other attach, which moves the SOURCE rather than a target and

@@ -785,6 +785,25 @@ data Effect card
     -- payload. A SlotName for Designate's reason: rule 702.100a's "this
     -- creature" is Binding.triggerSource, one object.
     Evolve SlotName.SlotName
+  | -- | CR 702.134a and CR 702.134c together: put a +1/+1 counter on the slot's
+    -- creature, and record that the source MENTORED it -- rule 702.134c's marker,
+    -- which Aegis of the Legion's "whenever equipped creature mentors a creature"
+    -- reads. The whole payload of the ability Pawl.Engine.Keyword.mentor mints, and
+    -- its only producer.
+    --
+    -- Evolve's shape one rule over, and one opcode rather than a PutCounters beside
+    -- a marker for a DIFFERENT reason than that one's: rule 702.134c's marker is
+    -- gated on nothing, so two effects in a clause could state it -- but the marker
+    -- names a PAIR, the mentor and the mentored creature, and a second effect would
+    -- have no way to say which creature the first one's counter reached. What the
+    -- freedom from the gate buys is that this arm emits unconditionally where
+    -- Evolve's asks how many counters landed.
+    --
+    -- The counter's kind and count are the rule's rather than the card's, so
+    -- neither is a payload. A SlotName for Evolve's reason, with the other side of
+    -- the pair: this one names rule 702.134a's chosen TARGET, the mentor being the
+    -- resolving ability's own source.
+    Mentor SlotName.SlotName
   | -- | CR 731.1: "it becomes day" / "it becomes night" -- the GAME gains that
     -- designation. Tovolar, Dire Overlord's upkeep trigger is `ItBecomes Night`.
     --

@@ -57,6 +57,9 @@
 -- CR 702.134 mentor, the first keyword whose
 -- minted ability TARGETS -- a slot chosen under CR 603.3d and narrowed by a power
 -- comparison against its own source -- with Blade Instructor -- `mentorSpec`.
+-- CR 702.134c, the first condition that watches another ability
+-- RESOLVE and the first read through its bearer's ATTACHMENT, with Aegis of the
+-- Legion -- `mentorsTriggerSpec`.
 -- CR 702.23 rampage, whose bonus multiplies a printed N by a number
 -- read off the declaration, with Wolverine Pack and Horrible Hordes --
 -- `rampageSpec`. CR 702.149 training, whose CONDITION reads the rest
@@ -3719,6 +3722,153 @@ mentorSpec s registry =
             [TriggerCondition.SelfAttacks TriggerFrequency.EveryTime, TriggerCondition.SelfAttacks TriggerFrequency.EveryTime]
           Spec.assertEqWith s "each with rule 702.134a's one slot" (concatMap specsOf abilities) [expectedSpec, expectedSpec]
 
+-- CR 702.134c, the OTHER half of rule 702.134: not mentor's own attack trigger but
+-- an ability that watches a mentor ability RESOLVE. "An ability that triggers
+-- whenever a creature mentors another creature triggers whenever a mentor ability
+-- whose source is the first creature and whose target is the second creature
+-- resolves", which is TriggerCondition.AttachedCreatureMentors read off
+-- GameEvent.Mentored.
+--
+-- Aegis of the Legion {R}{W} Artifact -- Equipment is the card and the only printing
+-- that reads rule 702.134c: "Equipped creature gets +1/+1 and has mentor. Whenever
+-- equipped creature mentors a creature, put a shield counter on that creature. Equip
+-- {3}". Every case below equips it by fixture (CR 301.5's state, not the equip
+-- ability), so what is under test is the trigger rather than CR 702.6b.
+--
+-- Hill Giant 3/3 wears it, which makes it a 4/4 with mentor -- so no number here is
+-- printed on any card in the board: the mentor's 4 is the Equipment's bonus, the
+-- mentored Goblin Piker's 3/2 is its printed 2/1 plus rule 702.134a's counter, and 4
+-- is not 3 is not 2. The Aegis itself is a fourth reading again, holding no counters
+-- at all.
+--
+-- What separates "a creature MENTORED another" from "a creature WITH MENTOR
+-- attacked" is the pair of declarations: the Giant attacking beside the Piker
+-- mentors it, and the Giant attacking ALONE triggers rule 702.134a all the same and
+-- mentors nothing, rule 702.134a's target having to be an attacking creature. The
+-- two boards are the same board; only the attackers differ.
+mentorsTriggerSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+mentorsTriggerSpec s registry =
+  let board mine = do
+        ours <- mapM (S.printingOf s registry) mine
+        pure (S.combatBoardOf ours [])
+      plan :: [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
+      plan attackers target p = case p of
+        Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature target))) sets
+        _ -> S.aggressiveAnswer p
+      atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
+      atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
+      countersOn oid gs = maybe Map.empty Object.counters (Game.lookupObject oid gs)
+   in Spec.describe s "CR 702.134c a creature mentoring another" $ do
+        -- The proving test, and the whole of rule 702.134c in one board: the mentor
+        -- ability resolves, and the ability watching it puts its counter on the
+        -- creature that was MENTORED -- rule 702.134c's "second creature", which is
+        -- neither the Aegis (the ability's own source) nor the Giant (the first
+        -- creature). Rule 702.134a's +1/+1 counter sits beside it on the same
+        -- permanent, so the two kinds are told apart rather than counted together.
+        Spec.it s "CR 702.134c the mentored creature takes the shield counter" $ do
+          (gs, mine, _) <- board ["Hill Giant", "Goblin Piker", "Aegis of the Legion"]
+          case mine of
+            [giant, piker, aegis] -> do
+              let after = atDamage (plan [giant, piker] piker) (S.attach aegis giant gs)
+              Spec.assertEqWith
+                s
+                "the Piker carries rule 702.134a's counter and rule 702.134c's"
+                (countersOn piker after)
+                (Map.fromList [(CounterKind.PlusOnePlusOne, 1), (CounterKind.Shield, 1)])
+              Spec.assertEqWith
+                s
+                "and neither the mentor nor the Equipment carries either"
+                (countersOn giant after, countersOn aegis after)
+                (Map.empty, Map.empty)
+              Spec.assertEqWith
+                s
+                "the equipped Giant is a 4/4 and the mentored Piker a 3/2"
+                (S.powerToughnessOf giant after, S.powerToughnessOf piker after)
+                (Just (4, 4), Just (3, 2))
+            _ -> Spec.assertFailure s "fixture should give alice a Giant, a Piker and an Aegis"
+        -- The negative, and the case that makes the one above about MENTORING rather
+        -- than about attacking: the same board, with the Piker held back. Rule
+        -- 702.134a's ability still triggers -- the Giant attacked -- but rule
+        -- 702.134a's target must be an attacking creature (CR 508.1k), so the
+        -- ability has no legal target, never resolves, and rule 702.134c's event
+        -- never happens. The answerer still aims at the Piker, so an engine that
+        -- mentored a creature that stayed home would put both counters on it.
+        Spec.it s "CR 702.134c attacking is not mentoring: nothing was mentored" $ do
+          (gs, mine, _) <- board ["Hill Giant", "Goblin Piker", "Aegis of the Legion"]
+          case mine of
+            [giant, piker, aegis] -> do
+              let after = atDamage (plan [giant] piker) (S.attach aegis giant gs)
+              Spec.assertEqWith
+                s
+                "no counters anywhere"
+                (countersOn piker after, countersOn giant after)
+                (Map.empty, Map.empty)
+              Spec.assertEqWith
+                s
+                "and the Piker is its printed 2/1"
+                (S.powerToughnessOf piker after)
+                (Just (2, 1))
+            _ -> Spec.assertFailure s "fixture should give alice a Giant, a Piker and an Aegis"
+        -- CR 122.6: BOTH counters go on through the placement funnel, so a CR 614.16
+        -- replacement reaches them. Doubling Season ({5}{G}, "If an effect would put
+        -- one or more counters on a permanent you control, it puts twice that many")
+        -- doubles each, and 2 and 2 is a different reading from 1 and 1: rule
+        -- 702.134a's counter would not double if the mentor opcode wrote it straight
+        -- onto the permanent, and rule 702.134c's would not if the shield counter
+        -- did.
+        Spec.it s "CR 122.6 Doubling Season doubles both of them" $ do
+          (gs, mine, _) <- board ["Hill Giant", "Goblin Piker", "Aegis of the Legion", "Doubling Season"]
+          case mine of
+            [giant, piker, aegis, _] -> do
+              let after = atDamage (plan [giant, piker] piker) (S.attach aegis giant gs)
+              Spec.assertEqWith
+                s
+                "two of each"
+                (countersOn piker after)
+                (Map.fromList [(CounterKind.PlusOnePlusOne, 2), (CounterKind.Shield, 2)])
+              Spec.assertEqWith s "so the Piker is a 4/3" (S.powerToughnessOf piker after) (Just (4, 3))
+            _ -> Spec.assertFailure s "fixture should give alice a Giant, a Piker, an Aegis and a Doubling Season"
+        -- The same funnel narrowed to ONE of the two kinds, which is what tells the
+        -- readings apart that Doubling Season above leaves symmetrical: Hardened
+        -- Scales ({G}, "If one or more +1/+1 counters would be put on a creature you
+        -- control, that many plus one are put instead") reaches rule 702.134a's
+        -- counter and not rule 702.134c's, so the Piker ends on two +1/+1 counters
+        -- and one shield counter -- a pair no other reading of this board produces.
+        Spec.it s "CR 614.16 Hardened Scales reaches the +1/+1 counter alone" $ do
+          (gs, mine, _) <- board ["Hill Giant", "Goblin Piker", "Aegis of the Legion", "Hardened Scales"]
+          case mine of
+            [giant, piker, aegis, _] -> do
+              let after = atDamage (plan [giant, piker] piker) (S.attach aegis giant gs)
+              Spec.assertEqWith
+                s
+                "two +1/+1 counters, one shield counter"
+                (countersOn piker after)
+                (Map.fromList [(CounterKind.PlusOnePlusOne, 2), (CounterKind.Shield, 1)])
+            _ -> Spec.assertFailure s "fixture should give alice a Giant, a Piker, an Aegis and a Hardened Scales"
+        -- CR 301.5c's "equipped creature", which is the whole of what the condition
+        -- narrows by. A mentoring happens -- Blade Instructor's own printed mentor
+        -- (CR 702.134a) puts its counter on the Piker -- and the Aegis, worn by an
+        -- Icehide Golem that stayed home, is watching the wrong creature, so no
+        -- shield counter is put. An engine that read the condition as "a creature
+        -- mentors" rather than "equipped creature mentors" would fire here.
+        Spec.it s "CR 702.134c another creature's mentoring is not the equipped creature's" $ do
+          (gs, mine, _) <- board ["Blade Instructor", "Goblin Piker", "Icehide Golem", "Aegis of the Legion"]
+          case mine of
+            [instructor, piker, golem, aegis] -> do
+              let after = atDamage (plan [instructor, piker] piker) (S.attach aegis golem gs)
+              Spec.assertEqWith
+                s
+                "the Instructor's counter landed and no shield counter did"
+                (countersOn piker after)
+                (Map.singleton CounterKind.PlusOnePlusOne 1)
+              Spec.assertEqWith
+                s
+                "nor anywhere else"
+                (countersOn golem after, countersOn instructor after, countersOn aegis after)
+                (Map.empty, Map.empty, Map.empty)
+            _ -> Spec.assertFailure s "fixture should give alice an Instructor, a Piker, a Golem and an Aegis"
+
 -- CR 702.149a's training, which rule 702 states as a triggered
 -- ability -- and the first whose trigger CONDITION reads the rest of the
 -- declaration, through Filter.PowerGreaterThanSource and the source power
@@ -7079,6 +7229,13 @@ representativeEvents cond =
         -- not the bearer -- which pins the floor for a matching pair too, since
         -- this arm binds nothing either way.
         TriggerCondition.SelfEvolves -> one (GameEvent.Evolved departed)
+        -- CR 702.134c's own event, and the only one this condition admits. TWO
+        -- distinct ids, which is what the pin needs here: eventBindings stamps the
+        -- SECOND under `thatMentoredCreature`, so an arm that bound the mentor
+        -- instead would still agree with eventBindingSlots if the two coincided.
+        -- Whether the pair matches on the board below does not matter, eventBindings
+        -- reading the event rather than the attachment.
+        TriggerCondition.AttachedCreatureMentors -> one (GameEvent.Mentored departed arrived)
         -- CR 701.21a's own event, and the only one this condition admits. The
         -- payload is arbitrary: the condition compares nothing, so any sacrifice
         -- matches and the floor is the same for all of them.
@@ -7161,6 +7318,7 @@ everyTriggerCondition =
     TriggerCondition.PermanentTurnedFaceUp (Filter.Type.And []),
     TriggerCondition.PermanentBecomesDesignated Designation.Renowned (Filter.Type.And []),
     TriggerCondition.SelfEvolves,
+    TriggerCondition.AttachedCreatureMentors,
     TriggerCondition.PermanentSacrificed,
     TriggerCondition.SagaFinalChapterTriggers PlayerRelation.You,
     -- BOTH relations, on the SpellCast pair's reasoning above: an eventBindings
@@ -9750,6 +9908,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Trigger" $ do
   flankingSpec s registry
   exaltedSpec s registry
   mentorSpec s registry
+  mentorsTriggerSpec s registry
   trainingSpec s registry
   decayedSpec s registry
   provokeSpec s registry

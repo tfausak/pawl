@@ -1873,10 +1873,16 @@ afflict n =
 -- power less than its own power -- which is why the atom is strict rather than
 -- "no greater than".
 --
--- Effect.PutCounters and not battle cry's ModifyTarget: rule 702.134a puts a
--- COUNTER on, so it is CR 122.6's funnel (and CR 614.16's replacement
--- opportunity), and what it grants outlives the turn because CR 613.4c reads the
--- counter every projection.
+-- A COUNTER and not battle cry's ModifyTarget: rule 702.134a puts a counter on, so
+-- it is CR 122.6's funnel (and CR 614.16's replacement opportunity), and what it
+-- grants outlives the turn because CR 613.4c reads the counter every projection.
+--
+-- Effect.Mentor and not Effect.PutCounters, for evolve's reason one rule over: CR
+-- 702.134c makes "a creature mentors another creature" a trigger event, so the
+-- placement has to be distinguishable from every other +1/+1 counter, and only the
+-- resolution knows which creature rule 702.134a's chosen target turned out to be.
+-- The counter still goes through Pawl.Engine.Event.putCounters, so the funnel above
+-- is unaffected; Pawl.TriggerSpec's Doubling Season case proves it.
 --
 -- Single mode, ChooseExactly 1, and no "if" clause, so intervening = Nothing --
 -- the only thing rule 702.134a leaves to choose is the target.
@@ -1892,7 +1898,7 @@ mentor =
     }
   where
     spec = TargetSpec.required Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
-    effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot mentorTarget)
+    effect = Effect.Mentor mentorTarget
 
 -- The slot rule 702.134a's one target is chosen into. Named here rather than in
 -- Pawl.Engine.Binding, which holds the RESERVED names a card may not use: this is
@@ -1926,8 +1932,10 @@ mentorTarget = SlotName.MkSlotName (Text.pack "mentored")
 -- controller conjunct, for mentor's reason: CR 508.1 makes every attacker the
 -- active player's.
 --
--- Effect.PutCounters and not ModifyTarget, again for mentor's reasons -- CR
--- 122.6's funnel, and CR 613.4c's reading every projection.
+-- A COUNTER and not ModifyTarget, again for mentor's reasons -- CR 122.6's funnel,
+-- and CR 613.4c's reading every projection. The plain Effect.PutCounters where
+-- mentor has an opcode of its own: rule 702.149a marks nothing for a trigger to
+-- read, so nothing has to tell this placement from any other.
 training :: TriggeredAbility Card
 training =
   TriggeredAbility.MkTriggeredAbility
@@ -2599,8 +2607,9 @@ vanishingLastCounter =
 -- CR 702.43a's SECOND ability: "when this permanent is put into a graveyard from
 -- the battlefield, you may put a +1/+1 counter on target artifact creature for
 -- each +1/+1 counter on this permanent." Mentor's shape -- one target slot, one
--- Effect.PutCounters -- with a "may" and a counted quantity where mentor has a
--- mandatory clause and a literal 1.
+-- counter-placing effect -- with a "may" and a counted quantity where mentor has a
+-- mandatory clause and a literal 1, and a plain Effect.PutCounters where that one
+-- has CR 702.134c's marker to record.
 --
 -- TriggerCondition.SelfDies is CR 700.4's battlefield-to-graveyard pair, which is
 -- what rule 702.43a's longhand spells out. So the ability's source is the

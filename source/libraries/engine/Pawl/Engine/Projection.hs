@@ -1519,6 +1519,7 @@ rewriteEffect pairs effect = case effect of
   Effect.Designate _ _ -> effect
   Effect.Unsuspect ref -> Effect.Unsuspect (rewriteObjectRef pairs ref)
   Effect.Evolve _ -> effect
+  Effect.Mentor _ -> effect
   Effect.ItBecomes _ -> effect
   Effect.ExileUntilMonarch _ -> effect
   Effect.Attach _ -> effect
@@ -1750,6 +1751,10 @@ rewriteTriggerCondition pairs condition = case condition of
   -- Filter, so CR 612.1 reaches it too.
   TriggerCondition.PermanentBecomesDesignated d f -> TriggerCondition.PermanentBecomesDesignated d (Filter.rewrite pairs f)
   TriggerCondition.SelfEvolves -> condition
+  -- CR 702.134c's is nullary as well: the mentor is found through the source's
+  -- attachment and the mentored creature through the event, so no subtype word of
+  -- the card's is in it for CR 612.1 to swap.
+  TriggerCondition.AttachedCreatureMentors -> condition
   -- CR 701.21a's condition is nullary too: "a player" and "a permanent" name no
   -- subtype word for CR 612.1 to swap.
   TriggerCondition.PermanentSacrificed -> condition
