@@ -3893,7 +3893,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
             ( "CR 614.1's counter-placement pattern",
               base
                 { Face.replacementEffects =
-                    [ReplacementEffect.CounterR (CounterPattern.MkCounterPattern Nothing ControllerRelation.Yours buried) (Scaling.AddMore 1)]
+                    [ReplacementEffect.CounterR (CounterPattern.MkCounterPattern Nothing Nothing ControllerRelation.Yours buried Nothing) (Scaling.AddMore 1)]
                 }
             ),
             ( "a created token's own static ability",

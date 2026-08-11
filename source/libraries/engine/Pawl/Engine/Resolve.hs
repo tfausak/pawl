@@ -3140,7 +3140,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
-          placed <- Event.putCounters CounterCause.ByEffect target CounterKind.PlusOnePlusOne 1
+          placed <- Event.putCounters (CounterCause.ByEffect controller) target CounterKind.PlusOnePlusOne 1
           Monad.when (placed > 0) (State.modify' (Event.recordEvent (GameEvent.Evolved target)))
       _ -> pure ()
   -- CR 731.1: the GAME gains the designation. Everything about what that entails
@@ -3272,7 +3272,7 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- Doubling Season) get their opportunity against each placement.
       Just n ->
         Monad.when (n > 0) . Monad.forM_ targets $ \target ->
-          Event.putCounters CounterCause.ByEffect target kind (Integer.toNaturalSaturating n)
+          Event.putCounters (CounterCause.ByEffect controller) target kind (Integer.toNaturalSaturating n)
   -- CR 122: PutCounters' mirror, and deliberately NOT through a CR 614.16 gate
   -- -- that rule replaces a placement, and nothing in CR 614 replaces a removal,
   -- so there is no loop for this to enter.
@@ -3339,21 +3339,12 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       -- counter replacements (Hardened Scales, Doubling Season) apply to a
       -- proliferated counter exactly as they do to a placed one.
       Monad.forM_ keptPermanents $ \oid ->
-        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters CounterCause.ByEffect oid kind 1
-      -- Player counters are added directly, with no CR 614 opportunity, matching
-      -- GainPlayerCounters below and gapped for the same reason (#122).
+        Monad.forM_ (kindsOn oid) $ \kind -> Event.putCounters (CounterCause.ByEffect controller) oid kind 1
+      -- CR 122.1: and player counters through their own funnel, so the same CR
+      -- 614 opportunity reaches a proliferated poison counter.
       Monad.forM_ keptPlayers $ \pid ->
         Monad.forM_ (kindsFor pid) $ \kind ->
-          State.modify'
-            ( \g ->
-                g
-                  { GameState.players =
-                      Map.adjust
-                        (\pl -> pl {Player.counters = Map.insertWith (+) kind 1 (Player.counters pl)})
-                        pid
-                        (GameState.players g)
-                  }
-            )
+          Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind 1)
   -- CR 701.54a: the Ring tempts the resolving controller. The whole keyword
   -- action is Pawl.Engine.Ring.tempt's, which is where rule 701.54's text lives --
   -- this arm knows only that some effect asked for it, exactly as the arms around
@@ -3367,21 +3358,12 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
     case Quantity.evaluateFor viewOf context gs resolving source quantity of
       Just n
         | n > 0 ->
-            -- CR 122 / 107.14: each recipient gets n counters of kind, directly
-            -- on the player record -- no funnel of PutCounters' kind, since CR
-            -- 614's counter replacements have no player-counter producer yet
-            -- (#122).
+            -- CR 122 / 107.14: ONE evaluation for the whole set (CR 608.2f), then
+            -- CR 122.6's funnel per recipient -- PutCounters' posture above, so a
+            -- counter-scaling replacement (Vorinclex, Monstrous Raider) gets its
+            -- CR 614 opportunity against each player's gain.
             Monad.forM_ recipients $ \pid ->
-              State.modify'
-                ( \g ->
-                    g
-                      { GameState.players =
-                          Map.adjust
-                            (\p -> p {Player.counters = Map.insertWith (+) kind (Integer.toNaturalSaturating n) (Player.counters p)})
-                            pid
-                            (GameState.players g)
-                      }
-                )
+              Monad.void (Event.putPlayerCounters (CounterCause.ByEffect controller) pid kind (Integer.toNaturalSaturating n))
       _ -> pure ()
   Effect.RemovePlayerCounters ref kind quantity -> do
     gs <- State.get
@@ -3392,11 +3374,12 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
       Just n
         | n > 0 ->
             -- CR 122: the mirror of GainPlayerCounters above, off the player
-            -- record directly and with the same missing CR 614 opportunity
-            -- (#122). Natural subtraction would underflow, so the floor is
-            -- explicit: a player with fewer counters than the effect removes
-            -- ends at none, which is what "removes one rad counter from
-            -- themselves" of a player who has none means.
+            -- record directly and through no funnel, for the reason
+            -- Effect.RemoveCounters gives: CR 614 replaces a placement, and
+            -- nothing in it replaces a removal. Natural subtraction would
+            -- underflow, so the floor is explicit -- a player with fewer counters
+            -- than the effect removes ends at none, which is what "removes one rad
+            -- counter from themselves" of a player who has none means.
             Monad.forM_ recipients $ \pid ->
               State.modify'
                 ( \g ->

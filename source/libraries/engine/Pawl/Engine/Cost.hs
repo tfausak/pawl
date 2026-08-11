@@ -1656,7 +1656,9 @@ payComponent pid oid component = case component of
   -- afterwards is CR 614's business rather than the payment's -- the counters
   -- were put on, so the "if you don't" branch does not run.
   CostComponent.PutPlusOneCountersOnThis n -> do
-    Monad.void (Event.putCounters CounterCause.ByEffect oid CounterKind.PlusOnePlusOne n)
+    -- CR 609.1: the player putting them is the one whose resolution this is, which
+    -- for a cost paid during a resolution is the player paying it.
+    Monad.void (Event.putCounters (CounterCause.ByEffect pid) oid CounterKind.PlusOnePlusOne n)
     pure Payment.Paid
   -- CR 406.2's move, through Event.changeZone -- the shared zone-change funnel, so
   -- the card gets a CR 400.7 incarnation and anything watching a graveyard-to-exile

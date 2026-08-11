@@ -81,6 +81,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.ObjectRef as ObjectRef
 import qualified Pawl.Types.OptionalDecision as OptionalDecision
 import qualified Pawl.Types.Phase as Phase
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import qualified Pawl.Types.PlayerId as PlayerId
 import qualified Pawl.Types.Printing as Printing
 import qualified Pawl.Types.Prompt as Prompt
@@ -2352,6 +2353,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Replacement" $ do
   unleashSpec s registry
   brineElementalSpec s registry
   coldsteelHeartSpec s registry
+  vorinclexSpec s registry
 
 -- alice controls one Mountain plus `artifacts` Darksteel Myr, and holds a
 -- Galvanic Blast; `others` are her further permanents, added after the Myr.
@@ -3659,3 +3661,142 @@ coldsteelHeartSpec s registry = Spec.describe s "Coldsteel Heart (CR 616.1)" $ d
     -- migrated to ReplacementEntry, not to prove anything about #74.
     assertBoth "tapped first" (pickRewrite EntryRewrite.Tapped)
     assertBoth "colour first" (pickRewrite EntryRewrite.ChooseColor)
+
+-- CR 122.1 / 122.6 with CR 614.1: Vorinclex, Monstrous Raider ({4}{G}{G}
+-- Legendary Creature -- Phyrexian Praetor 6/6, "Trample, haste. If you would put
+-- one or more counters on a permanent or player, put twice that many . . .
+-- instead. If an opponent would put one or more counters on a permanent or
+-- player, they put half that many . . . instead, rounded down.").
+--
+-- The card the player-counter funnel needed: its own ruling says it "cares deeply
+-- about who is putting the counters", so a board that reads the RECIPIENT instead
+-- answers differently on every case below but the first.
+--
+-- Every count is chosen so the three readings differ: three energy is six
+-- doubled, one halved and three unreplaced, and one poison counter is two, zero
+-- and one.
+vorinclexSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.1)" $ do
+  let -- THREE seats: at two, "an opponent" and "the other player" are the same
+      -- seat, and carol is what tells CR 122.6a's putter apart from a reading
+      -- that asks who is affected.
+      --
+      -- `withVorinclex` is the only difference between a case and its control --
+      -- same printing, same seat, same trigger.
+      board withVorinclex printing pid = do
+        vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+        let seated = if withVorinclex then snd (S.addCreature vorinclex S.alice S.threePlayerGame) else S.threePlayerGame
+            (oid, entered) = S.entersWithTrigger printing pid seated
+        pure (oid, S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority))
+      energyIn = S.playerCounterOf PlayerCounterKind.Energy S.alice
+      poisonIn g = (S.playerCounterOf PlayerCounterKind.Poison S.alice g, S.playerCounterOf PlayerCounterKind.Poison S.bob g, S.playerCounterOf PlayerCounterKind.Poison S.carol g)
+  -- CR 122.6: the gain reaches the CR 616.1 loop at all. Without the funnel the
+  -- energy lands unreplaced at three, which is the control below.
+  Spec.it s "CR 614.1 alice's own three energy are doubled to six" $ do
+    sage <- S.printingOf s registry "Sage of Shaila's Claim"
+    (_, doubled) <- board True sage S.alice
+    (_, plain) <- board False sage S.alice
+    Spec.assertEqWith s "twice that many" (energyIn doubled) 6
+    Spec.assertEqWith s "and three without the praetor" (energyIn plain) 3
+  -- CR 107.1a's rounding, and the axis: bob is putting these on HIMSELF, so a
+  -- reading that asked whose counters they are would find alice's clause and
+  -- double them.
+  Spec.it s "CR 107.1a bob's three energy are halved to one, rounded down" $ do
+    sage <- S.printingOf s registry "Sage of Shaila's Claim"
+    (_, halved) <- board True sage S.bob
+    (_, plain) <- board False sage S.bob
+    Spec.assertEqWith s "half of three, rounded down" (S.playerCounterOf PlayerCounterKind.Energy S.bob halved) 1
+    Spec.assertEqWith s "and three without the praetor" (S.playerCounterOf PlayerCounterKind.Energy S.bob plain) 3
+    Spec.assertEqWith s "alice, who put none on herself, has none" (energyIn halved) 0
+  -- CR 122.6a: alice is the one PUTTING all three counters, so all three are
+  -- doubled -- including the ones bob and carol receive, who are her opponents.
+  -- This is the case a recipient-based reading gets wrong in both directions at
+  -- once: bob's and carol's would be halved to zero instead.
+  Spec.it s "CR 122.6a alice's Ichor Rats poisons the whole table twice over" $ do
+    ichorRats <- S.printingOf s registry "Ichor Rats"
+    (rats, doubled) <- board True ichorRats S.alice
+    (_, plain) <- board False ichorRats S.alice
+    Spec.assertBool s (S.onBattlefield rats doubled) "the Rats are on the battlefield"
+    Spec.assertEqWith s "twice that many, for opponents too" (poisonIn doubled) (2, 2, 2)
+    Spec.assertEqWith s "one each without the praetor" (poisonIn plain) (1, 1, 1)
+  -- CR 614.1a's "instead" taken to zero: half of one, rounded down, is a
+  -- replacement that removes the event rather than resizing it. The Rats still
+  -- entered and their trigger still resolved, which is what separates this from a
+  -- trigger that never ran.
+  Spec.it s "CR 107.1a bob's Ichor Rats poisons nobody: half of one is zero" $ do
+    ichorRats <- S.printingOf s registry "Ichor Rats"
+    (rats, erased) <- board True ichorRats S.bob
+    (_, plain) <- board False ichorRats S.bob
+    Spec.assertBool s (S.onBattlefield rats erased) "the Rats are on the battlefield"
+    Spec.assertEqWith s "nobody is poisoned" (poisonIn erased) (0, 0, 0)
+    Spec.assertEqWith s "one each without the praetor" (poisonIn plain) (1, 1, 1)
+  -- CR 122.6's OBJECT half, on the same axis: alice casts Battlegrowth at bob's
+  -- creature, so the counters go on a permanent she does not control and are
+  -- doubled anyway. Doubling Season's clause -- which reads whose permanent it is
+  -- -- would leave this one alone.
+  Spec.it s "CR 122.6 alice doubles a counter she puts on bob's creature" $ do
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let (gs, spellId, mine, theirs) = counterBoard forest battlegrowth [vorinclex] [pikerPrinting]
+        (bare, bareSpell, _, bareTheirs) = counterBoard forest battlegrowth [] [pikerPrinting]
+    case (mine, theirs, bareTheirs) of
+      (praetor : _, piker : _, barePiker : _) -> do
+        Spec.assertEqWith s "1 * 2" (countersOn CounterKind.PlusOnePlusOne piker (castAndResolve (raceAnswer praetor piker) gs spellId)) 2
+        Spec.assertEqWith s "and one without the praetor" (countersOn CounterKind.PlusOnePlusOne barePiker (castAndResolve (raceAnswer barePiker barePiker) bare bareSpell)) 1
+      _ -> Spec.assertFailure s "fixture did not build both boards"
+  -- The object half's other direction, and the pair the byWhom check on that arm
+  -- turns on: BOB casts the Battlegrowth, at his own creature, with alice's
+  -- praetor watching. Half of one counter is none. The two boards differ in the
+  -- praetor alone.
+  Spec.it s "CR 122.6 bob's counter on bob's own creature is halved away" $ do
+    forest <- S.printingOf s registry "Forest"
+    battlegrowth <- S.printingOf s registry "Battlegrowth"
+    vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+    pikerPrinting <- S.printingOf s registry "Goblin Piker"
+    let bobsBoard withVorinclex =
+          let (_, g1) = S.addCreature forest S.bob (S.landsInPlay forest 1)
+              (piker, g2) = S.addCreature pikerPrinting S.bob g1
+              g3 = if withVorinclex then snd (S.addCreature vorinclex S.alice g2) else g2
+              (spell, g4) = S.addHandCard battlegrowth S.bob g3
+           in (piker, S.runPure (raceAnswer piker piker) g4 (S.cast S.bob spell >> Stack.resolveTop))
+        (halvedPiker, halved) = bobsBoard True
+        (plainPiker, plain) = bobsBoard False
+    Spec.assertEqWith s "half of one, rounded down" (countersOn CounterKind.PlusOnePlusOne halvedPiker halved) 0
+    Spec.assertEqWith s "and one without the praetor" (countersOn CounterKind.PlusOnePlusOne plainPiker plain) 1
+  -- The negative control for CounterPattern.onWho: Doubling Season says "on a
+  -- permanent you control", which no player is, so alice's own energy is
+  -- untouched by it. Same seat and same trigger as the doubling case above.
+  Spec.it s "CR 614.16 Doubling Season does not reach a player's counters" $ do
+    doublingSeason <- S.printingOf s registry "Doubling Season"
+    sage <- S.printingOf s registry "Sage of Shaila's Claim"
+    let (_, seated) = S.addCreature doublingSeason S.alice S.threePlayerGame
+        (_, entered) = S.entersWithTrigger sage S.alice seated
+        after = S.runPure S.identityAnswer entered (Engine.settleForPriority >> Stack.resolveTop >> Engine.settleForPriority)
+    Spec.assertEqWith s "three, not six" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
+  -- CR 122.6a's default putter, which is the one thing the cases above cannot
+  -- see: an entering permanent's counters are put on by ITS controller, so bob's
+  -- riot counter is halved by alice's praetor. Reading the ability's own source
+  -- or the CR 616.1 loop's controller instead would leave it at one.
+  --
+  -- The goblin ends with neither the counter nor haste, which is what taking
+  -- CR 702.136a's first half and having it halved away means.
+  Spec.it s "CR 702.136a bob's riot counter is halved away before it lands" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    forest <- S.printingOf s registry "Forest"
+    vorinclex <- S.printingOf s registry "Vorinclex, Monstrous Raider"
+    zhurTaa <- S.printingOf s registry "Zhur-Taa Goblin"
+    let goblinBoard withVorinclex =
+          let (_, g1) = S.addCreature mountain S.bob (S.landsInPlay forest 1)
+              (_, g2) = S.addCreature forest S.bob g1
+              g3 = if withVorinclex then snd (S.addCreature vorinclex S.alice g2) else g2
+              (held, g4) = S.addHandCard zhurTaa S.bob g3
+              after = S.runPure (riotChoosing OptionalDecision.Exercises) g4 (S.cast S.bob held >> Stack.resolveTop)
+           in (newestNamed (CardName.MkCardName $ Text.pack "Zhur-Taa Goblin") after, after)
+    case (goblinBoard True, goblinBoard False) of
+      ((Just halvedGoblin, halved), (Just plainGoblin, plain)) -> do
+        Spec.assertEqWith s "half of one, rounded down" (countersOn CounterKind.PlusOnePlusOne halvedGoblin halved) 0
+        Spec.assertBool s (not (Projection.hasKeyword Keyword.Haste halvedGoblin halved)) "and no haste: the counter was taken, not declined"
+        Spec.assertEqWith s "and one without the praetor" (countersOn CounterKind.PlusOnePlusOne plainGoblin plain) 1
+      _ -> Spec.assertFailure s "the goblin did not reach the battlefield"
