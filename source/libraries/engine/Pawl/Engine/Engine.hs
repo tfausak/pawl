@@ -772,11 +772,9 @@ placeBorne srcId pending = do
       -- CR 603.3d: targets for the chosen mode(s) only, chosen as the ability
       -- is placed. A mode with no target slots (Create, or a Draw that names its
       -- drawer without targeting) asks nothing.
-      let sets = Target.legalSets (Just controller) srcId (Modal.modesTargetSpecs chosenModes modal) gs
-      chosen <-
-        if Map.null sets
-          then pure Map.empty
-          else Game.choose (Prompt.ChooseTargets decider controller abilId sets)
+      let specs = Modal.modesTargetSpecs chosenModes modal
+          sets = Target.legalSets (Just controller) srcId specs gs
+      chosen <- Target.chooseTargets decider controller abilId specs sets
       -- CR 113.7: the ability's SOURCE is bound under the reserved slot as it is
       -- placed, so "this creature" resolves as an ordinary slot read even after
       -- the source has left the battlefield.

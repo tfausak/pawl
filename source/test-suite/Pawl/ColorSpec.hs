@@ -68,7 +68,7 @@ import qualified Pawl.Types.Zone as Zone
 
 -- "target nonblack creature", the spec Doom Blade and the CR 115.1a cases share.
 nonblackCreature :: TargetSpec.TargetSpec
-nonblackCreature = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
+nonblackCreature = TargetSpec.required Pool.Creatures (Just (Filter.Type.Not (Filter.Type.HasColor Color.Black)))
 
 -- Red Elemental Blast's two modes, in printed order (CR 700.2 /
 -- data/cards/red-elemental-blast.json):

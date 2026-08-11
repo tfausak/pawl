@@ -397,7 +397,7 @@ reinforce n cost =
       ActivatedAbility.condition = Nothing
     }
   where
-    spec = TargetSpec.MkTargetSpec Pool.Creatures Nothing
+    spec = TargetSpec.required Pool.Creatures Nothing
     effect =
       Effect.PutCounters
         CounterKind.PlusOnePlusOne
@@ -1865,7 +1865,7 @@ mentor =
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
+    spec = TargetSpec.required Pool.Creatures (Just (Filter.And [Filter.IsAttacking, Filter.PowerLessThanSource]))
     effect = Effect.PutCounters CounterKind.PlusOnePlusOne (Quantity.Literal 1) (ObjectRef.InSlot mentorTarget)
 
 -- The slot rule 702.134a's one target is chosen into. Named here rather than in
@@ -2050,7 +2050,7 @@ provoke =
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec = TargetSpec.MkTargetSpec Pool.Creatures (Just Filter.ControlledByDefendingPlayer)
+    spec = TargetSpec.required Pool.Creatures (Just Filter.ControlledByDefendingPlayer)
     requirement =
       Effect.RequireBlock
         Duration.UntilEndOfCombat
@@ -2471,7 +2471,7 @@ soulshift n =
     }
   where
     spec =
-      TargetSpec.MkTargetSpec
+      TargetSpec.required
         (Pool.CardsInGraveyard PlayerScope.You)
         (Just (Filter.And [Filter.HasSubtype Subtype.Spirit, Filter.ManaValueAtMost (toInteger n)]))
     back =
@@ -2614,7 +2614,7 @@ modular =
       TriggeredAbility.intervening = Nothing
     }
   where
-    spec = TargetSpec.MkTargetSpec Pool.Creatures (Just (Filter.HasCardType CardType.Artifact))
+    spec = TargetSpec.required Pool.Creatures (Just (Filter.HasCardType CardType.Artifact))
     effect =
       Effect.PutCounters
         CounterKind.PlusOnePlusOne

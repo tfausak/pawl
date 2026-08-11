@@ -71,6 +71,10 @@ data Response
   | DeclaredBlockers (Map.Map ObjectId.ObjectId (Set.Set ObjectId.ObjectId))
   | AssignedCombatDamage (Map.Map Recipient.Recipient Natural.Natural)
   | ChoseTargets (Map.Map SlotName.SlotName Recipient.Recipient)
+  | -- | CR 601.2c: the slots a caster announced they would fill, out of the ones
+    -- CR 115.6 lets them leave empty. A set of names rather than a count per
+    -- name, since every variable slot today is "up to one" (#1219).
+    AnnouncedTargets (Set.Set SlotName.SlotName)
   | -- | CR 612: the (from, to) basic land types a text-changer's caster chose.
     -- Named for the swap rather than for the pair, matching
     -- Prompt.ChooseLandTypeSwap.

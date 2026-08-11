@@ -59,6 +59,7 @@ encode p answer = case p of
   Prompt.DeclareBlockers {} -> Response.DeclaredBlockers answer
   Prompt.AssignCombatDamage {} -> Response.AssignedCombatDamage answer
   Prompt.ChooseTargets {} -> Response.ChoseTargets answer
+  Prompt.AnnounceTargets {} -> Response.AnnouncedTargets answer
   Prompt.ChooseLandTypeSwap {} -> Response.ChoseLandTypeSwap answer
   Prompt.ChooseCreatureTypeSwap {} -> Response.ChoseCreatureTypeSwap answer
   Prompt.SearchLibrary {} -> Response.Searched answer
@@ -162,6 +163,9 @@ decode p response = case p of
     _ -> Nothing
   Prompt.ChooseTargets {} -> case response of
     Response.ChoseTargets chosen -> Just chosen
+    _ -> Nothing
+  Prompt.AnnounceTargets {} -> case response of
+    Response.AnnouncedTargets announced -> Just announced
     _ -> Nothing
   Prompt.ChooseLandTypeSwap {} -> case response of
     Response.ChoseLandTypeSwap pair -> Just pair
@@ -364,6 +368,10 @@ defaultAnswer p = case p of
   -- One legal recipient per slot, chosen deterministically (the minimum). A
   -- slot with no legal recipient stays unfilled -- casting rejects that answer.
   Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
+  -- CR 115.6: fill every slot that has a candidate, matching the arm above --
+  -- declining is equally legal, and a default that declined would leave every
+  -- "up to one" card's effect unexercised by the specs that take this answer.
+  Prompt.AnnounceTargets _ _ _ offers -> Map.keysSet offers
   -- A canonical identity swap: Mountain -> Mountain changes nothing.
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   -- The same identity for CR 612.2's creature-type half. Frog is a creature

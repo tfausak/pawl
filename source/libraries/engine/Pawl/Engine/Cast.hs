@@ -922,7 +922,8 @@ castProposed pid sid face castFrom candidates before = do
           if notElem chosenCost payable
             then reject
             else do
-              let sets = Target.legalSets (Just pid) sid (Card.modesTargetSpecs chosenModes face) gs
+              let specs = Card.modesTargetSpecs chosenModes face
+                  sets = Target.legalSets (Just pid) sid specs gs
               -- CR 601.2b's announcement is free -- any Natural -- but the player
               -- making it is told what the board can pay. The bound rides the
               -- CHOSEN cost, and nothing filters the answer against it: an
@@ -972,13 +973,8 @@ castProposed pid sid face castFrom candidates before = do
                   -- was computed from the same post-move `gs`, so a "target spell"
                   -- slot draws from the pool CR 601.2a built -- with this spell in
                   -- it, and CR 115.5 taking it back out.
-                  chosen <-
-                    if Map.null sets
-                      then pure Map.empty
-                      else Game.choose (Prompt.ChooseTargets decider pid sid sets)
-                  let keysAgree = Map.keysSet chosen == Map.keysSet sets
-                      eachLegal = and (Map.intersectionWith Set.member chosen sets)
-                  if not (keysAgree && eachLegal)
+                  chosen <- Target.chooseTargets decider pid sid specs sets
+                  if not (Target.selectionLegal specs sets chosen)
                     then reject
                     else do
                       -- CR 601.2b then 601.2f: X substituted and the Phyrexian

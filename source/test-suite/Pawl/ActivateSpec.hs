@@ -863,7 +863,7 @@ reinforceSpec s registry = Spec.describe s "Reinforce" $ do
           s
           "one slot, 'target creature' with nothing narrowing it"
           (foldMap (Map.elems . Mode.targetSpecs) (Modal.modes (ActivatedAbility.modal ability)))
-          [TargetSpec.MkTargetSpec Pool.Creatures Nothing]
+          [TargetSpec.required Pool.Creatures Nothing]
       abilities -> Spec.assertFailure s ("expected one reinforce ability, got " <> show (length abilities))
 
   -- The whole card, aimed across the table. The Guard is in the graveyard while
