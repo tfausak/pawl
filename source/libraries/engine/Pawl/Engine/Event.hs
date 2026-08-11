@@ -6106,6 +6106,16 @@ reactionTriggers events gs = filter (interveningHolds gs) (eventTriggers events 
 -- "if" may be about the event's object and not only about the source. Stack's
 -- re-check reads the same slots off the placed ability, for the reason the view
 -- above must match.
+--
+-- Which is why the view is the UNSCOPED viewWithLastKnownAnywhere: CR 608.2h is
+-- owed to every object the clause reads, and a slot naming an object that has
+-- since left would otherwise be described as one with no characteristics.
+--
+-- Nothing OBSERVES that at this end of the rule, and scoping the view back to the
+-- source here leaves the suite green: evolve is the only ability whose "if" reads
+-- a slot, and rule 702.100a's entrant is on the battlefield by construction while
+-- its own entry is being gathered. So this is a fence keeping the two checks
+-- reading alike, not a proved behaviour -- the proved one is Stack's re-check.
 interveningHolds :: GameState -> PendingTrigger -> Bool
 interveningHolds gs pending =
   case (TriggeredAbility.intervening (PendingTrigger.ability pending), PendingTrigger.source pending) of
@@ -6113,7 +6123,7 @@ interveningHolds gs pending =
     (Just _, TriggerSource.Sourceless) -> True
     (Just cond, TriggerSource.OfObject oid) ->
       Condition.holds
-        (Projection.viewWithLastKnown oid gs)
+        (Projection.viewWithLastKnownAnywhere gs)
         (Filter.contextWithSlots (Just (PendingTrigger.controller pending)) (Just oid) (Binding.objectSlots (PendingTrigger.bindings pending)))
         gs
         oid

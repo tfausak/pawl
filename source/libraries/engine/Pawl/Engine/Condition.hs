@@ -12,12 +12,14 @@
 -- The VIEW is the caller's, and picking it is a rules decision rather than a
 -- detail. Three answers, one per kind of question:
 --
---   * CR 603.4's intervening "if" on a leaves-the-battlefield ability asks about
---     a source that no longer exists, so Event.interveningHolds and both arms of
+--   * CR 603.4's intervening "if" asks about objects that may no longer exist --
+--     the source of a leaves-the-battlefield ability, or the entrant rule
+--     702.100a's clause is about -- so Event.interveningHolds and both arms of
 --     Pawl.Engine.Stack's CR 608.2a re-check (the object-borne one and the
---     inherent one) pass Projection.viewWithLastKnown, never
---     Projection.fullView. Nothing here can compensate for the wrong one -- a
---     source read as an empty object simply answers False.
+--     inherent one) pass Projection.viewWithLastKnownAnywhere, which owes CR
+--     608.2h to every id it is aimed at rather than to one. Nothing here can
+--     compensate for the wrong view -- an object read as an empty one simply
+--     answers False.
 --   * CR 604.7 settles a static ability's "as long as" clause the other way: it
 --     "can't use an object's last known information", so
 --     Projection.conditionHolds passes a live Projection.viewUpTo -- bounded

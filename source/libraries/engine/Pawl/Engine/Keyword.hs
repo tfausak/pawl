@@ -1518,7 +1518,11 @@ battleCry =
 -- the condition reaches it through Quantity.AgainstSlot at the entrant's own
 -- reserved slot (Binding.became, stamped by Event.eventBindings). Both
 -- intervening checks fill Filter.Context's slotObjects from the trigger's
--- bindings, which is what makes that read answerable.
+-- bindings, which is what makes that read answerable, and both read it through
+-- CR 608.2h -- an entrant killed while the trigger waits is compared at the power
+-- and toughness it last had on the battlefield, which rule 702.100a's rulings
+-- state outright. Pawl.TriggerSpec's Evolve group proves it at the resolution
+-- check, the only one that can observe it.
 --
 -- Condition.Any because rule 702.100a's "and/or" compares two DIFFERENT
 -- characteristics; no single Compares states it, since one comparison reads one
@@ -1538,11 +1542,6 @@ battleCry =
 -- which is rule 702.100b: the creature "evolves" when that placement puts one or
 -- more counters on it, and one opcode is what ties the marker to the placement.
 -- Renegade Krasis reads it.
---
--- Not implemented: an entrant that has LEFT the battlefield before the ability
--- resolves is read as an object with no characteristics rather than through CR
--- 608.2h last known information, so the re-check fails where the rules would put
--- the counter (#1178).
 evolve :: TriggeredAbility Card
 evolve =
   TriggeredAbility.MkTriggeredAbility

@@ -139,10 +139,14 @@ resolveTopWith runSubgame = do
           --
           -- The ability's own bindings supply the context's slot objects, as
           -- Event.interveningHolds supplies the pending trigger's: rule 702.100a's
-          -- "that creature" is the entrant at Binding.became, not the source.
+          -- "that creature" is the entrant at Binding.became, not the source. So
+          -- CR 608.2h is owed to that entrant too and the view is the UNSCOPED
+          -- one -- an entrant killed while the trigger waited is compared at the
+          -- power and toughness it last had, which is the read this arm alone
+          -- observes: at gather time the entrant is still there by construction.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnown srcId gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just srcId) (Binding.objectSlots (Object.bindings obj))) gs srcId cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just srcId) (Binding.objectSlots (Object.bindings obj))) gs srcId cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
@@ -171,13 +175,15 @@ resolveTopWith runSubgame = do
           -- redundant, not jointly redundant -- Pawl.SpeedSpec's "speed stops at
           -- 4" case fails when BOTH are removed.
           --
-          -- The view is `oid`'s own, which has no characteristics to speak of --
-          -- sound because an inherent ability's condition reads a PLAYER (CR
-          -- 702.179d's "your speed"), never the object it hangs on, there being
-          -- none to read.
+          -- The view is the same unscoped one the arm above passes, so the rule
+          -- cannot mean one thing for a borne trigger and another for an inherent
+          -- one. It describes `oid` as an object with no characteristics either
+          -- way -- sound because an inherent ability's condition reads a PLAYER
+          -- (CR 702.179d's "your speed"), never the object it hangs on, there
+          -- being none to read.
           case TriggeredAbility.intervening ability of
             Just cond
-              | not (Condition.holds (Projection.viewWithLastKnown oid gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just oid) (Binding.objectSlots (Object.bindings obj))) gs oid cond) ->
+              | not (Condition.holds (Projection.viewWithLastKnownAnywhere gs) (Filter.contextWithSlots (Just (Object.owner obj)) (Just oid) (Binding.objectSlots (Object.bindings obj))) gs oid cond) ->
                   State.modify' (Game.cease oid)
             _ ->
               let chosen = Binding.modesOf (Object.bindings obj)
