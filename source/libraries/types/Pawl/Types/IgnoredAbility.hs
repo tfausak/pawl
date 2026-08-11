@@ -14,7 +14,9 @@ import qualified Pawl.Types.PlayerId as PlayerId
 -- has left the battlefield suppresses nothing that still exists, so nothing has
 -- to travel with the object.
 --
--- The SOURCE and not one of its abilities: see Pawl.Types.SpecialAction (#1139).
+-- The SOURCE and not one of its abilities: see Pawl.Types.SpecialAction (#1267).
+-- Damping Engine is what makes that exact rather than convenient -- its one
+-- sentence declares two player abilities and its ignore covers both.
 data IgnoredAbility = MkIgnoredAbility
   { -- | Who ignores it. CR 116.2d's "that player" -- always the player who took
     -- the action, since the action is the payment.
