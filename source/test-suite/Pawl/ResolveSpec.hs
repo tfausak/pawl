@@ -6217,6 +6217,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   baneOfProgressSpec s registry
   upToOneTargetSpec s registry
   multiTargetSpec s registry
+  supportSpec s registry
 
 -- CR 601.2c's announcement, answered with a stated number for every variable
 -- slot -- where S.identityAnswer announces as many as the board allows.
@@ -6370,6 +6371,127 @@ resolveOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectI
 resolveOne answer gs spellId =
   let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
    in snd (Engine.runGamePure answer cast Stack.resolveTop)
+
+-- CR 701.41 support, which is card DATA and no opcode: "support N" is written out
+-- as the counters it means, over a CR 601.2c slot of 0 to N.
+--
+-- Lead by Example {1}{G} Instant (data/cards/lead-by-example.json): "Support 2.",
+-- and nothing else -- CR 701.41a's INSTANT reading, which has no "other" in it.
+--
+-- Joraga Auxiliary {1}{G}{W} 2/3 (data/cards/joraga-auxiliary.json):
+-- "{4}{G}{W}: Support 2.", CR 701.41a's PERMANENT reading, whose "other" is a
+-- Not IsSource on the slot.
+--
+-- Three readings of "up to two target creatures" a careless board cannot tell
+-- apart -- two of three, one of three, and none -- so each case names a different
+-- number of targets on the same board and the creature nobody named is asserted
+-- untouched. Three candidates for two slots, because a prompt offered exactly as
+-- many candidates as it needs is never asked.
+supportSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+supportSpec s registry = Spec.describe s "Support" $ do
+  Spec.it s "CR 701.41a support 2 counters each of the two creatures it named" $ do
+    (pikerId, wallId, ratsId, gs, spellId) <- leadBoard s registry []
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker took a counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertEqWith s "so did the Wall" (plusCountersOn wallId after) (Just 1)
+    Spec.assertEqWith s "the Rats, whom nobody named, took none" (plusCountersOn ratsId after) (Just 0)
+  -- The same board and the same spell, differing only in the announced number:
+  -- "up to two" allows one, and one is not two.
+  Spec.it s "CR 601.2c support 2 announcing one target counters only that one" $ do
+    (pikerId, wallId, ratsId, gs, spellId) <- leadBoard s registry []
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 1 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker took a counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertEqWith s "and the second creature it could have taken took none" (plusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "nor did the Rats" (plusCountersOn ratsId after) (Just 0)
+  -- CR 115.6's zero. Lead by Example has no second clause, so what makes the
+  -- declined case observable is that no counter appears anywhere: an engine that
+  -- chose the targets itself would put two.
+  Spec.it s "CR 115.6 support 2 announcing no targets counters nobody" $ do
+    (pikerId, wallId, ratsId, gs, spellId) <- leadBoard s registry []
+    let after = resolveOne decliningTargets gs spellId
+    Spec.assertEqWith s "the Piker took none" (plusCountersOn pikerId after) (Just 0)
+    Spec.assertEqWith s "nor the Wall" (plusCountersOn wallId after) (Just 0)
+    Spec.assertEqWith s "nor the Rats" (plusCountersOn ratsId after) (Just 0)
+  -- CR 122.6 / 614.16: each of support's placements reaches the funnel on its own,
+  -- so a counter-scaling replacement gets an opportunity against every target
+  -- rather than one against the batch. Doubling Season reads whose PERMANENT it is,
+  -- which is why both targets here are alice's.
+  Spec.it s "CR 122.6 Doubling Season doubles support's counter on each target" $ do
+    (pikerId, wallId, _, seasoned, seasonedSpell) <- leadBoard s registry [("Doubling Season", S.alice)]
+    (barePiker, bareWall, _, bare, bareSpell) <- leadBoard s registry []
+    let seasonedAfter = resolveOne (takingTargets 2 [pikerId, wallId]) seasoned seasonedSpell
+        bareAfter = resolveOne (takingTargets 2 [barePiker, bareWall]) bare bareSpell
+    Spec.assertEqWith s "1 * 2 on the Piker" (plusCountersOn pikerId seasonedAfter) (Just 2)
+    Spec.assertEqWith s "1 * 2 on the Wall too" (plusCountersOn wallId seasonedAfter) (Just 2)
+    Spec.assertEqWith s "and one each without the enchantment" (plusCountersOn barePiker bareAfter, plusCountersOn bareWall bareAfter) (Just 1, Just 1)
+  -- The same funnel from the other side, and the reading a doubled board cannot
+  -- separate from an unreplaced one: half of one counter, rounded down, is none.
+  -- Vorinclex reads who is PUTTING them (CR 122.6a), so bob's praetor halves what
+  -- alice's spell places on bob's own creatures. Zero, one and two are three
+  -- distinct answers on the same board.
+  Spec.it s "CR 122.6a an opponent's Vorinclex halves support's counters away" $ do
+    (pikerId, wallId, _, watched, watchedSpell) <- leadBoard s registry [("Vorinclex, Monstrous Raider", S.bob)]
+    (barePiker, bareWall, _, bare, bareSpell) <- leadBoard s registry []
+    let watchedAfter = resolveOne (takingTargets 2 [pikerId, wallId]) watched watchedSpell
+        bareAfter = resolveOne (takingTargets 2 [barePiker, bareWall]) bare bareSpell
+    Spec.assertEqWith s "half of one on the Piker" (plusCountersOn pikerId watchedAfter) (Just 0)
+    Spec.assertEqWith s "half of one on the Wall" (plusCountersOn wallId watchedAfter) (Just 0)
+    Spec.assertEqWith s "and one each without the praetor" (plusCountersOn barePiker bareAfter, plusCountersOn bareWall bareAfter) (Just 1, Just 1)
+  -- CR 701.41a's "other", which only the PERMANENT reading has. The answerer names
+  -- the Auxiliary FIRST, so a slot that offered it would spend one of its two
+  -- targets on it and leave one of the Rats and the Piker at zero.
+  Spec.it s "CR 701.41a support on a permanent cannot choose that permanent" $ do
+    forest <- S.printingOf s registry "Forest"
+    plains <- S.printingOf s registry "Plains"
+    piker <- S.printingOf s registry "Goblin Piker"
+    rats <- S.printingOf s registry "Typhoid Rats"
+    wall <- S.printingOf s registry "Wall of Stone"
+    joraga <- S.printingOf s registry "Joraga Auxiliary"
+    let (_, g0) = S.addCreature plains S.alice (S.landsInPlay forest 5)
+        (auxId, g1) = S.addCreature joraga S.alice g0
+        (pikerId, g2) = S.addCreature piker S.bob g1
+        (ratsId, g3) = S.addCreature rats S.bob g2
+        (wallId, g4) = S.addCreature wall S.bob g3
+        board = g4 {GameState.priority = Just S.alice}
+        answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [auxId, pikerId, ratsId]
+    case Activate.abilitiesFor auxId board of
+      [ability] -> do
+        let after = S.runPure answer board (Activate.activateAbility S.alice auxId ability >> Stack.resolveTop)
+        Spec.assertEqWith s "the Auxiliary itself, which support excludes, took none" (plusCountersOn auxId after) (Just 0)
+        Spec.assertEqWith s "the Piker took one" (plusCountersOn pikerId after) (Just 1)
+        Spec.assertEqWith s "and so did the Rats" (plusCountersOn ratsId after) (Just 1)
+        Spec.assertEqWith s "the Wall, whom nobody named, took none" (plusCountersOn wallId after) (Just 0)
+      abilities -> Spec.assertFailure s ("expected one ability, got " <> show (length abilities))
+
+-- Two Forests for Lead by Example, three creatures with three distinct printed
+-- boxes (2/1, 0/8, 1/1) so which of them took a counter is legible, and the spell
+-- in alice's hand. The first two are alice's, since Doubling Season's clause reads
+-- whose permanent takes the counter; the Rats are bob's. `extra` seats further
+-- printings by name, which is the only difference between a case and its control.
+leadBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  [(String, PlayerId.PlayerId)] ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+leadBoard s registry extra = do
+  forest <- S.printingOf s registry "Forest"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  lead <- S.printingOf s registry "Lead by Example"
+  extras <- mapM (\(name, pid) -> fmap (\p -> (p, pid)) (S.printingOf s registry name)) extra
+  let (pikerId, g1) = S.addCreature piker S.alice (S.landsInPlay forest 2)
+      (wallId, g2) = S.addCreature wall S.alice g1
+      (ratsId, g3) = S.addCreature rats S.bob g2
+      g4 = List.foldl' (\g (p, pid) -> snd (S.addCreature p pid g)) g3 extras
+      (gs, spellId) = S.handOne lead g4
+  pure (pikerId, wallId, ratsId, gs, spellId)
 
 -- CR 115.6: declines every optional slot, announcing zero targets. Everything
 -- else is S.identityAnswer's answer, which for ChooseTargets fills what it is
