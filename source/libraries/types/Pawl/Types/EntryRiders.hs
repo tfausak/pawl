@@ -54,16 +54,17 @@ import qualified Pawl.Types.TapState as TapState
 -- to the battlefield ... with a +1/+1 counter on it" (CR 702.93a, CR 702.79a).
 -- The same rider one opcode over is incubate's "create an Incubator token that
 -- enters the battlefield with N +1/+1 counters on it" (CR 701.53a).
--- A rider and not an Effect.PutCounters after the move, because the permanent
--- must never exist on the battlefield without them: Pawl.Engine.Event places them
--- inside the CR 400.7 funnel, before the entry loop and before the Moved event --
--- and, for a batch of tokens, before any of their entry loops, so CR 614.12's
--- reading of the batch sees them. Through Event.putCounters there, CR 122.6's funnel, so CR
--- 614.16 applies and Doubling Season sees them -- the posture
--- EntryRewrite.WithCounters takes for the counters a permanent's OWN text asks
--- for.
+-- A rider and not an Effect.PutCounters afterwards, because the permanent must
+-- never exist on the battlefield without them. So Pawl.Engine.Event places them
+-- INSIDE whichever door the object arrives by: inside the CR 400.7 funnel for a
+-- move, before its entry loop and before the Moved event, and for a batch of
+-- created tokens after all of them are minted but before any entry loop, so CR
+-- 614.12's reading of that batch sees them. Through Event.putCounters either way,
+-- CR 122.6's funnel, so CR 614.16 applies and Doubling Season sees them -- the
+-- posture EntryRewrite.WithCounters takes for the counters a permanent's OWN text
+-- asks for.
 --
--- READ BY BOTH opcodes, unlike `transformed` below: a Create hands it to
+-- READ BY BOTH opcodes, unlike `transformed` above: a Create hands it to
 -- Event.createTokens and a MoveToZone to Event.changeZoneEntering.
 -- Pawl.ReplacementSpec's Eyes of Gitaxias group proves the Create road, where a
 -- token created with three +1/+1 counters on it takes six from Vorinclex.
