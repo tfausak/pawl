@@ -347,6 +347,67 @@ maybe c =
       Codec.schema = fmap Schema.nullable (Codec.schema c)
     }
 
+-- The Codec-shaped halves of encodeList/decodeList and its siblings above;
+-- each just wraps the existing pair rather than reimplementing it, and each
+-- outlives its function-shaped half only until #1263 converts the last caller.
+
+-- | Encodes to a two-element array and rejects any other length on decode.
+-- There is no existing encodeTuple/decodeTuple pair to wrap, unlike its
+-- siblings below.
+tuple :: Codec.Codec a -> Codec.Codec b -> Codec.Codec (a, b)
+tuple ca cb =
+  Codec.MkCodec
+    { Codec.encode = \(a, b) -> array [Codec.encode ca a, Codec.encode cb b],
+      Codec.decode = \value -> do
+        xs <- asArray value
+        case xs of
+          [av, bv] -> (,) <$> Codec.decode ca av <*> Codec.decode cb bv
+          _ -> Left . Text.pack $ "expected a 2-element array but got " <> show value,
+      Codec.schema = (\a b -> Schema.tupleOf [a, b]) <$> Codec.schema ca <*> Codec.schema cb
+    }
+
+list :: Codec.Codec a -> Codec.Codec [a]
+list c =
+  Codec.MkCodec
+    { Codec.encode = encodeList (Codec.encode c),
+      Codec.decode = decodeList (Codec.decode c),
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
+-- | The only one of this group whose schema is 'Schema.uniqueArray': 'Set' is
+-- the only element type here that guarantees uniqueness on the wire.
+set :: (Ord a) => Codec.Codec a -> Codec.Codec (Set.Set a)
+set c =
+  Codec.MkCodec
+    { Codec.encode = encodeSet (Codec.encode c),
+      Codec.decode = decodeSet (Codec.decode c),
+      Codec.schema = Schema.uniqueArray <$> Codec.schema c
+    }
+
+seq :: Codec.Codec a -> Codec.Codec (Seq.Seq a)
+seq c =
+  Codec.MkCodec
+    { Codec.encode = encodeSeq (Codec.encode c),
+      Codec.decode = decodeSeq (Codec.decode c),
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
+nonEmpty :: Codec.Codec a -> Codec.Codec (NonEmpty.NonEmpty a)
+nonEmpty c =
+  Codec.MkCodec
+    { Codec.encode = encodeNonEmpty (Codec.encode c),
+      Codec.decode = decodeNonEmpty (Codec.decode c),
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
+multiset :: (Ord a) => Codec.Codec a -> Codec.Codec (Map.Map a Natural.Natural)
+multiset c =
+  Codec.MkCodec
+    { Codec.encode = encodeMultiset (Codec.encode c),
+      Codec.decode = decodeMultiset (Codec.decode c),
+      Codec.schema = Schema.array <$> Codec.schema c
+    }
+
 -- | 'assertJsonCodec' against a bundle rather than a loose pair.
 assertCodec ::
   (Stack.HasCallStack, Monad m, Eq a, Show a) =>

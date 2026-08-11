@@ -1,10 +1,22 @@
 module Pawl.JsonCodec.CommonSpec where
 
 import qualified Data.Either as Either
+import qualified Data.List.NonEmpty as NonEmpty
+import qualified Data.Map.Strict as Map
+import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Numeric.Natural as Natural
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
+import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Spec as Spec
+
+-- The element codec every collection case below shares, following the
+-- pattern 'Pawl.JsonCodec.ArmSpec' and 'Pawl.JsonCodec.FieldsSpec' use.
+integerCodec :: Codec.Codec Integer
+integerCodec = Common.scalar Schema.integer Common.integer Common.asInteger
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
@@ -138,3 +150,60 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
         s
         (Either.isLeft (Common.defaultedField "k" [] (Common.decodeList Common.asInteger) [Value.pair "k" Value.null]))
         "expected a decode failure"
+
+  Spec.describe s "tuple" $ do
+    Spec.it s "round trips" $
+      Common.assertCodec s (Common.tuple integerCodec integerCodec) (1, 2) "[1,2]"
+    Spec.it s "rejects a one-element array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.tuple integerCodec integerCodec) =<< Common.parse (Text.pack "[1]")))
+        "expected a decode failure"
+    Spec.it s "rejects a three-element array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.tuple integerCodec integerCodec) =<< Common.parse (Text.pack "[1,2,3]")))
+        "expected a decode failure"
+
+  Spec.describe s "list"
+    . Spec.it s "round trips"
+    $ Common.assertCodec s (Common.list integerCodec) [1, 2, 3] "[1,2,3]"
+
+  Spec.describe s "set" $ do
+    Spec.it s "round trips" $
+      Common.assertCodec s (Common.set integerCodec) (Set.fromList [1, 2, 3]) "[1,2,3]"
+    -- decodeSet is a Set.fromList underneath, so a repeated element collapses
+    -- rather than erroring.
+    Spec.it s "deduplicates a repeated element on decode" $
+      Spec.assertEq
+        s
+        (Codec.decode (Common.set integerCodec) =<< Common.parse (Text.pack "[1,1,2]"))
+        (Right (Set.fromList [1, 2]))
+
+  Spec.describe s "seq"
+    . Spec.it s "round trips"
+    $ Common.assertCodec s (Common.seq integerCodec) (Seq.fromList [1, 2, 3]) "[1,2,3]"
+
+  Spec.describe s "nonEmpty" $ do
+    Spec.it s "round trips" $
+      Common.assertCodec s (Common.nonEmpty integerCodec) (NonEmpty.fromList [1, 2, 3]) "[1,2,3]"
+    Spec.it s "rejects an empty array" $
+      Spec.assertBool
+        s
+        (Either.isLeft (Codec.decode (Common.nonEmpty integerCodec) =<< Common.parse (Text.pack "[]")))
+        "expected a decode failure"
+
+  Spec.describe s "multiset" $ do
+    Spec.it s "round trips to ascending order" $
+      Common.assertCodec
+        s
+        (Common.multiset integerCodec)
+        (Map.fromList [(1, 2), (2, 1)] :: Map.Map Integer Natural.Natural)
+        "[1,1,2]"
+    -- decodeMultiset recounts, so the wire order need not match the key order
+    -- the encoder would have produced.
+    Spec.it s "recounts repeats regardless of input order" $
+      Spec.assertEq
+        s
+        (Codec.decode (Common.multiset integerCodec) =<< Common.parse (Text.pack "[2,1,2]"))
+        (Right (Map.fromList [(1, 1), (2, 2)]) :: Either Text.Text (Map.Map Integer Natural.Natural))
