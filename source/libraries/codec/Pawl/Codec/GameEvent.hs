@@ -16,6 +16,7 @@ import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Codec.ZoneChange as ZoneChange
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.GameEvent as GameEvent
 
@@ -24,7 +25,7 @@ toJson e = case e of
   GameEvent.Moved zc pc -> Common.tagged "Moved" . Just . Common.array $ [ZoneChange.toJson zc, ProjectedCharacteristics.toJson pc]
   GameEvent.DamageDealt ev -> Common.tagged "DamageDealt" . Just $ DamageEvent.toJson ev
   GameEvent.DamagePrevented r n -> Common.tagged "DamagePrevented" . Just . Common.array $ [Recipient.toJson r, Common.encodeNatural n]
-  GameEvent.StepBegan p pid -> Common.tagged "StepBegan" . Just . Common.array $ [Phase.toJson p, PlayerId.toJson pid]
+  GameEvent.StepBegan p pid -> Common.tagged "StepBegan" . Just . Common.array $ [Codec.encode Phase.codec p, PlayerId.toJson pid]
   GameEvent.SpellCast pid oid pc -> Common.tagged "SpellCast" . Just . Common.array $ [PlayerId.toJson pid, ObjectId.toJson oid, ProjectedCharacteristics.toJson pc]
   GameEvent.BecameMonarch pid -> Common.tagged "BecameMonarch" . Just $ PlayerId.toJson pid
   GameEvent.Discarded pid oid cause ->
@@ -59,7 +60,7 @@ fromJson value = do
     ("Moved", Just (Value.Array (Array.MkArray [zc, pc]))) -> GameEvent.Moved <$> ZoneChange.fromJson zc <*> ProjectedCharacteristics.fromJson pc
     ("DamageDealt", Just v) -> GameEvent.DamageDealt <$> DamageEvent.fromJson v
     ("DamagePrevented", Just (Value.Array (Array.MkArray [r, n]))) -> GameEvent.DamagePrevented <$> Recipient.fromJson r <*> Common.decodeNatural n
-    ("StepBegan", Just (Value.Array (Array.MkArray [p, pid]))) -> GameEvent.StepBegan <$> Phase.fromJson p <*> PlayerId.fromJson pid
+    ("StepBegan", Just (Value.Array (Array.MkArray [p, pid]))) -> GameEvent.StepBegan <$> Codec.decode Phase.codec p <*> PlayerId.fromJson pid
     ("SpellCast", Just (Value.Array (Array.MkArray [pid, oid, pc]))) -> GameEvent.SpellCast <$> PlayerId.fromJson pid <*> ObjectId.fromJson oid <*> ProjectedCharacteristics.fromJson pc
     ("BecameMonarch", Just v) -> GameEvent.BecameMonarch <$> PlayerId.fromJson v
     ("Discarded", Just (Value.Array (Array.MkArray [pid, oid, cause]))) ->

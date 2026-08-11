@@ -13,6 +13,7 @@ import qualified Pawl.Codec.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 
@@ -20,7 +21,7 @@ toJson :: TriggerCondition.TriggerCondition -> Value.Value
 toJson c = case c of
   TriggerCondition.SelfEnters -> Common.nullary "SelfEnters"
   TriggerCondition.PermanentEnters f -> Common.tagged "PermanentEnters" . Just $ Filter.toJson Keyword.toJson f
-  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Common.array $ [Phase.toJson p, TurnScope.toJson s]
+  TriggerCondition.StepBegins p s -> Common.tagged "StepBegins" . Just . Common.array $ [Codec.encode Phase.codec p, TurnScope.toJson s]
   TriggerCondition.StateIs c2 -> Common.tagged "StateIs" . Just $ Condition.toJson c2
   TriggerCondition.SelfDealsCombatDamageToPlayer -> Common.nullary "SelfDealsCombatDamageToPlayer"
   TriggerCondition.PermanentDealsCombatDamageToPlayer f -> Common.tagged "PermanentDealsCombatDamageToPlayer" . Just $ Filter.toJson Keyword.toJson f
@@ -72,7 +73,7 @@ fromJson value = do
   case (t, mv) of
     ("SelfEnters", _) -> Right TriggerCondition.SelfEnters
     ("PermanentEnters", Just v) -> TriggerCondition.PermanentEnters <$> Filter.fromJson Keyword.fromJson v
-    ("StepBegins", Just (Value.Array (Array.MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Phase.fromJson p <*> TurnScope.fromJson s
+    ("StepBegins", Just (Value.Array (Array.MkArray [p, s]))) -> TriggerCondition.StepBegins <$> Codec.decode Phase.codec p <*> TurnScope.fromJson s
     ("StateIs", Just v) -> TriggerCondition.StateIs <$> Condition.fromJson v
     ("SelfDealsCombatDamageToPlayer", _) -> Right TriggerCondition.SelfDealsCombatDamageToPlayer
     ("PermanentDealsCombatDamageToPlayer", Just v) -> TriggerCondition.PermanentDealsCombatDamageToPlayer <$> Filter.fromJson Keyword.fromJson v
