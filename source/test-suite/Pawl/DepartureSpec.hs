@@ -50,7 +50,7 @@ crownedIn event = case event of
   GameEvent.BecameMonarch pid -> Just pid
   _ -> Nothing
 
--- CR 603.6: one permanent already on the battlefield having its entry gathered
+-- CR 603.6a: one permanent already on the battlefield having its entry gathered
 -- and its trigger resolved. What the two CR 725.4 eligibility cases below build
 -- their boards out of, Jared Carthalion's ETB being the only way to get a
 -- restricted player.
@@ -215,11 +215,12 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
   -- become the monarch this turn" on alice. Then the monarch leaves.
   --
   -- Three seats, and they are what makes this discriminating. Alice is the active
-  -- player, so CR 725.4's FIRST sentence would hand her the crown -- the case
-  -- above proves exactly that on a board with no restriction. Here she cannot
-  -- take it, so the walk anchored on her seat runs on to carol. On two seats
-  -- there would be nowhere for it to run to, and "no monarch" would pass for
-  -- either reading.
+  -- player, so CR 725.4's FIRST sentence would hand her the crown -- which is
+  -- exactly what the unrestricted board in "the monarch departs on someone else's
+  -- turn" above shows. Here she cannot take it, so the walk anchored on her seat
+  -- runs on to carol. Two seats would answer "no monarch" instead: distinguishable
+  -- from crowning alice, but it would exercise the third sentence rather than the
+  -- second, and the crown passing ON to a later seat is what the second states.
   --
   -- PlayerEffectSpec's Jared group carries the primary observable (two seats, no
   -- departure) and the note on what the card omits.

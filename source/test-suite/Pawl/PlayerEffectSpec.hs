@@ -3203,19 +3203,19 @@ jaredBoard jared jailer piker =
       (pikerId, gs3) = S.addCreature piker S.alice gs2
    in (jaredId, jailerId, pikerId, gs3)
 
--- One permanent's CR 603.6 entry, gathered and resolved. The permanent is already
+-- One permanent's CR 603.6a entry, gathered and resolved. The permanent is already
 -- on the battlefield, so this feeds the event alone -- the same staging
 -- ExpirySpec's monarch group uses.
-jaredEntered :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-jaredEntered oid gs =
+etbResolved :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+etbResolved oid gs =
   let entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
       withEvent = S.withEvents [GameEvent.Moved entered (Projection.project oid gs)] gs
    in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
 
 -- CR 725.2's crown steal, as the event it triggers off: `attacker` deals combat
 -- damage to bob, who must be the monarch for the inherent ability to match.
-jaredStealsFrom :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
-jaredStealsFrom attacker gs =
+damageToTheMonarch :: ObjectId.ObjectId -> GameState.GameState -> GameState.GameState
+damageToTheMonarch attacker gs =
   let dmg = DamageEvent.MkDamageEvent attacker (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat
       withEvent = S.withEvents [GameEvent.DamageDealt dmg] gs
    in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
@@ -3233,7 +3233,7 @@ jaredSpec s registry =
         -- resolution, crowning the ONLY opponent two seats offer.
         Spec.it s "CR 725.1 his enters trigger crowns the targeted opponent, and stores the restriction on his controller" $ do
           (jaredId, _, _, gs) <- board
-          let after = jaredEntered jaredId gs
+          let after = etbResolved jaredId gs
           Spec.assertEqWith s "bob is the monarch" (GameState.monarch after) (Just S.bob)
           Spec.assertEqWith s "one stored CR 611.2c effect" (fmap ActivePlayerEffect.effect (GameState.playerEffects after)) [PlayerEffect.Type.CantBecomeMonarch]
           Spec.assertEqWith s "scoped to its controller" (fmap ActivePlayerEffect.scope (GameState.playerEffects after)) [PlayerScope.You]
@@ -3246,7 +3246,7 @@ jaredSpec s registry =
         -- this, the refusal below could be a Jailer whose ETB never resolved.
         Spec.it s "CR 725.1 with no restriction standing, Palace Jailer's enters trigger crowns alice" $ do
           (_, jailerId, _, gs) <- board
-          Spec.assertEqWith s "alice takes the crown" (GameState.monarch (jaredEntered jailerId gs)) (Just S.alice)
+          Spec.assertEqWith s "alice takes the crown" (GameState.monarch (etbResolved jailerId gs)) (Just S.alice)
 
         -- THE PRIMARY OBSERVABLE. Two seats, no departure: an
         -- Effect.BecomeMonarch aimed at a restricted player does nothing, and CR
@@ -3254,8 +3254,8 @@ jaredSpec s registry =
         -- either -- bob keeps the crown rather than the game losing it.
         Spec.it s "CR 101.2 / 725.1 the restriction stops Palace Jailer's TheController crowning outright" $ do
           (jaredId, jailerId, _, gs) <- board
-          let restricted = jaredEntered jaredId gs
-              after = jaredEntered jailerId restricted
+          let restricted = etbResolved jaredId gs
+              after = etbResolved jailerId restricted
           Spec.assertEqWith s "bob keeps the crown" (GameState.monarch after) (Just S.bob)
           Spec.assertEqWith s "and no crowning of alice was recorded" (filter (== GameEvent.BecameMonarch S.alice) (S.eventsOf after)) []
 
@@ -3265,18 +3265,18 @@ jaredSpec s registry =
         -- permanent.
         Spec.it s "CR 514.2 the restriction ends at cleanup, and then the same crowning lands" $ do
           (jaredId, jailerId, _, gs) <- board
-          let restricted = jaredEntered jaredId gs
+          let restricted = etbResolved jaredId gs
               ended = S.runPure S.identityAnswer restricted (Engine.runTurnBasedActions (Phase.Ending EndingStep.Cleanup))
           Spec.assertEqWith s "nothing stored" (GameState.playerEffects ended) []
           Spec.assertBool s (not (PlayerEffect.prohibitsBecomingMonarch S.alice ended)) "alice may be crowned again"
-          Spec.assertEqWith s "so the Jailer's ETB now crowns her" (GameState.monarch (jaredEntered jailerId ended)) (Just S.alice)
+          Spec.assertEqWith s "so the Jailer's ETB now crowns her" (GameState.monarch (etbResolved jailerId ended)) (Just S.alice)
 
         -- THE CONTROL for CR 725.2's route, with bob crowned by the fixture
         -- instead of by Jared's trigger: an unrestricted alice takes the crown off
         -- a creature's combat damage.
         Spec.it s "CR 725.2 with no restriction standing, combat damage to the monarch hands alice the crown" $ do
           (_, _, pikerId, gs) <- board
-          Spec.assertEqWith s "alice steals it" (GameState.monarch (jaredStealsFrom pikerId (S.withMonarch S.bob gs))) (Just S.alice)
+          Spec.assertEqWith s "alice steals it" (GameState.monarch (damageToTheMonarch pikerId (S.withMonarch S.bob gs))) (Just S.alice)
 
         -- The vacuity trap this issue was filed with: CR 725.2's inherent ability
         -- is SOURCELESS and reaches the crown through MonarchTarget
@@ -3286,9 +3286,9 @@ jaredSpec s registry =
         -- nobody.
         Spec.it s "CR 101.2 / 725.2 the restriction stops the sourceless crown steal as well" $ do
           (jaredId, _, pikerId, gs) <- board
-          let restricted = jaredEntered jaredId gs
+          let restricted = etbResolved jaredId gs
           Spec.assertEqWith s "bob was crowned by Jared's own trigger" (GameState.monarch restricted) (Just S.bob)
-          Spec.assertEqWith s "and keeps the crown through alice's combat damage" (GameState.monarch (jaredStealsFrom pikerId restricted)) (Just S.bob)
+          Spec.assertEqWith s "and keeps the crown through alice's combat damage" (GameState.monarch (damageToTheMonarch pikerId restricted)) (Just S.bob)
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 spec s registry = Spec.describe s "Pawl.Engine.PlayerEffect" $ do
