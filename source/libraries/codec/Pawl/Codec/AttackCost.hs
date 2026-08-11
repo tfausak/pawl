@@ -2,9 +2,9 @@ module Pawl.Codec.AttackCost where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ManaCost as ManaCost
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AttackCost as AttackCost
 
 -- | "subject" is Pawl.Codec.AttackRequirement's key and names the same axis:

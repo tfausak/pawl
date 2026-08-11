@@ -2,8 +2,8 @@
 
 module Pawl.Codec.EndingStepSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EndingStep as EndingStep
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.EndingStep as EndingStep
 

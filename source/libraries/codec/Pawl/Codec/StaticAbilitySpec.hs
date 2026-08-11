@@ -3,8 +3,8 @@
 module Pawl.Codec.StaticAbilitySpec where
 
 import qualified Data.List.NonEmpty as NonEmpty
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.StaticAbility as StaticAbility
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.Aggregation as Aggregation

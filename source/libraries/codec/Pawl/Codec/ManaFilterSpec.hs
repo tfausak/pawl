@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ManaFilterSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ManaFilter as ManaFilter
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.ManaFilter as ManaFilter

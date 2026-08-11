@@ -5,7 +5,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
 import qualified Pawl.Codec.CastOffer as CastOffer
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.DamageKind as DamageKind
@@ -39,6 +38,7 @@ import qualified Pawl.Codec.Uses as Uses
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Effect as Effect
 -- These type modules share an alias with their codec module, the posture Onset
 -- already took here: the names never collide, since a codec module exports

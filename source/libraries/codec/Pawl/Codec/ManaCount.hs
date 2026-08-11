@@ -1,10 +1,10 @@
 module Pawl.Codec.ManaCount where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ManaFilter as ManaFilter
 import qualified Pawl.Codec.PlayerRef as PlayerRef
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ManaCount as ManaCount
 
 -- | A BARE OBJECT keyed by the record's field names, the shape every

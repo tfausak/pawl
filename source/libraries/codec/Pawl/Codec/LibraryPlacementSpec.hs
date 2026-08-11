@@ -2,8 +2,8 @@
 
 module Pawl.Codec.LibraryPlacementSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.LibraryPlacement as LibraryPlacement
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 import qualified Pawl.Types.LibraryPosition as LibraryPosition

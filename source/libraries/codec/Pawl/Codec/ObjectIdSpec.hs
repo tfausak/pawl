@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ObjectIdSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ObjectId as ObjectId
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ObjectId as ObjectId
 

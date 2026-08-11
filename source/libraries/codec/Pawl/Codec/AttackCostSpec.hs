@@ -3,7 +3,7 @@
 module Pawl.Codec.AttackCostSpec where
 
 import qualified Pawl.Codec.AttackCost as AttackCost
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.AttackCost as AttackCost

@@ -1,10 +1,10 @@
 module Pawl.Codec.PlayerRef where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.PlayerRef as PlayerRef
 
 toJson :: PlayerRef.PlayerRef -> Value.Value

@@ -3,7 +3,7 @@
 module Pawl.Codec.AggregationSpec where
 
 import qualified Pawl.Codec.Aggregation as Aggregation
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
 

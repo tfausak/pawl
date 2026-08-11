@@ -2,8 +2,8 @@
 
 module Pawl.Codec.DamageEventSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.DamageEvent as DamageEvent
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DamageEvent as DamageEvent
 import qualified Pawl.Types.DamageKind as DamageKind

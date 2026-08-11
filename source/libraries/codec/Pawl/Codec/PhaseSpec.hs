@@ -2,8 +2,8 @@
 
 module Pawl.Codec.PhaseSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Phase as Phase
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CombatStep as CombatStep

@@ -11,7 +11,6 @@ import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Card as Card
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryRiders as EntryRiders
 import qualified Pawl.Codec.Face as Face.Codec
 import qualified Pawl.Codec.Subtype as Subtype
@@ -47,6 +46,7 @@ import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Slug as Slug
 import qualified Pawl.Spec as Spec

@@ -2,8 +2,8 @@
 
 module Pawl.Codec.PlayerStaticAbilitySpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.PlayerStaticAbility as PlayerStaticAbility
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.PlayerEffect as PlayerEffect
 import qualified Pawl.Types.PlayerScope as PlayerScope

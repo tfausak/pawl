@@ -1,10 +1,10 @@
 module Pawl.Codec.DamageRewrite where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Codec.Scaling as Scaling
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 
 toJson :: DamageRewrite.DamageRewrite -> Value.Value

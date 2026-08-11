@@ -1,12 +1,12 @@
 module Pawl.Codec.Expiry where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Expiry as Expiry
 
 -- | CR 611.2: the STORED duration, which never appears in card JSON -- a card

@@ -4,9 +4,9 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Clause as Clause
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.TargetSpec as TargetSpec
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Mode as Mode
 
 toJson :: (Eq card) => (card -> Value.Value) -> Mode.Mode card -> Value.Value

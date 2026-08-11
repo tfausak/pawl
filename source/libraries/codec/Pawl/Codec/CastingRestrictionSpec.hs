@@ -3,7 +3,7 @@
 module Pawl.Codec.CastingRestrictionSpec where
 
 import qualified Pawl.Codec.CastingRestriction as CastingRestriction
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.BeginningStep as BeginningStep
 import qualified Pawl.Types.CastingRestriction as CastingRestriction

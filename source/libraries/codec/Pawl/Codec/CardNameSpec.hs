@@ -4,7 +4,7 @@ module Pawl.Codec.CardNameSpec where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardName as CardName
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardName as CardName
 

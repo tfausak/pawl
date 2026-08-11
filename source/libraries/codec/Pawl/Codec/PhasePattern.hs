@@ -1,10 +1,10 @@
 module Pawl.Codec.PhasePattern where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.PhasePattern as PhasePattern
 
 -- | `whosePhase` is runtime-only -- a player-scoped skip is baked by Resolve's

@@ -2,8 +2,8 @@
 
 module Pawl.Codec.DamageRewriteSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.ObjectId as ObjectId

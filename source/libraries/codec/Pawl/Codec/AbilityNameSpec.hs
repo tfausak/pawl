@@ -4,7 +4,7 @@ module Pawl.Codec.AbilityNameSpec where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 

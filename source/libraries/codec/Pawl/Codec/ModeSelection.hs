@@ -1,8 +1,8 @@
 module Pawl.Codec.ModeSelection where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ModeSelection as ModeSelection
 
 toJson :: ModeSelection.ModeSelection -> Value.Value

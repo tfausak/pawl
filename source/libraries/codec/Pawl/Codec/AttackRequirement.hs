@@ -2,8 +2,8 @@ module Pawl.Codec.AttackRequirement where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 
 -- | The key is "subject" and not "attacker": CR 508.1d's requirement names the

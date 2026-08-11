@@ -2,8 +2,8 @@
 
 module Pawl.Codec.LoyaltySpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Loyalty as Loyalty
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Loyalty as Loyalty
 

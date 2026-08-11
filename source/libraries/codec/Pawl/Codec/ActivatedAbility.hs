@@ -2,12 +2,12 @@ module Pawl.Codec.ActivatedAbility where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivationRestriction as ActivationRestriction
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 
 toJson :: (Eq card) => (card -> Value.Value) -> ActivatedAbility.ActivatedAbility card -> Value.Value

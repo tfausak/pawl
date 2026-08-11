@@ -3,7 +3,6 @@ module Pawl.Codec.Filter where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
@@ -11,6 +10,7 @@ import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Filter as Filter
 
 -- | CR 702.29e's typecycling filter, absent for plain cycling: null rather than

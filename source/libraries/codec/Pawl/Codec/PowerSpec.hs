@@ -2,8 +2,8 @@
 
 module Pawl.Codec.PowerSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Power as Power
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Power as Power
 import qualified Pawl.Types.Quantity as Quantity

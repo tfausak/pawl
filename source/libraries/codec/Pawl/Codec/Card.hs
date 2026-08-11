@@ -7,10 +7,10 @@
 module Pawl.Codec.Card where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Face as Face
 import qualified Pawl.Codec.Layout as Layout
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Layout as Layout
 

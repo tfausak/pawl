@@ -2,11 +2,11 @@ module Pawl.Codec.StaticAbility where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.Modification as Modification
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.StaticAbility as StaticAbility
 
 -- | CR 613.6: the parts of one ability's effect travel together, so the wire

@@ -2,9 +2,9 @@ module Pawl.Codec.DelayedTriggerSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.DelayedTrigger as DelayedTrigger
 import qualified Pawl.Codec.FaceSpec as FaceSpec
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger

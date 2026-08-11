@@ -1,12 +1,12 @@
 module Pawl.Codec.Keyword where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.MorphVariant as MorphVariant
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Keyword as Keyword
 
 -- | This module TIES THE CODEC KNOT that Pawl.Codec.Filter's keyword parameter

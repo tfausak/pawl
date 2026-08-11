@@ -3,7 +3,6 @@ module Pawl.Codec.Modification where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardType as CardType
 import qualified Pawl.Codec.Color as Color
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Quantity as Quantity
@@ -11,6 +10,7 @@ import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Modification as Modification
 
 toJson :: Modification.Modification -> Value.Value

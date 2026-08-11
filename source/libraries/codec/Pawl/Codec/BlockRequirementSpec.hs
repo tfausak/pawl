@@ -3,7 +3,7 @@
 module Pawl.Codec.BlockRequirementSpec where
 
 import qualified Pawl.Codec.BlockRequirement as BlockRequirement
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.BlockRequirement as BlockRequirement

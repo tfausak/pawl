@@ -1,10 +1,10 @@
 module Pawl.Codec.Recipient where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Recipient as Recipient
 
 toJson :: Recipient.Recipient -> Value.Value

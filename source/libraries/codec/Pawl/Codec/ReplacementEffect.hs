@@ -1,7 +1,6 @@
 module Pawl.Codec.ReplacementEffect where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CounterPattern as CounterPattern
 import qualified Pawl.Codec.DamagePattern as DamagePattern
 import qualified Pawl.Codec.DamageRewrite as DamageRewrite
@@ -17,6 +16,7 @@ import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Codec.ZoneChangePattern as ZoneChangePattern
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.ReplacementEffect as ReplacementEffect
 
 toJson :: ReplacementEffect.ReplacementEffect -> Value.Value

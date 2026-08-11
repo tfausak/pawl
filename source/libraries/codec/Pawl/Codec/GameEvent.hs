@@ -2,7 +2,6 @@ module Pawl.Codec.GameEvent where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardName as CardName
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Countering as Countering
 import qualified Pawl.Codec.DamageEvent as DamageEvent
@@ -17,6 +16,7 @@ import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Codec.ZoneChange as ZoneChange
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.GameEvent as GameEvent
 
 toJson :: GameEvent.GameEvent -> Value.Value

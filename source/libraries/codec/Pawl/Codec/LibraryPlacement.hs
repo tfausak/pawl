@@ -1,9 +1,9 @@
 module Pawl.Codec.LibraryPlacement where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.LibraryPosition as LibraryPosition
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.LibraryPlacement as LibraryPlacement
 
 -- A stated placement writes the POSITION's own tag, so every card file written

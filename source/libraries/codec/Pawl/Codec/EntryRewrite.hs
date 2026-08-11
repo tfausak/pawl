@@ -1,13 +1,13 @@
 module Pawl.Codec.EntryRewrite where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.EntryOption as EntryOption
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EntryRewrite as EntryRewrite
 
 toJson :: EntryRewrite.EntryRewrite -> Value.Value

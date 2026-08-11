@@ -1,10 +1,10 @@
 module Pawl.Codec.CostComponent where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.CostComponent as CostComponent
 
 -- | Tagged rather than bare-nullary from the start: this family grows

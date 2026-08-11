@@ -1,12 +1,12 @@
-module Pawl.Codec.CommonSpec where
+module Pawl.JsonCodec.CommonSpec where
 
 import qualified Data.Either as Either
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
-spec s = Spec.describe s "Pawl.Codec.Common" $ do
+spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
   Spec.describe s "parse" $ do
     Spec.it s "rejects trailing input" $
       Spec.assertBool s (Either.isLeft . Common.parse $ Text.pack "\"a\" x") "expected a parse failure"

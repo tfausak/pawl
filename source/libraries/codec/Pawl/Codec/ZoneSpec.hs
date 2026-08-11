@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ZoneSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Zone as Zone
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Zone as Zone
 

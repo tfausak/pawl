@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ScalingSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Scaling as Scaling
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Scaling as Scaling
 

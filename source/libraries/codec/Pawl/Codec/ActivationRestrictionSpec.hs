@@ -3,7 +3,7 @@
 module Pawl.Codec.ActivationRestrictionSpec where
 
 import qualified Pawl.Codec.ActivationRestriction as ActivationRestriction
-import qualified Pawl.Codec.Common as Common
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ActivationRestriction as ActivationRestriction
 import qualified Pawl.Types.BeginningStep as BeginningStep

@@ -30,7 +30,6 @@ import qualified Pawl.Codec.ClauseSpec
 import qualified Pawl.Codec.ColorSpec
 import qualified Pawl.Codec.CombatRestrictionSpec
 import qualified Pawl.Codec.CombatStepSpec
-import qualified Pawl.Codec.CommonSpec
 import qualified Pawl.Codec.ComparisonSpec
 import qualified Pawl.Codec.ConditionSpec
 import qualified Pawl.Codec.ControllerRelationSpec
@@ -172,6 +171,7 @@ import qualified Pawl.Json.ObjectSpec
 import qualified Pawl.Json.PairSpec
 import qualified Pawl.Json.StringSpec
 import qualified Pawl.Json.ValueSpec
+import qualified Pawl.JsonCodec.CommonSpec
 import qualified Pawl.JsonPointer.EvaluateSpec
 import qualified Pawl.JsonPointer.PointerSpec
 import qualified Pawl.JsonPointer.TokenSpec
@@ -291,7 +291,7 @@ spec s registry = do
   Pawl.Codec.ColorSpec.spec s
   Pawl.Codec.CombatRestrictionSpec.spec s
   Pawl.Codec.CombatStepSpec.spec s
-  Pawl.Codec.CommonSpec.spec s
+  Pawl.JsonCodec.CommonSpec.spec s
   Pawl.Codec.ComparisonSpec.spec s
   Pawl.Codec.ConditionSpec.spec s
   Pawl.Codec.ControllerRelationSpec.spec s

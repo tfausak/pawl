@@ -4,10 +4,10 @@ import qualified Control.Monad as Monad
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardType as CardType
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Subtype as Subtype
 import qualified Pawl.Codec.Supertype as Supertype
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.TypeLine as TypeLine
 
 toJson :: TypeLine.TypeLine -> Value.Value

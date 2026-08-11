@@ -1,12 +1,12 @@
 module Pawl.Codec.DamageEvent where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.DamageKind as DamageKind
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.Recipient as Recipient
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DamageEvent as DamageEvent
 
 toJson :: DamageEvent.DamageEvent -> Value.Value

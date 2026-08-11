@@ -2,8 +2,8 @@
 
 module Pawl.Codec.KeywordFamilySpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.KeywordFamily as KeywordFamily
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.KeywordFamily as KeywordFamily
 

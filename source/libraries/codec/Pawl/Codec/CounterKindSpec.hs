@@ -2,9 +2,9 @@
 
 module Pawl.Codec.CounterKindSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Keyword as Keyword
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.Keyword as Keyword

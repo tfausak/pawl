@@ -4,8 +4,8 @@ module Pawl.Codec.UnlessPaidSpec where
 
 import qualified Data.Either as Either
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.UnlessPaid as UnlessPaid
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.ManaCost as ManaCost

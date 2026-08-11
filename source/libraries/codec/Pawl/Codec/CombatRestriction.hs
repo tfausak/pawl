@@ -3,9 +3,9 @@ module Pawl.Codec.CombatRestriction where
 import qualified Data.Text as Text
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Affected as Affected.Type
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type

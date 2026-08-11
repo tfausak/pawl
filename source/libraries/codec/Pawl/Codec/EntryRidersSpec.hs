@@ -3,8 +3,8 @@
 module Pawl.Codec.EntryRidersSpec where
 
 import qualified Data.Map.Strict as Map
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CounterKind as CounterKind
 import qualified Pawl.Types.EntryRiders as EntryRiders

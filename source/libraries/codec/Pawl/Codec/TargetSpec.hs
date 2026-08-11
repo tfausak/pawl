@@ -2,13 +2,13 @@ module Pawl.Codec.TargetSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Pool as Pool
 import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TargetCount as TargetCount
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSpec as TargetSpec

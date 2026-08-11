@@ -4,13 +4,13 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Card as Card
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Expiry as Expiry
 import qualified Pawl.Codec.ObjectId as ObjectId
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Codec.TriggeredAbility as TriggeredAbility
 import qualified Pawl.Codec.TurnWindow as TurnWindow
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
 
 toJson :: DelayedTrigger.DelayedTrigger -> Value.Value

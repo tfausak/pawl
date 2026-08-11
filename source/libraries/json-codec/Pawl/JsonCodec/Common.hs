@@ -16,7 +16,7 @@
 -- in a readable order rather than an alphabetical one. That order is
 -- incidental: JSON objects are unordered, and 'sortKeys' exists to compare two
 -- values regardless of it.
-module Pawl.Codec.Common where
+module Pawl.JsonCodec.Common where
 
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
@@ -247,7 +247,7 @@ decodeMultiset :: (Ord a) => (Value.Value -> Either Text.Text a) -> Value.Value 
 decodeMultiset f value = Map.fromListWith (+) . fmap (\k -> (k, 1)) <$> decodeList f value
 
 encodeMaybe :: (a -> Value.Value) -> Maybe a -> Value.Value
-encodeMaybe = Maybe.maybe Pawl.Codec.Common.null
+encodeMaybe = Maybe.maybe Pawl.JsonCodec.Common.null
 
 decodeMaybe :: (Value.Value -> Either Text.Text a) -> Value.Value -> Either Text.Text (Maybe a)
 decodeMaybe f value = case value of

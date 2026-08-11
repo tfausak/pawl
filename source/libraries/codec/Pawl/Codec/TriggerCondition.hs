@@ -2,7 +2,6 @@ module Pawl.Codec.TriggerCondition where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.CardName as CardName
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.CounterKind as CounterKind
 import qualified Pawl.Codec.Filter as Filter
@@ -14,6 +13,7 @@ import qualified Pawl.Codec.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
 
 toJson :: TriggerCondition.TriggerCondition -> Value.Value

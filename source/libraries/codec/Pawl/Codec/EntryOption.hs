@@ -2,9 +2,9 @@ module Pawl.Codec.EntryOption where
 
 import qualified Data.Set as Set
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EntryOption as EntryOption
 
 -- | 'power' and 'toughness' stay REQUIRED (R5 of the omit-defaults design): a

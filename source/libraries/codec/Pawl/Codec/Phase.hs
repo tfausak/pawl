@@ -3,9 +3,9 @@ module Pawl.Codec.Phase where
 import qualified Data.Text as Text
 import qualified Pawl.Codec.BeginningStep as BeginningStep
 import qualified Pawl.Codec.CombatStep as CombatStep
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.EndingStep as EndingStep
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Phase as Phase
 
 toJson :: Phase.Phase -> Value.Value

@@ -1,10 +1,10 @@
 module Pawl.Codec.Condition where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Comparison as Comparison
 import qualified Pawl.Codec.Quantity as Quantity
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Condition as Condition
 
 -- | TWO BARE OBJECT shapes, told apart by their keys rather than by

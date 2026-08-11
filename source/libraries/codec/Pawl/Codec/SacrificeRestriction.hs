@@ -2,8 +2,8 @@ module Pawl.Codec.SacrificeRestriction where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Affected as Affected
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.SacrificeRestriction as SacrificeRestriction
 
 -- | An object with one named key, the shape Pawl.Codec.AttackRequirement has and

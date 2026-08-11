@@ -1,10 +1,10 @@
 module Pawl.Codec.PlayerStaticAbility where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.PlayerEffect as PlayerEffect
 import qualified Pawl.Codec.PlayerScope as PlayerScope
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.PlayerStaticAbility as PlayerStaticAbility
 
 toJson :: PlayerStaticAbility.PlayerStaticAbility -> Value.Value

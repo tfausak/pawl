@@ -3,11 +3,11 @@ module Pawl.Codec.TriggeredAbility where
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import qualified Pawl.Codec.AbilityName as AbilityName
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Condition as Condition
 import qualified Pawl.Codec.Modal as Modal
 import qualified Pawl.Codec.TriggerCondition as TriggerCondition
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.TriggeredAbility as TriggeredAbility
 

@@ -1,10 +1,10 @@
 module Pawl.Codec.EventShape where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Zone as Zone
 import qualified Pawl.Json.Array as Array
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.EventShape as EventShape
 
 toJson :: EventShape.EventShape -> Value.Value

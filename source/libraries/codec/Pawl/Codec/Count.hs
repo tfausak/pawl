@@ -2,11 +2,11 @@ module Pawl.Codec.Count where
 
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Aggregation as Aggregation
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Scope as Scope
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.Count as Count
 
 -- | A BARE OBJECT keyed by the record's field names, the shape every

@@ -2,8 +2,8 @@
 
 module Pawl.Codec.ModeIndexSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.ModeIndex as ModeIndex
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.ModeIndex as ModeIndex
 

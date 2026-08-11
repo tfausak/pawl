@@ -2,8 +2,8 @@
 
 module Pawl.Codec.TurnScopeSpec where
 
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.TurnScope as TurnScope
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.TurnScope as TurnScope
 

@@ -1,8 +1,8 @@
 module Pawl.Codec.TurnWindow where
 
 import qualified Data.Text as Text
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.TurnWindow as TurnWindow
 
 -- | CR 603.7a: the STORED onset, which like Expiry beside it never appears in card

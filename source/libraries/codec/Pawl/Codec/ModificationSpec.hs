@@ -3,8 +3,8 @@
 module Pawl.Codec.ModificationSpec where
 
 import qualified Data.Set as Set
-import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Modification as Modification
+import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.CardType as CardType
 import qualified Pawl.Types.Color as Color
