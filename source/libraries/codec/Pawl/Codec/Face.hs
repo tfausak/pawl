@@ -15,6 +15,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.ActivatedAbility as ActivatedAbility
+import qualified Pawl.Codec.AlternativeCost as AlternativeCost
 import qualified Pawl.Codec.AttackCost as AttackCost
 import qualified Pawl.Codec.AttackRequirement as AttackRequirement
 import qualified Pawl.Codec.BlockPermission as BlockPermission
@@ -25,7 +26,6 @@ import qualified Pawl.Codec.CastingRestriction as CastingRestriction
 import qualified Pawl.Codec.Color as Color
 import qualified Pawl.Codec.CombatRestriction as CombatRestriction
 import qualified Pawl.Codec.Common as Common
-import qualified Pawl.Codec.Cost as Cost
 import qualified Pawl.Codec.CostComponent as CostComponent
 import qualified Pawl.Codec.Counterability as Counterability
 import qualified Pawl.Codec.Defense as Defense
@@ -81,7 +81,7 @@ toJson encodeCard f =
       Common.optionalPair "sacrificeRestrictions" [] (Common.encodeList SacrificeRestriction.toJson) (Face.sacrificeRestrictions f),
       Common.optionalPair "attackCosts" [] (Common.encodeList AttackCost.toJson) (Face.attackCosts f),
       Common.optionalPair "additionalCosts" [] (Common.encodeList (CostComponent.toJson Keyword.toJson)) (Face.additionalCosts f),
-      Common.optionalPair "alternativeCosts" [] (Common.encodeList (Cost.toJson Keyword.toJson)) (Face.alternativeCosts f),
+      Common.optionalPair "alternativeCosts" [] (Common.encodeList AlternativeCost.toJson) (Face.alternativeCosts f),
       -- CR 103.5b / CR 103.6: an array of ACTIONS, each an array of effects, so a
       -- face granting two of them is writable (Pawl.Types.Face).
       Common.optionalPair "mulliganActions" [] (Common.encodeList (Common.encodeList (Effect.toJson encodeCard))) (Face.mulliganActions f),
@@ -122,7 +122,7 @@ fromJson decodeCard value = do
   sacrificeRestrictions <- Common.defaultedField "sacrificeRestrictions" [] (Common.decodeList SacrificeRestriction.fromJson) ps
   attackCosts <- Common.defaultedField "attackCosts" [] (Common.decodeList AttackCost.fromJson) ps
   additionalCosts <- Common.defaultedField "additionalCosts" [] (Common.decodeList (CostComponent.fromJson Keyword.fromJson)) ps
-  alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList (Cost.fromJson Keyword.fromJson)) ps
+  alternativeCosts <- Common.defaultedField "alternativeCosts" [] (Common.decodeList AlternativeCost.fromJson) ps
   mulliganActions <- Common.defaultedField "mulliganActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   openingHandActions <- Common.defaultedField "openingHandActions" [] (Common.decodeList (Common.decodeList (Effect.fromJson decodeCard))) ps
   specialActions <- Common.defaultedField "specialActions" [] (Common.decodeList SpecialAction.fromJson) ps
