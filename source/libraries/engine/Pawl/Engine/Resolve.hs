@@ -3035,6 +3035,13 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
               _ -> Nothing
     case newMonarch of
       Nothing -> pure ()
+      -- CR 101.2: CR 725.1 and CR 725.3 gate nobody -- they ALLOW a crowning -- so
+      -- Jared Carthalion's "You can't become the monarch this turn" outranks this
+      -- instruction and the crown does not move. Read here rather than at the
+      -- three MonarchTarget arms above, so every route this opcode has is stopped
+      -- at once, CR 725.2's sourceless steal included (that ability still triggers
+      -- and still resolves; it just crowns nobody).
+      Just p | PlayerEffect.prohibitsBecomingMonarch p gs -> pure ()
       Just p -> do
         -- CR 725.3: the previous monarch ceases simply because `monarch` is
         -- overwritten (at most one at a time).

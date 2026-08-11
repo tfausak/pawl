@@ -248,6 +248,7 @@ rewritePlayerEffect pairs effect = case effect of
   PlayerEffect.CantBeTargetedBy _ -> effect
   PlayerEffect.DamageCantBePrevented _ -> effect
   PlayerEffect.CantSearchLibraries -> effect
+  PlayerEffect.CantBecomeMonarch -> effect
 
 -- CR 601.2i: how many spells this player has cast this turn. A fold over the
 -- whole event log, which is exactly "this turn" because Engine.handoffTurn clears
@@ -350,6 +351,7 @@ prohibitsCasting pid name gs =
         -- is more or less allowed to cast a spell for it.
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
    in any prohibits (applying pid gs)
 
 -- CR 305.1: does any effect prohibit `pid` from PLAYING a land with this name?
@@ -395,6 +397,7 @@ prohibitsPlayingLand pid name gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
    in any prohibits (applying pid gs)
 
 -- CR 701.23: does any effect prohibit `pid` from searching a library?
@@ -426,6 +429,49 @@ prohibitsSearching pid gs =
         PlayerEffect.CastAsThoughItHadFlash _ -> False
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantBecomeMonarch -> False
+   in any (prohibits . snd) (applying pid gs)
+
+-- CR 725 / 101.2: is `pid` forbidden from becoming the monarch? CR 725.4 asks the
+-- question in the rulebook's own words -- "the next player in turn order who can
+-- become the monarch" -- and CR 725.1 and CR 725.3 ask it nowhere, which is why
+-- the ordinary crowning route needs CR 101.2 to read this at all: those two rules
+-- ALLOW a crowning, and a "can't" outranks them.
+--
+-- Takes no source and no route, unlike the two casting prohibitions above taking
+-- a name: the restriction Jared Carthalion prints is on the PLAYER, and rule 725
+-- gives the designation no parts for a narrowing to name. See
+-- Pawl.Types.PlayerEffect.CantBecomeMonarch.
+--
+-- A DISJUNCTION for CR 101.2's reason.
+prohibitsBecomingMonarch :: PlayerId -> GameState -> Bool
+prohibitsBecomingMonarch pid gs =
+  let prohibits effect = case effect of
+        PlayerEffect.CantBecomeMonarch -> True
+        -- Every other arm is about casting, playing, targeting, countering,
+        -- searching, paying or keeping mana. CR 725.1's designation is none of
+        -- those: it is handed out by a resolving effect or by rule 725.2 itself,
+        -- and no prohibition on casting reaches an effect that has already
+        -- resolved.
+        PlayerEffect.CantCastSpells -> False
+        PlayerEffect.CantCastMoreThan _ -> False
+        PlayerEffect.CantCastChosenName -> False
+        PlayerEffect.CantPlayLandChosenName -> False
+        PlayerEffect.IncreaseSpellCost _ _ -> False
+        PlayerEffect.ReduceSpellCost _ _ -> False
+        PlayerEffect.PlayAdditionalLands _ -> False
+        PlayerEffect.NoMaximumHandSize -> False
+        PlayerEffect.DontLoseUnspentMana _ -> False
+        -- CR 702.18a/702.11c stop a SPELL from choosing this player as a target.
+        -- CR 725.1's effect need not target to crown them (Palace Jailer's "you
+        -- become the monarch" names nobody), so shroud is not an eligibility
+        -- restriction; where a card does target (Jared's own first clause), CR
+        -- 115.1's own check turns it away before this one is asked.
+        PlayerEffect.CantBeTargetedBy _ -> False
+        PlayerEffect.CastAsThoughItHadFlash _ -> False
+        PlayerEffect.CantBeCountered _ -> False
+        PlayerEffect.DamageCantBePrevented _ -> False
+        PlayerEffect.CantSearchLibraries -> False
    in any (prohibits . snd) (applying pid gs)
 
 -- CR 614.1c: the card names chosen as this effect's source entered
@@ -491,6 +537,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
       reductionOf effect = case effect of
         PlayerEffect.ReduceSpellCost criterion amount -> matching criterion amount
         PlayerEffect.IncreaseSpellCost _ _ -> Nothing
@@ -506,6 +553,7 @@ costAdjustments pid oid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
       effects = fmap snd (applying pid gs)
    in (Maybe.mapMaybe increaseOf effects, Maybe.mapMaybe reductionOf effects)
 
@@ -558,6 +606,7 @@ mayCastAsThoughItHadFlash pid oid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
    in any (allows . snd) (applying pid gs)
 
 -- CR 702.18a / 702.11c: is `pid` protected from being the target of a spell or
@@ -608,6 +657,7 @@ protectedFromTargeting caster pid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 305.2: the number of lands a player may normally play during their turn.
@@ -656,6 +706,7 @@ landPlaysAllowed pid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
    in defaultLandPlays + sum (Maybe.mapMaybe (grantOf . snd) (applying pid gs))
 
 -- CR 402.2: a player's maximum hand size, normally seven cards. NOT CR 103.5's
@@ -685,6 +736,7 @@ maximumHandSize pid gs =
         PlayerEffect.CantBeCountered _ -> False
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
    in if any (removes . snd) (applying pid gs)
         then Nothing
         else Just defaultMaximumHandSize
@@ -730,6 +782,7 @@ keepsUnspentMana pid gs =
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.DamageCantBePrevented _ -> Nothing
         PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
       filters = Maybe.mapMaybe (keeps . snd) (applying pid gs)
    in \unit -> any (\f -> ManaFilter.matches f unit) filters
 
@@ -784,6 +837,7 @@ cantBeCountered pid oid gs =
         -- The two travel together on one card and share nothing.
         PlayerEffect.DamageCantBePrevented _ -> False
         PlayerEffect.CantSearchLibraries -> False
+        PlayerEffect.CantBecomeMonarch -> False
    in any (stops . snd) (applying pid gs)
 
 -- CR 615.12 / 613.11: every "damage can't be prevented" effect standing right
@@ -831,6 +885,7 @@ unpreventable gs =
   let says (src, effect) = case effect of
         PlayerEffect.DamageCantBePrevented pattern_ -> Just (src, pattern_)
         PlayerEffect.CantSearchLibraries -> Nothing
+        PlayerEffect.CantBecomeMonarch -> Nothing
         PlayerEffect.CantBeCountered _ -> Nothing
         PlayerEffect.CantCastSpells -> Nothing
         PlayerEffect.CantCastMoreThan _ -> Nothing

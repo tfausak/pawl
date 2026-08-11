@@ -35,6 +35,7 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
 import qualified Pawl.Types.Zone as Zone
+import qualified Pawl.Types.ZoneChange as ZoneChange
 
 statusOf :: PlayerId.PlayerId -> GameState.GameState -> Maybe Status.Status
 statusOf pid gs = fmap Player.status (Map.lookup pid (GameState.players gs))
@@ -48,6 +49,16 @@ crownedIn :: GameEvent.GameEvent -> Maybe PlayerId.PlayerId
 crownedIn event = case event of
   GameEvent.BecameMonarch pid -> Just pid
   _ -> Nothing
+
+-- CR 603.6a: one permanent already on the battlefield having its entry gathered
+-- and its trigger resolved. What the two CR 725.4 eligibility cases below build
+-- their boards out of, Jared Carthalion's ETB being the only way to get a
+-- restricted player.
+entersResolved :: ObjectId -> GameState.GameState -> GameState.GameState
+entersResolved oid gs =
+  let entered = ZoneChange.MkZoneChange oid oid Zone.Stack Zone.Battlefield
+      withEvent = S.withEvents [GameEvent.Moved entered (Projection.project oid gs)] gs
+   in S.runPure S.identityAnswer (S.runPure S.identityAnswer withEvent Engine.settleForPriority) Engine.priorityLoop
 
 -- bob's Meandering Towershell, stolen by alice's Control Magic, on a board that
 -- has not started its first turn -- so alice's own untap step is what writes CR
@@ -196,6 +207,55 @@ spec s registry = Spec.describe s "Pawl.Engine.Departure" $ do
         board = S.withMonarch S.carol aliceGone
         gone = Departure.depart Departure.Type.Conceded S.carol board
     Spec.assertEqWith s "bob, the seat after alice's -- dave would be the seat after carol's" (GameState.monarch gone) (Just S.bob)
+
+  -- CR 725.4's OTHER half: "the next player in turn order WHO CAN BECOME THE
+  -- MONARCH". Jared Carthalion, True Heir is the only printing that makes that
+  -- clause bite, and his own ETB builds the whole board: alice's Jared enters,
+  -- crowns the first opponent his target slot offers (bob) and stores "You can't
+  -- become the monarch this turn" on alice. Then the monarch leaves.
+  --
+  -- Three seats, and they are what makes this discriminating. Alice is the active
+  -- player, so CR 725.4's FIRST sentence would hand her the crown -- which is
+  -- exactly what the unrestricted board in "the monarch departs on someone else's
+  -- turn" above shows. Here she cannot take it, so the walk anchored on her seat
+  -- runs on to carol. Two seats would answer "no monarch" instead: distinguishable
+  -- from crowning alice, but it would exercise the third sentence rather than the
+  -- second, and the crown passing ON to a later seat is what the second states.
+  --
+  -- PlayerEffectSpec's Jared group carries the primary observable (two seats, no
+  -- departure) and the note on what the card omits.
+  Spec.it s "CR 725.4 the crown skips a seat that can't become the monarch" $ do
+    jared <- S.printingOf s registry "Jared Carthalion, True Heir"
+    let (jaredId, gs1) = S.addCreature jared S.alice S.threePlayerGame
+        board = entersResolved jaredId gs1
+        gone = Departure.depart Departure.Type.Conceded S.bob board
+    Spec.assertEqWith s "alice is the active player" (GameState.activePlayer board) S.alice
+    Spec.assertEqWith s "bob was crowned by Jared's trigger" (GameState.monarch board) (Just S.bob)
+    Spec.assertEqWith s "carol takes the crown, not the restricted active player" (GameState.monarch gone) (Just S.carol)
+    Spec.assertEqWith s "and the two crownings are bob's then carol's" (crownings gone) [S.bob, S.carol]
+
+  -- The same clause, discriminating for the WALK rather than for the active
+  -- player's own branch. Four seats and TWO Jareds, one apiece for alice and bob:
+  -- the case above cannot tell the walk's gate from an ungated walk, because the
+  -- only ineligible seat on that board is the one the active-player branch already
+  -- turned away. Here alice (active) and bob (the very next seat in turn order)
+  -- are both restricted and both still in the game, so the two readings disagree
+  -- -- a gated walk reaches dave, an ungated one stops at bob.
+  --
+  -- The board is also where PlayerScope.You is observable on this axis: each
+  -- Jared restricts its OWN controller, so carol and dave are untouched by either.
+  Spec.it s "CR 725.4 the walk itself skips a still-playing seat that can't become the monarch" $ do
+    jared <- S.printingOf s registry "Jared Carthalion, True Heir"
+    let (alicesJared, gs1) = S.addCreature jared S.alice S.fourPlayerGame
+        (bobsJared, gs2) = S.addCreature jared S.bob gs1
+        board = entersResolved bobsJared (entersResolved alicesJared gs2)
+        gone = Departure.depart Departure.Type.Conceded S.carol (S.withMonarch S.carol board)
+    Spec.assertEqWith s "alice is the active player" (GameState.activePlayer board) S.alice
+    -- Bob's Jared targeted the first opponent his slot offered, which is alice --
+    -- already restricted by her own Jared, so that crowning did nothing and bob
+    -- keeps the crown his own opponent handed him.
+    Spec.assertEqWith s "bob still holds the crown alice's Jared gave him" (GameState.monarch board) (Just S.bob)
+    Spec.assertEqWith s "dave takes the crown: alice and bob are both restricted, and carol is leaving" (GameState.monarch gone) (Just S.dave)
 
   -- CR 725.4: "If no player still in the game can become the monarch, the
   -- game continues with no monarch."

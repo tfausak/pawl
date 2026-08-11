@@ -28,6 +28,7 @@ toJson e = case e of
   PlayerEffect.CantBeCountered c -> Common.tagged "CantBeCountered" . Just $ Filter.toJson Keyword.toJson c
   PlayerEffect.DamageCantBePrevented p -> Common.tagged "DamageCantBePrevented" . Just $ DamagePattern.toJson p
   PlayerEffect.CantSearchLibraries -> Common.nullary "CantSearchLibraries"
+  PlayerEffect.CantBecomeMonarch -> Common.nullary "CantBecomeMonarch"
 
 fromJson :: Value.Value -> Either Text.Text PlayerEffect.PlayerEffect
 fromJson value = do
@@ -47,4 +48,5 @@ fromJson value = do
     ("CantBeCountered", Just v) -> PlayerEffect.CantBeCountered <$> Filter.fromJson Keyword.fromJson v
     ("DamageCantBePrevented", Just v) -> PlayerEffect.DamageCantBePrevented <$> DamagePattern.fromJson v
     ("CantSearchLibraries", _) -> Right PlayerEffect.CantSearchLibraries
+    ("CantBecomeMonarch", _) -> Right PlayerEffect.CantBecomeMonarch
     _ -> Left . Text.pack $ "unknown PlayerEffect: " <> t
