@@ -247,7 +247,7 @@ data Prompt r where
   -- -- and only those with at least one legal recipient, since zero is the sole
   -- answer for the rest. Every variable slot today is "up to one", so the count
   -- is 0 or 1 and the announcement IS the set of slots that will be filled; a
-  -- count above one is a different gap (#1219). Not asked when the map is empty.
+  -- count above one is a different gap (#1220). Not asked when the map is empty.
   --
   -- Carrying the candidate sets rather than the bare names, because the answer is
   -- a real decision and the player deciding needs to see what they would be

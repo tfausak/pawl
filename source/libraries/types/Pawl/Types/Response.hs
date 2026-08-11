@@ -73,7 +73,7 @@ data Response
   | ChoseTargets (Map.Map SlotName.SlotName Recipient.Recipient)
   | -- | CR 601.2c: the slots a caster announced they would fill, out of the ones
     -- CR 115.6 lets them leave empty. A set of names rather than a count per
-    -- name, since every variable slot today is "up to one" (#1219).
+    -- name, since every variable slot today is "up to one" (#1220).
     AnnouncedTargets (Set.Set SlotName.SlotName)
   | -- | CR 612: the (from, to) basic land types a text-changer's caster chose.
     -- Named for the swap rather than for the pair, matching

@@ -11,7 +11,7 @@ module Pawl.Types.TargetRequirement where
 --
 -- 'UpToOne' and not a general count, because the count is a different gap: a slot
 -- holds one Recipient, so "up to three target cards" needs the binding to hold a
--- set (#1219 states the decomposition).
+-- set (#1220).
 data TargetRequirement
   = Required
   | UpToOne

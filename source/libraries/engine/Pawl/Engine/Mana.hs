@@ -318,6 +318,10 @@ manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
 -- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
 -- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even
 -- where the game state stops it producing.
+--
+-- DECLARING a slot is what disqualifies it, not filling one, and CR 605.1a's own
+-- "(see rule 115.6)" is why: an ability whose slot may be left empty is "still
+-- said to require targets", so a CR 115.6 slot keeps it off this list too.
 isManaAbility :: ActivatedAbility.ActivatedAbility Card.Card -> Bool
 isManaAbility ab =
   not (null (Maybe.mapMaybe ManaAbility.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
