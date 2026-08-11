@@ -207,10 +207,17 @@ what a later change would be most expensive to alter, since every `codec` value
 in the tree is written against it, and recursion is the known reason the plain
 form fails.
 
-`Codec`-shaped combinators live beside the type; the function-shaped ones stay in
-`Common`. As the full pass proceeds, `Common` drains into `Codec` -- `encodeSeq`
-and `decodeSeq` become one `Codec.seq`, and so on -- and `Common` emptying is the
-signal that the pass is finished.
+`Pawl.JsonCodec.Codec` holds the type and nothing else. Combinators of both
+shapes live in `Common`, which imports it: `Codec.maybe` wraps the
+`encodeMaybe`/`decodeMaybe` pair rather than reimplementing it, and
+`assertCodec` needs the record to read `encode` and `decode` off. Putting the
+`Codec`-shaped ones beside the type instead would make `Codec` and `Common`
+mutually recursive, or duplicate the element logic.
+
+As the full pass proceeds, each function-shaped pair in `Common` collapses into
+its `Codec`-shaped replacement -- `encodeSeq` and `decodeSeq` become one
+`Codec.seq` -- and the last of them going is the signal that the pass is
+finished.
 
 ## Records: derived, through `ApplicativeDo`
 
