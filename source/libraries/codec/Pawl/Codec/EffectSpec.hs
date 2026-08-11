@@ -29,6 +29,7 @@ import qualified Pawl.Types.DestructionRewrite as DestructionRewrite
 import qualified Pawl.Types.Duration as Duration
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.EntryRiders as EntryRiders
+import qualified Pawl.Types.ExchangeSides as ExchangeSides
 import qualified Pawl.Types.ExtraPhase as ExtraPhase
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
@@ -371,8 +372,15 @@ spec s = Spec.describe s "Pawl.Codec.Effect" $ do
       s
       toJson
       fromJson
-      (Effect.ExchangeLifeTotals (SlotName.MkSlotName (Text.pack "target")))
-      """ {"type":"ExchangeLifeTotals","value":"target"} """
+      (Effect.ExchangeLifeTotals (ExchangeSides.WithController (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"ExchangeLifeTotals","value":{"type":"WithController","value":"target"}} """
+  Spec.it s "ExchangeLifeTotals between two targets" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      (Effect.ExchangeLifeTotals (ExchangeSides.BetweenTargets (SlotName.MkSlotName (Text.pack "players"))))
+      """ {"type":"ExchangeLifeTotals","value":{"type":"BetweenTargets","value":"players"}} """
   -- Create's EntryRiders and bound slot are each ELIDED when they are the
   -- default, exactly like MoveToZone above: four emitted forms, the middle two
   -- told apart at decode by JSON TYPE.

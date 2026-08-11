@@ -3375,6 +3375,45 @@ mirrorBoard mirror aliceLife bobLife carolLife =
           }
       )
 
+-- Soul Conduit (Eldritch Moon) on alice's battlefield over six untapped Islands,
+-- with the three seats at three DIFFERENT life totals: "{6}, {T}: Two target
+-- players exchange life totals."
+--
+-- The same three seats and the same schedule surgery as mirrorBoard, and for the
+-- same reasons -- but here the point of the third seat is that the two sides of
+-- the exchange can BOTH be players other than the controller, which two seats
+-- cannot express.
+soulConduitBoard :: Printing.Printing -> Printing.Printing -> Integer -> Integer -> Integer -> (ObjectId.ObjectId, GameState.GameState)
+soulConduitBoard conduit island aliceLife bobLife carolLife =
+  let withLands = List.foldl' (\gs _ -> snd (S.addCreature island S.alice gs)) S.threePlayerGame [1 .. 6 :: Int]
+      (conduitId, gs1) = S.addCreature conduit S.alice withLands
+      at pid n = Map.adjust (\pl -> pl {Player.life = n}) pid
+   in ( conduitId,
+        gs1
+          { GameState.activePlayer = S.alice,
+            GameState.phase = Phase.Beginning BeginningStep.Upkeep,
+            GameState.priority = Just S.alice,
+            GameState.remaining = Seq.drop 1 (GameState.remaining gs1),
+            GameState.players = at S.alice aliceLife (at S.bob bobLife (at S.carol carolLife (GameState.players gs1)))
+          }
+      )
+
+-- Takes the first activation offered, taps whatever the payment asks for, and
+-- fills the target slot with `sides` -- S.preferring rather than a fixed set, so
+-- the announced count (CR 601.2c) is what decides how many are named.
+conduitAnswer :: [PlayerId.PlayerId] -> Prompt.Prompt r -> r
+conduitAnswer sides p = case p of
+  Prompt.ChooseAction _ _ options -> case filter isActivation options of
+    a : _ -> a
+    [] -> A.Pass
+  Prompt.ChooseManaSource _ _ candidates -> Just (NonEmpty.head candidates)
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring wanted sets
+  _ -> S.identityAnswer p
+  where
+    wanted r = case r of
+      Recipient.ToPlayer pid -> elem pid sides
+      _ -> False
+
 -- Takes the first activation offered and aims every target slot at `who`.
 exchangeAnswer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 exchangeAnswer who p = case p of
@@ -3455,6 +3494,60 @@ exchangeLifeTotalsSpec s registry = Spec.describe s "ExchangeLifeTotals" $ do
     Spec.assertBool s (not (Set.member mirrorId (GameState.battlefield after))) "and the ability was activated: its sacrifice was paid"
     Spec.assertEqWith s "no gain" (lifeGains after) []
     Spec.assertEqWith s "no loss" (lifeLosses after) []
+
+  -- CR 701.12c's other shape: BOTH sides come out of one instance of the word
+  -- "target" (CR 601.2c), and neither of them need be the controller. bob at 27
+  -- and carol at 13 swap while alice, who activated it, keeps her 4 -- so the
+  -- reading in which the controller is always one side gets a different answer
+  -- for every seat. The four numbers (4, 13, 27 and the 14 that moves) are
+  -- distinct, so no pair of readings coincides.
+  Spec.it s "CR 701.12c Soul Conduit exchanges the totals of two players, neither of them its controller" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (conduitId, board) = soulConduitBoard conduit island 4 27 13
+        after = S.runPure (conduitAnswer [S.bob, S.carol]) board Engine.runStep
+    Spec.assertEqWith s "bob took carol's 13" (S.lifeOf S.bob after) (Just 13)
+    Spec.assertEqWith s "carol took bob's 27" (S.lifeOf S.carol after) (Just 27)
+    Spec.assertEqWith s "alice, who activated it, is untouched" (S.lifeOf S.alice after) (Just 4)
+    Spec.assertEqWith s "carol gained 14" (lifeGains after) [(S.carol, 14)]
+    Spec.assertEqWith s "bob lost 14" (lifeLosses after) [(S.bob, 14)]
+    -- The ability was really activated, so an exchange that did nothing cannot
+    -- pass the assertions above by leaving the board alone.
+    Spec.assertEqWith s "and the Conduit paid its own {T}" (fmap Object.tapped (Game.lookupObject conduitId after)) (Just TapState.Tapped)
+
+  -- The same board and the same interpreter, differing only in which two players
+  -- the answer names: the controller is a side when she is TARGETED, and the slot
+  -- is what decides.
+  Spec.it s "CR 601.2c both sides are read from the slot, the controller included when named" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (_, board) = soulConduitBoard conduit island 4 27 13
+        after = S.runPure (conduitAnswer [S.alice, S.bob]) board Engine.runStep
+    Spec.assertEqWith s "alice took bob's 27" (S.lifeOf S.alice after) (Just 27)
+    Spec.assertEqWith s "bob took alice's 4" (S.lifeOf S.bob after) (Just 4)
+    Spec.assertEqWith s "carol, whom nobody named, is untouched" (S.lifeOf S.carol after) (Just 13)
+
+  -- CR 701.12a: "if the entire exchange can't be completed, no part of the
+  -- exchange occurs." One of the two targets leaves the game after the ability is
+  -- on the stack, so CR 608.2b drops her (a departed player is no longer in CR
+  -- 115's pool) and the ability resolves with one side and no exchange -- rather
+  -- than falling back on the controller, which is the reading this discriminates.
+  Spec.it s "CR 701.12a an exchange left with one side does nothing at all" $ do
+    conduit <- S.printingOf s registry "Soul Conduit"
+    island <- S.printingOf s registry "Island"
+    let (conduitId, board) = soulConduitBoard conduit island 4 27 13
+        answer :: Prompt.Prompt r -> r
+        answer = conduitAnswer [S.bob, S.carol]
+    case Activate.abilitiesFor conduitId board of
+      [ability] -> do
+        let activated = S.runPure answer board (Activate.activateAbility S.alice conduitId ability)
+            gone = S.runPure answer activated (Departure.leaveGame Departure.Type.Conceded S.carol)
+            after = S.runPure answer gone Stack.resolveTop
+        Spec.assertEqWith s "bob, the surviving target, keeps his 27" (S.lifeOf S.bob after) (Just 27)
+        Spec.assertEqWith s "and alice, who is no side of it, keeps her 4" (S.lifeOf S.alice after) (Just 4)
+        Spec.assertEqWith s "no gain" (lifeGains after) []
+        Spec.assertEqWith s "no loss" (lifeLosses after) []
+      other -> Spec.assertFailure s ("expected exactly one activated ability on the Conduit, got " <> show (length other))
 
 -- One with the Machine, the card that proves Aggregation.Greatest (#254):
 -- "Draw cards equal to the greatest mana value among artifacts you control."

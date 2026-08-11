@@ -13,6 +13,7 @@ import qualified Pawl.Codec.Daytime as Daytime
 import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Duration as Duration
 import qualified Pawl.Codec.EntryRiders as EntryRiders
+import qualified Pawl.Codec.ExchangeSides as ExchangeSides
 import qualified Pawl.Codec.ExtraPhase as ExtraPhase
 import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
@@ -104,7 +105,7 @@ toJson codec e = case e of
   Effect.Discard s q -> Common.tagged "Discard" (Just (Common.array [SlotName.toJson s, Quantity.toJson q]))
   Effect.LoseLife r q -> Common.tagged "LoseLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   Effect.GainLife r q -> Common.tagged "GainLife" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
-  Effect.ExchangeLifeTotals s -> Common.tagged "ExchangeLifeTotals" (Just (SlotName.toJson s))
+  Effect.ExchangeLifeTotals sides -> Common.tagged "ExchangeLifeTotals" (Just (ExchangeSides.toJson sides))
   Effect.IncreaseSpeed r q -> Common.tagged "IncreaseSpeed" (Just (Common.array [PlayerRef.toJson r, Quantity.toJson q]))
   -- Create's payload is positional, and the EntryRiders are ELIDED when they
   -- are the CR 110.5b default. The three-element form is therefore two shapes,
@@ -282,7 +283,7 @@ fromJson decode value = do
     "GainLife" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.GainLife <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "GainLife expects [playerRef, quantity]"
-    "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . SlotName.fromJson)
+    "ExchangeLifeTotals" -> Common.withValue mv (fmap Effect.ExchangeLifeTotals . ExchangeSides.fromJson)
     "IncreaseSpeed" -> case mv of
       Just (Value.Array (Array.MkArray [r, q])) -> Effect.IncreaseSpeed <$> PlayerRef.fromJson r <*> Quantity.fromJson q
       _ -> Left . Text.pack $ "IncreaseSpeed expects [playerRef, quantity]"

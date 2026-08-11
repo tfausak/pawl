@@ -168,6 +168,8 @@ library codec
     Pawl.Codec.EntryRidersSpec
     Pawl.Codec.EventShape
     Pawl.Codec.EventShapeSpec
+    Pawl.Codec.ExchangeSides
+    Pawl.Codec.ExchangeSidesSpec
     Pawl.Codec.Expiry
     Pawl.Codec.ExpirySpec
     Pawl.Codec.ExtraPhase
@@ -629,6 +631,7 @@ library types
     Pawl.Types.EntwineDecision
     Pawl.Types.EventGroup
     Pawl.Types.EventShape
+    Pawl.Types.ExchangeSides
     Pawl.Types.ExilePlayPermission
     Pawl.Types.Expiry
     Pawl.Types.ExtraPhase
