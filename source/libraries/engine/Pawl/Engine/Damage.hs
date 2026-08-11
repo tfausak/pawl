@@ -563,11 +563,10 @@ damagedCardTypes gs recipient =
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
-  let -- CR 120.3d / 702.90c / 702.80a and CR 120.3e: the creature result. Counters
-      -- are added directly (not via Event.putCounters) because this is a
-      -- consequence of a damage event that already ran the CR 616 replacement
-      -- loop, so a "would put -1/-1 from infect" CR 614 sub-replacement is out of
-      -- scope (#122).
+  let -- CR 120.3d / 702.90c / 702.80a and CR 120.3e: the creature result.
+      --
+      -- Not implemented: the counters are added directly rather than through
+      -- Event.putCounters, so no CR 614 loop runs on the placement (#1231).
       --
       -- The disjunction is CR 120.3d's "wither and/or infect" verbatim, and its
       -- scope is this creature arm ALONE: CR 120.3a's life-loss exception names
@@ -585,11 +584,11 @@ applyDamage events = do
       -- battle that many DEFENSE counters. One function, because the two rules
       -- differ in nothing but the counter kind and read the same three ways:
       -- removed directly rather than through a "would remove counters"
-      -- sub-replacement (#122) -- and CR 614.16 scales counters an effect PUTS on,
-      -- never removal -- floored at 0 rather than wrapped, because Object.counters
-      -- is Natural while CR 306.5c makes loyalty and CR 122.1g defense the COUNT of
-      -- those counters, and destroying nothing (CR 120.5): CR 704.5i and CR 704.5v
-      -- are what read the 0.
+      -- sub-replacement, there being no such thing -- CR 614.16 scales counters an
+      -- effect PUTS on, and nothing in CR 614 replaces a removal -- floored at 0
+      -- rather than wrapped, because Object.counters is Natural while CR 306.5c
+      -- makes loyalty and CR 122.1g defense the COUNT of those counters, and
+      -- destroying nothing (CR 120.5): CR 704.5i and CR 704.5v are what read the 0.
       removeCounters kind ev oid g =
         let have obj = Map.findWithDefault 0 kind (Object.counters obj)
             strip obj =
@@ -644,6 +643,10 @@ applyDamage events = do
           -- The damaged PLAYER gets the counters, not the source's controller,
           -- who merely performs it (CR 120.3b/120.3g). And toxic is scoped to
           -- COMBAT damage, so a noncombat event's captured value is ignored.
+          --
+          -- Not implemented: the counters are written straight onto the player
+          -- rather than through Event.putPlayerCounters, so no CR 614 loop runs on
+          -- the placement (#1231).
           --
           -- WITHER IS ABSENT ON PURPOSE. CR 120.3d pairs it with infect for a
           -- creature recipient only; CR 120.3a's exception names infect alone, so

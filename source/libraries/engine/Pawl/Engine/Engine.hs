@@ -486,6 +486,12 @@ runTurnBasedActions phase = do
 -- double the lore counter CR 714.3a's replacement gives it as it enters -- and that
 -- asymmetry is the whole reason Pawl.Types.CounterCause exists.
 --
+-- The player it carries is rule 714.3c's "that player", who is both the one whose
+-- phase is beginning and the one controlling every Saga this advances. That is not
+-- bookkeeping: a clause naming a PLAYER rather than an effect -- Vorinclex,
+-- Monstrous Raider's -- does reach this placement, because 714.3c has a player make
+-- it.
+--
 -- The Sagas are fixed from ONE projection taken before any counter goes on, which
 -- is CR 703.4f's own reading: the whole placement is a single turn-based action,
 -- so a Saga whose chapter ability would give its controller another Saga does not
@@ -495,7 +501,7 @@ advanceSagas :: PlayerId -> Game ()
 advanceSagas pid = do
   gs <- State.get
   let pcs = Projection.projectAll gs
-  Monad.mapM_ (\oid -> Event.putCounters CounterCause.ByRule oid CounterKind.Lore 1) (Saga.advancing (\oid -> Projection.controllerOf oid gs) pid pcs gs)
+  Monad.mapM_ (\oid -> Event.putCounters (CounterCause.ByRule pid) oid CounterKind.Lore 1) (Saga.advancing (\oid -> Projection.controllerOf oid gs) pid pcs gs)
 
 -- CR 603.3: put each triggered ability that fired since the last placement on the
 -- stack, in APNAP order (CR 603.3b): active player's triggers first, then each

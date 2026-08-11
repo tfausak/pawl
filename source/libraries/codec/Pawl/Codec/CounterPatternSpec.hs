@@ -21,8 +21,10 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       CounterPattern.fromJson
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Just CounterKind.PlusOnePlusOne,
+          CounterPattern.byWhom = Nothing,
           CounterPattern.whose = ControllerRelation.Yours,
-          CounterPattern.onWhat = Filter.HasCardType CardType.Creature
+          CounterPattern.onWhat = Filter.HasCardType CardType.Creature,
+          CounterPattern.onWho = Nothing
         }
       """ {"whichKind":{"type":"PlusOnePlusOne"},"whose":{"type":"Yours"},"onWhat":{"type":"HasCardType","value":{"type":"Creature"}}} """
   -- whichKind = Nothing means ANY kind, never "no kind", and the trivial filter
@@ -34,8 +36,10 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       CounterPattern.fromJson
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
+          CounterPattern.byWhom = Nothing,
           CounterPattern.whose = ControllerRelation.Yours,
-          CounterPattern.onWhat = Filter.And []
+          CounterPattern.onWhat = Filter.And [],
+          CounterPattern.onWho = Nothing
         }
       """ {"whose":{"type":"Yours"},"onWhat":{"type":"And","value":[]}} """
   -- CR 109.5: whichKind's Nothing and whose's Anyones are both what a pattern
@@ -47,7 +51,24 @@ spec s = Spec.describe s "Pawl.Codec.CounterPattern" $ do
       CounterPattern.fromJson
       CounterPattern.MkCounterPattern
         { CounterPattern.whichKind = Nothing,
+          CounterPattern.byWhom = Nothing,
           CounterPattern.whose = ControllerRelation.Anyones,
-          CounterPattern.onWhat = Filter.And []
+          CounterPattern.onWhat = Filter.And [],
+          CounterPattern.onWho = Nothing
         }
       """ {"onWhat":{"type":"And","value":[]}} """
+  -- CR 122.6: Vorinclex, Monstrous Raider's halving clause -- narrowed by who is
+  -- PUTTING the counters, and reaching players as well as permanents.
+  Spec.it s "Vorinclex (a putter relation, and players too)" $
+    Common.assertJsonCodec
+      s
+      CounterPattern.toJson
+      CounterPattern.fromJson
+      CounterPattern.MkCounterPattern
+        { CounterPattern.whichKind = Nothing,
+          CounterPattern.byWhom = Just ControllerRelation.Opponents,
+          CounterPattern.whose = ControllerRelation.Anyones,
+          CounterPattern.onWhat = Filter.And [],
+          CounterPattern.onWho = Just ControllerRelation.Anyones
+        }
+      """ {"byWhom":{"type":"Opponents"},"onWhat":{"type":"And","value":[]},"onWho":{"type":"Anyones"}} """

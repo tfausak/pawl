@@ -94,6 +94,7 @@ import Pawl.Types.PendingTrigger (PendingTrigger)
 import qualified Pawl.Types.PendingTrigger as PendingTrigger
 import Pawl.Types.PhaseSelector (PhaseSelector)
 import qualified Pawl.Types.Player as Player
+import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
 import Pawl.Types.PlayerId (PlayerId)
 import qualified Pawl.Types.PlayerRelation as PlayerRelation
 import Pawl.Types.Prevention (Prevention)
@@ -802,7 +803,7 @@ apply batch candidate event =
       -- iteration from placing them twice.
       EntryRewrite.WithCounters kind n -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Monad.void (putCounters CounterCause.ByEffect oid kind n)
+        Monad.void (putOwnCounters oid kind n)
         pure (Just event)
       -- CR 616.1b / 110.2: Gather Specimens. The entering object's CR 110.2
       -- DEFAULT controller becomes CR 109.5's "you" -- the candidate's
@@ -910,7 +911,7 @@ apply batch candidate event =
             State.modify' $ \gs2 ->
               let note obj = obj {Object.bindings = Map.insert Binding.sacrificedCount (Binding.toAmount many) (Object.bindings obj)}
                in gs2 {GameState.objects = Map.adjust note oid (GameState.objects gs2)}
-            Monad.mapM_ (\k -> putCounters CounterCause.ByEffect oid k many) kind
+            Monad.mapM_ (\k -> putOwnCounters oid k many) kind
             pure (Just event)
       -- CR 702.136a: riot. "You may have this permanent enter with an additional
       -- +1/+1 counter on it. If you don't, it gains haste."
@@ -952,7 +953,7 @@ apply batch candidate event =
             let decider = Decide.deciderFor controller gs
             answer <- Game.choose (Prompt.ChooseRiot decider controller oid)
             case answer of
-              OptionalDecision.Exercises -> Monad.void (putCounters CounterCause.ByEffect oid CounterKind.PlusOnePlusOne 1)
+              OptionalDecision.Exercises -> Monad.void (putOwnCounters oid CounterKind.PlusOnePlusOne 1)
               OptionalDecision.Declines ->
                 State.modify' $ \gs2 ->
                   -- CR 611.2a: "gains haste" with no stated end lasts until the
@@ -998,7 +999,7 @@ apply batch candidate event =
             let decider = Decide.deciderFor controller gs
             answer <- Game.choose (Prompt.ChooseUnleash decider controller oid)
             case answer of
-              OptionalDecision.Exercises -> Monad.void (putCounters CounterCause.ByEffect oid CounterKind.PlusOnePlusOne 1)
+              OptionalDecision.Exercises -> Monad.void (putOwnCounters oid CounterKind.PlusOnePlusOne 1)
               OptionalDecision.Declines -> pure ()
             pure (Just event)
       -- CR 614.1d / 110.5b: "This permanent enters tapped" (Zof Bloodbog's land,
@@ -1143,10 +1144,20 @@ apply batch candidate event =
     -- Unreachable: `applies` admits DestructionR only against WouldBeDestroyed.
     (ReplacementEffect.DestructionR _, _) -> pure (Just event)
     -- CR 122.6/614.16: Hardened Scales/Doubling Season scale a counter placement.
-    (ReplacementEffect.CounterR _ scaling, ProposedEvent.WouldPutCounters oid kind n) -> do
+    (ReplacementEffect.CounterR _ scaling, ProposedEvent.WouldPutCounters cause oid kind n) -> do
       Replacement.consume (ReplacementCandidate.identity candidate)
-      pure (Just (ProposedEvent.WouldPutCounters oid kind (Replacement.scale scaling n)))
-    -- Unreachable: `applies` admits CounterR only against WouldPutCounters.
+      pure (Just (ProposedEvent.WouldPutCounters cause oid kind (Replacement.scale scaling n)))
+    -- CR 122.1: the same rewrite against a player -- Vorinclex, Monstrous Raider's
+    -- "on a permanent or player". Through the same `scale`, so the two recipients
+    -- cannot disagree about what doubling or halving means.
+    --
+    -- The event SURVIVES at a scaled count of zero rather than being cancelled
+    -- here, so CR 616.2's next iteration still sees it and CR 614.5 still spends
+    -- this row; putPlayerCounters is what declines to write a zero.
+    (ReplacementEffect.CounterR _ scaling, ProposedEvent.WouldPutPlayerCounters cause pid kind n) -> do
+      Replacement.consume (ReplacementCandidate.identity candidate)
+      pure (Just (ProposedEvent.WouldPutPlayerCounters cause pid kind (Replacement.scale scaling n)))
+    -- Unreachable: `applies` admits CounterR only against the two counter events.
     (ReplacementEffect.CounterR _ _, _) -> pure (Just event)
     -- CR 614.16: Doubling Season scales token creation.
     (ReplacementEffect.TokenR _ scaling, ProposedEvent.WouldCreateTokens pid card n) -> do
@@ -1200,7 +1211,7 @@ apply batch candidate event =
     (ReplacementEffect.TurnUpR _ rewrite, ProposedEvent.WouldTurnFaceUp oid) -> case rewrite of
       TurnUpRewrite.WithCounters kind n -> do
         Replacement.consume (ReplacementCandidate.identity candidate)
-        Monad.void (putCounters CounterCause.ByEffect oid kind n)
+        Monad.void (putOwnCounters oid kind n)
         pure (Just event)
       -- CR 303.4k with CR 614.1e: Gift of Doom's "as this Aura is turned face
       -- up, you may attach it to a creature", applied WHILE the permanent turns
@@ -1479,19 +1490,21 @@ resolveDestruction asOf regenerability oid = do
   outcome <- applyReplacementsIn asOf Set.empty (ProposedEvent.WouldBeDestroyed oid regenerability)
   pure (outcome >>= Replacement.asDestruction)
 
--- The single counter-PLACEMENT funnel (CR 122.6: counters as markers on a
--- permanent -- not to be confused with `counter` below, CR 701.6's countering of
--- a spell). CR 122.6 makes this the right single seam, since it covers both
--- counters put on a permanent already on the battlefield and counters an object
--- is given as it enters. A zero count after the loop puts nothing on.
+-- The single counter-PLACEMENT funnel for an OBJECT recipient (CR 122.6: counters
+-- as markers on a permanent -- not to be confused with `counter` below, CR 701.6's
+-- countering of a spell; putPlayerCounters below is the player's). CR 122.6 makes
+-- this the right single seam, since it covers both counters put on a permanent
+-- already on the battlefield and counters an object is given as it enters. A zero
+-- count after the loop puts nothing on.
 --
 -- Beside the other change-and-emit funnels of this module, and `apply`'s
--- EntryRewrite arms call it directly for CR 122.6's as-it-enters clause. A copy
--- of the body anywhere else would be a second funnel, which is the one thing a
--- funnel must not have.
+-- EntryRewrite arms reach it through putOwnCounters for CR 122.6's as-it-enters
+-- clause. A copy of the body anywhere else would be a second funnel, which is the
+-- one thing a funnel must not have.
 --
--- The CounterCause is CR 614.16's question and nothing else: it decides whether
--- the CR 616.1 loop runs at all. See resolveCounters.
+-- The CounterCause is the placement's PROVENANCE and nothing else -- who is putting
+-- the counters, and whether an effect is what put them. Only a row reads it; see
+-- Replacement.matchesPutter.
 --
 -- ANSWERS how many counters actually landed, which is not what was asked for: CR
 -- 614.16 may have grown or erased the placement, and an object that is no longer
@@ -1527,6 +1540,23 @@ putCounters cause oid kind n = do
               -- ability off nothing.
               State.modify' (recordEvent (GameEvent.CountersPut target settledKind before (before + settledCount)) . bumped)
               pure settledCount
+
+-- CR 122.6a: putCounters with the rule's DEFAULT putter -- "if the effect doesn't
+-- specify a player, the object's controller puts those counters on it". Every
+-- placement onto the RECEIVING object's own account goes through here: the entry
+-- rewrites of `apply` above (CR 614.1c-d), CR 702.37b's megamorph counter, and the
+-- counters a spell's entry riders give. No printing in the pool exercises the
+-- rule's exception by naming a player, so nothing needs to pass one.
+--
+-- An object with no controller is one that is not on the battlefield, and
+-- putCounters places nothing on such an object anyway -- so answering 0 without
+-- raising the event is the same answer, reached one step earlier.
+putOwnCounters :: ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game Natural
+putOwnCounters oid kind n = do
+  gs <- State.get
+  case Projection.controllerOf oid gs of
+    Nothing -> pure 0
+    Just putter -> putCounters (CounterCause.ByEffect putter) oid kind n
 
 -- CR 122: take counters off an object, recording a CountersRemoved event from
 -- the before/after pair so a trigger can read the crossing. That event's other
@@ -1575,26 +1605,51 @@ removeCounters oid kind n =
 
 -- CR 122.6: settle a proposed counter placement. Nothing means none are put on.
 --
--- CR 614.16 is the gate. Its replacement effects -- "if an effect would put one or
--- more counters on a permanent" -- reach a placement made by a resolving spell or
--- ability, or by another replacement or prevention effect, and nothing else; CR
--- 609.1 makes a turn-based action none of those. So a ByRule placement skips the
--- CR 616.1 loop and stands as proposed.
---
--- Skipping the WHOLE loop, rather than filtering CR 614.16's rows out of it, is an
--- equivalence that rests on a capability pawl lacks and not on a claim about
--- Magic: ReplacementEffect.CounterR is the only class `Replacement.matches` pairs
--- with a WouldPutCounters, and every CounterR is one of CR 614.16's two shapes (a
--- Scaling -- see Replacement.scale). A counter replacement OUTSIDE rule 614.16 --
--- Solemnity's "if one or more counters would be put on a permanent or player, they
--- aren't" -- has no representation and no printing in the pool, and the card that
--- brings one must move this gate from the loop's door into the row filter (#847).
+-- EVERY placement runs the CR 616.1 loop, whatever its cause, and the cause rides
+-- the event into Replacement.matchesPutter -- which is where CR 614.16's "if an
+-- effect would put" and Vorinclex's "if you would put" part company. A ByRule
+-- placement used to skip the loop at this door, an equivalence that held only while
+-- every representable counter replacement was one of rule 614.16's; Vorinclex is
+-- not one, so the gate moved into the row filter (#847).
 resolveCounters :: CounterCause.CounterCause -> ObjectId -> CounterKind.CounterKind Keyword.Type.Keyword -> Natural -> Game (Maybe (ObjectId, CounterKind.CounterKind Keyword.Type.Keyword, Natural))
-resolveCounters cause oid kind n = case cause of
-  CounterCause.ByRule -> pure (Just (oid, kind, n))
-  CounterCause.ByEffect -> do
-    outcome <- applyReplacements (ProposedEvent.WouldPutCounters oid kind n)
-    pure (outcome >>= Replacement.asCounters)
+resolveCounters cause oid kind n = do
+  outcome <- applyReplacements (ProposedEvent.WouldPutCounters cause oid kind n)
+  pure (outcome >>= Replacement.asCounters)
+
+-- CR 122.1 / 122.6: putCounters' player half -- the ONE place a player's counters
+-- go up. Answers how many actually landed, which is not what was asked for: the
+-- CR 616.1 loop may have grown the placement (Vorinclex, Monstrous Raider's
+-- doubling), shrunk it or erased it. Nobody reads the answer yet; it is the shape
+-- putCounters already has, and dropping it would make the two funnels disagree
+-- about their own event.
+--
+-- No GameEvent is recorded, where putCounters records CR 122.6's CountersPut: that
+-- event carries an ObjectId, and no trigger condition in
+-- Pawl.Types.TriggerCondition watches a player's counters -- so an event minted
+-- here would have no reader. The card that gives it one brings the condition and
+-- the event together; this is where it is recorded.
+putPlayerCounters :: CounterCause.CounterCause -> PlayerId -> PlayerCounterKind.PlayerCounterKind -> Natural -> Game Natural
+putPlayerCounters cause pid kind n = do
+  resolved <- resolvePlayerCounters cause pid kind n
+  case resolved of
+    Nothing -> pure 0
+    Just (target, settledKind, settledCount)
+      | settledCount == 0 -> pure 0
+      | otherwise -> do
+          -- Zero is the guard putCounters puts on its own write, and Scaling.Halve
+          -- is what makes it reachable here: half of one counter, rounded down, is
+          -- a replacement that removes the event.
+          State.modify' $ \gs ->
+            let bump p = p {Player.counters = Map.insertWith (+) settledKind settledCount (Player.counters p)}
+             in gs {GameState.players = Map.adjust bump target (GameState.players gs)}
+          pure settledCount
+
+-- CR 122.1: resolveCounters for a player recipient, and read the same way -- the
+-- cause rides the event and the rows decide which causes they reach.
+resolvePlayerCounters :: CounterCause.CounterCause -> PlayerId -> PlayerCounterKind.PlayerCounterKind -> Natural -> Game (Maybe (PlayerId, PlayerCounterKind.PlayerCounterKind, Natural))
+resolvePlayerCounters cause pid kind n = do
+  outcome <- applyReplacements (ProposedEvent.WouldPutPlayerCounters cause pid kind n)
+  pure (outcome >>= Replacement.asPlayerCounters)
 
 -- CR 111.1: settle a proposed token creation. Nothing means none are created.
 resolveTokens :: PlayerId -> Card -> Natural -> Game (Maybe (PlayerId, Card, Natural))
@@ -2099,7 +2154,7 @@ changeZoneAttaching asOf oid requestedDest position seed tapped entering under s
             -- Before the loop rather than after it, which no card observes: no
             -- entry replacement in the pool reads a counter the entering object
             -- already has, and the two are simultaneous in the rules anyway.
-            Monad.mapM_ (\(kind, n) -> Monad.void (putCounters CounterCause.ByEffect newId kind n)) (Map.toAscList entering)
+            Monad.mapM_ (\(kind, n) -> Monad.void (putOwnCounters newId kind n)) (Map.toAscList entering)
             runEntry Set.empty newId
           -- CR 709.5h: an ability that triggers on a door opening fires "regardless
           -- of whether it was given that designation while entering the

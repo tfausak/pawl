@@ -19,19 +19,25 @@ toJson :: CounterPattern.CounterPattern -> Value.Value
 toJson p =
   Common.object
     ( Common.optionalPair "whichKind" Nothing (Common.encodeMaybe (CounterKind.toJson Keyword.toJson)) (CounterPattern.whichKind p)
+        <> Common.optionalPair "byWhom" Nothing (Common.encodeMaybe ControllerRelation.toJson) (CounterPattern.byWhom p)
         <> Common.optionalPair "whose" defaultWhose ControllerRelation.toJson (CounterPattern.whose p)
         <> Common.requiredPair "onWhat" (Filter.toJson Keyword.toJson) (CounterPattern.onWhat p)
+        <> Common.optionalPair "onWho" Nothing (Common.encodeMaybe ControllerRelation.toJson) (CounterPattern.onWho p)
     )
 
 fromJson :: Value.Value -> Either Text.Text CounterPattern.CounterPattern
 fromJson value = do
   ps <- Common.asObject value
   k <- Common.defaultedField "whichKind" Nothing (Common.decodeMaybe (CounterKind.fromJson Keyword.fromJson)) ps
+  b <- Common.defaultedField "byWhom" Nothing (Common.decodeMaybe ControllerRelation.fromJson) ps
   w <- Common.defaultedField "whose" defaultWhose ControllerRelation.fromJson ps
   o <- Common.field "onWhat" ps >>= Filter.fromJson Keyword.fromJson
+  p <- Common.defaultedField "onWho" Nothing (Common.decodeMaybe ControllerRelation.fromJson) ps
   pure
     CounterPattern.MkCounterPattern
       { CounterPattern.whichKind = k,
+        CounterPattern.byWhom = b,
         CounterPattern.whose = w,
-        CounterPattern.onWhat = o
+        CounterPattern.onWhat = o,
+        CounterPattern.onWho = p
       }
