@@ -185,6 +185,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsAttachedToPermanent
       """ {"type":"IsAttachedToPermanent"} """
+  Spec.it s "IsAttachedToSource" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.IsAttachedToSource
+      """ {"type":"IsAttachedToSource"} """
   Spec.it s "CanHostSubject" $
     Common.assertJsonCodec
       s

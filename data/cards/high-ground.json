@@ -3,7 +3,10 @@
     {
       "blockPermissions": [
         {
-          "additional": 1,
+          "additional": {
+            "type": "Literal",
+            "value": 1
+          },
           "affected": {
             "type": "Matching",
             "value": {
