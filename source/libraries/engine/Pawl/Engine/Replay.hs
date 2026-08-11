@@ -37,6 +37,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import Pawl.Types.Response (Response)
 import qualified Pawl.Types.Response as Response
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TargetCount as TargetCount
 
 -- Flatten an answer into the log. The GADT refines 'r' per branch, so each
 -- constructor pairs with the response that carries its payload.
@@ -365,13 +366,14 @@ defaultAnswer p = case p of
      in case blockers of
           r : _ -> Map.singleton r n
           [] -> Map.empty
-  -- One legal recipient per slot, chosen deterministically (the minimum). A
-  -- slot with no legal recipient stays unfilled -- casting rejects that answer.
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe Set.lookupMin sets
-  -- CR 115.6: fill every slot that has a candidate, matching the arm above --
-  -- declining is equally legal, and a default that declined would leave every
-  -- "up to one" card's effect unexercised by the specs that take this answer.
-  Prompt.AnnounceTargets _ _ _ offers -> Map.keysSet offers
+  -- As many legal recipients per slot as the announced count asks for, chosen
+  -- deterministically (the smallest ones). A slot with too few candidates is
+  -- underfilled -- casting rejects that answer.
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(n, rs) -> Set.fromList (take (Natural.toIntSaturating n) (Set.toAscList rs))) sets
+  -- CR 601.2c: announce as MANY as the board allows, matching the arm above --
+  -- announcing fewer is equally legal, and a default that declined would leave
+  -- every "up to N" card's effect unexercised by the specs that take this answer.
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (\(count, rs) -> min (TargetCount.most count) (Natural.length rs)) offers
   -- A canonical identity swap: Mountain -> Mountain changes nothing.
   Prompt.ChooseLandTypeSwap {} -> (Subtype.Mountain, Subtype.Mountain)
   -- The same identity for CR 612.2's creature-type half. Frog is a creature

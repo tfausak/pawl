@@ -2,6 +2,7 @@ module Pawl.Types.PreventionRider where
 
 import qualified Data.Map as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Pawl.Types.Card as Card
 import qualified Pawl.Types.Effect as Effect
 import qualified Pawl.Types.PlayerId as PlayerId
@@ -28,7 +29,7 @@ import qualified Pawl.Types.SlotName as SlotName
 -- Pawl.Engine.Resolve.runPreventionRiders for Quantity.InSlot to read.
 data PreventionRider = MkPreventionRider
   { effects :: Seq.Seq (Effect.Effect Card.Card),
-    targets :: Map.Map SlotName.SlotName Recipient.Recipient,
+    targets :: Map.Map SlotName.SlotName (Set.Set Recipient.Recipient),
     controller :: PlayerId.PlayerId
   }
   deriving (Eq, Ord, Show)

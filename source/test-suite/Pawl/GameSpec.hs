@@ -194,7 +194,7 @@ gameSpec s registry = Spec.describe s "Game" $ do
           base
             { GameState.objects =
                 Map.adjust
-                  (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.alice)) Nothing Seq.empty})
+                  (\o -> o {Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.alice))) Nothing Seq.empty})
                   (ObjectId.MkObjectId 0)
                   (GameState.objects base)
             }
@@ -1717,10 +1717,7 @@ slaveAnswer p = case p of
         h : _ -> h
         [] -> A.Pass
       else A.Pass
-  Prompt.ChooseTargets _ _ _ sets ->
-    Map.mapMaybe
-      (\s -> if Set.member (Recipient.ToPlayer S.bob) s then Just (Recipient.ToPlayer S.bob) else Set.lookupMin s)
-      sets
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer S.bob) sets
   _ -> S.identityAnswer p
 
 -- CR 723.5 combat: alice, controlling bob, declares bob's attackers. Attackers
@@ -1761,7 +1758,7 @@ illegalActivationAnswer oid ability p = case p of
   -- recipient, which is the Sorcerer itself -- and a 1/1 pinging itself dies, so
   -- the board this test wants to inspect would not exist by the time it looked.
   Prompt.ChooseTargets _ _ _ sets ->
-    pure (Map.mapMaybe (\candidates -> pickPlayerRecipient candidates) sets)
+    pure (S.preferring isPlayerRecipient sets)
   _ -> pure (S.identityAnswer p)
 
 -- The lowest ToPlayer recipient in a legal set, falling back to the lowest of
@@ -1773,12 +1770,6 @@ isPlayerRecipient r = case r of
   Recipient.ToPlaneswalker _ -> False
   Recipient.ToBattle _ -> False
   Recipient.ToObject _ -> False
-
-pickPlayerRecipient :: Set.Set Recipient.Recipient -> Maybe Recipient.Recipient
-pickPlayerRecipient candidates =
-  case filter isPlayerRecipient (Set.toList candidates) of
-    r : _ -> Just r
-    [] -> Set.lookupMin candidates
 
 isCastAction :: A.Action -> Bool
 isCastAction a = case a of

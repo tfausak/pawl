@@ -572,7 +572,7 @@ sacrificeSpec s registry =
           placed = snd (Engine.runGamePure S.identityAnswer gs1 Engine.placePendingTriggers)
           bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid placed)
           selfOf oid = Map.lookup Binding.triggerSource (Binding.targetsOf (bindingsOn oid))
-      Spec.assertEqWith s "the trigger names its source" (fmap selfOf (GameState.stack placed)) [Just (Recipient.ToObject ripId)]
+      Spec.assertEqWith s "the trigger names its source" (fmap selfOf (GameState.stack placed)) [Just (Set.singleton (Recipient.ToObject ripId))]
 
 -- CR 603.10a's sacrifice family, end to end. Mayhem Devil {1}{B}{R} Creature --
 -- Devil 3/3: "Whenever a player sacrifices a permanent, this creature deals 1
@@ -607,7 +607,7 @@ mayhemDevilSpec s registry =
       -- the Devil's trigger's when the priority loop places it, so two answerers
       -- aim the two damage sources at two different players.
       aimAt who p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
       board devil extra =
         let (_, withDevil) = S.addCreature devil S.alice S.threePlayerGame
@@ -846,7 +846,7 @@ stateTriggerSpec s registry =
 -- falls through to the identity answer.
 answerHackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
 answerHackAt oid from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   Prompt.ChooseLandTypeSwap {} -> (from, to)
   _ -> S.identityAnswer p
 
@@ -2047,7 +2047,7 @@ poisonousSpec s registry =
         Spec.it s "CR 603.2 the damaged player rides the trigger in the reserved slot" $ do
           let ev = GameEvent.DamageDealt (DamageEvent.MkDamageEvent (ObjectId.MkObjectId 7) (Recipient.ToPlayer S.bob) 2 False False False 0 Nothing DamageKind.Combat)
               bindings = Event.eventBindings TriggerCondition.SelfDealsCombatDamageToPlayer ev
-          Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.bob))
+          Spec.assertEqWith s "bob is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.bob)))
         -- The proving test. CR 702.70a: "Whenever this creature deals combat
         -- damage to a player, that player gets N poison counters." bob is dealt
         -- the Piker's two damage AND gets three poison -- poisonous is not
@@ -2224,7 +2224,7 @@ annihilatorSpec s registry =
         -- attacking side instead.
         Spec.it s "CR 603.2 the defending player rides the declaration in the reserved slot" $ do
           let bindings = Event.eventBindings (TriggerCondition.SelfAttacks TriggerFrequency.EveryTime) (GameEvent.AttackerDeclared (ObjectId.MkObjectId 7) S.carol 1)
-          Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.carol))
+          Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 613.8's dependency, read off the projection before any attack: WHICH
         -- permanents actually carry the granted keyword. Without this the two
         -- board cases below could pass off a keyword nobody has.
@@ -2722,7 +2722,7 @@ conscriptBoard mountain piker megrim conscripts =
 -- her Mountains on one of them would never reach the Conscripts.
 aimedCast :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimedCast spell victim p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> Map.mapMaybe (Set.lookupMin . Set.filter ((== Just victim) . Recipient.objectOf)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (\(_, legal) -> Set.filter ((== Just victim) . Recipient.objectOf) legal) sets
   Prompt.ChooseAction _ _ actions -> case filter (S.isCastOf spell) actions of
     action : _ -> action
     [] -> A.Pass
@@ -2834,7 +2834,7 @@ counterTriggerSpec s registry =
          in (victimId, cancelId, gs)
       -- Targets the spell already on the stack, and takes rule 603.5's "may".
       answerWith victimId p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject victimId)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets
         Prompt.ChooseOptional {} -> OptionalDecision.Exercises
         _ -> S.identityAnswer p
    in Spec.describe s "CounterTrigger" $ do
@@ -2906,7 +2906,7 @@ counterTriggerSpec s registry =
               (boltId, gs) = S.addHandCard bolt S.bob withLibrary
               answer :: Prompt.Prompt r -> r
               answer p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
                 Prompt.ChooseOptional {} -> OptionalDecision.Exercises
                 _ -> S.identityAnswer p
               cast = S.runPure answer gs (S.cast S.bob boltId)
@@ -2998,7 +2998,7 @@ counterTriggerSpec s registry =
                   -- effect that must NOT occur is her own life total.
                   atAlice :: Prompt.Prompt r -> r
                   atAlice p = case p of
-                    Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+                    Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
                     Prompt.ChooseOptional {} -> OptionalDecision.Exercises
                     _ -> S.identityAnswer p
                   -- Stifle's only legal target is the ability -- the Pool.Abilities
@@ -3482,7 +3482,7 @@ mentorSpec s registry =
       plan :: [ObjectId.ObjectId] -> ObjectId.ObjectId -> Prompt.Prompt r -> r
       plan attackers target p = case p of
         Prompt.DeclareAttackers _ _ ids -> filter (`elem` attackers) ids
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature target)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature target))) sets
         _ -> S.aggressiveAnswer p
       atDamage :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       atDamage = S.runToStep (Phase.Combat CombatStep.CombatDamage)
@@ -3822,7 +3822,7 @@ provokeSpec s registry =
       plan :: OptionalDecision.OptionalDecision -> ObjectId.ObjectId -> Prompt.Prompt r -> r
       plan may target p = case p of
         Prompt.ChooseOptional {} -> may
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature target)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature target))) sets
         Prompt.DeclareBlockers {} -> Map.empty
         _ -> S.aggressiveAnswer p
       atBlockers :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
@@ -4970,7 +4970,7 @@ afflictSpec s registry =
         -- the attacking side, or none at all.
         Spec.it s "CR 603.2 the defending player rides the becomes-blocked event in the reserved slot" $ do
           let bindings = Event.eventBindings TriggerCondition.SelfBecomesBlocked (GameEvent.AttackerBlocked (ObjectId.MkObjectId 9) S.carol)
-          Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Recipient.ToPlayer S.carol))
+          Spec.assertEqWith s "carol is bound under thatPlayer" (Binding.targetsOf bindings) (Map.singleton Binding.triggerPlayer (Set.singleton (Recipient.ToPlayer S.carol)))
         -- CR 702.130b: "If a creature has multiple instances of afflict, each
         -- triggers separately." Asked of the mint rather than of a board, as
         -- bushido's and prowess' are: no card in this pool prints afflict twice
@@ -5863,7 +5863,7 @@ permanentDiesSpec s registry =
               -- Recipient, which would aim at whichever creature sorts first.
               answer :: Prompt.Prompt r -> r
               answer p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature pikerId))) sets
                 _ -> S.identityAnswer p
               cast = S.runPure answer gs (S.cast S.alice spellId)
               damaged = S.runPure answer cast Stack.resolveTop
@@ -5947,7 +5947,7 @@ permanentDiesSpec s registry =
               (withSpell, spell) = S.handOne skirmish withLands
               answer :: Prompt.Prompt r -> r
               answer p = case p of
-                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature merenId)) sets
+                Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature merenId))) sets
                 _ -> S.identityAnswer p
               afterCast = S.runPure answer withSpell (S.cast S.alice spell)
               resolved = S.runPure answer afterCast Stack.resolveTop
@@ -6110,7 +6110,7 @@ leavesBattlefieldSpec s registry =
       -- Every slot stamped on every object currently on the stack, which for
       -- these boards is the one placed trigger.
       stackSlots gs =
-        concatMap (Map.toList . Binding.targetsOf . maybe Map.empty Object.bindings . flip Game.lookupObject gs) (GameState.stack gs)
+        concatMap (Map.toList . Map.mapMaybe Binding.onlyOne . Binding.targetsOf . maybe Map.empty Object.bindings . flip Game.lookupObject gs) (GameState.stack gs)
    in Spec.describe s "LeavesTheBattlefield" $ do
         -- The destination this condition SHARES with "dies", so the wider
         -- condition is not merely the narrower one's complement: a Thragtusk
@@ -6936,7 +6936,7 @@ becameSlotSpec s registry =
           (roachId, board) <- roachBoard
           let (settled, _) = boltIt board
               bindingsOn oid = maybe Map.empty Object.bindings (Game.lookupObject oid settled)
-              slots = concatMap (Map.toList . Binding.targetsOf . bindingsOn) (GameState.stack settled)
+              slots = concatMap (Map.toList . Map.mapMaybe Binding.onlyOne . Binding.targetsOf . bindingsOn) (GameState.stack settled)
               slotFor name = lookup name slots
           Spec.assertEqWith s "self is the permanent that died" (slotFor Binding.triggerSource) (Just (Recipient.ToObject roachId))
           Spec.assertBool s (Maybe.isNothing (Game.lookupObject roachId settled)) "and that id is gone (CR 400.7)"
@@ -8500,7 +8500,7 @@ lifeLossTriggerSpec s registry =
       -- identityAnswer's lowest-sorting candidate -- which is alice, and so is
       -- the control case rather than the positive one.
       aimAt who p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
       -- alice: two Swamps for the {B}{B}, an Exquisite Blood, and Sign in Blood
       -- in hand.
@@ -8644,7 +8644,7 @@ mindcrankSpec s registry =
       -- Sign in Blood's one target slot, answered with `who` -- as the Exquisite
       -- Blood group's helper does, and for the same reason.
       aimAt who p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
       sizeOf zone pid gs = length (Game.zoneMembers zone pid gs)
       -- alice: two Swamps for the {B}{B}, a Mindcrank, and Sign in Blood in hand.
@@ -8708,7 +8708,7 @@ anafenzaAttackSpec s registry =
       -- that is the difference between a discriminating test and a passing one:
       -- with the Piker the lowest-id candidate, an answerer that takes the first
       -- offer reaches the same board whether or not the filter rejected anything.
-      recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)] r
+      recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient)] r
       recordTargets p = case p of
         Prompt.ChooseTargets _ _ _ sets -> do
           State.modify' (<> [sets])
@@ -8730,7 +8730,7 @@ anafenzaAttackSpec s registry =
             Spec.assertEqWith
               s
               "the Piker attacking beside her is the only legal target"
-              (fmap Map.elems offered)
+              (fmap (fmap snd . Map.elems) offered)
               [[Set.singleton (Recipient.ToCreature pikerId)]]
             Spec.assertEqWith s "and it took the counter" (countersOn pikerId settled) (Just 1)
             Spec.assertEqWith s "\"another\" keeps Anafenza off her own trigger" (countersOn anafenzaId settled) (Just 0)
@@ -8781,7 +8781,7 @@ ezuriExperienceSpec s registry =
       -- the least Recipient -- which on the first board below is one of the three
       -- Pikers rather than the permanent every assertion is about.
       aimAt oid p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
         _ -> S.identityAnswer p
       -- alice casts the spell in her hand and lets the stack empty, so the spell
       -- resolves and so does whatever Ezuri's entry trigger put on top of it.
@@ -8838,7 +8838,7 @@ ezuriExperienceSpec s registry =
         Spec.it s "CR 122.1 five experience counters put five, and \"another\" keeps Ezuri off her own trigger" $ do
           (ezuriId, targetId, board) <- ezuriAndTarget
           let gs = S.addPlayerCounter PlayerCounterKind.Experience 5 S.alice board
-              recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)] r
+              recordTargets :: Prompt.Prompt r -> State.State [Map.Map SlotName.SlotName (Natural, Set.Set Recipient.Recipient)] r
               recordTargets p = case p of
                 Prompt.ChooseTargets _ _ _ sets -> do
                   State.modify' (<> [sets])
@@ -8849,7 +8849,7 @@ ezuriExperienceSpec s registry =
           Spec.assertEqWith
             s
             "the Construct is the only legal target"
-            (fmap Map.elems offered)
+            (fmap (fmap snd . Map.elems) offered)
             [[Set.singleton (Recipient.ToCreature targetId)]]
           Spec.assertEqWith s "five counters, not three" (countersOn targetId combat) (Just 5)
           Spec.assertEqWith s "so its printed 2/1 reads 7/6" (S.powerToughnessOf targetId combat) (Just (7, 6))
@@ -8929,7 +8929,7 @@ handOfThePraetorsSpec s registry =
       -- S.identityAnswer, whose lowest-sorting candidate on this board is alice
       -- -- the caster, and so the wrong answer to prove anything with.
       aimAt who p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
         _ -> S.identityAnswer p
       -- alice bears the Hand; alice and bob each get two Forests (Glistener
       -- Elf's {G}) and two Mountains (Goblin Piker's {1}{R}). carol gets no
@@ -9153,10 +9153,7 @@ monarchTriggerSpec s registry =
       -- picks the least Recipient, which would aim the edict at alice herself.
       targetsPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
       targetsPlayer victim p = case p of
-        Prompt.ChooseTargets _ _ _ sets ->
-          Map.mapMaybe
-            (\legal -> if Set.member (Recipient.ToPlayer victim) legal then Just (Recipient.ToPlayer victim) else Set.lookupMin legal)
-            sets
+        Prompt.ChooseTargets _ _ _ sets -> S.preferring (== Recipient.ToPlayer victim) sets
         _ -> S.identityAnswer p
       resolveAll :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> GameState.GameState
       resolveAll answer gs = snd (Engine.runGamePure answer gs Engine.priorityLoop)
@@ -9224,10 +9221,10 @@ monarchTriggerSpec s registry =
               answer :: Prompt.Prompt r -> r
               answer p = case p of
                 Prompt.ChooseTargets _ _ _ sets ->
-                  Map.mapMaybeWithKey
-                    ( \slot legal -> case Map.lookup slot denethorAnswers of
-                        Just wanted | Set.member wanted legal -> Just wanted
-                        _ -> if Set.member (Recipient.ToPlayer S.bob) legal then Just (Recipient.ToPlayer S.bob) else Set.lookupMin legal
+                  Map.mapWithKey
+                    ( \slot offer ->
+                        let wanted = Map.findWithDefault (Recipient.ToPlayer S.bob) slot denethorAnswers
+                         in Map.findWithDefault Set.empty slot (S.preferring (== wanted) (Map.singleton slot offer))
                     )
                     sets
                 _ -> S.identityAnswer p

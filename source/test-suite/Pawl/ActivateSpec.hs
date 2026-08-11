@@ -423,7 +423,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Activate" $ do
 -- already sacrificed -- observable nowhere.
 aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimAt who p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
   _ -> S.identityAnswer p
 
 -- CR 113.7a / 608.2h: an ability resolves using its source's LAST KNOWN
@@ -1588,7 +1588,7 @@ variableActivationCostSpec s registry = Spec.describe s "VariableActivationCost"
 -- targeted instruction went elsewhere.
 aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
 -- alice's three untapped Mountains, `owner`'s Brothers of Fire and the other
@@ -1694,7 +1694,7 @@ youOnActivatedAbilitySpec s registry = Spec.describe s "YouOnActivatedAbility" $
 -- the Forest, added first for exactly that reason.
 hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
 hackAt spellId from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject spellId)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject spellId))) sets
   Prompt.ChooseLandTypeSwap {} -> (from, to)
   _ -> S.identityAnswer p
 

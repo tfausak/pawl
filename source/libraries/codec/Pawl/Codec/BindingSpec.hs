@@ -4,6 +4,7 @@ module Pawl.Codec.BindingSpec where
 
 import qualified Data.Map.Strict as Map
 import qualified Data.Sequence as Seq
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Codec.Binding as Binding
 import qualified Pawl.Codec.Common as Common
@@ -35,14 +36,14 @@ spec s = Spec.describe s "Pawl.Codec.Binding" $ do
       Binding.toJson
       Binding.fromJson
       ( Binding.MkBinding
-          { Binding.target = Just (Recipient.ToPlayer (PlayerId.MkPlayerId 0)),
+          { Binding.targets = Just (Set.singleton (Recipient.ToPlayer (PlayerId.MkPlayerId 0))),
             Binding.amount = Just 3,
             Binding.modes = Just (Seq.fromList [ModeIndex.MkModeIndex 0, ModeIndex.MkModeIndex 2, ModeIndex.MkModeIndex 2]),
             Binding.copy = Just ProjectedCharacteristicsSpec.testCharacteristics,
             Binding.objects = Just (Seq.fromList [ObjectId.MkObjectId 7, ObjectId.MkObjectId 4])
           }
       )
-      ( "{\"target\":{\"type\":\"ToPlayer\",\"value\":0},"
+      ( "{\"targets\":[{\"type\":\"ToPlayer\",\"value\":0}],"
           <> "\"amount\":3,\"modes\":[0,2,2],\"copy\":"
           <> ProjectedCharacteristicsSpec.testCharacteristicsJson
           <> ",\"objects\":[7,4]}"

@@ -83,8 +83,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
             equip
             equip
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature creature))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature creature)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature creature)))
             (Effect.Attach slot)
         after = S.runPure S.identityAnswer gs run
     Spec.assertEqWith s "the Equipment is attached to the creature" (fmap Object.attachedTo (Game.lookupObject equip after)) (Just (Just (Recipient.ToCreature creature)))
@@ -119,8 +119,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
             equip
             equip
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature second))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature second)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature second)))
             (Effect.Attach slot)
         after = S.runPure S.identityAnswer gs run
     Spec.assertEqWith s "it moved to the second creature" (fmap Object.attachedTo (Game.lookupObject equip after)) (Just (Just (Recipient.ToCreature second)))
@@ -179,8 +179,8 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
               equip
               equip
               S.alice
-              (Map.singleton slot True)
-              (Map.singleton slot (Recipient.ToCreature t))
+              (Map.singleton slot (Set.singleton (Recipient.ToCreature t)))
+              (Map.singleton slot (Set.singleton (Recipient.ToCreature t)))
               (Effect.Attach slot)
         stampOf g = fmap Object.timestamp (Game.lookupObject equip g)
         moved = attachTo second gs
@@ -223,7 +223,7 @@ equipmentSpec s registry = Spec.describe s "Equipment" $ do
 -- board construction the way the sibling cases above force theirs.
 aimAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAt oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   _ -> S.identityAnswer p
 
 -- CR 704.5p, the sibling of CR 704.5n above: 704.5n asks whether the HOST is
@@ -567,7 +567,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Aura" $ do
 -- first, and the entry choice is the whole point of this card.
 mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
 mirageOn landId subtype p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject landId)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject landId))) sets
   Prompt.ChooseBasicLandType {} -> subtype
   _ -> S.identityAnswer p
 
@@ -624,7 +624,7 @@ chosenLandTypeSpec s registry = Spec.describe s "ChosenLandType" $ do
 -- is not in the legal set at all.
 aimRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
 aimRecipient recipient p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const recipient) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton recipient)) sets
   _ -> S.identityAnswer p
 
 -- Answers Prompt.ChooseAttachment with one fixed object -- the destination an
@@ -642,7 +642,7 @@ destination oid p = case p of
 -- ability needs both.
 moveAura :: ObjectId.ObjectId -> ObjectId.ObjectId -> Prompt.Prompt r -> r
 moveAura aura dest p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject aura)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject aura))) sets
   Prompt.ChooseAttachment {} -> dest
   _ -> S.identityAnswer p
 
@@ -790,8 +790,8 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               crownObj
               crownObj
               S.alice
-              (Map.singleton slot True)
-              (Map.singleton slot (Recipient.ToObject aura))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
               (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
         stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
     Spec.assertEqWith s "it moved" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature second)))
@@ -817,8 +817,8 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               crownObj
               crownObj
               S.alice
-              (Map.singleton slot True)
-              (Map.singleton slot (Recipient.ToObject aura))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
               (Effect.AttachTarget slot (Filter.Type.HasCardType CardType.Creature))
         stampOf g = fmap Object.timestamp (Game.lookupObject aura g)
     Spec.assertEqWith s "still on the Piker" (fmap Object.attachedTo (Game.lookupObject aura after)) (Just (Just (Recipient.ToCreature first)))
@@ -856,8 +856,8 @@ reattachSpec s registry = Spec.describe s "Reattach" $ do
               crownObj
               crownObj
               S.alice
-              (Map.singleton slot True)
-              (Map.singleton slot (Recipient.ToObject aura))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject aura)))
               -- `And []` matches everything, so the land is offered as a
               -- destination and CR 303.4j is what rejects it.
               (Effect.AttachTarget slot (Filter.Type.And []))

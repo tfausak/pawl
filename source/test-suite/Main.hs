@@ -116,7 +116,7 @@ import qualified Pawl.Codec.SubtypeFamilySpec
 import qualified Pawl.Codec.SubtypeSpec
 import qualified Pawl.Codec.SupertypeSpec
 import qualified Pawl.Codec.TapStateSpec
-import qualified Pawl.Codec.TargetRequirementSpec
+import qualified Pawl.Codec.TargetCountSpec
 import qualified Pawl.Codec.TargetSpecSpec
 import qualified Pawl.Codec.TokenPatternSpec
 import qualified Pawl.Codec.ToughnessSpec
@@ -372,7 +372,7 @@ spec s registry = do
   Pawl.Codec.SubtypeSpec.spec s
   Pawl.Codec.SupertypeSpec.spec s
   Pawl.Codec.TapStateSpec.spec s
-  Pawl.Codec.TargetRequirementSpec.spec s
+  Pawl.Codec.TargetCountSpec.spec s
   Pawl.Codec.TargetSpecSpec.spec s
   Pawl.Codec.TokenPatternSpec.spec s
   Pawl.Codec.ToughnessSpec.spec s

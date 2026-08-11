@@ -14,7 +14,7 @@ import qualified Pawl.Types.TargetSpec as TargetSpec
 -- Filter's own coverage lives in Pawl.Codec.FilterSpec, so these cases exercise
 -- it only in its embedded position: a bare pool (Nothing filter, omitted key),
 -- a filtered pool, and the Not IsSource conjunct carrying CR 601.2c's "another"
--- (#163). The requirement key is omitted for every Required spec, which is what
+-- (#163). The count key is omitted for every one-target spec, which is what
 -- keeps the corpus unrewritten.
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.TargetSpec" $ do
@@ -56,11 +56,19 @@ spec s = Spec.describe s "Pawl.Codec.TargetSpec" $ do
       TargetSpec.fromJson
       (TargetSpec.required Pool.CardsInExile Nothing)
       """ {"pool":{"type":"CardsInExile"}} """
-  -- CR 115.6's "up to one target", the one case that spends the requirement key.
+  -- CR 115.6's "up to one target", and CR 601.2c's larger count: the two cases
+  -- that spend the count key.
   Spec.it s "an up-to-one spec" $
     Common.assertJsonCodec
       s
       TargetSpec.toJson
       TargetSpec.fromJson
-      (TargetSpec.upToOne Pool.Creatures Nothing)
-      """ {"pool":{"type":"Creatures"},"requirement":{"type":"UpToOne"}} """
+      (TargetSpec.upTo 1 Pool.Creatures Nothing)
+      """ {"pool":{"type":"Creatures"},"count":{"least":0,"most":1}} """
+  Spec.it s "an up-to-two spec" $
+    Common.assertJsonCodec
+      s
+      TargetSpec.toJson
+      TargetSpec.fromJson
+      (TargetSpec.upTo 2 Pool.Creatures Nothing)
+      """ {"pool":{"type":"Creatures"},"count":{"least":0,"most":2}} """

@@ -898,7 +898,7 @@ kirdApeSpec s registry = Spec.describe s "Kird Ape" $ do
 -- castHackAt, which is local there for the same reason this one is local here.
 hackAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
 hackAt oid from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   Prompt.ChooseLandTypeSwap {} -> (from, to)
   _ -> S.identityAnswer p
 
@@ -909,7 +909,7 @@ hackAt oid from to p = case p of
 -- because the group needs it and nothing else here does.
 mirageOn :: ObjectId.ObjectId -> Subtype.Subtype -> Prompt.Prompt r -> r
 mirageOn landId subtype p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject landId)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject landId))) sets
   Prompt.ChooseBasicLandType {} -> subtype
   _ -> S.identityAnswer p
 
@@ -1244,5 +1244,5 @@ ridersOn host gs =
 -- which S.identityAnswer declines.
 aimRecipient :: Recipient.Recipient -> Prompt.Prompt r -> r
 aimRecipient recipient p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const recipient) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton recipient)) sets
   _ -> S.identityAnswer p

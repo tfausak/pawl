@@ -34,6 +34,7 @@
 module Pawl.SacrificeRestrictionSpec where
 
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import qualified Pawl.Engine.Activate as Activate
 import qualified Pawl.Engine.Engine as Engine
@@ -215,8 +216,8 @@ offerSpec s registry = Spec.describe s "Offer" $ do
             source
             source
             S.bob
-            (Map.singleton victimSlot True)
-            (Map.singleton victimSlot (Recipient.ToPlayer S.alice))
+            (Map.singleton victimSlot (Set.singleton (Recipient.ToPlayer S.alice)))
+            (Map.singleton victimSlot (Set.singleton (Recipient.ToPlayer S.alice)))
             (Effect.PlayerSacrifices victimSlot anyCreature (Quantity.Literal 1))
         after = S.runPure S.identityAnswer gs edict
         barren = S.runPure S.identityAnswer g3 edict

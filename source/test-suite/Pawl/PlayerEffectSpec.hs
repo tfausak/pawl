@@ -1595,7 +1595,7 @@ hybridDiscountSpec s registry =
 -- Magical Hack in another; a changer asks only its own.
 swapAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
 swapAt oid from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   Prompt.ChooseCreatureTypeSwap {} -> (from, to)
   Prompt.ChooseLandTypeSwap {} -> (from, to)
   _ -> S.identityAnswer p
@@ -2896,7 +2896,7 @@ counteringBoard island cancel stifle sorcerer victim permanents =
 -- exercised -- so a silence below is the rule and never a declined option.
 counteringAnswer :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 counteringAnswer oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
 
@@ -2905,7 +2905,7 @@ counteringAnswer oid p = case p of
 -- legal target is the ability, which the default interpreter picks.
 counteringAtAlice :: Prompt.Prompt r -> r
 counteringAtAlice p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
   Prompt.ChooseOptional {} -> OptionalDecision.Exercises
   _ -> S.identityAnswer p
 

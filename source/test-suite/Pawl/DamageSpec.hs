@@ -86,10 +86,7 @@ import qualified Pawl.Types.Zone as Zone
 aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimedAt oid p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
-    let naming candidates = case filter (\r -> Recipient.objectOf r == Just oid) (Set.toList candidates) of
-          r : _ -> Just r
-          [] -> Set.lookupMin candidates
-     in Map.mapMaybe naming sets
+    S.preferring (\r -> Recipient.objectOf r == Just oid) sets
   _ -> S.identityAnswer p
 
 -- The permanent of a given name on the battlefield, found by NAME because CR
@@ -564,11 +561,7 @@ toxicSpec s registry =
 pingsBob :: Prompt.Prompt r -> r
 pingsBob p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
-    let aim candidates =
-          if Set.member (Recipient.ToPlayer S.bob) candidates
-            then Just (Recipient.ToPlayer S.bob)
-            else Set.lookupMin candidates
-     in Map.mapMaybe aim sets
+    S.preferring (== Recipient.ToPlayer S.bob) sets
   _ -> S.identityAnswer p
 
 lifelinkSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1804,7 +1797,7 @@ boltBlockerMidCombat :: Bool -> ObjectId.ObjectId -> ObjectId.ObjectId -> GameSt
 boltBlockerMidCombat blocks bolt blocker gs =
   let aimedAtBlocker :: Prompt.Prompt r -> r
       aimedAtBlocker p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature blocker)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature blocker))) sets
         Prompt.DeclareBlockers {} | not blocks -> Map.empty
         _ -> S.aggressiveAnswer p
       declared =

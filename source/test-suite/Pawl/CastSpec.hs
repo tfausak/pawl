@@ -392,8 +392,8 @@ castSpec s registry = Spec.describe s "Cast" $ do
             "the Piker is the target, and alice is CR 109.5's you"
             (Binding.targetsOf (Object.bindings obj))
             ( Map.fromList
-                [ (SlotName.MkSlotName (Text.pack "target"), Recipient.ToCreature (S.pikerOf base)),
-                  (Binding.you, Recipient.ToPlayer S.alice)
+                [ (SlotName.MkSlotName (Text.pack "target"), Set.singleton (Recipient.ToCreature (S.pikerOf base))),
+                  (Binding.you, Set.singleton (Recipient.ToPlayer S.alice))
                 ]
             )
   Spec.it s "casting a {X}{R} spell at X=3 stamps amount 3 and pays {3}{R}" $ do
@@ -463,7 +463,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
         liar :: Prompt.Prompt r -> r
         liar p = case p of
           Prompt.ChooseTargets _ _ _ sets ->
-            fmap (const (Recipient.ToCreature (ObjectId.MkObjectId 999))) sets
+            fmap (const (Set.singleton (Recipient.ToCreature (ObjectId.MkObjectId 999)))) sets
           _ -> S.identityAnswer p
         after = snd (Engine.runGamePure liar gs (S.cast S.alice oid))
     Spec.assertEqWith s "nothing on the stack" (length (GameState.stack after)) 0
@@ -586,7 +586,7 @@ castSpec s registry = Spec.describe s "Cast" $ do
 answerXOf :: Natural -> Prompt.Prompt r -> r
 answerXOf n p = case p of
   Prompt.ChooseX {} -> n
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 -- Discards from the BACK of hand. Deliberately unlike every fallback, so the
@@ -716,7 +716,7 @@ answerAtBound p = case p of
   Prompt.ChooseX _ _ _ bound -> do
     State.modify' (\seen -> seen <> [bound])
     pure bound
-  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)
   _ -> pure (S.identityAnswer p)
 
 -- Announces ONE MORE than the bound -- legal under CR 601.2b and unaffordable by
@@ -724,7 +724,7 @@ answerAtBound p = case p of
 answerAboveBound :: Prompt.Prompt r -> r
 answerAboveBound p = case p of
   Prompt.ChooseX _ _ _ bound -> bound + 1
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 -- answerAtBound and answerAboveBound in one, COUNTING the CR 601.2c target
@@ -737,7 +737,7 @@ answerAtBoundOffsetCounting offset p = case p of
   Prompt.ChooseX _ _ _ bound -> pure (bound + offset)
   Prompt.ChooseTargets _ _ _ sets -> do
     State.modify' (+ 1)
-    pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+    pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)
   _ -> pure (S.identityAnswer p)
 
 -- Records the object each CR 601.2c target question is asked ABOUT, and aims
@@ -747,7 +747,7 @@ answerRecordingTargetObject :: Prompt.Prompt r -> State.State [ObjectId.ObjectId
 answerRecordingTargetObject p = case p of
   Prompt.ChooseTargets _ _ oid sets -> do
     State.modify' (\seen -> seen <> [oid])
-    pure (fmap (const (Recipient.ToPlayer S.bob)) sets)
+    pure (fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets)
   _ -> pure (S.identityAnswer p)
 
 -- How many cards of this name sit in alice's hand (the reject-not-repair no-op
@@ -765,7 +765,7 @@ inHandNamed name gs = length (filter (nameOnStack (CardName.MkCardName $ Text.pa
 -- `you` bound anything or not.
 answerTargetingBob :: Prompt.Prompt r -> r
 answerTargetingBob p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 charSpec :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> n ()
@@ -1076,7 +1076,7 @@ grips ::
 grips decision toTap toUntap p = case p of
   Prompt.ChooseEntwine {} -> decision
   Prompt.ChooseTargets _ _ _ sets ->
-    Map.mapWithKey (\slot _ -> Recipient.ToObject (if slot == tapSlot then toTap else toUntap)) sets
+    Map.mapWithKey (\slot _ -> Set.singleton (Recipient.ToObject (if slot == tapSlot then toTap else toUntap))) sets
   _ -> S.identityAnswer p
 
 -- Was CR 702.42a's question actually put to the player, and what did they say?
@@ -2270,6 +2270,7 @@ spec s registry = Spec.describe s "Pawl.Engine.Cast" $ do
   flashSpec s registry
   victorManchaSpec s registry
   upToOneTargetSpec s registry
+  multiTargetCastSpec s registry
 
 -- CR 115.6's "up to one target", read at cast time. Rat Out {B} Instant is "Up
 -- to one target creature gets -1/-1 until end of turn. You create a 1/1 black
@@ -2307,6 +2308,40 @@ upToOneTargetSpec s registry = Spec.describe s "UpToOneTargetCast" $ do
           _ -> False
     Spec.assertBool s (not (announced bare)) "no candidate, no question"
     Spec.assertBool s (announced peopled) "a candidate, so the caster is asked"
+
+-- CR 601.2c's count above one, read at cast time. Hearts on Fire {1}{R} Instant
+-- is "One or two target creatures each get +2/+1 until end of turn": the number
+-- is a real question with two creatures to choose between and no question at all
+-- with one, because "in some cases, the number of targets will be defined by the
+-- spell's text" -- and here the board defines it just as firmly.
+multiTargetCastSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+multiTargetCastSpec s registry = Spec.describe s "MultiTargetCast" $ do
+  Spec.it s "CR 601.2c one candidate fixes the number, so nothing is announced" $ do
+    (one_, _, spellId) <- heartsBoards s registry
+    Spec.assertEqWith s "nothing asked" (announcedCounts spellId one_) []
+  Spec.it s "CR 601.2c a second candidate makes the number a question" $ do
+    (_, two, spellId) <- heartsBoards s registry
+    Spec.assertEqWith s "asked, and answered here with the maximum" (announcedCounts spellId two) [2]
+
+-- One Hearts on Fire in alice's hand over two Mountains, on two boards that
+-- differ only in whether bob has a second creature.
+heartsBoards :: (Monad m) => Spec.Spec m n -> Registry.Registry m -> m (GameState.GameState, GameState.GameState, ObjectId.ObjectId)
+heartsBoards s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  hearts <- S.printingOf s registry "Hearts on Fire"
+  let (one_, spellId) = S.handOne hearts (snd (S.addCreature piker S.bob (S.landsInPlay mountain 2)))
+      (_, two) = S.addCreature rats S.bob one_
+  pure (one_, two, spellId)
+
+-- Every number CR 601.2c's announcement carried while casting this spell.
+announcedCounts :: ObjectId.ObjectId -> GameState.GameState -> [Natural]
+announcedCounts spellId gs =
+  [ n
+  | Response.AnnouncedTargets counts <- snd (Replay.record S.identityAnswer gs (S.cast S.alice spellId)),
+    n <- Map.elems counts
+  ]
 
 -- Casts the first offered option, then declines (the loop re-offers until empty).
 castFirstOption :: Prompt.Prompt r -> r

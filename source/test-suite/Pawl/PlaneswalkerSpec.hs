@@ -21,7 +21,6 @@
 module Pawl.PlaneswalkerSpec where
 
 import qualified Data.List as List
-import qualified Data.Map.Strict as Map
 import qualified Data.Maybe as Maybe
 import qualified Data.Set as Set
 import qualified Data.Text as Text
@@ -31,6 +30,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -149,10 +149,11 @@ graveyardCount name gs =
 aimedAt :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimedAt oid p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
-    let naming candidates = case filter (\r -> Recipient.objectOf r == Just oid) (Set.toList candidates) of
-          r : _ -> Just r
-          [] -> Set.lookupMin candidates
-     in Map.mapMaybe naming sets
+    let naming (n, candidates) =
+          Set.fromList
+            . take (Natural.toIntSaturating n)
+            $ filter (\r -> Recipient.objectOf r == Just oid) (Set.toList candidates) <> Set.toList candidates
+     in fmap naming sets
   _ -> S.identityAnswer p
 
 -- Cast the burn spell at the planeswalker and resolve it. NOT settled: CR 120.5

@@ -845,7 +845,7 @@ extraPhaseSpec s registry = Spec.describe s "ExtraPhase" $ do
 -- recipient tagged for any other pool is not in its legal set at all.
 aimPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimPlayer pid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer pid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer pid))) sets
   _ -> S.identityAnswer p
 
 -- alice in her precombat main phase with priority, five untapped Islands per

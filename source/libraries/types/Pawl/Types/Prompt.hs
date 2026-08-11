@@ -40,6 +40,7 @@ import qualified Pawl.Types.Recipient as Recipient
 import qualified Pawl.Types.ReplacementEntry as ReplacementEntry
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Subtype as Subtype
+import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TriggerEntry as TriggerEntry
 
 data Prompt r where
@@ -231,28 +232,33 @@ data Prompt r where
   -- no minimum. Not asked when the division is forced (one recipient, no excess).
   -- Validation is Damage.legalAssignment. See the M2c spec, section 4.
   AssignCombatDamage :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map Recipient.Recipient Natural.Natural -> Natural.Natural -> Prompt (Map.Map Recipient.Recipient Natural.Natural)
-  -- | CR 601.2c. One legal-recipient set per named slot of the spell being cast
-  -- (the ObjectId); the answer fills every slot. Slots agree by NAME, never by
-  -- position. Not asked when the spell has no slots: zero slots is no choice
-  -- at all, and where the rules leave nothing to ask, don't prompt.
+  -- | CR 601.2c. Per named slot of the spell being cast (the ObjectId): HOW MANY
+  -- targets it takes, and the legal recipients to take them from. The answer
+  -- fills every slot, with exactly the stated number apiece. Slots agree by NAME,
+  -- never by position. Not asked when the spell has no slots: zero slots is no
+  -- choice at all, and where the rules leave nothing to ask, don't prompt.
   --
-  -- The slots offered are the ones that WILL be filled: a CR 115.6 slot the
-  -- caster declined at AnnounceTargets below is not among them.
-  ChooseTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName Recipient.Recipient)
+  -- The slots offered are the ones that WILL be filled, at the counts
+  -- AnnounceTargets below settled: a CR 115.6 slot the caster declined is not
+  -- among them.
+  --
+  -- The count is carried even though it is always at most the candidate set's
+  -- size, because "choose two of these three" is not a question the set alone
+  -- states.
+  ChooseTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Natural.Natural, Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName (Set.Set Recipient.Recipient))
   -- | CR 601.2c's other announcement, made BEFORE ChooseTargets above: "If the
   -- spell has a variable number of targets, the player announces how many targets
   -- they will choose before they announce those targets."
   --
-  -- The Map holds only the slots with a variable number -- CR 115.6's "up to one"
-  -- -- and only those with at least one legal recipient, since zero is the sole
-  -- answer for the rest. Every variable slot today is "up to one", so the count
-  -- is 0 or 1 and the announcement IS the set of slots that will be filled; a
-  -- count above one is a different gap (#1220). Not asked when the map is empty.
+  -- The Map holds only the slots with a variable number, each with the range it
+  -- may be answered within -- the printed count (CR 601.2c), already narrowed to
+  -- what the board can supply, so a slot whose range has collapsed to one number
+  -- is not offered at all. Not asked when the map is empty.
   --
-  -- Carrying the candidate sets rather than the bare names, because the answer is
+  -- Carrying the candidate sets rather than the bare ranges, because the answer is
   -- a real decision and the player deciding needs to see what they would be
   -- aiming at.
-  AnnounceTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) -> Prompt (Set.Set SlotName.SlotName)
+  AnnounceTargets :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Map.Map SlotName.SlotName (TargetCount.TargetCount, Set.Set Recipient.Recipient) -> Prompt (Map.Map SlotName.SlotName Natural.Natural)
   -- | CR 612: choose the two basic land types for a text-changing spell's slot.
   --
   -- Asked AS THE EFFECT IS APPLIED, not as the spell is cast: CR 608.2d puts a

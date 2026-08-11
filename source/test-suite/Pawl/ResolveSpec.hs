@@ -38,6 +38,7 @@ import qualified Pawl.Engine.Resolve as Resolve
 import qualified Pawl.Engine.Setup as Setup
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
+import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Registry as Registry
 import qualified Pawl.Spec as Spec
 import qualified Pawl.Support as S
@@ -110,6 +111,7 @@ import qualified Pawl.Types.Result as Result
 import qualified Pawl.Types.Scope as Scope
 import qualified Pawl.Types.SearchDestination as SearchDestination
 import qualified Pawl.Types.Sickness as Sickness
+import qualified Pawl.Types.SlotArity as SlotArity
 import qualified Pawl.Types.SlotName as SlotName
 import qualified Pawl.Types.Source as Source
 import qualified Pawl.Types.Status as Status
@@ -117,6 +119,7 @@ import qualified Pawl.Types.Subtype as Subtype
 import qualified Pawl.Types.SubtypeFamily as SubtypeFamily
 import qualified Pawl.Types.Supertype as Supertype
 import qualified Pawl.Types.TapState as TapState
+import qualified Pawl.Types.TargetCount as TargetCount
 import qualified Pawl.Types.TargetSpec as TargetSpec
 import qualified Pawl.Types.Timestamp as Timestamp
 import qualified Pawl.Types.TriggerCondition as TriggerCondition
@@ -155,8 +158,8 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.noSource
               S.noSource
               S.bob
-              (Map.singleton slot True)
-              (Map.singleton slot (Recipient.ToObject myr))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
               (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
         control =
           S.runPure S.identityAnswer board $
@@ -164,8 +167,8 @@ targetSpec s registry = Spec.describe s "Target" $ do
               S.noSource
               S.noSource
               S.bob
-              (Map.singleton slot True)
-              (Map.singleton slot (Recipient.ToObject myr))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
+              (Map.singleton slot (Set.singleton (Recipient.ToObject myr)))
               (Effect.GainControl Duration.Indefinite (ObjectRef.InSlot slot))
     Spec.assertEqWith s "no control effect is stored for a departed controller" (GameState.continuousEffects after) []
     Spec.assertEqWith s "and the Myr's controller is unchanged" (Projection.controllerOf myr after) (Just S.carol)
@@ -562,7 +565,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
     Spec.assertEqWith s "one card in the graveyard" (length (Game.zoneMembers Zone.Graveyard S.alice after)) 1
   Spec.it s "CR 612 slotsOf finds a ChangeText slot" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
-    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot)) (Set.singleton slot)
+    Spec.assertEqWith s "slotsOf" (Resolve.slotsOf (Effect.ChangeText SubtypeFamily.CreatureType (Set.singleton Subtype.Wall) slot)) (Map.singleton slot SlotArity.One)
   Spec.it s "CR 605 manaProduced reads AddMana, nothing else" $ do
     Spec.assertEqWith s "add mana" (ManaAbility.manaProduced (Effect.AddMana (ManaProduction.OfType (ManaType.Colored Color.Green)))) (Just (ManaProduction.OfType (ManaType.Colored Color.Green)))
     Spec.assertEqWith s "add mana of any color" (ManaAbility.manaProduced (Effect.AddMana ManaProduction.AnyColor)) (Just ManaProduction.AnyColor)
@@ -701,7 +704,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -903,7 +906,7 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               Object.facing = Facing.FaceUp,
               Object.damage = 0,
               Object.sickness = Sickness.Settled S.alice,
-              Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer S.bob)) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
+              Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer S.bob))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
               Object.counters = Map.empty,
               Object.attachedTo = Nothing,
               Object.chosenColor = Nothing,
@@ -1311,8 +1314,8 @@ resolveSpec s registry = Spec.describe s "Resolve" $ do
               S.noSource
               S.noSource
               S.alice
-              (Map.singleton slot True)
-              (Map.singleton slot (Recipient.ToCreature pikerId))
+              (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
+              (Map.singleton slot (Set.singleton (Recipient.ToCreature pikerId)))
               (Effect.ModifyTarget Duration.UntilEndOfTurn m (ObjectRef.InSlot slot))
         refused = store (Modification.ModifyPowerToughness (Quantity.Literal 3) Quantity.Star)
         stored = store (Modification.ModifyPowerToughness (Quantity.Literal 3) (Quantity.Literal 3))
@@ -1361,7 +1364,7 @@ installControlBy mindslaver controller target gs0 =
             Object.facing = Facing.FaceUp,
             Object.damage = 0,
             Object.sickness = Sickness.Settled controller,
-            Object.bindings = Binding.fromChoices (Map.singleton slot (Recipient.ToPlayer target)) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
+            Object.bindings = Binding.fromChoices (Map.singleton slot (Set.singleton (Recipient.ToPlayer target))) Nothing (Seq.singleton (ModeIndex.MkModeIndex 0)),
             Object.counters = Map.empty,
             Object.attachedTo = Nothing,
             Object.chosenColor = Nothing,
@@ -1503,7 +1506,7 @@ racingCounters island piker cancel =
       (cancelB, gs2) = handAppend cancel S.alice gs1
       atVictim :: Prompt.Prompt r -> r
       atVictim p = case p of
-        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject victimId)) sets
+        Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject victimId))) sets
         _ -> S.identityAnswer p
       castA = snd (Engine.runGamePure atVictim gs2 (S.cast S.alice cancelA))
       castB = snd (Engine.runGamePure atVictim castA (S.cast S.alice cancelB))
@@ -1644,7 +1647,7 @@ bobPaysAndCounters :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 bobPaysAndCounters notThis p = case p of
   Prompt.ChooseTargets _ player _ sets
     | player == S.bob ->
-        Map.mapMaybe (Set.lookupMin . Set.filter (\r -> Recipient.objectOf r /= Just notThis)) sets
+        fmap (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (Set.toAscList (Set.filter (\r -> Recipient.objectOf r /= Just notThis) legal)))) sets
   _ -> bobPaysAnswer p
 
 -- The pay-or-not answers in a transcript, in order.
@@ -2144,7 +2147,7 @@ magicalHackTimingSpec s registry = Spec.describe s "MagicalHackTiming" $ do
 -- other prompt takes the identity fallback.
 evolveAt :: ObjectId.ObjectId -> Subtype.Subtype -> Subtype.Subtype -> Prompt.Prompt r -> r
 evolveAt oid from to p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToObject oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToObject oid))) sets
   Prompt.ChooseCreatureTypeSwap {} -> (from, to)
   _ -> S.identityAnswer p
 
@@ -2185,7 +2188,7 @@ recordingForbidden oid p = case p of
   Prompt.ChooseLandTypeSwap _ _ _ _ forbidden -> do
     State.modify' (Set.union forbidden)
     pure (Subtype.Mountain, Subtype.Mountain)
-  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToObject oid)) sets)
+  Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToObject oid))) sets)
   _ -> pure (S.identityAnswer p)
 
 -- Cast Dragon Fodder; optionally cast Artificial Evolution at the Dragon Fodder
@@ -2248,7 +2251,7 @@ bitterblossomChain s registry swap = do
 -- be answered rather than forced by construction.
 aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
 -- CR 612.2's OTHER half, end to end through the real engine: "a creature type
@@ -2422,7 +2425,7 @@ stifleBoard island stifle sorcerer lands stifles = case soleActivatedAbility sor
             [1 .. stifles]
         atAlice :: Prompt.Prompt r -> r
         atAlice p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.alice)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.alice))) sets
           _ -> S.identityAnswer p
         activated = S.runPure atAlice (withStifles {GameState.priority = Just S.bob}) (Activate.activateAbility S.bob srcId ability)
      in Just (stifleIds, srcId, activated)
@@ -2583,7 +2586,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         bindings =
           Binding.setTriggerSource
             source
-            (Binding.fromChoices (Map.singleton targetSlot (Recipient.ToCreature victim)) Nothing Seq.empty)
+            (Binding.fromChoices (Map.singleton targetSlot (Set.singleton (Recipient.ToCreature victim))) Nothing Seq.empty)
         withBindings = base4 {GameState.objects = Map.adjust (\o -> o {Object.bindings = bindings}) abilId (GameState.objects base4)}
         -- Kill the sole real target before resolution: CR 608.2b makes it
         -- illegal (it's no longer a legal CreatureTarget), while the
@@ -2602,7 +2605,7 @@ fizzleSpec s registry = Spec.describe s "Fizzle" $ do
         atBob :: Prompt.Prompt r -> r
         atBob p = case p of
           Prompt.ChooseTargets _ _ _ sets ->
-            fmap (const (Recipient.ToPlayer S.bob)) sets
+            fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
           Prompt.ChooseAction _ _ actions ->
             case filter (S.isCastOf oid) actions of
               h : _ -> h
@@ -2665,14 +2668,14 @@ castBlackRemovalAt swamp printing foe =
 -- behaves like identityAnswer. Used to aim a player-targeting spell at bob.
 atBobAnswer :: Prompt.Prompt r -> r
 atBobAnswer p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
   _ -> S.identityAnswer p
 
 -- atBobAnswer's creature counterpart: aim every target slot at one named
 -- creature, rather than at whatever Set.lookupMin happens to offer first.
 atCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 atCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
 -- Add k cards of a printing to pid's hand (each a fresh Hand-zone object).
@@ -2976,7 +2979,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         -- aim the spell at bob.
         noDiscard q = case q of
           Prompt.ChooseDiscard {} -> []
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
           _ -> S.identityAnswer q
         cast = snd (Engine.runGamePure noDiscard gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
@@ -2997,7 +3000,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (gs, spellId) = S.handOne mindRot withHand
         noDiscard q = case q of
           Prompt.ChooseDiscard {} -> []
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
           _ -> S.identityAnswer q
         cast = snd (Engine.runGamePure noDiscard gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure noDiscard cast Stack.resolveTop)
@@ -3015,7 +3018,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (gs, spellId) = S.handOne mindRot withHand
         onlyLast q = case q of
           Prompt.ChooseDiscard _ _ ids _ -> take 1 (reverse ids)
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
           _ -> S.identityAnswer q
         cast = snd (Engine.runGamePure onlyLast gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure onlyLast cast Stack.resolveTop)
@@ -3035,7 +3038,7 @@ zoneChangeSpec s registry = Spec.describe s "ZoneChange" $ do
         (gs, spellId) = S.handOne mindRot withHand
         sameTwice q = case q of
           Prompt.ChooseDiscard _ _ ids _ -> concat (replicate 2 (take 1 ids))
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer S.bob)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer S.bob))) sets
           _ -> S.identityAnswer q
         cast = snd (Engine.runGamePure sameTwice gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure sameTwice cast Stack.resolveTop)
@@ -3069,7 +3072,7 @@ libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
         (gs, spellId) = S.handOne griptide g4
         aimAtPiker :: Prompt.Prompt r -> r
         aimAtPiker p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature pikerId))) sets
           _ -> S.identityAnswer p
         cast = snd (Engine.runGamePure aimAtPiker gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure aimAtPiker cast Stack.resolveTop)
@@ -3124,7 +3127,7 @@ libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
           Prompt.ChooseLibraryEnd {} -> do
             State.modify (+ 1)
             pure (S.identityAnswer p)
-          Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Recipient.ToCreature pikerId)) sets)
+          Prompt.ChooseTargets _ _ _ sets -> pure (fmap (const (Set.singleton (Recipient.ToCreature pikerId))) sets)
           _ -> pure (S.identityAnswer p)
         (after, asked) =
           State.runState
@@ -3147,7 +3150,7 @@ libraryPositionSpec s registry = Spec.describe s "LibraryPosition" $ do
         (gs, spellId) = S.handOne unsummon g2
         aimAtPiker :: Prompt.Prompt r -> r
         aimAtPiker p = case p of
-          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature pikerId)) sets
+          Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature pikerId))) sets
           _ -> S.identityAnswer p
         cast = snd (Engine.runGamePure aimAtPiker gs (S.cast S.alice spellId))
         after = snd (Engine.runGamePure aimAtPiker cast Stack.resolveTop)
@@ -3387,7 +3390,7 @@ exchangeAnswer who p = case p of
   Prompt.ChooseAction _ _ options -> case filter isActivation options of
     a : _ -> a
     [] -> A.Pass
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
   _ -> S.identityAnswer p
 
 isActivation :: A.Action -> Bool
@@ -3700,7 +3703,7 @@ copyTheOnlyTarget p = case p of
 -- Aims every target slot at one creature, for a fixture with several legal ones.
 targetingCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 targetingCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
 -- Soul's Majesty, the card that proves Quantity.AgainstSlot (#1171): "Draw cards
@@ -3840,8 +3843,8 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             oid
             oid
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 1) slot)
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "one of the two counters is gone" (fmap Object.counters (Game.lookupObject oid after)) (Just (Map.singleton CounterKind.MinusOneMinusOne 1))
@@ -3859,8 +3862,8 @@ countersSpec s registry = Spec.describe s "Counters" $ do
             oid
             oid
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.RemoveCounters CounterKind.MinusOneMinusOne (Quantity.Literal 3) slot)
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "the kind is gone, not negative" (fmap Object.counters (Game.lookupObject oid after)) (Just Map.empty)
@@ -4046,8 +4049,8 @@ untapSpec s registry = Spec.describe s "Untap" $ do
             oid
             oid
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.Untap (ObjectRef.InSlot slot))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "target is untapped" (fmap Object.tapped (Game.lookupObject oid after)) (Just TapState.Untapped)
@@ -4064,8 +4067,8 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             oid
             oid
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
         after = snd (Engine.runGamePure S.identityAnswer base run)
     Spec.assertEqWith s "alice now controls it" (Projection.controllerOf oid after) (Just S.alice)
@@ -4088,8 +4091,8 @@ gainControlSpec s registry = Spec.describe s "GainControl" $ do
             oid
             oid
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.GainControl Duration.UntilEndOfTurn (ObjectRef.InSlot slot))
         after = snd (Engine.runGamePure S.identityAnswer settled run)
     Spec.assertEqWith s "alice controlled it before" (Projection.controllerOf oid settled) (Just S.alice)
@@ -4372,8 +4375,8 @@ creatureFilter = Filter.Type.HasCardType CardType.Creature
 targetsPlayer :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 targetsPlayer victim p = case p of
   Prompt.ChooseTargets _ _ _ sets ->
-    Map.mapMaybe
-      (\legal -> if Set.member (Recipient.ToPlayer victim) legal then Just (Recipient.ToPlayer victim) else Set.lookupMin legal)
+    fmap
+      (\(n, legal) -> Set.fromList (take (Natural.toIntSaturating n) (List.nub (filter (== Recipient.ToPlayer victim) (Set.toAscList legal) <> Set.toAscList legal))))
       sets
   _ -> S.identityAnswer p
 
@@ -4408,7 +4411,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
     let (src, g0) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
         (hisPiker, g1) = S.addCreature piker S.bob g0
         (hisRats, gs) = S.addCreature rats S.bob g1
-        edict = Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        edict = Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
         keptRats = S.runPure (sacrifices hisPiker) gs edict
         keptPiker = S.runPure (sacrifices hisRats) gs edict
     Spec.assertBool s (S.onBattlefield hisRats keptRats) "choosing the Piker leaves the Rats"
@@ -4432,7 +4435,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
         (hers, g1) = S.addCreature piker S.alice g0
         (hisPiker, g2) = S.addCreature piker S.bob g1
         (hisRats, gs) = S.addCreature rats S.bob g2
-        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure (namesInstead hers) gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
         bobsLeft = length (filter (`S.onBattlefield` after) [hisPiker, hisRats])
     Spec.assertBool s (S.onBattlefield hers after) "alice's creature is untouched"
     -- The edict still takes exactly one: an answer the engine refuses does not
@@ -4451,7 +4454,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
             State.modify (+ 1)
             pure (S.identityAnswer p)
           _ -> pure (S.identityAnswer p)
-        act = Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
+        act = Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1))
         asked = State.execState (Engine.runGame countingAnswer gs act) 0
         after = S.runPure S.identityAnswer gs act
     Spec.assertEqWith s "nothing to choose" asked 0
@@ -4461,7 +4464,7 @@ playerSacrificesSpec s registry = Spec.describe s "PlayerSacrifices" $ do
   Spec.it s "CR 609.3 an edict against an empty board does nothing" $ do
     piker <- S.printingOf s registry "Goblin Piker"
     let (src, gs) = S.addCreature piker S.alice (Setup.emptyGame S.bothPlayers)
-        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget True) (Map.singleton slotTarget (Recipient.ToPlayer S.bob)) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
+        after = S.runPure S.identityAnswer gs (Resolve.applyEffect src src S.alice (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Map.singleton slotTarget (Set.singleton (Recipient.ToPlayer S.bob))) (Effect.PlayerSacrifices slotTarget creatureFilter (Quantity.Literal 1)))
     Spec.assertBool s (S.onBattlefield src after) "alice keeps hers"
   -- The gameplay-level proof: the real card, cast and resolved.
   Spec.it s "Diabolic Edict whole card: cast off two Swamps, bob sacrifices" $ do
@@ -4512,9 +4515,9 @@ denethorDamageSlot = SlotName.MkSlotName (Text.pack "damage")
 -- what makes the two slots differ. Recording is how the test asserts the map it
 -- fed in is the map the engine received, instead of inferring it from the board.
 answerSlots ::
-  Map.Map SlotName.SlotName Recipient.Recipient ->
+  Map.Map SlotName.SlotName (Set.Set Recipient.Recipient) ->
   Prompt.Prompt r ->
-  State.State [Map.Map SlotName.SlotName Recipient.Recipient] r
+  State.State [Map.Map SlotName.SlotName (Set.Set Recipient.Recipient)] r
 answerSlots answers p = case p of
   Prompt.ChooseTargets {} -> do
     let deflt = S.identityAnswer p
@@ -4575,7 +4578,7 @@ targetedMonarchSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry 
 targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
   Spec.it s "CR 725.1/725.3 the crown goes to the TARGETED player, not the controller and not the damage's target" $ do
     (ability, srcId, gs0) <- denethorBoard s registry
-    let answers = Map.fromList [(denethorCrownSlot, Recipient.ToPlayer S.bob), (denethorDamageSlot, Recipient.ToPlayer S.carol)]
+    let answers = Map.fromList [(denethorCrownSlot, Set.singleton (Recipient.ToPlayer S.bob)), (denethorDamageSlot, Set.singleton (Recipient.ToPlayer S.carol))]
         act = do Activate.activateAbility S.alice srcId ability; Stack.resolveTop
         ((_, after), asked) = State.runState (Engine.runGame (answerSlots answers) gs0 act) []
     Spec.assertEqWith s "alice held the crown going in" (GameState.monarch gs0) (Just S.alice)
@@ -4596,7 +4599,7 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
   Spec.it s "CR 725.3 the unseated monarch stops drawing at end step, and the new one starts" $ do
     (ability, srcId, gs0) <- denethorBoard s registry
     piker <- S.printingOf s registry "Goblin Piker"
-    let answers = Map.fromList [(denethorCrownSlot, Recipient.ToPlayer S.bob), (denethorDamageSlot, Recipient.ToPlayer S.carol)]
+    let answers = Map.fromList [(denethorCrownSlot, Set.singleton (Recipient.ToPlayer S.bob)), (denethorDamageSlot, Set.singleton (Recipient.ToPlayer S.carol))]
         act = do Activate.activateAbility S.alice srcId ability; Stack.resolveTop
         ((_, after), _) = State.runState (Engine.runGame (answerSlots answers) gs0 act) []
         -- CR 104.3c: a seat asked to draw from an empty library loses instead, so
@@ -4624,7 +4627,7 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
   -- players. CR 800.4 is what lets the game go on around the concession.
   Spec.it s "CR 608.2b one illegal target does not fizzle the ability, and the other half still happens" $ do
     (ability, srcId, gs0) <- denethorBoard s registry
-    let answers = Map.fromList [(denethorCrownSlot, Recipient.ToPlayer S.bob), (denethorDamageSlot, Recipient.ToPlayer S.carol)]
+    let answers = Map.fromList [(denethorCrownSlot, Set.singleton (Recipient.ToPlayer S.bob)), (denethorDamageSlot, Set.singleton (Recipient.ToPlayer S.carol))]
         activated = snd (State.evalState (Engine.runGame (answerSlots answers) gs0 (Activate.activateAbility S.alice srcId ability)) [])
         concede = Departure.depart Departure.Type.Conceded
         resolveAfter f = S.runPure S.identityAnswer (f activated) Stack.resolveTop
@@ -4662,9 +4665,9 @@ targetedMonarchSpec s registry = Spec.describe s "TargetedMonarch" $ do
   -- is a locality convenience, keeping all three answers in one place.
   Spec.it s "CR 725.1 slotsOf reads the targeted monarch's slot, and only that arm's" $ do
     let slot = SlotName.MkSlotName (Text.pack "player")
-    Spec.assertEqWith s "the targeted arm names its slot" (Resolve.slotsOf (Effect.BecomeMonarch (MonarchTarget.InSlot slot))) (Set.singleton slot)
-    Spec.assertEqWith s "the resolving controller names none" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.TheController)) Set.empty
-    Spec.assertEqWith s "and neither does CR 725.2's crown steal" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)) Set.empty
+    Spec.assertEqWith s "the targeted arm names its slot" (Resolve.slotsOf (Effect.BecomeMonarch (MonarchTarget.InSlot slot))) (Map.singleton slot SlotArity.One)
+    Spec.assertEqWith s "the resolving controller names none" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.TheController)) Map.empty
+    Spec.assertEqWith s "and neither does CR 725.2's crown steal" (Resolve.slotsOf (Effect.BecomeMonarch MonarchTarget.ControllerOfSource)) Map.empty
 
 -- Palace Jailer's ruling (Scryfall, 2021-03-19): "If you're not the monarch as
 -- Palace Jailer's second ability resolves, the creature will be exiled until
@@ -4691,8 +4694,8 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.noSource
             S.noSource
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.ExileUntilMonarch slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         settled = snd (Engine.runGamePure S.identityAnswer exiled Monarch.returnExiledForMonarch)
@@ -4713,8 +4716,8 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.noSource
             S.noSource
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.ExileUntilMonarch slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         -- Palace Jailer's OTHER entry trigger: alice takes the crown. She is
@@ -4740,8 +4743,8 @@ exileUntilMonarchSpec s registry = Spec.describe s "ExileUntilMonarch" $ do
             S.noSource
             S.noSource
             S.alice
-            (Map.singleton slot True)
-            (Map.singleton slot (Recipient.ToCreature oid))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
+            (Map.singleton slot (Set.singleton (Recipient.ToCreature oid)))
             (Effect.ExileUntilMonarch slot)
         exiled = snd (Engine.runGamePure S.identityAnswer base exile)
         noMonarch = snd (Engine.runGamePure S.identityAnswer exiled {GameState.monarch = Nothing} Monarch.returnExiledForMonarch)
@@ -6034,19 +6037,173 @@ spec s registry = Spec.describe s "Pawl.Engine.Resolve" $ do
   auraThiefSpec s registry
   baneOfProgressSpec s registry
   upToOneTargetSpec s registry
+  multiTargetSpec s registry
+
+-- CR 601.2c's announcement, answered with a stated number for every variable
+-- slot -- where S.identityAnswer announces as many as the board allows.
+announcingCount :: Natural -> Prompt.Prompt r -> r
+announcingCount n p = case p of
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const n) offers
+  _ -> S.identityAnswer p
+
+-- Announces `n` targets per slot and aims them at `wanted`, in that order of
+-- preference. S.identityAnswer would take the least Recipients instead, which on
+-- these boards is not what the assertions are about.
+takingTargets :: Natural -> [ObjectId.ObjectId] -> Prompt.Prompt r -> r
+takingTargets n wanted p = case p of
+  Prompt.AnnounceTargets {} -> announcingCount n p
+  Prompt.ChooseTargets _ _ _ sets -> S.preferring (\r -> maybe False (\oid -> elem oid wanted) (Recipient.objectOf r)) sets
+  _ -> S.identityAnswer p
+
+-- The +1/+1 counters on one permanent.
+plusCountersOn :: ObjectId.ObjectId -> GameState.GameState -> Maybe Natural
+plusCountersOn oid gs = fmap (Map.findWithDefault 0 CounterKind.PlusOnePlusOne . Object.counters) (Game.lookupObject oid gs)
+
+-- CR 601.2c's count above one, read at resolution.
+--
+-- Hearts on Fire {1}{R} Instant (data/cards/hearts-on-fire.json): "One or two
+-- target creatures each get +2/+1 until end of turn." A range whose minimum is
+-- neither zero nor its maximum, so it exercises both ends -- castability gates on
+-- the minimum, the announcement chooses between one and two, and CR 608.2b's
+-- per-recipient legality shows on the survivor when the other target goes.
+--
+-- Agent Bishop, Man in Black {2}{W} 1/2 (data/cards/agent-bishop-man-in-black.json):
+-- "At the beginning of combat on your turn, put a +1/+1 counter on each of up to
+-- two target creatures." The same count on a TRIGGERED ability, where
+-- Resolve.resolveModes rather than Resolve.targetsAllIllegal asks CR 608.2b's
+-- question.
+multiTargetSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
+multiTargetSpec s registry = Spec.describe s "MultiTarget" $ do
+  -- Three creatures with three different power/toughness boxes, so which two were
+  -- pumped is legible; two targets out of three is what makes the count a choice
+  -- rather than a sweep.
+  Spec.it s "CR 601.2c Hearts on Fire pumps the two creatures it named, and only those" $ do
+    (pikerId, ratsId, wallId, gs, spellId) <- heartsBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker is +2/+1" (S.powerToughnessOf pikerId after) (Just (4, 2))
+    Spec.assertEqWith s "the Wall is +2/+1" (S.powerToughnessOf wallId after) (Just (2, 9))
+    Spec.assertEqWith s "the Rats, whom nobody named, are untouched" (S.powerToughnessOf ratsId after) (Just (1, 1))
+  -- The same board and the same spell, differing only in the announced number.
+  Spec.it s "CR 601.2c announcing one target pumps one creature" $ do
+    (pikerId, _, wallId, gs, spellId) <- heartsBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 1 [pikerId, wallId]
+        after = resolveOne answer gs spellId
+    Spec.assertEqWith s "the Piker is +2/+1" (S.powerToughnessOf pikerId after) (Just (4, 2))
+    Spec.assertEqWith s "and the second creature it would have taken is untouched" (S.powerToughnessOf wallId after) (Just (0, 8))
+  -- CR 608.2b: "Illegal targets, if any, won't be affected by parts of a
+  -- resolving spell's effect for which they're illegal." One target of two leaves
+  -- the battlefield between the announcement and the resolution, which under a
+  -- per-SLOT reading of that rule would take the survivor down with it.
+  Spec.it s "CR 608.2b one of two targets leaving does not stop the other being pumped" $ do
+    (pikerId, _, wallId, gs, spellId) <- heartsBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+        gone = snd (Engine.runGamePure answer cast (Event.changeZone wallId Zone.Graveyard))
+        after = snd (Engine.runGamePure answer gone Stack.resolveTop)
+    Spec.assertEqWith s "the surviving target is +2/+1" (S.powerToughnessOf pikerId after) (Just (4, 2))
+    Spec.assertBool s (not (Set.member wallId (GameState.battlefield after))) "and the other one is gone"
+  -- CR 601.2c's minimum, which is castability's question: one legal creature is
+  -- enough for "one or two", and none is not. Both boards hold the same two
+  -- Mountains, so the creature is the only difference between them.
+  Spec.it s "CR 601.2c a minimum above zero gates castability" $ do
+    mountain <- S.printingOf s registry "Mountain"
+    piker <- S.printingOf s registry "Goblin Piker"
+    hearts <- S.printingOf s registry "Hearts on Fire"
+    let lands = S.landsInPlay mountain 2
+        (_, withCreature) = S.addCreature piker S.bob lands
+        castable board = let (gs, spellId) = S.handOne hearts board in S.castable S.alice spellId gs
+    Spec.assertBool s (castable withCreature) "one creature is enough for one or two targets"
+    Spec.assertBool s (not (castable lands)) "and no creature is not"
+  -- The ability path's own CR 608.2b (Resolve.resolveModes), which the spell path
+  -- above does not reach.
+  Spec.it s "CR 601.2c Agent Bishop's trigger counters the two creatures it named" $ do
+    (bishopId, pikerId, ratsId, wallId, gs) <- bishopBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        after = S.runPure answer (S.runPure answer gs Engine.settleForPriority) Stack.resolveTop
+    Spec.assertEqWith s "the Piker took a counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertEqWith s "so did the Wall" (plusCountersOn wallId after) (Just 1)
+    Spec.assertEqWith s "the Rats, whom nobody named, took none" (plusCountersOn ratsId after) (Just 0)
+    Spec.assertEqWith s "and neither did Bishop" (plusCountersOn bishopId after) (Just 0)
+  Spec.it s "CR 608.2b Agent Bishop's trigger still counters the target that survives" $ do
+    (_, pikerId, _, wallId, gs) <- bishopBoard s registry
+    let answer :: Prompt.Prompt r -> r
+        answer = takingTargets 2 [pikerId, wallId]
+        -- The trigger is PLACED (CR 603.3, targets announced) and then one of them
+        -- leaves, so CR 608.2b has something to re-validate when it resolves.
+        placed = S.runPure answer gs Engine.settleForPriority
+        gone = S.runPure answer placed (Event.changeZone wallId Zone.Graveyard)
+        after = S.runPure answer gone Stack.resolveTop
+    Spec.assertEqWith s "the surviving target took its counter" (plusCountersOn pikerId after) (Just 1)
+    Spec.assertBool s (not (Set.member wallId (GameState.battlefield after))) "and the other one is gone"
+
+-- Two Mountains for Hearts on Fire, three of bob's creatures with three distinct
+-- printed boxes (2/1, 1/1, 0/8), and the spell in alice's hand.
+heartsBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState, ObjectId.ObjectId)
+heartsBoard s registry = do
+  mountain <- S.printingOf s registry "Mountain"
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  hearts <- S.printingOf s registry "Hearts on Fire"
+  let (pikerId, g1) = S.addCreature piker S.bob (S.landsInPlay mountain 2)
+      (ratsId, g2) = S.addCreature rats S.bob g1
+      (wallId, g3) = S.addCreature wall S.bob g2
+      (gs, spellId) = S.handOne hearts g3
+  pure (pikerId, ratsId, wallId, gs, spellId)
+
+-- Agent Bishop on alice's battlefield with the same three creatures, at the
+-- beginning of her combat, where its ability triggers.
+bishopBoard ::
+  (Monad m) =>
+  Spec.Spec m n ->
+  Registry.Registry m ->
+  m (ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, ObjectId.ObjectId, GameState.GameState)
+bishopBoard s registry = do
+  piker <- S.printingOf s registry "Goblin Piker"
+  rats <- S.printingOf s registry "Typhoid Rats"
+  wall <- S.printingOf s registry "Wall of Stone"
+  bishop <- S.printingOf s registry "Agent Bishop, Man in Black"
+  let (bishopId, g1) = S.addCreature bishop S.alice (Setup.emptyGame S.bothPlayers)
+      (pikerId, g2) = S.addCreature piker S.bob g1
+      (ratsId, g3) = S.addCreature rats S.bob g2
+      (wallId, g4) = S.addCreature wall S.bob g3
+      combat = Phase.Combat CombatStep.BeginningOfCombat
+      gs =
+        Event.recordEvent (GameEvent.StepBegan combat S.alice) $
+          g4
+            { GameState.phase = combat,
+              GameState.activePlayer = S.alice,
+              GameState.priority = Just S.alice
+            }
+  pure (bishopId, pikerId, ratsId, wallId, gs)
+
+-- Cast a spell from alice's hand and resolve it.
+resolveOne :: (forall r. Prompt.Prompt r -> r) -> GameState.GameState -> ObjectId.ObjectId -> GameState.GameState
+resolveOne answer gs spellId =
+  let cast = snd (Engine.runGamePure answer gs (S.cast S.alice spellId))
+   in snd (Engine.runGamePure answer cast Stack.resolveTop)
 
 -- CR 115.6: declines every optional slot, announcing zero targets. Everything
 -- else is S.identityAnswer's answer, which for ChooseTargets fills what it is
 -- offered -- so the two answerers differ in exactly one decision.
 decliningTargets :: Prompt.Prompt r -> r
 decliningTargets p = case p of
-  Prompt.AnnounceTargets {} -> Set.empty
+  Prompt.AnnounceTargets _ _ _ offers -> fmap (const 0) offers
   _ -> S.identityAnswer p
 
 -- Announces one named slot and declines the rest.
 announcingOnly :: SlotName.SlotName -> Prompt.Prompt r -> r
 announcingOnly slot p = case p of
-  Prompt.AnnounceTargets _ _ _ offers -> Set.intersection (Map.keysSet offers) (Set.singleton slot)
+  Prompt.AnnounceTargets _ _ _ offers -> Map.mapWithKey (\name (count, _) -> if name == slot then TargetCount.most count else 0) offers
   _ -> S.identityAnswer p
 
 -- CR 115.6's "up to one target", read at resolution.

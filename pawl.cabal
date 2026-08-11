@@ -284,8 +284,8 @@ library codec
     Pawl.Codec.SupertypeSpec
     Pawl.Codec.TapState
     Pawl.Codec.TapStateSpec
-    Pawl.Codec.TargetRequirement
-    Pawl.Codec.TargetRequirementSpec
+    Pawl.Codec.TargetCount
+    Pawl.Codec.TargetCountSpec
     Pawl.Codec.TargetSpec
     Pawl.Codec.TargetSpecSpec
     Pawl.Codec.TokenPattern
@@ -713,6 +713,7 @@ library types
     Pawl.Types.Scope
     Pawl.Types.SearchDestination
     Pawl.Types.Sickness
+    Pawl.Types.SlotArity
     Pawl.Types.SlotName
     Pawl.Types.Source
     Pawl.Types.SourceRelation
@@ -723,7 +724,7 @@ library types
     Pawl.Types.SubtypeFamily
     Pawl.Types.Supertype
     Pawl.Types.TapState
-    Pawl.Types.TargetRequirement
+    Pawl.Types.TargetCount
     Pawl.Types.TargetSpec
     Pawl.Types.Timestamp
     Pawl.Types.TokenPattern

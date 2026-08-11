@@ -941,9 +941,9 @@ replaySpec s registry =
       Spec.assertEqWith s "replayed: the concession is gone" (GameState.result drifted) Nothing
       Spec.assertEqWith s "and the report says so" desync (Just (Desync.Mismatched 0 (Response.ChoseX 0)))
     Spec.it s "a ChooseTargets answer round-trips through the transcript" $ do
-      let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
+      let sets = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (1 :: Natural.Natural, Set.singleton (Recipient.ToPlayer S.bob))
           p = Prompt.ChooseTargets (Decider.MkDecider S.alice) S.alice (ObjectId.MkObjectId 0) sets
-          answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Recipient.ToPlayer S.bob)
+          answer = Map.singleton (SlotName.MkSlotName (Text.pack "target")) (Set.singleton (Recipient.ToPlayer S.bob))
       Spec.assertEqWith s "decode . encode = Just" (Replay.decode p (Replay.encode p answer)) (Just answer)
     -- CR 700.2b/603.3d: the mode chosen as Aether Channeler's ETB trigger is
     -- placed (Engine.placeOne prompts ChooseModes) records/replays exactly

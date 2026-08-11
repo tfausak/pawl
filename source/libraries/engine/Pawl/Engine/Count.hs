@@ -160,7 +160,10 @@ playersFor context gs ref =
         PlayerRef.InSlot name -> do
           src <- Filter.source context
           obj <- Game.lookupObject src gs
-          recipient <- Map.lookup name (Binding.targetsOf (Object.bindings obj))
+          -- One recipient or none: a count reads a slot that names one player,
+          -- and Binding.onlyOne is how every such reader declines a slot that
+          -- names several (CR 601.2c).
+          recipient <- Binding.onlyOne =<< Map.lookup name (Binding.targetsOf (Object.bindings obj))
           case recipient of
             Recipient.ToPlayer pid -> Just [pid]
             Recipient.ToCreature _ -> Nothing

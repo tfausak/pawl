@@ -43,8 +43,25 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
   Spec.it s "fromChoices projects a slot's chosen target" $ do
     let slot = SlotName.MkSlotName (Text.pack "target")
         r = Recipient.ToPlayer S.alice
-        m = Binding.fromChoices (Map.singleton slot r) Nothing Seq.empty
-    Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot r
+        m = Binding.fromChoices (Map.singleton slot (Set.singleton r)) Nothing Seq.empty
+    Spec.assertEq s (Binding.targetsOf m) $ Map.singleton slot (Set.singleton r)
+
+  -- CR 601.2c: a slot may name several targets, and a reader that can take only
+  -- one must decline rather than pick. Pawl.CardSpec's arity lint is what keeps a
+  -- card from reaching this in the first place, so this is the only place the
+  -- declining itself is asserted.
+  Spec.it s "onlyOne takes a lone recipient" $
+    Spec.assertEq s (Binding.onlyOne (Set.singleton (Recipient.ToPlayer S.alice))) (Just (Recipient.ToPlayer S.alice))
+  Spec.it s "onlyOne declines a slot that names several" $
+    Spec.assertEq s (Binding.onlyOne (Set.fromList [Recipient.ToPlayer S.alice, Recipient.ToPlayer S.bob])) Nothing
+
+  -- An empty answer is no binding at all, which is what keeps CR 608.2b measuring
+  -- the slots FILLED rather than the slots offered (CR 115.6).
+  Spec.it s "fromChoices drops a slot answered with no targets" $
+    Spec.assertEq
+      s
+      (Binding.targetsOf (Binding.fromChoices (Map.singleton (SlotName.MkSlotName (Text.pack "target")) Set.empty) Nothing Seq.empty))
+      Map.empty
 
   Spec.it s "fromChoices stores X under the reserved slot" $ do
     let m = Binding.fromChoices Map.empty (Just 3) Seq.empty
@@ -107,7 +124,7 @@ spec s = Spec.describe s "Pawl.Engine.Binding" $ do
             (Binding.toObject (ObjectId.MkObjectId 1))
             (Binding.toObject (ObjectId.MkObjectId 2))
     Spec.assertEq s (Binding.targetsOf (Map.singleton slotTokens merged)) $
-      Map.singleton slotTokens (Recipient.ToObject (ObjectId.MkObjectId 1))
+      Map.singleton slotTokens (Set.singleton (Recipient.ToObject (ObjectId.MkObjectId 1)))
 
   Spec.it s "a target binding carries no group" $ do
     let slot = SlotName.MkSlotName (Text.pack "tokens")

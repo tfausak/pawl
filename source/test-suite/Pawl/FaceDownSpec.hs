@@ -350,7 +350,7 @@ tap oid gs =
 -- S.identityAnswer: the point of the case is which creature was chosen.
 aimAtCreature :: ObjectId.ObjectId -> Prompt.Prompt r -> r
 aimAtCreature oid p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToCreature oid)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToCreature oid))) sets
   _ -> S.identityAnswer p
 
 -- CR 708.2a's name: the empty one, which matches no printed card.
@@ -891,7 +891,7 @@ farseerBoard land farseer morph n =
 -- ability's own controller, and so the control rather than the positive case.
 aimAt :: PlayerId.PlayerId -> Prompt.Prompt r -> r
 aimAt who p = case p of
-  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Recipient.ToPlayer who)) sets
+  Prompt.ChooseTargets _ _ _ sets -> fmap (const (Set.singleton (Recipient.ToPlayer who))) sets
   _ -> S.identityAnswer p
 
 -- CR 303.4k's board. alice holds the Aura and has three Swamps for CR 702.37a's
