@@ -38,15 +38,17 @@ Two new sublibraries, inserted between `json` and `codec`:
 
 ```
 spec
-  json           Value, encode, decode
-    json-schema  Schema, Name, SchemaM, define, run
-      json-codec Common, Codec, Fields, Arm
-        codec    CardName, PhasePattern, ... and nothing else
+  json             Value, encode, decode
+    json-pointer   Pointer, Token, encode, encodeFragment
+      json-schema  Schema, Name, SchemaM, define, run
+        json-codec Common, Codec, Fields, Arm
+          codec    CardName, PhasePattern, ... and nothing else
 ```
 
-`pawl:json-schema` is a peer of `pawl:json-pointer`: an RFC-adjacent format
-modelled over `Pawl.Json.Value`, with no knowledge of Pawl's types or of the
-codec's conventions.
+`pawl:json-schema` sits on `pawl:json-pointer` rather than beside it: a `$ref` is
+a pointer, and the library that already models one correctly is the one that
+should build it. Like its neighbour it is an RFC-adjacent format over
+`Pawl.Json.Value`, with no knowledge of Pawl's types or the codec's conventions.
 
 `pawl:json-codec` holds the shape of a codec and the generic helpers.
 `pawl:codec` is left holding codecs for `pawl:types` types, one module each,
@@ -147,19 +149,40 @@ reachable definition name -- carrying both characters RFC 6901 reserves. Pawl
 defines no such type today and has no plans to, but `Name` is derived from the
 whole language, not from Pawl's habits.
 
-So the two positions are escaped differently, and `Define` keeps them apart:
+So the two positions are written differently, and `Define` keeps them apart:
 
-- **The `$defs` key is the raw name.** It is a JSON object key; JSON escapes
-  nothing here.
-- **The `$ref` is a URI-reference containing a JSON Pointer**, so it is escaped
-  twice, in order. RFC 6901 first: `~` to `~0`, then `/` to `~1` -- that order,
-  or a `/` rewritten to `~1` gets its `~` rewritten again. RFC 3986 second: a
-  fragment cannot carry `#`, `%`, `<`, `>`, `\`, `^` or `|`, all of which are
-  legal Haskell operator characters, so what remains is percent-encoded. Second
-  because 6901 introduces no `%` of its own.
+- **The `$defs` key is the raw name.** It is a JSON object key; nothing is
+  escaped here.
+- **The `$ref` is built as a `Pointer`**, never as a string:
 
-`Face Card` never reaches either rule, because `typeName` joins arguments with
-`_` before any of this. The space is a rendering choice; these are correctness.
+  ``` hs
+  reference :: Name.Name -> Schema.Schema
+  reference name =
+    schemaOf . Pointer.encodeFragment . Pointer.MkPointer $
+      [Token.MkToken (Text.pack "$defs"), Token.MkToken (Name.unwrap name)]
+  ```
+
+  A `Token` stores unescaped text and `Pointer.encode` escapes on the way out,
+  `~` before `/`, which is the ordering a hand-rolled escape gets wrong -- a `/`
+  rewritten to `~1` otherwise has its own `~` rewritten again. That is already
+  written, documented and tested in `pawl:json-pointer`, and this is what that
+  library is for.
+
+`Face Card` reaches none of it: `typeName` joins arguments with `_` first. The
+`_` is a rendering choice; the escaping is correctness.
+
+### One addition to `pawl:json-pointer`
+
+`encodeFragment` is new. RFC 6901 section 6 defines a second representation of a
+pointer -- the URI fragment identifier -- which prefixes `#` and percent-encodes
+what RFC 3986 forbids in a fragment: `#`, `%`, `<`, `>`, `\`, `^` and `|`, every
+one a legal Haskell operator character. `$ref` takes that form, not the plain
+one.
+
+It belongs in `json-pointer`, not here. The library claims RFC 6901, section 6 is
+part of RFC 6901, and a schema library has no business knowing about URIs. It is
+a short function beside `encode`, with its own case in `PointerSpec`, and it
+leaves `json-pointer` covering the whole RFC rather than most of it.
 
 `Pawl.JsonSchema.Schema` exports generic constructors only: `string`, `integer`,
 `natural`, `object`, `oneOf`, `constant`, `nullable`, `withDefault`. Pawl's
@@ -348,11 +371,13 @@ synthetic self-referential `define`, asserting the cycle breaks into a `$ref`
 instead of diverging. That tests the machinery, not any type's schema.
 `Pawl.JsonSchema.NameSpec` pins the rendering rule the same way: a bare type
 gives `PhasePattern`, an applied one `Face_Card` rather than a name with a space
-in it. Escaping is tested against a hand-built `MkName ":~/"` rather than a real
-operator-named type -- that a `TypeRep` for one renders its operator verbatim is
-GHC's contract, and asserting it would cost `TypeOperators` to say nothing about
-the code under test. What can be wrong is the escape, and that is what the case
-covers: `$defs` key `:~/`, `$ref` `#/$defs/:~0~1`.
+in it. Escaping itself is `pawl:json-pointer`'s, already covered by `TokenSpec`,
+and is not re-tested here; `encodeFragment` gets its own case in `PointerSpec`
+beside `encode`. What `DefineSpec` adds is that the two are composed correctly --
+a `MkName ":~/"` giving the `$defs` key `:~/` and the `$ref` `#/$defs/:~0~1`.
+That uses a hand-built `Name` rather than a real operator-named type: that a
+`TypeRep` renders its operator verbatim is GHC's contract, and asserting it would
+cost `TypeOperators` to say nothing about the code under test.
 
 Golden schemas per type and a schema validator were both considered and
 rejected for now -- see *Alternatives rejected*.
@@ -422,3 +447,6 @@ covers it.
   module, but `#/$defs/Pawl.Types.PhasePattern.PhasePattern` in every reference,
   with the module name repeating the type name, for a collision the convention
   already prevents.
+- **Escaping `$ref` inside `json-schema`.** `pawl:json-pointer` was written
+  before the schema for this, and gets the `~`-before-`/` ordering right. A
+  second implementation would be a second thing to get wrong.
