@@ -227,8 +227,10 @@ data TriggerCondition
     -- the attacker into Pawl.Engine.Binding.blockedCreature for the payload's
     -- "that creature" to read.
     --
-    -- No Filter over the attacker, unlike SelfBecomesBlockedBy: every printing of
-    -- this form says "a creature" and nothing more.
+    -- No Filter over the attacker, unlike SelfBecomesBlockedBy. The printings that
+    -- narrow it -- Netcaster Spider's "a creature with flying" -- are not served
+    -- (#1253); SelfBlocksOneOrMore's Filter is a different arity and does not
+    -- cover them.
     --
     -- Rule 509.3b's other producer, an effect that causes the bearer to block,
     -- records no event and so does not reach this (#1146). CR 509.4's creature
@@ -247,6 +249,31 @@ data TriggerCondition
     -- The Natural is the floor. Two on every card in the pool; carried because
     -- the rule is written about a number rather than about two.
     SelfBlocksAtLeast Natural.Natural
+  | -- | CR 509.3e: "whenever [a creature] blocks one or more [F] creatures" --
+    -- Serra Inquisitors' first half, whose Filter is "black". SelfBlocksAtLeast
+    -- with the number spent on a QUALITY instead: rule 509.3e's last sentence
+    -- covers "at least a certain number", and one is the number every filtered
+    -- printing states. Matched against the same grouped GameEvent.BlocksDeclared
+    -- and self-scoped the same way.
+    --
+    -- The grouping is what the printed "one or more" asks for: the bearer's whole
+    -- declaration fires this once, however many admitted creatures it blocked.
+    -- CR 509.3b's per-attacker form is SelfBlocksCreature above, and two admitted
+    -- attackers is the board that tells them apart.
+    --
+    -- No Natural, unlike SelfBlocksAtLeast: no printing filters AND counts past
+    -- one, and a floor no card states would be a number no board could observe.
+    -- The two arms stay separate for that reason rather than merging into a
+    -- counted-and-filtered one.
+    --
+    -- The Filter is a predicate over each ATTACKER the bearer blocked, read from
+    -- Pawl.Types.Combat's declaration record rather than from the event, which
+    -- carries only how many. Read at the scan, which is rule 509.3f's "at the
+    -- point blockers are declared" for SelfBecomesBlockedBy's reason.
+    --
+    -- Rule 509.3e's "effects that add or remove blockers" reach neither this nor
+    -- SelfBlocksAtLeast: the declaration is the only producer (#1146).
+    SelfBlocksOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 509.3c: "whenever [a creature] becomes blocked" -- Sacred Prey's. The
     -- ATTACKING side of SelfBlocks, and self-scoped the same way.
     --
@@ -291,6 +318,26 @@ data TriggerCondition
     -- creature put onto the battlefield blocking, which this one form DOES
     -- trigger for -- have no producer in the pool and record no event (#1146).
     SelfBecomesBlockedBy (Filter.Filter Keyword.Keyword)
+  | -- | CR 509.3e: "whenever [a creature] becomes blocked by one or more [F]
+    -- creatures" -- Serra Inquisitors' second half, and SelfBlocksOneOrMore read
+    -- from the ATTACKING side. Self-scoped like SelfBecomesBlocked, and matched
+    -- against the grouped GameEvent.AttackerBlocked for the same reason its
+    -- blocking twin reads GameEvent.BlocksDeclared: the printed "one or more"
+    -- fires once for the whole declaration.
+    --
+    -- That grouping is the whole difference from SelfBecomesBlockedBy above,
+    -- which reads the per-blocker pair and fires once for each. Two admitted
+    -- blockers is the board that tells them apart.
+    --
+    -- No blocker is bound. The form names a SET ("one or more"), not an object,
+    -- and the pool's payloads that reach into that set are Equipment (Godsend's
+    -- "one of those creatures"), whose attachment-scoped triggers pawl has no
+    -- shape for; Serra Inquisitors' payload names only itself.
+    --
+    -- Rule 509.3e's other producers -- an effect that adds a blocker, and a
+    -- creature put onto the battlefield blocking -- record no event (#1146), as
+    -- for every condition in this family.
+    SelfBecomesBlockedByOneOrMore (Filter.Filter Keyword.Keyword)
   | -- | CR 603.6 (a zone-change trigger): "when this card is put into your
     -- graveyard from your library" -- Narcomoeba's. Self-scoped like SelfEnters.
     --
