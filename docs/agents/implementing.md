@@ -42,19 +42,33 @@ silence is not.
 
 ## Mutation testing
 
-`CLAUDE.md` requires mutating the change away and re-running. Three things it
-does not say:
+`CLAUDE.md` requires mutating the change away and re-running. What it does not
+say:
+
+- **Apply the mutations one at a time and read the failure.** Red is not the
+  bar: it must go red for the *intended* reason, and only in the intended
+  place. A mutation that fails a dozen unrelated cases, or fails the target
+  case with a different message than the behaviour predicts, has proved
+  something else.
 
 - **Never `git checkout <file>` to revert a mutation.** An agent lost real
   edits that way. Copy the file to a backup first and move the backup back.
 
+- **Build a negative as a pair of boards differing in exactly one thing.** The
+  positive and the negative share mana, seats, timing and stock; the single
+  difference is the thing under test. A negative assembled on its own board
+  passes for reasons you did not choose.
+
 - **Report a mutation you could not run.** If a behaviour holds by construction
-  rather than by a guard you wrote, there is nothing to break, and the honest
-  report is that the assertion is a regression fence rather than a proof. Say
-  so at the code site and in the PR. Several units have turned on this.
+  rather than by a guard you wrote, or `-Werror` rejects the mutated source so
+  the suite never runs, there is nothing to break. Say plainly that the
+  assertion is a regression fence rather than a proof --- at the code site and
+  in the PR. Do not let a fence read as coverage. Several units have turned on
+  this.
 
 - **A mutation that leaves the suite green means the change has no observer.**
-  Do not close the issue as done. It is `wontfix` or `expires:synthetic`.
+  Do not close the issue as done. Add the card that gives the line an observer;
+  failing that it is `wontfix` or `expires:synthetic`.
 
 Re-run at least the load-bearing mutations after any merge from `origin/main`.
 A bad conflict resolution can neuter a test while leaving the suite green.
@@ -89,6 +103,18 @@ These have each shipped a green-but-meaningless test in this repository:
 
 - **A token exiled from a graveyard ceases to exist** (CR 111.7), so a token
   victim makes an exile assertion unobservable.
+
+- **An answerer can silently repair the assertion.** If the fixture's answerer
+  picks by searching for a legal option rather than by index, it will find the
+  right one again after your mutation, and the test stays green while the
+  engine's own choice is broken. Pin the answer, and check the assertion
+  actually reads the engine's output.
+
+- **Two conditions a board cannot tell apart.** Before writing the assertion,
+  name the other reading of the rule and check the board distinguishes them ---
+  same zone for two different destinations, same timestamp for two layers, the
+  same player holding two roles. If it does not, change the board, not the
+  assertion.
 
 ## Cards
 
