@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- | The codec's base module: the tagged-object convention, the element-generic
 -- combinators, the field combinators, and the spec assertions every per-type
 -- module is written in terms of. Encoding and decoding themselves live in
@@ -18,6 +20,7 @@
 -- values regardless of it.
 module Pawl.JsonCodec.Common where
 
+import qualified Data.Either as Either
 import qualified Data.Foldable as Foldable
 import qualified Data.List as List
 import qualified Data.List.NonEmpty as NonEmpty
@@ -26,6 +29,7 @@ import qualified Data.Maybe as Maybe
 import qualified Data.Sequence as Seq
 import qualified Data.Set as Set
 import qualified Data.Text as Text
+import qualified Data.Typeable as Typeable
 import qualified GHC.Stack as Stack
 import qualified Numeric.Natural as Natural
 import qualified Pawl.Decimal as Decimal
@@ -39,6 +43,10 @@ import qualified Pawl.Json.Object as Object
 import qualified Pawl.Json.Pair as Pair
 import qualified Pawl.Json.String as String
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
+import qualified Pawl.JsonSchema.Define as Define
+import qualified Pawl.JsonSchema.Name as Name
+import qualified Pawl.JsonSchema.Schema as Schema
 import qualified Pawl.Spec as Spec
 import qualified Text.Parsec as Parsec
 
@@ -318,3 +326,52 @@ assertJson ::
 assertJson s j = case parse (Text.pack j) of
   Left e -> Spec.assertFailure s $ "invalid JSON: " <> show j <> ": " <> show e
   Right v -> pure v
+
+-- Bundles --------------------------------------------------------------------
+
+-- | The shape every newtype over a JSON scalar takes: a fixed schema, filed
+-- under the type's own name, with the encoder and decoder passed in.
+scalar ::
+  forall a.
+  (Typeable.Typeable a) =>
+  Schema.Schema ->
+  (a -> Value.Value) ->
+  (Value.Value -> Either Text.Text a) ->
+  Codec.Codec a
+scalar s enc dec =
+  Codec.MkCodec
+    { Codec.encode = enc,
+      Codec.decode = dec,
+      Codec.schema = Define.define (Name.typeName (Typeable.Proxy :: Typeable.Proxy a)) (pure s)
+    }
+
+-- | Lifts a codec to one that also reads and writes null. Not filed in @$defs@:
+-- @Maybe@ is a structural wrapper rather than a type a reader wants named.
+maybe :: Codec.Codec a -> Codec.Codec (Maybe a)
+maybe c =
+  Codec.MkCodec
+    { Codec.encode = encodeMaybe (Codec.encode c),
+      Codec.decode = decodeMaybe (Codec.decode c),
+      Codec.schema = fmap Schema.nullable (Codec.schema c)
+    }
+
+-- | 'assertJsonCodec' against a bundle rather than a loose pair.
+assertCodec ::
+  (Stack.HasCallStack, Monad m, Eq a, Show a) =>
+  Spec.Spec m n ->
+  Codec.Codec a ->
+  a ->
+  String ->
+  m ()
+assertCodec s c = assertJsonCodec s (Codec.encode c) (Codec.decode c)
+
+-- | Forces a codec's schema and checks only that it is an object. It asserts
+-- nothing about the content, so editing a schema never edits a test -- but a
+-- bottom fails here, and a definition that fails to terminate fails on the
+-- suite's timeout.
+assertHasSchema :: (Stack.HasCallStack, Applicative m) => Spec.Spec m n -> Codec.Codec a -> m ()
+assertHasSchema s c =
+  Spec.assertBool
+    s
+    (Either.isRight (asObject (Define.run (Codec.schema c))))
+    "expected the schema to be an object"

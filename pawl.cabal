@@ -488,12 +488,14 @@ library json-codec
     pawl:decimal,
     pawl:extra,
     pawl:json,
+    pawl:json-schema,
     pawl:spec,
     text ^>=2.1.3,
 
   hs-source-dirs: source/libraries/json-codec
   -- cabal-gild: discover source/libraries/json-codec
   exposed-modules:
+    Pawl.JsonCodec.Codec
     Pawl.JsonCodec.Common
     Pawl.JsonCodec.CommonSpec
 

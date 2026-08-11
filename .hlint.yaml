@@ -1,10 +1,17 @@
 - extensions:
   - default: false
   - name:
+    - ApplicativeDo
+    # Pawl.JsonCodec.Fields is contravariant in its encoding direction, so it
+    # can be Applicative but never Monad. ApplicativeDo is what lets a record
+    # still be built with the do-notation the style guide asks for.
     - FlexibleContexts
     - GADTs
     - MultilineStrings
     - RankNTypes
+    - ScopedTypeVariables
+    # Pawl.JsonCodec.Fields and Pawl.JsonCodec.Arm derive a schema definition
+    # name from their own type variable, which has to be in scope in the body.
 
 # Prefer `f . g $ h x` over `f $ g $ h x`.
 - group: {name: dollar, enabled: true}
