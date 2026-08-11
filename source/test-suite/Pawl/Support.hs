@@ -1632,7 +1632,11 @@ stubView table oid =
                 Filter.counters = Map.empty,
                 Filter.ringBearerFor = Nothing,
                 Filter.designations = Set.empty,
-                Filter.kicked = False
+                Filter.kicked = False,
+                -- CR 602.1: the table registers no abilities either, for the
+                -- reason `owner` above gives -- no Count in the pool filters on
+                -- one.
+                Filter.nonManaActivatedAbility = False
               }
         [] -> Nothing
 

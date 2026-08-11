@@ -314,6 +314,8 @@ library codec
     Pawl.Codec.TypeLineSpec
     Pawl.Codec.UnlessPaid
     Pawl.Codec.UnlessPaidSpec
+    Pawl.Codec.UntapRestriction
+    Pawl.Codec.UntapRestrictionSpec
     Pawl.Codec.Uses
     Pawl.Codec.UsesSpec
     Pawl.Codec.Zone
@@ -410,6 +412,7 @@ library engine
     Pawl.Engine.Summoning
     Pawl.Engine.Target
     Pawl.Engine.Turn
+    Pawl.Engine.UntapRestriction
 
 -- The catalog of every exception Pawl can throw, and nothing else.
 library exceptions
@@ -752,6 +755,7 @@ library types
     Pawl.Types.TurnWindow
     Pawl.Types.TypeLine
     Pawl.Types.UnlessPaid
+    Pawl.Types.UntapRestriction
     Pawl.Types.Uses
     Pawl.Types.Zone
     Pawl.Types.ZoneChange
@@ -846,6 +850,7 @@ test-suite pawl-test-suite
     Pawl.TransformSpec
     Pawl.TriggerSpec
     Pawl.TurnSpec
+    Pawl.UntapRestrictionSpec
 
   type: exitcode-stdio-1.0
 

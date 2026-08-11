@@ -32,6 +32,7 @@ import qualified Pawl.Engine.Engine as Engine
 import qualified Pawl.Engine.Event as Event
 import qualified Pawl.Engine.Game as Game
 import qualified Pawl.Engine.Mana as Mana
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Engine.Replay as Replay
 import qualified Pawl.Engine.Setup as Setup
@@ -348,7 +349,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
-     in Spec.assertBool s (Mana.isManaAbility ab) "mana ability"
+     in Spec.assertBool s (ManaAbility.isManaAbility ab) "mana ability"
 
   Spec.it s "CR 605.1a an ability that targets is NOT a mana ability" $
     let ab =
@@ -361,7 +362,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
-     in Spec.assertBool s (not (Mana.isManaAbility ab)) "targets -> not mana"
+     in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "targets -> not mana"
 
   Spec.it s "CR 605.1a a damage ability is NOT a mana ability" $
     let ab =
@@ -374,7 +375,7 @@ manaSpec s registry = Spec.describe s "Mana" $ do
               ActivatedAbility.restrictions = [],
               ActivatedAbility.condition = Nothing
             }
-     in Spec.assertBool s (not (Mana.isManaAbility ab)) "no mana produced -> not mana"
+     in Spec.assertBool s (not (ManaAbility.isManaAbility ab)) "no mana produced -> not mana"
 
   Spec.it s "CR 605 a settled Llanowar Elves is a green mana source" $ do
     llanowarElves <- S.printingOf s registry "Llanowar Elves"

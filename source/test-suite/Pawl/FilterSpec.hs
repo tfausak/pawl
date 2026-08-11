@@ -54,7 +54,10 @@ blackCreature =
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
-      Filter.kicked = False
+      Filter.kicked = False,
+      -- CR 602.1 / 605.1a: a vanilla creature as far as this axis goes, so the
+      -- atom's own cases below say which view they want rather than inheriting it.
+      Filter.nonManaActivatedAbility = False
     }
 
 -- A colourless (devoid) creature with power 5, no controller recorded.
@@ -85,7 +88,8 @@ devoidBigCreature =
       Filter.counters = Map.empty,
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
-      Filter.kicked = False
+      Filter.kicked = False,
+      Filter.nonManaActivatedAbility = False
     }
 
 -- A creature whose only ability is the given keyword -- the toxic N and landwalk
@@ -757,3 +761,18 @@ spec s = Spec.describe s "Pawl.Engine.Filter" $ do
 
     Spec.it s "a player candidate is vacuously false" $ do
       Spec.assertBool s (not (Filter.matches self aPlayer (Filter.Type.HasCounters CounterKind.PlusOnePlusOne))) "player"
+
+  -- CR 602.1 / 605.1a, read off the one field the builders fill. Whether an
+  -- ability is a mana ability is decided there, not here, so these cases are the
+  -- atom's plumbing; Pawl.UntapRestrictionSpec is where the classification itself
+  -- is proved against two real lands.
+  Spec.describe s "HasNonManaActivatedAbility" $ do
+    Spec.it s "matches a permanent whose view records one" $ do
+      Spec.assertBool s (Filter.matches self (blackCreature {Filter.nonManaActivatedAbility = True}) Filter.Type.HasNonManaActivatedAbility) "has one"
+
+    Spec.it s "does not match one whose view records none" $ do
+      Spec.assertBool s (not (Filter.matches self blackCreature Filter.Type.HasNonManaActivatedAbility)) "vanilla"
+
+    -- CR 109.1: a player is not an object and has no abilities.
+    Spec.it s "a player candidate is vacuously false" $ do
+      Spec.assertBool s (not (Filter.matches self aPlayer Filter.Type.HasNonManaActivatedAbility)) "player"

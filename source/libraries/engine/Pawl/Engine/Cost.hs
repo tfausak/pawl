@@ -656,9 +656,10 @@ zoneFunctionedFrom cost = Maybe.listToMaybe (Maybe.mapMaybe zoneOfComponent (Cos
 zoneOfComponent :: CostComponent.CostComponent Keyword.Type.Keyword -> Maybe Zone.Zone
 zoneOfComponent component = case component of
   -- CR 702.29a's "Discard this card": the hand, which is where cycling functions.
-  -- Not read by anything today -- Pawl.Engine.Keyword.handAbilitiesOf mints the
-  -- cycling ability into the hand from rule 702.29a directly, which is the same
-  -- answer by a shorter route -- and written because CR 113.6m says it.
+  -- LOAD-BEARING since CR 702.29b and CR 702.77b put the minted cycling and
+  -- reinforce abilities into the projection for every zone: this is the answer
+  -- Activate.functionsIn reads to keep a Rustic Clachan on the battlefield from
+  -- offering its reinforce ability.
   CostComponent.DiscardThis -> Just Zone.Hand
   CostComponent.ExileThisFromGraveyard -> Just Zone.Graveyard
   CostComponent.TapThis -> Nothing

@@ -17,6 +17,8 @@ import qualified Data.Set as Set
 import qualified Pawl.Engine.Binding as Binding
 import qualified Pawl.Engine.Filter as Filter
 import qualified Pawl.Engine.Game as Game
+import qualified Pawl.Engine.Keyword as Keyword
+import qualified Pawl.Engine.ManaAbility as ManaAbility
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count.Type
 import qualified Pawl.Types.EventShape as EventShape
@@ -330,5 +332,24 @@ viewOfSnapshot mController isToken snapshot =
       -- battlefield now (CR 701.54e), not about one at the moment of an event.
       Filter.ringBearerFor = Nothing,
       Filter.designations = Set.empty,
-      Filter.kicked = False
+      Filter.kicked = False,
+      -- CR 602.1 / 605.1a off the snapshot, which is what it reads for `keywords`
+      -- and `power` too -- so this answers what the object HAD at the event.
+      --
+      -- Rule 702's own abilities are minted on top, exactly as
+      -- Pawl.Engine.Projection.abilitiesFromCharacteristics mints them: a
+      -- ProjectedCharacteristics stores the printed and granted list only, so
+      -- reading the field bare would answer differently here than live for a
+      -- Vehicle with crew or a land with reinforce. CR 702.178a's grant condition
+      -- is not re-asked -- there is no board at the event to ask it against, and
+      -- no snapshot-shaped reader in the pool asks this question at all.
+      Filter.nonManaActivatedAbility =
+        not
+          ( all
+              ManaAbility.isManaAbility
+              ( PC.activatedAbilities snapshot
+                  <> Keyword.battlefieldAbilitiesOf (PC.keywords snapshot)
+                  <> Keyword.handAbilitiesOf (Map.keysSet (PC.keywords snapshot))
+              )
+          )
     }
