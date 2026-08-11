@@ -23,6 +23,7 @@ import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.Affected as Affected
 import qualified Pawl.Types.CombatRestriction as CombatRestriction
 import qualified Pawl.Types.Condition as Condition.Type
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Face as Face
 import qualified Pawl.Types.Filter as Filter.Type
 import Pawl.Types.GameState (GameState)
@@ -217,7 +218,7 @@ inForce gs =
       -- CR 701.60c: "a suspected permanent has menace and 'This creature can't
       -- block' for as long as it's suspected". Decayed's row (CR 702.147a) with
       -- the keyword swapped for the designation -- aimed at the source alone,
-      -- with no CR 509.1b "unless" gate -- and read off Object.suspected rather than stamped
+      -- with no CR 509.1b "unless" gate -- and read off Object.designations rather than stamped
       -- when the designation was set, so it ends when the designation does. The
       -- menace half is a characteristic, and lives in
       -- Pawl.Engine.Projection.designationGathered.
@@ -232,7 +233,7 @@ inForce gs =
       -- and this gate drops it anyway (#1216). The menace half has no such hole,
       -- going through the layer fold itself.
       designationRows source = case Game.lookupObject source gs of
-        Just obj | Object.suspected obj -> [(source, [], CombatRestriction.CantBlock (Affected.Matching Filter.Type.IsSource) Nothing)]
+        Just obj | Set.member Designation.Suspected (Object.designations obj) -> [(source, [], CombatRestriction.CantBlock (Affected.Matching Filter.Type.IsSource) Nothing)]
         _ -> []
       -- The two ability losses the printed rows below check for, named because the
       -- designation row above asks the same question: CR 305.7's basic-land

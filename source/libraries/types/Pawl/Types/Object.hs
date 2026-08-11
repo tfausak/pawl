@@ -7,6 +7,7 @@ import qualified Pawl.Types.Binding as Binding
 import qualified Pawl.Types.CardName as CardName
 import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.ExilePlayPermission as ExilePlayPermission
 import qualified Pawl.Types.Facing as Facing
 import qualified Pawl.Types.Keyword as Keyword
@@ -396,58 +397,47 @@ data Object = MkObject
     -- re-decides it, from the half that was cast, every time the permanent
     -- enters.
     unlockedHalves :: Set.Set CardName.CardName,
-    -- | CR 702.112b: the RENOWNED designation. "Renowned is a designation that has
-    -- no rules meaning other than to act as a marker that the renown ability and
-    -- other spells and abilities can identify."
+    -- | Every designation this permanent has: CR 702.112b's renowned, CR 701.37b's
+    -- monstrous and CR 701.60b's suspected, which Pawl.Types.Designation holds as
+    -- one type because the three rules word the mark identically.
     --
-    -- A Bool where ringBearerFor above is a Maybe PlayerId, because rule 702.112b
-    -- names no player: it is a mark on the permanent alone, and nothing ends it on
-    -- a change of control the way CR 701.54a ends the Ring-bearer's.
+    -- A Set where ringBearerFor above is a Maybe PlayerId, because none of the
+    -- three rules names a player: each is a mark on the permanent alone, and
+    -- nothing ends one on a change of control the way CR 701.54a ends the
+    -- Ring-bearer's.
     --
-    -- STORED rather than projected, and rule 702.112b says why outright --
+    -- STORED rather than projected, and all three rules say why outright --
     -- "neither an ability nor part of the permanent's copiable values". So no CR
-    -- 613 layer writes it, and a Clone of a renowned creature is not renowned, for
-    -- the reason ringBearerFor's note gives.
+    -- 613 layer writes this, and a Clone of a renowned creature is not renowned,
+    -- for the reason ringBearerFor's note gives.
     --
     -- Per-incarnation state, like damage and counters: cleared by newIncarnation.
     -- That IS rule 702.112b's "once a permanent becomes renowned, it stays renowned
-    -- until it leaves the battlefield" -- the designation ends with the
-    -- incarnation, so there is no sweep to run.
-    renowned :: Bool,
-    -- | CR 701.37b: the MONSTROUS designation, "a marker that the monstrosity
-    -- action and other spells and abilities can identify".
+    -- until it leaves the battlefield", rule 701.37b's same sentence for monstrous
+    -- and rule 701.60a's "until it leaves the battlefield" for suspected -- the
+    -- designation ends with the incarnation, so there is no sweep to run.
     --
-    -- Everything renowned's note above says holds word for word here, because
-    -- rule 701.37b is worded the same: a Bool with no player, stored rather than
-    -- projected ("neither an ability nor part of the permanent's copiable
-    -- values"), and per-incarnation, which IS rule 701.37b's "it stays monstrous
-    -- until it leaves the battlefield". Two fields rather than one designation
-    -- set (#1193).
-    monstrous :: Bool,
-    -- | CR 701.60b: the SUSPECTED designation. A Bool, stored rather than
-    -- projected ("neither an ability nor part of the permanent's copiable
-    -- values"), and per-incarnation, all for renowned's reasons above -- which is
-    -- rule 701.60a's "until it leaves the battlefield".
-    --
-    -- Unlike those two this designation HAS rules meaning: CR 701.60c gives the
-    -- permanent menace and "this creature can't block" for as long as it is
-    -- suspected. Both are read off this field live rather than stamped when it is
-    -- set -- Pawl.Engine.Projection.designationGathered for the keyword and
+    -- Suspected is the one member with rules meaning of its own: CR 701.60c gives
+    -- the permanent menace and "this creature can't block" for as long as it is
+    -- suspected. Both are read off this set live rather than stamped when it is
+    -- written -- Pawl.Engine.Projection.designationGathered for the keyword and
     -- Pawl.Engine.CombatRestriction.inForce for the restriction -- so nothing has
     -- to be unwound if it ends. Rule 701.60a's other ending, "until a spell or
-    -- ability causes it to no longer be suspected", is Effect.Unsuspect.
-    suspected :: Bool,
+    -- ability causes it to no longer be suspected", is Effect.Unsuspect, and it
+    -- deletes that one member.
+    designations :: Set.Set Designation.Designation,
     -- | CR 702.33d: has this SPELL been kicked? "If a spell's controller declares
     -- the intention to pay any of that spell's kicker costs, that spell has been
     -- 'kicked'", and this is that declaration, stamped by Pawl.Engine.Cast at CR
     -- 601.2b onto the stack incarnation CR 601.2a made.
     --
-    -- A Bool for the three designations' reason above, and stored for it too:
-    -- nothing a CR 613 layer computes may move it, since it records a choice
-    -- rather than a characteristic. Unlike them it is a fact about a SPELL, so the
-    -- field is False for every permanent: rule 702.33e's payoff on a permanent card
-    -- is a CR 614.1c entry replacement, which reads the SPELL on the stack and not
-    -- the permanent it becomes (Monstrous War-Leech, #610).
+    -- Stored for the designations' reason above: nothing a CR 613 layer computes
+    -- may move it, since it records a choice rather than a characteristic. A Bool
+    -- and not a member of Pawl.Types.Designation because it is a fact about a
+    -- SPELL, where every member of that type is a mark "only permanents can have",
+    -- so the field is False for every permanent: rule 702.33e's payoff on a
+    -- permanent card is a CR 614.1c entry replacement, which reads the SPELL on the
+    -- stack and not the permanent it becomes (Monstrous War-Leech, #610).
     --
     -- Per-incarnation, which CR 400.7 makes the whole of rule 702.33d's duration:
     -- the designation belongs to the spell, and the permanent or the card in a
@@ -505,8 +495,6 @@ newIncarnation object =
       ringBearerFor = Nothing,
       protector = Nothing,
       unlockedHalves = Set.empty,
-      renowned = False,
-      monstrous = False,
-      suspected = False,
+      designations = Set.empty,
       kicked = False
     }

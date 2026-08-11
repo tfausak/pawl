@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.Common as Common
 import qualified Pawl.Codec.Count as Count
 import qualified Pawl.Codec.CounterKind as CounterKind
+import qualified Pawl.Codec.Designation as Designation
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.ManaCount as ManaCount
 import qualified Pawl.Codec.PlayerCounterKind as PlayerCounterKind
@@ -39,9 +40,7 @@ toJson q = case q of
   -- CR 702.112b's designation, with nothing on the wire: the object is whichever
   -- one the quantity is evaluated against, and the answer is a 0/1 rather than a
   -- stored number, so there is neither a reference nor a payload.
-  Quantity.IsRenowned -> Common.nullary "IsRenowned"
-  Quantity.IsMonstrous -> Common.nullary "IsMonstrous"
-  Quantity.IsSuspected -> Common.nullary "IsSuspected"
+  Quantity.HasDesignation d -> Common.tagged "HasDesignation" . Just $ Designation.toJson d
   Quantity.WasKicked -> Common.nullary "WasKicked"
   -- CR 508.3b's record, with only a PlayerRef on the wire: what is counted comes
   -- from the combat record rather than from anything the card names.
@@ -77,9 +76,7 @@ fromJson value = do
     ("IsMonarch", Just v) -> Quantity.IsMonarch <$> PlayerRef.fromJson v
     ("PlayerCounters", Just (Value.Array (Array.MkArray [p, k]))) -> Quantity.PlayerCounters <$> PlayerRef.fromJson p <*> PlayerCounterKind.fromJson k
     ("ObjectCounters", Just v) -> Quantity.ObjectCounters <$> CounterKind.fromJson Keyword.fromJson v
-    ("IsRenowned", _) -> Right Quantity.IsRenowned
-    ("IsMonstrous", _) -> Right Quantity.IsMonstrous
-    ("IsSuspected", _) -> Right Quantity.IsSuspected
+    ("HasDesignation", Just v) -> Quantity.HasDesignation <$> Designation.fromJson v
     ("WasKicked", _) -> Right Quantity.WasKicked
     ("OpponentsAttacked", Just v) -> Quantity.OpponentsAttacked <$> PlayerRef.fromJson v
     ("CardsDiscardedThisTurn", Just v) -> Quantity.CardsDiscardedThisTurn <$> PlayerRef.fromJson v

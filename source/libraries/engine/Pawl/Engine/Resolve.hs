@@ -59,6 +59,7 @@ import qualified Pawl.Types.DamagePattern as DamagePattern
 import qualified Pawl.Types.DamageRewrite as DamageRewrite
 import qualified Pawl.Types.Decider as Decider
 import qualified Pawl.Types.DelayedTrigger as DelayedTrigger
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.DiscardCause as DiscardCause
 import qualified Pawl.Types.Duration as Duration
 import Pawl.Types.Effect (Effect)
@@ -283,18 +284,15 @@ slotsOf effect = case effect of
   -- CR 725.1's crown names a target slot only in the InSlot arm (Denethor's
   -- "target player"); the other two derive their player and read nothing.
   Effect.BecomeMonarch target -> monarchTargetSlots target
-  -- A READ: the slot names the permanent gaining the designation. Reserved
-  -- rather than a target on every producer today (rule 702.112a's "it"), but
-  -- the lint's question is which slots the effect names, not which are targets.
-  Effect.BecomeRenowned slot -> oneSlot slot
-  -- A READ, BecomeRenowned's: CR 701.37a's "it" is the ability's own bearer.
-  Effect.BecomeMonstrous slot -> oneSlot slot
-  -- A READ, BecomeRenowned's: CR 701.60a's "suspect a creature" names one.
-  Effect.Suspect slot -> oneSlot slot
+  -- A READ: the slot names the permanent gaining the designation. Reserved rather
+  -- than a target on renown and monstrosity (rule 702.112a's "it") and a CR 115.6
+  -- target on Rune-Brand Juggler's suspect, but the lint's question is which slots
+  -- the effect names, not which are targets.
+  Effect.Designate _ slot -> oneSlot slot
   -- A READ of whatever slot the ref names, Tap's arm: rule 701.60a's ending can
   -- reach a set instead.
   Effect.Unsuspect ref -> objectRefSlots ref
-  -- A READ, BecomeRenowned's: the slot names the permanent rule 702.100a's
+  -- A READ, Designate's: the slot names the permanent rule 702.100a's
   -- counter goes on.
   Effect.Evolve slot -> oneSlot slot
   Effect.ItBecomes _ -> Map.empty
@@ -447,9 +445,7 @@ slotsAreExhaustive effect = case effect of
   -- which monarchTargetSlots reports as nothing.
   Effect.BecomeMonarch MonarchTarget.ControllerOfSource -> False
   Effect.BecomeMonarch (MonarchTarget.InSlot _) -> True
-  Effect.BecomeRenowned _ -> True
-  Effect.BecomeMonstrous _ -> True
-  Effect.Suspect _ -> True
+  Effect.Designate _ _ -> True
   Effect.Unsuspect _ -> True
   Effect.Evolve _ -> True
   Effect.ItBecomes _ -> True
@@ -546,9 +542,7 @@ readsX = any effectReadsX
       Effect.RequireBlock {} -> False
       Effect.CreateEmblem {} -> False
       Effect.BecomeMonarch {} -> False
-      Effect.BecomeRenowned _ -> False
-      Effect.BecomeMonstrous _ -> False
-      Effect.Suspect _ -> False
+      Effect.Designate _ _ -> False
       Effect.Unsuspect _ -> False
       Effect.Evolve _ -> False
       Effect.ItBecomes _ -> False
@@ -617,9 +611,7 @@ searchesLibrary effect = case effect of
   Effect.RequireBlock {} -> False
   Effect.CreateEmblem {} -> False
   Effect.BecomeMonarch {} -> False
-  Effect.BecomeRenowned _ -> False
-  Effect.BecomeMonstrous _ -> False
-  Effect.Suspect _ -> False
+  Effect.Designate _ _ -> False
   Effect.Unsuspect _ -> False
   Effect.Evolve _ -> False
   Effect.ItBecomes _ -> False
@@ -747,9 +739,7 @@ boundSlots effect = case effect of
   Effect.RequireBlock {} -> Set.empty
   Effect.CreateEmblem {} -> Set.empty
   Effect.BecomeMonarch {} -> Set.empty
-  Effect.BecomeRenowned _ -> Set.empty
-  Effect.BecomeMonstrous _ -> Set.empty
-  Effect.Suspect _ -> Set.empty
+  Effect.Designate _ _ -> Set.empty
   Effect.Unsuspect _ -> Set.empty
   Effect.Evolve _ -> Set.empty
   Effect.ItBecomes _ -> Set.empty
@@ -3083,80 +3073,65 @@ applyEffectWith runSubgame resolving source controller legal chosen effect = cas
         -- overwritten (at most one at a time).
         State.modify' (\g -> g {GameState.monarch = Just p})
         State.modify' (Event.recordEvent (GameEvent.BecameMonarch p))
-  -- CR 702.112b: the slot's permanent gains the RENOWNED designation -- the
-  -- second half of rule 702.112a's ability, and a state write rather than a CR 613
-  -- modification, the rule making it "neither an ability nor part of the
-  -- permanent's copiable values".
+  -- The slot's permanent gains the designation -- CR 702.112a's "and it becomes
+  -- renowned", CR 701.37a's "and it becomes monstrous", CR 701.60a's suspect -- and
+  -- a state write rather than a CR 613 modification, every one of those rules making
+  -- it "neither an ability nor part of the permanent's copiable values".
   --
   -- PutCounters' slot read without the quantity: a player recipient takes no
-  -- designation (rule 702.112b: "only permanents can be or become renowned"), an
-  -- illegal slot at resolution is CR 608.2b's no-op, and an id naming no object --
-  -- the permanent has left the battlefield (CR 400.7) -- writes nothing and emits
-  -- nothing, the lookup below answering Nothing.
+  -- designation (rule 702.112b: "only permanents can be or become renowned", and
+  -- rules 701.37b and 701.60b say the same of the other two), an illegal slot at
+  -- resolution is CR 608.2b's no-op, and an id naming no object -- the permanent has
+  -- left the battlefield (CR 400.7) -- writes nothing and emits nothing, the lookup
+  -- below answering Nothing.
   --
-  -- GameEvent.BecameRenowned is what "whenever a creature you control becomes
-  -- renowned" (Valeron Wardens) triggers on. Emitted only on a TRANSITION, the
-  -- same gate Event.unlockHalf applies to CR 709.5c's designation: a permanent
-  -- that is already renowned does not become renowned again. No board in the pool
-  -- can reach an already-renowned permanent here -- CR 603.4's intervening "if"
-  -- removes rule 702.112a's second ability from the stack (CR 608.2a) -- so the
-  -- gate is a fence rather than a tested branch.
-  Effect.BecomeRenowned slot ->
+  -- GameEvent.BecameDesignated is what "whenever a creature you control becomes
+  -- renowned" (Valeron Wardens) and "when this creature becomes monstrous" (Arbor
+  -- Colossus) trigger on, the designation in the event telling the two apart.
+  -- Emitted only on a TRANSITION, the same gate Event.unlockHalf applies to CR
+  -- 709.5c's designation: a permanent that is already renowned does not become
+  -- renowned again, which is also CR 701.60d's "a suspected permanent can't become
+  -- suspected again".
+  --
+  -- That gate is a FENCE rather than a tested branch on every board in the pool, and
+  -- deleting it leaves the suite green: each producer is stopped before it reaches
+  -- here. Renown's intervening "if" (CR 603.4) removes the second ability from the
+  -- stack (CR 608.2a); monstrosity's CR 701.37a "if this permanent isn't monstrous"
+  -- is the CLAUSE's condition, read as Quantity.HasDesignation Monstrous before
+  -- either of its effects runs, which is also what keeps a second monstrosity from
+  -- putting counters on. Suspect CAN reach it -- Rune-Brand Juggler's "up to one
+  -- target creature you control" narrows by nothing else -- but the only thing the
+  -- gate suppresses is the event, and no card reads a permanent becoming suspected
+  -- (#1215), so there is nothing to assert on either side.
+  --
+  -- CR 701.60c's menace and "this creature can't block" are not written here. They
+  -- are read off Object.designations by Pawl.Engine.Projection and
+  -- Pawl.Engine.CombatRestriction, which is rule 701.60c's "for as long as it's
+  -- suspected".
+  Effect.Designate designation slot ->
     case legalOne slot legal of
       Just recipient -> case Recipient.objectOf recipient of
         Nothing -> pure ()
         Just target -> do
           gs <- State.get
-          Monad.when (maybe False (not . Object.renowned) (Game.lookupObject target gs)) $ do
+          Monad.when (maybe False (not . Set.member designation . Object.designations) (Game.lookupObject target gs)) $ do
             State.modify'
-              (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.renowned = True}) target (GameState.objects g)})
-            State.modify' (Event.recordEvent (GameEvent.BecameRenowned target))
-      _ -> pure ()
-  -- CR 701.37a's "and it becomes monstrous", the second of the two instructions
-  -- a monstrosity ability's clause holds. No transition gate and no event, where
-  -- BecomeRenowned above has both: the write is idempotent, and nothing in the
-  -- pool triggers on becoming monstrous (#1194).
-  --
-  -- What keeps the SECOND monstrosity from putting counters on is not here: it
-  -- is the clause's own condition (CR 701.37a's "if this permanent isn't
-  -- monstrous"), read as Quantity.IsMonstrous before either effect runs.
-  Effect.BecomeMonstrous slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target ->
-          State.modify'
-            (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.monstrous = True}) target (GameState.objects g)})
-      _ -> pure ()
-  -- CR 701.60a's "suspect a creature", BecomeMonstrous' arm above in every
-  -- respect: an idempotent write, which is CR 701.60d's "a suspected permanent
-  -- can't become suspected again", and no event (#1215).
-  --
-  -- CR 701.60c's menace and "this creature can't block" are not written here.
-  -- They are read off Object.suspected by Pawl.Engine.Projection and
-  -- Pawl.Engine.CombatRestriction, which is rule 701.60c's "for as long as it's
-  -- suspected".
-  Effect.Suspect slot ->
-    case legalOne slot legal of
-      Just recipient -> case Recipient.objectOf recipient of
-        Nothing -> pure ()
-        Just target ->
-          State.modify'
-            (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.suspected = True}) target (GameState.objects g)})
+              (\g -> g {GameState.objects = Map.adjust (\o -> o {Object.designations = Set.insert designation (Object.designations o)}) target (GameState.objects g)})
+            State.modify' (Event.recordEvent (GameEvent.BecameDesignated designation target))
       _ -> pure ()
   -- CR 701.60a's other ending, "until a spell or ability causes it to no longer be
-  -- suspected". The write Suspect above makes, undone; nothing else has to be,
-  -- because CR 701.60c's menace and can't-block are read off this field live
-  -- rather than stamped when it was set.
+  -- suspected". The write Designate above makes, undone for that one designation;
+  -- nothing else has to be, because CR 701.60c's menace and can't-block are read off
+  -- the set live rather than stamped when it was written.
   --
   -- Tap's arm structurally: the victims are enumerated ONCE through
   -- objectRefObjects for CR 608.2f's simultaneity, and an illegal slot (CR
   -- 608.2b), a player recipient and a set that matched nothing all arrive as the
-  -- empty list. Idempotent for Suspect's reason -- clearing a designation nothing
+  -- empty list. Idempotent for Designate's reason -- clearing a designation nothing
   -- has leaves the permanent as it was.
   Effect.Unsuspect ref ->
     State.modify' $ \gs ->
-      let unsuspect o = o {Object.suspected = False}
+      let unsuspect o = o {Object.designations = Set.delete Designation.Suspected (Object.designations o)}
        in gs
             { GameState.objects =
                 foldr (Map.adjust unsuspect) (GameState.objects gs) (objectRefObjects legal resolving controller source gs ref)

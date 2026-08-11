@@ -10,6 +10,7 @@ import qualified Pawl.Types.Color as Color
 import qualified Pawl.Types.Cost as Cost
 import qualified Pawl.Types.CostComponent as CostComponent
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword.Type
 import qualified Pawl.Types.ObjectId as ObjectId
@@ -193,38 +194,33 @@ data View = MkView
     -- off the battlefield, a player, an event snapshot -- the vacuous posture
     -- power and controller already take.
     ringBearerFor :: Maybe PlayerId.PlayerId,
-    -- CR 702.112b: does this candidate have the RENOWNED designation? Read
-    -- straight off Object.renowned, for ringBearerFor's reason -- rule 702.112b
-    -- makes it a designation rather than a characteristic, so no projection
-    -- writes it -- and a Bool rather than a Maybe because the rule names no
-    -- player.
+    -- Which of Pawl.Types.Designation's marks does this candidate have? Read
+    -- straight off Object.designations, for ringBearerFor's reason -- the rules
+    -- behind that type make each a designation rather than a characteristic, so no
+    -- projection writes it -- and a Set rather than a Maybe because none of them
+    -- names a player.
     --
-    -- False for every candidate with no object to read it off: a printed card off
+    -- Empty for every candidate with no object to read it off: a printed card off
     -- the battlefield, a player, an event snapshot -- the vacuous posture `tapped`
     -- and `token` already take.
-    renowned :: Bool,
-    -- CR 701.37b: does this candidate have the MONSTROUS designation? Read off
-    -- Object.monstrous, and False where there is no object to read it off, both
-    -- for `renowned` above's reasons -- the two rules word their designations
-    -- the same way.
-    monstrous :: Bool,
-    -- CR 701.60b: does this candidate have the SUSPECTED designation? Read off
-    -- Object.suspected, `renowned` above in every respect. Read by this module's
-    -- own Filter.IsSuspected arm (Rune-Brand Juggler's sacrifice cost) and by
-    -- Pawl.Engine.Quantity's IsSuspected arm, answering Repeat Offender's clause
-    -- condition. What CR 701.60c hangs off the designation does NOT come through
-    -- here: Pawl.Engine.Projection.designationGathered and
-    -- Pawl.Engine.CombatRestriction.inForce hold no view and read the field
-    -- directly.
-    suspected :: Bool,
-    -- CR 702.33d: has this candidate been kicked? Read off Object.kicked, and
-    -- False where there is no object to read it off, both for `renowned` above's
-    -- reasons. Its one reader is Pawl.Engine.Quantity's WasKicked arm, answering
-    -- Burst Lightning's clause conditions.
     --
-    -- Not a designation of a PERMANENT as the three above are -- rule 702.33d
+    -- Read by this module's own Filter.HasDesignation arm (Aragorn, Hornburg
+    -- Hero's trigger, Rune-Brand Juggler's sacrifice cost) and by
+    -- Pawl.Engine.Quantity's HasDesignation arm (renown's intervening "if",
+    -- monstrosity's clause condition, Repeat Offender's). What CR 701.60c hangs off
+    -- `Suspected` does NOT come through here:
+    -- Pawl.Engine.Projection.designationGathered and
+    -- Pawl.Engine.CombatRestriction.inForce hold no view and read the object
+    -- directly.
+    designations :: Set.Set Designation.Designation,
+    -- CR 702.33d: has this candidate been kicked? Read off Object.kicked, and
+    -- False where there is no object to read it off, both for the reasons
+    -- `designations` above gives. Its one reader is Pawl.Engine.Quantity's WasKicked
+    -- arm, answering Burst Lightning's clause conditions.
+    --
+    -- Not a designation of a PERMANENT as that field holds -- rule 702.33d
     -- designates the SPELL -- but it comes through the view for the same reason
-    -- they do: the reader holds a view and not a board.
+    -- those do: the reader holds a view and not a board.
     kicked :: Bool
   }
   deriving (Eq, Show)
@@ -282,11 +278,9 @@ playerView pid =
       -- player is not one -- the same shape CR 725.1's monarch has with the two
       -- sides swapped.
       ringBearerFor = Nothing,
-      -- CR 702.112b: "only permanents can be or become renowned", and a player is
-      -- not one.
-      renowned = False,
-      monstrous = False,
-      suspected = False,
+      -- CR 702.112b: "only permanents can be or become renowned", CR 701.37b and
+      -- CR 701.60b saying the same of the other two, and a player is not one.
+      designations = Set.empty,
       kicked = False
     }
 
@@ -499,20 +493,16 @@ matches context view predicate = case predicate of
   Filter.IsRingBearer -> case (ringBearerFor view, perspective context) of
     (Just designated, Just you) -> designated == you
     _ -> False
-  -- CR 702.112b's designation, asked of the CANDIDATE. A live read of
-  -- Object.renowned, never a stamp on the candidate: the rule ends the
-  -- designation when the permanent leaves the battlefield, and CR 400.7's new
-  -- incarnation simply arrives without it. Asks nothing of the perspective,
-  -- unlike the arm above -- the designation belongs to no player.
-  Filter.IsRenowned -> renowned view
-  -- CR 701.60b's designation, asked of the CANDIDATE. IsRenowned's live read
-  -- above in every respect: CR 701.60a ends the designation when the permanent
-  -- leaves the battlefield, and CR 400.7's new incarnation arrives without it, so
-  -- nothing is stamped on the candidate. NOT the menace or the can't-block CR
-  -- 701.60c hangs off it -- a permanent can have either from somewhere else.
-  Filter.IsSuspected -> suspected view
+  -- The designation, asked of the CANDIDATE. A live read of Object.designations,
+  -- never a stamp on the candidate: each rule ends its designation when the
+  -- permanent leaves the battlefield, and CR 400.7's new incarnation simply arrives
+  -- without it. Asks nothing of the perspective, unlike the arm above -- none of
+  -- these designations belongs to a player. NOT the menace or the can't-block CR
+  -- 701.60c hangs off `Suspected` -- a permanent can have either from somewhere
+  -- else.
+  Filter.HasDesignation d -> Set.member d (designations view)
   -- CR 122.1, asked of the CANDIDATE: has it one or more counters of the kind?
-  -- IsRenowned's live read, of counters instead of a designation: CR 400.7's new
+  -- HasDesignation's live read, of counters instead of a designation: CR 400.7's new
   -- incarnation arrives with none, so nothing is stamped on the candidate.
   Filter.HasCounters kind -> Map.findWithDefault 0 kind (counters view) > 0
   Filter.And fs -> all (matches context view) fs
@@ -584,8 +574,7 @@ rewrite pairs predicate = case predicate of
   Filter.IsToken -> predicate
   Filter.IsTapped -> predicate
   Filter.IsRingBearer -> predicate
-  Filter.IsRenowned -> predicate
-  Filter.IsSuspected -> predicate
+  Filter.HasDesignation _ -> predicate
   -- Rewritten THROUGH the kind: CR 122.1b's keyword counter carries a keyword,
   -- and rule 612.1 reaches a word inside one exactly as it does in HasKeyword
   -- above. Every other kind names no word to swap.

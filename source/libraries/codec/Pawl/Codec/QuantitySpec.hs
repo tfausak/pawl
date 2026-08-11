@@ -9,6 +9,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.Aggregation as Aggregation
 import qualified Pawl.Types.Count as Count
 import qualified Pawl.Types.CounterKind as CounterKind
+import qualified Pawl.Types.Designation as Designation
 import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.Keyword as Keyword
 import qualified Pawl.Types.PlayerCounterKind as PlayerCounterKind
@@ -154,34 +155,32 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.IsMonarch (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"IsMonarch","value":{"type":"InSlot","value":"target"}} """
-  -- CR 702.112b, with NOTHING on the wire: the designation rides the object the
-  -- quantity is evaluated against, so this is Power's shape rather than
-  -- IsMonarch's, and a payload here would be a decoder inventing one.
-  Spec.it s "IsRenowned" $
+  -- CR 702.112b, CR 701.37b and CR 701.60b: WHICH designation is on the wire and
+  -- nothing else, the object it is asked of riding the evaluation rather than a
+  -- reference -- so this is Power's shape rather than IsMonarch's.
+  Spec.it s "HasDesignation Renowned" $
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
-      Quantity.IsRenowned
-      """ {"type":"IsRenowned"} """
-  -- CR 701.37b, nothing on the wire for IsRenowned's reason just above.
-  Spec.it s "IsMonstrous" $
+      (Quantity.HasDesignation Designation.Renowned)
+      """ {"type":"HasDesignation","value":{"type":"Renowned"}} """
+  Spec.it s "HasDesignation Monstrous" $
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
-      Quantity.IsMonstrous
-      """ {"type":"IsMonstrous"} """
-  -- CR 701.60b, nothing on the wire for IsRenowned's reason above.
-  Spec.it s "IsSuspected" $
+      (Quantity.HasDesignation Designation.Monstrous)
+      """ {"type":"HasDesignation","value":{"type":"Monstrous"}} """
+  Spec.it s "HasDesignation Suspected" $
     Common.assertJsonCodec
       s
       Quantity.toJson
       Quantity.fromJson
-      Quantity.IsSuspected
-      """ {"type":"IsSuspected"} """
-  -- CR 702.33d, nothing on the wire for IsRenowned's reason above -- and a
-  -- distinct tag, the designation being a different question.
+      (Quantity.HasDesignation Designation.Suspected)
+      """ {"type":"HasDesignation","value":{"type":"Suspected"}} """
+  -- CR 702.33d, with nothing on the wire: a spell's kicked flag is not a member of
+  -- Pawl.Types.Designation, so it keeps a tag of its own.
   Spec.it s "WasKicked" $
     Common.assertJsonCodec
       s

@@ -661,8 +661,8 @@ data Keyword
     --
     -- RENOWNED is not here, and rule 702.112b is why: it is a designation on the
     -- permanent rather than an ability, and "neither an ability nor part of the
-    -- permanent's copiable values". It rides Pawl.Types.Object.renowned, beside the
-    -- Ring-bearer designation and a battle's protector.
+    -- permanent's copiable values". It rides Pawl.Types.Object.designations, beside
+    -- the Ring-bearer designation and a battle's protector.
     Renown Natural.Natural
   | Devoid -- 702.114
   | -- | 702.118b: a creature with skulk can't be blocked by creatures with greater
