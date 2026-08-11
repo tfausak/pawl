@@ -1928,6 +1928,9 @@ playerEffectFilters playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented _ -> []
   -- CR 701.23 names no quality of the libraries it stops being searched.
   PlayerEffect.CantSearchLibraries -> []
+  -- CR 725 names no quality either: the designation has no parts (Jared
+  -- Carthalion, True Heir).
+  PlayerEffect.CantBecomeMonarch -> []
 
 -- Does this carrier pair CR 615.12's "damage can't be prevented" with a
 -- scope narrower than the whole table?
@@ -1954,6 +1957,7 @@ unpreventableScopeOffends :: PlayerScope.PlayerScope -> PlayerEffect.PlayerEffec
 unpreventableScopeOffends scope playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented _ -> scope /= PlayerScope.EachPlayer
   PlayerEffect.CantSearchLibraries -> False
+  PlayerEffect.CantBecomeMonarch -> False
   -- Every other arm IS asked about a player, so its scope is read exactly as
   -- written and any of the three is legitimate: Rule of Law and Thalia say
   -- EachPlayer, Silence's stored prohibition says Opponents, and Prowling
@@ -1990,6 +1994,7 @@ unpreventablePatternOffends :: PlayerEffect.PlayerEffect -> Bool
 unpreventablePatternOffends playerEffect = case playerEffect of
   PlayerEffect.DamageCantBePrevented pattern_ -> Maybe.isJust (DamagePattern.whichRecipient pattern_)
   PlayerEffect.CantSearchLibraries -> False
+  PlayerEffect.CantBecomeMonarch -> False
   PlayerEffect.IncreaseSpellCost _ _ -> False
   PlayerEffect.ReduceSpellCost _ _ -> False
   PlayerEffect.CantCastSpells -> False

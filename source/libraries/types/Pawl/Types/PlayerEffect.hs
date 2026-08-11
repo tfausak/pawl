@@ -271,4 +271,30 @@ data PlayerEffect
     -- WHOSE searching is the carrier's PlayerScope, as for every arm here:
     -- Leonin Arbiter says "players" with no possessive, so EachPlayer.
     CantSearchLibraries
+  | -- | CR 725 / 101.2 / Jared Carthalion, True Heir: this player can't become the
+    -- monarch.
+    --
+    -- CR 611.1's third clause once more, and here in the same shape
+    -- CantSearchLibraries takes: CR 725.1 makes the monarch a DESIGNATION a
+    -- player has rather than a characteristic of any object, so nothing in the CR
+    -- 613.1 layers computes it and a restriction on taking it belongs on CR
+    -- 613.11's rules axis.
+    --
+    -- CR 101.2 is what makes it bite, because neither CR 725.1 nor CR 725.3 gates
+    -- WHO may be crowned: an effect instructing this player to become the monarch
+    -- is allowed by the rules and stopped by this "can't". CR 725.4's "the next
+    -- player in turn order who can become the monarch" is the one place the
+    -- rulebook asks the question itself.
+    --
+    -- WHOSE crown is the carrier's PlayerScope, as for every arm here. Jared's
+    -- "You can't become the monarch this turn" writes PlayerScope.You on the
+    -- stored CR 611.2c carrier, whose expiry is the duration -- exactly the shape
+    -- Silence takes, and the reason no duration is carried here.
+    --
+    -- NULLARY, and rule 725 is why: the designation has no parts, so there is
+    -- nothing for a payload to narrow. Not "can't become the monarch from a
+    -- particular source" either -- CR 725.1 leaves the naming to the card and the
+    -- restriction is on the PLAYER, so every route is stopped at once (the
+    -- ordinary effect, and CR 725.2's sourceless steal).
+    CantBecomeMonarch
   deriving (Eq, Ord, Show)

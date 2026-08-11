@@ -205,3 +205,11 @@ spec s = Spec.describe s "Pawl.Codec.PlayerEffect" $ do
       PlayerEffect.fromJson
       PlayerEffect.CantSearchLibraries
       """ {"type":"CantSearchLibraries"} """
+  -- CR 725 / Jared Carthalion, True Heir.
+  Spec.it s "CantBecomeMonarch" $
+    Common.assertJsonCodec
+      s
+      PlayerEffect.toJson
+      PlayerEffect.fromJson
+      PlayerEffect.CantBecomeMonarch
+      """ {"type":"CantBecomeMonarch"} """
