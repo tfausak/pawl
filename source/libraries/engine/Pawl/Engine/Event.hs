@@ -4289,7 +4289,7 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- asks only whether that is the bearer's host -- the pairing with the second
   -- creature is the event's, decided where the mentor ability resolved.
   --
-  -- CR 301.5c's "equipped creature" read off Object.attachedTo, which is where the
+  -- CR 301.5a's "equipped creature" read off Object.attachedTo, which is where the
   -- Equipment records it, through Recipient.objectOf for CR 303.4's other
   -- destination: an Equipment attached to nothing, or an Aura enchanting a player,
   -- has no host id to compare and answers False.
@@ -5263,8 +5263,9 @@ looksBack condition = case condition of
   TriggerCondition.PermanentBecomesDesignated _ _ -> False
   -- Nor here: rule 702.100b's counters are put on a permanent on the battlefield.
   TriggerCondition.SelfEvolves -> False
-  -- Nor here, for the same reason one rule over: rule 702.134a's counter goes on an
-  -- attacking creature, which CR 508.1a keeps on the battlefield.
+  -- Nor here, for the same reason one rule over: rule 702.134a's counter goes on a
+  -- creature that CR 508.1k has made an attacking creature, and a permanent leaving
+  -- the battlefield is removed from combat (CR 506.4) rather than mentored.
   TriggerCondition.AttachedCreatureMentors -> False
   -- Entries, not departures (CR 603.6a). The rule's own CR 603.6a checks "all
   -- permanents on the battlefield (including the newcomers)" AFTER the event.
@@ -5826,9 +5827,10 @@ zoneTriggeredFrom cond = case cond of
   -- The same default again: rule 702.100b's marker goes to a creature, and
   -- Renegade Krasis is the creature watching itself.
   TriggerCondition.SelfEvolves -> Nothing
-  -- The same default a third time, from the Equipment's side: CR 301.5a keeps an
-  -- attached Equipment on the battlefield, so Aegis of the Legion does its watching
-  -- from there and CR 113.6k's exception does not apply.
+  -- The same default a third time, from the Equipment's side: CR 301.5c unattaches
+  -- an Equipment rather than moving it, so one that equips anything is on the
+  -- battlefield, and Aegis of the Legion watches from there -- CR 113.6k's exception
+  -- is for a condition that cannot trigger from the battlefield at all.
   TriggerCondition.AttachedCreatureMentors -> Nothing
   -- CR 113.6's default: an ability of a permanent functions only while that
   -- permanent is on the battlefield. CR 113.6k's exception is for a trigger

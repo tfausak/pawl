@@ -861,7 +861,7 @@ data TriggerCondition
     -- the one printing that reads rule 702.134c is an Equipment, so its source is
     -- never the mentoring creature (SelfEvolves' shape would ask about the Aegis)
     -- and "equipped creature" is not a class of objects a Filter could name (CR
-    -- 301.5c makes it the one permanent this source is attached to). The same
+    -- 301.5f makes it whatever creature this source is attached to). The same
     -- sentence Affected.Attached states for a static ability, stated for a trigger.
     -- A card printing "whenever a creature you control mentors" earns the filtered
     -- form, and one printing "whenever this creature mentors" the self-scoped one.

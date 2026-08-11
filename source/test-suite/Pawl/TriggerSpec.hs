@@ -3732,8 +3732,9 @@ mentorSpec s registry =
 -- Aegis of the Legion {R}{W} Artifact -- Equipment is the card and the only printing
 -- that reads rule 702.134c: "Equipped creature gets +1/+1 and has mentor. Whenever
 -- equipped creature mentors a creature, put a shield counter on that creature. Equip
--- {3}". Every case below equips it by fixture (CR 301.5's state, not the equip
--- ability), so what is under test is the trigger rather than CR 702.6b.
+-- {3}". Every case below equips it by fixture (CR 301.5a's attachment as a state,
+-- not the ability that makes it), so what is under test is the trigger rather than
+-- CR 702.6a's equip.
 --
 -- Hill Giant 3/3 wears it, which makes it a 4/4 with mentor -- so no number here is
 -- printed on any card in the board: the mentor's 4 is the Equipment's bonus, the
@@ -3846,7 +3847,7 @@ mentorsTriggerSpec s registry =
                 (countersOn piker after)
                 (Map.fromList [(CounterKind.PlusOnePlusOne, 2), (CounterKind.Shield, 1)])
             _ -> Spec.assertFailure s "fixture should give alice a Giant, a Piker, an Aegis and a Hardened Scales"
-        -- CR 301.5c's "equipped creature", which is the whole of what the condition
+        -- CR 301.5f's "equipped creature", which is the whole of what the condition
         -- narrows by. A mentoring happens -- Blade Instructor's own printed mentor
         -- (CR 702.134a) puts its counter on the Piker -- and the Aegis, worn by an
         -- Icehide Golem that stayed home, is watching the wrong creature, so no

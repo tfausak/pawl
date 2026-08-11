@@ -1892,7 +1892,7 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   -- CR 702.112b's carries one too -- Valeron Wardens' "a creature you control".
   TriggerCondition.PermanentBecomesDesignated _ f -> [f]
   TriggerCondition.SelfEvolves -> []
-  -- CR 702.134c's carries none either: "equipped creature" is CR 301.5c's one
+  -- CR 702.134c's carries none either: "equipped creature" is CR 301.5f's one
   -- permanent rather than a class of them, and "a creature" narrows by nothing.
   TriggerCondition.AttachedCreatureMentors -> []
   -- CR 701.21a's is nullary too: "a permanent" names no quality, so unlike
