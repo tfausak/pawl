@@ -563,8 +563,9 @@ damagedCardTypes gs recipient =
 applyDamage :: [DamageEvent.DamageEvent] -> Game ()
 applyDamage events = do
   (survivors, prevented) <- Event.resolveDamageBatch events
-  let -- CR 120.3d / 702.90c / 702.80a and CR 120.3e: the creature result. Counters
-      -- Not implemented: these are added directly rather than through
+  let -- CR 120.3d / 702.90c / 702.80a and CR 120.3e: the creature result.
+      --
+      -- Not implemented: the counters are added directly rather than through
       -- Event.putCounters, so no CR 614 loop runs on the placement (#1231).
       --
       -- The disjunction is CR 120.3d's "wither and/or infect" verbatim, and its
@@ -585,10 +586,9 @@ applyDamage events = do
       -- removed directly rather than through a "would remove counters"
       -- sub-replacement, there being no such thing -- CR 614.16 scales counters an
       -- effect PUTS on, and nothing in CR 614 replaces a removal -- floored at 0
-      -- rather than wrapped, because Object.counters
-      -- is Natural while CR 306.5c makes loyalty and CR 122.1g defense the COUNT of
-      -- those counters, and destroying nothing (CR 120.5): CR 704.5i and CR 704.5v
-      -- are what read the 0.
+      -- rather than wrapped, because Object.counters is Natural while CR 306.5c
+      -- makes loyalty and CR 122.1g defense the COUNT of those counters, and
+      -- destroying nothing (CR 120.5): CR 704.5i and CR 704.5v are what read the 0.
       removeCounters kind ev oid g =
         let have obj = Map.findWithDefault 0 kind (Object.counters obj)
             strip obj =

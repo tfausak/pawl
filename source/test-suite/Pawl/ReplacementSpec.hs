@@ -3698,9 +3698,10 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
     (_, plain) <- board False sage S.alice
     Spec.assertEqWith s "twice that many" (energyIn doubled) 6
     Spec.assertEqWith s "and three without the praetor" (energyIn plain) 3
-  -- CR 107.1a's rounding, and the axis: bob is putting these on HIMSELF, so a
-  -- reading that asked whose counters they are would find alice's clause and
-  -- double them.
+  -- CR 107.1a's rounding. bob is putting these on HIMSELF, so this case does not
+  -- separate the putter from the recipient -- both are bob, and either reading
+  -- halves. What it does prove is the halving clause and its rounding: three is
+  -- one, not two and not three. The putter axis is the Ichor Rats case below.
   Spec.it s "CR 107.1a bob's three energy are halved to one, rounded down" $ do
     sage <- S.printingOf s registry "Sage of Shaila's Claim"
     (_, halved) <- board True sage S.bob
@@ -3777,8 +3778,9 @@ vorinclexSpec s registry = Spec.describe s "Vorinclex, Monstrous Raider (CR 122.
     Spec.assertEqWith s "three, not six" (S.playerCounterOf PlayerCounterKind.Energy S.alice after) 3
   -- CR 122.6a's default putter, which is the one thing the cases above cannot
   -- see: an entering permanent's counters are put on by ITS controller, so bob's
-  -- riot counter is halved by alice's praetor. Reading the ability's own source
-  -- or the CR 616.1 loop's controller instead would leave it at one.
+  -- riot counter is halved by alice's praetor. A putter read off the active
+  -- player, or off the applying row's own controller, is alice here and would
+  -- DOUBLE the counter instead.
   --
   -- The goblin ends with neither the counter nor haste, which is what taking
   -- CR 702.136a's first half and having it halved away means.
