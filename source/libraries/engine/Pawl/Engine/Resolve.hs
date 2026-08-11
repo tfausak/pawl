@@ -128,9 +128,10 @@ import qualified Pawl.Types.Zone as Zone
 
 -- The read side of the D4 dataflow lint answers WHICH slots and HOW MANY
 -- recipients apiece (Pawl.Types.SlotArity): a slot read through an ObjectRef can
--- hold CR 601.2c's "up to two", and one read any other way cannot. These four
+-- hold CR 601.2c's "up to two", and one read any other way cannot. These
 -- combinators are the join, which takes the conservative arity wherever two reads
--- of one card disagree.
+-- disagree -- and are written out rather than left to Map's own Monoid, whose
+-- union is left-biased and would keep whichever arity it saw first.
 joinTwo :: Map.Map SlotName SlotArity -> Map.Map SlotName SlotArity -> Map.Map SlotName SlotArity
 joinTwo = Map.unionWith min
 
@@ -189,7 +190,7 @@ slotsOf effect = case effect of
   -- Projection.quantitiesOf. No card in the pool reads a slot there, but a
   -- dangling one would otherwise slip past the lint entirely.
   Effect.ModifyTarget duration modification ref ->
-    joinSlots [objectRefSlots ref, foldMap quantitySlots (Projection.quantitiesOf modification), durationSlots duration]
+    joinSlots [objectRefSlots ref, joinSlots (fmap quantitySlots (Projection.quantitiesOf modification)), durationSlots duration]
   Effect.ChangeText _ _ slot -> oneSlot slot
   Effect.AddMana _ -> Map.empty
   Effect.Search _ _ -> Map.empty
@@ -228,7 +229,7 @@ slotsOf effect = case effect of
   -- The ReplacementEffect carries no Quantity, but the Duration and Condition each
   -- carry two, and a Quantity.InSlot inside either is a slot read. No card writes
   -- one, but a dangling one would slip past the lint as ModifyTarget's would.
-  Effect.Replace duration _ _ condition _ -> joinTwo (durationSlots duration) (foldMap conditionSlots condition)
+  Effect.Replace duration _ _ condition _ -> joinTwo (durationSlots duration) (joinSlots (fmap conditionSlots (Maybe.maybeToList condition)))
   -- The PlayerRef may name a target slot -- Fatigue's "target player".
   Effect.SkipNextPhase ref _ -> playerRefSlots ref
   -- The ObjectRef names the shielded recipient and the Quantity the shield's size.
@@ -245,7 +246,7 @@ slotsOf effect = case effect of
       [ durationSlots duration,
         objectRefSlots ref,
         quantitySlots quantity,
-        Map.delete Binding.eventAmount (foldMap slotsOf rider)
+        Map.delete Binding.eventAmount (joinSlots (fmap slotsOf (Foldable.toList rider)))
       ]
   -- The same two reads, minus the shield size this opcode does not carry.
   Effect.PreventAllDamage duration ref -> joinTwo (durationSlots duration) (objectRefSlots ref)
@@ -336,7 +337,7 @@ conditionSlots :: Condition.Type.Condition -> Map.Map SlotName SlotArity
 conditionSlots condition = case condition of
   Condition.Type.Compares measured _ threshold ->
     joinTwo (quantitySlots measured) (quantitySlots threshold)
-  Condition.Type.Any conditions -> foldMap conditionSlots conditions
+  Condition.Type.Any conditions -> joinSlots (fmap conditionSlots conditions)
 
 -- CR 603.3b: is slotsOf's answer for this effect the WHOLE of what APPLYING it
 -- reads off the resolving object's bindings? A CLASSIFICATION of effects, in the
@@ -947,8 +948,8 @@ resolveSpellWith runSubgame oid = do
                     taken <- if gated then exercises oid effectController idx cIdx clause else pure False
                     -- CR 118.12a: and then this clause's "unless [a player]
                     -- pays", offered only for a clause that is happening at all.
-                    -- The legality and the targets are the START-of-resolution
-                    -- ones, matching CR 608.2b's single re-validation; the
+                    -- The legal targets are the START-of-resolution ones,
+                    -- matching CR 608.2b's single re-validation; the
                     -- per-effect re-read above adds only slots this resolution
                     -- DEFINES, and an "unless" is offered before any of THIS
                     -- clause's effects have run. A later clause's gate is asked
@@ -1089,11 +1090,10 @@ resolveModes stackId srcId modes = do
                   -- Re-read the LIVE bindings for THIS effect (CR 608.2c), the
                   -- same shape resolveSpellWith's applyOne has: a Create's single
                   -- token (CR 111.1) reaches the sentence after the one that
-                  -- minted it. Both maps are recomputed from the SAME bindings,
-                  -- because every slot read consults both -- a slot present in
-                  -- `chosen` but missing from the legality map reads as illegal,
-                  -- so a re-read of one without the other would drop exactly the
-                  -- bindings it just gained.
+                  -- minted it. Both maps are recomputed from the SAME bindings:
+                  -- `legalNow` is `chosenNow` with CR 608.2b's illegal recipients
+                  -- filtered out, so re-reading one without the other would drop
+                  -- exactly the bindings it just gained.
                   bindingsNow <- State.gets (maybe (Object.bindings obj) Object.bindings . Game.lookupObject stackId)
                   let chosenNow = Binding.targetsOf bindingsNow
                       legalNow = Map.mapWithKey legalSlot chosenNow
@@ -1241,9 +1241,10 @@ paid resolving source idx cIdx legal clause = case Clause.unlessPaid clause of
 -- the targeted spell. NOT CR 109.5, which is the rule for the words "you" and
 -- "your" on an object; this card says "its controller" instead.
 --
--- Legality is asked as every other slot read asks it (CR 608.2b): a slot filled
--- by targeting that has since become illegal names nobody, and a reserved slot
--- has no target spec, so legalSlot already answered True.
+-- Legality is asked as every other slot read asks it (CR 608.2b): a target that
+-- has since become illegal is already out of `legal`, and a reserved slot has no
+-- target spec, so legalSlot dropped nothing from it. A slot naming SEVERAL pays
+-- nothing -- an "unless [a player] pays" names one payer (`legalOne`).
 payerOf :: SlotName -> Map.Map SlotName (Set Recipient) -> GameState -> Maybe PlayerId
 payerOf slot legal gs = case legalOne slot legal of
   Just (Recipient.ToPlayer pid) -> Just pid
@@ -1356,9 +1357,10 @@ legalMany slot legal = Set.toList (Map.findWithDefault Set.empty slot legal)
 -- resolution filled rather than the source's bindings (which is what
 -- Count.playersFor reads for a static count).
 --
--- A slot's legality is asked as every other slot read asks it (CR 608.2b): one
--- filled by targeting that has since become illegal names nobody, and a reserved
--- slot has no target spec, so legalSlot already answered True.
+-- A slot's legality is asked as every other slot read asks it (CR 608.2b): a
+-- target that has since become illegal is already out of `legal`, and a reserved
+-- slot has no target spec, so legalSlot dropped nothing from it. A slot naming
+-- SEVERAL names nobody here -- a PlayerRef points at one player (`legalOne`).
 --
 -- CR 102.1: a player who has left keeps their row in GameState.players with a
 -- Departed status, so `everyone` is Game.stillPlaying rather than the map's keys.
@@ -1384,9 +1386,10 @@ playerRefPlayers legal controller gs ref = case ref of
 -- playerRefPlayers above, and the ONE place a filter-selected set is swept, so
 -- every opcode that takes an ObjectRef gets the same answer.
 --
--- InSlot asks legality the way every other slot read does (CR 608.2b): a slot
--- filled by targeting that has since become illegal names nobody, and a player
--- recipient names no object. It asks that of a TARGET; a slot a Create bound to
+-- InSlot takes every recipient CR 608.2b left legal -- one for "target
+-- creature", up to the announced count for "up to two target creatures" (CR
+-- 601.2c) -- and a player recipient among them names no object. It asks that of a
+-- TARGET; a slot a Create bound to
 -- a group of minted tokens is answered before the question is put, since a group
 -- is a definition rather than a target (CR 115.10a) and CR 608.2b has nothing to
 -- re-validate about one.
@@ -1432,7 +1435,7 @@ objectRefObjects :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId -> 
 objectRefObjects legal resolving controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
     -- The slot names every token a Create bound there ("they"), so all of them
-    -- are named at once. Ahead of the target read and not subject to `legality`:
+    -- are named at once. Ahead of the target read and not subject to `legal`:
     -- a group binding is a definition, never a target (CR 115.10a), so CR 608.2b
     -- has nothing to re-validate. See slotGroup for why being ahead is safe.
     Just group -> Foldable.toList group
@@ -1533,8 +1536,8 @@ objectRefRecipients :: Map.Map SlotName (Set Recipient) -> ObjectId -> PlayerId 
 objectRefRecipients legal resolving controller source gs ref = case ref of
   ObjectRef.InSlot slot -> case slotGroup slot resolving gs of
     -- A group is objects, so its members arrive as Recipient.ToObject exactly as
-    -- EachMatching's do -- the player a slot can hold is the single-target case
-    -- below, and CR 111.1's tokens are never players.
+    -- EachMatching's do -- a player is something only a TARGET slot can hold, and
+    -- CR 111.1's tokens are never players.
     Just group -> fmap Recipient.ToObject (Foldable.toList group)
     Nothing -> legalMany slot legal
   ObjectRef.EachMatching _ -> fmap Recipient.ToObject (objectRefObjects legal resolving controller source gs ref)
@@ -1714,12 +1717,15 @@ installDamageRow controller source duration kind rewrite rider g recipient = cas
 -- the resolution's slot objects ride along so a Quantity.AgainstSlot can aim at
 -- one -- Soul's Majesty reading the power of the creature it targets.
 --
--- Only LEGAL slots, and only OBJECT recipients. CR 608.2b's last sentences say a
--- part of an effect requiring information about an illegal target fails to
--- determine it, and a player recipient has no characteristics to read at all.
--- Both drop out as an absent key, so the quantity is unanswered rather than
--- answered off the source. Nothing in the pool observes the legality half: a
--- one-target spell with an illegal target does not resolve at all.
+-- Only LEGAL recipients, only OBJECT ones, and only where the slot names exactly
+-- one. CR 608.2b's last sentences say a part of an effect requiring information
+-- about an illegal target fails to determine it, and a player recipient has no
+-- characteristics to read at all; a slot naming SEVERAL supplies no one object to
+-- evaluate a Quantity.AgainstSlot against, which is why Pawl.CardSpec rejects a
+-- card that reads a multi-target slot that way. All three drop out as an absent
+-- key, so the quantity is unanswered rather than answered off the source. Nothing
+-- in the pool observes the legality half: a one-target spell with an illegal
+-- target does not resolve at all.
 effectContext :: PlayerId -> ObjectId -> Map.Map SlotName (Set Recipient) -> Filter.Context
 effectContext controller source legal =
   Filter.contextWithSlots (Just controller) (Just source)
