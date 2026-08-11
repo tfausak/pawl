@@ -52,14 +52,14 @@ additionalBlocks candidates gs =
       -- against the FULL projection.
       named source affected creature =
         Projection.affects source creature affected (Projection.project creature gs) gs
-      -- CR 604.2's "as long as", read exactly as CombatRestriction.inForce reads
-      -- its "unless" and with the opposite polarity: a permission whose gate does
-      -- NOT hold grants nothing. Asked once per permission and not per candidate,
-      -- because CR 109.5 fixes the "you" inside it as the SOURCE's controller.
       -- One reading of the source, shared by the gate and the amount below: CR
       -- 109.5's "you" and Filter.IsSource both mean the permanent printing the
       -- sentence, so both ask through the same Context.
       contextOf source = Filter.contextFor (Projection.controllerOf source gs) (Just source)
+      -- CR 604.2's "as long as", read exactly as CombatRestriction.inForce reads
+      -- its "unless" and with the opposite polarity: a permission whose gate does
+      -- NOT hold grants nothing. Asked once per permission and not per candidate,
+      -- because CR 109.5 fixes the "you" inside it as the SOURCE's controller.
       granted source changes permission = case BlockPermission.while permission of
         Nothing -> True
         Just condition ->
@@ -79,6 +79,10 @@ additionalBlocks candidates gs =
       -- is the strict direction, and Nothing here would read as Palace Guard's
       -- sentence. CR 107.1b supplies the other clamp -- a calculation yielding a
       -- negative number uses zero instead -- which is Integer.toNaturalSaturating.
+      --
+      -- Both clamps are regression FENCES rather than proven behaviour: the pool's
+      -- one counted permission counts objects in a zone, which is always answerable
+      -- and never negative, so no test can distinguish either from the alternative.
       amount source changes permission = case BlockPermission.additional permission of
         Nothing -> Nothing
         Just quantity ->
