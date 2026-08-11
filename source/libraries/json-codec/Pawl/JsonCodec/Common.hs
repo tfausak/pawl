@@ -11,8 +11,11 @@
 -- binding, or encoding a default value and decoding it back stops being the
 -- identity.
 --
--- Nothing here names a @Pawl.Types@ type, which is what keeps it below the
--- per-type modules rather than in a cycle with them.
+-- Nothing here names a @Pawl.Types@ type. Since the move to @pawl:json-codec@,
+-- that is guaranteed by the build graph rather than by discipline:
+-- @pawl:json-codec@ does not depend on @pawl:types@, so a @Pawl.Types@ import
+-- would fail to build, which is what keeps this module below the per-type
+-- modules rather than in a cycle with them.
 --
 -- 'object' and 'asObject' trade in 'Pair.Pair' lists so fields can be written
 -- in a readable order rather than an alphabetical one. That order is
@@ -215,6 +218,11 @@ decodeNullary tyName table value = do
     Just x -> Right x
     Nothing -> Left . Text.pack $ "unknown " <> tyName <> ": " <> t
 
+-- The pairs below (encodeList/decodeList and its siblings) are the last
+-- function-shaped combinators; each is waiting to collapse into one
+-- Codec-shaped replacement, e.g. a future Codec.list, during the full
+-- pawl:codec conversion (#1263).
+
 encodeList :: (a -> Value.Value) -> [a] -> Value.Value
 encodeList f = array . fmap f
 
@@ -372,6 +380,7 @@ assertCodec s c = assertJsonCodec s (Codec.encode c) (Codec.decode c)
 -- is demanded, so pattern-matching the value (as 'asObject' alone does) forces
 -- only the outer tag, not the @$defs@ bodies inside it; rendering to text and
 -- parsing it back walks the whole tree, which is what actually forces those.
+-- Not validated against the schema itself (#1264).
 assertHasSchema :: (Stack.HasCallStack, Applicative m) => Spec.Spec m n -> Codec.Codec a -> m ()
 assertHasSchema s c =
   Spec.assertBool

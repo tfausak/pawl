@@ -7,12 +7,10 @@
 -- codec in the tree is written against it.
 --
 -- This module holds the type and nothing else. The combinators live in
--- @Pawl.JsonCodec.Common@, which imports this: 'Common.maybe' wraps the
--- existing element helpers rather than reimplementing them, and 'assertCodec'
--- reads this record. Siting them here instead would invert that: this leaf
--- module would need to import @Common@ for 'Common.encodeMaybe',
--- 'Common.decodeMaybe', 'Common.asObject' and 'Common.assertJsonCodec', while
--- @Common@ would need nothing back from here.
+-- @Pawl.JsonCodec.Common@, which imports this for the element helpers and the
+-- spec assertions it uses. Siting them here instead would invert that: this
+-- leaf module would need to import @Common@ back, while @Common@ would need
+-- nothing back from here.
 module Pawl.JsonCodec.Codec where
 
 import qualified Data.Text as Text
