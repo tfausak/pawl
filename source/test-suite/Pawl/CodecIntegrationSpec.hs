@@ -223,9 +223,13 @@ spec s registry = Spec.describe s "Pawl.Codec (integration)" $ do
 -- sort order, lives in Pawl.Codec.TriggeredAbilitySpec now.
 
 -- Binding's own per-constructor coverage (the empty binding, and every field
--- populated at once, exercising Quantity.fromJsonPair via its
--- characteristicPT field) and its toJsonMap/fromJsonMap sort-by-slot-name
--- proof live in Pawl.Codec.BindingSpec now.
+-- populated at once) and its toJsonMap/fromJsonMap sort-by-slot-name proof
+-- live in Pawl.Codec.BindingSpec now. Quantity.fromJsonPair -- the
+-- characteristicPT pair's decoder -- is exercised directly in
+-- Pawl.Codec.QuantitySpec, not here: BindingSpec's "every field populated"
+-- case sets Binding.copy from ProjectedCharacteristicsSpec.testCharacteristics,
+-- whose characteristicPT is Nothing, so the key is absent and
+-- Common.defaultedField never calls the decoder.
 -- DelayedTrigger's own per-constructor coverage (CR 603.7a/603.7b's default,
 -- and each of a restricted window and a stated expiry) lives in
 -- Pawl.Codec.DelayedTriggerSpec now. Neither needed a registry fixture -- a synthetic Binding/Card stand-in
