@@ -85,7 +85,7 @@ scripted edit.
 newtype Schema = MkSchema { unwrap :: Value.Value }
 
 -- Pawl.JsonSchema.Name
-newtype Name = MkName { unwrap :: String }
+newtype Name = MkName { unwrap :: Text.Text }
 
 typeName :: (Typeable.Typeable a) => Proxy.Proxy a -> Name
 
@@ -199,7 +199,8 @@ data Codec a = MkCodec
     schema :: Define.SchemaM Schema.Schema
   }
 
-maybe :: Codec a -> Codec (Maybe a)
+-- Pawl.JsonCodec.Common
+maybe :: Codec.Codec a -> Codec.Codec (Maybe a)
 ```
 
 `schema` is `SchemaM Schema`, not `Schema`, from the start. The field type is
@@ -208,7 +209,7 @@ in the tree is written against it, and recursion is the known reason the plain
 form fails.
 
 `Pawl.JsonCodec.Codec` holds the type and nothing else. Combinators of both
-shapes live in `Common`, which imports it: `Codec.maybe` wraps the
+shapes live in `Common`, which imports it: `Common.maybe` wraps the
 `encodeMaybe`/`decodeMaybe` pair rather than reimplementing it, and
 `assertCodec` needs the record to read `encode` and `decode` off. Siting the
 `Codec`-shaped ones beside the type instead would work -- the edge would run
@@ -228,7 +229,7 @@ finished.
 data Fields o a = MkFields
   { encodeFields :: o -> [Pair.Pair Value.Value],
     decodeFields :: [Pair.Pair Value.Value] -> Either Text.Text a,
-    schemaFields :: Define.SchemaM ([Pair.Pair Value.Value], [String])
+    schemaFields :: Define.SchemaM ([Pair.Pair Value.Value], [Text.Text])
   }
 
 required :: String -> Codec.Codec a -> (o -> a) -> Fields o a
@@ -241,14 +242,18 @@ one. A field's key is still a string, because a JSON key is not a Haskell name.
 
 `Functor` maps `decodeFields` only; the other two fields are contravariant in
 `o` and untouched. `Applicative` concatenates all three. There is no `Monad`
-instance and there cannot be one, which is load-bearing below.
+instance, deliberately: `encodeFields` never mentions `a` at all, so `>>=`
+would have no `a` to hand its continuation on the encoding side. Contravariance
+in `o` is not what rules this out by itself -- `newtype F o a = F (o -> Maybe
+a)` is contravariant in `o` and is a lawful monad -- the missing `a` is the
+actual obstruction, and it is load-bearing below.
 
 ``` hs
 -- Pawl.Codec.PhasePattern
 codec :: Codec.Codec PhasePattern.PhasePattern
 codec = Fields.object $ do
   p <- Fields.required "whichPhase" PhaseSelector.codec PhasePattern.whichPhase
-  w <- Fields.defaulted "whosePhase" Nothing (Codec.maybe PlayerId.codec) PhasePattern.whosePhase
+  w <- Fields.defaulted "whosePhase" Nothing (Common.maybe PlayerId.codec) PhasePattern.whosePhase
   pure
     PhasePattern.MkPhasePattern
       { PhasePattern.whichPhase = p,
@@ -317,9 +322,15 @@ Two calls where the honest schema is the looser one:
 - **A defaulted field is nullable *and* optional.** `defaultedField` treats an
   absent key and an explicit `null` alike, so the schema has to permit both.
 
-Neither is a limitation of the schema language; both are the decoder's actual
-behaviour written down. A schema that is stricter than its decoder is a lie in
-the direction that costs a card author an afternoon.
+- **`"type":"integer"` accepts more than `asInteger` does.** JSON Schema's
+  `integer` type admits any number with a zero fractional part, including
+  `1.0` and `1e2`; `Common.asInteger` accepts `1e2` (a non-negative exponent)
+  but rejects `1.0` (a fractional mantissa). Same direction as the other two:
+  the schema is looser, never stricter, than the decoder.
+
+Neither of the first two is a limitation of the schema language; both are the
+decoder's actual behaviour written down. A schema that is stricter than its
+decoder is a lie in the direction that costs a card author an afternoon.
 
 ## The slice
 
@@ -364,16 +375,20 @@ Each converted spec gains exactly one schema case:
 
 ``` hs
 Spec.it s "has a schema" $
-  Spec.assertBool
-    s
-    (Either.isRight (Common.asObject (Define.run (Codec.schema PhasePattern.codec))))
-    "expected an object"
+  Common.assertHasSchema s PhasePattern.codec
 ```
 
-It asserts nothing about content, so editing a schema never edits a test -- but
-it forces the value, so a bottom fails, and a `define` that fails to terminate
-fails on the suite's `--timeout 1s`. Schemas themselves are reviewed by eye from
-the PR body, which carries all seven rendered.
+`assertHasSchema` renders the schema to text and parses it back, rather than
+pattern-matching `Define.run`'s result with `Common.asObject` directly --
+`asObject` only matches `Value.Object`'s outer constructor, so a schema whose
+`$defs` bodies are bottom or non-terminating would still satisfy
+`Either.isRight (Common.asObject (Define.run ...))` without those bodies ever
+being forced. Render-then-parse walks the whole tree, so a bottom fails and a
+`define` that fails to terminate fails on the suite's timeout.
+
+It asserts nothing about content, so editing a schema never edits a test.
+Schemas themselves are reviewed by eye from the PR body, which carries all
+seven rendered.
 
 `Pawl.JsonSchema.DefineSpec` is the one place a literal is cheap and stable: a
 synthetic self-referential `define`, asserting the cycle breaks into a `$ref`
