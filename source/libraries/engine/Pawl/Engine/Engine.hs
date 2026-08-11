@@ -218,10 +218,17 @@ settleAll pid = do
 -- object `p` no longer controls.
 --
 -- It samples rather than hooks because control is DERIVED: a control-granting
--- static ability is re-read live by the projection, so a control change has no
--- event to hang a re-sickening on (#198). `settleForPriority` is where it
+-- static ability is re-read live by the projection, so no resolution announces a
+-- control change for a re-sickening to hang on. `settleForPriority` is where it
 -- samples, which is every point the board can CHANGE; a bare priority pass leaves
 -- the state untouched, so the previous sample already saw this exact board.
+--
+-- `sampleControl` mints a GameEvent.ControlChanged off the same difference for CR
+-- 603.2's benefit, and this deliberately does NOT read it. They are diffs of the
+-- same two boards, so consuming the log would add an ordering dependency between two
+-- samplers and buy nothing -- and they run at different moments on purpose: the event
+-- has to be minted before the trigger scan, while this has to land after it, on the
+-- pass where the board finally stops moving.
 --
 -- It only ever CLEARS. That asymmetry is what makes the sampling sound: a
 -- discrepancy proves control changed, so clearing is always right, while
@@ -298,6 +305,70 @@ sampleWorldSince = do
       let (ts, gs1) = Game.freshTimestamp gs
           stamp obj = obj {Object.worldSince = Just ts}
       State.put gs1 {GameState.objects = foldr (Map.adjust stamp) cleared toStamp}
+
+-- The OBSERVATION POINT for a control change (CR 613.1b puts control in layer 2,
+-- so the projection re-reads it live and nothing announces the answer changing).
+-- Diffs the live controller of every battlefield permanent against
+-- GameState.controlSample and records a GameEvent.ControlChanged for each
+-- difference, then stores the new snapshot. Reports whether it recorded anything.
+--
+-- MINTING AN EVENT is what makes this different from the three samplers beside it
+-- (checkControlContinuity, Combat.removeChanged, Ring.endOnControlChange), which
+-- each clear one piece of stored state and tell nobody. A trigger condition cannot
+-- be written against stored state that quietly changes, so CR 603.2 needs an entry
+-- in the log; `Engine.reactions` already mints GameEvent.AbilityTriggered for the
+-- same reason, so that the ordinary trigger machinery applies unchanged.
+--
+-- FIRST SIGHTING IS NOT A CHANGE. An id absent from the previous snapshot is
+-- recorded and nothing else, so a permanent entering -- under its owner or, by CR
+-- 110.2's Object.enteredUnder, under somebody else -- mints no event. That is the
+-- rule and not a conservatism: CR 603.2's event is control CHANGING, and a
+-- permanent that has just entered has not had two controllers.
+--
+-- The snapshot is REBUILT from the battlefield, which prunes it: a permanent that
+-- left has no entry to go stale, and CR 400.7 gives what comes back a new id this
+-- has never seen, so a creature borrowed, killed and reanimated does not read as
+-- coming home.
+--
+-- WHERE IT RUNS: inside `performSettle`'s recursion guard and BEFORE
+-- placePendingTriggers, because a minted event has to be scanned by a later pass
+-- of the same settle -- the three samplers performSettle runs LAST sit outside the
+-- guard precisely
+-- because they make no further work, and this one does. It terminates because it
+-- only mints on a difference and writes the difference away, so a board that stops
+-- changing mints nothing.
+--
+-- Recording through Event.recordEvent means the CR 603.3a control sample
+-- (GameState.controlWhenTriggered) can be taken here, on a settle where nothing else
+-- was unscanned. That is the right reading and not an accident: an ability triggering
+-- off a control change triggered when control had already moved, so the controller
+-- the scan reads is the post-change one.
+--
+-- One Projection.controlGrants hoisted over the walk, as
+-- checkControlContinuity and Projection.controls both do.
+sampleControl :: Game Bool
+sampleControl = do
+  gs <- State.get
+  let grants = Projection.controlGrants gs
+      sampled =
+        Map.fromList
+          [ (oid, pid)
+          | oid <- Set.toList (GameState.battlefield gs),
+            Just pid <- [Projection.controllerOfGiven grants Set.empty oid gs]
+          ]
+      changes =
+        [ GameEvent.ControlChanged oid before after
+        | (oid, after) <- Map.toList sampled,
+          Just before <- [Map.lookup oid (GameState.controlSample gs)],
+          before /= after
+        ]
+  State.put gs {GameState.controlSample = sampled}
+  -- CR 603.2's simultaneity: two permanents whose control reverted in the same CR
+  -- 514.2 sweep changed hands at the same moment, so the batch is one event group
+  -- and CR 603.3b orders the abilities they trigger.
+  Monad.unless (null changes) . Event.simultaneously $
+    State.modify' (\g -> List.foldl' (flip Event.recordEvent) g changes)
+  pure (not (null changes))
 
 -- CR 514.1's cleanup discard -- NOT CR 514.2, the damage-removal and
 -- end-of-turn sweep beside it. Non-identical cards share a hand, so trimming
@@ -916,13 +987,14 @@ settleForPriority = Monad.void performSettle
 -- CR 117.5: each time a player would receive priority, sweep expired "for as
 -- long as" effects, perform state-based actions, then put triggered abilities
 -- on the stack, repeating until none of the three does anything. Then priority
--- is granted (by the caller). The repeat is gated on five cheap booleans -- the
--- conditional sweep, a monarch exile returning, a day/night check acting, an SBA
--- firing, a trigger being placed -- so a settle that changes nothing costs one
--- board projection and one length comparison per carrier, NOT a deep GameState
--- equality check. On top of
--- that, every pass pays four samples of derived state (sampleWorldSince for
--- CR 704.5k, checkControlContinuity for CR 302.6, Combat.removeChanged for
+-- is granted (by the caller). The repeat is gated on cheap booleans -- the
+-- conditional sweep, a monarch exile returning, a day/night check acting, the
+-- control sample minting an event, an SBA firing, a trigger being placed -- so a
+-- settle that changes nothing costs one board projection and one length comparison
+-- per carrier, NOT a deep GameState equality check. On top of
+-- that, every pass pays five samples of derived state (sampleWorldSince for
+-- CR 704.5k, sampleControl for CR 603.2's control-change event,
+-- checkControlContinuity for CR 302.6, Combat.removeChanged for
 -- CR 506.4, Ring.endOnControlChange for CR 701.54a), because a derived change to
 -- control, to card types or to supertypes has nothing else to notice it.
 --
@@ -939,9 +1011,11 @@ settleForPriority = Monad.void performSettle
 -- It also REPORTS whether it performed any state-based action or placed any
 -- triggered ability, because one caller needs the answer and the rest do not.
 -- That caller is `cleanupException` (CR 514.3a), and those two are exactly what
--- the rule asks about; the conditional sweep, the monarch exile return and the
--- day/night check also make the loop repeat but are none of them, so none is
--- reported.
+-- the rule asks about; the conditional sweep, the monarch exile return, the
+-- day/night check and the control sample also make the loop repeat but are none of
+-- them, so none is reported. The control sample is the one whose omission could
+-- cost a CR 514.3a round, and it cannot: an event it mints is scanned by the very
+-- next pass, so a trigger it produces is reported as `placed` there.
 --
 -- Reported across EVERY pass, where CR 704.3's last sentence names the step's
 -- first check. The two agree wherever the conditional sweep is inert, which is
@@ -962,6 +1036,11 @@ performSettle = do
   -- guard because it runs on every pass, but not part of it -- stamping makes no
   -- further work, so it is never a reason to loop.
   sampleWorldSince
+  -- The control-change observation point, and unlike the four other samples in
+  -- this function it MAKES WORK: a GameEvent.ControlChanged it mints has to be
+  -- scanned, so it runs before placePendingTriggers and joins the recursion guard
+  -- below. See `sampleControl`.
+  sampledControl <- sampleControl
   acted <- Sba.performStateBasedActions
   placed <- placePendingTriggers
   -- Last, and for the same reason the conditional sweep runs first: all three
@@ -985,7 +1064,7 @@ performSettle = do
   State.modify' Combat.removeChanged
   checkControlContinuity
   Ring.endOnControlChange
-  more <- if swept || returned || dayNight || acted || placed then performSettle else pure False
+  more <- if swept || returned || dayNight || sampledControl || acted || placed then performSettle else pure False
   pure (acted || placed || more)
 
 -- CR 104.4b: how many events may happen with no player able to decide anything

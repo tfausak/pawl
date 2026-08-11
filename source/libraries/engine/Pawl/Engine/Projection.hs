@@ -1700,6 +1700,12 @@ rewriteTriggerCondition pairs condition = case condition of
   -- permanent stop being a Saga would be read off the projection this rewrites,
   -- not out of the condition.
   TriggerCondition.SagaFinalChapterTriggers _ -> condition
+  -- CR 603.7's slot-named condition carries a SLOT NAME, which is card data but not
+  -- card TEXT: it names an entry in the ability's own environment, so no CR 612.1
+  -- subtype swap can reach it. What the slot holds is a creature whose subtypes a
+  -- text change may well have rewritten, and that is read off the projection rather
+  -- than out of the condition.
+  TriggerCondition.LoseControlOfBound _ -> condition
 
 -- CR 612.1 through Condition's predicate vocabulary, at the four clauses a
 -- PRINTED ability carries one in: a triggered ability's CR 603.8 state trigger

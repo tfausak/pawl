@@ -510,6 +510,8 @@ triggerConditionCounts triggerCondition = case triggerCondition of
   TriggerCondition.PlayerDiscards _ -> []
   -- CR 725.1's crowning condition is a PlayerRelation too.
   TriggerCondition.PlayerBecomesMonarch _ -> []
+  -- CR 603.7's slot-named condition holds a SlotName, which is no Count.
+  TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -1374,6 +1376,32 @@ ownDeclaredTargetSlots card =
           )
     )
 
+-- The slots an ARMING carrier declares as targets: the three carriers above that
+-- can arm a CR 603.7 delayed ability, which is all of them except the delayed
+-- abilities themselves. CR 603.7c captures the whole environment of the object
+-- that armed, so a target chosen for the arming spell is in the delayed ability's
+-- bindings -- Ray of Command's "when you lose control of the creature" reads the
+-- creature the spell targeted.
+--
+-- Its own declared specs are EXCLUDED on purpose: the delayed-ability read lint
+-- compares against those separately, per mode, and folding them in here would make
+-- that comparison vacuous.
+--
+-- LOOSE about WHICH carrier armed, because nothing here tracks that: a delayed
+-- ability reading a slot declared by an activated ability that does not arm it
+-- would pass. Tightening it means threading the arming site through, which no card
+-- in the pool needs -- Ray of Command arms from the spell that declares the slot.
+armingTargetSlots :: Face.Face Card.Type.Card -> Set.Set SlotName.SlotName
+armingTargetSlots card =
+  Set.unions
+    ( Map.keysSet (Card.allTargetSpecs card)
+        : fmap
+          (Map.keysSet . Modal.allTargetSpecs)
+          ( fmap ActivatedAbility.modal (Face.activatedAbilities card)
+              <> fmap TriggeredAbility.modal (Face.triggeredAbilities card)
+          )
+    )
+
 -- Every slot a card DECLARES as a target: the four carriers above, on the card's
 -- own face AND on every face it mints. A token's triggered ability
 -- declares its targets through CR 603.3d exactly as the minting card's does, so
@@ -1875,6 +1903,9 @@ triggerConditionFilters triggerCondition = case triggerCondition of
   TriggerCondition.PlayerDiscards _ -> []
   -- CR 725.1's crowning condition is a PlayerRelation, which holds no Filter.
   TriggerCondition.PlayerBecomesMonarch _ -> []
+  -- CR 603.7's slot-named condition holds a SlotName, which is no Filter -- what
+  -- the slot holds was selected by the arming spell's own target spec.
+  TriggerCondition.LoseControlOfBound _ -> []
   TriggerCondition.SelfPutIntoGraveyardFromLibrary -> []
   TriggerCondition.SelfPutIntoGraveyardFromAnywhere -> []
   TriggerCondition.SelfDies -> []
@@ -2959,9 +2990,11 @@ lintSpec s registry = Spec.describe s "Lint" $ do
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no card shadows a minted delayed ability" (fmap (S.nameOf . Printing.card) offenders) []
   -- Every slot a delayed ability READS must be one the arming card DEFINES:
-  -- the reserved trigger-source slot, a token bound by a Create, or the
+  -- the reserved trigger-source slot, a token bound by a Create, the
   -- incarnation a MoveToZone bound at its destination (Meandering Towershell's
-  -- exiled card). The `abilityBound` side is `cardResolutionEffects` for the
+  -- exiled card), or a TARGET the arming carrier declared (armingTargetSlots, which
+  -- is CR 603.7c's captured environment -- Ray of Command's third sentence). The
+  -- `abilityBound` side is `cardResolutionEffects` for the
   -- reason the lint above takes it: the binding effect can live in the ability
   -- that arms, not only in a spell mode.
   --
@@ -2976,7 +3009,7 @@ lintSpec s registry = Spec.describe s "Lint" $ do
   Spec.it s "every slot a delayed ability reads is bound by its card" $ do
     ps <- S.allPrintings s
     let cardOffends card =
-          let bound = Set.insert Binding.triggerSource (Resolve.definedSlots (cardResolutionEffects card))
+          let bound = Set.insert Binding.triggerSource (Set.union (armingTargetSlots card) (Resolve.definedSlots (cardResolutionEffects card)))
            in any (modalSlotsOffend bound . TriggeredAbility.modal) (Map.elems (Face.delayedAbilities card))
         offenders = filter (anyFace cardOffends . Printing.card) ps
     Spec.assertEqWith s "no dangling delayed-ability slot" (fmap (S.nameOf . Printing.card) offenders) []

@@ -9,6 +9,7 @@ import qualified Pawl.Codec.Filter as Filter
 import qualified Pawl.Codec.Keyword as Keyword
 import qualified Pawl.Codec.Phase as Phase
 import qualified Pawl.Codec.PlayerRelation as PlayerRelation
+import qualified Pawl.Codec.SlotName as SlotName
 import qualified Pawl.Codec.TriggerFrequency as TriggerFrequency
 import qualified Pawl.Codec.TurnScope as TurnScope
 import qualified Pawl.Json.Array as Array
@@ -61,6 +62,7 @@ toJson c = case c of
   TriggerCondition.PermanentSacrificed -> Common.nullary "PermanentSacrificed"
   TriggerCondition.SagaFinalChapterTriggers r -> Common.tagged "SagaFinalChapterTriggers" . Just $ PlayerRelation.toJson r
   TriggerCondition.PlayerBecomesMonarch r -> Common.tagged "PlayerBecomesMonarch" . Just $ PlayerRelation.toJson r
+  TriggerCondition.LoseControlOfBound s -> Common.tagged "LoseControlOfBound" . Just $ SlotName.toJson s
 
 fromJson :: Value.Value -> Either Text.Text TriggerCondition.TriggerCondition
 fromJson value = do
@@ -108,4 +110,5 @@ fromJson value = do
     ("PermanentSacrificed", _) -> Right TriggerCondition.PermanentSacrificed
     ("SagaFinalChapterTriggers", Just v) -> TriggerCondition.SagaFinalChapterTriggers <$> PlayerRelation.fromJson v
     ("PlayerBecomesMonarch", Just v) -> TriggerCondition.PlayerBecomesMonarch <$> PlayerRelation.fromJson v
+    ("LoseControlOfBound", Just v) -> TriggerCondition.LoseControlOfBound <$> SlotName.fromJson v
     _ -> Left . Text.pack $ "unknown TriggerCondition: " <> t

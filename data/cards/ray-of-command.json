@@ -1,6 +1,33 @@
 {
   "faces": [
     {
+      "delayedAbilities": [
+        {
+          "ability": {
+            "condition": {
+              "type": "LoseControlOfBound",
+              "value": "target"
+            },
+            "modal": {
+              "modes": [
+                {
+                  "clauses": [
+                    {
+                      "effects": [
+                        {
+                          "type": "Tap",
+                          "value": "target"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "name": "tap it"
+        }
+      ],
       "manaCost": [
         {
           "type": "Generic",
@@ -50,6 +77,10 @@
                       },
                       "target"
                     ]
+                  },
+                  {
+                    "type": "ArmDelayedTrigger",
+                    "value": "tap it"
                   }
                 ]
               }

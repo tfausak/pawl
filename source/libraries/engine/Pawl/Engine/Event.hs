@@ -290,6 +290,7 @@ movedOf event = case event of
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
 
 -- The damage an event describes, if it is any.
 damageOf :: GameEvent -> Maybe DamageEvent
@@ -318,6 +319,7 @@ damageOf event = case event of
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
 
 -- Who revealed what, if the event is a reveal (CR 701.20a).
 revealOf :: GameEvent -> Maybe (PlayerId, PC.ProjectedCharacteristics)
@@ -346,6 +348,7 @@ revealOf event = case event of
   GameEvent.LifeGained _ _ -> Nothing
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+  GameEvent.ControlChanged {} -> Nothing
 
 -- CR 117.5: the events the trigger scan has not yet consumed, WITH the
 -- EventGroup each belongs to. Only eventTriggers wants the groups; every other
@@ -2653,8 +2656,23 @@ turnScopeAdmits scope active own = case scope of
 -- permanent, not only the one an event names. The sole home of casing on
 -- TriggerCondition for rules purposes -- Pawl.Codec also cases on every
 -- constructor, but only at the JSON boundary.
+--
+-- The BINDINGLESS reading, which is every caller that has no environment to offer
+-- and every condition but one. `matchesTriggerGiven` below is the same act with CR
+-- 603.7c's captured environment in hand.
 matchesTrigger :: GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
-matchesTrigger gs bearer you cond event = case cond of
+matchesTrigger = matchesTriggerGiven Map.empty
+
+-- The same question against a slot environment, for the one condition whose subject
+-- is an object named EARLIER rather than the bearer or a class of objects
+-- (TriggerCondition.LoseControlOfBound). Projection.controllerOf's `-Given` shape:
+-- the plain name above defaults the extra argument, so a caller with nothing to say
+-- says nothing.
+--
+-- An empty map is not a special case -- it simply names no slot, so the one arm
+-- that reads a slot finds none and answers False.
+matchesTriggerGiven :: Map.Map SlotName.SlotName Binding -> GameState -> ObjectId -> PlayerId -> TriggerCondition -> GameEvent -> Bool
+matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- CR 603.6a: the bearer's own object entered the battlefield.
   TriggerCondition.SelfEnters -> case event of
     GameEvent.Moved zc _ -> ZoneChange.object zc == bearer && ZoneChange.to zc == Zone.Battlefield
@@ -2681,6 +2699,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 603.6a's "whenever a [type] enters": a permanent the Filter admits
   -- entered the battlefield. The bearer frames the match rather than being it --
   -- it is the Filter.Context's source (so `Not IsSource` is Soul Warden's
@@ -2733,6 +2752,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 603.2b: this step began, on a turn the scope admits.
   TriggerCondition.StepBegins wanted scope -> case event of
     GameEvent.StepBegan began active ->
@@ -2760,6 +2780,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 603.8: a state trigger is not an event trigger. It never matches an entry
   -- in the log; stateTriggers below is its whole story.
   TriggerCondition.StateIs _ -> False
@@ -2793,6 +2814,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- The same event read by a BYSTANDER (CR 510.1b / 510.2): a permanent the Filter
   -- admits dealt combat damage to a player. The Filter reads the event's DAMAGER,
   -- the bearer contributing only CR 109.5's "you" and the Filter.Context's source
@@ -2838,6 +2860,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 725.2: never matched via a card's bearer -- the monarch's crown-steal is
   -- an inherent ability of no object, so its real match lives in
   -- Pawl.Engine.Monarch.inherentMatch, not here.
@@ -2878,6 +2901,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 701.9a: a card was discarded, by a player the relation admits. The
   -- discarding player comes from the event; CR 109.5 fixes "you" as the
   -- ability's controller (CR 603.3a), and Megrim's "an opponent" is every other
@@ -2922,6 +2946,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 725.1: a player BECAME the monarch. Matched against the event the
   -- crowning records, so every route through CR 725.1's "an effect instructs a
   -- player to become the monarch" fires it alike: Effect.BecomeMonarch records
@@ -2963,6 +2988,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 508.3a: the bearer was DECLARED as an attacker. Matched against the
   -- declaration event rather than Combat.attackers, which keeps that rule's last
   -- sentence true -- a creature put onto the battlefield attacking is in the
@@ -3003,6 +3029,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 702.149a: the bearer was declared as an attacker, and at least one OTHER
   -- attacking creature satisfies the Filter. SelfAttacks' event and its identity
   -- check, with an existential over the rest of the declaration added.
@@ -3055,6 +3082,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 506.5: a creature the Filter admits was declared as an attacker, and it
   -- was the ONLY one the declaration named. The same event SelfAttacks reads,
   -- with the count taken instead of the bearer's identity.
@@ -3096,6 +3124,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 702.105a: the bearer was declared attacking A PLAYER, and no player still in
   -- the game has more life than that one. SelfAttacks' event and its identity
   -- check, with the comparison added.
@@ -3142,6 +3171,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 509.3a: the bearer was DECLARED as a blocker. SelfAttacks' mirror, and
   -- matched against the declaration event for that arm's reason -- CR 509.4's
   -- creature put onto the battlefield blocking is in Combat.blockers and has no
@@ -3182,6 +3212,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 509.3b: the PAIRWISE event, which is that rule's "once for each attacking
   -- creature the creature with the ability blocks" -- and the difference from
   -- SelfBlocks above, together with the attacker eventBindings stamps under
@@ -3215,6 +3246,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 509.3e: the bearer blocked at least `n` creatures. SelfBlocks with the
   -- count read, on the very same grouped event -- which is what makes rule
   -- 509.3e's "when blockers are declared" the moment this fires.
@@ -3246,6 +3278,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 509.3c: the bearer BECAME a blocked creature, which CR 509.1h makes the
   -- declaration's other product. SelfBlocks' arm above is the mirror.
   --
@@ -3281,6 +3314,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 509.3d: a creature the Filter admits was declared as a blocker FOR the
   -- bearer. The pair on GameEvent.BlockerDeclared is read from the ATTACKING
   -- side, which is what makes this fire once per blocker where
@@ -3323,6 +3357,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 603.6: a zone-change trigger matched on BOTH ends of the move, library to
   -- graveyard. The bearer is the incarnation the card became on arrival per CR
   -- 400.7e, a graveyard being public (CR 400.2). The pair is also what makes CR
@@ -3358,6 +3393,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 603.6 with NO origin zone: the destination is the whole condition, so a
   -- discard, a mill, a countered spell and a death all match. `from` is
   -- deliberately unread, which is the one line separating this from the two
@@ -3396,6 +3432,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 603.6c narrowed by CR 700.4's definition of "dies": the bearer was put into
   -- a graveyard from the battlefield. Both ends are load-bearing -- `from` keeps a
   -- permanent DISCARDED out of a hand silent, and `to` keeps one EXILED off the
@@ -3434,6 +3471,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- The same rule and zone pair as SelfDies, watched by a BYSTANDER. The bearer
   -- frames the match rather than being it, as for PermanentEnters: it is the
   -- Filter.Context's source (so `Not IsSource` is "another"), and its controller
@@ -3485,6 +3523,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 603.6c taken whole. The `from` half matches SelfDies'; the `to` half is
   -- where they part company, this one asking only that the destination be ANOTHER
   -- zone.
@@ -3526,6 +3565,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 701.6a: a spell was countered, by a spell or ability whose controller the
   -- relation admits. The countering source's controller comes from the event,
   -- captured as the counter happened, and CR 109.5/603.3a fix "you" as the
@@ -3566,6 +3606,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 615.13: a prevention effect was applied and prevented some damage, and the
   -- damage it prevented was addressed to a player the relation admits. CR 109.5 /
   -- 603.3a fix "you" as the ability's controller, exactly as PlayerDiscards and
@@ -3617,6 +3658,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 119.9: a source caused a player the relation admits to gain life. The
   -- gaining player comes from the event; CR 109.5 / 603.3a fix "you" as the
   -- ability's controller, exactly as PlayerDiscards, SpellOrAbilityCounters and
@@ -3663,6 +3705,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeLost _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- A player the relation admits LOST life -- Exquisite Blood's "whenever an
   -- opponent loses life". The losing player comes from the event; CR 109.5 /
   -- 603.3a fix "you" as the ability's controller, exactly as PlayerGainsLife
@@ -3716,6 +3759,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 714.2b: counters of this kind were put onto the BEARER, and the count
   -- crossed N going up. Both halves of the rule's sentence are here -- see
   -- Pawl.Types.TriggerCondition.SelfCountersReached for why the intervening "if"
@@ -3735,6 +3779,7 @@ matchesTrigger gs bearer you cond event = case cond of
     -- Rule 714.2b says "are PUT onto", so a removal crosses nothing: a Saga whose
     -- lore counters were taken off and put back fires its chapters again.
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
@@ -3768,6 +3813,7 @@ matchesTrigger gs bearer you cond event = case cond of
   TriggerCondition.SelfLastCounterRemoved wanted -> case event of
     GameEvent.CountersRemoved oid kind _ after -> oid == bearer && kind == wanted && after == 0
     GameEvent.CountersPut {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
     GameEvent.DamagePrevented _ _ -> False
@@ -3833,6 +3879,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.PermanentSacrificed {} -> False
     GameEvent.AbilityTriggered {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -3885,6 +3932,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.LifeGained _ _ -> False
     GameEvent.CountersPut {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
   -- CR 709.5h: the bearer is the permanent that was given the designation, and
   -- the door named is the one it was given for. A bare comparison of an id and a
   -- name, in SelfEnters' shape and for its reason -- nothing about the entrant's
@@ -3902,6 +3950,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -3940,6 +3989,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -3996,6 +4046,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -4030,6 +4081,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -4057,6 +4109,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -4105,6 +4158,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.AbilityTriggered {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -4139,6 +4193,7 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
     GameEvent.CountersPut {} -> False
     -- CR 700.4 again, from this side: a sacrifice DOES record a Moved event, and
     -- matching it here would answer twice for one sacrifice.
@@ -4163,7 +4218,7 @@ matchesTrigger gs bearer you cond event = case cond of
   -- the SAME event fire the ability once here, which is also the right answer --
   -- CR 603.2 matches an event against "a triggered ability's trigger event", and
   -- the ability is one ability.
-  TriggerCondition.AnyOf conditions -> any (\c -> matchesTrigger gs bearer you c event) conditions
+  TriggerCondition.AnyOf conditions -> any (\c -> matchesTriggerGiven bindings gs bearer you c event) conditions
   -- CR 603.3b's second class, the one condition in this type whose event is
   -- another ability triggering: "whenever the final chapter ability of a Saga you
   -- control triggers".
@@ -4211,6 +4266,55 @@ matchesTrigger gs bearer you cond event = case cond of
     GameEvent.HalfUnlocked {} -> False
     GameEvent.SpellCast {} -> False
     GameEvent.CountersRemoved {} -> False
+    GameEvent.ControlChanged {} -> False
+    GameEvent.CountersPut {} -> False
+    GameEvent.Moved _ _ -> False
+    GameEvent.DamageDealt _ -> False
+    GameEvent.DamagePrevented _ _ -> False
+    GameEvent.StepBegan _ _ -> False
+    GameEvent.BecameMonarch _ -> False
+    GameEvent.Discarded {} -> False
+    GameEvent.Revealed _ _ -> False
+    GameEvent.AttackerDeclared {} -> False
+    GameEvent.BlockerDeclared _ _ -> False
+    GameEvent.BlocksDeclared _ _ -> False
+    GameEvent.AttackerBlocked _ _ -> False
+    GameEvent.SpellCountered _ -> False
+    GameEvent.LoyaltyAbilityActivated _ -> False
+    GameEvent.LifeLost _ _ -> False
+    GameEvent.LifeGained _ _ -> False
+  -- CR 603.7: "when you lose control of the creature" -- Ray of Command's third
+  -- sentence. The slot is read out of CR 603.7c's captured environment, so the
+  -- creature this asks about is the one the spell targeted rather than whatever
+  -- creature happens to change hands.
+  --
+  -- Binding.objectSlots and not Binding.objectsOf: the printed sentence is about
+  -- ONE creature, and a slot holding a group or several targets names none of them
+  -- here rather than any one of them.
+  --
+  -- `before == you` and nothing about `after`, because losing control is the whole
+  -- of what the sentence asks. Engine.sampleControl only mints the event when the
+  -- two players differ, so no separate "and somebody else has it now" conjunct is
+  -- needed for the match to mean a change.
+  --
+  -- The `== Just oid` conjunct is a REGRESSION FENCE rather than a proven
+  -- behaviour: no board in the pool can tell it from `Map.member slot`. The only
+  -- control changes a Ray of Command board sees are the reversions of the creatures
+  -- its controller stole, all in one CR 514.2 sweep, and the ability taps its slot
+  -- whichever of them matched -- CR 603.7b spending the one shot either way. A card
+  -- whose controller can lose control of a DIFFERENT permanent while this entry is
+  -- armed is what would observe it.
+  TriggerCondition.LoseControlOfBound slot -> case event of
+    GameEvent.ControlChanged oid before _ ->
+      Map.lookup slot (Binding.objectSlots bindings) == Just oid && before == you
+    GameEvent.AbilityTriggered {} -> False
+    GameEvent.PermanentSacrificed {} -> False
+    GameEvent.TurnedFaceUp _ -> False
+    GameEvent.BecameRenowned _ -> False
+    GameEvent.Evolved _ -> False
+    GameEvent.HalfUnlocked {} -> False
+    GameEvent.SpellCast {} -> False
+    GameEvent.CountersRemoved {} -> False
     GameEvent.CountersPut {} -> False
     GameEvent.Moved _ _ -> False
     GameEvent.DamageDealt _ -> False
@@ -4248,6 +4352,9 @@ reactsToAbilityTriggering cond = case cond of
   -- pass exists at all.
   TriggerCondition.SagaFinalChapterTriggers _ -> True
   TriggerCondition.AnyOf conditions -> any reactsToAbilityTriggering conditions
+  -- CR 603.7's own event is a control change, not an ability triggering, so it
+  -- belongs to CR 603.3b's first pass.
+  TriggerCondition.LoseControlOfBound _ -> False
   -- Everything else names something that happened to the board or to a player,
   -- which is CR 603.3b's first class in as many words.
   TriggerCondition.SelfEnters -> False
@@ -4821,6 +4928,11 @@ eventBindingSlots cond = case cond of
   -- default -- eventBindings has no arm for this condition either. A card
   -- watching an OPPONENT be crowned is what would want the slot (#1051).
   TriggerCondition.PlayerBecomesMonarch _ -> Set.empty
+  -- Empty by decision: the permanent the event names is the one the condition's own
+  -- SLOT already names, and Ray of Command's "tap it" reads that slot rather than
+  -- anything the event bound. A slot for the player who GAINED control is what a
+  -- card printing "that player" would earn; nothing prints one.
+  TriggerCondition.LoseControlOfBound _ -> Set.empty
 
 -- Whether a damage recipient is a player (CR 120.1): a total discriminator over
 -- Recipient, so the combat-damage-to-player trigger matcher stays non-partial.
@@ -4929,6 +5041,10 @@ looksBack condition = case condition of
   -- CR 725.1's crowning names no zone change either -- it moves a DESIGNATION,
   -- not an object -- so none of CR 603.10a's four families reaches it.
   TriggerCondition.PlayerBecomesMonarch _ -> False
+  -- CR 603.10a's look-back is for a bearer that left; this condition's subject is a
+  -- permanent still on the battlefield, Engine.sampleControl sampling nowhere else,
+  -- and its bearer is a CR 603.7 delayed entry the store keeps rather than the log.
+  TriggerCondition.LoseControlOfBound _ -> False
 
 -- CR 603.6a: every event is checked against every permanent currently on the
 -- battlefield, not only the object the event names -- a step trigger belongs to a
@@ -5125,6 +5241,7 @@ eventTriggers events gs =
         GameEvent.LifeGained _ _ -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
         GameEvent.CountersRemoved {} -> Map.empty
+        GameEvent.ControlChanged {} -> Map.empty
       -- CR 603.10a's look-back at the permanent this event removed: every
       -- ability it had, unfiltered, for the reason `battlefieldAbilitiesOf`
       -- above gives.
@@ -5238,6 +5355,7 @@ eventTriggers events gs =
         GameEvent.LifeGained _ _ -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
         GameEvent.CountersRemoved {} -> Map.empty
+        GameEvent.ControlChanged {} -> Map.empty
       -- CR 113.6k and CR 113.6m: every card in every graveyard carrying at least
       -- one ability those rules put there. The one source that widens the SCANNED
       -- ZONE rather than recovering an object an event names, which is why it is
@@ -5310,8 +5428,14 @@ eventTriggers events gs =
         GameEvent.LifeGained _ _ -> Map.empty
         GameEvent.CountersPut {} -> Map.empty
         GameEvent.CountersRemoved {} -> Map.empty
+        GameEvent.ControlChanged {} -> Map.empty
       forOne event (oid, (ctrl, abilities)) =
-        let fires ab = matchesTrigger gs oid ctrl (TriggeredAbility.condition ab) event
+        let -- The bearer's own slot environment, so a condition naming a slot
+            -- (TriggerCondition.LoseControlOfBound) is read the same way here as it
+            -- is for a CR 603.7 delayed entry. Empty for a bearer read out of last
+            -- known information, which has no object left to ask.
+            bindings = maybe Map.empty Object.bindings (Game.lookupObject oid gs)
+            fires ab = matchesTriggerGiven bindings gs oid ctrl (TriggeredAbility.condition ab) event
             pend ab = PendingTrigger.MkPendingTrigger (TriggerSource.OfObject oid) ctrl ab (eventBindings (TriggeredAbility.condition ab) event)
          in fmap pend (filter fires abilities)
       -- Map.unions is left-biased, so a live battlefield reading wins over a
@@ -5516,6 +5640,11 @@ zoneTriggeredFrom cond = case cond of
   -- CR 113.6's default once more: Custodi Lich is a creature and watches the
   -- crown from the battlefield, so the card sees no crowning from a graveyard.
   TriggerCondition.PlayerBecomesMonarch _ -> Nothing
+  -- CR 113.6's default, and never actually consulted: this condition's only carrier
+  -- is a CR 603.7 delayed entry, which Event.delayedPending gathers out of
+  -- GameState.delayedTriggers rather than out of a zone. The default is right
+  -- anyway -- the event it matches happens on the battlefield.
+  TriggerCondition.LoseControlOfBound _ -> Nothing
 
 -- CR 603.2b / 109.5: does this condition restrict the turn its event may occur
 -- on to the ABILITY'S CONTROLLER's turn? True for "at the beginning of YOUR
@@ -5645,6 +5774,10 @@ controllerTurnScoped cond = case cond of
   -- combat damage step of whoever is attacking. The watcher may or may not be
   -- that player, which is exactly what makes this not controller-scoped.
   TriggerCondition.PlayerBecomesMonarch _ -> False
+  -- Carries no TurnScope at all: CR 514.2 ends the control effect Ray of Command's
+  -- delayed ability watches on the turn the spell resolved, but that is the
+  -- DURATION's doing rather than a restriction the condition states.
+  TriggerCondition.LoseControlOfBound _ -> False
 
 -- CR 603.8: state triggers. For every battlefield permanent, each StateIs ability
 -- it bears whose condition is currently TRUE and which has no instance of ITSELF
@@ -5740,6 +5873,10 @@ stateTriggers gs
               -- player BECOMING the monarch, and a settle re-reading "is the
               -- monarch" would fire it again every time until the crown moved.
               TriggerCondition.PlayerBecomesMonarch _ -> False
+              -- CR 603.2 event trigger too, and not a state: it fires on control
+              -- CHANGING, and a settle re-reading "somebody else controls it" would
+              -- fire it again on every pass thereafter.
+              TriggerCondition.LoseControlOfBound _ -> False
               -- CR 709.5h is an EVENT trigger: it fires on the permanent BEING
               -- GIVEN the designation, which CR 709.5c leaves it holding
               -- thereafter, so a state read would fire it again every time the
@@ -5836,7 +5973,11 @@ delayedPending events gs =
         TurnWindow.OnTurn n -> n == GameState.turnNumber gs
       fires entry =
         let cond = TriggeredAbility.condition (DelayedTrigger.ability entry)
-         in armed entry && any (matchesTrigger gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
+         in -- The entry's own bindings, which is CR 603.7c's captured environment:
+            -- TriggerCondition.LoseControlOfBound asks about an object named as the
+            -- arming spell resolved, and the store is the only thing that still
+            -- remembers it.
+            armed entry && any (matchesTriggerGiven (DelayedTrigger.bindings entry) gs (DelayedTrigger.source entry) (DelayedTrigger.controller entry) cond) events
       pend entry =
         PendingTrigger.MkPendingTrigger
           (TriggerSource.OfObject (DelayedTrigger.source entry))

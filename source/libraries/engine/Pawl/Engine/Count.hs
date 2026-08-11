@@ -266,6 +266,9 @@ snapshotView gs shape event = case event of
   -- and no EventShape names it either.
   GameEvent.CountersPut {} -> Nothing
   GameEvent.CountersRemoved {} -> Nothing
+  -- A control change names two players and one object by id, snapshots no
+  -- characteristics, and no EventShape names it.
+  GameEvent.ControlChanged {} -> Nothing
 
 -- The Filter.View a recorded snapshot yields, shared by every arm of
 -- snapshotView above so that two shapes of event cannot disagree about what a
