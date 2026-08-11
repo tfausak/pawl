@@ -219,13 +219,18 @@ attackedThisStep pid gs =
 -- been removed from combat since the declaration?
 --
 -- Asked where the answer is USED rather than sampled into the combat record the
--- way removeChanged samples its two clauses, and the difference is invisible: an
--- attack target is read in exactly three places, and all three re-ask --
--- Damage.combatRecipient at CR 510.1's assignment, whose own CR 510.1b is
--- phrased for precisely this case, Defender.playerOf for CR 508.5's defending
--- player, which reads the planeswalker's controller and never whether it is
--- still attacked, and Battle.isBeingAttacked for CR 704.5w's rider, which asks
--- only whether a battle is named at all.
+-- way removeChanged samples its two clauses, and the difference is invisible:
+-- Damage.combatRecipient asks it at CR 510.1's assignment, whose own CR 510.1b is
+-- phrased for precisely this case, and Battle.isBeingAttacked asks the record for
+-- CR 704.5w's rider, which needs only whether a battle is named at all.
+-- Defender.playerOf, CR 508.5's reader, needs no removal test of its own: the
+-- defending player of a creature attacking a planeswalker is the record's
+-- defending player whether or not the planeswalker is still there (rule 508.5's
+-- second sentence). The remaining readers of a target look only for
+-- AttackTarget.OfPlayer -- AttackCost.costsOn's attack taxes,
+-- Quantity.attackedOpponent's CR 702.121a melee, Event's CR 702.105a dethrone,
+-- Pawl.Types.TriggerCondition's attacked player -- and a rule that removes a
+-- PLANESWALKER from combat cannot change what those answer.
 --
 -- Every other reader of Combat.attackers takes its KEYS (Projection's
 -- Filter.IsAttacking, blockCeiling, declareBlockers, Damage.dealCombatDamage),
@@ -234,13 +239,13 @@ attackedThisStep pid gs =
 --
 -- So the state pawl stores -- an attacker whose recorded target is no longer
 -- attackable -- and the state the rules describe are observationally the same
--- board. CR 702.19e is now in the pool and reads the record after removal
--- (Thrasta, Tempest's Roar), and it does not separate them: rule 702.19e is
--- stated as an exception to CR 506.4c, so KEEPING the record naming the
+-- board, and keeping the record is required rather than merely harmless: rule
+-- 702.19e is stated as an exception to CR 506.4c, so the entry naming the
 -- planeswalker is what lets Damage.combatRecipient tell "was attacking a
--- planeswalker that is gone" from "was never attacking anything". What is still
--- unmodeled is a trigger that reads WHAT was attacked (CR 508.3b) and CR 508.5's
--- last known information (#537).
+-- planeswalker that is gone" from "was never attacking anything" (Thrasta,
+-- Tempest's Roar is the printing). What no board can yet show is a trigger that
+-- reads WHAT was attacked, CR 508.3b's shape, since GameEvent.AttackerDeclared
+-- carries no target (#538).
 stillAttacked :: ObjectId -> GameState -> Bool
 stillAttacked oid gs = case Combat.defender (GameState.combat gs) of
   -- No defending player is no attack (see Pawl.Types.Combat's defender field), so
@@ -821,8 +826,11 @@ landwalkAllowsGiven grants pcs attacker gs =
       -- coincide only while there is exactly one defending player (CR 802, #175),
       -- and CR 310.8d breaks them apart at two seats as soon as a battle is
       -- attacked. Nothing means the object is not attacking, so no landwalk of its
-      -- can restrict anything.
-      defendingPlayer = Defender.playerOfAttacker grants attacker gs
+      -- can restrict anything -- or, for an attacker whose BATTLE has left the
+      -- battlefield, that pawl has no protector left to read (#1248). This is the
+      -- one reader of CR 508.5 with no fallback of its own, so it is where that
+      -- rule's second sentence is observable.
+      defendingPlayer = Defender.playerOfAttacker attacker gs
       -- CR 702.14c's lands of the defending player. Lazy, and load-bearing: this
       -- walks the whole battlefield, and `any` below never forces it for an
       -- attacker without landwalk, which is every attacker in almost every combat
@@ -1502,16 +1510,16 @@ declareAttackers pid = do
               -- own answer and not an invention: attackTargets offered only the
               -- defending player themselves, planeswalkers they control and
               -- battles they protect, so every announced target's defending
-              -- player IS this player. Reaching the fallback at all needs the
-              -- attacked permanent to have left the battlefield between the
-              -- announcement and this line -- a mana ability paid for a CR 508.1h
-              -- cost to attack is the only window, and no card in the pool can
-              -- put a planeswalker or a battle through it. Total rather than a
-              -- Maybe in the event, which every reader would then discard.
+              -- player IS this player. Only a BATTLE can reach the fallback now
+              -- (Defender.playerOf answers the record itself for a planeswalker),
+              -- and reaching it needs the battle to have left the battlefield
+              -- between the announcement and this line -- a mana ability paid for a
+              -- CR 508.1h cost to attack is the only window, and no card in the
+              -- pool can put one through it. Total rather than a Maybe in the
+              -- event, which every reader would then discard.
               State.modify'
                 ( \g ->
-                    let grants = Projection.controlGrants g
-                        defendingFor oid = Maybe.fromMaybe defender ((\t -> Defender.playerOf grants t g) =<< Map.lookup oid recorded)
+                    let defendingFor oid = Maybe.fromMaybe defender ((\t -> Defender.playerOf t g) =<< Map.lookup oid recorded)
                         declared = Natural.length attacking
                      in List.foldl' (\h oid -> Event.recordEvent (GameEvent.AttackerDeclared oid (defendingFor oid) declared) h) g attacking
                 )
@@ -1720,13 +1728,13 @@ declareBlockers = do
           -- themselves, their planeswalkers and the battles they protect, so every
           -- attacked target's defending player IS this player. The window it covers
           -- is wider than declareAttackers' -- a whole step, in which the attacked
-          -- permanent can leave -- and CR 508.5's second sentence is what makes the
-          -- answer the same either way.
+          -- permanent can leave -- and CR 508.5's second sentence is why the answer
+          -- is the same either way: Defender.playerOf reads the record for a
+          -- planeswalker, so only a departed BATTLE reaches the fallback.
           let wasBlocked = Map.keysSet (Combat.blockers (GameState.combat gs1))
               becameBlocked = Set.difference (Set.fromList (fmap snd pairs)) wasBlocked
           State.modify'
             ( \g ->
-                let grants = Projection.controlGrants g
-                    defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker grants oid g)
+                let defendingFor oid = Maybe.fromMaybe pid (Defender.playerOfAttacker oid g)
                  in List.foldl' (\h attacker -> Event.recordEvent (GameEvent.AttackerBlocked attacker (defendingFor attacker)) h) g (Set.toList becameBlocked)
             )

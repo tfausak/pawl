@@ -7,9 +7,7 @@
 module Pawl.Engine.Defender where
 
 import qualified Data.Map.Strict as Map
-import qualified Data.Set as Set
 import qualified Pawl.Engine.Battle as Battle
-import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Types.AttackTarget as AttackTarget
 import qualified Pawl.Types.Combat as Combat
 import Pawl.Types.GameState (GameState)
@@ -29,18 +27,36 @@ import Pawl.Types.PlayerId (PlayerId)
 -- rather than off Combat.defender is what makes that true of a battle whose
 -- controller is the attacking player -- the case CR 310.8b's "notably" creates.
 --
--- Nothing means the target names no player: a planeswalker or battle that has left
--- the battlefield, or a battle mid-repair with no designation (CR 310.10).
+-- The planeswalker arm answers CR 508.5's BOTH sentences with the combat record's
+-- defending player, and never asks the planeswalker. Both ways a target is
+-- recorded draw it from Pawl.Engine.Combat.attackTargets -- CR 508.1b's
+-- declaration and CR 508.4's entry -- and that list offers only planeswalkers the
+-- defending player controls, so while the planeswalker is attacked its controller
+-- IS that player. Once CR 506.4 removes it from combat the rule's second sentence
+-- wants the controller it had "before it was removed from combat", which is the
+-- same seat; reading the object instead answers NOBODY once CR 704.5i has buried
+-- it, since the burial leaves no object to read a controller off, and answers the
+-- owner on any board where the two seats differ. Pawl.CombatSpec's
+-- LastKnownDefendingPlayer group is that board, built with a Confiscate. CR 702.19e
+-- is what settles that a creature attacking a removed planeswalker still HAS a
+-- defending player: it assigns damage to one.
 --
--- CR 508.5's second sentence -- the defending player of a creature that is no
--- longer attacking, read off what it WAS attacking before it left combat -- is last
--- known information, and this reads live instead. Unreachable in the pool, which
--- has no card that can remove an attacked permanent from combat and change who
--- defends through it (#537), and unobservable besides.
-playerOf :: [Projection.ControlGrant] -> AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
-playerOf grants target gs = case target of
+-- CR 802's attack-multiple-players option is what would break the identity, since
+-- several defending players make the record's one player the wrong answer for some
+-- attacker; pawl has no options concept to read it from (#175), and this arm reads
+-- the per-attacker record again when it arrives.
+--
+-- Nothing means the target names no player: no defending player at all (outside
+-- combat), a battle that has left the battlefield, or a battle mid-repair with no
+-- designation (CR 310.10).
+--
+-- The BATTLE arm still reads live, so CR 508.5's second sentence is unanswered for
+-- a battle removed from combat -- its protector goes with it and this answers
+-- Nothing (#1248).
+playerOf :: AttackTarget.AttackTarget -> GameState -> Maybe PlayerId
+playerOf target gs = case target of
   AttackTarget.OfPlayer pid -> Just pid
-  AttackTarget.OfPlaneswalker oid -> Projection.controllerOfGiven grants Set.empty oid gs
+  AttackTarget.OfPlaneswalker _ -> Combat.defender (GameState.combat gs)
   AttackTarget.OfBattle oid -> Battle.protectorOf oid gs
 
 -- The same rule, asked of the attacking CREATURE rather than of what it attacks
@@ -48,7 +64,7 @@ playerOf grants target gs = case target of
 -- being phrased about a creature. Nothing when the object is not attacking at
 -- all, which is the honest answer: a creature that is not an attacker has no
 -- defending player.
-playerOfAttacker :: [Projection.ControlGrant] -> ObjectId -> GameState -> Maybe PlayerId
-playerOfAttacker grants attacker gs =
-  (\target -> playerOf grants target gs)
+playerOfAttacker :: ObjectId -> GameState -> Maybe PlayerId
+playerOfAttacker attacker gs =
+  (\target -> playerOf target gs)
     =<< Map.lookup attacker (Combat.attackers (GameState.combat gs))
