@@ -266,10 +266,9 @@ applyModification lyr src cands gs oid m pc =
 -- The ability clause strips keywords and the four fields below. An ability
 -- landing on OTHER objects is decided by a gate instead, because it must be kept
 -- out of the candidate list rather than erased from its own projection: gather
--- and controlGrants use liveGiven, and every reader after the layers uses
--- liveAfterLayers. Only the liveGiven pair still reads base where this reads the
--- projection, so the halves disagree on an object that became a land at layer 4
--- (#391).
+-- uses liveGiven, and every reader after the layers uses liveAfterLayers. Only
+-- liveGiven still reads base where this reads the projection, so the halves
+-- disagree on an object that became a land at layer 4 (#391).
 --
 -- CR 305.7 spares abilities GRANTED to the land, which needs no guard: every
 -- field cleared here is seeded from the card, and GainKeyword is layer 6, after
@@ -342,18 +341,16 @@ affects source oid a partial gs = case a of
   -- AttachedPlayerControls below instead.
   Affected.Attached -> (Game.lookupObject source gs >>= Object.attachedTo >>= Recipient.objectOf) == Just oid
   Affected.Matching f ->
-    let -- CR 109.5: "you" is the SOURCE's controller. controllerOf folds a CR
-        -- 305.7 liveness gate that calls back into this function, so this call is
-        -- safe only because `perspective` stays an unforced thunk until a
-        -- ControlledBy conjunct needs it, and no subtype-setting effect in the
-        -- pool pairs Matching with ControlledBy. A laziness accident, not a
-        -- structural guarantee: such a card would recurse and hang rather than
-        -- answer wrong (#197).
+    let -- CR 109.5: "you" is the SOURCE's controller. Safe to force from any
+        -- affected set, subtype-setting ones included, because controlGrants
+        -- consults no liveness gate and so cannot re-enter this function -- see
+        -- the CR 613.1 argument there. Celestial Dawn is the card that proves it,
+        -- via Pawl.ProjectionSpec's "Celestial Dawn sets only the lands its own
+        -- controller controls".
         perspective = controllerOf source gs
      in Set.member oid (GameState.battlefield gs)
           && Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
-  -- Matching's body without the battlefield conjunct. The `perspective` laziness
-  -- caveat in the Matching arm above applies here unchanged (#197).
+  -- Matching's body without the battlefield conjunct.
   Affected.MatchingAnywhere f ->
     let perspective = controllerOf source gs
      in Filter.matches (Filter.contextFor perspective (Just source)) (viewOfCharacteristics oid partial (controllerOf oid gs) (countersOf oid gs) gs) f
@@ -363,11 +360,10 @@ affects source oid a partial gs = case a of
   -- applied by the time this set is asked.
   --
   -- Unlike the Matching arm's `perspective`, controllerOf is FORCED here on every
-  -- candidate, so the #197 recursion hazard would bite if a subtype-setting
-  -- effect ever carried an AttachedPlayerControls set; none does, and
-  -- controllerOfGiven's namesFrom answers False for this arm rather than
-  -- recursing. The Filter's perspective stays the source's controller per CR
-  -- 109.5, not the enchanted player's.
+  -- candidate, which costs nothing now that controlGrants cannot re-enter this
+  -- function; controllerOfGiven's namesFrom answers False for this arm besides.
+  -- The Filter's perspective stays the source's controller per CR 109.5, not the
+  -- enchanted player's.
   --
   -- The candidate's controller is bound once and used twice, since controllerOf
   -- rebuilds controlGrants -- a whole-board walk -- on every call.
@@ -1185,13 +1181,16 @@ setLandSubtypeEffects gs =
 -- dependency order, falling back to timestamp order inside a dependency loop (CR
 -- 613.8b). This function only asks the applied ones whether they name `oid`.
 --
--- This is the INSIDE-THE-FOLD gate, and its two callers are gather (via
--- permanentParts) and controlGrants. "Applies to" reads BASE characteristics so
--- nothing recurses into the projection being built. That restriction costs a real
--- case: a permanent that becomes a land only through a layer-4 type change
--- (Ashaya on Thalia) is invisible here while the fold's own arm reaches it, so the
--- two halves of CR 305.7 still disagree for those two callers (#391). Every reader
--- OUTSIDE the fold uses liveAfterLayers below, which has no such disagreement.
+-- This is the INSIDE-THE-FOLD gate, and gather (via permanentParts) is its one
+-- caller. "Applies to" reads BASE characteristics so nothing recurses into the
+-- projection being built. That restriction costs a real case: a permanent that
+-- becomes a land only through a layer-4 type change (Ashaya on Thalia) is
+-- invisible here while the fold's own arm reaches it, so the two halves of CR
+-- 305.7 still disagree there (#391). Every reader OUTSIDE the fold uses
+-- liveAfterLayers below, which has no such disagreement.
+--
+-- The layer-2 control fold deliberately asks NEITHER gate -- see controlGrants for
+-- the CR 613.1 argument, and for the divergence a gate there caused.
 liveGiven :: [(ObjectId, Affected.Affected)] -> ObjectId -> GameState -> Bool
 liveGiven setEffs oid gs =
   not (any (\(src, aff) -> affectsBase src oid aff gs) (appliedSetEffects setEffs gs))
@@ -3298,57 +3297,51 @@ data ControlGrant = MkControlGrant
 
 -- Every layer-2 control-granting STATIC ability on the battlefield, gathered once.
 --
--- NOT `gather`. This must not project, and cannot: affects reads controllerOf to
--- supply CR 109.5's "you" when matching a Filter, so a controllerOf built on
--- gather would be mutually recursive with it. That is why Affected.Matching and
--- MatchingAnywhere are unsupported below (#195).
+-- NOT `gather`, and PROJECTION-FREE throughout: affects reads controllerOf to
+-- supply CR 109.5's "you" when matching a Filter, so a controlGrants that
+-- consulted the layers would be mutually recursive with it. That is why
+-- Affected.Matching and MatchingAnywhere are unsupported below (#195), and why the
+-- CR 305.7 gate this used to apply is gone -- liveGiven -> affectsBase -> affects's
+-- Matching arm -> controllerOf -> back here diverged rather than answering wrong,
+-- for a subtype-setting effect whose filter asks about control (Celestial Dawn).
 --
--- Hoisted for liveGiven's reason: `controls` calls controllerOf once per
--- battlefield object, so recomputing this list inside it would be quadratic in the
--- battlefield, inside a loop the SBA sweep runs at every priority boundary.
+-- Hoisted like setLandSubtypeEffects and for its reason: `controls` calls
+-- controllerOf once per battlefield object, so recomputing this list inside it
+-- would be quadratic in the battlefield, inside a loop the SBA sweep runs at every
+-- priority boundary.
 --
--- Layer 6 is invisible to this fold -- a control-granting static ability stripped
--- by LoseAllAbilities still appears here -- and CR 613.1 says that is the right
--- answer: control is layer 2 (CR 613.1b) and ability removal layer 6 (CR 613.1f),
--- so the grant was made before anything stripped the ability that made it. CR
--- 613.8a scopes dependency within a layer and CR 613.6 keeps a started effect
--- applying, so no reordering reaches across. Nothing is added at layer 6 either:
--- its vocabulary cannot put a static ability on an object.
+-- Removing that gate is what CR 613.1 wanted anyway: control is layer 2
+-- (CR 613.1b), the CR 305.7 land-subtype strip is layer 4 (CR 613.1d) and
+-- LoseAllAbilities layer 6 (CR 613.1f), so both strips happen AFTER this grant has
+-- started to apply, and CR 613.6 keeps it applying "even if the ability generating
+-- the effect is removed during this process". CR 613.8a scopes dependency within a
+-- layer, so no reordering reaches across either. Nothing is added at layer 6
+-- either: its vocabulary cannot put a static ability on an object.
 --
--- That is also why this keeps liveGiven's BASE read rather than taking
--- liveAfterLayers: control is decided at layer 2, before any layer-4 setter
--- applies, so CR 613.6 keeps the grant applying "even if the ability generating
--- the effect is removed during this process".
---
--- INVARIANT this liveness gate depends on (#197): the `liveGiven` call below must
--- never FORCE a control-dependent Filter, since liveGiven -> affectsBase ->
--- affects's Matching arm calls controllerOf, which calls back into controlGrants.
--- Nothing here prevents it; it holds only because no subtype-setting effect in the
--- pool pairs a Matching filter with ControlledBy.
+-- Unobservable in that direction today, and honestly so: no card in the pool is a
+-- land whose PRINTED rules text grants control, so nothing can watch a grant
+-- survive the strip. What the removal is observable for is the divergence above,
+-- via Pawl.ProjectionSpec's two Celestial Dawn cases. Pawl.ProjectionSpec's "a
+-- layer-6 strip on the Aura does not undo its layer-2 grant" pins the same
+-- direction for layer 6.
 controlGrants :: GameState -> [ControlGrant]
 controlGrants gs =
-  let setEffs = setLandSubtypeEffects gs
-      grantsOf permId = case Game.lookupObject permId gs of
+  let grantsOf permId = case Game.lookupObject permId gs of
         Nothing -> []
         Just permObj -> case Game.faceOf permId gs of
           Nothing -> []
           Just face ->
-            -- CR 305.7: a land whose subtype was SET has lost its rules text, so
-            -- it grants nothing. Same gate gather applies to every static ability.
-            if not (null setEffs) && not (liveGiven setEffs permId gs)
-              then []
-              else
-                let isControl sa = any isControlOp (StaticAbility.modifications sa)
-                    isControlOp m = case m of
-                      Modification.SetControllerToSource -> True
-                      _ -> False
-                    toGrant sa =
-                      MkControlGrant
-                        { cgSource = permId,
-                          cgAffected = StaticAbility.affected sa,
-                          cgTimestamp = Object.timestamp permObj
-                        }
-                 in fmap toGrant (filter isControl (Face.staticAbilities face))
+            let isControl sa = any isControlOp (StaticAbility.modifications sa)
+                isControlOp m = case m of
+                  Modification.SetControllerToSource -> True
+                  _ -> False
+                toGrant sa =
+                  MkControlGrant
+                    { cgSource = permId,
+                      cgAffected = StaticAbility.affected sa,
+                      cgTimestamp = Object.timestamp permObj
+                    }
+             in fmap toGrant (filter isControl (Face.staticAbilities face))
    in concatMap grantsOf (Set.toList (GameState.battlefield gs))
 
 -- CR 108.4 / 613.1b: an object's controller is its owner, overridden by layer-2
