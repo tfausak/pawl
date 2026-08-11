@@ -308,7 +308,7 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
     Spec.it s "sacrificeRestrictions (CR 701.21a/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.sacrificeRestrictions <$> decodeFace v) (Right [])
-    Spec.it s "untapRestrictions (CR 502.1/101.2) defaults to the empty list" $ do
+    Spec.it s "untapRestrictions (CR 502.3/101.2) defaults to the empty list" $ do
       v <- Common.assertJson s baseFaceJson
       Spec.assertEq s (Face.untapRestrictions <$> decodeFace v) (Right [])
     Spec.it s "attackCosts (CR 508.1c/508.1h) defaults to the empty list" $ do

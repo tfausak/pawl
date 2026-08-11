@@ -268,7 +268,7 @@ data Face card = MkFace
     -- the two declarations CR 508.1 and CR 509.1 describe, and this is read
     -- wherever CR 701.21a's sacrifice is reached from.
     sacrificeRestrictions :: [SacrificeRestriction.SacrificeRestriction],
-    -- | CR 604.1/604.2 / 502.1 / 101.2: this face's printed UNTAP PROHIBITIONS --
+    -- | CR 604.1/604.2 / 502.3 / 101.2: this face's printed UNTAP PROHIBITIONS --
     -- "each land with an activated ability that isn't a mana ability doesn't untap
     -- during its controller's untap step" (Tsabo's Web); read by
     -- Pawl.Engine.UntapRestriction, never by Pawl.Engine.Projection, for
@@ -276,7 +276,7 @@ data Face card = MkFace
     --
     -- Its own field rather than an arm of sacrificeRestrictions above, for the
     -- reason that field gives one line up: the two forbid unrelated game actions,
-    -- and this one is read at exactly one site, CR 502.1's turn-based action.
+    -- and this one is read at exactly one site, CR 502.3's turn-based action.
     untapRestrictions :: [UntapRestriction.UntapRestriction],
     -- | CR 604.1/604.2 / 508.1c / 508.1h: this face's printed COSTS TO ATTACK --
     -- Ghostly Prison's {2} per attacking creature; read by Pawl.Engine.AttackCost,

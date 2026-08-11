@@ -2,7 +2,7 @@ module Pawl.Types.UntapRestriction where
 
 import qualified Pawl.Types.Affected as Affected
 
--- | CR 502.1 / CR 101.2: one printed UNTAP PROHIBITION -- an effect saying a
+-- | CR 502.3 / CR 101.2: one printed UNTAP PROHIBITION -- an effect saying a
 -- permanent "doesn't untap during its controller's untap step". Tsabo's Web's
 -- second sentence is the pool's printing.
 --
@@ -13,15 +13,15 @@ import qualified Pawl.Types.Affected as Affected
 -- Every step of that type's argument for why it cannot be a
 -- Pawl.Types.Modification holds here unchanged.
 --
--- CR 101.2 is what gives the prohibition its force over CR 502.1's untap: the
+-- CR 101.2 is what gives the prohibition its force over CR 502.3's untap: the
 -- turn-based action directs the untap and this states it can't happen, so the
 -- "can't" wins. Nothing else in the rules asks -- an untap the ACTIVE PLAYER's
--- untap step does not perform (Effect.Untap, CR 701.26a) is a different action,
+-- untap step does not perform (Effect.Untap, CR 701.26b) is a different action,
 -- which this sentence does not name and so does not touch.
 --
--- ONE field rather than a sum, for SacrificeRestriction's reason: CR 502.1 is one
+-- ONE field rather than a sum, for SacrificeRestriction's reason: CR 502.3 is one
 -- action and a prohibition names a subject and nothing else. No "unless" gate
--- beside it either -- the pool's printing states none, and CR 502.1 writes no
+-- beside it either -- the pool's printing states none, and CR 502.3 writes no
 -- clause into the rule the way CR 508.1c does.
 --
 -- Gathered LIVE from the battlefield at the untap step and never captured, the

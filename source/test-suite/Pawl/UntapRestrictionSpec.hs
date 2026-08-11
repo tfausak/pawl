@@ -1,4 +1,4 @@
--- Covers: CR 502.1 / CR 101.2's UNTAP PROHIBITION -- Pawl.Types.UntapRestriction,
+-- Covers: CR 502.3 / CR 101.2's UNTAP PROHIBITION -- Pawl.Types.UntapRestriction,
 -- the set Pawl.Engine.UntapRestriction answers, and the one place it is
 -- subtracted (Pawl.Engine.Engine.untapAll); CR 602.1 / 605.1a read as
 -- Pawl.Types.Filter's HasNonManaActivatedAbility atom off
@@ -47,7 +47,7 @@ import qualified Pawl.Types.ObjectId as ObjectId
 import qualified Pawl.Types.Phase as Phase
 
 -- The untap step's turn-based actions, run for whoever the game state says is
--- active (CR 502.1). The one door Pawl.Engine.UntapRestriction is read through.
+-- active (CR 502.3). The one door Pawl.Engine.UntapRestriction is read through.
 untapStep :: GameState.GameState -> GameState.GameState
 untapStep gs = S.runPure S.identityAnswer gs (Engine.runTurnBasedActions (Phase.Beginning BeginningStep.Untap))
 
@@ -72,12 +72,12 @@ spec s registry = Spec.describe s "UntapRestriction" $ do
   prohibitionSpec s registry
   existenceSpec s registry
 
--- CR 502.1 / CR 101.2 through the untap step itself.
+-- CR 502.3 / CR 101.2 through the untap step itself.
 prohibitionSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 prohibitionSpec s registry = Spec.describe s "Prohibition" $ do
   -- The unit's central claim, and all three permanents are asserted on one board
   -- so no assertion can pass on a board the others did not see.
-  Spec.it s "CR 502.1/702.77b whole cards: under Tsabo's Web the Rustic Clachan does not untap, and the Seat of the Synod does" $ do
+  Spec.it s "CR 502.3/702.77b whole cards: under Tsabo's Web the Rustic Clachan does not untap, and the Seat of the Synod does" $ do
     (clachanId, seatId, sorcererId, gs) <- webBoard s registry True
     let untapped = untapStep gs
     Spec.assertBool s (Game.isTapped clachanId untapped) "the land with reinforce is still tapped"
@@ -85,7 +85,7 @@ prohibitionSpec s registry = Spec.describe s "Prohibition" $ do
     Spec.assertBool s (not (Game.isTapped sorcererId untapped)) "and 'each land' left the Prodigal Sorcerer alone"
   -- The same board with Tsabo's Web taken away and nothing else changed, so the
   -- assertion above cannot be passing because a Rustic Clachan never untaps.
-  Spec.it s "CR 502.1 without Tsabo's Web every one of them untaps" $ do
+  Spec.it s "CR 502.3 without Tsabo's Web every one of them untaps" $ do
     (clachanId, seatId, sorcererId, gs) <- webBoard s registry False
     let untapped = untapStep gs
     Spec.assertBool s (not (Game.isTapped clachanId untapped)) "the Clachan untapped"

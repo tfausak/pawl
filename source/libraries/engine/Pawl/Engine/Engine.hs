@@ -187,15 +187,16 @@ priorityHolder gs =
 checkSba :: Game ()
 checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 
--- CR 502.1's untap, minus what CR 101.2 says can't happen: an effect saying a
--- permanent doesn't untap during its controller's untap step takes the permanent
--- out of this fold and leaves it exactly as it was (Tsabo's Web,
--- Pawl.Engine.UntapRestriction).
+-- CR 502.3's untap, and its own "effects can keep one or more of a player's
+-- permanents from untapping": an effect saying a permanent doesn't untap during
+-- its controller's untap step takes it out of this fold and leaves it exactly as
+-- it was (Tsabo's Web, Pawl.Engine.UntapRestriction). CR 101.2 is what makes the
+-- "can't" beat the turn-based action.
 --
 -- The prohibition is asked of the ids this step would otherwise untap, so a
--- permanent its controller does not control is never a candidate -- CR 502.1
--- untaps the active player's permanents, and the sentence says "its controller's
--- untap step" of the same player.
+-- permanent this player does not control is never a candidate -- CR 502.3 untaps
+-- the active player's permanents, and the printed sentence says "its controller's
+-- untap step" of that same player.
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get

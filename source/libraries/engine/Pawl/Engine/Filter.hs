@@ -227,10 +227,10 @@ data View = MkView
     -- of what Filter.HasNonManaActivatedAbility asks and this module holds no
     -- board to measure an ability against.
     --
-    -- Filled by the two Pawl.Engine.Projection builders, which is what keeps the
-    -- CR 605.1a test out of here: the projection knows the abilities and this
-    -- module would have to import Pawl.Engine.Mana to classify one, which the
-    -- layering forbids.
+    -- Filled by the builders that hold an ability list -- Pawl.Engine.Projection's
+    -- two and Pawl.Engine.Count.viewOfSnapshot -- which is what keeps CR 605.1a's
+    -- test out of here: classifying an ability means importing
+    -- Pawl.Engine.ManaAbility, and this module holds no abilities to classify.
     --
     -- LAZY, for Pawl.Engine.Projection.viewOfCharacteristics' attachedToCreature
     -- reason: filling it re-asks CR 702.178a's grant condition, which reaches a

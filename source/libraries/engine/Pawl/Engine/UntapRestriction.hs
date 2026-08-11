@@ -1,4 +1,4 @@
--- CR 502.1 / 101.2 / 613.11: the continuous effects that FORBID CR 502.1's untap.
+-- CR 502.3 / 101.2 / 613.11: the continuous effects that FORBID CR 502.3's untap.
 -- One of the modules on the axis CR 613.11 reaches past the layer system
 -- (alongside Pawl.Engine.PlayerEffect, Pawl.Engine.BlockRequirement,
 -- Pawl.Engine.AttackRequirement, Pawl.Engine.CombatRestriction,
@@ -10,7 +10,7 @@
 --
 -- ONE place asks, unlike Pawl.Engine.SacrificeRestriction's two: the sentence
 -- names the untap step's turn-based action and nothing else, so an Effect.Untap
--- during the turn (CR 701.26a) is untouched -- which is the printed reading, not
+-- during the turn (CR 701.26b) is untouched -- which is the printed reading, not
 -- a shortcut.
 module Pawl.Engine.UntapRestriction where
 
@@ -24,7 +24,7 @@ import qualified Pawl.Types.GameState as GameState
 import Pawl.Types.ObjectId (ObjectId)
 import qualified Pawl.Types.UntapRestriction as UntapRestriction
 
--- CR 502.1 with CR 101.2: which of `candidates` an effect in force right now says
+-- CR 502.3 with CR 101.2: which of `candidates` an effect in force right now says
 -- DOESN'T UNTAP during its controller's untap step. Tsabo's Web's second
 -- sentence.
 --
