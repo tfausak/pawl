@@ -3972,6 +3972,11 @@ provokeSpec s registry =
 --
 -- A test whose entrant beat the Raptor on both axes would pass whichever half
 -- were implemented, and would not be a test of the disjunction at all.
+--
+-- The last two cases are CR 608.2a's re-check read against CR 608.2h, and they
+-- are a pair: the same Piker leaves the battlefield before the trigger resolves
+-- either way, and the only difference is the numbers the record filed for it --
+-- its own 2/1 when damage killed it, 0/0 when a shrink did.
 evolveSpec :: (Monad m, Monad n) => Spec.Spec m n -> Registry.Registry m -> n ()
 evolveSpec s registry =
   let settle gs = snd (Engine.runGamePure S.identityAnswer gs Engine.settleForPriority)
@@ -4039,6 +4044,50 @@ evolveSpec s registry =
           Spec.assertBool s (not (null (GameState.stack onStack))) "the trigger really was on the stack"
           Spec.assertEqWith s "the Raptor is a 2/3, which the Piker beats on neither axis" (S.powerToughnessOf raptorId responded) (Just (2, 3))
           Spec.assertEqWith s "so no counter on resolution" (countersOn raptorId after) Map.empty
+        -- CR 608.2h, the other half of that re-check: the ENTRANT is killed while
+        -- the trigger waits, and rule 702.100a's rulings say the comparison is
+        -- made against the power and toughness it last had on the battlefield --
+        -- not against an object with no characteristics. Only the RESOLUTION check
+        -- can observe this: at gather time the entrant has just entered and is
+        -- still there by construction, so the read this pins is Stack's alone.
+        --
+        -- LETHAL DAMAGE rather than a shrink is what kills it, and that is the
+        -- whole design of the board: a shrink would change the very numbers under
+        -- test, where damage leaves them alone (CR 704.5g destroys the Piker at
+        -- the 2/1 the record files). So last known information answers TRUE here
+        -- and a blank object answers False, which is what makes the two readings
+        -- distinguishable at all.
+        Spec.it s "CR 608.2h a Piker killed in response evolves the Raptor from its last known 2/1" $ do
+          raptor <- S.printingOf s registry "Cloudfin Raptor"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (raptorId, pikerId, gs) = board raptor piker S.alice
+              onStack = settle gs
+              dead = settle (S.markDamage pikerId 1 onStack)
+              after = resolveAll dead
+          Spec.assertBool s (not (null (GameState.stack onStack))) "the trigger really was on the stack"
+          Spec.assertEqWith s "and the Piker is gone before it resolves" (S.onBattlefield pikerId dead) False
+          Spec.assertEqWith s "the counter goes on all the same" (countersOn raptorId after) (Map.singleton CounterKind.PlusOnePlusOne 1)
+          Spec.assertEqWith s "so it is a 1/2" (S.powerToughnessOf raptorId after) (Just (1, 2))
+        -- The case above's paired negative -- same Raptor, same Piker, same
+        -- departure before resolution, and the single difference is HOW it left:
+        -- a -2/-1 kills it at 0/0 (CR 704.5f) instead, and 0/0 beats the Raptor's
+        -- 0/1 on neither axis. So the numbers the record filed are what the
+        -- re-check reads, rather than the entrant's PRINTED 2/1 -- which would put
+        -- the counter on -- and rather than a departed entrant being waved through
+        -- unexamined.
+        Spec.it s "CR 608.2h an entrant shrunk to 0/0 as it died evolves nothing" $ do
+          raptor <- S.printingOf s registry "Cloudfin Raptor"
+          piker <- S.printingOf s registry "Goblin Piker"
+          let (raptorId, pikerId, gs) = board raptor piker S.alice
+              onStack = settle gs
+              shrunk = S.withEffect pikerId (Modification.ModifyPowerToughness (Quantity.Type.Literal (-2)) (Quantity.Type.Literal (-1))) onStack
+              dead = settle shrunk
+              after = resolveAll dead
+          Spec.assertBool s (not (null (GameState.stack onStack))) "the trigger really was on the stack"
+          Spec.assertEqWith s "the Piker left as a 0/0" (S.powerToughnessOf pikerId shrunk) (Just (0, 0))
+          Spec.assertEqWith s "and is gone before the trigger resolves" (S.onBattlefield pikerId dead) False
+          Spec.assertEqWith s "no counters" (countersOn raptorId after) Map.empty
+          Spec.assertEqWith s "the Raptor is its printed 0/1" (S.powerToughnessOf raptorId after) (Just (0, 1))
         -- CR 702.100d: each instance triggers separately, asserted of the MINT as
         -- prowess' and training's are, no printing carrying evolve twice.
         Spec.it s "CR 702.100d two instances mint two abilities" $ do
