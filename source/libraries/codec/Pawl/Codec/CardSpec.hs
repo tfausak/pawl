@@ -59,6 +59,7 @@ bareFace n =
       Face.attackRequirements = [],
       Face.combatRestrictions = [],
       Face.sacrificeRestrictions = [],
+      Face.untapRestrictions = [],
       Face.attackCosts = [],
       Face.mulliganActions = [],
       Face.openingHandActions = [],

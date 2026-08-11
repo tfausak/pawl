@@ -47,6 +47,7 @@ import qualified Pawl.Engine.Speed as Speed
 import qualified Pawl.Engine.Stack as Stack
 import qualified Pawl.Engine.Target as Target
 import qualified Pawl.Engine.Turn as Turn
+import qualified Pawl.Engine.UntapRestriction as UntapRestriction
 import qualified Pawl.Extra.Int as Int
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.Action as Action.Type
@@ -186,12 +187,22 @@ priorityHolder gs =
 checkSba :: Game ()
 checkSba = sampleWorldSince >> Sba.checkStateBasedActions
 
+-- CR 502.1's untap, minus what CR 101.2 says can't happen: an effect saying a
+-- permanent doesn't untap during its controller's untap step takes the permanent
+-- out of this fold and leaves it exactly as it was (Tsabo's Web,
+-- Pawl.Engine.UntapRestriction).
+--
+-- The prohibition is asked of the ids this step would otherwise untap, so a
+-- permanent its controller does not control is never a candidate -- CR 502.1
+-- untaps the active player's permanents, and the sentence says "its controller's
+-- untap step" of the same player.
 untapAll :: PlayerId -> Game ()
 untapAll pid = do
   gs <- State.get
   let untap obj = obj {Object.tapped = TapState.Untapped}
       ids = Projection.controls pid gs
-  State.put gs {GameState.objects = foldr (Map.adjust untap) (GameState.objects gs) ids}
+      prohibited = UntapRestriction.doesNotUntap ids gs
+  State.put gs {GameState.objects = foldr (Map.adjust untap) (GameState.objects gs) (filter (\oid -> not (Set.member oid prohibited)) ids)}
 
 -- CR 302.6: permanents the active player has controlled since their turn began
 -- are no longer summoning sick. The untap step is where that becomes true.

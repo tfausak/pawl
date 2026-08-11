@@ -131,6 +131,7 @@ import qualified Pawl.Codec.TurnUpRewriteSpec
 import qualified Pawl.Codec.TurnWindowSpec
 import qualified Pawl.Codec.TypeLineSpec
 import qualified Pawl.Codec.UnlessPaidSpec
+import qualified Pawl.Codec.UntapRestrictionSpec
 import qualified Pawl.Codec.UsesSpec
 import qualified Pawl.Codec.ZoneChangePatternSpec
 import qualified Pawl.Codec.ZoneChangeSpec
@@ -206,6 +207,7 @@ import qualified Pawl.TargetSpec
 import qualified Pawl.TransformSpec
 import qualified Pawl.TriggerSpec
 import qualified Pawl.TurnSpec
+import qualified Pawl.UntapRestrictionSpec
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.HUnit as HU
 
@@ -390,6 +392,7 @@ spec s registry = do
   Pawl.Codec.TurnWindowSpec.spec s
   Pawl.Codec.TypeLineSpec.spec s
   Pawl.Codec.UnlessPaidSpec.spec s
+  Pawl.Codec.UntapRestrictionSpec.spec s
   Pawl.Codec.UsesSpec.spec s
   Pawl.Codec.ZoneChangePatternSpec.spec s
   Pawl.Codec.ZoneChangeSpec.spec s
@@ -461,3 +464,4 @@ spec s registry = do
   Pawl.TransformSpec.spec s registry
   Pawl.TriggerSpec.spec s registry
   Pawl.TurnSpec.spec s registry
+  Pawl.UntapRestrictionSpec.spec s registry

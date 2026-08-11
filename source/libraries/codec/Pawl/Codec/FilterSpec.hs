@@ -221,6 +221,13 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       fromJson
       Filter.IsRingBearer
       """ {"type":"IsRingBearer"} """
+  Spec.it s "HasNonManaActivatedAbility" $
+    Common.assertJsonCodec
+      s
+      toJson
+      fromJson
+      Filter.HasNonManaActivatedAbility
+      """ {"type":"HasNonManaActivatedAbility"} """
   Spec.it s "HasDesignation Renowned" $
     Common.assertJsonCodec
       s

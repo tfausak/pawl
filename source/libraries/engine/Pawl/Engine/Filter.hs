@@ -221,7 +221,24 @@ data View = MkView
     -- Not a designation of a PERMANENT as that field holds -- rule 702.33d
     -- designates the SPELL -- but it comes through the view for the same reason
     -- those do: the reader holds a view and not a board.
-    kicked :: Bool
+    kicked :: Bool,
+    -- CR 602.1 / 605.1a: does the candidate have an activated ability that isn't
+    -- a mana ability? A Bool and not the ability list, because that is the whole
+    -- of what Filter.HasNonManaActivatedAbility asks and this module holds no
+    -- board to measure an ability against.
+    --
+    -- Filled by the two Pawl.Engine.Projection builders, which is what keeps the
+    -- CR 605.1a test out of here: the projection knows the abilities and this
+    -- module would have to import Pawl.Engine.Mana to classify one, which the
+    -- layering forbids.
+    --
+    -- LAZY, for Pawl.Engine.Projection.viewOfCharacteristics' attachedToCreature
+    -- reason: filling it re-asks CR 702.178a's grant condition, which reaches a
+    -- second projection, and `affects` builds a view from inside a projection
+    -- already. Nothing forces it unless a Filter actually contains the atom, and
+    -- the pool's one printing (Tsabo's Web) is read outside the layer fold; an
+    -- affected-set filter that used it would recurse.
+    nonManaActivatedAbility :: Bool
   }
   deriving (Eq, Show)
 
@@ -281,7 +298,11 @@ playerView pid =
       -- CR 702.112b: "only permanents can be or become renowned", CR 701.37b and
       -- CR 701.60b saying the same of the other two, and a player is not one.
       designations = Set.empty,
-      kicked = False
+      kicked = False,
+      -- CR 602.1: an activated ability is an ability OF AN OBJECT, and CR 109.1's
+      -- list of what an object is has no player in it -- `keywords` above, one
+      -- rule over.
+      nonManaActivatedAbility = False
     }
 
 -- The perspective the match is relative to: who counts as "you" (CR 109.5), and
@@ -483,6 +504,11 @@ matches context view predicate = case predicate of
   -- makes a token's characteristics equivalent to a card's.
   Filter.IsToken -> token view
   Filter.IsTapped -> tapped view
+  -- CR 602.1 with CR 605.1a's exclusion, both applied by the builder that holds
+  -- the abilities. A live read: the projection is re-asked on every match, so a
+  -- land Humility has stripped stops matching at once, and CR 702.29b's and CR
+  -- 702.77b's abilities are in the list the builder measured.
+  Filter.HasNonManaActivatedAbility -> nonManaActivatedAbility view
   -- CR 701.54e's designation conjunct, asked of the perspective (CR 109.5's
   -- "you"). A live read of Object.ringBearerFor, never a stamp on the candidate:
   -- CR 701.54a ends the designation when another creature takes it, and the next
@@ -575,6 +601,10 @@ rewrite pairs predicate = case predicate of
   Filter.IsTapped -> predicate
   Filter.IsRingBearer -> predicate
   Filter.HasDesignation _ -> predicate
+  -- Untouched: CR 612.1 swaps a subtype, a colour or a card type word, and this
+  -- atom names none -- "an activated ability that isn't a mana ability" has no
+  -- word inside it for Artificial Evolution to reach.
+  Filter.HasNonManaActivatedAbility -> predicate
   -- Rewritten THROUGH the kind: CR 122.1b's keyword counter carries a keyword,
   -- and rule 612.1 reaches a word inside one exactly as it does in HasKeyword
   -- above. Every other kind names no word to swap.

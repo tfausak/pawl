@@ -19,7 +19,6 @@ import qualified Pawl.Engine.PlayerEffect as PlayerEffect
 import qualified Pawl.Engine.Projection as Projection
 import qualified Pawl.Extra.Natural as Natural
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
-import qualified Pawl.Types.Card as Card
 import Pawl.Types.Claim (Claim)
 import qualified Pawl.Types.Color as Color
 import Pawl.Types.Cost (Cost)
@@ -167,7 +166,7 @@ manaRoutesOfGiven pcs oid gs =
         fmap
           (\effects -> (ActivatedAbility.cost ability, Maybe.mapMaybe ManaAbility.manaProduced effects))
           (Modal.selectionEffects (ActivatedAbility.modal ability))
-      fromAbilities = concatMap selectionRoutes (filter isManaAbility (Projection.abilitiesGiven pcs oid gs))
+      fromAbilities = concatMap selectionRoutes (filter ManaAbility.isManaAbility (Projection.abilitiesGiven pcs oid gs))
    in fromSubtypes <> fromAbilities
 
 -- CR 305.6's intrinsic mana ability is "{T}: Add [the type]", printed on no card
@@ -305,27 +304,6 @@ typesOf = fmap ManaUnit.manaType . unitsOf
 -- solRingSpec is the standing proof against.
 manaTypesOf :: ObjectId -> GameState -> [ManaType]
 manaTypesOf oid gs = List.nub (concatMap typesOf (manaYieldsOf oid gs))
-
--- CR 605.1a: an activated ability is a mana ability if it could add mana AND
--- doesn't target and is not itself a loyalty ability (CR 606.2, which
--- Pawl.Engine.Cost.isLoyaltyCost answers; no loyalty ability in the pool adds
--- mana, so the clause is inert rather than checked here). Read at two sites:
--- manaRoutesOfGiven includes a mana ability as a source, and
--- Activate.activatableGiven refuses to put one on the stack (CR 605.3b). What
--- Action.legalActions offers instead is Action.ActivateManaAbility, one per
--- manaSourcesGiven, which is CR 605.3a's priority window.
---
--- Asked of the WHOLE ability, across every mode -- CR 605.1a's "could add mana"
--- is satisfied by any mode that does, and CR 605.2 keeps it a mana ability even
--- where the game state stops it producing.
---
--- DECLARING a slot is what disqualifies it, not filling one, and CR 605.1a's own
--- "(see rule 115.6)" is why: an ability whose slot may be left empty is "still
--- said to require targets", so a CR 115.6 slot keeps it off this list too.
-isManaAbility :: ActivatedAbility.ActivatedAbility Card.Card -> Bool
-isManaAbility ab =
-  not (null (Maybe.mapMaybe ManaAbility.manaProduced (Modal.allEffects (ActivatedAbility.modal ab))))
-    && Map.null (Modal.allTargetSpecs (ActivatedAbility.modal ab))
 
 setPool :: PlayerId -> Mana -> GameState -> GameState
 setPool pid pool gs = gs {GameState.manaPool = Map.insert pid pool (GameState.manaPool gs)}
