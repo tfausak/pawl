@@ -169,20 +169,25 @@ spec s = Spec.describe s "Pawl.JsonCodec.Common" $ do
     . Spec.it s "round trips"
     $ Common.assertCodec s Common.natural 2 "2"
 
+  -- Descending and carrying a duplicate, unlike the ascending duplicate-free
+  -- literals elsewhere in this file: 'list' preserves order and permits
+  -- repeats, and an ascending duplicate-free case would still pass an
+  -- implementation that reordered or deduplicated.
   Spec.describe s "list"
     . Spec.it s "round trips"
-    $ Common.assertCodec s (Common.list integerCodec) [1, 2, 3] "[1,2,3]"
+    $ Common.assertCodec s (Common.list integerCodec) [3, 3, 1] "[3,3,1]"
 
   Spec.describe s "set" $ do
     Spec.it s "round trips" $
       Common.assertCodec s (Common.set integerCodec) (Set.fromList [1, 2, 3]) "[1,2,3]"
-    -- decodeSet is a Set.fromList underneath, so a repeated element collapses
-    -- rather than erroring.
-    Spec.it s "deduplicates a repeated element on decode" $
-      Spec.assertEq
+    -- The schema says uniqueItems, so the decoder has to guarantee it: a
+    -- repeated element is a decode failure, not a value that silently
+    -- collapses.
+    Spec.it s "rejects a repeated element on decode" $
+      Spec.assertBool
         s
-        (Codec.decode (Common.set integerCodec) =<< Common.parse (Text.pack "[1,1,2]"))
-        (Right (Set.fromList [1, 2]))
+        (Either.isLeft (Codec.decode (Common.set integerCodec) =<< Common.parse (Text.pack "[1,1,2]")))
+        "expected a decode failure"
 
   Spec.describe s "seq"
     . Spec.it s "round trips"

@@ -93,8 +93,15 @@ multiset :: (Ord a) => Codec.Codec a -> Codec.Codec (Map.Map a Natural.Natural)
 
 Each wraps the `encodeX`/`decodeX` pair `Common` already owns rather than
 reimplementing it; each is the `Codec`-shaped half of a pair that #1263 will
-eventually delete. `set` emits `uniqueItems`; the others do not, because only
-`Set` guarantees it.
+eventually delete. A collection's schema should be as expressive as the
+constraint it names, and the decoder is tightened to guarantee what the
+schema claims rather than the schema being trimmed to whatever the decoder
+happened to accept: `set` emits `uniqueItems` and `decodeSet` rejects a
+repeated element to match; `nonEmpty` emits `minItems: 1` and `decodeNonEmpty`
+already rejected `[]`. `multiset` is deliberately NOT tightened the same
+way -- a repeat there is the encoding of a count (CR 122.1's counters), not a
+mistake, so its schema carries no uniqueness keyword and its decoder keeps
+recounting repeats.
 
 `tuple` is arity 2 and that is deliberate: all seven multi-payload arms in this
 closure are arity 2. Repo-wide there are 39 at arity 2, 7 at arity 3 and 2 at

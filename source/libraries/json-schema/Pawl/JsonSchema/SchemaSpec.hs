@@ -62,6 +62,14 @@ spec s = Spec.describe s "Pawl.JsonSchema.Schema" $ do
           Value.pair "uniqueItems" (Value.boolean True)
         ]
 
+  Spec.it s "nonEmptyArray adds minItems: 1 to array" $ do
+    Spec.assertEq s (Schema.unwrap (Schema.nonEmptyArray Schema.string))
+      . obj
+      $ [ Schema.pair "type" (str "array"),
+          Schema.pair "items" (Schema.unwrap Schema.string),
+          Schema.pair "minItems" (Schema.integerValue 1)
+        ]
+
   Spec.it s "tupleOf pins prefixItems and both bounds" $ do
     Spec.assertEq s (Schema.unwrap (Schema.tupleOf [Schema.string, Schema.integer]))
       . obj

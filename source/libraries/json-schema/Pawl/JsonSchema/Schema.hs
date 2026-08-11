@@ -54,6 +54,10 @@ uniqueArray s =
   fromPairs $
     keywords (array s) <> [Value.pair "uniqueItems" $ Value.boolean True]
 
+-- | An array whose decoder rejects an empty one, e.g. 'Pawl.JsonCodec.Common.nonEmpty'.
+nonEmptyArray :: Schema -> Schema
+nonEmptyArray s = fromPairs $ keywords (array s) <> [pair "minItems" (integerValue 1)]
+
 tupleOf :: [Schema] -> Schema
 tupleOf ss =
   fromPairs
