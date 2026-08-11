@@ -1,17 +1,18 @@
 - extensions:
   - default: false
   - name:
+    # Pawl.JsonCodec.Fields has no Monad instance and cannot get one:
+    # encodeFields never mentions a at all, so a bind would have no a to hand
+    # its continuation on the encoding side. ApplicativeDo is what lets a
+    # record still be built with the do-notation the style guide asks for.
     - ApplicativeDo
-    # Pawl.JsonCodec.Fields is contravariant in its encoding direction, so it
-    # can be Applicative but never Monad. ApplicativeDo is what lets a record
-    # still be built with the do-notation the style guide asks for.
     - FlexibleContexts
     - GADTs
     - MultilineStrings
     - RankNTypes
-    - ScopedTypeVariables
     # Pawl.JsonCodec.Fields and Pawl.JsonCodec.Arm derive a schema definition
     # name from their own type variable, which has to be in scope in the body.
+    - ScopedTypeVariables
 
 # Prefer `f . g $ h x` over `f $ g $ h x`.
 - group: {name: dollar, enabled: true}

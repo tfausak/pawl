@@ -4,11 +4,14 @@
 -- decoder, the schema's @properties@ and its @required@ all come out of one
 -- expression.
 --
--- 'Fields' is contravariant in @o@ on its encoding side, so it is 'Applicative'
--- and can never be 'Monad'. That is deliberate and load-bearing: with
--- @ApplicativeDo@, a field whose value depends on an earlier one fails to
--- compile rather than quietly desugaring through a bind the encoder could not
--- honour.
+-- 'Fields' has no 'Monad' instance and cannot get one: 'encodeFields' never
+-- mentions @a@ at all, so '>>=' would have no @a@ to hand its continuation on
+-- the encoding side. (Contravariance in @o@ alone would not rule out 'Monad'
+-- in @a@ -- @newtype F o a = F (o -> Maybe a)@ is contravariant in @o@ and is
+-- a lawful monad; the missing @a@ is the actual obstruction.) That is
+-- deliberate and load-bearing: with @ApplicativeDo@, a field whose value
+-- depends on an earlier one fails to compile rather than quietly desugaring
+-- through a bind the encoder could not honour.
 module Pawl.JsonCodec.Fields where
 
 import qualified Data.Text as Text
@@ -21,6 +24,11 @@ import qualified Pawl.JsonSchema.Define as Define
 import qualified Pawl.JsonSchema.Name as Name
 import qualified Pawl.JsonSchema.Schema as Schema
 
+-- | Assumes distinct keys across the 'required'/'defaulted' fields composed
+-- into one 'Fields': 'Common.field' (via 'lookupPair') takes the first match
+-- on decode, so a duplicate key is dead code, and 'encodeFields' does not
+-- dedupe either, so a duplicate emits two identical JSON object members --
+-- the first of which wins on the next decode.
 data Fields o a = MkFields
   { encodeFields :: o -> [Pair.Pair Value.Value],
     decodeFields :: [Pair.Pair Value.Value] -> Either Text.Text a,
