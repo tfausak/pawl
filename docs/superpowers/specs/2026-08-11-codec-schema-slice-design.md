@@ -134,15 +134,32 @@ for the type, so base names are unique by construction, and qualification would
 lengthen every `$ref` in the document to buy nothing. `tyConModule` is there if
 that convention ever breaks.
 
-Two things fall out of deriving rather than writing:
+Parameterised types then name themselves: `Face Card` and `Face Token` are
+distinct `TypeRep`s, so they take distinct `$defs` entries with no further
+design. The cost is a `(Typeable card)` constraint on the parametric codecs,
+which the slice does not reach.
 
-- **RFC 6901 escaping is moot.** A derived name is built from Haskell
-  identifiers and `_`, so it can never contain the `~` or `/` that a JSON
-  Pointer would have to escape. A hand-written string could.
-- **Parameterised types name themselves.** `Face Card` and `Face Token` are
-  distinct `TypeRep`s, so they take distinct `$defs` entries with no further
-  design. The cost is a `(Typeable card)` constraint on the parametric codecs,
-  which the slice does not reach.
+### A `$defs` key and a `$ref` are not the same string
+
+`tyConName` returns whatever the type constructor is called, verbatim. Haskell
+admits operator type constructors, so `(:~/)` is a nameable type and `":~/"` is a
+reachable definition name -- carrying both characters RFC 6901 reserves. Pawl
+defines no such type today and has no plans to, but `Name` is derived from the
+whole language, not from Pawl's habits.
+
+So the two positions are escaped differently, and `Define` keeps them apart:
+
+- **The `$defs` key is the raw name.** It is a JSON object key; JSON escapes
+  nothing here.
+- **The `$ref` is a URI-reference containing a JSON Pointer**, so it is escaped
+  twice, in order. RFC 6901 first: `~` to `~0`, then `/` to `~1` -- that order,
+  or a `/` rewritten to `~1` gets its `~` rewritten again. RFC 3986 second: a
+  fragment cannot carry `#`, `%`, `<`, `>`, `\`, `^` or `|`, all of which are
+  legal Haskell operator characters, so what remains is percent-encoded. Second
+  because 6901 introduces no `%` of its own.
+
+`Face Card` never reaches either rule, because `typeName` joins arguments with
+`_` before any of this. The space is a rendering choice; these are correctness.
 
 `Pawl.JsonSchema.Schema` exports generic constructors only: `string`, `integer`,
 `natural`, `object`, `oneOf`, `constant`, `nullable`, `withDefault`. Pawl's
@@ -331,7 +348,11 @@ synthetic self-referential `define`, asserting the cycle breaks into a `$ref`
 instead of diverging. That tests the machinery, not any type's schema.
 `Pawl.JsonSchema.NameSpec` pins the rendering rule the same way: a bare type
 gives `PhasePattern`, an applied one `Face_Card` rather than a name with a space
-in it.
+in it. Escaping is tested against a hand-built `MkName ":~/"` rather than a real
+operator-named type -- that a `TypeRep` for one renders its operator verbatim is
+GHC's contract, and asserting it would cost `TypeOperators` to say nothing about
+the code under test. What can be wrong is the escape, and that is what the case
+covers: `$defs` key `:~/`, `$ref` `#/$defs/:~0~1`.
 
 Golden schemas per type and a schema validator were both considered and
 rejected for now -- see *Alternatives rejected*.
