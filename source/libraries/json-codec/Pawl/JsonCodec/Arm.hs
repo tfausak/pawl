@@ -36,6 +36,16 @@ tag arm = case arm of
   MkNullary t _ -> t
   MkPayload t _ _ -> t
 
+-- | Assumes distinct tags across 'arms': 'List.find' takes the first match on
+-- decode, so a duplicate tag is dead code, and 'armSchema' does not dedupe
+-- either, so a duplicate emits two identical 'Schema.oneOf' branches that
+-- nothing (including the value the decoder accepts) validates against.
+--
+-- A known tag missing its @value@ reports 'Common.withValue''s
+-- @"missing tagged value"@, not an unknown-tag message. Most hand-written
+-- codecs fall through their wildcard on a @(tag, mv)@ match instead and
+-- report the tag as unknown; converting one to 'tagged' changes that string,
+-- deliberately, since the tag genuinely is known here.
 tagged :: forall a. (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 tagged enc arms =
   Codec.MkCodec
