@@ -169,7 +169,7 @@ spec s = Spec.describe s "Pawl.Codec.Keyword" $ do
       Keyword.Trample
       """ {"type":"Trample"} """
   -- CR 702.19c is a keyword of its own and not a flavour of the one above, so
-  -- the pair is asserted distinct: a fromJson arm that fell through to Trample
+  -- the pair is asserted distinct: an arm that decoded to Trample instead
   -- would round-trip the tag and quietly drop the variant.
   Spec.it s "TrampleOverPlaneswalkers" $ do
     Common.assertCodec

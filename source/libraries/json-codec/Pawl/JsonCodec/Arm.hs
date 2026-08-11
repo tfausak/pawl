@@ -40,12 +40,16 @@ payload t c inject = Payload t (fmap inject . Codec.decode c) (Codec.schema c)
 -- under the same tag -- 'Pawl.Codec.Keyword'\'s @Hexproof@ is the first user:
 -- CR 702.11b's bare hexproof omits @value@ entirely and CR 702.11d's
 -- "hexproof from [quality]" carries it, and both decode to the one
--- constructor. 'payload' cannot express this: its schema always requires
--- @value@, which would reject the bare form a real card (and 'payload'\'s own
--- decoder) accepts -- a schema stricter than the codec it describes, the
--- harmful direction. Decode here takes an absent @value@ as 'Nothing' and a
--- present one through the element codec as 'Just', and the schema marks
--- @value@ optional to match.
+-- constructor. 'payload' cannot express this -- NOT because its schema is
+-- wrong: 'payload'\'s schema and its decoder agree exactly, both requiring
+-- @value@ ('Common.withValue' fails on 'Nothing' the same way the schema's
+-- @required@ list does). The real reason is that 'Hexproof' needs ONE
+-- constructor to accept TWO shapes, and a single 'payload' arm only ever
+-- accepts one. (The stricter-than-the-codec defect this branch actually
+-- shipped belonged to the hand-written decode override 'optionalPayload'
+-- replaced, not to 'payload' itself.) Decode here takes an absent @value@ as
+-- 'Nothing' and a present one through the element codec as 'Just', and the
+-- schema marks @value@ optional to match.
 optionalPayload :: String -> Codec.Codec b -> (Maybe b -> a) -> Arm a
 optionalPayload t c inject =
   OptionalPayload t (fmap inject . traverse (Codec.decode c)) (Codec.schema c)
@@ -61,11 +65,12 @@ tag arm = case arm of
 -- either, so a duplicate emits two identical 'Schema.oneOf' branches that
 -- nothing (including the value the decoder accepts) validates against.
 --
--- A known tag missing its @value@ reports 'Common.withValue''s
--- @"missing tagged value"@, not an unknown-tag message. Most hand-written
--- codecs fall through their wildcard on a @(tag, mv)@ match instead and
--- report the tag as unknown; converting one to 'tagged' changes that string,
--- deliberately, since the tag genuinely is known here.
+-- A known 'Payload' tag missing its @value@ reports 'Common.withValue''s
+-- @"missing tagged value"@, not an unknown-tag message -- an 'OptionalPayload'
+-- tag takes the same absence as 'Nothing' instead of failing. Most
+-- hand-written codecs fall through their wildcard on a @(tag, mv)@ match
+-- instead and report the tag as unknown; converting one to 'tagged' changes
+-- that string, deliberately, since the tag genuinely is known here.
 tagged :: forall a. (Typeable.Typeable a) => (a -> Value.Value) -> [Arm a] -> Codec.Codec a
 tagged enc arms =
   Codec.MkCodec

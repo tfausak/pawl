@@ -9,8 +9,11 @@ import qualified Pawl.Types.CostComponent as CostComponent
 
 -- | Tagged rather than bare-nullary from the start: this family grows
 -- payload-carrying constructors (PayLife, Sacrifice), so it is built from
--- 'Arm.tagged' rather than delegated to a nullary-table helper, and a new
--- arm needs only another entry in the list below.
+-- 'Arm.tagged' rather than delegated to a nullary-table helper. A new arm
+-- needs an entry in the list below AND a case in the hand-written @encode@
+-- below it -- 'Arm.tagged' derives the decoder and the schema from the list
+-- alone, but the encoder is deliberately not derived (see 'Arm.tagged'\'s own
+-- Haddock), so every arm is written twice.
 --
 -- The keyword codec is a PARAMETER; see Pawl.Codec.Filter's header.
 codec :: (Typeable.Typeable keyword) => Codec.Codec keyword -> Codec.Codec (CostComponent.CostComponent keyword)

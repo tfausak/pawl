@@ -243,7 +243,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
       """ {"type":"Not","value":{"type":"HasColor","value":{"type":"Black"}}} """
   -- Nested And/Or/Not, exercising the recursion the per-constructor cases above
   -- do not.
-  Spec.it s "nested And/Or/Not round-trips (P9)" $
+  Spec.it s "nested And/Or/Not round-trips" $
     let doomBlade = Filter.Not (Filter.HasColor Color.Black)
         terror = Filter.And [Filter.Not (Filter.HasColor Color.Black), Filter.Not (Filter.HasCardType CardType.Artifact)]
         reprisal = Filter.PowerAtLeast 4
@@ -278,7 +278,7 @@ spec s = Spec.describe s "Pawl.Codec.Filter" $ do
             auraGraftTarget,
             auraGraftDestination
           ]
-  Spec.describe s "Common.maybe codec (P9)" $ do
+  Spec.describe s "Common.maybe codec" $ do
     Spec.it s "CR 702.29e's typecycling filter, present" $
       Common.assertFromJson s (Codec.decode (Common.maybe codec)) "{\"type\":\"HasCardType\",\"value\":{\"type\":\"Creature\"}}" (Just (Filter.HasCardType CardType.Creature))
     Spec.it s "absent (JSON null)" $

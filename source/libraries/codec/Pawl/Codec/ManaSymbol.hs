@@ -15,7 +15,10 @@ codec =
       Arm.payload "OfType" ManaType.codec ManaSymbol.OfType,
       Arm.payload "Hybrid" (Common.tuple ManaType.codec ManaType.codec) (uncurry ManaSymbol.Hybrid),
       Arm.payload "MonocoloredHybrid" ManaType.codec ManaSymbol.MonocoloredHybrid,
-      -- A Color, not a ManaType: CR 107.4f's five Phyrexian symbols are all coloured.
+      -- A Color, not a ManaType: CR 107.4f's five MONOCOLOURED Phyrexian symbols
+      -- are all coloured. The rule also names ten HYBRID Phyrexian symbols
+      -- ({G/U/P}), "both of its component colors" -- a single Color payload
+      -- cannot carry that, and this constructor has no counterpart for them (#364).
       Arm.payload "Phyrexian" Color.codec ManaSymbol.Phyrexian,
       -- Nullary: CR 107.4h's {S} names no mana type and no colour, so there is
       -- nothing for it to carry.
