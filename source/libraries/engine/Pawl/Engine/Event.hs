@@ -3287,9 +3287,10 @@ matchesTriggerGiven bindings gs bearer you cond event = case cond of
   -- The attackers come from Combat.blockers rather than from the event, which
   -- carries a count and no ids -- the count being unfiltered, and this condition
   -- asking about a quality. That map is keyed by ATTACKER, so the bearer's own
-  -- entries are the ones whose blocker set holds it. Exact at this moment for SelfAttacksWithAnother's
-  -- reason: CR 509.2a puts these triggers on the stack before any player gets
-  -- priority, so the record still holds the declaration that made the event.
+  -- entries are the ones whose blocker set holds it. Exact at this moment for
+  -- SelfAttacksWithAnother's reason: CR 509.2a puts these triggers on the stack
+  -- before any player gets priority, so the record still holds the declaration
+  -- that made the event.
   --
   -- viewWithLastKnown, and the Filter context framed by the bearer, exactly as
   -- SelfBecomesBlockedBy's arm below does it.
