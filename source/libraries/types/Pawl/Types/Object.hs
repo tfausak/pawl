@@ -436,7 +436,26 @@ data Object = MkObject
     -- Pawl.Engine.CombatRestriction.inForce for the restriction -- so nothing has
     -- to be unwound if it ends. Rule 701.60a's other ending, "until a spell or
     -- ability causes it to no longer be suspected", is Effect.Unsuspect.
-    suspected :: Bool
+    suspected :: Bool,
+    -- | CR 702.33d: has this SPELL been kicked? "If a spell's controller declares
+    -- the intention to pay any of that spell's kicker costs, that spell has been
+    -- 'kicked'", and this is that declaration, stamped by Pawl.Engine.Cast at CR
+    -- 601.2b onto the stack incarnation CR 601.2a made.
+    --
+    -- A Bool for the three designations' reason above, and stored for it too:
+    -- nothing a CR 613 layer computes may move it, since it records a choice
+    -- rather than a characteristic. Unlike them it is a fact about a SPELL, so the
+    -- field is False for every permanent: rule 702.33e's payoff on a permanent card
+    -- is a CR 614.1c entry replacement, which reads the SPELL on the stack and not
+    -- the permanent it becomes (Monstrous War-Leech, #610).
+    --
+    -- Per-incarnation, which CR 400.7 makes the whole of rule 702.33d's duration:
+    -- the designation belongs to the spell, and the permanent or the card in a
+    -- graveyard that the spell becomes is a new object with no memory of it.
+    --
+    -- A Bool and not a count: CR 702.33c's multikicker is payable "any number of
+    -- times", and no card in the pool has two kicker costs either (#1234, #1235).
+    kicked :: Bool
   }
   deriving (Eq, Ord, Show)
 
@@ -488,5 +507,6 @@ newIncarnation object =
       unlockedHalves = Set.empty,
       renowned = False,
       monstrous = False,
-      suspected = False
+      suspected = False,
+      kicked = False
     }

@@ -50,6 +50,7 @@ toJson k = case k of
   Keyword.JumpStart -> Common.nullary "JumpStart"
   Keyword.Afflict n -> Common.tagged "Afflict" . Just $ Common.encodeNatural n
   Keyword.Cycling cost searchFor -> Common.tagged "Cycling" . Just . Common.array $ [Cost.toJson toJson cost, Common.encodeMaybe (Filter.toJson toJson) searchFor]
+  Keyword.Kicker cost -> Common.tagged "Kicker" . Just $ Cost.toJson toJson cost
   Keyword.Flashback cost -> Common.tagged "Flashback" . Just $ Cost.toJson toJson cost
   Keyword.Fear -> Common.nullary "Fear"
   Keyword.Intimidate -> Common.nullary "Intimidate"
@@ -128,6 +129,7 @@ fromJson value = do
     ("JumpStart", _) -> Right Keyword.JumpStart
     ("Afflict", Just v) -> Keyword.Afflict <$> Common.decodeNatural v
     ("Cycling", Just (Value.Array (Array.MkArray [c, f]))) -> Keyword.Cycling <$> Cost.fromJson fromJson c <*> Filter.optional fromJson f
+    ("Kicker", Just v) -> Keyword.Kicker <$> Cost.fromJson fromJson v
     ("Flashback", Just v) -> Keyword.Flashback <$> Cost.fromJson fromJson v
     ("Fear", _) -> Right Keyword.Fear
     ("Intimidate", _) -> Right Keyword.Intimidate

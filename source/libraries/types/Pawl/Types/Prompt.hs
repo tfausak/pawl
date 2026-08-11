@@ -23,6 +23,7 @@ import qualified Pawl.Types.Filter as Filter
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -380,6 +381,17 @@ data Prompt r where
   -- Asked only when entwining is available -- the spell has the keyword, every mode
   -- is legal (CR 700.2a), and some candidate cost plus this one is payable.
   ChooseEntwine :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt EntwineDecision.EntwineDecision
+  -- | Rule 702.33a: whether this player pays the kicker cost of the spell they are
+  -- casting. The ObjectId is the spell; the Cost is the additional cost kicking
+  -- adds on top of whichever candidate cost is then announced (CR 601.2f).
+  --
+  -- Asked AFTER ChooseModes and before ChooseCost, which is CR 601.2b's own order
+  -- -- and unlike ChooseEntwine above it changes no mode choice, rule 702.33a
+  -- being about the cost alone.
+  --
+  -- Asked only when kicking is available: the spell has the keyword, and some
+  -- candidate cost plus this one is payable.
+  ChooseKicker :: Decider.Decider -> PlayerId.PlayerId -> ObjectId.ObjectId -> Cost.Cost Keyword.Keyword -> Prompt KickerDecision.KickerDecision
   -- CR 903.9a: this player's commander is in a graveyard or in exile, having
   -- arrived since the last state-based action check. Rule 903.9a is a "may", so
   -- the owner is asked; the object stays where it is if they decline, and is not

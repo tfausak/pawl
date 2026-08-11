@@ -180,6 +180,15 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       Quantity.IsSuspected
       """ {"type":"IsSuspected"} """
+  -- CR 702.33d, nothing on the wire for IsRenowned's reason above -- and a
+  -- distinct tag, the designation being a different question.
+  Spec.it s "WasKicked" $
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      Quantity.WasKicked
+      """ {"type":"WasKicked"} """
   -- CR 122.1, with BOTH halves on the wire: a PlayerRef saying whose and a
   -- PlayerCounterKind saying which. Rule 728.1's reading is the Relative one.
   Spec.it s "PlayerCounters, relative and from a slot" $ do

@@ -269,6 +269,10 @@ evaluateAgainst viewOf context gs announcedOn mOid mView quantity = case quantit
   Quantity.IsMonstrous -> fmap (\view -> if Filter.monstrous view then 1 else 0) mView
   -- CR 701.60b's designation as a 0/1, IsRenowned's arm in every respect.
   Quantity.IsSuspected -> fmap (\view -> if Filter.suspected view then 1 else 0) mView
+  -- CR 702.33d's designation as a 0/1, IsRenowned's arm in every respect. The
+  -- object it reads is the RESOLVING SPELL, which is still on the stack while its
+  -- own clause conditions are gated (Pawl.Engine.Resolve.gateHolds).
+  Quantity.WasKicked -> fmap (\view -> if Filter.kicked view then 1 else 0) mView
   -- CR 508.3b: how many of that player's opponents were declared attacked this
   -- combat phase. LifeTotal's arm in shape -- live, one player only, resolved
   -- through the same Count.playersFor, and Nothing for a reference naming
@@ -388,6 +392,7 @@ substituteStar star quantity = case quantity of
   Quantity.IsRenowned -> quantity
   Quantity.IsMonstrous -> quantity
   Quantity.IsSuspected -> quantity
+  Quantity.WasKicked -> quantity
   Quantity.OpponentsAttacked _ -> quantity
   Quantity.CardsDiscardedThisTurn _ -> quantity
   Quantity.BlockersBeyondFirst -> quantity
@@ -443,6 +448,7 @@ slots quantity = case quantity of
   Quantity.IsRenowned -> Set.empty
   Quantity.IsMonstrous -> Set.empty
   Quantity.IsSuspected -> Set.empty
+  Quantity.WasKicked -> Set.empty
   -- And a seventh PlayerRef in that same position, CR 508.3b's record having
   -- nothing else on it.
   Quantity.OpponentsAttacked _ -> Set.empty
@@ -490,6 +496,7 @@ slotsAreExhaustive quantity = case quantity of
   Quantity.IsRenowned -> True
   Quantity.IsMonstrous -> True
   Quantity.IsSuspected -> True
+  Quantity.WasKicked -> True
   Quantity.OpponentsAttacked ref -> playerRefIsSlotless ref
   Quantity.CardsDiscardedThisTurn ref -> playerRefIsSlotless ref
   Quantity.BlockersBeyondFirst -> True
@@ -553,6 +560,7 @@ readsX quantity = case quantity of
   Quantity.IsRenowned -> False
   Quantity.IsMonstrous -> False
   Quantity.IsSuspected -> False
+  Quantity.WasKicked -> False
   Quantity.OpponentsAttacked _ -> False
   Quantity.CardsDiscardedThisTurn _ -> False
   Quantity.BlockersBeyondFirst -> False

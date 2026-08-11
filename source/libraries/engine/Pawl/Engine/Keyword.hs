@@ -214,6 +214,7 @@ abilitiesFor keyword count = case keyword of
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Cycling _ _ -> []
+  Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Infect -> []
@@ -285,6 +286,7 @@ handAbilitiesFor keyword = case keyword of
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
+  Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
@@ -466,6 +468,7 @@ battlefieldAbilitiesFor keyword count = case keyword of
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
+  Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
@@ -717,6 +720,11 @@ permissionsFor cardTypes keyword = case keyword of
   Keyword.Morph _ _ -> []
   Keyword.Menace -> []
   Keyword.Renown _ -> []
+  -- CR 702.33a grants no permission either, for entwine's reason below: kicker
+  -- adds a cost to a cast some other rule already allowed. CR 702.33a's "as you
+  -- cast this spell" is not a zone or a timing permission -- it is when the
+  -- additional cost is announced (CR 601.2b).
+  Keyword.Kicker _ -> []
   -- CR 702.42a grants no permission: entwine widens a MODE choice and adds a
   -- cost to a cast that some other rule already allowed; it never allows one.
   Keyword.Entwine _ -> []
@@ -881,6 +889,21 @@ morphCost :: Set Keyword -> Maybe (Cost Keyword)
 morphCost keywords =
   let costOf keyword = case keyword of
         Keyword.Morph cost _ -> Just cost
+        _ -> Nothing
+   in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
+
+-- CR 702.33a: the ADDITIONAL cost this card's controller may pay as they cast it,
+-- or Nothing when it has no kicker. Read by Pawl.Engine.Cast, which offers it at
+-- CR 601.2b and adds it to whichever candidate cost was announced (CR 601.2f).
+--
+-- A wildcard rather than an exhaustive case, exactly as flashbackCost above.
+--
+-- Nothing beyond the FIRST kicker cost is reachable, so CR 702.33b's "kicker
+-- [cost 1] and/or [cost 2]" is unrepresented (#1235).
+kickerCost :: Set Keyword -> Maybe (Cost Keyword)
+kickerCost keywords =
+  let costOf keyword = case keyword of
+        Keyword.Kicker cost -> Just cost
         _ -> Nothing
    in Maybe.listToMaybe (Maybe.mapMaybe costOf (Set.toAscList keywords))
 
@@ -1064,6 +1087,7 @@ mintedReplacementsFor keyword count = case keyword of
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Cycling _ _ -> []
+  Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
@@ -1193,6 +1217,7 @@ mintedCombatRestrictionsFor keyword = case keyword of
   Keyword.Menace -> []
   Keyword.Renown _ -> []
   Keyword.Cycling _ _ -> []
+  Keyword.Kicker _ -> []
   Keyword.Flashback _ -> []
   Keyword.Entwine _ -> []
   Keyword.Bushido _ -> []
@@ -1256,6 +1281,7 @@ familyOf keyword = case keyword of
   Keyword.Hexproof _ -> Just KeywordFamily.Hexproof
   Keyword.Landwalk _ -> Just KeywordFamily.Landwalk
   Keyword.Cycling _ _ -> Just KeywordFamily.Cycling
+  Keyword.Kicker _ -> Just KeywordFamily.Kicker
   Keyword.Flashback _ -> Just KeywordFamily.Flashback
   Keyword.Morph _ _ -> Just KeywordFamily.Morph
   Keyword.Entwine _ -> Just KeywordFamily.Entwine

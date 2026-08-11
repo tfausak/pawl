@@ -15,6 +15,7 @@ import qualified Pawl.Types.EntwineDecision as EntwineDecision
 import qualified Pawl.Types.HandActionIndex as HandActionIndex
 import qualified Pawl.Types.HybridPayment as HybridPayment
 import qualified Pawl.Types.Keyword as Keyword
+import qualified Pawl.Types.KickerDecision as KickerDecision
 import qualified Pawl.Types.LibraryPosition as LibraryPosition
 import qualified Pawl.Types.ManaOption as ManaOption
 import qualified Pawl.Types.ManaSymbol as ManaSymbol
@@ -212,6 +213,9 @@ data Response
   | -- | CR 702.42a / 601.2b: whether a caster used a modal spell's entwine
     -- ability.
     AnnouncedEntwine EntwineDecision.EntwineDecision
+  | -- | CR 702.33a / 601.2b: whether a caster declared the intention to pay a
+    -- spell's kicker cost, which is CR 702.33d's "that spell has been kicked".
+    AnnouncedKicker KickerDecision.KickerDecision
   | -- | CR 903.9a's answer: whether the commander goes to the command zone.
     ReturnedCommander CommandZoneDecision.CommandZoneDecision
   | -- | CR 401.2's answer: the end of their library an owner picked for one card.
