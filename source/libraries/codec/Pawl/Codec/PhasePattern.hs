@@ -4,6 +4,7 @@ import qualified Data.Text as Text
 import qualified Pawl.Codec.PhaseSelector as PhaseSelector
 import qualified Pawl.Codec.PlayerId as PlayerId
 import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.PhasePattern as PhasePattern
 
@@ -16,13 +17,13 @@ import qualified Pawl.Types.PhasePattern as PhasePattern
 toJson :: PhasePattern.PhasePattern -> Value.Value
 toJson p =
   Common.object
-    ( Common.requiredPair "whichPhase" PhaseSelector.toJson (PhasePattern.whichPhase p)
+    ( Common.requiredPair "whichPhase" (Codec.encode PhaseSelector.codec) (PhasePattern.whichPhase p)
         <> Common.optionalPair "whosePhase" Nothing (Common.encodeMaybe PlayerId.toJson) (PhasePattern.whosePhase p)
     )
 
 fromJson :: Value.Value -> Either Text.Text PhasePattern.PhasePattern
 fromJson value = do
   ps <- Common.asObject value
-  p <- Common.field "whichPhase" ps >>= PhaseSelector.fromJson
+  p <- Common.field "whichPhase" ps >>= Codec.decode PhaseSelector.codec
   w <- Common.defaultedField "whosePhase" Nothing (Common.decodeMaybe PlayerId.fromJson) ps
   pure PhasePattern.MkPhasePattern {PhasePattern.whichPhase = p, PhasePattern.whosePhase = w}

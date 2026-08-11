@@ -12,30 +12,28 @@ import qualified Pawl.Types.PhaseSelector as PhaseSelector
 spec :: (Monad m, Monad n) => Spec.Spec m n -> n ()
 spec s = Spec.describe s "Pawl.Codec.PhaseSelector" $ do
   Spec.it s "Step" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PhaseSelector.toJson
-      PhaseSelector.fromJson
+      PhaseSelector.codec
       (PhaseSelector.Step (Phase.Beginning BeginningStep.DrawStep))
       """ {"type":"Step","value":{"type":"Beginning","value":{"type":"DrawStep"}}} """
   Spec.it s "BeginningPhase" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PhaseSelector.toJson
-      PhaseSelector.fromJson
+      PhaseSelector.codec
       PhaseSelector.BeginningPhase
       """ {"type":"BeginningPhase"} """
   Spec.it s "CombatPhase" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PhaseSelector.toJson
-      PhaseSelector.fromJson
+      PhaseSelector.codec
       PhaseSelector.CombatPhase
       """ {"type":"CombatPhase"} """
   Spec.it s "EndingPhase" $
-    Common.assertJsonCodec
+    Common.assertCodec
       s
-      PhaseSelector.toJson
-      PhaseSelector.fromJson
+      PhaseSelector.codec
       PhaseSelector.EndingPhase
       """ {"type":"EndingPhase"} """
+  Spec.it s "has a schema" $
+    Common.assertHasSchema s PhaseSelector.codec

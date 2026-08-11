@@ -1,25 +1,23 @@
 module Pawl.Codec.PhaseSelector where
 
-import qualified Data.Text as Text
 import qualified Pawl.Codec.Phase as Phase
-import qualified Pawl.Json.Value as Value
+import qualified Pawl.JsonCodec.Arm as Arm
 import qualified Pawl.JsonCodec.Codec as Codec
 import qualified Pawl.JsonCodec.Common as Common
 import qualified Pawl.Types.PhaseSelector as PhaseSelector
 
-toJson :: PhaseSelector.PhaseSelector -> Value.Value
-toJson selector = case selector of
-  PhaseSelector.Step p -> Common.tagged "Step" . Just $ Codec.encode Phase.codec p
-  PhaseSelector.BeginningPhase -> Common.nullary "BeginningPhase"
-  PhaseSelector.CombatPhase -> Common.nullary "CombatPhase"
-  PhaseSelector.EndingPhase -> Common.nullary "EndingPhase"
-
-fromJson :: Value.Value -> Either Text.Text PhaseSelector.PhaseSelector
-fromJson value = do
-  (t, mv) <- Common.asTagged value
-  case (t, mv) of
-    ("Step", Just v) -> PhaseSelector.Step <$> Codec.decode Phase.codec v
-    ("BeginningPhase", _) -> Right PhaseSelector.BeginningPhase
-    ("CombatPhase", _) -> Right PhaseSelector.CombatPhase
-    ("EndingPhase", _) -> Right PhaseSelector.EndingPhase
-    _ -> Left . Text.pack $ "unknown PhaseSelector: " <> t
+codec :: Codec.Codec PhaseSelector.PhaseSelector
+codec =
+  Arm.tagged
+    encode
+    [ Arm.payload "Step" Phase.codec PhaseSelector.Step,
+      Arm.nullary "BeginningPhase" PhaseSelector.BeginningPhase,
+      Arm.nullary "CombatPhase" PhaseSelector.CombatPhase,
+      Arm.nullary "EndingPhase" PhaseSelector.EndingPhase
+    ]
+  where
+    encode selector = case selector of
+      PhaseSelector.Step p -> Common.tagged "Step" . Just $ Codec.encode Phase.codec p
+      PhaseSelector.BeginningPhase -> Common.nullary "BeginningPhase"
+      PhaseSelector.CombatPhase -> Common.nullary "CombatPhase"
+      PhaseSelector.EndingPhase -> Common.nullary "EndingPhase"
