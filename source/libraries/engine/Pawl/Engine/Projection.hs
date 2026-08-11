@@ -1740,6 +1740,9 @@ rewriteQuantity pairs quantity = case quantity of
   -- And a leaf: CR 508.3b's record holds attack targets, which name players and
   -- object ids rather than any word CR 612.1 could swap.
   Quantity.Type.OpponentsAttacked _ -> quantity
+  -- And a leaf: CR 701.9a's tally holds logged events, which name players and
+  -- object ids rather than any word CR 612.1 could swap.
+  Quantity.Type.CardsDiscardedThisTurn _ -> quantity
   -- And a leaf: CR 509.1h's declaration names object ids, not a word CR 612.1
   -- could swap.
   Quantity.Type.BlockersBeyondFirst -> quantity

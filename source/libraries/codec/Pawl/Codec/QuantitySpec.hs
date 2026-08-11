@@ -230,6 +230,23 @@ spec s = Spec.describe s "Pawl.Codec.Quantity" $ do
       Quantity.fromJson
       (Quantity.OpponentsAttacked (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
       """ {"type":"OpponentsAttacked","value":{"type":"InSlot","value":"target"}} """
+  -- CR 701.9a, with a PlayerRef and nothing else on the wire: what is counted is
+  -- the turn-scoped event log. Asmoranomardicadaistinaculdacar's is the Relative
+  -- arm; the InSlot arm beside it is the one a recursive decoder could lose a
+  -- payload through, as OpponentsAttacked's is.
+  Spec.it s "CardsDiscardedThisTurn, relative and from a slot" $ do
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.CardsDiscardedThisTurn (PlayerRef.Relative PlayerRelation.You))
+      """ {"type":"CardsDiscardedThisTurn","value":{"type":"Relative","value":{"type":"You"}}} """
+    Common.assertJsonCodec
+      s
+      Quantity.toJson
+      Quantity.fromJson
+      (Quantity.CardsDiscardedThisTurn (PlayerRef.InSlot (SlotName.MkSlotName (Text.pack "target"))))
+      """ {"type":"CardsDiscardedThisTurn","value":{"type":"InSlot","value":"target"}} """
   -- CR 509.1h with NOTHING on the wire: the object is the one the quantity is
   -- evaluated against, so this is a bare tag like Power and ManaValue.
   Spec.it s "BlockersBeyondFirst is nullary" $

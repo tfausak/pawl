@@ -15,6 +15,7 @@ import qualified Pawl.Spec as Spec
 import qualified Pawl.Types.AbilityName as AbilityName
 import qualified Pawl.Types.ActivatedAbility as ActivatedAbility
 import qualified Pawl.Types.Affected as Affected
+import qualified Pawl.Types.AlternativeCost as AlternativeCost
 import qualified Pawl.Types.AttackCost as AttackCost
 import qualified Pawl.Types.AttackRequirement as AttackRequirement
 import qualified Pawl.Types.BlockPermission as BlockPermission
@@ -213,7 +214,7 @@ populatedFace =
       Face.sacrificeRestrictions = [SacrificeRestriction.MkSacrificeRestriction Affected.Attached],
       Face.attackCosts = [AttackCost.MkAttackCost Affected.Attached (ManaCost.MkManaCost [ManaSymbol.Generic 2])],
       Face.additionalCosts = [CostComponent.TapThis],
-      Face.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []],
+      Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])],
       Face.counterability = Counterability.CantBeCountered,
       Face.mulliganActions = [[Effect.ExileHandThenDraw]],
       Face.openingHandActions = [[Effect.ExileHandThenDraw]],
@@ -246,7 +247,7 @@ populatedFaceJson =
     <> "\"sacrificeRestrictions\":[{\"affected\":{\"type\":\"Attached\"}}],"
     <> "\"attackCosts\":[{\"subject\":{\"type\":\"Attached\"},\"perAttacker\":[{\"type\":\"Generic\",\"value\":2}]}],"
     <> "\"additionalCosts\":[{\"type\":\"TapThis\"}],"
-    <> "\"alternativeCosts\":[{\"mana\":[]}],"
+    <> "\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}],"
     <> "\"counterability\":{\"type\":\"CantBeCountered\"},"
     <> "\"mulliganActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
     <> "\"openingHandActions\":[[{\"type\":\"ExileHandThenDraw\"}]],"
@@ -427,8 +428,8 @@ spec s = Spec.describe s "Pawl.Codec.Face" $ do
         s
         encodeFace
         decodeFace
-        baseFace {Face.alternativeCosts = [Cost.MkCost (Just (ManaCost.MkManaCost [])) []]}
-        (init baseFaceJson <> ",\"alternativeCosts\":[{\"mana\":[]}]}")
+        baseFace {Face.alternativeCosts = [AlternativeCost.MkAlternativeCost Nothing (Cost.MkCost (Just (ManaCost.MkManaCost [])) [])]}
+        (init baseFaceJson <> ",\"alternativeCosts\":[{\"cost\":{\"mana\":[]}}]}")
     Spec.it s "counterability" $
       Common.assertJsonCodec
         s

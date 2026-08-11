@@ -3,21 +3,23 @@
     {
       "alternativeCosts": [
         {
-          "components": [
-            {
-              "type": "Sacrifice",
-              "value": [
-                2,
-                {
-                  "type": "HasSubtype",
-                  "value": {
-                    "type": "Mountain"
+          "cost": {
+            "components": [
+              {
+                "type": "Sacrifice",
+                "value": [
+                  2,
+                  {
+                    "type": "HasSubtype",
+                    "value": {
+                      "type": "Mountain"
+                    }
                   }
-                }
-              ]
-            }
-          ],
-          "mana": []
+                ]
+              }
+            ],
+            "mana": []
+          }
         }
       ],
       "manaCost": [
